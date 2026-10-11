@@ -67,7 +67,14 @@ bool advance(Core &core, uint64_t elapsed) {
         core.frame_end += duration;
     }
     if (reason != kNone) {
+        // The file cannot be played: the show is invalid from this refresh on.
         close_stream(core);
+        core.playing = kNothing;
+        if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
+            core_fail(core, reason, file.name, kNone);
+        } else {
+            core_fail(core, kFileMalformed, file.name, reason);
+        }
         return false;
     }
     core.shown = animation;

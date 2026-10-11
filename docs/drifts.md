@@ -1569,3 +1569,20 @@ them. At the start of every session it asks for `status` with room for 191 bytes
 stops unless the core returns 0; that call carries no timestamp for the core.
 
 **Resolution.** `tests/core/host/host.cpp`.
+
+## Seed 02: A read failure that begins while a file plays
+
+**Question.** Task 9 tests a read failure in the middle of a file while it plays. The
+design's host option `--read-fails FILE OFFSET` makes every reading of the file fail,
+and the core reads every file whole at startup, so with it the show is invalid before
+anything plays. The task also asks for a test that no `read` asks for more than 512
+bytes, and the design names no way to see that.
+
+**Answer.** The test host has one more option, `--read-fails-after FILE OFFSET N`, which
+spares the first N openings of the file, as `--remove-after` and `--swap-after` do. The
+host stops with `file misuse` when the core asks for more than 512 bytes, or for none, in
+one `read`; the invocation `odrig_host guard read` shows that it does, and every session
+of the suite then proves that the core never asks for more.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/test_failure.py`,
+`tests/core/test_memory.py`.

@@ -1,6 +1,11 @@
+import random
 import unittest
+import zlib
+
+from odrig import odrg
 
 from . import support
+from .test_session import scripted_session
 
 
 def two_leg_show():
@@ -62,6 +67,102 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
         for number in (6, 7, 8, 9, 10):
             run = support.start(two_leg_show(), options=["--alloc-fails-at", str(number)])
             self.assertEqual((run.error, run.legs), ("out-of-memory", ((1, 1, 180), (2, 2, 180))))
+
+
+def hundred_items():
+    """A show of 100 items on the ten-leg mapping: 80 animations, each with a file of its
+    own, and 20 cycles of 10 entries."""
+    clip = support.clip(1, 60, 30, (20, 20))
+    items = [{"id": number, "file": f"clip-{number:02d}.odrg"} for number in range(1, 81)]
+    items += [{"id": 80 + number, "cycle": [1 + (7 * number + entry) % 80 for entry in range(10)], "seconds": number} for number in range(1, 21)]
+    files = {"mapping.json": support.mapping_texts()["legs-10"], "show.json": support.show_text(items, 128, 100)}
+    files.update({item["file"]: clip for item in items[:80]})
+    return files
+
+
+def stored_clip(frames, compressed):
+    """An ODRG file for the 60 x 30 canvas with this many frames of 20 ms, each stored."""
+    rng = random.Random(4)
+    palette = [rng.randbytes(3) for _ in range(9)]
+    pictures = [bytes(rng.randrange(9) for _ in range(1800)) for _ in range(8)]
+    records = [odrg.stored_record(pictures[number % 8], 20) for number in range(frames)]
+    deflate = (lambda body: zlib.compress(body, 6, wbits=-15)) if compressed else None
+    return odrg.container(60, 30, palette, records, deflate)
+
+
+class FixedMemory(unittest.TestCase):
+    def test_the_ten_leg_mapping_with_a_show_of_100_items_asks_for_less_than_131072_bytes(self):
+        run = support.start(hundred_items(), [support.line(0, "status")])
+        self.assertIsNone(run.error)
+        self.assertEqual(len(run.legs), 10)
+        asked, blocks = run.memory
+        self.assertLess(asked, 131072)
+        self.assertEqual(blocks, 10)
+        # Every block but the core object has a size that follows from the mapping and
+        # the show: legs, the pixel of each LED, LED data, row check, pixel buffer, window,
+        # items, cycle entries, files.
+        tables = 10 * 12 + 1800 * 2 + 1800 * 3 + 4 + 5400 + 32768 + 100 * 16 + 200 * 2 + 80 * 48
+        self.assertEqual(tables, 53132)
+        core_object = asked - tables
+        self.assertGreater(core_object, 2000)
+        self.assertLessEqual(core_object, 4096)
+
+    def test_the_memory_does_not_depend_on_the_length_of_a_clip(self):
+        sizes = {}
+        memory = set()
+        for frames in (50, 3000):
+            for compressed in (False, True):
+                clip = stored_clip(frames, compressed)
+                files = {
+                    "mapping.json": support.mapping_texts()["legs-10"],
+                    "show.json": support.show_text([{"id": 1, "file": "clip.odrg"}], 255, 1),
+                    "clip.odrg": clip,
+                }
+                # The whole clip is played, and a loop more.
+                script = [f"poll {time}" for time in range(0, 40 * frames, 500)] + [support.line(40 * frames, "status")]
+                run = support.start(files, script)
+                self.assertIsNone(run.error)
+                self.assertIn('"playing":1', run.lines[-1])
+                self.assertIn('"error":null', run.lines[-1])
+                sizes[frames, compressed] = len(clip)
+                memory.add(run.memory)
+        # A clip of 1 second and one of 60 seconds: 90 KB and 5.4 MB without compression.
+        self.assertLess(sizes[50, False], 100000)
+        self.assertGreater(sizes[3000, False], 5000000)
+        self.assertLess(sizes[3000, True], sizes[3000, False] // 50)
+        self.assertEqual(len(memory), 1)
+
+    def test_no_read_asks_for_more_than_512_bytes(self):
+        # The test host stops when it is asked for more, and every session of the suite,
+        # among them one over a file of several megabytes, runs on it without stopping.
+        result = support.host("guard", "read")
+        self.assertEqual(result.status, 71)
+        self.assertEqual(result.out, "file misuse\n")
+        with support.installed(hundred_items()) as folder:
+            self.assertEqual(support.session(folder, ["poll 0"]).status, 0)
+
+
+class RepeatableOutput(unittest.TestCase):
+    def output(self, options=()):
+        script = scripted_session()[:1200]
+        with support.installed(support.example_show()) as folder:
+            result = support.host("session", folder, *options, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
+        self.assertEqual((result.status, result.err), (0, ""))
+        return result.out
+
+    def test_one_session_run_twice_prints_identical_output(self):
+        first = self.output()
+        self.assertGreater(first.count("\n"), 3000)
+        self.assertIn("reply ", first)
+        self.assertEqual(self.output(), first)
+
+    def test_memory_filled_with_the_byte_a5_gives_the_output_of_zeroed_memory(self):
+        self.assertEqual(self.output(["--dirty-memory"]), self.output())
+
+    def test_an_invalid_show_on_dirty_memory_gives_the_output_of_zeroed_memory(self):
+        for files in ({}, {"mapping.json": support.mapping_texts()["legs-2"]}, {"mapping.json": "{}"}):
+            script = [support.line(5, "status"), "poll 5", "poll 25", "error"]
+            self.assertEqual(support.start(files, script, ["--dirty-memory"]), support.start(files, script))
 
 
 if __name__ == "__main__":

@@ -169,7 +169,7 @@ Rules for every task:
     10.7, 10.8, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 12.1, 12.2, 12.3, 17.4,
     17.5
 
-- [ ] 9. Failure while playing, fixed memory and repeatable output
+- [x] 9. Failure while playing, fixed memory and repeatable output
   - Make a failure during playback end the show as Requirement 16 states, and add the
     options `--remove-after`, `--swap-after` and `--dirty-memory` to the test host.
   - `tests/core/test_failure.py`: a read failure in the middle of a file, a file removed

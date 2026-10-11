@@ -32,8 +32,12 @@ int usage() {
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
         "       odrig_host decode FILE | --batch\n"
-        "       odrig_host session DIR | --batch [--alloc-fails-at N] [--read-fails FILE OFFSET] [--trace-files]\n"
-        "       odrig_host guard alloc | new\n",
+        "       odrig_host session DIR | --batch [options]\n"
+        "       odrig_host guard alloc | new | read\n"
+        "options of a session:\n"
+        "       --alloc-fails-at N  --dirty-memory  --trace-files\n"
+        "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
+        "       --remove-after FILE N  --swap-after FILE N OTHER\n",
         stderr);
     return kUsage;
 }
@@ -91,8 +95,15 @@ std::vector<std::string> batch(const std::string &bytes) {
 // How a session differs from a plain one.
 struct Options {
     long alloc_fails_at = 0;        // the number of the `alloc` call that returns NULL; 0 for none
+    bool dirty_memory = false;      // hand out memory filled with the byte 0xA5, not zeroed
     std::string read_fails_file;    // the file whose reading fails,
-    long read_fails_offset = 0;     // and the offset at which `read` returns -1
+    long read_fails_offset = 0;     // the offset at which `read` returns -1,
+    long read_fails_after = 0;      // and the number of openings that are spared
+    std::string remove_after_file;  // the file that is gone
+    long remove_after = 0;          // once it has been opened this many times
+    std::string swap_after_file;    // the file under whose name
+    long swap_after = 0;            // after this many openings
+    std::string swap_other;         // the content of this other file is served
     bool trace_files = false;       // print `open <name> <result>` for every `open`
 };
 
@@ -162,10 +173,11 @@ private:
         if (host.alloc_calls_ == host.options_.alloc_fails_at) {
             return nullptr;
         }
-        void *block = std::calloc(1, bytes != 0 ? bytes : 1);
+        void *block = std::malloc(bytes != 0 ? bytes : 1);
         if (block == nullptr) {
             std::abort();
         }
+        std::memset(block, host.options_.dirty_memory ? 0xA5 : 0, bytes);
         host.blocks_.push_back(block);
         host.bytes_given_ += bytes;
         return block;
@@ -177,26 +189,39 @@ private:
         if (host.is_open_) {
             stop("file misuse", kFileMisuse);
         }
+        // What the name stands for now: nothing once the file is removed, another file
+        // once it is swapped.
+        const Options &options = host.options_;
+        long &openings = host.openings_[name];
+        std::string source = name;
+        bool removed = name == options.remove_after_file && openings >= options.remove_after;
+        if (name == options.swap_after_file && openings >= options.swap_after) {
+            source = options.swap_other;
+        }
         int found = 1;
-        if (host.from_ == kFromMemory) {
+        if (removed) {
+            found = 0;
+        } else if (host.from_ == kFromMemory) {
             host.content_ = host.memory_;
         } else if (host.from_ == kFromFiles) {
-            auto file = host.files_.find(name);
+            auto file = host.files_.find(source);
             found = file != host.files_.end() ? 1 : 0;
             if (found) {
                 host.content_ = file->second;
             }
         } else {
-            found = host.load(name);
+            found = host.load(source.c_str());
         }
-        if (host.options_.trace_files) {
+        if (options.trace_files) {
             std::printf("open %s %d\n", name, found);
         }
         if (found != 1) {
             return found;
         }
+        ++openings;
         host.is_open_ = true;
         host.open_name_ = name;
+        host.read_fails_now_ = name == options.read_fails_file && openings > options.read_fails_after;
         host.offset_ = 0;
         host.reads_ = 0;
         return 1;
@@ -211,7 +236,7 @@ private:
         size_t count = kReadSizes[host.reads_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = std::min(count, host.content_.size() - host.offset_);
-        if (host.open_name_ == host.options_.read_fails_file) {
+        if (host.read_fails_now_) {
             size_t fails_at = static_cast<size_t>(host.options_.read_fails_offset);
             if (host.offset_ >= fails_at) {
                 return -1;
@@ -275,6 +300,8 @@ private:
 
     std::string content_;
     std::string open_name_;
+    std::map<std::string, long> openings_;
+    bool read_fails_now_ = false;
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
@@ -612,17 +639,21 @@ private:
     odrig_core *core_ = nullptr;
 };
 
-// Does what the guard must stop: asks the host for memory, or the program, as the core
-// would after startup.
+// Does what the test host must stop: asks the host for memory, or the program, as the core
+// would after startup; or asks the host for more of a file than 512 bytes at once.
 int guard_check(const std::string &what) {
-    Host host = Host::of_memory("");
+    Host host = Host::of_memory("content");
     odrig_host functions = host.interface();
     guard::InCore inside;
     if (what == "alloc") {
         functions.alloc(functions.ctx, 16);
-    } else {
+    } else if (what == "new") {
         char *volatile block = new char[1];
         delete[] block;
+    } else {
+        uint8_t buffer[513];
+        functions.open(functions.ctx, "file");
+        functions.read(functions.ctx, buffer, sizeof buffer);
     }
     std::printf("the guard let it pass\n");
     return 1;
@@ -682,7 +713,8 @@ int main(int argc, char **argv) {
     if (invocation == "decode" && arguments.size() == 2) {
         return decode(arguments[1]);
     }
-    if (invocation == "guard" && arguments.size() == 2 && (arguments[1] == "alloc" || arguments[1] == "new")) {
+    if (invocation == "guard" && arguments.size() == 2 &&
+        (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {
         return guard_check(arguments[1]);
     }
     if (invocation == "session" && arguments.size() >= 2) {
@@ -696,6 +728,23 @@ int main(int argc, char **argv) {
                        whole_number(arguments[at + 2], &options.read_fails_offset)) {
                 options.read_fails_file = arguments[at + 1];
                 at += 3;
+            } else if (arguments[at] == "--read-fails-after" && at + 3 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.read_fails_offset) &&
+                       whole_number(arguments[at + 3], &options.read_fails_after)) {
+                options.read_fails_file = arguments[at + 1];
+                at += 4;
+            } else if (arguments[at] == "--remove-after" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.remove_after)) {
+                options.remove_after_file = arguments[at + 1];
+                at += 3;
+            } else if (arguments[at] == "--swap-after" && at + 3 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.swap_after)) {
+                options.swap_after_file = arguments[at + 1];
+                options.swap_other = arguments[at + 3];
+                at += 4;
+            } else if (arguments[at] == "--dirty-memory") {
+                options.dirty_memory = true;
+                at += 1;
             } else if (arguments[at] == "--trace-files") {
                 options.trace_files = true;
                 at += 1;

@@ -118,6 +118,11 @@ struct Core {
     OdrgDecoder decoder;
 };
 
+// Makes the show invalid with a reason text: `<reason>`, `<reason> <about>` or
+// `<reason> <about> <detail>`, and passes the text to the host's log. The first failure
+// decides: when the show is invalid already, nothing changes.
+void core_fail(Core &core, Reason reason, const char *about, Reason detail);
+
 }  // namespace odrig
 
 // The type the host interface names is the core object itself.
