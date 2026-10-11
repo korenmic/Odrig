@@ -1,0 +1,10 @@
+{
+  "number": 5,
+  "slug": "05-p0-canvas-60-by-60",
+  "state": "remaining",
+  "title": "Canvas 60 by 60",
+  "priority": "P0",
+  "addedAt": "2026-10-11T14:58:22+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Bring the mapping, documents, demo show, emulator views, limits and board measurements to the new 60 x 60 target: ten legs of six rows."
+}
