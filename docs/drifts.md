@@ -1420,3 +1420,53 @@ bytes of input after the last byte of the stream. The host hands out every file 
 of changing sizes, none above 512 bytes, so every test runs the core against short reads.
 
 **Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`.
+
+## Seed 02: The reason for a file with several defects, read as a stream
+
+**Question.** The core never holds a whole file, and `docs/reasons.md` fixes the order of
+the checks for a reader that does: a compressed body is inflated whole before the first
+record is looked at, and all data bytes of a record are present before one of its bits is
+judged. A reader that works through a stream meets the defects of a file in another order.
+For a file with two defects it would name another reason than `check`, and the design asks
+only that the core accepts and rejects the same files.
+
+**Answer.** The core reports the same reason as the reference decoder for every file. When
+it finds a defect in the body it reads on before it answers: in a compressed file to the
+end of the DEFLATE stream, where a defect of the stream or bytes after the stream win; and
+in any file to the end of the record's data, where a record cut short wins as `truncated`.
+This costs time only for a file that is refused, which ends the show in any case. The suite
+compares the reason, not only acceptance, for 3,000 damaged copies and for every prefix of
+a file.
+
+**Resolution.** `core/src/odrg_decoder.cpp`, `settled` and `body_stopped`;
+`tests/core/test_decoder.py`.
+
+## Seed 02: Codes above 255 in the core
+
+**Question.** The spec of seed 02 was written before `docs/format.md` and
+`docs/reasons.md` gained the reason `bad-code`, and its design does not mention it.
+
+**Answer.** The core rejects such a file as the documents now say: it reads the Rice code
+whole, so a code cut off by the end of the data is `out-of-bits`, and then rejects a Rice
+value above 255 in plain mode or above 254 in run mode as `bad-code`. The two invalid
+vectors for it are rejected with that reason, and a test compares the reasons of the
+vector folder with the "ODRG files" table of `docs/reasons.md`.
+
+**Resolution.** `core/src/odrg_decoder.cpp`; `core/src/reasons.h`;
+`tests/core/test_vectors.py`.
+
+## Seed 02: Details of the ODRG decoder that differ from the design
+
+**Question.** The design has `open` read the header and the palette. Requirement 3
+criterion 4 has the size of a file compared with the mapping after its header and before
+its body, and the palette is part of the body: a file of the wrong size whose body is cut
+inside the palette must be `size-mismatch`. The design also compares every byte written
+with C in a palette file.
+
+**Answer.** `open` reads the 16 bytes of the header only, and the palette is read with the
+first frame record. The palette indexes are checked by looking at the whole picture after
+each record, which is what the reference decoder does and gives the same result as
+checking each byte written. A record asked for after the last one of the file is
+`truncated`. The functions keep the names and arguments the design gives them.
+
+**Resolution.** `core/src/odrg_decoder.h`, `core/src/odrg_decoder.cpp`.

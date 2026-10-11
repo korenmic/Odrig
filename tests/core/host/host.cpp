@@ -12,6 +12,7 @@
 
 #include "file_source.h"
 #include "inflate.h"
+#include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
 
@@ -23,7 +24,8 @@ const int kFileMisuse = 71;
 int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
-        "       odrig_host inflate [--batch]\n",
+        "       odrig_host inflate [--batch]\n"
+        "       odrig_host decode FILE | --batch\n",
         stderr);
     return kUsage;
 }
@@ -246,6 +248,73 @@ int inflate(bool in_batch) {
     return 0;
 }
 
+// Reads one ODRG file with the core's decoder, as the core does when it checks a file.
+// Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each record with
+// the picture as three bytes for each pixel, then `end`; or, at the point where the file is
+// refused, `rejected <reason>`.
+void decode_one(Files &files, const char *name) {
+    odrig_host host = files.host();
+    odrig::FileSource file;
+    std::memset(&file, 0, sizeof file);
+    odrig::OdrgDecoder decoder;
+    std::memset(&decoder, 0, sizeof decoder);
+    odrig::Inflate inflate;
+    std::memset(&inflate, 0, sizeof inflate);
+    std::vector<uint8_t> window(odrig::kWindowSize);
+
+    odrig::Reason reason = file.open(host, name);
+    if (reason == odrig::kNone) {
+        reason = decoder.open(&file, &inflate, window.data());
+    }
+    if (reason == odrig::kNone) {
+        std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
+                    decoder.frames, decoder.compressed);
+        std::vector<uint8_t> pixels(decoder.n, 0);
+        std::string picture;
+        for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
+            uint16_t duration = 0;
+            reason = decoder.next(pixels.data(), &duration);
+            if (reason != odrig::kNone) {
+                break;
+            }
+            picture.clear();
+            if (decoder.colours != 0) {
+                for (uint8_t index : pixels) {
+                    picture.append(reinterpret_cast<const char *>(decoder.palette) + 3 * index, 3);
+                }
+            } else {
+                picture.assign(pixels.begin(), pixels.end());
+            }
+            std::printf("frame %u %s\n", duration, hex(picture).c_str());
+        }
+        if (reason == odrig::kNone) {
+            reason = decoder.finish();
+        }
+    }
+    file.close();
+    if (reason == odrig::kNone) {
+        std::printf("end\n");
+    } else {
+        std::printf("rejected %s\n", odrig::reason_name(reason));
+    }
+}
+
+int decode(const std::string &argument) {
+    if (argument == "--batch") {
+        for (const std::string &content : batch(standard_input())) {
+            Files files = Files::of_memory(content);
+            decode_one(files, "file.odrg");
+        }
+        return 0;
+    }
+    size_t slash = argument.rfind('/');
+    std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
+    std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
+    Files files = Files::of_folder(folder);
+    decode_one(files, name.c_str());
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -260,6 +329,9 @@ int main(int argc, char **argv) {
         if (arguments.size() == 2 && arguments[1] == "--batch") {
             return inflate(true);
         }
+    }
+    if (arguments.size() == 2 && arguments[0] == "decode") {
+        return decode(arguments[1]);
     }
     return usage();
 }

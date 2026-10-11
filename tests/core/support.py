@@ -65,3 +65,46 @@ def inflate_each(streams):
     if len(results) != len(streams):
         raise AssertionError(f"odrig_host inflate gave {len(results)} results for {len(streams)} streams")
     return results
+
+
+Decoded = collections.namedtuple("Decoded", "header records reason")
+Decoded.__doc__ = """What the core's ODRG decoder makes of a file.
+
+`header` is `(W, H, C, F, compressed)`, or `None` when the header is refused. `records` holds
+`(duration, picture)` for each frame record decoded, the picture as three bytes for each
+pixel. `reason` is `None` for a file read to its end, or the reason it is refused for.
+"""
+
+
+def _decoded(lines):
+    header = None
+    records = []
+    for line in lines:
+        word, _, rest = line.partition(" ")
+        if word == "header":
+            width, height, colours, frames, compressed = (int(number) for number in rest.split())
+            header = (width, height, colours, frames, bool(compressed))
+        elif word == "frame":
+            duration, _, picture = rest.partition(" ")
+            records.append((int(duration), bytes.fromhex(picture)))
+        elif word == "end":
+            return Decoded(header, tuple(records), None)
+        elif word == "rejected":
+            return Decoded(header, tuple(records), rest)
+        else:
+            break
+    raise AssertionError("odrig_host decode printed no ending")
+
+
+def decode_file(path):
+    """What the core's ODRG decoder makes of a file on disk."""
+    return _decoded(iter(host_lines("decode", path)))
+
+
+def decode_each(files):
+    """What the core's ODRG decoder makes of each of these files, given as bytes."""
+    lines = iter(host_lines("decode", "--batch", stdin=batch(files)))
+    results = [_decoded(lines) for _ in files]
+    if next(lines, None) is not None:
+        raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
+    return results

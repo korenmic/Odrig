@@ -61,7 +61,7 @@ Rules for every task:
     is `bad-deflate`.
   - Requirements: 2.1, 2.3, 2.8, 15.1, 15.2, 15.3
 
-- [ ] 3. ODRG decoder, checked against the vectors and the reference decoder
+- [x] 3. ODRG decoder, checked against the vectors and the reference decoder
   - Create `core/src/odrg_decoder.h`, `.cpp` as the design describes, and the invocation
     `decode` in the test host.
   - `tests/core/test_vectors.py`: every `.odrg` in `tests/vectors/valid` gives the frames of
