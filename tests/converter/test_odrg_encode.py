@@ -189,6 +189,19 @@ class FrameRecords(unittest.TestCase):
         best = odrg.best_record(bytes(8), bytes(8), 8, 1, 20)
         self.assertEqual(best, struct.pack("<HHB", 20, 2, 0x00) + b"\x00")
 
+    def test_codes_of_each_predictor_on_a_3_by_2_canvas(self):
+        # Index bytes 1 2 3 / 4 5 6 become 2 3 5 / 4 6 7.
+        old, new = bytes([1, 2, 3, 4, 5, 6]), bytes([2, 3, 5, 4, 6, 7])
+        # Predictor 0: the differences +1 +1 +2 0 +1 +1.
+        self.assertEqual(odrg.codes(old, new, 3, 1, 0), bytes([2, 2, 4, 0, 2, 2]))
+        # Predictor 1: each difference less the one on its left, the first of a row less the
+        # first of the row before: +1 0 +1 / -1 +1 0.
+        self.assertEqual(odrg.codes(old, new, 3, 1, 1), bytes([2, 0, 2, 1, 2, 0]))
+        # Predictor 2: each new byte less its neighbour: 2 +1 +2 / +2 +2 +1.
+        self.assertEqual(odrg.codes(old, new, 3, 1, 2), bytes([4, 2, 4, 4, 4, 2]))
+        # Predictor 3: the new bytes themselves.
+        self.assertEqual(odrg.codes(old, new, 3, 1, 3), bytes([4, 6, 10, 8, 12, 14]))
+
     def test_the_stored_record(self):
         self.assertEqual(odrg.stored_record(b"\x01\x02\x03", 500), b"\xf4\x01\x04\x00\x40\x01\x02\x03")
 

@@ -151,7 +151,9 @@ Helpers used by all readers:
 def loads(data: bytes) -> Animation      # Requirement 3
 def read(path) -> Animation
 def merged(frames) -> list[tuple[int, bytes]]   # joins consecutive identical pictures
-def dumps(animation: Animation) -> bytes  # Requirement 4; applies merged()
+def dumps(animation: Animation, merge=True) -> bytes
+                                          # Requirement 4; applies merged() unless merge is
+                                          # False, which only the vector builder passes
 def write(path, animation: Animation) -> None
 def colour_count(frames) -> int
 ```
@@ -188,6 +190,8 @@ def encode(animation: Animation, compressed: bool = True) -> bytes   # Requireme
 # Building blocks. encode() is made of them; the vector builder uses them to force choices.
 def palette_for(frames) -> list[bytes] | None        # hue order, or None above 256 colours
 def to_buffer(picture: bytes, palette) -> bytes      # picture -> the N buffer bytes
+def codes(old: bytes, new: bytes, width: int, bpp: int, predictor: int) -> bytes
+                                                     # the N codes of one predictor
 def coded_record(old: bytes, new: bytes, width: int, bpp: int, duration: int,
                  predictor: int, run: bool, k: int) -> bytes
 def stored_record(new: bytes, duration: int) -> bytes
@@ -505,9 +509,12 @@ python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.jso
 ## Test vectors
 
 `tests/converter/build_vectors.py`, run as `python -m tests.converter.build_vectors`, writes
-both sets from fixed data and a seeded `random.Random`. It uses `coded_record`,
-`stored_record` and `container` to force each choice, and writes each expected `NAME.json`
-from the pictures it started with, not from the decoder. It exposes the cases as data
+both sets from fixed data and a seeded `random.Random`, of which it uses only `random()`.
+It uses `coded_record`, `stored_record` and `container` to force each choice, and writes
+each expected `NAME.json` from the pictures it started with, not from the decoder. A coded
+record holds at most N bytes of data, so a forced combination cannot code every picture:
+the builder grows each picture byte by byte from codes that the combination writes in at
+most N bytes, and checks them against `codes`. It exposes the cases as data
 (`valid_cases()`, `invalid_cases()`), each with its name, its bytes, whether zlib made any
 of them and, for an invalid case, the valid bytes it was changed from, so the tests can
 compare the tracked folders with it.

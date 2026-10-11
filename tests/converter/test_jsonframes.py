@@ -271,6 +271,13 @@ class CanonicalForm(unittest.TestCase):
         written = jsonframes.loads(jsonframes.dumps(jsonframes.Animation(2, 1, frames)))
         self.assertEqual(written.frames, ((60, picture), (20, other), (100, picture)))
 
+    def test_frames_can_be_written_as_given_for_the_test_vectors(self):
+        picture = RED + BLUE
+        animation = jsonframes.Animation(2, 1, ((20, picture), (40, picture)))
+        self.assertEqual(jsonframes.dumps(animation).count(b'"ms"'), 1)
+        unmerged = jsonframes.dumps(animation, merge=False)
+        self.assertEqual(jsonframes.loads(unmerged).frames, animation.frames)
+
     def test_merged_joins_only_neighbours(self):
         a, b = RED, BLUE
         self.assertEqual(jsonframes.merged([(1, a), (2, a), (3, b), (4, a)]), [(3, a), (3, b), (4, a)])

@@ -131,7 +131,7 @@ Rules for every task:
     `mapping/legs-2.json` is 60 x 6 with 50 frames.
   - Requirements: 7.11, 16.1, 16.2, 16.3
 
-- [ ] 9. Valid test vectors
+- [x] 9. Valid test vectors
   - Create `tests/converter/build_vectors.py` with the valid set of the design, run it, and
     track `tests/vectors/valid/`.
   - `tests/converter/test_vectors.py`: every `NAME.odrg` in the folder has a `NAME.json`

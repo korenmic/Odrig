@@ -161,6 +161,44 @@ python -m odrig.generators.dense build/dense.json --mapping mapping/legs-10.json
 
 Encoded, that clip is 765,984 bytes uncompressed and about 725,000 bytes compressed.
 
+## Test vectors
+
+`tests/vectors/` holds small ODRG files for checking any ODRG reader against the reference
+decoder. No file is above 4,096 bytes.
+
+`tests/vectors/valid/` holds pairs: `NAME.odrg` and `NAME.json`. The JSON frames file has
+one frame for every frame record of the ODRG file, in order and without merging: the
+duration of the record and the picture after it. A reader is right when it gives exactly
+those frames.
+
+| Name | Content |
+|---|---|
+| `rgb-modes` | 4 x 3 without a palette: one coded record for each of the 64 combinations of predictor, mode and k. |
+| `pal-modes` | 5 x 4 with a palette of 7: the same 64 combinations on index bytes. |
+| `escape` | Plain-mode and run-mode records, for k from 0 to 4, with Rice values on both sides of the long form (eight one-bits and the value) and the largest value. No other vector uses the long form. |
+| `stored.rgb`, `stored.pal` | Stored records: first in the file, after a coded record and after a stored one. |
+| `run-to-end` | Run-mode records that end in a zero run, and records whose codes are all zero. |
+| `run-last-nonzero` | Run-mode records whose last code is not zero. |
+| `long-run` | A 20 x 16 palette canvas with zero runs longer than 255 codes. |
+| `durations` | Records of 1 ms and of 65,535 ms. |
+| `pal-256`, `pal-1` | A 16 x 16 file that uses all 256 palette entries; a file with a palette of one colour. |
+| `one-wide.rgb`, `one-wide.pal` | A canvas of 1 x 5, where every pixel starts a row. |
+| `one-high.rgb`, `one-high.pal` | A canvas of 5 x 1. |
+| `one-pixel.rgb`, `one-pixel.pal` | A canvas of 1 x 1. |
+| `deflate-stored`, `deflate-fixed`, `deflate-dynamic` | One body in a DEFLATE stream of one stored block, one fixed-code block and one dynamic-code block. |
+| `encoded.pal`, `encoded.rgb` | Short animations written by `encode`, compressed. |
+
+The vectors are the output of a tracked program, which makes them from fixed data:
+
+```
+python -m tests.converter.build_vectors
+```
+
+It makes each folder hold exactly its set. The suite checks that the tracked files are what
+the program gives, byte for byte. The compressed files (`deflate-*` and `encoded.*`) are
+left out of that comparison, because another zlib may compress the same body to other
+bytes; they are checked by decoding them.
+
 ## Tests
 
 ```

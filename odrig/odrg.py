@@ -322,12 +322,12 @@ def stored_record(new, duration):
 
 def coded_record(old, new, width, bpp, duration, predictor, run, k):
     """A coded frame record written with the given predictor, mode and k."""
-    codes = _codes(old, new, width * bpp, bpp, predictor)
+    record_codes = codes(old, new, width, bpp, predictor)
     rice = _RICE_TEXT[k]
     if run:
         pieces = []
         zeros = 0
-        for code in codes:
+        for code in record_codes:
             if code == 0:
                 zeros += 1
             else:
@@ -338,7 +338,7 @@ def coded_record(old, new, width, bpp, duration, predictor, run, k):
             pieces.append(_gamma_text(zeros + 1))
         text = "".join(pieces)
     else:
-        text = "".join(rice[code] for code in codes)
+        text = "".join(rice[code] for code in record_codes)
     text += "0" * (-len(text) % 8)
     data = int(text, 2).to_bytes(len(text) // 8, "big")
     if len(data) > len(new):
@@ -355,8 +355,7 @@ def best_record(old, new, width, bpp, duration):
     """
     best = None
     for predictor in range(4):
-        codes = _codes(old, new, width * bpp, bpp, predictor)
-        for run, k, size in _data_sizes(codes):
+        for run, k, size in _data_sizes(codes(old, new, width, bpp, predictor)):
             if best is None or size < best[0]:
                 best = (size, predictor, run, k)
     size, predictor, run, k = best
@@ -382,8 +381,9 @@ def _deflate(body):
     return deflater.compress(body) + deflater.flush()
 
 
-def _codes(old, new, stride, bpp, predictor):
-    """The N codes that turn `old` into `new` with a predictor, one byte each."""
+def codes(old, new, width, bpp, predictor):
+    """The N codes that turn the buffer `old` into `new` with a predictor, one byte each."""
+    stride = width * bpp
     if predictor == 0:
         residuals = _minus(new, old)
     elif predictor == 1:
@@ -414,12 +414,12 @@ def _neighbours(a, stride, bpp):
     return bytes(result)
 
 
-def _data_sizes(codes):
+def _data_sizes(record_codes):
     """`(run, k, bytes of data)` for plain mode and run mode with every k, in that order."""
-    histogram = collections.Counter(codes)
-    zero_runs = [len(zeros) for zeros in _ZERO_RUN.findall(codes)]
-    non_zero = len(codes) - histogram[0]
-    runs_before_a_code = len(zero_runs) - (1 if codes.endswith(b"\x00") else 0)
+    histogram = collections.Counter(record_codes)
+    zero_runs = [len(zeros) for zeros in _ZERO_RUN.findall(record_codes)]
+    non_zero = len(record_codes) - histogram[0]
+    runs_before_a_code = len(zero_runs) - (1 if record_codes.endswith(b"\x00") else 0)
     gamma_bits = sum(2 * (zeros + 1).bit_length() - 1 for zeros in zero_runs) + non_zero - runs_before_a_code
     sizes = []
     for k in range(8):

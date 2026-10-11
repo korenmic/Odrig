@@ -713,3 +713,21 @@ kept, with a note.
 
 **Resolution.** `docs/format.md`, "Measured sizes"; seed 01 `design.md`, "Encoder", step 2;
 `docs/converter.md`, "Generators".
+
+## Seed 01: What the vector builder needs from the tool
+
+**Question.** The design has the vector builder force each choice with `coded_record`, and
+write the expected frames "without merging". A frame record's L is at most N + 1, so a
+coded record holds at most N bytes of data, and a forced combination cannot code every
+picture: plain mode with k = 7, for one, fits only codes below 128. The design names no way
+to find a picture that a combination can code, and `jsonframes.dumps` always merges.
+
+**Answer.** `coded_record` raises `ValueError` for a combination that does not fit.
+`odrg.codes` is one more public building block: the N codes of one predictor. The builder
+grows each picture from codes its combination writes in at most N bytes and checks them
+against `odrg.codes`. `jsonframes.dumps` takes `merge=False`, which only the builder passes.
+Apart from the `escape` vector no vector uses the long form of a Rice code, so that vector
+alone proves the feature.
+
+**Resolution.** Seed 01 `design.md`, "jsonframes", "odrg" and "Test vectors";
+`docs/converter.md`, "Test vectors".

@@ -74,13 +74,17 @@ def merged(frames):
     return result
 
 
-def dumps(animation):
-    """The canonical bytes of a JSON frames file, with identical neighbours merged."""
+def dumps(animation, merge=True):
+    """The canonical bytes of a JSON frames file, with identical neighbours merged.
+
+    `merge=False` keeps every frame as given. Only the expected frames of the test vectors
+    are written that way: one frame for every frame record.
+    """
     size = 3 * animation.width * animation.height
     if animation.width < 1 or animation.height < 1 or not animation.frames:
         raise ValueError("an animation has a canvas and at least one frame")
     lines = []
-    for ms, picture in merged(animation.frames):
+    for ms, picture in merged(animation.frames) if merge else animation.frames:
         if ms < 1 or len(picture) != size:
             raise ValueError("a frame lasts at least 1 ms and has 3 * W * H bytes")
         lines.append(f'    {{"ms": {ms}, "pixels": {list(colours(picture))}}}')
