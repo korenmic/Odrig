@@ -1,0 +1,10 @@
+{
+  "number": 4,
+  "slug": "04-p1-firmware-build-with-the-player",
+  "state": "remaining",
+  "title": "Firmware build with the player",
+  "priority": "P1",
+  "addedAt": "2026-10-11T05:10:44+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Custom WLED 16.0.1 build for the ESP32-S3 that hosts the shared core, with tools to build, flash, install a show and roll back."
+}
