@@ -1,0 +1,10 @@
+{
+  "number": 7,
+  "slug": "07-p1-content-commands",
+  "state": "remaining",
+  "title": "Content commands",
+  "priority": "P1",
+  "addedAt": "2026-10-11T14:58:22+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Add the commands space, list, remove and chunked upload to the shared command list, the core, both hosts, the command tool and the documents."
+}
