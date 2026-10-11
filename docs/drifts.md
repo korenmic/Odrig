@@ -874,3 +874,283 @@ written".
 `in_progress`. The last task, the check list by eye, sets `completed`.
 
 **Resolution.** Seed 03 `tasks.md`, tasks 1 and 11.
+
+## Seed 04: What the seed builds on
+
+**Question.** The seed lists seeds 01 and 02 as what it depends on. Its definition of done
+also uses "the repository's command tool" and compares the board with the emulator, which
+are seed 03.
+
+**Answer.** Seed 04 is implemented after seeds 01, 02 and 03. It uses `odrigctl` for every
+exchange with the board's serial port and the emulator as what the board is compared with.
+
+**Resolution.** `docs/specs/04-p1-firmware-build-with-the-player/requirements.md`, the
+opening paragraph; `design.md`, "What this design relies on".
+
+## Seed 04: Where the installed show lives on the board
+
+**Question.** `docs/show.md` says a show is installed as one flat folder and that the same
+folder is uploaded to the board. It does not say where on the board. The board's file
+system already holds WLED's own files in its top folder. This is a gap in a governing
+document.
+
+**Answer.** The folder `/odrig` of WLED's LittleFS file system. Installing replaces that
+folder and nothing else, so "exactly the installed file set" can be checked, files of an
+earlier show cannot stay behind, and stock WLED, which ignores the folder, keeps its own
+settings and show for a roll-back.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 7 and 14; `design.md`, "Memory,
+time and files" and "Installing a show".
+
+## Seed 04: LED type and colour order
+
+**Question.** WLED needs an LED type and a colour order for every output. `mapping.json`
+has neither, and the seed says the outputs are set from `mapping.json` and that WLED's own
+output settings are not a second source. This is a gap in `docs/mapping.md`.
+
+**Answer.** Every output is made for WS2812B LEDs at 800 kHz with the order green, red,
+blue, fixed in the firmware. These are the values the proof-of-concept deploy script wrote
+for the strips that are confirmed working. A build with other LEDs needs a change to the
+mapping format, which is the owner's to decide.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 8 criterion 1; `design.md`, "The
+outputs".
+
+## Seed 04: How our code owns the LEDs
+
+**Question.** The seed says the core's LED data is sent to the outputs and that WLED's
+effects, presets and playlists take no part. WLED has no setting that switches its own
+drawing off.
+
+**Answer.** The usermod keeps WLED in the live mode that network pixel inputs use
+(`realtimeLock` with the time-out that never ends), in which WLED's loop skips effects,
+presets, playlists and nightlight, and checks at every pass that WLED is still in it. It
+writes the core's bytes straight to the outputs through `BusManager`, not through WLED's
+pixel buffer, so WLED's LED map, matrix layout, gamma correction and segments never touch
+them, and it sets the outputs to full brightness before every refresh. A consequence: the
+switch, the brightness slider and the live-override of WLED's interface no longer change
+the LEDs; only the commands of `docs/commands.md` do.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 9 and 10; `design.md`, "Holding the
+LEDs" and "Sending a refresh".
+
+## Seed 04: The values of the current limiter
+
+**Question.** The seed says WLED's current limiter stays active. The limiter needs a
+maximum current and a current for one LED, and the outputs are no longer made from WLED's
+settings.
+
+**Answer.** The limiter runs inside the call that sends a refresh, so it acts on every
+refresh. Its maximum stays the one in WLED's LED settings, 850 mA when nothing was set, and
+the outputs are made with WLED's default of 55 mA for one LED. The maximum is the one LED
+setting of WLED that still counts; it is changed in WLED's interface.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 10 criterion 2; `design.md`, "The
+outputs" and "Sending a refresh".
+
+## Seed 04: Ten legs on a chip with four RMT outputs
+
+**Question.** `docs/mapping.md` records that WLED supports up to 12 outputs on the
+ESP32-S3. Reading the source shows they are of two kinds: 4 RMT outputs and 8 through a
+parallel driver. Which legs get which, and what if a mapping asks for more?
+
+**Answer.** The usermod asks for RMT for every output; WLED gives it to the first four in
+mapping order and the parallel driver to the rest. A refresh of ten legs of 180 LEDs is on
+the wire for under 6 ms either way. The board can drive 12 legs. An output that cannot be
+made, for a thirteenth leg or for a pin the chip keeps for itself, is named in WLED's
+information; the other outputs and the core run unchanged, and `status` does not report it,
+because `docs/commands.md` gives `status` no member for it.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 8 criteria 4 and 5; `design.md`,
+"The outputs".
+
+## Seed 04: Calls to the core from two tasks
+
+**Question.** Seed 02 says the core is used from one thread. On the board, WLED's web
+server calls its handlers on the network task, while playback and the serial port run on
+the task of the main loop.
+
+**Answer.** One mutex is held for every call to the core, so the calls follow one another;
+the core keeps nothing that belongs to a task. The timestamp of a call is read after the
+mutex is taken. The emulator of seed 03 does the same with a lock.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 3 criterion 4; `design.md`, "Threads
+and the lock".
+
+## Seed 04: The content type of an HTTP command
+
+**Question.** `docs/commands.md` says the command line is the body of `POST /odrig` and
+names no content type for the request. The web server library of WLED 16.0.1 takes a body
+apart as form fields, before any handler sees it, when the type is
+`application/x-www-form-urlencoded`, and when it is `text/plain` and the body looks like
+`name=value`. This is a gap in a governing document.
+
+**Answer.** The firmware reads the body as it is when the library passes it on, and from
+the form field `body` when the library took it apart. With any other content type every
+body reaches the core byte for byte. With those two types this holds for every body without
+`&`, `=`, `+`, `%` and zero bytes, which every valid command is; a body with one of them can
+reach the core changed and so get another reply than in the emulator. `odrigctl` sends
+`application/octet-stream`. The owner may want `docs/commands.md` to name a content type.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 12 criterion 3; `design.md`, "HTTP
+transport". Seed 03 `design.md`, "The command tool".
+
+## Seed 04: How the board reports that its Wi-Fi network is up
+
+**Question.** The definition of done says "the board reports that its own Wi-Fi network is
+up after power-on". `status` has no member for Wi-Fi, a command exists only if something
+uses it, and WLED's own serial interface, through which this was asked on 2026-10-11, is
+switched off in the firmware.
+
+**Answer.** The report is WLED's own: `GET /json/info` on the board's address gives
+`wifi.ap`. Reaching it needs a device on the network, which also proves the network is up.
+It is one of the owner's checks, together with the HTTP commands, and `test-air` asks for
+it. Nothing is added to `status`.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 13 and 16; `design.md`, "Wi-Fi" and
+"tests/air".
+
+## Seed 04: What flashing writes
+
+**Question.** The seed asks for one command that flashes and one that restores stock WLED.
+It does not say which parts of the flash they write.
+
+**Answer.** Both write only the first application partition and clear the boot selection
+data, so that the board starts that partition. The bootloader and the partition table on
+the board are the ones of WLED's 16 MB layout, which the firmware is built for, and the
+tool reads the partition table to check that before it writes. `restore-stock --full` also
+writes the stock bootloader and partition table. Storage is never written by either, so
+WLED's settings, its old show and the files in `/odrig` survive going back and forth.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 4, 5 and 6; `design.md`, "Flashing
+and rolling back".
+
+## Seed 04: The stock WLED files and their checksums
+
+**Question.** Restoring needs the stock files and "files whose checksums are verified". The
+three files are untracked, in `firmware/wled-16.0.1/` of the main checkout, with a checksum
+list beside them.
+
+**Answer.** The checksums are tracked in `firmware/stock.sha256`; the files stay
+untracked, since WLED is not stored in this repository. `restore-stock` takes them from
+`firmware/wled-16.0.1/` unless told otherwise and checks each before it writes anything.
+The application image is the release asset of WLED 16.0.1, whose published SHA-256 equals
+the tracked one, so it can be fetched again. The factory backup in `esp32-backup/` is the
+last resort, used by hand; no tool reads or writes that folder.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 5 and 6; `design.md`, "Flashing and
+rolling back".
+
+## Seed 04: What the build needs besides PlatformIO
+
+**Question.** The seed says build tools install into a project-local environment. WLED's
+build also runs Node.js, to pack its web interface, which the seed does not mention, and
+WLED's configuration puts a build cache in the home folder.
+
+**Answer.** Everything goes into `build/firmware/`: a Python environment with WLED's own
+pinned PlatformIO, esptool and littlefs-python; Node.js 20.18 through the Python package
+`nodeenv`; PlatformIO's packages and caches, moved there with `PLATFORMIO_CORE_DIR` and
+`PLATFORMIO_BUILD_CACHE_DIR`; and the caches of npm and pip. The Mac must already have
+Python 3.10 or later, git and Apple's developer tools. Whether PlatformIO 6.1.17 runs under
+this Mac's Python 3.14, and whether `nodeenv` works here, is checked by the first task,
+which records a fallback if not.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 2; `design.md`, "The environment of
+every child process" and "setup", assumptions A1 to A3.
+
+## Seed 04: The C++ level of the WLED build
+
+**Question.** Seed 02 chose C++11 for the core and left the real flag of the WLED build to
+be confirmed here. Two sources read for this spec disagree: the build script of Tasmota's
+Arduino core at its tag 2.0.18 has `-std=gnu++11`, and WLED's own notes say C++17 for this
+platform.
+
+**Answer.** The second task reads the flag from the verbose output of a real build and
+records it. The core is valid C++11 and compiles under either; nothing in this design
+depends on which it is.
+
+**Resolution.** Seed 04 `design.md`, fact R28 and assumption A5; `tasks.md`, task 2.
+
+## Seed 04: No change to WLED's own files
+
+**Question.** The seed allows changes to WLED's files as small patch files. Does the
+firmware need any?
+
+**Answer.** No, as far as the source shows: the usermod is a library outside WLED's
+folder, WLED's serial handling is switched off by its own build flag
+`WLED_DISABLE_ADALIGHT`, the outputs and the live mode are reached through WLED's global
+functions, and the HTTP handler is registered on WLED's server object. The build still
+applies every patch file of `firmware/patches/`, so a patch that a task finds necessary has
+its place.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 1 criterion 3; `design.md`,
+"Overview" and "build".
+
+## Seed 04: Checking the board without eyes and without Wi-Fi
+
+**Question.** Much of what the seed asks for shows only on the LEDs or in WLED's
+information page, which needs the Wi-Fi network. An agent has neither eyes on the LEDs nor
+a way to join the network, and the port carries only the commands of `docs/commands.md`.
+
+**Answer.** A second build, the probe build, exists for the board tests only. It answers
+the line `#probe` on the port with measurements: the outputs and whether they work, a
+checksum of the colours each output holds, how often something else overwrote them, the
+refreshes sent, and the longest times. With it a test compares what the outputs hold with
+the emulator's recording. The firmware left on the board has none of this code. What still
+needs a person is listed as the owner's checks.
+
+**Resolution.** Seed 04 `requirements.md`, Requirements 15 and 16; `design.md`, "The probe
+build" and "Who checks what".
+
+## Seed 04: Shows installed by tests, and the wired strip
+
+**Question.** The definition of done names the example show, whose brightness is 128. Today
+one 60-LED strip is wired, on leg 1, fed from the board's 3.3 V pin, and power is out of
+scope for this project.
+
+**Answer.** Every show a test or an agent installs has a brightness of 40 or less; the
+test helper packs a copy of the show with its brightness replaced by 32 and refuses a
+brighter one. The items of the definition of done that need the LEDs to be seen, or two
+legs wired, are the owner's, at the brightness the owner chooses for the power supply in
+use.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 15 criterion 5 and Requirement 16;
+`tasks.md`, the rules and task 10.
+
+## Seed 04: Playback inside WLED's main loop
+
+**Question.** The usermod can ask the core for a refresh from WLED's main loop or from a
+task of its own. WLED's notes say the loop runs up to 2,000 times a second when idle but
+can slow to a few passes a second while its file system is written or many requests are
+served.
+
+**Answer.** Playback runs in the main loop: it is the simplest and shares no output with
+another task. The core is asked only when the outputs can take data, so `fps` in `status`
+is the real rate and shows a stall. If the measurements on the board show stalls in
+ordinary use, playback moves to its own task, designed then from those measurements.
+
+**Resolution.** Seed 04 `design.md`, "loop()" and "Risks"; `tasks.md`, tasks 6 and 8.
+
+## Seed 04: Start-up time on the board
+
+**Question.** Seed 02 left the time the core needs to check every file at start to be
+measured here, and gave two seconds with realistic content as the point at which the rule
+is looked at again. How is it measured?
+
+**Answer.** The usermod times its call that starts the core. The probe build reports the
+figure, and WLED's information shows it. It is measured for the example show, for one dense
+60 x 30 clip of 10 seconds, and for storage filled with 9 MB of dense clips, and written
+into `docs/firmware.md` and under the seed 02 entry of this file.
+
+**Resolution.** Seed 04 `requirements.md`, Requirement 7 criterion 7; `tasks.md`, task 8.
+
+## Seed 04: Recording the seed's progress
+
+**Question.** As for the other seeds, and one more: the definition of done has items only
+a person can check.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task is the owner's checks and sets `completed`; an agent leaves
+it open.
+
+**Resolution.** Seed 04 `tasks.md`, tasks 1 and 10.
