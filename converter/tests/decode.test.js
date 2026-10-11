@@ -300,3 +300,48 @@ test("codes are read whole before they are judged, and padding is not looked at"
     }
   });
 });
+
+test("encode followed by decode gives back a merged source byte for byte", async (t) => {
+  const folder = temporary(t);
+  const quiet = {status: 0, out: "", err: ""};
+  const there = path.join(folder, "there.odrg");
+  const back = path.join(folder, "back.json");
+
+  for (const source of ["animations/hello.json", "animations/dvd.json"]) {
+    for (const flags of [[], ["--uncompressed"]]) {
+      await t.test(`${source}${flags.length > 0 ? ", uncompressed" : ""}`, () => {
+        assert.deepEqual(runJs(["encode", source, there, ...flags]), quiet);
+        assert.deepEqual(runJs(["decode", there, back]), quiet);
+        assert.ok(fs.readFileSync(back).equals(fs.readFileSync(path.join(ROOT, source))));
+      });
+    }
+  }
+
+  await t.test("a source with neighbours of the same pixels comes back merged", () => {
+    const picture = Uint8Array.of(1, 2, 3, 4, 5, 6);
+    const other = Uint8Array.of(1, 2, 3, 4, 5, 7);
+    const animation = {width: 2, height: 1, frames: [{ms: 20, picture}, {ms: 30, picture}, {ms: 5, picture: other}, {ms: 70000, picture}, {ms: 70000, picture}]};
+    const source = path.join(folder, "source.json");
+    fs.writeFileSync(source, jsonframes.dumps(animation, {merge: false}));
+    for (const flags of [[], ["--uncompressed"]]) {
+      assert.deepEqual(runJs(["encode", source, there, ...flags]), quiet);
+      assert.deepEqual(runJs(["decode", there, back]), quiet);
+      assert.equal(fs.readFileSync(back, "utf8"), Buffer.from(jsonframes.dumps(animation)).toString("utf8"));
+      const written = jsonframes.loads(new Uint8Array(fs.readFileSync(back)));
+      assert.deepEqual(written.frames.map((frame) => frame.ms), [50, 5, 140000]);
+      const again = runPython(["decode", there, path.join(folder, "python.json")]);
+      assert.deepEqual(again, quiet);
+      assert.ok(fs.readFileSync(path.join(folder, "python.json")).equals(fs.readFileSync(back)));
+    }
+  });
+
+  await t.test("for the sources of the valid vectors", () => {
+    for (const name of validNames) {
+      const source = `tests/vectors/valid/${name.replace(/\.odrg$/, ".json")}`;
+      const merged = jsonframes.dumps(jsonframes.loads(bytesOf(VALID, name.replace(/\.odrg$/, ".json"))));
+      assert.deepEqual(runJs(["encode", source, there]), quiet);
+      assert.deepEqual(runJs(["decode", there, back]), quiet);
+      assert.ok(fs.readFileSync(back).equals(Buffer.from(merged)), name);
+    }
+  });
+});

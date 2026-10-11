@@ -107,7 +107,7 @@ Rules for every task:
   - Put the measured sizes of the six bodies into the commit message.
   - Requirements: 8.1, 8.4, 8.5, 8.6, 8.7
 
-- [ ] 5. The encoder and `encode`
+- [x] 5. The encoder and `encode`
   - Add the encoder to `lib/odrg.js`: `paletteFor`, `hueOrder`, `codes`, `dataSizes`,
     `bestRecord`, `codedRecord`, `storedRecord`, `container` and `encode`. Add `encode` to
     the table of subcommands.

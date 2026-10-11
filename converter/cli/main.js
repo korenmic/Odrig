@@ -7,6 +7,12 @@ import {errors, jsonframes, odrg, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
 
+function encode(values) {
+  const source = files.read(values.input);
+  const data = errors.naming(values.input, () => odrg.encode(jsonframes.loads(source), {compressed: !values.uncompressed}));
+  files.write(values.output, data);
+}
+
 function decode(values) {
   const data = files.read(values.input);
   const decoded = errors.naming(values.input, () => odrg.decode(data));
@@ -60,6 +66,7 @@ function check(values, streams) {
 // The subcommands that can be run: for each name the function that does the work. It is
 // given the values of the arguments and the two streams.
 export const SUBCOMMANDS = new Map([
+  ["encode", encode],
   ["decode", decode],
   ["check", check],
 ]);

@@ -2,6 +2,7 @@
 // folders, and data made from a seed.
 
 import {spawnSync} from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -232,4 +233,99 @@ export function sameVerdict(assert, ours, theirs, label) {
   if (!libraryText(theirs.err)) {
     assert.equal(ours.err, theirs.err, label);
   }
+}
+
+export function sha256(bytes) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+// The frame records of a decoded file as reference.py gives them for the Python decoder:
+// for each record its duration, its mode byte and the SHA-256 of the picture after it.
+export function recordsOf(decoded) {
+  return decoded.records.map((record, i) => [record.ms, decoded.modes[i], sha256(record.picture)]);
+}
+
+// An animation in the form reference.py reads: the bytes as hexadecimal text and the
+// durations as decimal text.
+export function forPython(animation, more = {}) {
+  return {
+    width: animation.width,
+    height: animation.height,
+    frames: animation.frames.map((frame) => [String(frame.ms), hex(frame.picture)]),
+    ...more,
+  };
+}
+
+// Has a generator of the Python tool write its animation for a mapping file into a folder,
+// and gives the path of the JSON frames file. `seconds` is the length of the dense clip.
+export function generated(folder, generator, mapping, seconds = null) {
+  const canvas = path.basename(mapping, ".json");
+  const out = path.join(folder, `${generator}-${canvas}${seconds === null ? "" : `-${seconds}s`}.json`);
+  const argv = [out, "--mapping", mapping, ...(seconds === null ? [] : ["--seconds", seconds])];
+  const done = runPython(argv, {module: `odrig.generators.${generator}`});
+  if (done.status !== 0) {
+    throw new Error(`the generator ${generator} ended with status ${done.status}: ${done.err}`);
+  }
+  return out;
+}
+
+const LONG_TIMES = [65535, 65536, 131070, 131071, 200000];
+
+// An animation made from a seed, for the encoder: a canvas of up to 40 x 30, a handful of
+// colours or very many, and frames that are new, nearly the frame before, the frame before
+// moved by a pixel, the frame before itself, one colour, or a ramp. Now and then a frame
+// lasts longer than one frame record can say.
+export function animationFrom(seed, {largestWidth = 40, largestHeight = 30} = {}) {
+  const from = numbers(seed);
+  const width = from.below(4) === 0 ? from.between(1, 3) : from.between(1, largestWidth);
+  const height = from.below(4) === 0 ? from.between(1, 3) : from.between(1, largestHeight);
+  const pixels = width * height;
+  const colourCount = from.pick([1, 2, 3, 16, 200, 256, 257, 100000]);
+  const palette = Array.from({length: Math.min(colourCount, 300)}, () => from.bytes(3));
+  const colour = () => (colourCount > 300 ? from.bytes(3) : from.pick(palette));
+  const fresh = () => {
+    const picture = new Uint8Array(3 * pixels);
+    for (let pixel = 0; pixel < pixels; pixel += 1) {
+      picture.set(colour(), 3 * pixel);
+    }
+    return picture;
+  };
+  const frames = [];
+  const count = from.between(1, 6);
+  for (let i = 0; i < count; i += 1) {
+    const kind = i === 0 ? from.pick(["new", "one colour", "ramp"]) : from.pick(["new", "nearly", "nearly", "moved", "same", "one colour", "ramp"]);
+    const before = i === 0 ? null : frames[i - 1].picture;
+    let picture;
+    if (kind === "new") {
+      picture = fresh();
+    } else if (kind === "nearly") {
+      picture = before.slice();
+      for (let change = from.between(1, 4); change > 0; change -= 1) {
+        picture.set(colour(), 3 * from.below(pixels));
+      }
+    } else if (kind === "moved") {
+      picture = new Uint8Array(3 * pixels);
+      picture.set(before.subarray(0, 3 * pixels - 3), 3);
+      picture.set(colour(), 0);
+    } else if (kind === "same") {
+      picture = before.slice();
+    } else if (kind === "one colour") {
+      picture = new Uint8Array(3 * pixels);
+      const one = colour();
+      for (let pixel = 0; pixel < pixels; pixel += 1) {
+        picture.set(one, 3 * pixel);
+      }
+    } else {
+      picture = new Uint8Array(3 * pixels);
+      const start = colour();
+      const step = from.between(0, 3);
+      for (let pixel = 0; pixel < pixels; pixel += 1) {
+        const x = pixel % width;
+        picture.set([(start[0] + step * x) & 0xff, start[1], colourCount <= 300 ? start[2] : (start[2] + pixel) & 0xff], 3 * pixel);
+      }
+    }
+    const ms = from.below(10) === 0 ? from.pick(LONG_TIMES) : from.between(1, 300);
+    frames.push({ms, picture});
+  }
+  return {width, height, frames};
 }

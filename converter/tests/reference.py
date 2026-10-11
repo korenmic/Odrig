@@ -7,6 +7,7 @@ Bytes travel as hexadecimal text, and whole numbers of any size as decimal text.
 
 import contextlib
 import fractions
+import hashlib
 import importlib
 import io
 import json
@@ -18,7 +19,7 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
-from odrig import cli, jsonframes, mapping, odrg  # noqa: E402
+from odrig import cli, errors, jsonframes, mapping, odrg  # noqa: E402
 
 
 def _run(argv):
@@ -140,9 +141,60 @@ def encode(arguments, sources):
     return files
 
 
+def forms(arguments, cases):
+    """The 64 coded records of `odrig.odrg.coded_record` for each pair of pixel buffers.
+
+    A case is `{"old", "new", "width", "bpp"}`. The result has the records in the order of
+    the search, predictors 0 to 3, plain mode before run mode, k from 0 to 7, with null for
+    a form whose data is longer than the buffer, and the record `best_record` chooses.
+    """
+    results = []
+    for given in cases:
+        old, new = bytes.fromhex(given["old"]), bytes.fromhex(given["new"])
+        width, bpp = given["width"], given["bpp"]
+        records = []
+        for predictor in range(4):
+            for run in (False, True):
+                for k in range(8):
+                    try:
+                        records.append(odrg.coded_record(old, new, width, bpp, 20, predictor, run, k).hex())
+                    except ValueError:
+                        records.append(None)
+        results.append({"records": records, "best": odrg.best_record(old, new, width, bpp, 20).hex()})
+    return results
+
+
+def decode(arguments, files):
+    """What `odrig.odrg.decode` gives for each file: the size, the palette size, whether the
+    body is compressed, and for every frame record its duration, its mode byte and the
+    SHA-256 of the picture after it; or the reason of its rejection."""
+    results = []
+    for data in files:
+        try:
+            decoded = odrg.decode(bytes.fromhex(data))
+        except errors.Rejection as rejection:
+            results.append({"reason": rejection.reason})
+            continue
+        results.append(
+            {
+                "width": decoded.width,
+                "height": decoded.height,
+                "palette": decoded.palette_size,
+                "compressed": decoded.compressed,
+                "records": [
+                    [ms, mode, hashlib.sha256(picture).hexdigest()]
+                    for (ms, picture), mode in zip(decoded.records, decoded.modes)
+                ],
+            }
+        )
+    return results
+
+
 REQUESTS = {
     "check": check,
     "encode": encode,
+    "forms": forms,
+    "decode": decode,
     "sixdigits": sixdigits,
     "dumps": dumps,
     "milliseconds": milliseconds,

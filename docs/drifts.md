@@ -4520,3 +4520,57 @@ calls zlib with the default memory level, as the Python tool does.
 
 **Resolution.** `converter/lib/deflate.js`; `converter/tests/deflate.test.js`;
 `converter/tests/reference.py`, `encode` and `deflate`.
+
+## Seed 06: The files of the JavaScript encoder beside the Python tool's
+
+**Question.** Requirement 7 asks for identical uncompressed files and Requirement 8 for
+compressed files within 5 percent. What do the two tools write for the tracked animations
+and the dense clip?
+
+**Answer.** The same bytes in every case that was run, compressed as well, with zlib
+1.2.12 on the Python side:
+
+| Source | Uncompressed, both tools | Compressed, JavaScript | Compressed, Python |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 (`animations/hello.json`) | 17,731 | 1,138 | 1,138 |
+| DVD bounce, 60 x 6 (`animations/dvd.json`) | 3,799 | 1,612 | 1,612 |
+| Hello world, 60 x 60 | 19,372 | 1,210 | 1,210 |
+| DVD bounce, 60 x 60 | 2,340 | 1,052 | 1,052 |
+| Dense, 60 x 60, 2 s | 299,683 | 285,360 | 285,360 |
+| Source of the vector `encoded.pal` | 202 | 184 | 184 |
+| Source of the vector `encoded.rgb` | 169 | 78 | 78 |
+
+The tests ask for identical uncompressed files and, for compressed ones, the same frame
+records from the reference decoder and from the library's own, and a size within 5
+percent; they print whether the compressed bytes are the same.
+
+**Resolution.** `converter/tests/encode.test.js`; `converter/tests/deflate.test.js`,
+"whole files, through the command line of both tools".
+
+## Seed 06: Details of the encoder that the design leaves open
+
+**Question.** The design names the functions of the encoder and not their shapes, and its
+count of frame records is "the sum over the frames of `ceil(ms / 65535)`", where `ms` can
+be a number of thirty digits.
+
+**Answer.** A palette is one `Uint8Array` of three bytes for each colour, or null.
+`hueOrder(r, g, b)` gives five whole numbers: the hue and the saturation each as a
+numerator and a denominator, and the largest channel; two colours are compared by
+cross-multiplying. The number of records of a frame is worked out without a division of
+floating-point numbers: with the remainder for a `Number`, and in `BigInt`s for a longer
+time, so `too-many-frames` names the count the Python tool names for a frame of 10 to the
+power 30 ms. `bestRecord` keeps the codes of the form it chose and writes the record from
+them; `codedRecord` writes one given form and refuses, as a mistake of the program and not
+as a rejection, a form whose data is longer than the pixel buffer, as the Python function
+does. `toBuffer` is offered beside the functions the task lists.
+
+`reference.py` has two more requests: `forms`, the 64 coded records of
+`odrig.odrg.coded_record` for a pair of pixel buffers with the record `best_record`
+chooses, and `decode`, the frame records of `odrig.odrg.decode` with the SHA-256 of each
+picture. The first lets a test compare every form of the search and not only the one that
+wins; the second gives the frame records of the reference decoder, which `decode` on the
+command line merges. `support.js` makes the 200 animations from seeds and has the
+generators of the Python tool write their sources into a temporary folder.
+
+**Resolution.** `converter/lib/odrg.js`; `converter/tests/reference.py`, `forms` and
+`decode`; `converter/tests/support.js`, `animationFrom` and `generated`.

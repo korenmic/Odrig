@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
-import {deflate, inflate} from "../lib/index.js";
-import {hex, numbers, reference, unhex, utf8} from "./support.js";
+import {deflate, inflate, jsonframes, odrg} from "../lib/index.js";
+import {generated, hex, numbers, recordsOf, reference, runJs, runPython, temporary, unhex, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -185,4 +187,68 @@ test("compressing the body of a dense 60 x 60 clip of 10 seconds takes under 20 
   t.diagnostic(`${name}: ${body.length} bytes; zlib at level 9 ${zlib.length}; deflateRaw ${ours.length}, in ${seconds.toFixed(3)} s`);
   assert.ok(seconds < 20, `it took ${seconds.toFixed(2)} s`);
   assert.ok(20 * ours.length <= 21 * zlib.length);
+});
+
+test("whole files, through the command line of both tools", async (t) => {
+  const folder = temporary(t);
+  const sources = [
+    ["Hello world on the bench canvas", generated(folder, "hello_world", BENCH)],
+    ["DVD bounce on the bench canvas", generated(folder, "dvd_bounce", BENCH)],
+    ["Hello world on 60 x 60", generated(folder, "hello_world", TARGET)],
+    ["DVD bounce on 60 x 60", generated(folder, "dvd_bounce", TARGET)],
+    ["a dense clip of 2 seconds on 60 x 60", generated(folder, "dense", TARGET, 2)],
+    ["the source of the vector encoded.pal", "tests/vectors/valid/encoded.pal.json"],
+    ["the source of the vector encoded.rgb", "tests/vectors/valid/encoded.rgb.json"],
+  ];
+  const quiet = {status: 0, out: "", err: ""};
+  for (const [label, source] of sources) {
+    await t.test(label, (inner) => {
+      const ours = path.join(folder, "ours.odrg");
+      const plain = path.join(folder, "plain.odrg");
+      const theirs = path.join(folder, "theirs.odrg");
+      const theirPlain = path.join(folder, "their-plain.odrg");
+      assert.deepEqual(runJs(["encode", source, ours]), quiet);
+      assert.deepEqual(runJs(["encode", source, plain, "--uncompressed"]), quiet);
+      assert.deepEqual(runPython(["encode", source, theirs]), quiet);
+      assert.deepEqual(runPython(["encode", source, theirPlain, "--uncompressed"]), quiet);
+      const files = [ours, plain, theirs, theirPlain].map((file) => new Uint8Array(fs.readFileSync(file)));
+      const [compressed, uncompressed, reference9, referencePlain] = files;
+      assert.equal(compressed[5], 1, "the flags byte says compressed");
+      assert.equal(uncompressed[5], 0);
+      assert.ok(Buffer.from(uncompressed).equals(Buffer.from(referencePlain)), "the uncompressed files are identical");
+
+      // The reference decoder gives the same frame records for the compressed file as for
+      // the uncompressed one, and so does the decoder of the library.
+      const decoded = reference("decode", [], files.map(hex));
+      assert.equal(decoded[0].compressed, true);
+      assert.equal(decoded[1].compressed, false);
+      assert.ok(decoded[1].records.length > 0);
+      assert.deepEqual(decoded[0].records, decoded[1].records);
+      assert.deepEqual(decoded[2].records, decoded[1].records);
+      assert.equal(decoded[0].palette, decoded[1].palette);
+      assert.deepEqual(recordsOf(odrg.decode(compressed)), decoded[1].records);
+      assert.deepEqual(recordsOf(odrg.decode(uncompressed)), decoded[1].records);
+
+      const bytes = Buffer.from(compressed).equals(Buffer.from(reference9)) ? "the same bytes" : "other bytes";
+      inner.diagnostic(
+        `${label}: uncompressed ${uncompressed.length} bytes in both tools; compressed ${compressed.length} bytes,` +
+          ` the Python tool's ${reference9.length}, ${bytes}`,
+      );
+      assert.ok(20 * compressed.length <= 21 * reference9.length, `${compressed.length} bytes against the Python tool's ${reference9.length}`);
+    });
+  }
+
+  await t.test("a source that compression makes larger is compressed anyway", () => {
+    const source = path.join(folder, "noise.json");
+    const from = numbers(31);
+    fs.writeFileSync(source, jsonframes.dumps({width: 20, height: 20, frames: [{ms: 20, picture: from.bytes(1200)}]}));
+    const ours = path.join(folder, "noise.odrg");
+    const plain = path.join(folder, "noise-plain.odrg");
+    assert.deepEqual(runJs(["encode", source, ours]), quiet);
+    assert.deepEqual(runJs(["encode", source, plain, "--uncompressed"]), quiet);
+    const compressed = fs.readFileSync(ours);
+    assert.equal(compressed[5], 1);
+    assert.ok(compressed.length > fs.readFileSync(plain).length);
+    assert.deepEqual(recordsOf(odrg.decode(new Uint8Array(compressed))), recordsOf(odrg.decode(new Uint8Array(fs.readFileSync(plain)))));
+  });
 });
