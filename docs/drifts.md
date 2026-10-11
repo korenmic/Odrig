@@ -3106,3 +3106,112 @@ change was committed, and passed there. The whole suite is run once more after t
 The same holds for any later commit that changes a source of the core.
 
 **Resolution.** The commit of task 4. `tests/emulator/test_scope.py` is unchanged.
+
+## Seed 05: The cell of the LEDs view of upright legs, and the bands of its LED numbers
+
+**Question.** The design says that the cell of the LEDs view of a column-leg file is the
+largest from 4 to 28 pixels at which the canvas, the leg band, the header and the marks fit
+the drawing area, and that the LED numbers at the ends of the columns are drawn where the
+cells are 9 pixels or more. It does not say whether the two bands of numbers count when the
+cell is chosen. If they do not, a drawing whose cells come out at 9 pixels is higher than
+its area by the two bands, and the stage scrolls.
+
+**Answer.** The bands count wherever they are drawn. The cell is the largest at which the
+drawing with its two number bands fits the area. Where that is below 9 pixels the bands are
+left out, and the cell is the largest that fits without them, and 8 pixels at most, so that
+no drawing has cells of 9 pixels without its numbers. For the target file this gives cells
+of 8 pixels without numbers in an area of 1280 x 546, as the design expects, the same in an
+area of 1280 x 620, and cells of 9 pixels with the numbers from an area 648 pixels high on.
+
+**Resolution.** `emulator/web/layout.js`, `fitUpright`; `tests/emulator/test_layout.py`,
+`UprightLeds`.
+
+## Seed 05: What the layout script gives for a column-leg file
+
+**Question.** The design says what `emulator/web/layout.js` describes for the strips of a
+leg and what the LEDs view of a column-leg file holds. It names neither the functions nor
+the parts of the fit, and it leaves three points of the drawing open: the eight colours
+that are added, the shape of the bracket, and a tenth row or column that lies next to the
+last one.
+
+**Answer.** `strips(m, i)` takes the place of `rows(m, i)`. A strip has `start`, `first`
+and `last`, and its place across the strips as `y` for a row and as `x` for a column, so a
+row-leg file gets what it got. `runs(m, i)` gives `top` and `bottom` for rows, as before,
+and `left` and `right` for columns, from the left. `marks(count)` gives the rows or columns
+that are marked, and `legSpans(m, f)` the pixels each run of columns of each leg takes
+across the drawing. The fit of a column-leg file has `feed`, `header`, `legBand`,
+`legWords` (where the words `leg` and `pin` stand), `yLabel`, `canvas`, and `numberTop` and
+`numberBottom`, which are null where the numbers are left out. It has no `bracket`,
+`numberLeft` or `numberRight`; those belong to a row-leg file.
+
+The eight colours added are `#e599f7`, `#c98f5a`, `#a5d8ff`, `#7fa650`, `#96f2d7`,
+`#868e96`, `#1098ad` and `#ffa8a8`: each differs from the leg before it and after it in the
+list. The bracket of a run has its long side towards the leg's number and its two ends
+towards the canvas, as the bracket of rows has; the design's drawing shows it open towards
+the number. A tenth row or column nearer than three to the last one is not marked, as the
+header of a row-leg file does it, so that no mark stands on another: a canvas 12 wide is
+marked at 1 and 12.
+
+**Resolution.** `emulator/web/layout.js`; `emulator/web/view.js`, `uprightLabels`;
+`tests/emulator/test_layout.py`, `Positions`, `ColoursAndCurve` and `UprightLeds`.
+
+## Seed 05: The tab Mapping on a column-leg file, before its mapping view is written
+
+**Question.** Task 5 gives the page the LEDs view for column legs and task 6 the mapping
+view. After the commit of task 5 the tab `Mapping` can be chosen while a column-leg file is
+shown, and the suite fits every mapping of `mapping_texts()` with a board.
+
+**Answer.** With a board, `fit` gives a column-leg file the arrangement of its LEDs view.
+`wires` gives such a file no line and `chain` no point, and `view.js` draws no board, no
+line and no chain for it: the tab shows the drawing of the LEDs view. One test says that
+every mapping of both kinds is fitted with and without a board; it states nothing that the
+mapping view of task 6 changes.
+
+**Resolution.** `emulator/web/layout.js`, `fit`, `wires` and `chain`;
+`tests/emulator/test_layout.py`, `EveryMapping`.
+
+## Seed 05: The tests of the page for row-leg files, where a name changed
+
+**Question.** The tasks say that a test that concerns a row-leg file passes unchanged. The
+design gives `read` of the page the member `strips` in place of `rows`, writes the
+functions that describe a leg for strips, and has twenty colours in place of twelve. Tests
+of `tests/emulator/test_layout.py` read those names, some of them on every mapping of
+`mapping_texts()`, which now has column-leg files.
+
+**Answer.** The tests read `strips` where they read `rows`, from `read` and from
+`strips(m, i)`, and three of them carry the new name of the function. Those that ran on
+every mapping and read `y`, or walked along a row, now run on the six row-leg mappings and
+check what they checked; beside each stands a test for the column-leg mappings. The test
+that the colour of a leg is entry `i mod 12` is replaced by three: twenty colours used in
+turn, the first twelve as they were, and twenty different ones for the target file. The two
+tests of the core that joined `mapping_texts()` and `column_mapping_texts()` take
+`mapping_texts()`, which holds both.
+
+That the page draws a row-leg file as before was established twice. Everything the layout
+script gives for the eight row-leg mappings of the suite, in fourteen drawing areas, with
+and without a board, was written out before and after the change and compared: the
+positions, the LED at every place, the strips, paths and runs, every part of the three
+arrangements, every line and every chain are the same. And a new test, `BenchFile`, holds
+the cell, the canvas and the board of the bench file in the nine areas the tests name, as
+the layout script gave them before this task.
+
+**Resolution.** `tests/emulator/test_layout.py`; `tests/emulator/js/dump_layout.js`;
+`tests/core/test_mapping.py`, `LegList`; `tests/core/test_playback.py`,
+`EveryLedShowsItsPixel`.
+
+## Seed 05: What the test of the area of 1280 x 546 said of a fit made for rows
+
+**Question.** Task 5 says that the test of the area of 1280 x 546 fails against a fit that
+takes the canvas of the target file for 60 rows of a row-leg file.
+
+**Answer.** It failed, but not for the size. The arrangement of a row-leg file puts its
+labels beside the canvas, and an area of 1280 x 546 is wide: the target file got cells of 8
+pixels and a canvas inside the area. What the test found missing were the parts of the LEDs
+view of a column-leg file: `Lists differ: ['feed', 'legBand', 'legWords', 'numberBottom',
+'numberTop'] != [] : the fit lacks parts of the LEDs view of a column-leg file`. The test
+of the area of 500 x 546 failed for the size: `5 not greater than or equal to 7`. The other
+failure the task asks for was as expected: with `layout.js` as it was, the position test
+for the target file stopped in `read`, with `TypeError: undefined is not an object
+(evaluating 'leg.rows.length')`. The commit message of the task gives the three texts.
+
+**Resolution.** The commit of task 5.

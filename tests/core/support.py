@@ -122,8 +122,8 @@ def decode_each(files):
     return results
 
 
-# Mappings beyond the two tracked ones: a leg that starts on the left, legs of two and of
-# four rows, legs listed in another order than their numbers and their rows, and one LED.
+# Row-leg mappings beyond the tracked ones: a leg that starts on the left, legs of two and
+# of four rows, legs listed in another order than their numbers and their rows, and one LED.
 MADE_UP_MAPPINGS = {
     "left-start": {"version": 1, "width": 7, "legs": [{"leg": 1, "pin": 4, "first_led": "left", "rows": [1, 2, 3]}]},
     "two-and-four-rows": {
@@ -144,14 +144,6 @@ MADE_UP_MAPPINGS = {
     },
     "one-led": {"version": 1, "width": 1, "legs": [{"leg": 255, "pin": 255, "first_led": "right", "rows": [1]}]},
 }
-
-
-def mapping_texts():
-    """The mappings the suites of the core and of the emulator play on, by name: the tracked
-    files and the made-up row-leg ones."""
-    texts = {path.stem: path.read_text(encoding="utf-8") for path in sorted((ROOT / "mapping").glob("*.json"))}
-    texts.update({name: json.dumps(mapping) for name, mapping in MADE_UP_MAPPINGS.items()})
-    return texts
 
 
 # Column-leg mappings: a leg that starts at the top, legs of two and of four columns of 5
@@ -179,8 +171,17 @@ MADE_UP_COLUMN_MAPPINGS = {
 
 
 def column_mapping_texts():
-    """The made-up column-leg mappings, by name. The suite of the core plays on them as well."""
+    """The made-up column-leg mappings, by name."""
     return {name: json.dumps(listed) for name, listed in MADE_UP_COLUMN_MAPPINGS.items()}
+
+
+def mapping_texts():
+    """The mappings the suites of the core and of the emulator play on, by name: the tracked
+    files and the made-up ones of both kinds."""
+    texts = {path.stem: path.read_text(encoding="utf-8") for path in sorted((ROOT / "mapping").glob("*.json"))}
+    texts.update({name: json.dumps(listed) for name, listed in MADE_UP_MAPPINGS.items()})
+    texts.update(column_mapping_texts())
+    return texts
 
 
 @contextlib.contextmanager

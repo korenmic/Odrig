@@ -88,9 +88,103 @@ var OdrigView = (function () {
     return {top: top, height: (run.top - run.bottom + 1) * f.cell};
   }
 
-  /* The band behind the rows of each leg, the bracket with the leg's number and pin, the
-     y of every row and the LED numbers at its two ends. In the mapping view also the
-     outline of the rows and the veil that fades them while another leg is pointed at. */
+  /* Presses a text into a width where its characters need more than that. */
+  function pressed(text, characters, size, room) {
+    if (characters * size * 0.6 > room) {
+      text.setAttribute("textLength", round(Math.max(1, room)));
+      text.setAttribute("lengthAdjust", "spacingAndGlyphs");
+    }
+    return text;
+  }
+
+  /* The labels of a column-leg file. For each leg: the band behind its columns and, in the
+     leg band, over each run of its columns a bracket with the leg's number and under the
+     number its pin. The words leg and pin stand once, at the left end of the leg band. The
+     rows are marked at the left of the canvas and the columns in the header: the first,
+     every tenth and the last. Where the drawing has the two number bands, the LED numbers
+     at the two ends of every column stand in them, written upright. */
+  function uprightLabels(m, f, under, over) {
+    var size = sizes(f);
+    var band = f.legBand;
+    var above = f.feed === "bottom";
+    /* From the canvas outward the band holds the bracket and the two lines of text. */
+    var hook = 4;
+    var inward = above ? hook : -hook;
+    var spine = above ? band.y + band.height - 2 - hook : band.y + 2 + hook;
+    var legLine = above ? band.y + size.leg : spine + 3 + size.leg;
+    var pinLine = legLine + size.pin + 1;
+    var groups = m.legs.map(function (leg, i) {
+      return svg("g", {"class": "of-leg", "data-leg": i});
+    });
+    OdrigLayout.legSpans(m, f).forEach(function (span) {
+      var leg = m.legs[span.leg];
+      var colour = OdrigLayout.colour(span.leg);
+      var group = groups[span.leg];
+      var middle = span.x + span.width / 2;
+      under.appendChild(svg("rect", {
+        "class": "tint", "data-leg": span.leg, x: span.x, y: f.canvas.y, width: span.width, height: f.canvas.height, fill: colour
+      }));
+      group.appendChild(svg("rect", {"class": "reach", x: span.x, y: band.y, width: span.width, height: band.height}));
+      group.appendChild(svg("path", {
+        "class": "bracket", stroke: colour,
+        d: "M" + (span.x + 2) + " " + (spine + inward) + "v" + (-inward) + "H" + (span.x + span.width - 2) + "v" + inward
+      }));
+      group.appendChild(pressed(svg("text", {
+        "class": "t-leg", x: middle, y: round(legLine), "text-anchor": "middle", "font-size": size.leg, fill: colour
+      }, String(leg.leg)), String(leg.leg).length, size.leg, span.width - 2));
+      group.appendChild(pressed(svg("text", {
+        "class": "t-pin", x: middle, y: round(pinLine), "text-anchor": "middle", "font-size": size.pin, fill: colour
+      }, String(leg.pin)), String(leg.pin).length, size.pin, span.width - 2));
+    });
+    var wordsEdge = f.legWords.x + f.legWords.width - 6;
+    over.appendChild(svg("text", {"class": "t-y", x: wordsEdge, y: round(legLine), "text-anchor": "end", "font-size": size.pin}, "leg"));
+    over.appendChild(svg("text", {"class": "t-y", x: wordsEdge, y: round(pinLine), "text-anchor": "end", "font-size": size.pin}, "pin"));
+
+    var marksEdge = f.yLabel.x + f.yLabel.width - 6;
+    OdrigLayout.marks(m.height).forEach(function (y) {
+      var named = y === 1 || y === m.height;
+      over.appendChild(svg("text", {
+        "class": named ? "t-y" : "t-x", x: marksEdge, y: round(OdrigLayout.centre(m, f, 1, y)[1] + size.x * 0.36), "text-anchor": "end", "font-size": size.x
+      }, named ? "y=" + y : String(y)));
+    });
+    var baseline = above ? f.header.y + f.header.height - 5 : f.header.y + size.x + 2;
+    OdrigLayout.marks(m.width).forEach(function (x) {
+      var named = x === 1 || x === m.width;
+      over.appendChild(svg("text", {
+        "class": named ? "t-y" : "t-x", x: OdrigLayout.centre(m, f, x, 1)[0], y: baseline, "text-anchor": "middle", "font-size": size.x
+      }, named ? "x=" + x : String(x)));
+    });
+
+    if (f.numberTop && f.numberBottom) {
+      /* An upright number is read from bottom to top. The one above the canvas begins at
+         the canvas, and the one below the canvas ends there. */
+      var ends = [
+        {y: f.numberTop.y + f.numberTop.height - 4, anchor: "start", room: f.numberTop.height - 6},
+        {y: f.numberBottom.y + 4, anchor: "end", room: f.numberBottom.height - 6}
+      ];
+      m.legs.forEach(function (leg, i) {
+        var colour = OdrigLayout.colour(i);
+        OdrigLayout.strips(m, i).forEach(function (strip) {
+          var x = OdrigLayout.centre(m, f, strip.x, 1)[0] + size.row * 0.36;
+          var fromBottom = strip.start === "bottom";
+          [fromBottom ? strip.last : strip.first, fromBottom ? strip.first : strip.last].forEach(function (number, e) {
+            var text = String(number);
+            groups[i].appendChild(pressed(svg("text", {
+              "class": "t-n", transform: "translate(" + round(x) + " " + ends[e].y + ") rotate(-90)", "text-anchor": ends[e].anchor, "font-size": size.row, fill: colour
+            }, text), text.length, size.row, ends[e].room));
+          });
+        });
+      });
+    }
+    groups.forEach(function (group) {
+      over.appendChild(group);
+    });
+  }
+
+  /* The labels of a row-leg file: the band behind the rows of each leg, the bracket with
+     the leg's number and pin, the y of every row and the LED numbers at its two ends. In
+     the mapping view also the outline of the rows and the veil that fades them while
+     another leg is pointed at. */
   function labels(m, f, under, over, top) {
     var size = sizes(f);
     var mapped = f.view === "mapping";
@@ -147,7 +241,7 @@ var OdrigView = (function () {
           group.appendChild(one);
         }
       });
-      OdrigLayout.rows(m, i).forEach(function (row) {
+      OdrigLayout.strips(m, i).forEach(function (row) {
         var at = OdrigLayout.centre(m, f, 1, row.y)[1];
         var baseline = at + size.row * 0.36;
         var fromRight = row.start === "right";
@@ -203,7 +297,7 @@ var OdrigView = (function () {
       /* Small arrows along each row, between two LEDs, say which way the chain runs. */
       var marks = m.width >= 12 ? [0.25, 0.5, 0.75] : (m.width >= 3 ? [0.5] : []);
       var reach = Math.max(2, f.cell * 0.26);
-      OdrigLayout.rows(m, i).forEach(function (row) {
+      OdrigLayout.strips(m, i).forEach(function (row) {
         var way = row.start === "right" ? -1 : 1;
         var y = OdrigLayout.centre(m, f, 1, row.y)[1];
         marks.forEach(function (share) {
@@ -374,7 +468,11 @@ var OdrigView = (function () {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
 
     var top = svg("g", {"class": "tags"});
-    labels(m, f, under, over, top);
+    if (m.kind === "columns") {
+      uprightLabels(m, f, under, over);
+    } else {
+      labels(m, f, under, over, top);
+    }
     if (f.view === "mapping") {
       chains(m, f, under, over);
       wiring(m, f, board, over);

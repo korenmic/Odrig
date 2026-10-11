@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from odrig import errors, mapping
+from odrig import errors, jsonframes, mapping, odrg
 
 from . import support
 
@@ -271,7 +271,8 @@ def leg_list(text):
 
 class LegList(unittest.TestCase):
     def test_every_mapping_gives_its_legs_in_the_order_of_the_file(self):
-        texts = {**support.mapping_texts(), **support.column_mapping_texts()}
+        texts = support.mapping_texts()
+        self.assertLessEqual({"legs-2", "legs-20", *support.MADE_UP_MAPPINGS, *support.MADE_UP_COLUMN_MAPPINGS}, set(texts))
         self.assertGreaterEqual(len(texts), 10)
         runs = support.start_each([{"mapping.json": text} for text in texts.values()])
         kinds = set()
@@ -294,6 +295,54 @@ class LegList(unittest.TestCase):
         for name, count in (("legs-2", 2), ("legs-10", 10)):
             run = support.start({"mapping.json": support.mapping_texts()[name]})
             self.assertEqual(run.legs, tuple((number, number, 180) for number in range(1, count + 1)))
+
+    def test_the_target_file_has_twenty_legs_of_180_leds_on_the_pins_1_to_18_21_and_47(self):
+        run = support.start({"mapping.json": support.mapping_texts()["legs-20"]})
+        self.assertEqual(run.core, "ok")
+        self.assertEqual(run.error, "show-missing")
+        pins = (*range(1, 19), 21, 47)
+        self.assertEqual(len(pins), 20)
+        self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate(pins, start=1)))
+
+    def target_with(self, clip):
+        """A session on the target file with a show of one clip, asked for its reason and
+        for one refresh."""
+        files = {
+            "mapping.json": support.mapping_texts()["legs-20"],
+            "show.json": support.show_text([{"id": 1, "file": "clip.odrg"}], 255, 1),
+            "clip.odrg": clip,
+        }
+        return support.start(files, ["error", "poll 0"])
+
+    def test_the_canvas_of_the_target_file_is_60_by_60(self):
+        for width, height in ((60, 30), (30, 60), (60, 61), (180, 20), (20, 180)):
+            run = self.target_with(support.clip("another size", width, height, (20,)))
+            self.assertEqual(run.error, "size-mismatch clip.odrg", (width, height))
+            self.assertEqual(run.lines[0], "error size-mismatch clip.odrg")
+        run = self.target_with(support.clip("the size", 60, 60, (20,)))
+        self.assertIsNone(run.error)
+        self.assertEqual(run.lines[:2], ["error none", "refresh 0"])
+        self.assertEqual(len(run.lines), 22)
+
+    def test_the_corners_of_the_target_file_are_where_its_requirement_puts_them(self):
+        # Pixel (x, y) has the colour (x, y, 200), so an LED tells which pixel it shows.
+        picture = b"".join(bytes((x, y, 200)) for y in range(1, 61) for x in range(1, 61))
+        run = self.target_with(odrg.encode(jsonframes.Animation(60, 60, ((20, picture),))))
+        self.assertEqual(run.lines[:2], ["error none", "refresh 0"])
+        legs = {}
+        for line in run.lines[2:]:
+            word, leg, data = line.split(" ")
+            self.assertEqual(word, "data")
+            leds = bytes.fromhex(data)
+            self.assertEqual(len(leds), 540)
+            legs[int(leg)] = [tuple(leds[at:at + 2]) for at in range(0, 540, 3)]
+        self.assertEqual(sorted(legs), list(range(1, 21)))
+        self.assertEqual([legs[1][n - 1] for n in (1, 60, 61, 120, 121)], [(1, 1), (1, 60), (2, 60), (2, 1), (3, 1)])
+        self.assertEqual(legs[20][180 - 1], (60, 60))
+        for number, leds in legs.items():
+            first = 3 * number - 2
+            self.assertEqual([leds[n - 1] for n in (1, 60, 61, 120, 121, 180)],
+                             [(first, 1), (first, 60), (first + 1, 60), (first + 1, 1), (first + 2, 1), (first + 2, 60)], number)
 
     def test_mappings_at_the_edges_of_the_rules_are_accepted(self):
         runs = support.start_each([{"mapping.json": json.dumps(value)} for value in ALLOWED.values()])

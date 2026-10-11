@@ -2,7 +2,7 @@
    Run in the JavaScript shell after the page's scripts:
    jsc board.js layout.js dump_layout.js -- MAPPING [QUESTIONS]
    QUESTIONS is a JSON object: {"areas": [[width, height], ...], "points": [[x, y], ...],
-   "leds": [[pin, n], ...], "pins": [pin, ...]}. */
+   "leds": [[pin, n], ...], "pins": [pin, ...], "counts": [count, ...]}. */
 
 var text = read(arguments[0]);
 var asked = arguments.length > 1 ? JSON.parse(arguments[1]) : {};
@@ -18,13 +18,15 @@ var out = {
     return places;
   }),
   found: [],
-  rows: m.legs.map(function (leg, i) { return OdrigLayout.rows(m, i); }),
+  strips: m.legs.map(function (leg, i) { return OdrigLayout.strips(m, i); }),
   paths: m.legs.map(function (leg, i) { return OdrigLayout.path(m, i); }),
   runs: m.legs.map(function (leg, i) { return OdrigLayout.runs(m, i); }),
   colours: m.legs.map(function (leg, i) { return OdrigLayout.colour(i); }),
   manyColours: [],
   shown: [],
   fits: (asked.areas || []).map(function (area) { return OdrigLayout.fit(m, area[0], area[1]); }),
+  spans: [],
+  marks: (asked.counts || []).map(function (count) { return OdrigLayout.marks(count); }),
   board: OdrigBoard,
   side: OdrigLayout.side(m),
   tracks: OdrigLayout.tracks(m),
@@ -56,13 +58,14 @@ for (var y = 1; y <= m.height; y += 1) {
   }
   out.found.push(row);
 }
-for (var i = 0; i < 30; i += 1) {
+for (var i = 0; i < 45; i += 1) {
   out.manyColours.push(OdrigLayout.colour(i));
 }
 for (var v = 0; v <= 255; v += 1) {
   out.shown.push(OdrigLayout.shown(v));
 }
 out.fits.forEach(function (f) {
+  out.spans.push(m.kind === "columns" ? OdrigLayout.legSpans(m, f) : null);
   var corners = [[1, 1], [m.width, 1], [1, m.height], [m.width, m.height]];
   out.centres.push(corners.map(function (corner) { return OdrigLayout.centre(m, f, corner[0], corner[1]); }));
   out.cells.push(corners.map(function (corner) {

@@ -112,7 +112,8 @@ class OneLoopAndIntoTheNext(Playback):
 
 class EveryLedShowsItsPixel(Playback):
     def test_on_every_mapping_each_led_shows_the_pixel_the_rule_gives_it(self):
-        texts = {**support.mapping_texts(), **support.column_mapping_texts()}
+        texts = support.mapping_texts()
+        self.assertLessEqual({"legs-2", "legs-20", *support.MADE_UP_MAPPINGS, *support.MADE_UP_COLUMN_MAPPINGS}, set(texts))
         kinds = set()
         for name, text in texts.items():
             with self.subTest(mapping=name):

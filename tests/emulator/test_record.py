@@ -172,6 +172,34 @@ class Recording(unittest.TestCase):
         self.assertEqual(len(recording.ticks), 1000)
         self.assertGreater(differing, 500)
 
+    def test_a_first_led_at_the_top_reverses_every_column_of_that_leg_of_the_target_file_and_of_no_other(self):
+        target = core_support.mapping_texts()["legs-20"]
+        files = {
+            "mapping.json": target,
+            "show.json": core_support.show_text([{"id": 1, "file": "clip.odrg"}], brightness=255, start=1),
+            "clip.odrg": core_support.clip("upright", 60, 60, durations=(20,) * 25),
+        }
+        refreshes, _ = support.reference(files, tick_times(1))
+        mapping = json.loads(target)
+        self.assertEqual((mapping["legs"][6]["leg"], mapping["legs"][6]["first_led"], mapping["legs"][6]["columns"]), (7, "bottom", [19, 20, 21]))
+        mapping["legs"][6]["first_led"] = "top"
+        recording, _ = self.record(self.installed({**files, "mapping.json": json.dumps(mapping)}), 1)
+        self.assertEqual(recording.legs, tuple((leg["leg"], leg["pin"], 180) for leg in mapping["legs"]))
+        self.assertEqual(len(recording.legs), 20)
+        differing = 0
+        for tick, reference in zip(recording.ticks, refreshes):
+            for index, (got, wanted) in enumerate(zip(recfile.split(recording, tick.data), reference)):
+                if index != 6:
+                    self.assertEqual(got, wanted, f"tick {tick.ms}: leg {index + 1}")
+                    continue
+                for column in range(3):
+                    got_leds = [got[offset:offset + 3] for offset in range(180 * column, 180 * (column + 1), 3)]
+                    wanted_leds = [wanted[offset:offset + 3] for offset in range(180 * column, 180 * (column + 1), 3)]
+                    self.assertEqual(got_leds, wanted_leds[::-1], f"tick {tick.ms}: column {column} of leg 7")
+                differing += got != wanted
+        self.assertEqual(len(recording.ticks), 50)
+        self.assertEqual(differing, 50)
+
     def test_an_invalid_mapping_gives_no_legs_and_no_refresh(self):
         files = core_support.example_show()
         files["mapping.json"] = b'{"version": 1, "width": 60}'

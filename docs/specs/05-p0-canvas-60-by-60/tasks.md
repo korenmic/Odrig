@@ -152,7 +152,7 @@ Rules for every task:
     `mapping-malformed` for a valid column-leg file.
   - Requirements: 5.1, 5.2, 5.3, 5.5, 5.7, 15.2, 15.3
 
-- [ ] 5. The page reads both kinds, the LEDs view for upright legs, and the target file
+- [x] 5. The page reads both kinds, the LEDs view for upright legs, and the target file
   - Add `mapping/legs-20.json` with the bytes the design prints.
   - `emulator/web/layout.js`: `read`, `position` and `find` for both kinds; the strips,
     the path and the runs of a leg; `side`; twenty colours; the LEDs view for column legs

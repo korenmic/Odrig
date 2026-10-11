@@ -80,6 +80,43 @@ class TrackedFiles(unittest.TestCase):
                 self.assertEqual({result.led_count(entry) for entry in result.legs}, {180})
 
 
+class TargetFile(unittest.TestCase):
+    PINS = (*range(1, 19), 21, 47)
+
+    def setUp(self):
+        self.path = support.ROOT / "mapping" / "legs-20.json"
+        self.canvas = mapping.read(self.path)
+
+    def test_it_is_a_column_leg_file_of_60_by_60_with_twenty_legs_of_180_leds(self):
+        self.assertEqual(self.canvas.kind, mapping.COLUMNS)
+        self.assertEqual((self.canvas.width, self.canvas.height), (60, 60))
+        self.assertEqual(self.canvas.strip_length, 60)
+        self.assertEqual(len(self.canvas.legs), 20)
+        self.assertEqual([self.canvas.led_count(entry) for entry in self.canvas.legs], [180] * 20)
+
+    def test_leg_n_has_the_columns_3n_minus_2_to_3n_from_the_bottom_on_the_pins_1_to_18_21_and_47(self):
+        self.assertEqual(len(self.PINS), 20)
+        self.assertEqual(self.canvas.legs, tuple(mapping.Leg(n, pin, "bottom", (3 * n - 2, 3 * n - 1, 3 * n)) for n, pin in enumerate(self.PINS, start=1)))
+        self.assertEqual([entry.leg for entry in self.canvas.legs], list(range(1, 21)))
+        self.assertEqual([entry.pin for entry in self.canvas.legs], [*range(1, 19), 21, 47])
+
+    def test_its_corners_are_where_the_requirement_puts_them(self):
+        first, last = self.canvas.legs[0], self.canvas.legs[19]
+        self.assertEqual([mapping.position(self.canvas, first, n) for n in (1, 60, 61, 120, 121)], [(1, 1), (1, 60), (2, 60), (2, 1), (3, 1)])
+        self.assertEqual(mapping.position(self.canvas, last, 180), (60, 60))
+        file = json.loads(self.path.read_bytes())
+        self.assertEqual([place_by_the_rule(file, file["legs"][0], n) for n in (1, 60, 61, 120, 121)], [(1, 1), (1, 60), (2, 60), (2, 1), (3, 1)])
+        self.assertEqual(place_by_the_rule(file, file["legs"][19], 180), (60, 60))
+
+    def test_its_members_are_written_as_the_mapping_document_writes_a_column_leg_file(self):
+        lines = ["{", '  "version": 1,', '  "height": 60,', '  "legs": [']
+        for n, pin in enumerate(self.PINS, start=1):
+            end = "," if n < 20 else ""
+            lines.append(f'    {{"leg": {n}, "pin": {pin}, "first_led": "bottom", "columns": [{3 * n - 2}, {3 * n - 1}, {3 * n}]}}{end}')
+        lines += ["  ]", "}"]
+        self.assertEqual(self.path.read_bytes(), ("\n".join(lines) + "\n").encode("ascii"))
+
+
 class Accepted(unittest.TestCase):
     def test_the_height_is_the_total_number_of_rows(self):
         self.assertEqual(mapping.loads(source()).height, 6)
@@ -528,6 +565,7 @@ ROW_LEG_FILES = {
 }
 
 COLUMN_LEG_FILES = {
+    "legs-20": (support.ROOT / "mapping" / "legs-20.json").read_bytes(),
     "two legs of three columns of 60": column_source(),
     "one leg that starts at the top": column_source(height=7, legs=[column_leg(1, 1, "top", columns=(1, 2, 3))]),
     "two and four columns": column_source(height=5, legs=[column_leg(1, 4, "bottom", columns=(1, 2)), column_leg(2, 5, "top", columns=(6, 5, 4, 3))]),

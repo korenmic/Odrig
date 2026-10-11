@@ -7,7 +7,9 @@ var OdrigLayout = (function () {
   "use strict";
 
   var COLOURS = ["#ff6b6b", "#ffa94d", "#ffd43b", "#a9e34b", "#51cf66", "#38d9a9",
-                 "#3bc9db", "#4dabf7", "#748ffc", "#b197fc", "#f783ac", "#ced4da"];
+                 "#3bc9db", "#4dabf7", "#748ffc", "#b197fc", "#f783ac", "#ced4da",
+                 "#e599f7", "#c98f5a", "#a5d8ff", "#7fa650", "#96f2d7", "#868e96",
+                 "#1098ad", "#ffa8a8"];
 
   var MIN_CELL = 4;
   var MAX_CELL = 28;
@@ -17,6 +19,15 @@ var OdrigLayout = (function () {
   var ROOMY = {gutter: 16, bracket: 84, yLabel: 40, number: 34, top: 22, bottom: 10};
   var COMPACT = {gutter: 10, bracket: 56, yLabel: 30, number: 24, top: 18, bottom: 8};
   var ROOMY_FROM = 13;
+
+  /* The parts around the canvas of a column-leg file: the gutters, the marks of the rows
+     at the left, the header with the marks of the columns, the band with the bracket, the
+     number and the pin of every leg, the two bands with the LED numbers at the ends of the
+     columns, and the margins above and below. */
+  var UPRIGHT_ROOMY = {gutter: 16, yLabel: 40, header: 20, legBand: 42, number: 34, margin: 10};
+  var UPRIGHT_COMPACT = {gutter: 10, yLabel: 30, header: 16, legBand: 32, number: 24, margin: 6};
+  /* The LED numbers at the ends of the columns are drawn where the cells are this large. */
+  var NUMBERED_FROM = 9;
 
   /* The mapping view with the board beside the canvas: the parts around the canvas, the
      channel of the lines between canvas and board, and the room for the leg labels and
@@ -37,22 +48,38 @@ var OdrigLayout = (function () {
   var BOARD = {width: 11.5, height: 26.25, head: 2.75, inset: 0.5625, pad: 0.27};
   var PITCH = {least: 10, usual: 16, most: 20};
 
-  /* The mapping of a mapping file: the width, the height (the number of rows of all
-     legs) and the legs, each with its number of LEDs. */
+  /* The mapping of a mapping file: its kind, "rows" or "columns", the width and the
+     height of the canvas, and the legs, each with its strips in chain order (the y of each
+     row, or the x of each column) and its number of LEDs. A file with `height` is a
+     column-leg file: its height is that member and its width the number of columns of all
+     legs. A row-leg file has `width`, and its height is the number of rows of all legs. */
   function read(text) {
     var file = JSON.parse(text);
-    var height = 0;
+    var columns = file.height !== undefined;
+    var length = columns ? file.height : file.width;
+    var total = 0;
     var legs = file.legs.map(function (leg) {
-      height += leg.rows.length;
+      var strips = (columns ? leg.columns : leg.rows).slice();
+      total += strips.length;
       return {
         leg: leg.leg,
         pin: leg.pin,
         first_led: leg.first_led,
-        rows: leg.rows.slice(),
-        count: file.width * leg.rows.length
+        strips: strips,
+        count: length * strips.length
       };
     });
-    return {width: file.width, height: height, legs: legs};
+    return {
+      kind: columns ? "columns" : "rows",
+      width: columns ? total : length,
+      height: columns ? length : total,
+      legs: legs
+    };
+  }
+
+  /* The number of LEDs in every strip: in every row, or in every column. */
+  function stripLength(m) {
+    return m.kind === "columns" ? m.height : m.width;
   }
 
   /* The index in the file of the leg on a pin, or -1. */
@@ -65,13 +92,17 @@ var OdrigLayout = (function () {
     return -1;
   }
 
-  /* Whether row r of a leg, counted in chain order from 0, starts on the right. */
-  function startsRight(leg, r) {
-    return (leg.first_led === "right") === (r % 2 === 0);
+  /* Whether strip s of a leg, counted in chain order from 0, starts at the end where the
+     canvas coordinate along it is 1: the left end of a row, the bottom end of a column.
+     The first strip starts at the `first_led` end, and every strip after it at the end
+     opposite to the one before. */
+  function startsLow(leg, s) {
+    return (leg.first_led === "left" || leg.first_led === "bottom") === (s % 2 === 0);
   }
 
   /* [x, y] of LED n, counted from 1, of the leg on a pin: the rule of docs/mapping.md,
-     "Where each LED is". Null when the pin has no leg or the leg no such LED. */
+     "Where each LED is", for the kind of the file. Null when the pin has no leg or the
+     leg no such LED. */
   function position(m, pin, n) {
     var i = legOfPin(m, pin);
     if (i < 0) {
@@ -81,69 +112,107 @@ var OdrigLayout = (function () {
     if (n !== Math.floor(n) || n < 1 || n > leg.count) {
       return null;
     }
-    var r = Math.floor((n - 1) / m.width);
-    var along = (n - 1) % m.width;
-    return [startsRight(leg, r) ? m.width - along : 1 + along, leg.rows[r]];
+    var length = stripLength(m);
+    var s = Math.floor((n - 1) / length);
+    var passed = (n - 1) % length;
+    var along = startsLow(leg, s) ? 1 + passed : length - passed;
+    return m.kind === "columns" ? [leg.strips[s], along] : [along, leg.strips[s]];
   }
 
   /* The leg, by its index in the file, and the LED number at a canvas position, or null. */
   function find(m, x, y) {
-    if (x !== Math.floor(x) || x < 1 || x > m.width) {
+    var columns = m.kind === "columns";
+    var across = columns ? x : y;
+    var along = columns ? y : x;
+    var length = stripLength(m);
+    if (along !== Math.floor(along) || along < 1 || along > length) {
       return null;
     }
     for (var i = 0; i < m.legs.length; i += 1) {
-      var r = m.legs[i].rows.indexOf(y);
-      if (r >= 0) {
-        var along = startsRight(m.legs[i], r) ? m.width - x : x - 1;
-        return {leg: i, led: r * m.width + along + 1};
+      var s = m.legs[i].strips.indexOf(across);
+      if (s >= 0) {
+        var passed = startsLow(m.legs[i], s) ? along - 1 : length - along;
+        return {leg: i, led: s * length + passed + 1};
       }
     }
     return null;
   }
 
-  /* For each row of leg i in chain order: its y, the side it starts on, and the LED
-     numbers at its start and at its end. */
-  function rows(m, i) {
+  /* For each strip of leg i in chain order: its place across the strips, as `y` for a row
+     and as `x` for a column, the end it starts at ("left" or "right" for a row, "bottom"
+     or "top" for a column), and the LED numbers at its start and at its end. */
+  function strips(m, i) {
     var leg = m.legs[i];
-    return leg.rows.map(function (y, r) {
-      return {
-        y: y,
-        start: startsRight(leg, r) ? "right" : "left",
-        first: r * m.width + 1,
-        last: (r + 1) * m.width
+    var columns = m.kind === "columns";
+    var length = stripLength(m);
+    return leg.strips.map(function (across, s) {
+      var low = startsLow(leg, s);
+      var strip = {
+        start: columns ? (low ? "bottom" : "top") : (low ? "left" : "right"),
+        first: s * length + 1,
+        last: (s + 1) * length
       };
+      strip[columns ? "x" : "y"] = across;
+      return strip;
     });
   }
 
-  /* The corner points of the chain of leg i in canvas coordinates: for each row in
+  /* The corner points of the chain of leg i in canvas coordinates: for each strip in
      chain order, where it starts and where it ends. */
   function path(m, i) {
+    var columns = m.kind === "columns";
+    var length = stripLength(m);
     var points = [];
-    rows(m, i).forEach(function (row) {
-      var fromRight = row.start === "right";
-      points.push([fromRight ? m.width : 1, row.y]);
-      points.push([fromRight ? 1 : m.width, row.y]);
+    strips(m, i).forEach(function (strip) {
+      var low = strip.start === "left" || strip.start === "bottom";
+      [low ? 1 : length, low ? length : 1].forEach(function (along) {
+        points.push(columns ? [strip.x, along] : [along, strip.y]);
+      });
     });
     return points;
   }
 
-  /* The rows of leg i as runs of neighbouring rows, from the top of the canvas down:
-     the highest and the lowest y of each run. */
+  /* The strips of leg i as runs of neighbouring strips. The rows of a row leg from the
+     top of the canvas down: the highest and the lowest y of each run, as `top` and
+     `bottom`. The columns of a column leg from the left: the lowest and the highest x of
+     each run, as `left` and `right`. */
   function runs(m, i) {
-    var ys = m.legs[i].rows.slice().sort(function (a, b) { return b - a; });
+    var columns = m.kind === "columns";
+    var first = columns ? "left" : "top";
+    var last = columns ? "right" : "bottom";
+    var step = columns ? 1 : -1;
+    var sorted = m.legs[i].strips.slice().sort(function (a, b) { return step * (a - b); });
     var found = [];
-    ys.forEach(function (y) {
-      var last = found[found.length - 1];
-      if (last && last.bottom === y + 1) {
-        last.bottom = y;
+    sorted.forEach(function (across) {
+      var run = found[found.length - 1];
+      if (run && run[last] + step === across) {
+        run[last] = across;
       } else {
-        found.push({top: y, bottom: y});
+        run = {};
+        run[first] = across;
+        run[last] = across;
+        found.push(run);
       }
     });
     return found;
   }
 
-  /* The colour of the leg at index i of the file. */
+  /* The rows, or the columns, that are marked beside a canvas that has `count` of them:
+     the first, every tenth and the last. A tenth nearer than three to the last is left
+     out, so that no mark stands on another. */
+  function marks(count) {
+    var found = [1];
+    for (var tenth = 10; tenth < count - 2; tenth += 10) {
+      found.push(tenth);
+    }
+    if (count > 1) {
+      found.push(count);
+    }
+    return found;
+  }
+
+  /* The colour of the leg at index i of the file. A leg beyond the last colour takes the
+     colours again from the start. */
   function colour(i) {
     return COLOURS[i % COLOURS.length];
   }
@@ -207,14 +276,16 @@ var OdrigLayout = (function () {
     };
   }
 
-  /* The side of the canvas on which most legs have their first LED, "right" when the
-     two sides are equal. The board is drawn on this side. */
+  /* The feed edge: the edge of the canvas at which most legs have their first LED. For a
+     row-leg file "right" or "left", "right" when the two are equal; the board is drawn on
+     this side. For a column-leg file "bottom" or "top", "bottom" when the two are equal. */
   function side(m) {
+    var edges = m.kind === "columns" ? ["bottom", "top"] : ["right", "left"];
     var balance = 0;
     m.legs.forEach(function (leg) {
-      balance += leg.first_led === "right" ? 1 : -1;
+      balance += leg.first_led === edges[0] ? 1 : -1;
     });
-    return balance >= 0 ? "right" : "left";
+    return balance >= 0 ? edges[0] : edges[1];
   }
 
   /* The row of pins of a board and the place in it of the pad for a GPIO, or null when
@@ -231,13 +302,13 @@ var OdrigLayout = (function () {
     return null;
   }
 
-  /* For each leg its track in the channel between the canvas and the board: the legs
-     ordered by the y of their first row, highest first, get the tracks 0, 1, 2 and so
-     on, track 0 nearest the canvas. */
+  /* For each leg of a row-leg file its track in the channel between the canvas and the
+     board: the legs ordered by the y of their first row, highest first, get the tracks 0,
+     1, 2 and so on, track 0 nearest the canvas. */
   function tracks(m) {
     var order = m.legs.map(function (leg, i) { return i; });
     order.sort(function (a, b) {
-      return m.legs[b].rows[0] - m.legs[a].rows[0] || a - b;
+      return m.legs[b].strips[0] - m.legs[a].strips[0] || a - b;
     });
     var track = [];
     order.forEach(function (i, k) {
@@ -455,9 +526,98 @@ var OdrigLayout = (function () {
     return below.cell > beside.cell ? below : beside;
   }
 
+  /* The place of every part of the drawing of a column-leg file, for a cell size and for
+     the point where the marks of the rows begin at the left and the drawing at the top.
+     From the top down: the header with the marks of the columns, the leg band, the upper
+     number band, the canvas and the lower number band. Where the feed edge is the top the
+     order is the other way round, so that the leg band lies on the side of the canvas away
+     from the feed edge. Without `numbered` the two number bands are left out. */
+  function uprightParts(m, parts, cell, numbered, x, y) {
+    var feed = side(m);
+    var canvasWidth = m.width * cell;
+    var canvasHeight = m.height * cell;
+    var number = numbered ? parts.number : 0;
+    var heights = [["header", parts.header], ["legBand", parts.legBand], ["numberAway", number], ["canvas", canvasHeight], ["numberFeed", number]];
+    var at = {};
+    var down = y;
+    (feed === "bottom" ? heights : heights.slice().reverse()).forEach(function (part) {
+      at[part[0]] = down;
+      down += part[1];
+    });
+    var canvasX = x + parts.yLabel;
+    function across(name, partHeight) {
+      return {x: canvasX, y: at[name], width: canvasWidth, height: partHeight};
+    }
+    return {
+      feed: feed,
+      header: across("header", parts.header),
+      legBand: across("legBand", parts.legBand),
+      legWords: {x: x, y: at.legBand, width: parts.yLabel, height: parts.legBand},
+      yLabel: {x: x, y: at.canvas, width: parts.yLabel, height: canvasHeight},
+      numberTop: numbered ? across(feed === "bottom" ? "numberAway" : "numberFeed", number) : null,
+      numberBottom: numbered ? across(feed === "bottom" ? "numberFeed" : "numberAway", number) : null,
+      canvas: across("canvas", canvasHeight)
+    };
+  }
+
+  /* The cell size and the place of every part of the drawing of a column-leg file for a
+     drawing area. The cell is the largest at which the drawing with its two number bands
+     fits the area. Where that is too small for the numbers, the bands are left out and
+     the cell is the largest that fits without them and is still too small for them. */
+  function fitUpright(m, width, height) {
+    function fixedHeight(parts, numbered) {
+      return 2 * parts.margin + parts.header + parts.legBand + (numbered ? 2 * parts.number : 0);
+    }
+    function cellFor(parts, numbered) {
+      var freeWidth = width - 2 * parts.gutter - parts.yLabel;
+      var freeHeight = height - fixedHeight(parts, numbered);
+      return clamp(Math.floor(Math.min(freeWidth / m.width, freeHeight / m.height)), MIN_CELL, MAX_CELL);
+    }
+    var parts = UPRIGHT_ROOMY;
+    var numbered = true;
+    var cell = cellFor(parts, numbered);
+    if (cell < ROOMY_FROM) {
+      parts = UPRIGHT_COMPACT;
+      cell = cellFor(parts, numbered);
+    }
+    if (cell < NUMBERED_FROM) {
+      numbered = false;
+      cell = Math.min(cellFor(parts, numbered), NUMBERED_FROM - 1);
+    }
+    var contentWidth = 2 * parts.gutter + parts.yLabel + m.width * cell;
+    var contentHeight = fixedHeight(parts, numbered) + m.height * cell;
+    var left = Math.max(0, Math.floor((width - contentWidth) / 2));
+    var top = Math.max(0, Math.floor((height - contentHeight) / 2));
+    var placed = uprightParts(m, parts, cell, numbered, left + parts.gutter, top + parts.margin);
+    return {
+      view: "leds",
+      feed: placed.feed,
+      cell: cell,
+      roomy: parts === UPRIGHT_ROOMY,
+      width: Math.max(width, contentWidth),
+      height: Math.max(height, contentHeight),
+      content: {x: left, y: top, width: contentWidth, height: contentHeight},
+      gutters: [
+        {x: left, y: top, width: parts.gutter, height: contentHeight},
+        {x: left + contentWidth - parts.gutter, y: top, width: parts.gutter, height: contentHeight}
+      ],
+      header: placed.header,
+      legBand: placed.legBand,
+      legWords: placed.legWords,
+      yLabel: placed.yLabel,
+      numberTop: placed.numberTop,
+      numberBottom: placed.numberBottom,
+      canvas: placed.canvas
+    };
+  }
+
   /* The cell size in pixels and the place of every part, for a drawing area of a width
-     and a height: the LEDs view, or with a board the mapping view. */
+     and a height. For a row-leg file: the LEDs view, or with a board the mapping view.
+     For a column-leg file: the drawing of its LEDs, with a board as without one. */
   function fit(m, width, height, board) {
+    if (m.kind === "columns") {
+      return fitUpright(m, width, height);
+    }
     return board ? fitMapping(m, width, height, board) : fitLeds(m, width, height);
   }
 
@@ -471,8 +631,12 @@ var OdrigLayout = (function () {
   }
 
   /* For each leg of a fitted mapping view: its pad, the label of the leg beside the pad,
-     and the corner points of the line from the pad to the first LED of the chain. */
+     and the corner points of the line from the pad to the first LED of the chain. The
+     drawing of a column-leg file has no board, and so no lines. */
   function wires(m, f, board) {
+    if (m.kind === "columns") {
+      return [];
+    }
     return f.arrangement === "below" ? wiresBelow(m, f) : wiresBeside(m, f);
   }
 
@@ -593,14 +757,18 @@ var OdrigLayout = (function () {
     });
   }
 
-  /* The corner points, in the pixels of a fitted drawing, of the chain of leg i: along
-     each row through the centres of its LEDs, and from the end of a row to the start of
-     the next by a short piece outside the edge of the canvas. `turns` says, for every
-     row but the first, where the chain comes back in and in which direction. */
+  /* The corner points, in the pixels of a fitted drawing, of the chain of leg i of a
+     row-leg file: along each row through the centres of its LEDs, and from the end of a
+     row to the start of the next by a short piece outside the edge of the canvas. `turns`
+     says, for every row but the first, where the chain comes back in and in which
+     direction. The drawing of a column-leg file has no chain: no point and no turn. */
   function chain(m, f, i) {
-    var corners = path(m, i);
     var points = [];
     var turns = [];
+    if (m.kind === "columns") {
+      return {points: points, turns: turns};
+    }
+    var corners = path(m, i);
     for (var r = 0; r < corners.length; r += 2) {
       var start = centre(m, f, corners[r][0], corners[r][1]);
       var end = centre(m, f, corners[r + 1][0], corners[r + 1][1]);
@@ -615,6 +783,25 @@ var OdrigLayout = (function () {
       points.push(end);
     }
     return {points: points, turns: turns};
+  }
+
+  /* For each run of neighbouring columns of each leg of a column-leg file, the legs in
+     the order of the file: the leg by its index, the first and the last x of the run, and
+     the pixels the run takes across a fitted drawing, which the bracket of the run spans. */
+  function legSpans(m, f) {
+    var spans = [];
+    m.legs.forEach(function (leg, i) {
+      runs(m, i).forEach(function (run) {
+        spans.push({
+          leg: i,
+          left: run.left,
+          right: run.right,
+          x: f.canvas.x + (run.left - 1) * f.cell,
+          width: (run.right - run.left + 1) * f.cell
+        });
+      });
+    });
+    return spans;
   }
 
   /* The centre of a canvas position in the pixels of a fitted drawing. */
@@ -638,9 +825,10 @@ var OdrigLayout = (function () {
     legOfPin: legOfPin,
     position: position,
     find: find,
-    rows: rows,
+    strips: strips,
     path: path,
     runs: runs,
+    marks: marks,
     colour: colour,
     shown: shown,
     side: side,
@@ -649,6 +837,7 @@ var OdrigLayout = (function () {
     fit: fit,
     wires: wires,
     chain: chain,
+    legSpans: legSpans,
     centre: centre,
     cellAt: cellAt
   };
