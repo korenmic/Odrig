@@ -3017,9 +3017,9 @@ transparent index, delay and disposal. The pictures are built in the command lin
 the rules of the GIF format as browsers apply them, written out in the design, so that
 the command line and the app give the same pictures. For the GIFs of the suite, and for
 ordinary GIFs, these are Pillow's pictures. In the three corners named above the two
-tools differ; the documentation says so. The delays are the file's own, which the package gives
-unchanged. The decoder program can read GIFs too and is the fallback, with the GIF reader
-forced so that another kind of picture under the name is still refused.
+tools differ; the documentation says so. The delays are the file's own, which the package
+gives unchanged. The decoder program can read GIFs too and is the fallback, with the GIF
+reader forced so that another kind of picture under the name is still refused.
 
 **Resolution.** Seed 06 `requirements.md`, Requirement 14 criteria 5, 6 and 10;
 `design.md`, "GIF" and assumption A6.
@@ -3152,3 +3152,352 @@ checked by a program, so no owner's check holds the seed open; it stays `in_prog
 if Chrome cannot be started by a program.
 
 **Resolution.** Seed 06 `tasks.md`, tasks 1, 9 and 10.
+
+## Seed 07: Error codes the seed does not name
+
+**Question.** The seed names eight codes for the new commands: `in-use`, `bad-argument`,
+`no-space`, `busy`, `bad-offset`, `incomplete`, `bad-checksum` and `bad-file`. It has none
+for `upload data`, `upload end` or `upload cancel` when no upload is open, which is what a
+client meets after the 60 seconds or after a restart of the board; and none for a storage
+that cannot be read or written. The owner approves every addition to the command list.
+This is a gap in the seed.
+
+**Answer.** Two codes are added, as working assumptions until the owner rules:
+`no-upload`, for the three commands with no upload open, and `storage-error`, for a
+failure of the host's storage, after which the show is as it was. The others are used as
+far as they reach: `unknown-id` for `remove` of an id no item has, as for `play`, and
+`show-invalid` for `list`, `remove` and every `upload` command while the show is invalid.
+The order when several apply is one list for all commands: `line-too-long`,
+`unknown-command`, `bad-argument`, `show-invalid`, `no-upload`, `incomplete`,
+`bad-checksum`, `busy`, `unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file`,
+`storage-error`.
+
+**Resolution.** `docs/specs/07-p1-content-commands/requirements.md`, Requirement 9;
+`design.md`, "The text of docs/commands.md" and "What goes beyond the seed".
+
+## Seed 07: `busy` for `upload end` and for `remove`
+
+**Question.** The seed gives `busy` to `upload begin` when an upload is already open. It
+does not say what `remove` does while an upload is open, or what `upload end` does when
+the file cannot be judged at once.
+
+**Answer.** `remove` is refused with `busy` while an upload is open: the upload may be
+about to replace that item, and both need the one buffer the core writes `show.json`
+from. `upload end` is answered with `busy` while the file is still being checked; the
+upload stays open and the client sends `upload end` again. See "Seed 07: Checking an
+uploaded file while the show plays". Both are uses of an approved code that the owner has
+not seen.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 4 criterion 3 and Requirement 7
+criterion 6; `design.md`, "The upload".
+
+## Seed 07: The form of the base64 and of the CRC-32
+
+**Question.** The seed writes `<base64>` and `<crc32>` and gives neither a form. Seed 04
+found that WLED's web server takes a request body apart as a form when a client sends it
+as a form or as plain text, and that a body is safe then only without `&`, `=`, `+` and
+`%`. The usual base64 has `+`, `/` and `=`.
+
+**Answer.** The base64 is the alphabet of RFC 4648, section 5: `A`-`Z`, `a`-`z`, `0`-`9`,
+`-` and `_`, without padding, with the unused bits of the last character zero, so that a
+piece has one spelling. Every valid command line is then still free of the four
+characters, whatever content type a client sends. The CRC-32 is the one of zlib and PNG,
+written as exactly eight hexadecimal digits in lower case; the documents give the check
+value for `123456789`.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 6 criterion 2 and Requirement 7
+criteria 1 and 2; `design.md`, "The upload".
+
+## Seed 07: The chunk size
+
+**Question.** The reply to `upload begin` names C, the most data bytes of one
+`upload data` line. The seed fixes the line at 2,048 characters and not C.
+
+**Answer.** C is 1,500. The longest line is then `upload data`, an offset of ten digits
+and 2,000 characters of base64: 2,023 characters. 1,518 bytes would fit exactly; 1,500
+leaves room and is a multiple of three, so every piece but the last is whole groups of
+base64. C is a constant of the core, the same on every host.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criterion 1; `design.md`, "The
+upload".
+
+## Seed 07: Checking an uploaded file while the show plays
+
+**Question.** `upload end` must refuse a file that is not valid ODRG for the canvas, with
+the format's reason. Finding that out means decoding the whole file. At startup that
+took 3.1 seconds on the board for a dense 60 x 30 clip of ten seconds, as seed 04
+measured. The seed also says playback continues during an upload, and the core is one
+thread that the host calls.
+
+**Answer.** The file is checked in steps of one frame record, one step after each refresh
+the core produces, by a second decoder with its own buffers that reads the file back from
+storage. The check begins when the last byte has arrived. `upload end` is answered with
+`busy` until it has ended. A step is skipped after a refresh that came late, so the check
+never pushes the rate down further. Two things follow that the owner should know: a file
+of F frames is checked in about F fiftieths of a second, however simple it is, so Hello
+world takes five seconds; and the second decoder costs 43,568 bytes of the core's memory.
+Checking the bytes as they arrive was not chosen: the decoder pulls its input and cannot
+stop inside a frame record, and a file read back is a file that was really stored.
+Checking inside `upload end` in one go was not chosen: the LEDs would stand still for
+seconds.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 7 criterion 6 and Requirement 10
+criterion 6; `design.md`, "The check".
+
+## Seed 07: One host function more than the seed lists
+
+**Question.** The seed says the host interface grows only by writing a file, renaming,
+deleting, and asking for free and total space. The check of an uploaded file needs to
+read that file while the player has another file open, and `open`, `read` and `close`
+hold one file, read front to back.
+
+**Answer.** One more function, `read_at`: up to 512 bytes of a named file from an offset.
+It carries no state in the core, and a host serves it with a second open file. It is a
+working assumption until the owner rules. Without it the check would have to stop
+playback, or the uploaded file would have to be trusted unchecked.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 14 criterion 1; `design.md`, "The
+host interface" and "The check".
+
+## Seed 07: Writing a file is three host functions
+
+**Question.** "Writing a file" could be one function that adds bytes to a named file. An
+upload arrives over hundreds of commands.
+
+**Answer.** Three functions: `write_open`, `write` and `write_close`. The host keeps the
+file open between the commands, and the file system commits once, at the end. A host must
+promise that a file is whole in storage after `write_close`, and that a file being
+written when the power goes is one the core removes at its start.
+
+**Resolution.** Seed 07 `design.md`, "The host interface".
+
+## Seed 07: How many items a running show can hold, and what `no-space` covers
+
+**Question.** The core takes its tables once, at startup, sized from `show.json`, and may
+not allocate afterwards. An upload adds an item. `docs/show.md` sets no limit on the
+number of items, and the seed names no code for a show that is full.
+
+**Answer.** The tables are taken with room for 32 items more than the show has at
+startup, and for at least 128. A new item beyond that is refused with `no-space`, which
+the seed gives to "the file would not fit"; replacing and removing still work, and a
+restart or a removal makes room. No limit is put on what a show file may hold. `no-space`
+for the file itself is judged with a reserve: the size, a 256th of it and 16,384 bytes
+must be free.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criteria 4 and 5 and
+Requirement 13; `design.md`, "Tables with room".
+
+## Seed 07: A show without items
+
+**Question.** `remove` can remove the last item, and `space` can report 0 animations.
+`docs/show.md` says `items` holds one or more items, so a show whose last item was removed
+would be invalid at the next start, and an invalid show takes no upload.
+
+**Answer.** `items` may be empty. A show without items is valid: nothing plays, `list`
+gives no items, and an upload adds the first. This changes `docs/show.md`,
+`docs/reasons.md`, the core and the Python reader of show files, and the JavaScript one
+when it exists. It is a change to a governing document that the owner has not seen.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 4 criterion 9 and Requirement 12
+criterion 5; `design.md`, "The text of docs/show.md"; `tasks.md`, task 4.
+
+## Seed 07: A power cut between two files
+
+**Question.** A change touches up to three files: the animation, `show.json`, and the
+animation that is no longer needed. A rename replaces one file at once, not three, and
+the host interface cannot list the folder to find a file that no item names.
+
+**Answer.** Every change has one rename of `show.json` at which the show changes; before
+it the old show is whole and after it the new one. A new animation is renamed into place
+before that point and an old one deleted after it. So that no file is left that the show
+does not name, the core first writes the names concerned into a small file,
+`pending.txt`; at its start it removes every file named there that no item names, and
+then that file. The temporary files `upload.part` and `show.part` are removed at every
+start. A folder with none of the three is started as before.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 11; `design.md`, "The four kinds of
+change" and "What the start does with leftovers".
+
+## Seed 07: What show.json looks like after the core wrote it
+
+**Question.** The core must write `show.json`. Nothing says in what layout, or which
+brightness it writes after `brightness` commands.
+
+**Answer.** One line without spaces and a line feed, with the members in the order of
+`docs/show.md`. The brightness written is the one the file had when the core started:
+what `brightness` changes is not kept across a restart, as before. A file written by hand
+keeps its layout until the first change.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 12; `design.md`, "The text of
+docs/show.md".
+
+## Seed 07: A file name that another item has
+
+**Question.** `upload begin` names a file. `docs/show.md` lets two items name one file. An
+upload under the name of another item's file would change that item's animation too.
+
+**Answer.** It is refused with `in-use`. An upload for an item may use that item's own
+file name or a name no item has. A show installed over USB with two items on one file
+keeps working, and the file is deleted with the last item that names it.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criterion 4; `design.md`, "The
+upload".
+
+## Seed 07: `list` and `space` with an invalid show, and a cycle too long for a reply
+
+**Question.** The seed does not say what `list` gives when the show is invalid, or what
+is done with an item that does not fit into a reply of 1,024 bytes even alone, which a
+cycle of more than about 150 ids of five digits does not.
+
+**Answer.** With an invalid show `list` is refused with `show-invalid`, like `play`, and
+so are `remove` and the `upload` commands: a show that is invalid cannot be repaired by a
+command, only installed again. `space` still answers, with 0 animations. A cycle too long
+for a reply is listed with an empty `cycle`, which no valid show has, so that `list`
+always gets through the show.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 2 criterion 2, Requirement 3
+criteria 6 and 7 and Requirement 9 criterion 4.
+
+## Seed 07: What plays after a change
+
+**Question.** The seed says what happens when the playing item is removed. It does not
+say what happens when the file of the animation on the LEDs is replaced.
+
+**Answer.** When the item being played got a new file, or the cycle being played lists
+it, what is playing starts again from its first frame at the next refresh. Every other
+change leaves the LEDs exactly as they would have been. The player closes its file before
+a rename or a removal touches it.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 10 criteria 3 and 4; `design.md`,
+"Playback and a change".
+
+## Seed 07: What 60 seconds without data means
+
+**Question.** "An upload with no data for 60 seconds is discarded." After the last byte no
+data comes any more, the check can take longer than 60 seconds, and a client can go away
+before it sends `upload end`.
+
+**Answer.** The 60 seconds are counted from the last progress: `upload begin`, a piece
+that was taken, or a step of the check. A check that runs is never cut off; an upload
+whose check has ended and whose `upload end` does not come is discarded after 60 seconds.
+The time is that of the timestamps the host passes with its calls.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 8 criteria 2 and 3.
+
+## Seed 07: Memory close to the limit
+
+**Question.** The core's memory for the 60 x 60 canvas with 100 items must stay under
+128 KB. Seed 05 leaves it at 70,768 bytes.
+
+**Answer.** With this seed it is about 124,600 bytes, 95 percent of the limit: the second
+decoder's window and pixel buffer, 43,568 bytes, the longer line and reply, the chunk
+buffer, and tables with room. The limit holds and the suite measures it. A later feature
+has little left.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 13 criterion 4; `design.md`,
+"Memory".
+
+## Seed 07: The space the emulator reports
+
+**Question.** The emulator applies the commands to its folder. The disk of a Mac has
+hundreds of gigabytes free, so `no-space` could never be met and a client would show
+figures unlike the board's.
+
+**Answer.** The emulator reports the board's storage: 10,354,688 bytes in total, or the
+number given with `--storage`, and as free the total less the files of the folder, each
+rounded up to a block of 4,096 bytes. The files themselves are really written, renamed
+and deleted in the folder.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 16 criteria 2 and 3.
+
+## Seed 07: Long lines in the emulator's log
+
+**Question.** The page's log shows every command line. An upload is hundreds of lines of
+2,000 characters.
+
+**Answer.** A log entry carries the first 200 characters of a line and `length`, the
+number of characters it has, and the page shows both. `cut` keeps its meaning: the line
+was longer than the core's limit.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 16 criterion 5.
+
+## Seed 07: Writes on the board and the LEDs
+
+**Question.** The board must report 25 or more refreshes a second during an upload. A
+write to the flash stops the task that makes it, and the core's lock with it. Nothing
+about the times of WLED's file system on this board was measured for the spec.
+
+**Answer.** One `upload data` is one write of at most 1,500 bytes. The usermod times every
+storage call and gives the core no further command line until twice that time has passed,
+and at least 20 ms, without looking into a line: it holds the port's bytes and the web
+server's request back. Storage calls so take at most a third of the time. An early task
+measures this on the board with the probe build, before the core's upload is written. If
+25 cannot be held, the writes move to a task of their own, designed from what was
+measured.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 17; `design.md`, "Pacing" and
+assumptions B1 to B6; `tasks.md`, task 3.
+
+## Seed 07: A long line on the board's port
+
+**Question.** A line may have 2,048 characters. Read in the Arduino core: the USB serial
+port keeps received bytes in a queue of 256 bytes and drops what does not fit.
+
+**Answer.** The usermod makes the queue 4,096 bytes. Whether a line sent in one piece then
+always arrives whole is tried on the board in task 3; if not, the command tool sends a
+line in pieces.
+
+**Resolution.** Seed 07 `design.md`, fact S5 and assumption B4.
+
+## Seed 07: Which show the board is measured with
+
+**Question.** The definition of done asks for 25 or more refreshes a second during an
+upload and 49 or more afterwards. Whether the board holds 49 with twenty legs is an open
+question of seed 05.
+
+**Answer.** The measurement is made with the bench show on two legs, whose rate without
+an upload is 49 or more whatever seed 05 found, and with an upload of a dense bench clip
+of 60 seconds.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 17 criterion 4; `tasks.md`, task 7.
+
+## Seed 07: Details of the command tool
+
+**Question.** The seed gives the tool four commands, a percentage, a speed and a status
+that is not zero on a failure. It does not say where the progress goes, what name the
+file gets, or what the tool does about a reply that does not come.
+
+**Answer.** Progress goes to standard error, and standard output gets the reply that
+ended the command. The name sent is the last part of the file's path, as it is; the core
+judges it. A piece whose reply did not come is sent once more, and `bad-offset` for that
+second line means the first was taken. On any reply that is not ok the tool sends
+`upload cancel` and exits with 1. It waits on `busy` for up to 600 seconds. A file that
+cannot be read is status 2, with nothing sent. Over the port the tool keeps the port open
+for the whole upload.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 18; `design.md`, "The command
+tool".
+
+## Seed 07: No command gives the canvas size
+
+**Question.** The app of seed 09 converts a video on the phone for the installation's
+canvas and speaks to the board only through the commands. No command reports the canvas
+size.
+
+**Answer.** Nothing is added here: a command or a member of a reply is the owner's to
+approve. A file of the wrong size is refused by `upload end` with `bad-file` and the
+reason `size-mismatch`, after it was sent. Seed 09 has to settle where the app gets the
+size.
+
+**Resolution.** Seed 07 `design.md`, "Risks", item 8.
+
+## Seed 07: Recording the seed's progress
+
+**Question.** As for the other seeds, and as for seeds 04 and 08: the definition of done
+has an item only a person can check.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task is the owner's check over the board's network and sets
+`completed`; an agent leaves it open.
+
+**Resolution.** Seed 07 `tasks.md`, tasks 1 and 9.
