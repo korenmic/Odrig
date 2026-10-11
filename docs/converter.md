@@ -31,6 +31,68 @@ when another program uses it. The test suite needs the libraries.
 | 1 | An input was rejected. One line `error: <reason>: <detail>` is written to standard error and no output is left behind. The reasons are listed in [reasons.md](reasons.md). |
 | 2 | The command line was not understood. A usage message is written to standard error and nothing else is written. |
 
+## import
+
+```
+python -m odrig import MEDIA OUT.json --mapping MAPPING [--fit fill|fit|stretch]
+                       [--start SECONDS] [--duration SECONDS]
+```
+
+Turns a video or a GIF into a JSON frames file for the canvas of a mapping file. The media
+file's name ends in `.mp4`, `.mov` or `.gif`, in any letter case. The canvas is as wide as
+the mapping's `width` and as high as the number of rows the mapping lists.
+
+```
+python -m odrig import clip.mp4 animations/clip.json --mapping mapping/legs-2.json
+```
+
+**Timeline.** The output is built on the 50 frames-per-second timeline. Ticks are 20 ms
+apart, the first at the start time, and each tick takes the source frame that is on screen
+at that moment: the last frame that starts no later. Ticks that follow each other with the
+same picture are written as one frame, so every `ms` is a multiple of 20.
+
+- In a video, the first video stream is used and time is counted from its first frame. A
+  frame is on screen until the next one starts; the last one stays for the mean interval
+  between the frames. Sound is ignored.
+- In a GIF, each frame is on screen for the delay the file records. A delay of 10 ms or
+  less counts as 100 ms, as in web browsers. The frames are gone through once.
+- Transparent pixels are black.
+
+**Part of a file.** `--start` and `--duration` are decimal numbers of seconds. Without
+`--start` the part starts at 0; without `--duration` it runs to the end of the media. The
+number of ticks is the length of the part divided by 20 ms, rounded to the nearest, and at
+least one, so the output is within 20 ms of the length asked for. A part that is not inside
+the media is refused with `bad-range`; it is never shortened.
+
+```
+python -m odrig import clip.mp4 animations/clip.json --mapping mapping/legs-2.json \
+    --start 12.5 --duration 4
+```
+
+**Fitting.** Canvas pixels are square, so the canvas has the shape of its width to its
+height. `--fit` says how a picture of another shape is put on it:
+
+| Fit | Result |
+|---|---|
+| `fill` | The default. The picture is scaled by one factor until it covers the whole canvas; what overflows is cut off equally on the two opposite sides. |
+| `fit` | The picture is scaled by one factor until all of it lies inside the canvas, centred; the rest of the canvas is black. |
+| `stretch` | The picture is scaled to the whole canvas, by a different factor in each direction when the shapes differ. |
+
+The colour of a canvas pixel is the mean of the source area it covers, each source pixel
+weighted by the area they share, rounded to the nearest whole number with halves up. Area
+outside the picture counts as black, so the edge of a bar that falls inside a pixel is
+blended. The same rule is used when the picture is enlarged. The mean is computed in whole
+numbers, so the same decoded picture gives the same canvas picture on every computer.
+
+The top row of the picture lands on the top row of the canvas, row H.
+
+A rotation that a file records for display, pixels that are not square and colour profiles
+are not applied: the picture is used as the library decodes it. A video filmed upright on a
+phone has to be turned before it is imported.
+
+`import` checks the mapping file first, then the name of the media file, then that it
+exists. Its reasons are under "Media files" in [reasons.md](reasons.md).
+
 ## encode
 
 ```

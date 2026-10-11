@@ -51,7 +51,9 @@ FILE_MALFORMED = "file-malformed"
 SIZE_MISMATCH = "size-mismatch"
 OUTPUT_NOT_EMPTY = "output-not-empty"
 
+UNSUPPORTED_MEDIA = "unsupported-media"
 UNREADABLE_MEDIA = "unreadable-media"
+BAD_RANGE = "bad-range"
 
 
 class Rejection(Exception):

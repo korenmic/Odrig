@@ -36,6 +36,23 @@ class UsageErrors(unittest.TestCase):
         self.assertIn("usage:", result.err)
 
 
+class Subcommands(unittest.TestCase):
+    def test_exactly_the_five_subcommands_are_offered(self):
+        self.assertEqual(
+            [subcommand.name for subcommand in cli.SUBCOMMANDS], ["import", "encode", "decode", "check", "pack"]
+        )
+        result = support.run("--help")
+        self.assertEqual(result.status, 0)
+        for name in ("import", "encode", "decode", "check", "pack"):
+            self.assertIn(name, result.out)
+
+    def test_every_subcommand_explains_itself(self):
+        for subcommand in cli.SUBCOMMANDS:
+            result = support.run(subcommand.name, "--help")
+            self.assertEqual(result.status, 0)
+            self.assertIn(f"usage: python -m odrig {subcommand.name}", result.out)
+
+
 class StartedAsAModule(unittest.TestCase):
     def test_no_subcommand_exits_with_status_2(self):
         result = support.run_module()

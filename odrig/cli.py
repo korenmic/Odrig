@@ -6,12 +6,50 @@ the command line was not understood.
 
 import argparse
 import collections
+import decimal
 import sys
 
-from . import errors, files, jsonframes, odrg
+from . import errors, files, jsonframes, mapping, media, odrg
 from . import pack as packing
 
 Subcommand = collections.namedtuple("Subcommand", "name summary configure run")
+
+
+def _milliseconds(text):
+    """Seconds given as a decimal number, in whole milliseconds, rounded to the nearest."""
+    try:
+        seconds = decimal.Decimal(text)
+    except decimal.InvalidOperation:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of seconds") from None
+    if not seconds.is_finite():
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of seconds")
+    return int((seconds * 1000).quantize(decimal.Decimal(1), rounding=decimal.ROUND_HALF_UP))
+
+
+def _configure_import(parser):
+    parser.add_argument("input", metavar="MEDIA", help="the .mp4, .mov or .gif file to read")
+    parser.add_argument("output", metavar="OUT.json", help="the JSON frames file to write")
+    parser.add_argument("--mapping", required=True, help="the mapping file that gives the canvas size")
+    parser.add_argument(
+        "--fit",
+        choices=("fill", "fit", "stretch"),
+        default="fill",
+        help="how a picture of another shape is put on the canvas (default: fill)",
+    )
+    parser.add_argument(
+        "--start", type=_milliseconds, default=0, metavar="SECONDS", help="where the part to convert starts"
+    )
+    parser.add_argument(
+        "--duration", type=_milliseconds, default=None, metavar="SECONDS", help="how long the part to convert is"
+    )
+
+
+def _import(arguments):
+    canvas = mapping.read(arguments.mapping)
+    animation = media.import_media(
+        arguments.input, canvas, arguments.fit, arguments.start, arguments.duration
+    )
+    jsonframes.write(arguments.output, animation)
 
 
 def _configure_encode(parser):
@@ -100,6 +138,7 @@ def _pack(arguments):
 
 
 SUBCOMMANDS = (
+    Subcommand("import", "Turns a video or GIF file into a JSON frames file.", _configure_import, _import),
     Subcommand("encode", "Turns a JSON frames file into an ODRG file.", _configure_encode, _encode),
     Subcommand("decode", "Turns an ODRG file back into a JSON frames file.", _configure_decode, _decode),
     Subcommand("check", "Validates a JSON frames or ODRG file and summarises it.", _configure_check, _check),

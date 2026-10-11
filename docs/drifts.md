@@ -759,3 +759,35 @@ have. The suite was run with numpy 2.4.6 on Python 3.14. The line for Python 3.1
 verified, because no Python 3.10 is installed here.
 
 **Resolution.** `requirements.txt`; seed 01 `design.md`, "Third-party libraries".
+
+## Seed 01: The versions of Pillow and PyAV
+
+**Question.** Which exact versions of Pillow and PyAV does `requirements.txt` name, and does
+PyAV install with pip alone on this Mac's Python 3.14?
+
+**Answer.** Pillow 12.3.0 and PyAV 17.1.0. Both install with pip alone on Python 3.14 on
+this Mac, and both publish ready-made packages for Python 3.10 and later on macOS, Windows
+and Linux. PyAV 17.1.0 is not the newest release: 18 needs Python 3.11 and 19 needs Python
+3.12. It carries its own FFmpeg libraries, with the `mpeg4` encoder the tests use to make
+their inputs. The names the design uses (`av.open`, `streams.video`, `decode`, `pts`,
+`time_base`, `to_ndarray`) are as described in that version, and a file it cannot decode
+raises `av.error.FFmpegError`.
+
+**Resolution.** `requirements.txt`; seed 01 `design.md`, "Third-party libraries".
+
+## Seed 01: Details of `import` settled while implementing
+
+**Question.** The requirements give `import` its reasons but not the order of its checks,
+and leave three cases open: a video with transparent pixels, although the design decodes
+video without transparency; a file named `.gif` that is in fact another kind of picture;
+and a video whose frames carry no time or come out of order.
+
+**Answer.** `import` reads the mapping file first, as `pack` does, then judges the name of
+the media file, then that it exists, then a negative start or a duration that is not above
+0, then decodes, and judges the part against the length of the media last. A video is
+decoded with its transparency and laid over black, like a GIF, so transparent pixels are
+black in every kind of file. A `.gif` file is read by the GIF reader only, so another kind
+of picture under that name is `unreadable-media`. A frame without a presentation time, or
+frames whose times go backwards, are `unreadable-media` too.
+
+**Resolution.** Seed 01 `design.md`, "Import timeline"; `docs/converter.md`, "import".

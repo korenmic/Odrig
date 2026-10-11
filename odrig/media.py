@@ -1,17 +1,100 @@
-"""import: putting the picture of a media file on the canvas.
+"""import: reading a media file, sampling it on the 20 ms timeline and fitting it to the canvas.
 
 This is the only module that needs third-party libraries. It loads them inside its
 functions, so the rest of the tool runs with the Python standard library alone.
 
 A source picture is a numpy array of rows x columns x 3 bytes, the top row first. A canvas
-picture is `bytes` in the pixel order of docs/format.md, the bottom row first.
+picture is `bytes` in the pixel order of docs/format.md, the bottom row first. Times are
+exact fractions of milliseconds.
 """
 
+import os
 from fractions import Fraction
 
-from . import errors
+from . import errors, jsonframes
 
 FITS = ("fill", "fit", "stretch")
+TICK_MS = 20
+SHORTEST_GIF_DELAY_MS = 10
+GIF_DELAY_MS = 100
+
+
+def import_media(path, mapping, fit="fill", start_ms=0, duration_ms=None):
+    """The animation of a media file on the canvas of a mapping: one 20 ms frame for each tick."""
+    frames = source_frames(path)
+    width, height = mapping.width, mapping.height
+
+    def place(picture):
+        rows, columns = picture.shape[:2]
+        return resample(picture, source_rect(columns, rows, width, height, fit), width, height)
+
+    with errors.naming(path):
+        pictures = tick_pictures(frames, start_ms, duration_ms, place)
+    return jsonframes.Animation(width, height, tuple((TICK_MS, picture) for picture in pictures))
+
+
+def source_frames(path):
+    """`(start_ms, end_ms, picture)` for each frame of a media file, in the order they are shown.
+
+    The reader is chosen by the ending of the file name, in any letter case. Nothing is
+    decoded before the frames are asked for.
+    """
+    reader = _READERS.get(os.path.splitext(os.fspath(path))[1].lower())
+    if reader is None:
+        raise errors.Rejection(
+            errors.UNSUPPORTED_MEDIA, f"{path}: the name does not end in .mp4, .mov or .gif"
+        )
+    if not os.path.isfile(path):
+        raise errors.Rejection(errors.NOT_FOUND, f"{path}: there is no such file")
+    return reader(path)
+
+
+def tick_pictures(frames, start_ms, duration_ms, resample):
+    """One canvas picture for each 20 ms tick of the requested part of the media.
+
+    The first tick is at `start_ms`. A tick shows the frame that is on screen at its time:
+    the last frame that starts no later. `resample` turns a source picture into a canvas
+    picture and is called once for each frame that is on screen at a tick. Without a
+    duration the part runs to the end of the media, which is the end of its last frame.
+    """
+    if start_ms < 0:
+        raise errors.Rejection(errors.BAD_RANGE, "the start is negative")
+    if duration_ms is not None and duration_ms <= 0:
+        raise errors.Rejection(errors.BAD_RANGE, "the duration is not above 0")
+    wanted = None if duration_ms is None else tick_count(duration_ms)
+    stop = None if duration_ms is None else start_ms + duration_ms
+
+    pictures = []
+    length = None
+    for _, end, picture in frames:
+        length = end
+        placed = None
+        while (wanted is None or len(pictures) < wanted) and start_ms + TICK_MS * len(pictures) < end:
+            if placed is None:
+                placed = resample(picture)
+            pictures.append(placed)
+        if stop is not None and end >= stop:
+            break
+    if length is None:
+        raise errors.Rejection(errors.UNREADABLE_MEDIA, "the file holds no picture")
+    if start_ms >= length:
+        raise errors.Rejection(
+            errors.BAD_RANGE, f"the start of {start_ms} ms is not before the end of the media at {_ms(length)} ms"
+        )
+    if stop is not None and stop > length:
+        raise errors.Rejection(
+            errors.BAD_RANGE, f"the part ends at {stop} ms, after the end of the media at {_ms(length)} ms"
+        )
+    return pictures[:wanted if wanted is not None else tick_count(length - start_ms)]
+
+
+def tick_count(length_ms):
+    """The number of 20 ms ticks of a length: the nearest whole number, halves up, at least 1."""
+    return max(1, (2 * Fraction(length_ms) + TICK_MS) // (2 * TICK_MS))
+
+
+def _ms(time):
+    return f"{float(time):.6g}"
 
 
 def source_rect(sw, sh, w, h, fit):
@@ -87,3 +170,75 @@ def _shares(start, length, count, unit):
     last = min(count, -(-end // unit))
     weights = [min(end, (index + 1) * unit) - max(start, index * unit) for index in range(first, last)]
     return first, weights
+
+
+def _gif_frames(path):
+    """The frames of a GIF file, gone through once, each shown for the delay the file records."""
+    import numpy
+    from PIL import Image
+
+    try:
+        with Image.open(path, formats=["GIF"]) as image:
+            start = Fraction(0)
+            for index in range(getattr(image, "n_frames", 1)):
+                image.seek(index)
+                delay = image.info.get("duration", 0)
+                if delay <= SHORTEST_GIF_DELAY_MS:
+                    delay = GIF_DELAY_MS
+                end = start + Fraction(delay)
+                yield start, end, _over_black(numpy.asarray(image.convert("RGBA")))
+                start = end
+    except (OSError, EOFError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
+        raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the GIF cannot be decoded: {error}") from None
+
+
+def _video_frames(path):
+    """The frames of the first video stream, timed from the first of them.
+
+    A frame is on screen until the next one starts. The last one stays for the mean interval
+    between the frames, or for 20 ms when it is the only one.
+    """
+    import av
+
+    try:
+        with av.open(os.fspath(path)) as container:
+            if not container.streams.video:
+                raise errors.Rejection(errors.UNREADABLE_MEDIA, "the file has no video stream")
+            stream = container.streams.video[0]
+            first = None
+            held = None
+            count = 0
+            for frame in container.decode(stream):
+                if frame.pts is None:
+                    raise errors.Rejection(errors.UNREADABLE_MEDIA, "a frame has no presentation time")
+                if first is None:
+                    first = frame.pts
+                time = (frame.pts - first) * stream.time_base * 1000
+                picture = _over_black(frame.to_ndarray(format="rgba"))
+                if held is not None:
+                    if time < held[0]:
+                        raise errors.Rejection(errors.UNREADABLE_MEDIA, "the frames are not in the order of their times")
+                    yield held[0], time, held[1]
+                held = (time, picture)
+                count += 1
+            if held is not None:
+                interval = held[0] / (count - 1) if count > 1 else Fraction(TICK_MS)
+                yield held[0], held[0] + interval, held[1]
+    except av.error.FFmpegError as error:
+        raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the video cannot be decoded: {error}") from None
+
+
+def _over_black(rgba):
+    """A picture with an alpha channel laid over black: a transparent pixel becomes black."""
+    import numpy
+
+    if rgba.shape[0] == 0 or rgba.shape[1] == 0:
+        raise errors.Rejection(errors.UNREADABLE_MEDIA, "a picture has no pixels")
+    colour = rgba[..., :3]
+    alpha = rgba[..., 3:]
+    if alpha.min() == 255:
+        return numpy.ascontiguousarray(colour)
+    return ((colour.astype(numpy.uint16) * alpha + 127) // 255).astype(numpy.uint8)
+
+
+_READERS = {".gif": _gif_frames, ".mp4": _video_frames, ".mov": _video_frames}

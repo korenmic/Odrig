@@ -186,7 +186,7 @@ Rules for every task:
     in `sys.modules`.
   - Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 20.2, 20.3
 
-- [ ] 13. The `import` subcommand: readers, timeline and ranges
+- [x] 13. The `import` subcommand: readers, timeline and ranges
   - Add Pillow and av to `requirements.txt` at exact versions, and confirm the PyAV names
     the design uses against that version.
   - Add `source_frames`, `tick_pictures` and `import_media` to `odrig/media.py`, and the

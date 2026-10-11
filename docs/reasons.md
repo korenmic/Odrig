@@ -115,6 +115,16 @@ The ids are checked in three passes over the items in file order: every repeated
 every id that a cycle or `start` names and no item has, then every cycle that names a
 cycle.
 
+## Media files
+
+`import` reads the mapping file first; its reasons are under "Mapping files".
+
+| Reason | Condition |
+|---|---|
+| `unsupported-media` | The file name does not end in `.mp4`, `.mov` or `.gif`. |
+| `unreadable-media` | The file cannot be decoded, or it holds no picture. |
+| `bad-range` | The start is negative, the duration is not above 0, the start is not before the end of the media, or the start plus the duration is after the end of the media. |
+
 ## Generators
 
 | Reason | Condition |

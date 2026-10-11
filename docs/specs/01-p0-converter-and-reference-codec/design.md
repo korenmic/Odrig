@@ -381,9 +381,9 @@ Speed: the residuals use `bytes.translate` and generator expressions, the histog
   `convert("RGBA")`, laid over black. Start times are the running sum of the delays.
 - **mp4 and mov** (PyAV): `av.open`, the first entry of `container.streams.video`, then
   `container.decode(stream)`. A frame's time is `(pts - first_pts) * stream.time_base`, and
-  its picture `frame.to_ndarray(format="rgb24")`. Each frame ends where the next begins. The
-  last frame lasts the mean interval `(last_time - first_time) / (count - 1)`, or 20 ms when
-  there is one frame.
+  its picture `frame.to_ndarray(format="rgba")`, laid over black. Each frame ends where the
+  next begins. The last frame lasts the mean interval `(last_time - first_time) / (count - 1)`,
+  or 20 ms when there is one frame.
 
 The end of the last frame is the length of the media. The requested length is the given
 duration, or the length of the media minus the start. The number of ticks is
@@ -563,7 +563,8 @@ All three publish binary wheels for macOS, Windows and Linux and install with pi
 They are installed, not copied into the repository. `requirements.txt` names an exact
 version of each, chosen when the import task is done as the newest release with wheels for
 Python 3.10 and later on the three systems. numpy has no such release: the file names
-numpy 2.2.6 for Python below 3.11 and numpy 2.4.6 from Python 3.11 on. The PyAV names used above (`av.open`,
+numpy 2.2.6 for Python below 3.11 and numpy 2.4.6 from Python 3.11 on. Pillow is 12.3.0
+and PyAV is 17.1.0, the newest PyAV that still serves Python 3.10. The PyAV names used above (`av.open`,
 `streams.video`, `decode`, `pts`, `time_base`, `to_ndarray`) are confirmed against that
 version in the same task.
 
