@@ -183,7 +183,7 @@ Rules for every task:
   - Add the mapping view to `docs/emulator.md`.
   - Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8
 
-- [ ] 9. The ten-leg demo show and the ten-leg measurements
+- [x] 9. The ten-leg demo show and the ten-leg measurements
   - Create and track `shows/demo-10/show.json` as in the design.
   - `tests/emulator/test_demo.py`: every case the design lists for it. The sources are
     generated into a temporary folder; nothing generated is tracked.

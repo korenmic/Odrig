@@ -22,6 +22,41 @@ no hardware, no network connection and no browser. The page's geometry is run in
 JavaScript shell of macOS,
 `/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`.
 
+## Two shows to run
+
+The emulator runs a packed show: the folder that `python -m odrig pack` writes, described in
+[converter.md](converter.md). Two shows are tracked. `python` on this page is any Python
+3.10 or later, `python3` on a Mac; nothing here needs the libraries of the converter's
+virtual environment. `pack` refuses an output folder that is not empty, so remove the
+folder before packing again.
+
+**The example show**, for today's build of two legs, 60 x 6: Hello world and the bouncing
+square, alternating every 15 seconds. Its sources are tracked in `animations/`.
+
+```
+python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+    --sources animations --out build/example-show
+python -m emulator build/example-show
+```
+
+**The demo show**, for the target build of ten legs, 60 x 30: the same two animations made
+for that canvas, alternating every 15 seconds and starting at power-on. Only
+`shows/demo-10/show.json` is tracked. The two sources come to about 10 MB, so they are
+written by the generators into `build/`, which git ignores:
+
+```
+mkdir -p build/demo-10/sources
+python -m odrig.generators.hello_world build/demo-10/sources/hello.json --mapping mapping/legs-10.json
+python -m odrig.generators.dvd_bounce  build/demo-10/sources/dvd.json   --mapping mapping/legs-10.json
+python -m odrig pack --show shows/demo-10/show.json --mapping mapping/legs-10.json \
+    --sources build/demo-10/sources --out build/demo-10/show
+python -m emulator build/demo-10/show
+```
+
+The canvas size comes from `mapping/legs-10.json` in every one of these commands; none
+names 60 or 30. The generators centre Hello world on the canvas and let the square use all
+of it.
+
 ## Starting
 
 ```
