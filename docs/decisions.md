@@ -15,8 +15,10 @@ it stands now.
 - The operators' app is an Android APK built with Capacitor. A PC version built with Tauri,
   able to use serial as well as Wi-Fi, is intended later. Our own server on the board offers
   commands only and no web page.
-- The board's Wi-Fi network has a password known to the operators. The password may be kept
-  in this repository.
+- The board's Wi-Fi network is named `odrig` and has a password known to the operators. The
+  password may be kept in this repository.
+- The owner has accepted the Android SDK's licence terms, so the app's build may accept them
+  when it installs the SDK.
 - WLED's own web interface stays reachable and unchanged for now; the owner wants to explore
   it.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
@@ -35,9 +37,11 @@ it stands now.
   the three rows below the previous one. Every leg's chain starts at the right end of its
   top row.
 - Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
-- Target: a 60 x 60 canvas, 3,600 LEDs, on ten legs of six rows each (360 LEDs per pin). The
-  mapping files, the demo show and everything else sized for 60 x 30 are brought to this
-  target by seed 05.
+- Target: a 60 x 60 canvas, 3,600 LEDs, on twenty legs. In the target the strips stand
+  upright: a leg is three columns of 60, and its snake starts at the bottom of its first
+  column. Leg 1 is the leftmost and starts at (1,1). The mapping file format, the mapping
+  files, the firmware's outputs, the demo show and everything else are brought to this target
+  by seed 05.
 - The mapping is defined by the files in `mapping/` and described in
   [mapping.md](mapping.md). The board and the emulator both read the installed mapping file
   at runtime; it is the only definition of the layout.
@@ -154,9 +158,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
   hardware.
 
-- The Wi-Fi password. A Wi-Fi password needs 8 to 63 characters, and the one the owner gave
-  has 7.
-- Who accepts the Android SDK licence that building the app requires.
+- Whether one board can drive twenty LED outputs. Stock WLED drives twelve on this chip;
+  seed 05 tries for twenty and reports.
 
 ## Change log
 
@@ -193,3 +196,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   put to the owner and, with no objection, settled as recommended: the 60 rows go on ten
   pins with six rows each, and the commands `space`, `list`, `remove` and `upload` take the
   form written in seed 07. WLED's web interface stays as it is.
+- 2026-10-11: The owner corrected the target again. A leg stays three strips of 60 (180
+  LEDs), so 60 x 60 means twenty legs, and the strips stand upright with each snake starting
+  at the bottom. This replaces the ten-pins-of-six-rows reading recorded earlier today. Seed
+  05 was rewritten before any work on it began. The owner supplied a Wi-Fi password of valid
+  length and accepted the Android SDK licence terms.
