@@ -4289,3 +4289,95 @@ has an item only a person can check.
 `completed`; an agent leaves it open.
 
 **Resolution.** Seed 07 `tasks.md`, tasks 1 and 9.
+
+## Seed 06: Where the check of the Node.js version lives
+
+**Question.** The design has `converter/odrig.js` check the version of Node.js and then
+import `cli/main.js`, and has a test give the check a version. A test that imports
+`odrig.js` starts the tool, and an old Node.js that reads `cli/main.js` before the check
+runs stops at the first word it does not know, with its own message.
+
+**Answer.** The check is a function of a file of its own, `converter/cli/version.js`,
+which the design's layout does not list. It is written in the oldest form of the language
+that knows modules, and `odrig.js` imports nothing else before the check has run:
+`cli/main.js` is imported afterwards, with `import()`. The test calls the function with
+versions, and starts the tool once with a Node.js that is made to report version 18.
+
+**Resolution.** `converter/cli/version.js`, `converter/odrig.js`;
+`converter/tests/cli.test.js`, "an old version of Node.js is refused".
+
+## Seed 06: The status of an error that is not a rejection
+
+**Question.** Requirement 2 criterion 10 asks that an error that is no rejection ends the
+program with Node's own message and a status that is neither 0, 1 nor 2. Node.js ends a
+program with status 1 when an error is not caught, which is the status of a rejected
+input.
+
+**Answer.** `main` of `cli/main.js` throws such an error on, as the design says.
+`converter/odrig.js` writes the error as Node.js prints it, with the places it passed
+through, to standard error and ends with status 70.
+
+**Resolution.** `converter/odrig.js`; `converter/tests/cli.test.js`, "an error that is no
+rejection is thrown on".
+
+## Seed 06: Arguments that begin with a minus sign, and seconds the parser refuses
+
+**Question.** The design takes the argument after an option for its value "unless it
+begins with `-` and is not a minus sign followed by digits with an optional fraction".
+The `argparse` of Python 3.14, which runs the reference here, reads more arguments as
+values: every argument in which a minus sign is followed by a digit, or by a point and a
+digit, so `-1e3` and `-1.` as well; a minus sign alone; and an argument that holds a
+space. Requirement 2 criterion 9 asks for the status of the Python tool.
+
+**Answer.** The parser follows the `argparse` that is installed: an argument is a value,
+after an option and among the positional arguments, when it does not begin with a minus
+sign, when a digit or a point and a digit follow the minus sign, when it is the minus sign
+alone, or when it holds a space. Anything else that begins with a minus sign and is no
+option of the subcommand is an unknown option. An older Python reads `-1e3` after
+`--start` as an unknown option and ends with status 2, where the JavaScript tool reads the
+start and ends with status 1.
+
+The parser checks the form of `--start` and `--duration` and keeps their text; the
+subcommand turns the text into milliseconds with the library. Seconds may be written
+`1.` and `.5`, as Python reads them. An exponent beyond 9999, plus or minus, is not a
+number of seconds. The Python tool ends a command line with such an exponent above zero
+with a traceback of its `decimal` module, and reads one with such an exponent below zero
+as 0 seconds; nobody writes either.
+
+`-h` is read as `--help`, as the Python tool reads it. A `--` in front of the subcommand,
+which the Python tool passes over, is not: the first argument is the subcommand or
+`--help`.
+
+**Resolution.** `converter/cli/arguments.js`; `converter/tests/cli.test.js`, "the parser".
+
+## Seed 06: The Python program the suite compares with, in a checkout without `.venv`
+
+**Question.** Requirement 18 criterion 4 takes the Python tool from `.venv/bin/python` of
+the repository, or from the program the environment variable `ODRIG_PYTHON` names. The
+tasks of this seed were run in a second checkout of the repository, a git worktree, which
+has no `.venv` folder of its own. Which of the two is asked first?
+
+**Answer.** `.venv` of the repository when it is there, else the program `ODRIG_PYTHON`
+names. With neither, every test that needs the Python tool fails with one message that
+names both ways and the two commands that make `.venv`. The suite was run in the worktree
+with `ODRIG_PYTHON` set to `.venv/bin/python` of the main checkout, and the three Python
+suites with that same program started in the worktree's root, so that it loads the
+worktree's `odrig`. In the main checkout nothing needs to be set. The suite gives
+`PYTHONPATH` the repository root when it starts Python, so that both tools can be started
+in a temporary folder and name a file by the same relative path.
+
+**Resolution.** `converter/tests/support.js`, `pythonFrom`, `python` and `runPython`;
+`converter/tests/cli.test.js`, "the Python tool the suite compares with".
+
+## Seed 06: The queue records of a run in a worktree
+
+**Question.** The tasks were queued and run in a git worktree while another run used the
+queue of the main checkout. The queue file is not tracked.
+
+**Answer.** The worktree has its own `.codex/local-task-queue.md` and
+`.codex/tactic/session.json`. Its records are numbered from Q-201, so that they can be
+appended to the main checkout's queue, whose numbers are lower. The records have no
+`TaskId` and no `TaskIdPacked`, as the records of the seeds before, because the task-id
+script does not run on this Mac.
+
+**Resolution.** `.codex/local-task-queue.md` of the worktree, records Q-201 to Q-210.

@@ -39,7 +39,7 @@ Rules for every task:
   Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The frame of the tool, and the test command
+- [x] 1. The frame of the tool, and the test command
   - Set `"state": "in_progress"` in `project-seeds/06-p1-javascript-converter/state.json`.
   - Create `converter/package.json` as the design prints it, without `dependencies` for
     now, and add `/converter/node_modules/` to `.gitignore`.
