@@ -630,3 +630,247 @@ ready-made package for the Python in use, the implementer chooses another reader
 with pip alone and records that choice here.
 
 **Resolution.** Seed 01 `tasks.md`, task 13.
+
+## Seed 03: Where the emulator and the command tool live
+
+**Question.** The seed names no folders. Seed 01's package `odrig` is the obvious home, but
+its suite forbids every module of `odrig/` from importing network or serial modules and from
+reading the operating system's name.
+
+**Answer.** Two packages of their own at the repository root: `emulator`, run as
+`python -m emulator`, and `odrigctl`, run as `python -m odrigctl`. The page's files are in
+`emulator/web/`, the tests in `tests/emulator/`, the demo show in `shows/demo-10/`.
+
+**Resolution.** `docs/specs/03-p0-emulator/design.md`, "Repository layout".
+
+## Seed 03: How a Python program runs the core
+
+**Question.** The seed says the emulator uses only the Python standard library apart from
+the core, and that the core is compiled natively from the firmware's source files. It does
+not say how Python reaches C++ code. Seed 02 left the build target for it to this seed.
+
+**Answer.** The core is built as a shared library by a new target `shared` in
+`core/Makefile`, from the same `src/*.cpp` with the same flags, and loaded with `ctypes`.
+The host interface is plain C, so no wrapper code in C++ is needed and no source file of the
+core changes. A second host program speaking over a pipe was not chosen: it would add a
+protocol to write and to test for no gain. One lock makes every call to the core follow the
+one before it, whichever thread asks.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 2; `design.md`, "Running the core";
+`tasks.md`, task 1.
+
+## Seed 03: The command tool and the proof-of-concept tools
+
+**Question.** The seed says "the repository's command tool is brought to the commands in
+`docs/commands.md`" and "the generic line sender stays as it is". The tools it means,
+`tools/wled.py` and `tools/wled_send.py`, are untracked proof-of-concept scripts that send
+WLED's own JSON, and the adopted rule is that untracked files are not edited.
+
+**Answer.** The command tool is new tracked code, the package `odrigctl`. The untracked
+scripts are not moved, edited, deleted or staged. `wled_send.py` sends any line to any
+serial port, so it works against the emulator's port unchanged; `wled.py` and
+`wled_deploy.py` keep working only against stock WLED.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 13; `design.md`, "The command tool".
+
+## Seed 03: What a wrong folder is
+
+**Question.** The seed asks for a clear message and a non-zero exit for "a wrong folder",
+and also says that for an invalid show "the page shows the reason the core reports". A
+folder without `mapping.json` is both.
+
+**Answer.** A path that does not exist or is not a folder stops the emulator with
+`not-a-folder`. Any folder starts the emulator: whether its content is a valid show is the
+core's judgement, and the page shows the core's reason. The emulator has no check of its own
+on the files.
+
+**Resolution.** Seed 03 `requirements.md`, Requirements 1, 10 and 12.
+
+## Seed 03: A stable name for the virtual serial port
+
+**Question.** A pseudo-terminal gets a different device name on every run. The seed wants
+serial tools to work "with only the port name changed", which needs a name that can be
+written down.
+
+**Answer.** The emulator makes a symbolic link to the device at
+`build/emulator/serial` under the repository root, or at the path given with
+`--serial-link`, replaces a link left by an earlier run, and removes it at exit. One
+emulator uses one link path.
+
+**Resolution.** Seed 03 `requirements.md`, Requirements 1 and 6; `design.md`, "The virtual
+serial port".
+
+## Seed 03: How refreshes and commands reach the page
+
+**Question.** The page must show 50 refreshes a second and every command at once, and the
+emulator may use only the standard library, which has no WebSocket.
+
+**Answer.** One server-sent event stream, `GET /events`, carries four kinds of event:
+`hello`, `frame`, `log` and `status`. A refresh of the ten-leg canvas is 5,400 bytes, 7,200
+characters in base64, so 50 a second is about 360 kB a second on the loopback address. Each
+page connection keeps only the newest refresh waiting, so a slow page skips refreshes
+instead of falling behind; log and status events are never dropped. A WebSocket written by
+hand was not chosen: the page sends nothing back, and the event stream reconnects by itself.
+
+**Resolution.** Seed 03 `design.md`, "GET /events".
+
+## Seed 03: HTTP details that docs/commands.md leaves open
+
+**Question.** `docs/commands.md` defines `POST /odrig`, the 200 and the 405. It does not
+say what content type a request has, what happens to a query string, a longer path, a
+request without a length or a very long body, or whether the reply's newline is part of the
+response body. The emulator and the board must agree on each. This is a gap in a governing
+document.
+
+**Answer.** Working assumptions until the owner rules otherwise: the request's content type
+is not looked at; the path is exactly `/odrig` and what follows a `?` is ignored; another
+method gets 405 with `Allow: POST`; a `POST` without a usable `Content-Length` gets 411; of a
+body longer than 128 bytes the first 128 are passed on, which the front-end answers with
+`line-too-long`; the response body is the reply exactly as the core returned it, newline
+included, with `Access-Control-Allow-Origin: *`, which WLED's server adds to every response
+on the board. The command tool sends `application/octet-stream`, because the board's web
+server library takes form and some plain-text bodies apart before a handler sees them; see
+"Seed 04: The content type of an HTTP command".
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 7; `design.md`, "POST /odrig" and
+"The command tool". Seed 04 `design.md`, "HTTP transport".
+
+## Seed 03: Where the page's status comes from
+
+**Question.** The page shows the current status, and the definition of done wants it to
+match what `status` returns. There are no emulator-only commands, and the log must show the
+commands that arrived, not the emulator's own.
+
+**Answer.** The emulator sends the core the ordinary `status` line after every command that
+arrived and once a second, and passes the reply to the page unchanged. These requests are
+not entered in the command log. Record mode makes none, so a recording holds exactly the
+scripted session.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 8 criteria 5 and 6 and Requirement 11
+criterion 6.
+
+## Seed 03: The record file and the script
+
+**Question.** The seed asks for a record mode that takes "an optional script of timed
+command lines" and "writes the per-leg LED data of every tick to a file". It gives neither
+format, nor says when a scripted command acts relative to the tick of the same time.
+
+**Answer.** The script is text: a time in milliseconds, a space, the command line. A
+command is given to the core with its own time before the first tick that is not earlier, so
+a command at the time of a tick is seen in that tick's refresh. The record file is binary
+with a 16-byte header, the legs as the core lists them, and one fixed-size record for each
+tick; replies of scripted commands are printed, not stored. Ticks are 0, 20, 40 ms and so on
+below the length.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 11; `design.md`, "Record mode".
+
+## Seed 03: What the flipped-mapping check compares
+
+**Question.** The definition of done says that with a mapping file in which one leg's
+`first_led` is flipped, "the recorded picture differs from the reference in exactly that
+leg's rows". A picture rebuilt with the same flipped file would not differ at all.
+
+**Answer.** The comparison is of LED data, leg by leg, against the reference for the
+unchanged mapping: the flipped file stands for a mapping file that does not match the
+wiring. Every other leg is equal at every tick, and in the flipped leg every row holds the
+reference row in reverse order.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 11 criterion 8; `tasks.md`, task 2.
+
+## Seed 03: Whether the ten-leg demo sources are tracked
+
+**Question.** The seed asks for "a tracked demo show for the ten-leg mapping". Seed 01
+tracks the two sources of the example show. For the 60 x 30 canvas the two JSON frames files
+come to about 10 MB, and `docs/decisions.md` leaves open whether large JSON sources are
+tracked.
+
+**Answer.** `shows/demo-10/show.json` is tracked. The two sources are written by seed 01's
+generators with `mapping/legs-10.json` into `build/demo-10/sources`, which is ignored, as
+seed 01 does for the dense clip. The documentation gives the commands, and the suite
+generates and packs the show in a temporary folder.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 14; `design.md`, "The ten-leg demo
+show".
+
+## Seed 03: The board drawing
+
+**Question.** The mapping view is "drawn from `mapping.json`", and needs the board's two
+rows of pins "labelled as on the real board". The order of the pins is not in
+`mapping.json`; it is only in the drawing of `docs/mapping.md`. Nothing says what is drawn
+for a leg whose pin the board does not have.
+
+**Answer.** The two rows of labels are a small table in the page, `board.js`, and a test
+compares it with the drawing in `docs/mapping.md`. Everything about legs comes from
+`mapping.json`. A pin that is not on the board gets a marked pad of its own under the
+board, with its number. The board is drawn on the side of the canvas where most legs have
+their first LED.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 9; `design.md`, "board.js" and
+"Mapping view".
+
+## Seed 03: How LED values are shown on a screen
+
+**Question.** The page draws the values the LEDs are given. A screen shows the value 128 at
+about a fifth of full brightness, while an LED driven half of the time looks more than half
+as bright, so dim shows would be nearly black on the page.
+
+**Answer.** Every value passes through one fixed curve, `255 * (v / 255) ^ (1 / 2.2)`
+rounded, before it is drawn, and a dark LED is drawn as a faint outline. The data, the
+record file and the tests use the unchanged values.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 4 criteria 6 and 7; `design.md`,
+"layout.js" and "LEDs view".
+
+## Seed 03: Testing the page without a browser
+
+**Question.** The page must work out LED positions itself, and the suite may need neither
+a browser nor anything installed. How is the page's code tested?
+
+**Answer.** The page's geometry is in `layout.js`, which uses nothing a browser provides.
+The suite runs it in the JavaScript shell that is part of macOS
+(`/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`, the
+engine Safari uses) and compares every LED position with the rule of `docs/mapping.md`
+computed in Python. How the page looks in Safari and in Chrome is a written check list for
+a person or for an agent with a tool that drives a browser; it is the last task, and the
+seed is completed only when it is done.
+
+**Resolution.** Seed 03 `requirements.md`, Requirements 5 and 16; `design.md`, "Testing
+strategy"; `tasks.md`, tasks 7, 8 and 11.
+
+## Seed 03: Exit statuses and failure reasons
+
+**Question.** The seed asks for "a clear message and a non-zero exit" from the emulator and
+"a non-zero status when the reply is not ok or the target cannot be reached" from the
+command tool. It names no statuses and no wording.
+
+**Answer.** Both use the error line of seed 01, `error: <reason>: <detail>`. The emulator
+exits with 1 for `not-a-folder`, `core-not-built`, `serial-unavailable`, `address-in-use`,
+`bad-length` and `bad-script`, and with 2 for a usage error. The command tool exits with 0
+for `"ok":true`, 1 for `"ok":false`, 2 for a usage error and 3 when the target cannot be
+reached or does not answer in time, so a script can tell a refused command from a missing
+target. These reasons are start-up failures of a program, not rejections of a file, so they
+are listed in `docs/emulator.md` and not in `docs/reasons.md`.
+
+**Resolution.** Seed 03 `requirements.md`, Requirements 12 and 13.
+
+## Seed 03: One test command that needs a built library
+
+**Question.** The suite needs the core's shared library, and the test command must be one
+command that selects its suite by discovery.
+
+**Answer.** The command is `python3 -m unittest discover -s tests/emulator -t .`. The test
+package builds the library with `make -C core shared` when it is imported and fails with
+make's output if that fails. The emulator itself never builds: without the library it stops
+with `core-not-built`.
+
+**Resolution.** Seed 03 `requirements.md`, Requirement 16; `design.md`, "Testing strategy".
+
+## Seed 03: Recording the seed's progress
+
+**Question.** As for seeds 01 and 02: the seed convention has no state that means "spec
+written".
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task, the check list by eye, sets `completed`.
+
+**Resolution.** Seed 03 `tasks.md`, tasks 1 and 11.
