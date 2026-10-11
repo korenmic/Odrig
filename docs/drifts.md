@@ -237,6 +237,19 @@ as the fallback for a slow board. A missing, invalid or wrongly sized source is 
 
 **Resolution.** Seed 01 `requirements.md`, Requirement 14.
 
+## Seed 01: Order of the checks on ids
+
+**Question.** `docs/show.md` lists three ways the ids of a show can be wrong. Nothing says
+which one is reported when a show has more than one of them, and the converter and the core
+must report the same one.
+
+**Answer.** The checks run in three passes: every repeated id first, then every id that a
+cycle or `start` names and no item has, then every cycle that names a cycle. Within a pass
+the items are taken in file order.
+
+**Resolution.** Seed 01 `requirements.md`, Requirement 14 criterion 5; `design.md`, "show".
+Seed 02 `design.md`, "show".
+
 ## Seed 01: Generators and the canvas size
 
 **Question.** Seed 01 says the two generators write "for the 60 x 6 canvas". Seed 03 says

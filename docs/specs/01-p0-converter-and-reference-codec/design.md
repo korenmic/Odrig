@@ -203,10 +203,10 @@ def container(width: int, height: int, palette, records: list[bytes],
 ### `show`
 
 `read(path) -> Show` applies Requirement 14 criterion 4 (`show-missing`, `show-malformed`),
-then checks ids in this order: `duplicate-id`, scanning items in file order; then each cycle
-in file order and each of its entries in list order, `undefined-id` before `nested-cycle`;
-then `start` (`undefined-id`). `files(show) -> list[str]` gives the different file names in
-the order of first use.
+then checks ids in three passes, in the order of the requirement's table: `duplicate-id`,
+scanning items in file order; `undefined-id`, over every entry of every cycle in file order
+and then `start`; `nested-cycle`, over every entry of every cycle in file order.
+`files(show) -> list[str]` gives the different file names in the order of first use.
 
 The file name rule is the regular expression `[a-z0-9._-]{1,32}` matching the whole name,
 and the name ending in `.odrg`.
