@@ -2387,3 +2387,215 @@ replies. The owner then ordered the seeds to proceed without commenting on the f
 taken as approval.
 
 **Resolution.** Seed 07 `seed.md`, Required Behavior 1 to 5.
+
+## Seed 08: Where the settings file is and what it looks like
+
+**Question.** The seed asks for "one tracked settings file" with the name and the password.
+It names neither the file's place nor its format nor its members.
+
+**Answer.** `firmware/wifi.json`, beside the tool that reads it: a JSON object with exactly
+the two strings `name` and `password`, read with the strict reader that reads `show.json`.
+Every other tracked settings file of this project is JSON, and `.gitattributes` keeps git
+from changing its bytes. It has no version member: it holds two values. A command can be
+pointed at another file of the same format with `--settings FILE`, which is how the tests
+give it other values; no option carries a name or a password itself, so neither lands in a
+shell history.
+
+**Resolution.** `docs/specs/08-p1-wifi-name-and-password/requirements.md`, Requirements 1
+and 2; `design.md`, "The settings file" and "Reading and checking a settings file".
+
+## Seed 08: "Nowhere else in the repository", and the name
+
+**Question.** The seed says the name and the password live in the settings file "and
+nowhere else in the repository". The name is `odrig`, the project's own name:
+`docs/decisions.md` states it, the seed states it, and `docs/wifi.md` must describe the
+network.
+
+**Answer.** The rule is read as: there is no second source of the settings. No source of
+the tool holds either value, and the tool takes them from a settings file only. The
+password is in no other tracked file at all, which a test checks over every tracked file.
+The name is also written in the documents that describe the network and in the one test
+that checks that the file names `odrig`. Two things the rule cannot reach: every password
+that was ever committed stays in the repository's history, and outside the repository the
+password is on the board and in the storage images of the work folder, which are copies of
+the board's storage that git ignores.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 1 criteria 4 and 5 and Requirement 5
+criterion 3; `design.md`, "The settings file".
+
+## Seed 08: Which characters a name and a password may have
+
+**Question.** The seed gives the limits in characters: 8 to 63 for the password, 1 to 32
+for the name. The radio counts bytes, a WPA2 password is defined over printable ASCII, and
+a name may be any 32 bytes. A name of 32 characters in another script is longer than 32
+bytes, and WLED would cut it.
+
+**Answer.** Both values are printable ASCII only, the characters from the space to the
+tilde, so a character is a byte and the seed's counts are the radio's. A value is taken as
+it is in the file; nothing is trimmed. A name in another script would need a limit in
+bytes, which is the owner's to ask for.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 2; `design.md`, "Reading and
+checking a settings file".
+
+## Seed 08: Where WLED keeps the name and the password, and what the tool writes
+
+**Question.** The seed says the tool "writes the name and password into the board's
+settings" and that WLED's other Wi-Fi settings are not changed. It does not say where those
+settings are. WLED 16.0.1 keeps the name in `/cfg.json`, as `ap.ssid`, and the password in
+`/wsec.json`, as `ap.psk`. It also reads a password from `/cfg.json` when one is there, in
+place of the other, serves `/cfg.json` to every device on the network, and writes the
+password's length there as `ap.pskl`. The board today holds the `/cfg.json` of the proof of
+concept, with LED settings only, and no `/wsec.json`.
+
+**Answer.** The tool sets `ap.ssid` and `ap.pskl` in `/cfg.json` and `ap.psk` in
+`/wsec.json`, and removes an `ap.psk` from `/cfg.json`. A missing `ap` object or a missing
+file is made with these members only; WLED uses its defaults for every member that is
+absent. Everything else keeps its value and its place: the channel, the hidden name, when
+the access point opens, the networks to join, and WLED's backup of its settings. `ap.pskl`
+is not read by WLED; it is set so that the file is what WLED itself would write. A file
+that already holds the values keeps its bytes.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 4; `design.md`, "Editing WLED's
+stored settings", facts W3 to W6 and observations B1 to B4.
+
+## Seed 08: What "installs the firmware on a board from scratch" is
+
+**Question.** The seed says the settings are applied "whenever the firmware tool installs
+the firmware on a board from scratch". The tool has no such command. `flash` writes the
+application only, and Requirement 4 of seed 04 says that it does not write storage and
+leaves storage as it was, which the board suite checks. "From nothing to a playing board"
+in `docs/firmware.md` is a list of commands.
+
+**Answer.** A new command, `install-firmware`: it checks the settings file and the image,
+writes the firmware as `flash` does, waits for the reply to `status`, and applies the
+settings as `set-wifi` does. `flash` stays as seed 04 defines it, and the list in
+`docs/firmware.md` names `install-firmware` in its place. A board from scratch is one with
+WLED's 16 MB layout whose storage does not hold the settings yet; a chip with nothing on it
+is first given the stock bootloader and partition table with `restore-stock --full`, as
+before. A board that only ever got `flash` keeps WLED's default password. The owner may
+prefer that `flash` itself applies the settings; that changes a requirement of seed 04 and
+is the owner's to decide.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 6 and Requirement 4 criterion 8;
+`design.md`, "`install-firmware`".
+
+## Seed 08: How the board reports its network's name over USB
+
+**Question.** The definition of done says "the board reports over USB that its network is
+up under the name `odrig`". The firmware's port carries only the commands of
+`docs/commands.md`, `status` has no member for Wi-Fi, and a command is added only with the
+owner's approval. WLED's own information reports whether the access point is active, not
+its name, and is reached over the network. The probe build reports `ap`.
+
+**Answer.** The probe build's report gets `ap_name` and `ap_auth`: the name and the
+protection in the configuration the chip's radio holds for its access point, read with the
+chip's own `esp_wifi_get_config`, and `null` while `ap` is 0. A board test takes "up under
+the name" from `ap` and `ap_name`, and "a password is set" from `ap_auth`, which is 3 for
+WPA2, and from storage read back, which must hold the password of the settings file; the
+two passwords are compared without being printed. The firmware has none of this code and
+no command is added. The usermod still names no Wi-Fi function of WLED: the call is the
+chip's, only reads, and is in the probe file. That a device can join stays the owner's
+check.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 7; `design.md`, "The probe build's
+report" and "How a program establishes the network over USB", facts W8 and W10 to W12,
+assumption A1.
+
+## Seed 08: Settings of WLED that decide whether the network opens, and what undoes ours
+
+**Question.** The seed says that after the restart the board hosts the network, and also
+that WLED's other Wi-Fi settings and its web interface are not changed. WLED's source shows
+what the second sentence leaves open: the access point opens at start only while no network
+to join is configured, else as WLED's setting for it says, and never with the setting
+"button only"; whoever has joined the network can change the name and the password in
+WLED's Wi-Fi settings page; and button 0, on pin 0, brings back WLED's default name and
+password until the next restart when held for more than 5 seconds, and formats the file
+system when held for more than 10.
+
+**Answer.** The tool changes none of this. The board hosts the network as the seed says
+when it is as it is today: no network to join, WLED's default setting. `docs/wifi.md` says
+what changes that, and that `set-wifi`, and `install-show` after a format, put things back.
+The button and the limit of four joined devices were read in the source and are not tried:
+no task presses a button. The owner may later want WLED's settings locked or its interface
+closed; the seed leaves the interface open "for now".
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 4 criterion 3, Requirement 7
+criterion 1 and Requirement 9 criterion 3; `design.md`, "What is left as it is", facts W8,
+W9, W14 and W15.
+
+## Seed 08: What the command prints, and when it is done
+
+**Question.** The seed says one command writes the name and the password "and restarts the
+board". It does not say what the command prints, how it knows that the board is back, or
+what it does when the board already holds the settings.
+
+**Answer.** As `install-show` does, the command waits for the board's reply to `status`,
+for 20 seconds or as long as `--wait` says, and ends with `no-reply` when none comes; the
+settings are stored then. It prints `name: <name>`, `password: set` and the reply. Its exit
+status does not depend on whether the show is valid, which is `install-show`'s matter. When
+the board already holds the settings, nothing is written and the board is restarted all the
+same. On a board that runs stock WLED the command stores the settings and ends with
+`no-reply`, because stock WLED answers no `status`.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 3; `design.md`, "`set-wifi`".
+
+## Seed 08: Keeping the password out of tests, logs and hand-overs
+
+**Question.** The seed says the password "is never printed by the tool or written to a
+log". The tool keeps storage images in the work folder, and every one of them holds
+`/wsec.json`. A failing test prints the two values it compared. The spec and its tasks are
+tracked files, and whoever implements task 1 needs the password.
+
+**Answer.** The tool writes no log. The storage images are copies of the board's storage in
+a folder git ignores; they hold the password as the board does, and `docs/wifi.md` says so.
+An error line quotes no text of a settings file, and the settings' text form inside the
+tool hides the password. A test reduces a comparison of passwords to true or false before
+it asserts. The board test that applies other values uses a name that begins with
+`odrig-test` and a password made in that run, and puts the settings file's values back. The
+spec holds no password: the implementer of task 1 gets it with the hand-over and writes it
+into the settings file only, and without it the task is blocked, not done with a password
+somebody made up.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 5 and Requirement 8 criterion 5;
+`design.md`, "Keeping the password out of sight"; `tasks.md`, the rules and task 1.
+
+## Seed 08: What docs/wifi.md says beyond the name and the password
+
+**Question.** The seed asks that `docs/wifi.md` describe the network and how to change its
+name and password. That page lists three things as not decided or not verified: the name
+and the password, how many phones can be joined at once, "not looked up or tested", and the
+range on site. `docs/android-app.md` still asks whether the network should have a password.
+
+**Answer.** The item on the name and the password goes. The number of phones was looked up
+while WLED's source was read for this spec: four, the default of the Arduino core's
+`softAP`, which WLED's call leaves. `docs/wifi.md` gives it as read and not tried, and it
+stays in the list of what is not verified; nothing changes the limit. The range stays in
+that list. `docs/android-app.md` is the page of seed 09 and is not edited here;
+`docs/decisions.md` already holds the answer to its question.
+
+**Resolution.** Seed 08 `requirements.md`, Requirement 9; `design.md`, "Documentation" and
+fact W10.
+
+## Seed 08: Seed 04 is not completed
+
+**Question.** The seed depends on seed 04, whose state is `in_progress`: its last task, the
+owner's checks, is open.
+
+**Answer.** Seed 08 needs seed 04's tool, its probe build and its suites, which are done,
+so its tasks do not wait. From task 4 of seed 08 on, the two owner's checks of seed 04 that
+need the board's network are done on the network `odrig` with the password of the settings
+file; task 6 writes that into the steps of `docs/firmware.md`.
+
+**Resolution.** Seed 08 `tasks.md`, the opening paragraph and task 6.
+
+## Seed 08: Recording the seed's progress
+
+**Question.** As for the other seeds, and as for seed 04: the definition of done has an
+item only a person can check.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task is the owner's check and sets `completed`; an agent leaves it
+open.
+
+**Resolution.** Seed 08 `tasks.md`, tasks 1 and 7.
