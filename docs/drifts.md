@@ -743,3 +743,19 @@ those comparisons fail on a computer the tool is meant to run on.
 treat `.odrg` files as binary.
 
 **Resolution.** `.gitattributes`.
+
+## Seed 01: The numpy version
+
+**Question.** The design asks for one exact version of each library, the newest with
+ready-made packages for Python 3.10 and later. No numpy release has packages for both
+Python 3.10 and Python 3.14, which is the only Python on the Mac this seed is verified on:
+numpy 2.2.6 is the last release for Python 3.10 and has none for 3.14, and from 2.3 on
+numpy needs Python 3.11.
+
+**Answer.** `requirements.txt` names two exact versions, each with the Python versions it
+applies to: numpy 2.2.6 below Python 3.11 and numpy 2.4.6, the newest that still serves
+Python 3.11, from there on. The tool uses only whole-number array arithmetic, which both
+have. The suite was run with numpy 2.4.6 on Python 3.14. The line for Python 3.10 is not
+verified, because no Python 3.10 is installed here.
+
+**Resolution.** `requirements.txt`; seed 01 `design.md`, "Third-party libraries".

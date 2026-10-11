@@ -7,16 +7,21 @@
 ## Setup
 
 The tool needs Python 3.10 or later. Create a virtual environment inside the repository
-once:
+once, and install the libraries of `requirements.txt` into it:
 
 ```
 python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 Every command on this page is run from the repository root with the Python of that
 environment, written `python` below: `.venv/bin/python` on macOS and Linux,
 `.venv\Scripts\python` on Windows. Nothing is installed outside the `.venv` folder, and git
 ignores it.
+
+The libraries are needed only to turn media files into JSON frames. `encode`, `decode`,
+`check`, `pack` and the generators run with Python alone, and so does the reference decoder
+when another program uses it. The test suite needs the libraries.
 
 ## Exit statuses
 

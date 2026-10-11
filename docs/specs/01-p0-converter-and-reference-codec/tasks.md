@@ -172,7 +172,7 @@ Rules for every task:
   - Add a `pack` section to `docs/converter.md` and the show table to `docs/reasons.md`.
   - Requirements: 1.3, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 14.9, 17.1, 17.2
 
-- [ ] 12. Fitting a picture to the canvas
+- [x] 12. Fitting a picture to the canvas
   - Create `requirements.txt` with numpy at an exact version, and `odrig/media.py` with
     `source_rect` and `resample`.
   - `tests/converter/test_import_fit.py`: for each fit, a source wider than the canvas

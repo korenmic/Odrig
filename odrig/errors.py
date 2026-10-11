@@ -51,6 +51,8 @@ FILE_MALFORMED = "file-malformed"
 SIZE_MISMATCH = "size-mismatch"
 OUTPUT_NOT_EMPTY = "output-not-empty"
 
+UNREADABLE_MEDIA = "unreadable-media"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

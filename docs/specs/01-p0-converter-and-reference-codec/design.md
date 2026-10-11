@@ -425,7 +425,8 @@ how the bars of `fit` are black and their inner edge is blended.
 
 The work is done per canvas row with numpy `int64` arrays: the source rows a canvas row
 overlaps are combined with their weights, then the columns. `resample` rejects
-`unreadable-media` when `255 * area` would not fit in 63 bits.
+`unreadable-media` when `511 * area`, the largest value of `2 * sum + area`, would not fit
+in 63 bits.
 
 ### Generators
 
@@ -561,7 +562,8 @@ states. The builder writes the cases listed there and one file for every other r
 All three publish binary wheels for macOS, Windows and Linux and install with pip alone.
 They are installed, not copied into the repository. `requirements.txt` names an exact
 version of each, chosen when the import task is done as the newest release with wheels for
-Python 3.10 and later on the three systems. The PyAV names used above (`av.open`,
+Python 3.10 and later on the three systems. numpy has no such release: the file names
+numpy 2.2.6 for Python below 3.11 and numpy 2.4.6 from Python 3.11 on. The PyAV names used above (`av.open`,
 `streams.video`, `decode`, `pts`, `time_base`, `to_ndarray`) are confirmed against that
 version in the same task.
 
