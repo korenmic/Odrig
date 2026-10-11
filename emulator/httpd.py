@@ -1,5 +1,5 @@
-"""The HTTP server on the page address: commands as `POST /odrig`, the event stream for
-the page, and the mapping file of the show."""
+"""The HTTP server on the page address: the files of the page, commands as `POST /odrig`,
+the event stream for the page, and the mapping file of the show."""
 
 import http.server
 import os
@@ -19,6 +19,30 @@ BODY_KEPT = 128
 CHUNK = 65536
 KEEP_ALIVE_SECONDS = 15
 STREAM_SEND_BUFFER = 32768
+
+WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+INDEX = "index.html"
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".json": "application/json",
+}
+
+
+def page_files(folder=WEB):
+    """The files of the page by the path each is asked for: its place on disk and its
+    content type. The table is made by listing the folder, so nothing outside it can be
+    asked for."""
+    files = {}
+    for name in sorted(os.listdir(folder)):
+        place = os.path.join(folder, name)
+        content_type = CONTENT_TYPES.get(os.path.splitext(name)[1])
+        if content_type is not None and os.path.isfile(place):
+            files["/" + name] = (place, content_type)
+    if "/" + INDEX in files:
+        files["/"] = files["/" + INDEX]
+    return files
 
 
 def stream(connection, write, keep_alive_seconds=KEEP_ALIVE_SECONDS):
@@ -65,6 +89,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.events()
         elif self.command == "GET" and path == MAPPING_PATH:
             self.mapping()
+        elif self.command == "GET" and path in self.server.pages:
+            self.page(*self.server.pages[path])
         else:
             self.empty(404)
 
@@ -110,6 +136,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def page(self, place, content_type):
+        """One file of the page."""
+        try:
+            with open(place, "rb") as file:
+                data = file.read()
+        except OSError:
+            self.empty(404)
+            return
+        self.content(content_type, data)
+
     def mapping(self):
         """The mapping file of the show folder, byte for byte."""
         try:
@@ -148,6 +184,7 @@ class Server(http.server.ThreadingHTTPServer):
         self.engine = engine
         self.show_dir = os.fspath(show_dir)
         self.hello = hello
+        self.pages = page_files()
         try:
             super().__init__((ADDRESS, port), Handler)
         except OSError as error:

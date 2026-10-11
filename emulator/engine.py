@@ -7,6 +7,26 @@ from . import binding
 
 GRID_MS = 20
 AFTER_GRID_NS = 200_000
+LONG_WAIT_NS = 3_000_000
+KEPT_BACK_NS = 2_000_000
+SHORT_SLEEP_NS = 500_000
+
+
+def wait_until(target_ns, clock=time.monotonic_ns, sleep=time.sleep):
+    """Sleeps until a moment of the clock, and wakes within a fraction of a millisecond.
+
+    One sleep of 20 ms wakes up to 10 ms late on a Mac, because the system lets a timer
+    slip by a share of its length. So the wait is cut up: half of what is left each time,
+    and at the end in steps of half a millisecond.
+    """
+    while True:
+        left = target_ns - clock()
+        if left <= 0:
+            return
+        if left > LONG_WAIT_NS:
+            sleep((left - KEPT_BACK_NS) / 2 / 1_000_000_000)
+        else:
+            sleep(min(left, SHORT_SLEEP_NS) / 1_000_000_000)
 
 
 class Engine:
@@ -79,21 +99,19 @@ class RealTime(threading.Thread):
     the loop also has the status for the page asked for.
     """
 
-    def __init__(self, engine, sleep=time.sleep):
+    def __init__(self, engine, wait=None):
         super().__init__(name="real-time", daemon=True)
         self.engine = engine
-        self.sleep = sleep
+        self.wait = wait if wait is not None else lambda target_ns: wait_until(target_ns, engine.clock)
         self._second = 0
         self._stopping = threading.Event()
 
     def step(self):
-        """Sleeps until just after the next grid time and asks for one refresh."""
+        """Waits until just after the next grid time and asks for one refresh."""
         engine = self.engine
         now = engine.now_ms()
         grid = engine.t0 + ((now - engine.t0) // GRID_MS + 1) * GRID_MS
-        wait_ns = engine.start_ns + grid * 1_000_000 + AFTER_GRID_NS - engine.clock()
-        if wait_ns > 0:
-            self.sleep(wait_ns / 1_000_000_000)
+        self.wait(engine.start_ns + grid * 1_000_000 + AFTER_GRID_NS)
         engine.tick()
         second = (engine.now_ms() - engine.t0) // 1000
         if second != self._second:

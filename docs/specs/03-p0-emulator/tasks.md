@@ -146,7 +146,7 @@ Rules for every task:
     transport.
   - Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10
 
-- [ ] 7. The page: LEDs view, status and command log
+- [x] 7. The page: LEDs view, status and command log
   - Create `emulator/web/index.html`, `style.css`, `layout.js` (`read`, `position`,
     `find`, `rows`, `path`, `colour`, `shown`, and `fit` without the board), `view.js` (the
     canvas of LEDs, the brackets, the `y=` labels and the end numbers) and `app.js` (the

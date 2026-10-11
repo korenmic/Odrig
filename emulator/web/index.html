@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>odrig emulator</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="head">
+  <div class="facts">
+    <span class="name">odrig emulator</span>
+    <span class="fact"><span class="key">show</span> <code id="show">-</code></span>
+    <span class="fact"><span class="key">serial</span> <code id="serial">-</code></span>
+    <span class="link" id="link" data-state="waiting">connecting</span>
+  </div>
+  <div class="state">
+    <span class="pill power" id="power" data-on="unknown">-</span>
+    <span class="pill"><span class="key">brightness</span> <span class="value" id="brightness">-</span><span class="meter"><span id="brightness-bar"></span></span></span>
+    <span class="pill"><span class="key">playing</span> <span class="value" id="playing">-</span></span>
+    <span class="pill"><span class="key">animation</span> <span class="value" id="animation">-</span></span>
+    <span class="pill"><span class="key">core</span> <span class="value" id="core-fps">-</span> <span class="unit">fps</span></span>
+    <span class="pill"><span class="key">page</span> <span class="value" id="page-fps">-</span> <span class="unit">fps</span></span>
+  </div>
+</header>
+<div class="band" id="band" hidden>The core reports that the show is invalid: <code id="reason"></code></div>
+<nav class="tabs">
+  <button type="button" class="tab" id="tab-leds" aria-pressed="true">LEDs</button>
+  <span class="readout" id="readout"></span>
+</nav>
+<main class="stage" id="stage">
+  <div class="drawing" id="drawing"></div>
+  <p class="note" id="note" hidden></p>
+</main>
+<section class="log" id="log">
+  <table>
+    <thead><tr><th class="time">time</th><th class="via">via</th><th class="line">command</th><th class="reply">reply</th></tr></thead>
+    <tbody id="entries"></tbody>
+  </table>
+  <p class="empty" id="empty">No command has arrived yet. Send one through the serial port or as POST /odrig.</p>
+</section>
+<script src="layout.js"></script>
+<script src="view.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

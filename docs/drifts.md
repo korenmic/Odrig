@@ -1725,3 +1725,40 @@ the emulator or for the board, and a test says so.
 
 **Resolution.** `odrigctl/cli.py`, `odrigctl/client.py`; `docs/emulator.md`, "The command
 tool"; `tests/emulator/test_tool.py`, `tests/emulator/test_scope.py`.
+
+## Seed 03: Waking the real-time loop in time
+
+**Question.** The design has the loop sleep until 0.2 ms after the next grid time. On this
+Mac one sleep of about 20 ms woke 6 ms late in the middle and up to 10 ms late: the system
+lets a timer slip by a share of its length. The core still produced 50 refreshes a second,
+so `status` showed nothing, but the refreshes left 12 to 30 ms apart, two of them often
+fell into one frame of the browser, and the page's own count was 47.
+
+**Answer.** The wait is cut up: half of what is left each time, and at the end steps of
+half a millisecond. Measured the same way, the wake-up was then 0.05 ms late in the middle
+and 0.3 ms at most, for about half a percent of one processor. The timestamps of the
+refreshes are 20 ms apart and the page counts 49 to 51 in a second, for the example show
+and for the dense 60 x 30 clip alike.
+
+**Resolution.** `emulator/engine.py`, `wait_until`; `tests/emulator/test_realtime.py`.
+
+## Seed 03: The page in a light appearance, and details of its files
+
+**Question.** The design gives the page one set of colours, a dark one, and says nothing
+of a system set to a light appearance. Its test forbids `//` in every page file, which is
+also how a JavaScript comment and the SVG namespace are written. It gives the LEDs view a
+cell of 17 pixels at 1280 x 800 and one label column, without widths.
+
+**Answer.** In a light appearance the header, the reason band and the log are light. The
+drawing always stands on the dark stage of the design, so the LEDs and the twelve leg
+colours, which were chosen for a dark ground, look the same either way. The scripts use
+block comments only, take the SVG namespace from an element the browser makes, and are
+plain ASCII, so the test can forbid `//` outright. The parts around the canvas have two
+sets of widths: a roomy one, which gives the 17 pixels at 1280 x 800, and a compact one
+for areas where the roomy one would leave cells below 13 pixels. A faint band of the leg
+colour lies behind the rows of each leg, the end numbers are in the leg colour, and the
+columns of the canvas are numbered every ten.
+
+**Resolution.** `emulator/web/style.css`, `emulator/web/layout.js`, `emulator/web/view.js`;
+`tests/emulator/test_page_files.py`, `tests/emulator/test_layout.py`; `docs/emulator.md`,
+"The page".

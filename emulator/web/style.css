@@ -1,0 +1,241 @@
+/* The page of the emulator. The drawing always stands on a dark stage, so that the LEDs
+   and the leg colours look the same in a light and in a dark appearance. */
+
+:root {
+  --page: #101214;
+  --panel: #181b1f;
+  --line: #262b31;
+  --text: #d8dee9;
+  --dim: #8b95a3;
+  --chip: #20252b;
+  --stage: #181b1f;
+  --stage-text: #d8dee9;
+  --stage-dim: #7f8996;
+  --good: #51cf66;
+  --bad: #ff6b6b;
+  --over-serial: #4dabf7;
+  --over-web: #38d9a9;
+  --band: #4a1d21;
+  --band-text: #ffd9d9;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --page: #eef0f3;
+    --panel: #ffffff;
+    --line: #d5dae1;
+    --text: #1f2933;
+    --dim: #5f6b7a;
+    --chip: #eef0f3;
+    --good: #2b8a3e;
+    --bad: #c92a2a;
+    --over-serial: #1971c2;
+    --over-web: #087f5b;
+    --band: #ffe3e3;
+    --band-text: #7d1a1a;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  color: var(--text);
+  font: 13px/1.4 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+code, .value, .readout, .log td, .log th { font-family: var(--mono); }
+
+.head {
+  flex: none;
+  padding: 8px 16px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.facts {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.name { font-weight: 650; letter-spacing: 0.01em; }
+.key { color: var(--dim); }
+.fact { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fact code { font-size: 12px; }
+
+.link { margin-left: auto; color: var(--dim); }
+.link::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.link[data-state="connected"]::before { background: var(--good); }
+.link[data-state="lost"]::before { background: var(--bad); }
+
+.state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: var(--chip);
+  white-space: nowrap;
+}
+.pill .value { font-weight: 600; font-size: 12px; }
+.pill .unit { color: var(--dim); }
+
+.power { font-weight: 650; min-width: 44px; justify-content: center; }
+.power[data-on="true"] { background: var(--good); color: #0b1a0e; }
+.power[data-on="false"] { background: transparent; box-shadow: inset 0 0 0 1px var(--dim); color: var(--dim); }
+
+.meter {
+  width: 46px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter span { display: block; height: 100%; width: 0; background: var(--text); }
+
+.band {
+  flex: none;
+  padding: 7px 16px;
+  background: var(--band);
+  color: var(--band-text);
+  border-bottom: 1px solid var(--bad);
+}
+.band code { font-weight: 600; }
+
+.tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  background: var(--stage);
+  border-bottom: 1px solid #23282e;
+}
+
+.tab {
+  height: 24px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--stage-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.tab:hover { color: var(--stage-text); }
+.tab[aria-pressed="true"] { background: #2b3138; color: var(--stage-text); font-weight: 600; }
+
+.readout {
+  margin-left: auto;
+  min-height: 18px;
+  color: var(--stage-text);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stage {
+  flex: 1 1 0;
+  min-height: 120px;
+  overflow: auto;
+  background: var(--stage);
+  color: var(--stage-text);
+}
+
+.drawing { position: relative; }
+.drawing canvas, .drawing svg { position: absolute; left: 0; top: 0; display: block; }
+.drawing svg { pointer-events: none; overflow: visible; }
+
+.note {
+  margin: 0;
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--stage-dim);
+}
+
+/* The texts of the drawing. */
+.drawing text { font-family: var(--mono); }
+.drawing .t-leg { font-family: var(--sans); font-weight: 650; }
+.drawing .t-pin { font-family: var(--sans); opacity: 0.85; }
+.drawing .t-y { fill: var(--stage-dim); }
+.drawing .t-x { fill: #5d6773; }
+.drawing .tint { opacity: 0.055; }
+.drawing .bracket { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.log {
+  flex: none;
+  height: clamp(104px, 19vh, 240px);
+  overflow: auto;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.log table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log th.time, .log th.via { width: 1px; }
+.log th.line { min-width: 30ch; width: 1px; }
+.log th {
+  position: sticky;
+  top: 0;
+  padding: 5px 16px 4px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  color: var(--dim);
+  font-weight: 500;
+  text-align: left;
+}
+.log td { padding: 3px 16px; white-space: pre; vertical-align: top; }
+.log td.time { color: var(--dim); }
+.log td.via { padding-right: 0; }
+.log td.reply { color: var(--dim); }
+.log tr[data-ok="true"] td.reply { color: var(--good); }
+.log tr[data-ok="false"] td.reply { color: var(--bad); }
+.log .cut { color: var(--dim); }
+
+.chip {
+  display: inline-block;
+  min-width: 44px;
+  padding: 0 7px;
+  border-radius: 8px;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--panel);
+}
+.chip[data-via="serial"] { background: var(--over-serial); }
+.chip[data-via="http"] { background: var(--over-web); }
+
+.log tr.new td { animation: arrive 1.2s ease-out; }
+@keyframes arrive {
+  from { background: rgba(77, 171, 247, 0.28); }
+  to { background: transparent; }
+}
+
+.empty { margin: 0; padding: 10px 16px; color: var(--dim); }

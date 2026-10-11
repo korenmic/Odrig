@@ -71,7 +71,7 @@ class Core:
 
 
 class Clock:
-    """A clock that only a sleep moves, and that a test can hold back."""
+    """A clock that only a wait moves, and that a test can make wake late."""
 
     def __init__(self, start_ns=123_456_789):
         self.ns = start_ns
@@ -80,8 +80,25 @@ class Clock:
     def __call__(self):
         return self.ns
 
+    def wait(self, target_ns):
+        self.ns = max(self.ns, target_ns) + (self.late_ns.pop(0) if self.late_ns else 0)
+
+
+class Sleeper:
+    """A clock with a sleep that wakes late by a share of the time asked for, as the
+    system's does."""
+
+    def __init__(self, late_share):
+        self.ns = 5_000_000_000
+        self.late_share = late_share
+        self.sleeps = []
+
+    def clock(self):
+        return self.ns
+
     def sleep(self, seconds):
-        self.ns += round(seconds * 1_000_000_000) + (self.late_ns.pop(0) if self.late_ns else 0)
+        self.sleeps.append(seconds)
+        self.ns += round(seconds * 1_000_000_000 * (1 + self.late_share)) + 20_000
 
 
 class Loop(unittest.TestCase):
@@ -91,7 +108,7 @@ class Loop(unittest.TestCase):
         running = engine.Engine(core, hub.Hub(), clock=clock)
         clock.ns += before_first_tick_ns
         running.tick()
-        return clock, core, running, engine.RealTime(running, sleep=clock.sleep)
+        return clock, core, running, engine.RealTime(running, wait=clock.wait)
 
     def test_the_first_request_sets_the_power_on_moment(self):
         _, core, running, _ = self.loop()
@@ -135,6 +152,25 @@ class Loop(unittest.TestCase):
         self.assertEqual(core.commands, [(3 + 1000 * second, b"status") for second in range(1, 6)])
         self.assertEqual(len(running.hub.entries()), 0)
         self.assertEqual(running.hub.latest_status(), '{"ok":true}')
+
+    def test_a_wait_of_20_ms_is_cut_up_so_that_it_ends_within_a_millisecond(self):
+        for late_share in (0.0, 0.35, 0.6):
+            sleeper = Sleeper(late_share)
+            target = sleeper.ns + 20_000_000
+            engine.wait_until(target, sleeper.clock, sleeper.sleep)
+            self.assertGreaterEqual(sleeper.ns, target)
+            self.assertLess(sleeper.ns - target, 1_000_000, f"a wait woke {sleeper.ns - target} ns late with sleeps {late_share:.0%} late")
+            self.assertLessEqual(max(sleeper.sleeps), 0.009)
+            self.assertLess(len(sleeper.sleeps), 40)
+        one_sleep = Sleeper(0.35)
+        one_sleep.sleep(0.020)
+        self.assertGreater(one_sleep.ns - 5_020_000_000, 6_000_000)
+
+    def test_a_wait_for_a_moment_that_has_passed_does_not_sleep(self):
+        sleeper = Sleeper(0.0)
+        engine.wait_until(sleeper.ns - 1, sleeper.clock, sleeper.sleep)
+        engine.wait_until(sleeper.ns, sleeper.clock, sleeper.sleep)
+        self.assertEqual(sleeper.sleeps, [])
 
     def test_timestamps_are_whole_milliseconds_from_the_start_of_the_engine(self):
         clock, core, running, _ = self.loop(start_ns=987_654_321_000, before_first_tick_ns=0)

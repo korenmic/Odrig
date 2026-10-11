@@ -13,12 +13,14 @@ Run from the repository root.
 | Command | What it does | What it needs |
 |---|---|---|
 | `make -C core shared` | Builds `core/build/libodrig_core.dylib`, the library the emulator loads, from every `core/src/*.cpp` with the flags of `make -C core`. | Apple's command-line developer tools: `make` and `c++`. |
-| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, and Python 3.10 or later with no added package. |
+| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and the JavaScript shell that is part of macOS. |
 
 The emulator never builds the library itself. The suite is every `test_*.py` file in
 `tests/emulator/`, found by discovery; importing the test package runs `make -C core shared`
 first, and when that fails no test runs and make's output is the failure. The suite needs
-no hardware, no network connection and no browser.
+no hardware, no network connection and no browser. The page's geometry is run in the
+JavaScript shell of macOS,
+`/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`.
 
 ## Starting
 
@@ -98,6 +100,7 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `POST /odrig` | Status 200, content type `application/json`, and the reply line as the core returned it, with its newline. The status is 200 for a reply with `"ok":false` too. |
 | Any other method on `/odrig` | Status 405 with `Allow: POST` and no body. The core is not called. |
 | `POST /odrig` without a `Content-Length` that is a whole number | Status 411. The core is not called. |
+| `GET /`, `GET /<name>` for a file of `emulator/web/` | The page and its files. See [The page](#the-page). |
 | `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
 | Any other path | Status 404. |
 
@@ -107,6 +110,69 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
 - An answer without a body closes its connection.
+
+## The page
+
+The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
+plain files in `emulator/web/`, loads nothing from another host, and works without a
+network connection. The page only shows: it sends no command. Every change on it comes
+from the [event stream](#the-event-stream), so a command sent by any tool is seen at once.
+
+From top to bottom the page has:
+
+- **The header.** The show folder and the serial port, whether the event stream is
+  connected, and the current status as `status` returns it: on or off, brightness, the id
+  of the item playing and the id of the animation on the LEDs. `core` is the `fps` the core
+  reports: its refreshes in the last full second. `page` is the page's own count: the
+  refreshes it drew in the last full second.
+- **The reason band.** When the core reports that the show is invalid, a red band shows the
+  reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
+  valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
+  LEDs to draw, and the page says so.
+- **The drawing**, described below, with a readout at its top right that names what the
+  pointer is on: `leg 2, pin 2, LED 61 (1,2)`.
+- **The command log.** One line for each command that arrived, by the serial port or over
+  HTTP: the time it arrived, how it came, the line, and the reply. A line of more than 64
+  characters is shown with its first 64 and the mark `…`. A byte outside printable ASCII is
+  shown as `\xNN`. The log keeps the newest line in sight, and a page opened later shows
+  the last 500 entries the emulator kept.
+
+In a light appearance of the system the header and the log are light. The drawing always
+stands on a dark stage, so the LEDs and the leg colours look the same either way.
+
+### The LEDs view
+
+The drawing shows every LED of every leg as a dot at its canvas position, with (1,1) at
+the bottom-left, x growing to the right and y growing upward. It is scaled to fit the
+window and drawn again when the window changes its size; a 60 x 30 canvas is shown whole in
+a window of 1280 x 800.
+
+```
+            x=1                                              x=60
+ leg 1    | y=6    60  o o o o o o o o o o o o o o o o o o o    1
+ pin 1    | y=5    61  o o o o o o o o o o o o o o o o o o o  120
+          | y=4   180  o o o o o o o o o o o o o o o o o o o  121
+ leg 2    | y=3    60  o o o o o o o o o o o o o o o o o o o    1
+ pin 2    | y=2    61  o o o o o o o o o o o o o o o o o o o  120
+          | y=1   180  o o o o o o o o o o o o o o o o o o o  121
+```
+
+- Each leg has one colour. A bracket in that colour spans the rows of the leg, with the
+  leg's number and its pin, and a faint band of the colour lies behind those rows. A leg
+  whose rows are not neighbours gets a bracket for each run of rows.
+- Every row has its `y` and, at its two ends, the numbers of the LEDs that sit there, so
+  the direction of the chain can be read off.
+- **The page places the LEDs itself.** A refresh arrives as the bytes the core produced for
+  each leg, in chain order, without coordinates. The page works out where LED n of a pin
+  is from that pin, n and the show's `mapping.json`, by the rule of
+  [mapping.md](mapping.md), and never reorders or corrects the data. A mapping mistake in
+  the core therefore shows as a scrambled picture. The rule is in
+  `emulator/web/layout.js`, which needs no browser, so the suite compares it with the
+  reference for every LED.
+- A dark LED is drawn as a faint ring, so every LED can be seen at any time.
+- A colour value v is shown as `255 * (v / 255) ^ (1 / 2.2)`, rounded: a screen shows a low
+  value much darker than an LED does. This one curve is the only change; the record file
+  and the event stream carry the values unchanged.
 
 ## The event stream
 
