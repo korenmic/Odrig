@@ -1,0 +1,45 @@
+#include "reasons.h"
+
+namespace odrig {
+
+const char *reason_name(Reason reason) {
+    switch (reason) {
+        case kReadError: return "read-error";
+        case kOutOfMemory: return "out-of-memory";
+        case kMappingMissing: return "mapping-missing";
+        case kMappingMalformed: return "mapping-malformed";
+        case kShowMissing: return "show-missing";
+        case kShowMalformed: return "show-malformed";
+        case kDuplicateId: return "duplicate-id";
+        case kUndefinedId: return "undefined-id";
+        case kNestedCycle: return "nested-cycle";
+        case kFileMissing: return "file-missing";
+        case kFileMalformed: return "file-malformed";
+        case kSizeMismatch: return "size-mismatch";
+        case kTruncated: return "truncated";
+        case kBadMagic: return "bad-magic";
+        case kBadVersion: return "bad-version";
+        case kReservedBits: return "reserved-bits";
+        case kZeroSize: return "zero-size";
+        case kBadPaletteSize: return "bad-palette-size";
+        case kCanvasTooLarge: return "canvas-too-large";
+        case kNoFrames: return "no-frames";
+        case kBadDeflate: return "bad-deflate";
+        case kZeroDuration: return "zero-duration";
+        case kBadLength: return "bad-length";
+        case kBadStoredLength: return "bad-stored-length";
+        case kOutOfBits: return "out-of-bits";
+        case kRunPastEnd: return "run-past-end";
+        case kBadCode: return "bad-code";
+        case kTooMuchPadding: return "too-much-padding";
+        case kBadPaletteIndex: return "bad-palette-index";
+        case kTrailingBytes: return "trailing-bytes";
+        case kNone:
+        case kEnd:
+        case kReasonCount:
+            break;
+    }
+    return "";
+}
+
+}  // namespace odrig

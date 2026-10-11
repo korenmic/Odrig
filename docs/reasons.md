@@ -136,3 +136,18 @@ cycle.
 | Reason | Condition |
 |---|---|
 | `cannot-write` | An output file or folder cannot be written, for example because its folder does not exist. |
+
+## The core
+
+The core is the library that plays an installed show, on the board and in the emulator; see
+[core.md](core.md). It writes no error line. When it refuses a show it holds the reason as a
+text that begins with a reason name, and the `status` command reports that text.
+
+It names an invalid show as "Shows" does, from `mapping-missing` to `size-mismatch`, and a
+rejected `.odrg` file as "ODRG files" does. It adds two reasons that only a running player
+can meet:
+
+| Reason | Condition |
+|---|---|
+| `read-error` | The host reports a failure while a file is read. |
+| `out-of-memory` | The host cannot supply the memory the core asks for when it starts. |

@@ -16,7 +16,9 @@ class ReasonsDocument(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = (DOCS / "reasons.md").read_text(encoding="utf-8")
-        rows = re.findall(r"(?m)^\| ((?:`[a-z0-9-]+`(?:, )?)+) \| (.+) \|$", cls.text)
+        # The last section lists what the core reports; the tool has only the reasons before it.
+        of_the_tool = cls.text.split("\n## The core\n")[0]
+        rows = re.findall(r"(?m)^\| ((?:`[a-z0-9-]+`(?:, )?)+) \| (.+) \|$", of_the_tool)
         cls.listed = {}
         for names, condition in rows:
             for name in re.findall(r"`([a-z0-9-]+)`", names):

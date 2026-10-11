@@ -22,7 +22,7 @@ Rules for every task:
   that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Build, test command and reason names
+- [x] 1. Build, test command and reason names
   - Create `core/Makefile` for GNU Make 3.81 with the targets `all`, `test` and `clean`, the
     compiler flags of the design, sources found by `$(wildcard src/*.cpp)`, a second
     compilation of the sources with the sanitizers for the test host, and a check that

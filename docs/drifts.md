@@ -1339,3 +1339,32 @@ a person can check.
 it open.
 
 **Resolution.** Seed 04 `tasks.md`, tasks 1 and 10.
+
+## Seed 02: Queue records without task ids
+
+**Question.** The workflow that queues the tasks adds a `TaskId` and a `TaskIdPacked` line
+to each queue record, made by its task-id script. That script builds its paths for Windows
+and stops on this Mac with a path that does not exist.
+
+**Answer.** The queue records of seed 02 carry `Status`, `Source` and `Task` only, like
+those of seed 01. The readers of the queue need no more: the status report counts all 25
+records as by-reference, with no missing reference.
+
+**Resolution.** `.codex/local-task-queue.md`, which is not tracked.
+
+## Seed 02: The core's reasons and the converter's test of docs/reasons.md
+
+**Question.** Task 1 adds `read-error` and `out-of-memory` to `docs/reasons.md`. The
+converter's suite, as delivered, checks that document in both directions: every reason of
+the tool is listed, and every listed reason is a reason of the tool. Seed 01's design asked
+for the first direction only. With the two new names the second check fails, because the
+tool does not have them.
+
+**Answer.** The document gets a last section, "The core", for what only the core reports.
+The converter's test reads the sections before it, so it still proves that the tool's part
+of the document and `odrig/errors.py` agree in both directions. The core's suite proves the
+other half: every name the core can report is in the document. The two names are not added
+to `odrig/errors.py`, since the tool never gives them.
+
+**Resolution.** `docs/reasons.md`, "The core"; `tests/converter/test_docs.py`;
+`tests/core/test_build.py`.

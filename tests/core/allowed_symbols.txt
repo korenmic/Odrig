@@ -1,0 +1,14 @@
+# The names the compiled core may refer to without defining them, as `nm` prints them.
+# One name per line. Nothing else may be listed here: no allocation, no input or output,
+# no clock.
+
+# The C library's routines for copying, filling and comparing memory.
+_memcpy
+_memmove
+_memset
+_bzero
+_memcmp
+
+# The compiler's own support: the check it adds to a function that holds a local array.
+___stack_chk_fail
+___stack_chk_guard
