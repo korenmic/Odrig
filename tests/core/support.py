@@ -1,15 +1,20 @@
 """Helpers shared by the tests of the core: where things are and how the test host is run."""
 
+import bisect
 import collections
 import contextlib
 import functools
+import itertools
 import json
 import pathlib
 import random
+import re
+import struct
 import subprocess
 import tempfile
 
-from odrig import jsonframes, odrg, pack
+from odrig import errors, jsonframes, mapping, odrg, pack, show
+from odrig.generators import dense
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
@@ -282,3 +287,182 @@ def seeded_animation(seed, width, height, durations, colours=5):
 def clip(seed, width, height, durations=(20, 20, 20), compressed=True):
     """The bytes of an ODRG file of a seeded animation."""
     return odrg.encode(seeded_animation(seed, width, height, durations), compressed=compressed)
+
+
+@functools.lru_cache(maxsize=None)
+def dense_clip(width, height, seconds, compressed=True):
+    """The bytes of an ODRG file of the converter's dense test clip."""
+    animation = jsonframes.Animation(width, height, tuple(dense.frames(width, height, seconds)))
+    return odrg.encode(animation, compressed=compressed)
+
+
+def show_refusal(rejection):
+    """The reason text the core holds for a show file the converter's reader refuses."""
+    if rejection.reason == "show-malformed":
+        return "show-malformed"
+    about = {
+        "duplicate-id": r"two items have the id (-?[0-9]+)",
+        "undefined-id": r"names the id (-?[0-9]+), which no item has",
+        "nested-cycle": r"the cycle of item ([0-9]+) names item",
+    }[rejection.reason]
+    number = int(re.search(about, rejection.detail).group(1))
+    return f"{rejection.reason} {max(-4294967295, min(4294967295, number))}"
+
+
+def led_pixels(width, leg):
+    """For LED 1, 2, ... of a leg, the place in pixel order of the canvas pixel it shows.
+
+    This is the rule of docs/mapping.md, "Where each LED is", written out once more.
+    """
+    places = []
+    for n in range(1, width * len(leg.rows) + 1):
+        r = (n - 1) // width
+        i = (n - 1) % width
+        y = leg.rows[r]
+        on_the_first_side = r % 2 == 0
+        starts_right = (leg.first_led == "right") == on_the_first_side
+        x = width - i if starts_right else 1 + i
+        places.append((y - 1) * width + (x - 1))
+    return places
+
+
+class _Invalid(Exception):
+    """The installed file set is refused, with this reason text."""
+
+
+class _Clip:
+    """The frames of one `.odrg` file, as the reference decoder gives them."""
+
+    def __init__(self, records):
+        self.pictures = [picture for _, picture in records]
+        self.ends = list(itertools.accumulate(duration for duration, _ in records))
+        self.total = self.ends[-1]
+
+    def picture_at(self, elapsed):
+        """The frame whose time span contains this time, with the animation looping."""
+        return self.pictures[bisect.bisect_right(self.ends, elapsed % self.total)]
+
+
+class ReferencePlayer:
+    """What the core does with an installed file set, stated a second time.
+
+    It is written from the requirements, in Python, on top of the converter's readers and
+    its reference decoder, and applies the mapping rule itself. `answer` takes an input
+    line of `odrig_host session` and gives the lines the test host prints for it, so a test
+    compares two texts. `poll` gives the same refresh as values.
+    """
+
+    GRID = 20
+
+    def __init__(self, files):
+        """`files` maps the name of each installed file to its content."""
+        self.error = None       # the reason the show is invalid, or None
+        self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
+        self.items = {}         # the items of the show by id
+        self.clips = {}         # the frames of each file by name
+        self.on = True
+        self.brightness = 0
+        self.playing = None     # the id of the item being played
+        self.zero = None        # the time zero of that item, once a refresh has set it
+        self.t0 = None          # the power-on moment
+        self.latest = None
+        self.next_due = None
+        content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
+        try:
+            start = self._check(content)
+        except _Invalid as invalid:
+            self.error = str(invalid)
+        else:
+            if start is not None:
+                self._play(start)
+
+    def _check(self, files):
+        """Reads the installed file set in the order of the checks. Returns the `start` id."""
+        if "mapping.json" not in files:
+            raise _Invalid("mapping-missing")
+        try:
+            canvas = mapping.loads(files["mapping.json"])
+        except errors.Rejection:
+            raise _Invalid("mapping-malformed") from None
+        self.legs = [(leg.leg, leg.pin, led_pixels(canvas.width, leg)) for leg in canvas.legs]
+
+        if "show.json" not in files:
+            raise _Invalid("show-missing")
+        try:
+            listed = show.loads(files["show.json"])
+        except errors.Rejection as rejection:
+            raise _Invalid(show_refusal(rejection)) from None
+        self.brightness = listed.brightness
+        self.items = {item.id: item for item in listed.items}
+
+        for name in show.files(listed):
+            if name not in files:
+                raise _Invalid(f"file-missing {name}")
+            data = files[name]
+            # The header is judged first, then the size against the mapping, then the body.
+            # The header alone, when it is sound, is refused as a file cut after it.
+            try:
+                odrg.decode(data[:16])
+            except errors.Rejection as rejection:
+                if len(data) < 16 or rejection.reason != "truncated":
+                    raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
+            if struct.unpack_from("<HH", data, 6) != (canvas.width, canvas.height):
+                raise _Invalid(f"size-mismatch {name}")
+            try:
+                self.clips[name] = _Clip(odrg.decode(data).records)
+            except errors.Rejection as rejection:
+                raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
+        return listed.start
+
+    def _play(self, number):
+        self.playing = number
+        self.zero = None
+
+    def _touch(self, now):
+        """Takes the timestamp of a call and gives the time the call happens at."""
+        if self.t0 is None:
+            self.t0 = self.latest = self.next_due = now
+        self.latest = max(self.latest, now)
+        return self.latest
+
+    def _picture(self, now, grid):
+        """The picture on the canvas at a refresh, or None when every LED is dark."""
+        if self.error is not None or self.playing is None:
+            return None
+        if self.zero is None:
+            self.zero = grid
+        item = self.items[self.playing]
+        picture = self.clips[item.file].picture_at(now - self.zero)
+        return picture if self.on else None
+
+    def poll(self, now):
+        """A request for a refresh at a timestamp.
+
+        Returns `(leg number, LED data)` for each leg, or None when no refresh is due.
+        """
+        now = self._touch(now)
+        if not self.legs or now < self.next_due:
+            return None
+        grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
+        self.next_due = grid + self.GRID
+        picture = self._picture(now, grid)
+        if picture is None:
+            return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+        sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
+        return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+
+    def answer(self, line):
+        """The lines the test host prints for one input line of a session."""
+        word, _, rest = line.partition(" ")
+        if word == "poll":
+            refresh = self.poll(int(rest))
+            if refresh is None:
+                return [f"idle {rest}"]
+            return [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
+        if line == "error":
+            return [f"error {self.error or 'none'}"]
+        raise ValueError(f"not an input line of a session: {line!r}")
+
+    def run(self, script):
+        """The lines the test host prints for the lines of a script."""
+        return [printed for line in script for printed in self.answer(line)]

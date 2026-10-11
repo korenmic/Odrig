@@ -460,7 +460,55 @@ private:
             print_error();
             return true;
         }
+        size_t space = line.find(' ');
+        std::string word = line.substr(0, space);
+        std::string rest = space == std::string::npos ? "" : line.substr(space + 1);
+        if (word == "poll") {
+            uint64_t now;
+            if (!timestamp(rest, &now)) {
+                return false;
+            }
+            poll(now);
+            return true;
+        }
         return false;
+    }
+
+    // A timestamp: decimal digits, at most 19 of them.
+    static bool timestamp(const std::string &text, uint64_t *value) {
+        if (text.empty() || text.size() > 19 || text.find_first_not_of("0123456789") != std::string::npos) {
+            return false;
+        }
+        *value = std::strtoull(text.c_str(), nullptr, 10);
+        return true;
+    }
+
+    // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
+    void poll(uint64_t now) {
+        int produced;
+        {
+            guard::InCore inside;
+            produced = odrig_core_poll(core_, now);
+        }
+        if (!produced) {
+            std::printf("idle %llu\n", static_cast<unsigned long long>(now));
+            return;
+        }
+        std::printf("refresh %llu\n", static_cast<unsigned long long>(now));
+        uint32_t count;
+        {
+            guard::InCore inside;
+            count = odrig_core_leg_count(core_);
+        }
+        for (uint32_t index = 0; index < count; ++index) {
+            odrig_leg leg;
+            {
+                guard::InCore inside;
+                odrig_core_leg(core_, index, &leg);
+            }
+            std::string rgb(reinterpret_cast<const char *>(leg.rgb), 3 * static_cast<size_t>(leg.led_count));
+            std::printf("data %u %s\n", leg.leg, hex(rgb).c_str());
+        }
     }
 
     void print_error() {

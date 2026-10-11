@@ -41,6 +41,9 @@ struct FileInfo {
     uint64_t total_ms;
 };
 
+// Stands for no item.
+const uint32_t kNothing = 0xFFFFFFFFu;
+
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
 struct Core {
@@ -75,6 +78,27 @@ struct Core {
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
+
+    // The clock. Every time is a timestamp of the host, in milliseconds.
+    uint8_t started;        // a call has carried a timestamp
+    uint64_t t0;            // the power-on moment: the first timestamp
+    uint64_t latest;        // the latest timestamp
+    uint64_t next_due;      // the first grid time that is neither used nor skipped
+
+    // Playback.
+    uint8_t on;
+    uint8_t scale[256];     // what each colour value is sent as, at the current brightness
+    uint32_t playing;       // the position of the item being played, or kNothing
+    uint32_t shown;         // the position of the animation item the latest refresh chose
+    uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
+    uint64_t zero;          // the item's time zero
+
+    // The file that is open for playback: an animation item in one turn and one loop.
+    uint8_t stream_open;
+    uint32_t stream_item;
+    uint64_t stream_turn;
+    uint64_t stream_loop;
+    uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
 
     FileSource file;
     Inflate inflate;

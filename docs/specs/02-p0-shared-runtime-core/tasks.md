@@ -110,7 +110,7 @@ Rules for every task:
     `odrig.show.read`.
   - Requirements: 3.1, 3.3, 3.4, 3.6, 15.4
 
-- [ ] 6. Clock, refreshes and playback of animation items
+- [x] 6. Clock, refreshes and playback of animation items
   - Create `core/src/player.h`, `.cpp` with the clock, the grid, the refresh of the design
     for animation items, the brightness table and the LED data, and `odrig_core_poll`. Add
     step 6 of the design's startup: an animation item named by `start` plays from power-on.

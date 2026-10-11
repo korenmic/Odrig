@@ -1,5 +1,4 @@
 import random
-import re
 import unittest
 
 from odrig import errors, mapping, show
@@ -350,15 +349,7 @@ def judged_by_the_converter(data):
     try:
         listed = show.loads(data)
     except errors.Rejection as rejection:
-        if rejection.reason == "show-malformed":
-            return "show-malformed"
-        about = {
-            "duplicate-id": r"two items have the id (-?[0-9]+)",
-            "undefined-id": r"names the id (-?[0-9]+), which no item has",
-            "nested-cycle": r"the cycle of item ([0-9]+) names item",
-        }[rejection.reason]
-        number = int(re.search(about, rejection.detail).group(1))
-        return f"{rejection.reason} {max(-4294967295, min(4294967295, number))}"
+        return support.show_refusal(rejection)
     return f"file-missing {show.files(listed)[0]}"
 
 

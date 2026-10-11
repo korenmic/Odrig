@@ -4,6 +4,7 @@
 #include "core_state.h"
 #include "mapping.h"
 #include "odrig_core.h"
+#include "player.h"
 #include "reasons.h"
 #include "show.h"
 
@@ -124,6 +125,7 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
     core->state.host = *host;
     core->state.starting = 1;
     odrig::start(core->state);
+    odrig::player_start(core->state);
     core->state.starting = 0;
     return core;
 }

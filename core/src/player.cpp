@@ -1,0 +1,168 @@
+#include "player.h"
+
+#include <string.h>
+
+#include "odrig_core.h"
+
+namespace odrig {
+
+namespace {
+
+void close_stream(Core &core) {
+    core.file.close();
+    core.stream_open = 0;
+}
+
+// Opens the file of an animation item for one turn and one loop, with the pixel buffer all
+// zero and no frame decoded.
+Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop) {
+    close_stream(core);
+    const FileInfo &file = core.files[core.items[animation].first];
+    Reason reason = core.file.open(core.host, file.name);
+    if (reason != kNone) {
+        return reason;
+    }
+    reason = core.decoder.open(&core.file, &core.inflate, core.window);
+    if (reason != kNone) {
+        return reason;
+    }
+    if (core.decoder.width != core.width || core.decoder.height != core.height) {
+        return kSizeMismatch;
+    }
+    memset(core.pixels, 0, core.decoder.n);
+    core.stream_open = 1;
+    core.stream_item = animation;
+    core.stream_turn = turn;
+    core.stream_loop = loop;
+    core.frame_end = 0;
+    return kNone;
+}
+
+// Brings the pixel buffer to the picture of the item being played, `elapsed` milliseconds
+// after its time zero. False when there is no picture to show.
+bool advance(Core &core, uint64_t elapsed) {
+    const ItemInfo &item = core.items[core.playing];
+    if (item.is_cycle) {
+        return false;
+    }
+    const uint32_t animation = core.playing;
+    const uint64_t turn = 0;
+    const FileInfo &file = core.files[item.first];
+    const uint64_t loop = elapsed / file.total_ms;
+    const uint64_t within = elapsed % file.total_ms;
+
+    Reason reason = kNone;
+    if (!core.stream_open || core.stream_item != animation || core.stream_turn != turn || core.stream_loop != loop) {
+        reason = open_stream(core, animation, turn, loop);
+    }
+    while (reason == kNone && core.frame_end <= within) {
+        uint16_t duration = 0;
+        reason = core.decoder.next(core.pixels, &duration);
+        core.frame_end += duration;
+    }
+    if (reason != kNone) {
+        close_stream(core);
+        return false;
+    }
+    core.shown = animation;
+    return true;
+}
+
+// Writes the colour of every LED: its pixel, through the palette in a palette file, at the
+// current brightness.
+void fill_leds(Core &core) {
+    const uint8_t *scale = core.scale;
+    const uint16_t *pixel = core.led_pixel;
+    uint8_t *out = core.led_data;
+    if (core.decoder.colours != 0) {
+        const uint8_t *palette = core.decoder.palette;
+        for (uint32_t led = 0; led < core.led_total; ++led) {
+            const uint8_t *colour = palette + 3u * core.pixels[pixel[led]];
+            *out++ = scale[colour[0]];
+            *out++ = scale[colour[1]];
+            *out++ = scale[colour[2]];
+        }
+    } else {
+        for (uint32_t led = 0; led < core.led_total; ++led) {
+            const uint8_t *colour = core.pixels + 3u * pixel[led];
+            *out++ = scale[colour[0]];
+            *out++ = scale[colour[1]];
+            *out++ = scale[colour[2]];
+        }
+    }
+}
+
+}  // namespace
+
+uint64_t clock_touch(Core &core, uint64_t now_ms) {
+    if (!core.started) {
+        core.started = 1;
+        core.t0 = now_ms;
+        core.latest = now_ms;
+        core.next_due = now_ms;
+    }
+    if (now_ms < core.latest) {
+        return core.latest;
+    }
+    core.latest = now_ms;
+    return now_ms;
+}
+
+void player_set_brightness(Core &core, uint8_t value) {
+    core.brightness = value;
+    for (uint32_t colour = 0; colour < 256; ++colour) {
+        core.scale[colour] = static_cast<uint8_t>((colour * value + 127) / 255);
+    }
+}
+
+void player_start(Core &core) {
+    core.on = 1;
+    core.playing = kNothing;
+    core.shown = kNothing;
+    player_set_brightness(core, core.brightness);
+    if (!core.invalid && core.has_start) {
+        player_play(core, core.start_item);
+    }
+}
+
+void player_play(Core &core, uint32_t item) {
+    close_stream(core);
+    core.playing = item;
+    core.zero_pending = 1;
+    const ItemInfo &played = core.items[item];
+    core.shown = played.is_cycle ? core.entries[played.first] : item;
+}
+
+int player_poll(Core &core, uint64_t now_ms) {
+    const uint64_t now = clock_touch(core, now_ms);
+    if (core.leg_count == 0 || now < core.next_due) {
+        return 0;
+    }
+    // The latest grid time at or before now is used; every earlier one is skipped.
+    const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
+    core.next_due = grid + kGridStep;
+
+    bool lit = false;
+    if (!core.invalid && core.playing != kNothing) {
+        if (core.zero_pending) {
+            core.zero = grid;
+            core.zero_pending = 0;
+        }
+        lit = advance(core, now - core.zero);
+    }
+    if (lit && core.on) {
+        fill_leds(core);
+    } else {
+        memset(core.led_data, 0, 3u * core.led_total);
+    }
+    return 1;
+}
+
+}  // namespace odrig
+
+int odrig_core_poll(odrig_core *core, uint64_t now_ms) {
+    if (core == nullptr) {
+        return 0;
+    }
+    return odrig::player_poll(core->state, now_ms);
+}
