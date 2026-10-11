@@ -18,9 +18,13 @@ it stands now.
 
 - The canvas is 60 columns wide. A **leg** is one data pin of the board together with the
   three 60-LED rows wired to it as a snake (180 LEDs).
-- Today: 2 legs, 6 rows, 360 LEDs. Legs 1 and 2 are on the pins labelled 1 and 2 and are
-  confirmed working.
+- Leg N uses the pin labelled N. Leg 1 holds the top three rows and each following leg holds
+  the three rows below the previous one. Every leg's chain starts at the right end of its
+  top row.
+- Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
 - Target: 10 legs, 30 rows, 1,800 LEDs.
+- The mapping is defined by the files in `mapping/` and described in
+  [mapping.md](mapping.md).
 - Coordinates are 1-based, with (1,1) at the bottom-left LED. The proof-of-concept scripts in
   `animations/` and `tools/` still use the earlier convention (0-based, origin top-left).
 - Playback target: 50 frames per second.
@@ -44,7 +48,7 @@ it stands now.
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
 
-The exact specifications of the JSON format and the custom binary format are not written yet.
+Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
 
 ### Measurements behind the choice
 
@@ -95,12 +99,11 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 
 ## Open questions
 
-- The exact JSON and custom binary specifications.
 - Whether large video-derived JSON sources are tracked as they are (the dense clip is 7 MB of
   JSON per 10 seconds).
 - Decode speed of the custom format on the board at 50 frames per second for 1,800 LEDs.
-- Which pins legs 3 to 10 use, and whether the firmware supports 10 outputs.
-- With the origin at the bottom-left, which leg holds the bottom three rows.
+- Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
+  hardware.
 - Which ready-made emulator, if any, to build on. Local trials are in progress.
 
 ## Change log
@@ -115,3 +118,5 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - 2026-10-11: Command rule and emulator decisions added (shared command front-end, virtual
   serial port, physical LEDs drawn from the mapping file, size from the mapping file, filters
   for ready-made emulators).
+- 2026-10-11: Format specification and mapping written. The runtime format is named ODRG.
+  Leg N is on pin N, leg 1 is at the top of the canvas.

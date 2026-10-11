@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "width": 60,
+  "legs": [
+    {"leg": 1, "pin": 1, "first_led": "right", "rows": [30, 29, 28]},
+    {"leg": 2, "pin": 2, "first_led": "right", "rows": [27, 26, 25]},
+    {"leg": 3, "pin": 3, "first_led": "right", "rows": [24, 23, 22]},
+    {"leg": 4, "pin": 4, "first_led": "right", "rows": [21, 20, 19]},
+    {"leg": 5, "pin": 5, "first_led": "right", "rows": [18, 17, 16]},
+    {"leg": 6, "pin": 6, "first_led": "right", "rows": [15, 14, 13]},
+    {"leg": 7, "pin": 7, "first_led": "right", "rows": [12, 11, 10]},
+    {"leg": 8, "pin": 8, "first_led": "right", "rows": [9, 8, 7]},
+    {"leg": 9, "pin": 9, "first_led": "right", "rows": [6, 5, 4]},
+    {"leg": 10, "pin": 10, "first_led": "right", "rows": [3, 2, 1]}
+  ]
+}

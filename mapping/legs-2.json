@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "width": 60,
+  "legs": [
+    {"leg": 1, "pin": 1, "first_led": "right", "rows": [6, 5, 4]},
+    {"leg": 2, "pin": 2, "first_led": "right", "rows": [3, 2, 1]}
+  ]
+}
