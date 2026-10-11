@@ -6,6 +6,13 @@ repository root and uses only the Python standard library. It loads the core as 
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
 decision about files, time and commands to it.
 
+This page covers the [commands](#commands) that build and test it, the
+[two shows](#two-shows-to-run) to run, [starting](#starting) it, its
+[serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
+[command tool](#the-command-tool), [the page](#the-page) with its two views, the
+[event stream](#the-event-stream), [record mode](#record-mode), the
+[exit statuses](#exit-statuses) and the [check list by eye](#the-check-list-by-eye).
+
 ## Commands
 
 Run from the repository root.
@@ -391,11 +398,17 @@ the nearest millisecond.
 python -m emulator build/example-show --record build/example.odrr --seconds 60
 ```
 
+| Option | Meaning |
+|---|---|
+| `--record OUT` | Starts record mode and names the record file to write. |
+| `--seconds S` | The length of the recording. It must be above 0. |
+| `--script FILE` | Timed command lines to give the core. Without it no command is given. |
+| `--core PATH` | Another shared library than `core/build/libodrig_core.dylib`. |
+
 Recording the same folder with the same length and the same script twice gives the same
 bytes. The emulator gives the core nothing of its own in this mode: only the requests for
-a refresh and the commands of the script.
-
-`--core PATH` names another shared library than `core/build/libodrig_core.dylib`.
+a refresh and the commands of the script. The options `--port`, `--serial-link` and
+`--verbose` belong to real time and do not go with `--record`.
 
 ### The script
 
@@ -478,3 +491,70 @@ the ticks to a Python program.
 Whether the folder holds a valid show is not the emulator's judgement but the core's: any
 folder is recorded, and with an invalid show the LED data is dark and `status` gives the
 reason.
+
+## The check list by eye
+
+The suite checks everything a program can check without a browser. How the page looks is
+checked by a person, or by a tool that drives a browser, with this list. Every step is done
+twice: once in current Safari and once in current Chrome. The number in brackets is the
+requirement and the criterion of `docs/specs/03-p0-emulator/requirements.md` the step
+covers.
+
+Before the first step, build the library and pack three shows: the example show and the
+demo show as under [Two shows to run](#two-shows-to-run), and a dense 60 x 30 clip of 10
+seconds on the ten-leg mapping:
+
+```
+make -C core shared
+mkdir -p build/dense/sources
+python -m odrig.generators.dense build/dense/sources/dense.json --mapping mapping/legs-10.json --seconds 10
+printf '{"version": 1, "brightness": 255, "items": [{"id": 1, "file": "dense.odrg"}], "start": 1}\n' > build/dense/show.json
+python -m odrig pack --show build/dense/show.json --mapping mapping/legs-10.json \
+    --sources build/dense/sources --out build/dense/show
+```
+
+Give the browser a window of 1280 x 800.
+
+1. **The words are upright (4.8).** Start `python -m emulator build/example-show` and open
+   the page. *Seen:* the words HELLO WORLD stand upright and read from left to right.
+   After 15 seconds the bouncing square takes their place, and the two alternate every 15
+   seconds.
+2. **Dark LEDs are visible (4.6).** With the same show. *Seen:* every LED that is not lit
+   is a faint ring, so all 360 positions can be made out.
+3. **The page keeps up (4.9).** With the same show, watch the header for ten seconds.
+   *Seen:* `page` shows 49 or more in every second, and so does `core`.
+4. **A command is seen at once (8.1).** Send
+   `python -m odrigctl --port build/emulator/serial brightness 40` and then
+   `python -m odrigctl --http 127.0.0.1:8600 play 2`. *Seen:* without reloading, each
+   command appears as a new line of the log as it is sent, with its time, `serial` or
+   `http`, the line, and the reply `{"ok":true}`.
+5. **The status follows (8.4).** After step 4. *Seen:* the header reads brightness 40,
+   playing 2, animation 2. Send `python -m odrigctl --http 127.0.0.1:8600 off`: the header
+   reads off and every LED is dark. Send `on`: the square is back.
+6. **The drawing fits and follows the window (4.2).** Stop the emulator and start
+   `python -m emulator build/dense/show`. *Seen:* the whole 60 x 30 canvas is in the
+   window, with nothing to scroll. Make the window smaller and larger: the drawing is drawn
+   again at the new size each time.
+7. **The page keeps up with a dense picture (4.9).** With the dense show, watch the header
+   for ten seconds. *Seen:* `page` shows 49 or more in every second.
+8. **The board (9.1).** Stop the emulator, start `python -m emulator build/demo-10/show`
+   and choose `Mapping`. *Seen:* a drawing of the board with the antenna at the top, the
+   two USB sockets at the bottom, and two rows of pins labelled, from the top, 3V3, 3V3,
+   RST, 4, 5, 6, 7 ... on the left and GND, TX, RX, 1, 2, 42 ... on the right, as in
+   [mapping.md](mapping.md).
+9. **Ten legs with the animation on them (14.5).** With the same view. *Seen:* ten legs on
+   the pins 1 to 10, each with a line from its pin to the first LED of its chain and the
+   path of the chain across its three rows, and HELLO WORLD playing on the LEDs of this
+   view.
+10. **Everything can be read (9.8).** With the same view. *Seen:* all ten legs, their
+    lines, their paths and the two end numbers of all 30 rows can be read, and no label is
+    drawn over another.
+11. **Pointing highlights one leg (9.5).** Point in turn at a leg's label, at its pin on
+    the board, at its line and at its rows. *Seen:* each time that leg stands out in all
+    these places and the other legs fade. Over an LED the readout also names the leg, the
+    pin, the LED number and the canvas coordinates.
+12. **An invalid show says why (10.1).** Stop the emulator. Copy `build/example-show` to
+    `build/example-broken`, remove `dvd.odrg` from the copy and start
+    `python -m emulator build/example-broken`. *Seen:* a band under the header shows
+    `file-missing dvd.odrg`, in the LEDs view and in the mapping view, and every LED is
+    dark.

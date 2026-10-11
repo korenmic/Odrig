@@ -194,7 +194,7 @@ Rules for every task:
   - Add to `docs/emulator.md` the commands that generate, pack and start the demo show.
   - Requirements: 3.4, 14.1, 14.2, 14.3, 14.4
 
-- [ ] 10. Documentation and final check by program
+- [x] 10. Documentation and final check by program
   - Complete `docs/emulator.md` as Requirement 17 lists, with the check list of
     Requirement 16 criterion 5 written as numbered steps that name what to start, what to
     send and what must be seen. Add one sentence to `README.md` pointing to

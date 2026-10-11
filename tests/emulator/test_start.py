@@ -186,6 +186,13 @@ class Start(unittest.TestCase):
             self.assertEqual(result.out, "")
         self.assertEqual(list(self.work.iterdir()), [])
 
+    def test_without_options_the_port_is_8600_and_the_library_is_the_one_the_makefile_builds(self):
+        self.assertEqual(app.PORT, 8600)
+        self.assertEqual(app.SERIAL_LINK, support.ROOT / "build" / "emulator" / "serial")
+        self.assertEqual(app.LIBRARY, support.LIBRARY)
+        arguments = app.parse([str(self.work)])
+        self.assertEqual((arguments.port, arguments.serial_link, arguments.core, arguments.verbose, arguments.record), (None, None, str(support.LIBRARY), False, None))
+
     def test_no_option_names_a_size_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
         self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--core", "--verbose", "--record", "--seconds", "--script"})

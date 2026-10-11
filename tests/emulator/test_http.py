@@ -2,9 +2,11 @@ import http.client
 import json
 import re
 import subprocess
+import tempfile
 import threading
 import unittest
 
+from emulator import failure, httpd, hub
 from tests.core.support import ReferencePlayer
 
 from . import support
@@ -168,6 +170,61 @@ class Commands(unittest.TestCase):
         ).stdout
         listening = re.findall(r"TCP (\S+) \(LISTEN\)", listed)
         self.assertEqual(listening, [f"127.0.0.1:{self.emulator.port}"])
+
+
+class Engine:
+    """Stands in for the engine: keeps every line the server hands it."""
+
+    def __init__(self):
+        self.lines = []
+        self.hub = hub.Hub()
+
+    def line(self, data, transport):
+        self.lines.append((data, transport))
+        return b'{"ok":true}\n'
+
+
+class WhatTheServerPassesOn(unittest.TestCase):
+    def setUp(self):
+        self.engine = Engine()
+        self.folder = support.entered(self, tempfile.TemporaryDirectory())
+        self.server = httpd.Server(0, self.engine, self.folder, lambda: {})
+        self.addCleanup(self.server.stop)
+        self.server.start()
+
+    def request(self, method, path, body=None, headers=None):
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.port, timeout=10)
+        self.addCleanup(connection.close)
+        connection.request(method, path, body=body, headers=headers or {})
+        answer = connection.getresponse()
+        return answer.status, answer.read()
+
+    def test_the_body_is_passed_on_as_it_arrived_with_or_without_its_newline(self):
+        bodies = [b"status", b"status\n", b"play 2\r\n", b"", b"\x00\xff caf\xc3\xa9", b"x" * 128]
+        for body in bodies:
+            self.assertEqual(self.request("POST", "/odrig", body), (200, b'{"ok":true}\n'))
+        self.assertEqual(self.engine.lines, [(body, "http") for body in bodies])
+
+    def test_of_a_body_longer_than_128_bytes_the_first_128_are_passed_on(self):
+        long_body = bytes(range(256)) * 40
+        for body in (long_body[:129], long_body[:300], long_body):
+            self.assertEqual(self.request("POST", "/odrig", body)[0], 200)
+        self.assertEqual(self.engine.lines, [(long_body[:128], "http")] * 3)
+
+    def test_the_front_end_is_not_called_for_another_method_a_missing_length_or_another_path(self):
+        for method in ("GET", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"):
+            self.assertEqual(self.request(method, "/odrig", None if method in ("GET", "HEAD") else b"on")[0], 405, method)
+        self.assertEqual(self.request("POST", "/odrig/x", b"on")[0], 404)
+        self.assertEqual(self.request("POST", "/", b"on")[0], 404)
+        received = support.raw_request(self.server.port, b"POST /odrig HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\non\n")
+        self.assertRegex(received, rb"\AHTTP/1\.1 411 ")
+        self.assertEqual(self.engine.lines, [])
+
+    def test_a_port_that_is_taken_is_address_in_use(self):
+        with self.assertRaises(failure.Failure) as caught:
+            httpd.Server(self.server.port, self.engine, self.folder, lambda: {})
+        self.assertEqual(caught.exception.reason, "address-in-use")
+        self.assertIn(f"127.0.0.1:{self.server.port}", caught.exception.detail)
 
 
 class InvalidShow(unittest.TestCase):

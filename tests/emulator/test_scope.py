@@ -94,6 +94,15 @@ class Scope(unittest.TestCase):
         if tracked:
             self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py"])
 
+    def test_no_commit_of_this_seed_changes_a_source_or_the_header_of_the_core(self):
+        changed = subprocess.run(
+            ["git", "log", "--grep=^Seed 03", "--format=", "--name-only", "--", "core/src", "core/include"],
+            cwd=support.ROOT, capture_output=True, text=True, check=True,
+        ).stdout.split()
+        self.assertEqual(changed, [])
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "core/src", "core/include"], cwd=support.ROOT, capture_output=True, text=True, check=True).stdout
+        self.assertEqual(dirty, "")
+
     def test_the_checks_find_what_they_look_for(self):
         tree = ast.parse("import os, ctypes.util\nfrom odrig import odrg\nfrom . import failure\nfrom .host import FolderHost\nimport numpy\nADDRESS = '0.0.0.0'\n")
         self.assertEqual(imported(tree), {"os", "ctypes", "odrig", "numpy"})
