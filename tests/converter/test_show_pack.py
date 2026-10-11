@@ -382,8 +382,17 @@ class Pack(unittest.TestCase):
         self.refused("output-not-empty", self.pack())
         self.assertEqual(self.out.read_bytes(), b"a file")
 
-    def test_an_output_whose_parent_does_not_exist_is_cannot_write(self):
-        self.refused("cannot-write", self.pack(out=self.folder / "absent" / "out"))
+    def test_folders_above_the_output_folder_are_made(self):
+        out = self.folder / "build" / "shows" / "example"
+        self.assertEqual(self.pack(out=out).status, 0)
+        self.assertEqual(len(list(out.iterdir())), 4)
+        self.assertEqual([entry.name for entry in out.parent.iterdir()], ["example"])
+
+    def test_an_output_that_cannot_be_made_is_cannot_write(self):
+        blocker = self.folder / "blocker"
+        blocker.write_bytes(b"a file where a folder is needed")
+        self.refused("cannot-write", self.pack(out=blocker / "out"))
+        self.assertEqual(blocker.read_bytes(), b"a file where a folder is needed")
 
     def test_the_order_of_the_table_when_two_apply(self):
         absent = self.folder / "absent.json"

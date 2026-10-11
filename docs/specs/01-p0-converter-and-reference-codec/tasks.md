@@ -207,7 +207,7 @@ Rules for every task:
   - Requirements: 1.6, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 13.1, 13.2,
     13.3, 20.2
 
-- [ ] 14. Documentation and final check
+- [x] 14. Documentation and final check
   - Complete `docs/converter.md` (every subcommand with one example, packing the example
     show into `build/example-show`, the vector layout) and `docs/reasons.md`, and add one
     sentence to `README.md` pointing to `docs/converter.md`.

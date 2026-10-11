@@ -1,10 +1,11 @@
 {
   "number": 1,
   "slug": "01-p0-converter-and-reference-codec",
-  "state": "in_progress",
+  "state": "completed",
   "title": "Converter and reference codec",
   "priority": "P0",
   "addedAt": "2026-10-11T05:10:44+03:00",
   "addedCommit": "pending-local",
+  "completedAt": "2026-10-11T08:01:34+03:00",
   "summary": "Python tool that imports video and GIF files to JSON frames, encodes JSON frames to ODRG, packs a show folder, and supplies the reference codec and test vectors."
 }

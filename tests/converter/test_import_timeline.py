@@ -152,6 +152,13 @@ class Gif(Fixtures):
         self.assertEqual(result.err.count("\n"), 1)
         self.assertFalse(output.exists())
 
+    def test_an_existing_output_is_replaced(self):
+        output = self.output()
+        output.write_bytes(b"something else, and longer than the new content " * 2000)
+        self.assertEqual(support.run("import", self.gif, output, "--mapping", LEGS_2).status, 0)
+        self.assertEqual(len(jsonframes.read(output).frames), 4)
+        self.assertEqual(sorted(entry.name for entry in self.folder.iterdir() if entry.name.startswith("out")), ["out.json"])
+
     def test_a_delay_of_10_ms_counts_as_100_and_one_of_20_ms_stays(self):
         path = self.folder / "delays.gif"
         media_fixtures.write_gif(path, C[:3], [10, 20, 100])

@@ -50,14 +50,16 @@ def pack(show_path, mapping_path, sources_dir, out_dir, compressed=True):
 
 
 def _write_folder(out_dir, content):
-    """Makes `out_dir` hold exactly `content`, or leaves everything as it was.
+    """Makes `out_dir` hold exactly `content`, or leaves it as it was.
 
     The files are written into `<out_dir>.part`, which then takes the place of `out_dir`.
+    Folders above `out_dir` that do not exist are made.
     """
     building = os.path.abspath(out_dir) + ".part"
     existed = os.path.isdir(out_dir)
     made = False
     try:
+        os.makedirs(os.path.dirname(building), exist_ok=True)
         os.mkdir(building)
         made = True
         for name, data in content.items():

@@ -4,6 +4,18 @@
 [format.md](format.md). It is a Python package at the repository root, started as
 `python -m odrig <subcommand>`.
 
+| Subcommand | What it does |
+|---|---|
+| [`import`](#import) | Turns a video or a GIF into a JSON frames file for the canvas of a mapping file. |
+| [`encode`](#encode) | Turns a JSON frames file into an ODRG file, the file the player reads. |
+| [`decode`](#decode) | Turns an ODRG file back into a JSON frames file. |
+| [`check`](#check) | Says whether a JSON frames or ODRG file is valid and what it holds. |
+| [`pack`](#pack) | Builds the folder that is installed for a show. |
+
+The page also covers the [generators](#generators) of the tracked animations, the
+[test vectors](#test-vectors) for other ODRG readers, the [tests](#tests), and how to use
+the reference decoder [from Python](#from-python).
+
 ## Setup
 
 The tool needs Python 3.10 or later. Create a virtual environment inside the repository
@@ -22,6 +34,22 @@ ignores it.
 The libraries are needed only to turn media files into JSON frames. `encode`, `decode`,
 `check`, `pack` and the generators run with Python alone, and so does the reference decoder
 when another program uses it. The test suite needs the libraries.
+
+| Library | Version | Used for |
+|---|---|---|
+| numpy | 2.4.6 (2.2.6 on Python 3.10) | The arithmetic that fits a picture to the canvas. |
+| Pillow | 12.3.0 | Reading GIF files. |
+| av (PyAV) | 17.1.0 | Reading mp4 and mov files. It carries its own FFmpeg libraries; no ffmpeg program is needed. |
+
+The examples on this page write into the folder `build/`, which git ignores. Make it once:
+
+```
+mkdir build
+```
+
+The tool opens no serial port and no network connection, and has no code for one operating
+system only. It is verified on macOS with Python 3.14. Windows, Linux and the Python
+versions from 3.10 to 3.13 are supported by construction and not yet verified.
 
 ## Exit statuses
 
@@ -43,7 +71,7 @@ file's name ends in `.mp4`, `.mov` or `.gif`, in any letter case. The canvas is 
 the mapping's `width` and as high as the number of rows the mapping lists.
 
 ```
-python -m odrig import clip.mp4 animations/clip.json --mapping mapping/legs-2.json
+python -m odrig import clip.mp4 build/clip.json --mapping mapping/legs-2.json
 ```
 
 **Timeline.** The output is built on the 50 frames-per-second timeline. Ticks are 20 ms
@@ -65,8 +93,8 @@ least one, so the output is within 20 ms of the length asked for. A part that is
 the media is refused with `bad-range`; it is never shortened.
 
 ```
-python -m odrig import clip.mp4 animations/clip.json --mapping mapping/legs-2.json \
-    --start 12.5 --duration 4
+python -m odrig import clip.mp4 build/clip.json --mapping mapping/legs-2.json \
+    --start 12.5 --duration 4 --fit fit
 ```
 
 **Fitting.** Canvas pixels are square, so the canvas has the shape of its width to its
@@ -115,7 +143,7 @@ millisecond. It follows the converter guidance of [format.md](format.md):
   writes the body as it is.
 
 ```
-python -m odrig encode clip.json clip.odrg
+python -m odrig encode animations/hello.json build/hello.odrg
 ```
 
 An existing output file is replaced. The same source and options always give the same
@@ -138,7 +166,7 @@ written as one frame, so the JSON file shows the same picture at every milliseco
 ODRG file. An existing output file is replaced.
 
 ```
-python -m odrig decode clip.odrg clip.json
+python -m odrig decode build/hello.odrg build/hello-again.json
 ```
 
 A file that breaks the format is rejected with one of the reasons under "ODRG files" in
@@ -158,7 +186,7 @@ frames and one ending in `.odrg` as ODRG, in any letter case. `--format` overrid
 and is needed for any other name; without it such a name is a usage error (status 2).
 
 ```
-python -m odrig check clip.odrg
+python -m odrig check build/hello.odrg
 ```
 
 For a valid file these lines are printed, and nothing else:
@@ -213,6 +241,7 @@ python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.jso
 `build/example-show` then holds `mapping.json`, `show.json`, `hello.odrg` and `dvd.odrg`.
 
 The output folder must be new or empty; otherwise `pack` refuses with `output-not-empty`.
+`pack` makes the folder, and the folders above it when they do not exist.
 `pack` checks everything before it writes anything: the mapping file, then the show file
 and its ids, then the output folder, then each source in the order the show names them. A
 source must have the canvas size of the mapping. The first thing that is wrong is reported,
@@ -329,4 +358,22 @@ python -m unittest discover -s tests/converter -t .
 
 This one command runs the whole suite of the tool. It finds the tests by itself: every file
 named `test_*.py` in `tests/converter/` is run, so a new test file needs no change anywhere
-else. The suite needs no hardware and no network connection.
+else. The suite needs no hardware and no network connection. It builds the media files it
+imports while it runs; none is tracked.
+
+## From Python
+
+The modules that other programs and tests build on need only the Python standard library:
+
+| Call | Result |
+|---|---|
+| `odrig.odrg.decode(data)` | The reference decoder: the canvas size, the palette size, whether the body is compressed, and for every frame record its duration, the picture after it and its mode byte. |
+| `odrig.odrg.encode(animation, compressed=True)` | The bytes of the ODRG file of an animation. |
+| `odrig.jsonframes.read(path)`, `loads(data)`, `dumps(animation)`, `write(path, animation)` | JSON frames files, read strictly and written in the canonical layout. |
+| `odrig.mapping.read(path)` | The canvas size and the legs of a mapping file. |
+| `odrig.show.read(path)` | The items of a show file. |
+| `odrig.pack.pack(show, mapping, sources, out, compressed=True)` | What the `pack` subcommand does. |
+
+A picture is `bytes` of 3 * W * H: red, green and blue for each pixel in the pixel order of
+[format.md](format.md), the bottom row first. A refused input raises
+`odrig.errors.Rejection`, which carries the `reason` and the `detail`.

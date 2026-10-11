@@ -791,3 +791,28 @@ of picture under that name is `unreadable-media`. A frame without a presentation
 frames whose times go backwards, are `unreadable-media` too.
 
 **Resolution.** Seed 01 `design.md`, "Import timeline"; `docs/converter.md`, "import".
+
+## Seed 01: The folders above the output folder of `pack`
+
+**Question.** The documented command packs the example show into `build/example-show`. In a
+fresh checkout there is no `build` folder, and nothing says who makes it.
+
+**Answer.** `pack` makes its output folder and the folders above it. `import`, `encode` and
+`decode` write one file and make no folder: a folder that does not exist is `cannot-write`.
+`docs/converter.md` has the reader make `build` once before the examples that write a file
+into it.
+
+**Resolution.** `docs/converter.md`, "Setup" and "pack".
+
+## Seed 01: What is verified
+
+**Question.** The requirements ask for Python 3.10 and later on macOS, Windows and Linux,
+and say that this seed verifies macOS only. The Mac has one Python, 3.14.
+
+**Answer.** The suite passes on macOS 26.5 on Apple Silicon with Python 3.14.6, zlib 1.2.12,
+numpy 2.4.6, Pillow 12.3.0 and PyAV 17.1.0, in a virtual environment built from
+`requirements.txt`. For Python 3.10 the suite only checks that every source file keeps to
+the grammar of that version. Nothing was run on Python 3.10 to 3.13, on Windows or on
+Linux.
+
+**Resolution.** `docs/converter.md`, "Setup"; `tests/converter/test_scope.py`.
