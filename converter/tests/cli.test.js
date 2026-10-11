@@ -542,3 +542,129 @@ test("the Python tool the suite compares with", async (t) => {
     assert.equal(runPython(["--help"]).status, 0);
   });
 });
+
+// Compares the two tools on one command line: the same status and standard output; the
+// same error line for a rejection; a usage message from both when it is not understood,
+// and a usage text from both for --help.
+function sameRun(argv, options = {}) {
+  const {js, python} = runBoth(argv, options);
+  const label = argv.join(" ");
+  assert.equal(js.status, python.status, `${label}: ${js.err} / ${python.err}`);
+  if (python.out.startsWith("usage: ")) {
+    assert.match(js.out, /^usage: node converter\/odrig\.js/, label);
+  } else {
+    assert.equal(js.out, python.out, label);
+  }
+  if (python.status === 2) {
+    assert.match(js.err, /^usage: node converter\/odrig\.js/, label);
+    assert.match(python.err, /^usage: /, label);
+  } else {
+    assert.equal(js.err, python.err, label);
+  }
+  return js;
+}
+
+test("check tells the format from the name, and --format overrides it", async (t) => {
+  const odrg = fs.readFileSync(path.join(ROOT, "tests", "vectors", "valid", "pal-1.odrg"));
+  const json = fs.readFileSync(path.join(ROOT, "tests", "vectors", "valid", "pal-1.json"));
+  const folder = temporary(t);
+  const put = (name, bytes) => {
+    fs.writeFileSync(path.join(folder, name), bytes);
+    return name;
+  };
+  const inFolder = {cwd: folder};
+
+  await t.test("a name that ends in .json or .odrg", () => {
+    assert.match(sameRun(["check", put("a.odrg", odrg)], inFolder).out, /^format: odrg\n/);
+    assert.match(sameRun(["check", put("a.json", json)], inFolder).out, /^format: json-frames\n/);
+  });
+
+  await t.test("the endings in capital letters", () => {
+    for (const name of ["B.ODRG", "b.Odrg", "b.oDRg"]) {
+      assert.match(sameRun(["check", put(name, odrg)], inFolder).out, /^format: odrg\n/);
+    }
+    for (const name of ["C.JSON", "c.Json", "c.jSoN"]) {
+      assert.match(sameRun(["check", put(name, json)], inFolder).out, /^format: json-frames\n/);
+    }
+  });
+
+  await t.test("a name without a known ending is not understood, whether the file is there or not", () => {
+    for (const name of [put("d.bin", odrg), put("e", json), put("f.odrg.txt", odrg), put("json", json), "missing", "missing.odr", put("g.json ", json)]) {
+      const result = sameRun(["check", name], inFolder);
+      assert.equal(result.status, 2, name);
+      assert.equal(result.out, "");
+      assert.ok(result.err.includes(`the name of ${name} does not tell its format; give --format`), result.err);
+    }
+  });
+
+  await t.test("--format gives the format of a name without a known ending", () => {
+    assert.match(sameRun(["check", "d.bin", "--format", "odrg"], inFolder).out, /^format: odrg\n/);
+    assert.match(sameRun(["check", "--format=json", "e"], inFolder).out, /^format: json-frames\n/);
+  });
+
+  await t.test("--format overrides the name", () => {
+    assert.match(sameRun(["check", put("h.json", odrg), "--format", "odrg"], inFolder).out, /^format: odrg\n/);
+    assert.match(sameRun(["check", put("h.odrg", json), "--format", "json"], inFolder).out, /^format: json-frames\n/);
+    assert.equal(sameRun(["check", "h.odrg"], inFolder).err.split(": ")[1], "bad-magic");
+    assert.equal(sameRun(["check", "a.odrg", "--format", "json"], inFolder).err.split(": ")[1], "bad-json");
+    assert.equal(sameRun(["check", "a.json", "--format", "json", "--format", "odrg"], inFolder).err.split(": ")[1], "bad-magic");
+  });
+
+  await t.test("a file that is not there is not-found once its format is known", () => {
+    assert.equal(sameRun(["check", "missing.odrg"], inFolder).err, "error: not-found: missing.odrg: No such file or directory\n");
+    assert.equal(sameRun(["check", "missing", "--format", "json"], inFolder).err, "error: not-found: missing: No such file or directory\n");
+  });
+});
+
+test("decode and check end with the status of the Python tool", async (t) => {
+  const folder = temporary(t);
+  fs.copyFileSync(path.join(ROOT, "tests", "vectors", "valid", "pal-1.odrg"), path.join(folder, "in.odrg"));
+  fs.copyFileSync(path.join(ROOT, "tests", "vectors", "invalid", "bad-magic.odrg"), path.join(folder, "bad.odrg"));
+  fs.copyFileSync(path.join(ROOT, "tests", "vectors", "valid", "pal-1.odrg"), path.join(folder, "-1"));
+  const lines = [
+    ["check"],
+    ["check", "in.odrg", "in.odrg"],
+    ["check", "in.odrg", "--format"],
+    ["check", "in.odrg", "--format", "xml"],
+    ["check", "in.odrg", "--format", "ODRG"],
+    ["check", "in.odrg", "--verbose"],
+    ["check", "--help"],
+    ["check", "in.odrg", "--help"],
+    ["check", "--format", "odrg", "--", "in.odrg"],
+    ["check", "--", "--format", "odrg"],
+    ["check", "-1"],
+    ["check", "-1", "--format", "odrg"],
+    ["check", "--format=odrg", "-1"],
+    ["check", "bad.odrg"],
+    ["check", "in.odrg"],
+    ["check", "in.odrg", "--format=odrg", "--format=json"],
+    ["check", ""],
+    ["check", "", "--format", "json"],
+    ["decode"],
+    ["decode", "in.odrg"],
+    ["decode", "in.odrg", "out.json", "more.json"],
+    ["decode", "in.odrg", "out.json", "--uncompressed"],
+    ["decode", "--help"],
+    ["decode", "-h"],
+    ["decode", "in.odrg", "out.json"],
+    ["decode", "--", "in.odrg", "out2.json"],
+    ["decode", "in.odrg", "--", "out3.json"],
+    ["decode", "bad.odrg", "out4.json"],
+    ["decode", "missing.odrg", "out5.json"],
+    ["decode", "in.odrg", "none/out.json"],
+    ["decode", "-1", "out6.json"],
+    ["decode", "in.odrg", "-2"],
+    ["decode", "in.odrg", ""],
+  ];
+  const statuses = new Set();
+  for (const argv of lines) {
+    await t.test(`odrig ${argv.map((argument) => (argument === "" ? '""' : argument)).join(" ")}`, () => {
+      statuses.add(sameRun(argv, {cwd: folder}).status);
+    });
+  }
+  await t.test("the three statuses are among them, and both tools wrote the same files", () => {
+    assert.deepEqual([...statuses].sort(), [0, 1, 2]);
+    const written = fs.readdirSync(folder).sort();
+    assert.deepEqual(written, ["-1", "-2", "bad.odrg", "in.odrg", "out.json", "out2.json", "out3.json", "out6.json"]);
+  });
+});

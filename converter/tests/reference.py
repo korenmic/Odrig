@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import tempfile
+import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
@@ -69,7 +70,52 @@ def milliseconds(arguments, texts):
     return [str(cli._milliseconds(text)) for text in texts]
 
 
-REQUESTS = {"check": check, "sixdigits": sixdigits, "dumps": dumps, "milliseconds": milliseconds}
+def inflate(arguments, streams):
+    """zlib's verdict on each raw DEFLATE stream.
+
+    `{"data": output, "left": bytes after the stream}` for a stream zlib takes to its end,
+    else `{"reason": "bad-deflate"}` or `{"reason": "truncated"}`, as `odrig.odrg` tells
+    them apart.
+    """
+    verdicts = []
+    for stream in streams:
+        inflater = zlib.decompressobj(wbits=-15)
+        try:
+            body = inflater.decompress(bytes.fromhex(stream)) + inflater.flush()
+        except zlib.error:
+            verdicts.append({"reason": "bad-deflate"})
+            continue
+        if not inflater.eof:
+            verdicts.append({"reason": "truncated"})
+        else:
+            verdicts.append({"data": body.hex(), "left": len(inflater.unused_data)})
+    return verdicts
+
+
+def deflate(arguments, inputs):
+    """One raw DEFLATE stream of zlib for each `{"data", "level", "strategy"}`."""
+    strategies = {
+        "default": zlib.Z_DEFAULT_STRATEGY,
+        "filtered": zlib.Z_FILTERED,
+        "huffman": zlib.Z_HUFFMAN_ONLY,
+        "rle": zlib.Z_RLE,
+        "fixed": zlib.Z_FIXED,
+    }
+    streams = []
+    for given in inputs:
+        deflater = zlib.compressobj(given["level"], zlib.DEFLATED, -15, 9, strategies[given.get("strategy", "default")])
+        streams.append((deflater.compress(bytes.fromhex(given["data"])) + deflater.flush()).hex())
+    return streams
+
+
+REQUESTS = {
+    "check": check,
+    "sixdigits": sixdigits,
+    "dumps": dumps,
+    "milliseconds": milliseconds,
+    "inflate": inflate,
+    "deflate": deflate,
+}
 
 
 def main(argv):

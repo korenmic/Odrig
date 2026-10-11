@@ -82,7 +82,7 @@ Rules for every task:
     is expected. Undo it.
   - Requirements: 1.5, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5
 
-- [ ] 3. The DEFLATE decoder, the ODRG decoder, `decode` and `check`
+- [x] 3. The DEFLATE decoder, the ODRG decoder, `decode` and `check`
   - Create `lib/inflate.js` and the decoder of `lib/odrg.js`. Add `decode` and `check` to
     the table of subcommands.
   - `tests/inflate.test.js` and `tests/decode.test.js` as the design lists them, with the

@@ -4434,3 +4434,45 @@ are in a file of their own, `converter/tests/whole.test.js`.
 
 **Resolution.** `converter/tests/reference.py`; `converter/tests/support.js`,
 `pythonChecks`.
+
+## Seed 06: A Gamma code too long for Python to print
+
+**Question.** The value of a Gamma code has as many bits as the code has zero bits in
+front, plus one, and the data of a record can hold a code of more than 200,000 bits. The
+reference names the length of the run, g - 1, in the detail of `run-past-end`. Python
+refuses to write a whole number of more than 4,300 digits as text: for a Gamma code of
+more than about 14,000 bits the Python tool ends with a traceback, `ValueError: Exceeds
+the limit (4300 digits) for integer string conversion`, and status 1.
+
+**Answer.** The JavaScript decoder reads a Gamma code of up to 30 bits as a `Number` and a
+longer one as a `BigInt`, and writes every digit. For a code of 14,000 bits and more it
+gives `error: run-past-end: ...` with the whole number, where the Python tool gives its
+traceback; the status is 1 in both. No encoder writes such a code: a run cannot be longer
+than N, which is at most 65,534.
+
+**Resolution.** `converter/lib/odrg.js`, `gamma` in `coded`;
+`converter/tests/decode.test.js`, "codes are read whole before they are judged, and
+padding is not looked at", which has codes of 40 and of 60 bits.
+
+## Seed 06: What the DEFLATE decoder says, and what the tests of the decoders compare
+
+**Question.** The design gives `inflateRaw` two reasons and leaves its details open, and
+lists what the tests of the two decoders hold without saying how many files.
+
+**Answer.** A stream that ends early is `truncated` with the sentence of the Python tool,
+`the file ends inside the DEFLATE stream`, so the ODRG decoder passes it on as it is. A
+stream that is not valid is `bad-deflate` with words of the decoder's own for each defect.
+
+`inflate.test.js` compares the verdict with zlib's for 126 streams zlib makes of nine
+inputs, at every level and with each of its strategies, each cut at every length and
+damaged in every byte where it has 400 bytes or fewer, for 6,000 streams both damaged and
+cut, for 3,000 inputs of noise, and for 27 streams with one defect each that the test
+writes out bit by bit. `decode.test.js` compares the whole error line with the Python
+tool's for 13,556 copies of the valid vectors: cut at every length, with a byte added,
+and with every byte changed twice, where a vector has 420 bytes or fewer, and at 420
+places from a seed where it has more. `reference.py` has the requests `inflate` and
+`deflate` for this. `summary` of `cli/main.js` gives the lines of `check` for bytes, so
+that these comparisons need no new program for each file.
+
+**Resolution.** `converter/lib/inflate.js`; `converter/tests/inflate.test.js`,
+`converter/tests/decode.test.js`; `converter/cli/main.js`, `summary`.

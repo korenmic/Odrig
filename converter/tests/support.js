@@ -7,8 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 
-import {errorLine} from "../cli/main.js";
-import {errors, jsonframes, whole} from "../lib/index.js";
+import {errorLine, summary} from "../cli/main.js";
+import {errors} from "../lib/index.js";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CONVERTER = path.join(ROOT, "converter");
@@ -194,27 +194,21 @@ export function pythonChecks(kind, files) {
   return reference("check", [kind], files.map(hex)).map(([status, out, err]) => ({status, out, err}));
 }
 
-// What the library says of a JSON frames file named case.json, in the form of `check`:
-// `{status, out, err}`.
-export function libraryJsonCheck(bytes) {
+// What the tool says of a file of a kind, "json" or "odrg", named case.json or case.odrg,
+// without a new program for each file: `{status, out, err}`, as `check` gives them.
+export function libraryCheck(kind, bytes) {
   try {
-    const animation = errors.naming("case.json", () => jsonframes.loads(bytes));
-    const duration = animation.frames.reduce((sum, frame) => whole.plus(sum, frame.ms), 0);
-    const lines = [
-      "format: json-frames",
-      `canvas: ${animation.width}x${animation.height}`,
-      `frames: ${animation.frames.length}`,
-      `duration_ms: ${duration}`,
-      `colours: ${jsonframes.colourCount(animation.frames)}`,
-      `file_bytes: ${bytes.length}`,
-    ];
-    return {status: 0, out: `${lines.join("\n")}\n`, err: ""};
+    return {status: 0, out: errors.naming(`case.${kind}`, () => summary(kind, bytes)), err: ""};
   } catch (error) {
     if (!(error instanceof errors.Rejection)) {
       throw error;
     }
     return {status: 1, out: "", err: errorLine(error)};
   }
+}
+
+export function libraryJsonCheck(bytes) {
+  return libraryCheck("json", bytes);
 }
 
 // Whether the detail of an error line of the Python tool holds text of a library, which
