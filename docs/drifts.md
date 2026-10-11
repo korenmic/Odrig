@@ -4476,3 +4476,47 @@ that these comparisons need no new program for each file.
 
 **Resolution.** `converter/lib/inflate.js`; `converter/tests/inflate.test.js`,
 `converter/tests/decode.test.js`; `converter/cli/main.js`, `summary`.
+
+## Seed 06: The compressor gives the bytes of zlib 1.2.12, and what is still asked of it
+
+**Question.** The design asks for zlib's method at level 9 and not for its bytes: the
+sketch made for it gave zlib's bytes for one body of six. How closely does the
+compressor of the library follow zlib, and what do the tests ask?
+
+**Answer.** `converter/lib/deflate.js` follows zlib step for step, also where a choice
+does not change what a decoder reads: position 0 of the input is never taken for the start
+of a match, as in zlib, where 0 stands for "none"; among two symbols that appear equally
+often the one whose tree is less deep is joined first; the code lengths are listed with
+zlib's rules for the repeat symbols 16, 17 and 18; and a comparison that runs past the
+end of the input meets zeros. The streams it writes for the six bodies of the design's
+table, for the dense 60 x 60 clip of ten seconds, and for 403 inputs made from seeds
+for this task, of up to 200,000 bytes, are the bytes zlib 1.2.12 writes at level 9 with
+its default memory level, which is how the Python tool calls it:
+
+| Body | Bytes | zlib 1.2.12, level 9 | `deflateRaw` |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 | 17,715 | 1,122 | 1,122 |
+| DVD bounce, 60 x 6 | 3,783 | 1,596 | 1,596 |
+| Dense, 60 x 6, 2 s | 34,462 | 32,826 | 32,826 |
+| Hello world, 60 x 60 | 19,356 | 1,194 | 1,194 |
+| DVD bounce, 60 x 60 | 2,324 | 1,036 | 1,036 |
+| Dense, 60 x 60, 1 s | 146,717 | 140,856 | 140,856 |
+| Dense, 60 x 60, 10 s | 1,462,220 | 1,383,750 | 1,383,750, in 0.05 s |
+
+The tests ask what Requirement 8 asks and no more: every stream is inflated by zlib and
+by the library to its input with nothing left over, two runs give the same bytes, and a
+stream is at most 5 percent larger than zlib's. They do not ask for zlib's bytes, because
+another build of zlib, such as the one some Pythons carry in place of zlib 1.2, writes
+other bytes; the test prints for each body whether the bytes are the same. One place
+where the bytes can differ from zlib 1.2.12 is known: within the last 258 bytes of an
+input longer than 65,274 bytes, zlib compares past the end of the input with bytes left
+over from 32,768 bytes earlier, where this compressor meets zeros, so among two matches
+that both reach the end of the input it can take another one.
+
+`reference.py` has the request `encode`, which gives the uncompressed and the compressed
+file of `odrig.odrg.encode` for an animation or for a generator of the Python tool and a
+mapping file; the body is the file without its 16-byte header. Its request `deflate`
+calls zlib with the default memory level, as the Python tool does.
+
+**Resolution.** `converter/lib/deflate.js`; `converter/tests/deflate.test.js`;
+`converter/tests/reference.py`, `encode` and `deflate`.

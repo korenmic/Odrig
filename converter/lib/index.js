@@ -2,6 +2,7 @@
 //
 // A page loads this file as a module, and Node.js imports it, as it is.
 
+export * as deflate from "./deflate.js";
 export * as errors from "./errors.js";
 export * as inflate from "./inflate.js";
 export * as jsonframes from "./jsonframes.js";

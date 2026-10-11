@@ -7,6 +7,7 @@ Bytes travel as hexadecimal text, and whole numbers of any size as decimal text.
 
 import contextlib
 import fractions
+import importlib
 import io
 import json
 import os
@@ -17,7 +18,7 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
-from odrig import cli, jsonframes  # noqa: E402
+from odrig import cli, jsonframes, mapping, odrg  # noqa: E402
 
 
 def _run(argv):
@@ -103,13 +104,45 @@ def deflate(arguments, inputs):
     }
     streams = []
     for given in inputs:
-        deflater = zlib.compressobj(given["level"], zlib.DEFLATED, -15, 9, strategies[given.get("strategy", "default")])
+        strategy = strategies[given.get("strategy", "default")]
+        deflater = zlib.compressobj(given["level"], zlib.DEFLATED, -15, zlib.DEF_MEM_LEVEL, strategy)
         streams.append((deflater.compress(bytes.fromhex(given["data"])) + deflater.flush()).hex())
     return streams
 
 
+def _generated(given):
+    """The animation of a generator of the Python tool on the canvas of a mapping file."""
+    canvas = mapping.read(os.path.join(ROOT, given["mapping"]))
+    module = importlib.import_module(f"odrig.generators.{given['generator']}")
+    if "seconds" in given:
+        frames = module.frames(canvas.width, canvas.height, given["seconds"])
+    else:
+        frames = module.frames(canvas.width, canvas.height)
+    return jsonframes.Animation(canvas.width, canvas.height, tuple(frames))
+
+
+def encode(arguments, sources):
+    """The uncompressed and the compressed file of `odrig.odrg.encode` for each source.
+
+    A source is an animation, or `{"generator", "mapping"}` with `"seconds"` for the dense
+    clip: the animation a generator of the Python tool makes for the canvas of a mapping
+    file.
+    """
+    files = []
+    for given in sources:
+        animation = _generated(given) if "generator" in given else _animation(given)
+        files.append(
+            {
+                "uncompressed": odrg.encode(animation, compressed=False).hex(),
+                "compressed": odrg.encode(animation, compressed=True).hex(),
+            }
+        )
+    return files
+
+
 REQUESTS = {
     "check": check,
+    "encode": encode,
     "sixdigits": sixdigits,
     "dumps": dumps,
     "milliseconds": milliseconds,

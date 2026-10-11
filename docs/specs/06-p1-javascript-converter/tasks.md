@@ -94,7 +94,7 @@ Rules for every task:
     accepted. Undo it.
   - Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 9.1, 9.2, 9.3, 9.4
 
-- [ ] 4. The DEFLATE compressor
+- [x] 4. The DEFLATE compressor
   - Create `lib/deflate.js` as the design's "The DEFLATE compressor" describes it.
   - `tests/deflate.test.js`, the parts that need no encoder: for the six bodies of the
     design's table, given by the request `encode` of `reference.py`, and for the inputs of
