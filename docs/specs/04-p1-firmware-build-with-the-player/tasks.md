@@ -242,3 +242,20 @@ Rules for every task:
     `project-seeds/04-p1-firmware-build-with-the-player/state.json`.
   - Requirements: 8.3, 12.1, 12.2, 12.3, 12.4, 13.1, 13.2, 13.3, 13.4, 16.1, 16.2, 16.7,
     16.8
+  - Open: the owner. Done by a program over USB on 2026-10-11, with one 60-LED strip on leg
+    1 and the example show at brightness 32:
+    - The show plays from the start with no command sent: after a restart `status` reports
+      `"playing":3`, animation 1 for the first 15 seconds, animation 2 for the next 15, then
+      1 again, and the outputs hold the bytes the emulator records for the same show
+      (`tests/board/test_autostart.py`, `tests/board/test_probe.py`). The restart was a
+      reset through USB, not the power switched off and on, and nobody looked at the LEDs.
+    - `python3 -m odrigctl --port /dev/cu.usbmodem101 status` reports `"fps":50`, with leg 2
+      not wired.
+    - The probe build reports WLED's access point as up within seconds of its start. The Mac
+      did not join the board's network: `test-air` was not run and no phone opened
+      `http://4.3.2.1/`. The tests of `tests/air/test_http.py` pass against the emulator.
+    - Nothing failed, so nothing was fixed in this task.
+  - Left for the owner: the four steps of `docs/firmware.md`, "The owner's checks": eyes on
+    the LEDs after a power cycle, `status` with two legs wired, `test-air` with this Mac on
+    the board's network, and WLED's interface on a phone. The task is not ticked and the
+    seed's state stays `in_progress`.

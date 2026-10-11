@@ -2329,3 +2329,27 @@ it so, that `core/library.json` and the override give the core no flag.
 
 **Resolution.** `tests/firmware/test_toolchain.py`, `tests/firmware/test_usermod_files.py`,
 `tests/firmware/test_docs.py`, `tests/board/test_autostart.py`, `tests/air/test_wled.py`.
+
+## Seed 04: The owner's checks without the owner
+
+**Question.** The last task is the owner's: eyes on the LEDs after a power cycle, two legs
+wired, and a device joined to the board's Wi-Fi network. The agent that implemented the
+seed had the board on USB with one 60-LED strip on leg 1, could not see the LEDs, and was
+not to join the board's network or to enter a Wi-Fi password anywhere.
+
+**Answer.** Every part a program can establish over USB was done and written under the
+task: the show plays from a restart with no command sent and its two animations take
+turns every 15 seconds, by what `status` reports; the outputs hold the bytes the emulator
+records; `status` reports 50 refreshes a second with the example show; and WLED reports
+its access point as up. The four steps of `docs/firmware.md`, "The owner's checks", were
+not done. The task is therefore not ticked, its queue record stays undone, and the seed's
+state stays `in_progress`: `completed` is set by whoever does the four steps.
+
+One thing the owner will meet at step 1 that no test shows: with one strip fed from the
+board's 3.3 V pin the installed show has brightness 32, and WLED's limiter, at its maximum
+of 850 mA and counting the 360 LEDs of two legs, dims the bright Hello world picture
+further. For a brighter picture the show's brightness and WLED's maximum current are both
+the owner's to set for the power supply in use.
+
+**Resolution.** Seed 04 `tasks.md`, task 10, which stays open; `docs/firmware.md`, "The
+owner's checks".
