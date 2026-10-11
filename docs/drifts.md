@@ -591,3 +591,42 @@ undefined-behaviour sanitizers.
 and the last task sets `completed`.
 
 **Resolution.** Seed 02 `tasks.md`, tasks 1 and 11.
+
+## Seeds 01 and 02: Tasks that edit the governing documents
+
+**Question.** The spec writer was told not to edit `docs/format.md`, `docs/mapping.md`,
+`docs/show.md`, `docs/commands.md` or `README.md`, yet seed 01 says an ambiguous document is
+fixed in the same change, and its tasks 3 and 6 add clarifications to `docs/format.md` and
+`docs/mapping.md`. May implementers edit those documents?
+
+**Answer.** Yes. The restriction applied to spec writing only. An implementer edits a
+governing document when its task says so, in the same commit as the code that depends on the
+clarification.
+
+**Resolution.** Seed 01 `tasks.md`, tasks 3, 6 and 14, and seed 02 `tasks.md`, task 11, stand
+as written.
+
+## Seed 02: Start-up time when every animation is checked
+
+**Question.** `docs/show.md` makes a show invalid when a listed `.odrg` file breaks its
+format, so the core decodes every listed file completely at start-up. With the board's
+storage full of animations that could take many seconds. Should start-up check less?
+
+**Answer.** No, not now. A full check at start-up keeps the board and the emulator identical
+and reports a bad file before the show begins. Today's shows are tens of kilobytes. The time
+is measured on the board in seed 04, and the rule is revisited only if start-up takes more
+than two seconds with realistic content.
+
+**Resolution.** Seed 02 `requirements.md` and `design.md` stand as written. Seed 04 measures
+start-up time.
+
+## Seed 01: Library versions for media import
+
+**Question.** The exact versions of numpy, Pillow and PyAV, and whether PyAV installs with
+pip alone on this Mac's Python, could not be confirmed while writing the spec.
+
+**Answer.** Seed 01 task 13 pins the versions it actually installs and tests. If PyAV has no
+ready-made package for the Python in use, the implementer chooses another reader that installs
+with pip alone and records that choice here.
+
+**Resolution.** Seed 01 `tasks.md`, task 13.
