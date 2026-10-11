@@ -185,7 +185,7 @@ Rules for every task:
     memory filled with the byte `0xA5` prints the same output as with zeroed memory.
   - Requirements: 13.2, 13.3, 14.1, 14.2, 16.1, 16.2
 
-- [ ] 10. Benchmark
+- [x] 10. Benchmark
   - Create `tests/core/bench/bench.cpp` and the target `bench` in `core/Makefile` as the
     design describes. The target is separate from `test` and has no pass mark.
   - Run it once and put the printed table in the commit message.

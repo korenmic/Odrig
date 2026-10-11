@@ -2,6 +2,7 @@
 #
 #   make -C core          builds build/libodrig_core.a
 #   make -C core test     builds the library and the test host, then runs the suite
+#   make -C core bench    builds the benchmark and the dense test clip, then times decoding
 #   make -C core clean    removes build/
 #
 # Written for GNU Make 3.81. Sources are found, never listed.
@@ -25,13 +26,15 @@ HOST_OBJECTS = $(patsubst $(TESTS)/host/%.cpp,$(BUILD)/host/%.o,$(HOST_SOURCES))
 
 LIBRARY = $(BUILD)/libodrig_core.a
 HOST = $(BUILD)/odrig_host
+BENCH = $(BUILD)/odrig_bench
+BENCH_CLIPS = $(BUILD)/bench/dense-compressed.odrg $(BUILD)/bench/dense-plain.odrg
 
 WARNINGS = -Wall -Wextra -Wpedantic -Wshadow -Werror
 CORE_FLAGS = -std=c++11 -O2 $(WARNINGS) -Wframe-larger-than=512 -fno-exceptions -fno-rtti -Iinclude
 SANITIZERS = -fsanitize=address,undefined -fno-sanitize-recover=undefined -O1 -g
 HOST_FLAGS = -std=c++17 $(WARNINGS) $(SANITIZERS) -Iinclude -Isrc
 
-.PHONY: all test clean python
+.PHONY: all test bench clean python
 
 all: $(LIBRARY)
 
@@ -61,6 +64,24 @@ python:
 
 test: python all $(HOST)
 	cd .. && $(PYTHON) -m unittest discover -s tests/core -t .
+
+# The benchmark links the library itself, built with the core's own flags and no sanitizer.
+$(BENCH): $(TESTS)/bench/bench.cpp $(LIBRARY) $(HEADERS) Makefile
+	$(CXX) -std=c++17 -O2 $(WARNINGS) -Iinclude -Isrc $< $(LIBRARY) -o $@
+
+# The dense 60 x 30 clip of 10 seconds, written and encoded by the converter.
+$(BUILD)/bench/dense.json: ../mapping/legs-10.json
+	@mkdir -p $(dir $@)
+	cd .. && $(PYTHON) -m odrig.generators.dense core/$@ --mapping mapping/legs-10.json --seconds 10
+
+$(BUILD)/bench/dense-compressed.odrg: $(BUILD)/bench/dense.json
+	cd .. && $(PYTHON) -m odrig encode core/$< core/$@
+
+$(BUILD)/bench/dense-plain.odrg: $(BUILD)/bench/dense.json
+	cd .. && $(PYTHON) -m odrig encode --uncompressed core/$< core/$@
+
+bench: python $(BENCH) $(BENCH_CLIPS)
+	$(BENCH) $(BENCH_CLIPS)
 
 clean:
 	rm -rf $(BUILD)
