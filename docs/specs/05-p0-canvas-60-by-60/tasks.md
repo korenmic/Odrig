@@ -216,7 +216,7 @@ Rules for every task:
     test fails naming a part of that file.
   - Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 16.1
 
-- [ ] 8. The board with the target file
+- [x] 8. The board with the target file
   - `tests/board/support.py`: the target file in place of the ten-leg file; the dense clip
     at 60 x 60; `legs_mapping` can make column legs.
   - `tests/board/test_probe.py` with the tests of `test_twenty.py` moved into it, and that
@@ -239,18 +239,11 @@ Rules for every task:
     bytes fails for that leg's output and for no other. Undo it.
   - The board is left with the firmware and the dim example show.
   - Requirements: 12.1, 12.3, 12.4, 12.5, 12.6, 12.7, 13.1, 13.2, 13.4, 15.5, 17.1, 17.2
-  - Left open. Done, without the board: `tests/board/support.py` has the target file, the
-    dense clip at 60 x 60, column legs in `legs_mapping` and the dimmed demo show for a
-    mapping; `tests/board/test_probe.py` has the two tests of the twenty outputs, on the
-    target file and on twenty column legs of three columns of 6, and `test_twenty.py` is
-    removed; `tests/board/test_fps.py` and `tests/board/test_measure.py` use the target
-    file. What these tests do before they talk to the board was run: the mappings are
-    valid, the emulator records twenty legs for each show, and the 9 MB show fits the
-    storage image. Not done, because the board does not answer on USB (see
-    `docs/drifts.md`, "Seed 05: A trial build at another optimisation level, and a board
-    that no longer answers"): none of these tests has run on the board, the measurements
-    are not taken and `docs/firmware.md`, "Measurements on the board", still has the
-    figures of seed 04, and the test of the exact bytes was not shown to fail.
+  - Done in two commits. The first has the board tests moved to the target file, written
+    while the board did not answer on USB. The second, with the board back, has them run:
+    the whole board suite passes, the measurements are in `docs/firmware.md`,
+    "Measurements on the board", and the test of the exact bytes was shown to fail for
+    output 7 alone with the `first_led` of leg 7 changed in the recorded mapping.
 
 - [x] 9. The target takes the place of the ten-leg file
   - Add `shows/demo-20/show.json`. Remove `shows/demo-10/` and `mapping/legs-10.json` with
@@ -306,8 +299,9 @@ Rules for every task:
   - Done with a tool that drives a browser: headless Chrome, both windows, 86 screenshots
     in `build/t10/shots/`, each looked at; no file of the page had to change. Of
     Requirement 16 criterion 5, the measurements of Requirement 13 with the target file
-    are task 8's and are not taken: `docs/firmware.md`, "Measurements on the board", says
-    so and keeps the figures of seed 04 as a record. Left for a person: the list in Safari
+    are task 8's; they were taken when the board was back and are in `docs/firmware.md`,
+    "Measurements on the board", beside the figures of seed 04, kept as a record. Left for
+    a person: the list in Safari
     and at a real screen, and the owner's checks 5 and 6 of `docs/firmware.md`.
 
 - [ ] 11. The last check, and the board left as it was found

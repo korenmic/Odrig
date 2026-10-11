@@ -3676,3 +3676,26 @@ requirement is changed.
 **Resolution.** `tests/board/test_fps.py`; `docs/decisions.md`, "Firmware", "Canvas and
 coordinates" and the change log; `docs/firmware.md`, "Verified on the board" and "The
 owner's checks".
+
+## Seed 05: The board tests for the target file, run
+
+**Question.** The entry "The board tests for the target file, written and not run" left
+task 8 open. The board is back.
+
+**Answer.** The whole board suite ran with the firmware of task 2 and the target file: 30
+tests, all passing, in 32 minutes. The measurements of `tests/board/test_measure.py` are in
+`docs/firmware.md`, "Measurements on the board"; the figures of seed 04 for ten row legs
+stay under them as a record, marked as such. The table has two columns more than the
+task's list: the working outputs of each show and the free internal memory, both of
+Requirement 13 criterion 4. The test of the exact bytes was shown to fail as the task
+asks: with the `first_led` of leg 7 changed to `"top"` in the copy of the mapping the
+emulator records, output 7 held `6240d9e2` where the recording gives `1368b71c`, and the
+other nineteen outputs agreed.
+
+The dense rows of the table are from the probe build, whose own work costs the compressed
+clip some refreshes: 28 to 37 a second there, 36 to 42 in the firmware. Both are inside
+what the owner accepts; see "The rate the owner accepts on the board: from 20 to 50".
+
+**Resolution.** `docs/firmware.md`, "Measurements on the board" and "Verified on the
+board"; `docs/mapping.md`, "What is confirmed"; `docs/specs/05-p0-canvas-60-by-60/tasks.md`,
+the note under task 8.

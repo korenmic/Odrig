@@ -332,8 +332,9 @@ x=60  | 121 -------------------------------------------> 180 |
   makes twenty working outputs on pins 1 to 18, 21 and 47, four through WLED's RMT driver
   and sixteen through its parallel driver, and every one of those pins carries the signal
   of a whole refresh, 24 pulses for every LED: measured on the board, see
-  [firmware.md](firmware.md), "Verified on the board". The board tests that do the same
-  with the target file itself are written and have not run on the board.
+  [firmware.md](firmware.md), "Verified on the board". The board tests found the same
+  with the target file itself, and each output holds its own leg's LED data as the
+  emulator records it for that file.
 - With that firmware LEDs on pins 2 to 18, 21 and 47 have not been seen, and no LED has
   been seen on a pin of the parallel driver. Pin 3 is one of the chip's boot-mode pins. It
   is expected to work for LED data.

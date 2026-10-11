@@ -580,25 +580,63 @@ own rate can be a refresh or two below the firmware's.
 
 ## Measurements on the board
 
-**These figures are those of the firmware of seed 04.** They were taken on 2026-10-11,
-before the target became twenty upright legs: on the bench file, and on a mapping of ten
-row legs of three rows of 60, 1,800 LEDs, on pins 1 to 10, with a dense 60 x 30 clip. That
-firmware drove ten outputs. The firmware of today drives twenty: with the target file,
-four through WLED's RMT driver and sixteen through its parallel driver.
+Taken by the board test `tests/board/test_measure.py` with the probe build, at brightness
+32, over ten seconds for each show; the test writes them to
+`build/firmware/out/measurements.json`. They were taken on 2026-10-12 with the firmware as
+it is: the core asked for refreshes by a task of its own, and with the target file twenty
+outputs, four through WLED's RMT driver and sixteen through its parallel driver. The one
+60-LED strip was wired, on leg 1; the other outputs sent to pins with nothing on them.
+WLED's maximum current was 850 mA, so on the target file the limiter dimmed every refresh.
 
-**The measurements with the target file are not taken yet.** The board tests that take
-them are written: `tests/board/test_measure.py` measures the example show on its two legs
-and, on the target file, the demo show of [emulator.md](emulator.md), the dense 60 x 60
-clip, compressed and uncompressed, and 9 MB of dense 60 x 60 clips. They have not run,
-because the board stopped answering on USB; see
-[Verified on the board](#verified-on-the-board), which also has what was measured with
-twenty outputs and the dense 60 x 60 clip before that.
+| Show | Working outputs | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest | Free internal memory |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 171 ms | 2,293 to 2,365 | 50 | 50 | 43 ms | 0.98 ms | 23.3 ms | 1.03 ms | 1.22 ms | 202,760 bytes |
+| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 174 ms | 367 to 420 | 50 | 50 | 42 ms | 1.79 ms | 23.7 ms | 15.7 ms | 16.1 ms | 126,520 bytes |
+| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,011 ms | 507 to 851 | 28 to 37 | 33 | 42 ms | 25.9 ms | 48.1 ms | 20.0 ms | 31.8 ms | 126,624 bytes |
+| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 59 s | 4,183 ms | 140 to 152 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.6 ms | 19.8 ms | 33.1 ms | 126,592 bytes |
+| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 165 s | 38,747 ms | 555 to 982 | 25 to 35 | 32 | 60 ms | 26.6 ms | 68.5 ms | 20.0 ms | 33.3 ms | 126,212 bytes |
 
-The figures below were taken by the board test of that time with the probe build, at
-brightness 32, over ten seconds for each show; the test writes them to
-`build/firmware/out/measurements.json`. The one 60-LED strip was wired, on leg 1; the other
-outputs sent to pins with nothing on them. WLED's maximum current was 850 mA, so on ten row
-legs the limiter dimmed every refresh.
+The files of a row are the whole show folder. The mean request is the time the core worked
+in a second over the refreshes sent in it; at a rate below 50 one request decodes every
+frame since the one before, so it is more than the work for one frame.
+
+What the figures say:
+
+- **The firmware drives twenty outputs.** With the target file all twenty work, on pins 1
+  to 18, 21 and 47.
+- **Every rate is inside the 20 to 50 a second the owner accepts.** A show that is not
+  dense plays at 50 on twenty legs as on two. The dense clip, in which every LED changes
+  at every frame, plays at 44 or 45 uncompressed and at 28 to 37 compressed in the probe
+  build; the firmware itself reports 45 to 47 and 36 to 42, see
+  [Verified on the board](#verified-on-the-board). A dense file plays faster uncompressed.
+- **A send to twenty outputs** takes 15.7 ms with the limiter's dimming of every LED in
+  it, and 20 ms while the core decodes a dense clip on the chip's other processor core.
+  The LEDs need 5.7 ms on the wire after that.
+- **The long requests** are those in which the core opens a file, at the start of every
+  loop of an animation and at every turn of a cycle: 23 ms for a small file, and up to
+  69 ms with dense clips, when the frames that came due meanwhile are decoded in the same
+  request.
+- **The start takes as long as the files are large.** The core checks every file at start
+  by decoding it: 174 ms for the demo show, 6.0 s for one dense 60 x 60 clip of 10 seconds
+  compressed and 4.2 s uncompressed, and 39 s for a storage filled with 9 MB of such
+  clips. For that time the LEDs are dark and the board answers nothing, on the port or on
+  the network; WLED opens its access point only afterwards. `install-show` and `flash`
+  wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
+  large show.
+- **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
+  work out the checksum of storage, before and after, and the write between. One dense
+  clip takes a minute and 9 MB take three.
+- **Memory.** 126,000 bytes of the chip's internal memory are free with twenty outputs of
+  180 LEDs and the core, 203,000 with two.
+
+Not measured, because the hardware is not wired: light on any leg but the one strip on
+pin 1, and the current the LEDs really draw.
+
+**What the firmware of seed 04 measured, kept as a record.** These figures were taken on
+2026-10-11, before the target became twenty upright legs: on the bench file, and on a
+mapping of ten row legs of three rows of 60, 1,800 LEDs, on pins 1 to 10, with a dense
+60 x 30 clip. That firmware asked the core in WLED's loop and drove ten outputs, and the
+limiter dimmed every refresh of the ten row legs.
 
 | Show | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -607,33 +645,10 @@ legs the limiter dimmed every refresh.
 | The same clip, uncompressed | 766,815 bytes | 48 s | 2,163 ms | 578 to 655 | 49 to 51 | 50 | 37 ms | 4.72 ms | 21.4 ms | 7.68 ms | 7.81 ms |
 | 9 MB of dense clips: twelve of 10 s and one of 4 s, compressed | 9,001,905 bytes | 178 s | 37,821 ms | 344 to 426 | 48 to 51 | 50 | 44 ms | 6.63 ms | 29.0 ms | 7.68 ms | 7.85 ms |
 
-What the figures say, of that firmware and those ten row legs:
 
-- **Decoding kept up with 1,800 LEDs.** The core's work for one frame of the dense
-  60 x 30 clip, reading from storage, decoding and placing every LED, takes 6.6 ms on
-  average for the compressed file and 4.7 ms for the uncompressed one. The firmware's
-  `status` reported 49 or 50 refreshes in every second for both, on ten outputs. With the
-  3,600 LEDs of the target it does not keep up: see
-  [Verified on the board](#verified-on-the-board).
-- **Ten outputs worked.** A send to ten outputs of 180 LEDs takes 7.7 ms with the limiter's
-  dimming of every LED in it. The LEDs need 5.4 ms on the wire after that; the core works
-  on the next frame meanwhile.
-- **The long requests** are those in which the core opens a file, at the start of every
-  loop of an animation and at every turn of a cycle, or in which the file system goes on
-  to another block. They delay one refresh by up to 29 ms and cost one refresh of a second
-  at most.
-- **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 171 ms for the example show, 3.1 s for one dense 60 x 30 clip of 10
-  seconds, and 38 s for a storage filled with 9 MB of such clips. For that time the LEDs
-  are dark and the board answers nothing, on the port or on the network; WLED opens its
-  access point only afterwards. `install-show` and `flash` wait 20 seconds for the board's
-  answer; `--wait SECONDS` makes them wait longer for a large show.
-- **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
-  work out the checksum of storage, before and after, and the write between. 9 MB take
-  three minutes.
-
-Not measured, because the hardware is not wired: light on any leg but the one strip on
-pin 1, and the current the LEDs really draw.
+With 1,800 LEDs the core's work for one dense frame was 6.6 ms compressed and 4.7 ms
+uncompressed and a send to ten outputs 7.7 ms, and both fitted into the 20 ms of a frame
+in one loop.
 
 ## The regions of the flash
 
@@ -673,10 +688,11 @@ marked `seed 05`, criterion 3 of Requirement 18 of
 `docs/specs/05-p0-canvas-60-by-60/requirements.md`.
 
 Seed 04 is completed when steps 1 to 4 are done. Steps 5 and 6 stay listed as open and do
-not hold seed 05 open; criterion 4 of that Requirement 18 says so. What holds seed 05 open
-is not for eyes: the board tests with the target file have not run. The rate does not hold
-it open: the board plays a dense 60 x 60 clip at 36 to 47 refreshes a second, and the owner
-accepts any rate from 20 to 50. See [Verified on the board](#verified-on-the-board).
+not hold seed 05 open; criterion 4 of that Requirement 18 says so. Nothing a
+program can establish holds seed 05 open either: the board tests pass with the target
+file, and the rate does not hold it open: the board plays a dense 60 x 60 clip at 36 to 47
+refreshes a second, and the owner accepts any rate from 20 to 50. See
+[Verified on the board](#verified-on-the-board).
 
 1. **The show plays from power-on (16.1).** Install the example show at the brightness
    chosen for the power supply in use; one strip fed from the board's 3.3 V pin allows 40
@@ -1013,6 +1029,25 @@ and its start preset and no Wi-Fi setting. The file was given its name back in t
 storage with the tool's own steps for storage, read, change in the image, check, write the
 changed block, compare; afterwards every file outside `/odrig` had the bytes it had before
 the trial.
+
+**The target file on the board.** The board tests then ran with `mapping/legs-20.json`,
+the column-leg file of the target, with the probe build and the firmware of the second
+task of seed 05:
+
+- Twenty working outputs of 180 LEDs on pins 1 to 18, 21 and 47, four `rmt` and sixteen
+  `parallel`; each holds exactly what the limiter's lowest level makes of its own leg's
+  bytes as the emulator records them for the target file; `pulses` is 4,320 on every pin
+  and `wire_us` between 4,500 and 7,500; a picture that does not change is sent 49 times
+  or more in every one of ten seconds, and `overwritten` stays 0.
+- With a column-leg file of twenty legs of three columns of 6 LEDs, which the limiter does
+  not dim, every output holds exactly its leg's bytes as the emulator records them, and
+  `pulses` is 432 on every pin. With the `first_led` of leg 7 changed to `"top"` in the
+  copy of the mapping the emulator recorded, and not in the one installed, output 7 and no
+  other differed from the recording.
+- `status` of the firmware in ten seconds each: 50 for the demo show on the target file,
+  36 to 42 for the dense 60 x 60 clip compressed and 45 to 47 uncompressed.
+- The whole board suite, 30 tests, passes; its last step leaves the firmware and the dim
+  example show, playing from its start.
 
 **From nothing.** With `build/firmware/` removed, `python3 firmware/fw.py build` set up the
 tools, fetched WLED and built the firmware in 2 minutes. The lists of the home folder from
