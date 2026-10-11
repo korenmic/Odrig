@@ -1804,3 +1804,65 @@ times, which is the number of pairs of pins that are out of order on the board.
 
 **Resolution.** `emulator/web/layout.js`, `fitBeside`, `fitBelow` and `wiresBelow`;
 `tests/emulator/test_layout.py`, `Lines`; `docs/emulator.md`, "The mapping view".
+
+## Seed 03: The check list by eye without a person and without Safari
+
+**Question.** The last task goes through the check list "in current Safari and in current
+Chrome" and needs "a person, or an agent with a tool that drives a real browser". The agent
+that implemented the seed had Chrome and a way to drive it. It had no way to drive Safari:
+Safari's remote automation has to be switched on in the system by its owner, and switching
+it on was not the agent's to do.
+
+**Answer.** The list was gone through in headless Chrome by a program, step by step, and
+every step was as described; the next entry has the results. Safari is left to the owner.
+The task is therefore not ticked, the queue record stays undone, and the seed's state stays
+`in_progress`: `completed` is set by whoever goes through the twelve steps in Safari. One
+check that a program can make for Safari was added to the suite: every script of the page
+is valid for Safari's JavaScript engine, which is the engine of the JavaScript shell of
+macOS.
+
+**Resolution.** Seed 03 `tasks.md`, task 11, which stays open; `docs/emulator.md`, "What
+has been checked"; `tests/emulator/test_page_files.py`.
+
+## Seed 03: What is verified
+
+**Question.** The requirements ask for a page that works in current Safari and Chrome, for
+49 refreshes a second on this Mac, and for a command tool that works against the emulator
+and the board alike. What of this has been seen to hold, and how?
+
+**Answer.** The suite, 259 tests, passes on macOS 26.5 on Apple Silicon with Apple clang
+21, GNU Make 3.81 and Python 3.14.6, after `make -C core clean`. It was not run with Python
+3.10 to 3.13; a test parses every source in the grammar of 3.10.
+
+The check list of `docs/emulator.md` was gone through in Chrome 154 without a window, in a
+viewport of 1280 x 800, by a program that drove the browser through its remote-debugging
+port. The emulator was started as the list says, on port 8600 and the link
+`build/emulator/serial`, and commands were sent with `odrigctl`.
+
+| Step | Criterion | What the program found |
+|---:|---|---|
+| 1 | 4.8 | The header read animation 1 at the start, 2 after 17 seconds and 1 after 32. The screenshots show HELLO WORLD upright, read from left to right, and then the square. |
+| 2 | 4.6 | On the ring of a dark LED the canvas holds the colour `#2a2f36`; its centre is empty. |
+| 3 | 4.9 | Example show: `page` read 50 in each of ten seconds, and `core` 50. |
+| 4 | 8.1 | After `brightness 40` through the port and `play 2` over HTTP the log had one line and then two, with `serial` and `http`, the lines and `{"ok":true}`, without a reload. |
+| 5 | 8.4 | The header read brightness 40, playing 2, animation 2; after `off` it read off and no LED was lit; after `on` the square was lit again. |
+| 6 | 4.2 | Dense show: nothing to scroll; the canvas was 1020 x 510 pixels inside the window. At 1000 x 700 the cells became 14 pixels and at 1600 x 1000 22. |
+| 7 | 4.9 | Dense show: `page` read 50 in each of ten seconds. |
+| 8 | 9.1 | The antenna is above the first pad and the two sockets at the lower edge of the board; the labels of the two rows, read from top to bottom, are the two lists of `board.js`. |
+| 9 | 14.5 | Ten pads are in a leg colour, leg N on pin N for 1 to 10, with ten lines, ten arrow heads and ten paths; the LEDs of this view were lit and `page` read 49 to 51. |
+| 10 | 9.8 | 175 texts, 60 of them end numbers, and no two of them overlap. |
+| 11 | 9.5 | Pointing at the label of leg 4, the pin of leg 3, the line of leg 9 and an LED of leg 10 highlighted that leg's label, pin, line, path, outline, numbers and band, faded 216 parts of the others and dimmed the rows of the nine other legs. The readouts were `leg 4, pin 4`, `leg 3, pin 3`, `leg 9, pin 9` and `leg 10, pin 10, LED 70 (10,2)`. |
+| 12 | 10.1 | The band read `file-missing dvd.odrg` in the LEDs view and in the mapping view, and no LED was lit. |
+
+Measured in the same way for ten seconds each: the example show and the ten-leg demo show
+both gave `fps` 50 in every reply to `status`, and the page counted 49 to 51 in every
+second, in the LEDs view and in the mapping view.
+
+Not verified: Safari, in any step. A person looking at a screen, in either browser: whether
+the rings of dark LEDs are easy enough to see and whether the drawing pleases are
+judgements the program did not make, though the screenshots were looked at. The command
+tool against the board: its serial path ran against pseudo-terminals only, and nothing was
+sent to the board. A network other than the loopback address.
+
+**Resolution.** `docs/emulator.md`, "The check list by eye". Seed 04 `tasks.md` uses the
+tool against the board.

@@ -1,5 +1,6 @@
 import pathlib
 import re
+import subprocess
 import tempfile
 import unittest
 from html.parser import HTMLParser
@@ -7,6 +8,7 @@ from html.parser import HTMLParser
 from emulator import httpd
 
 from . import support
+from .test_layout import JSC
 
 WEB = support.ROOT / "emulator" / "web"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json"}
@@ -123,6 +125,24 @@ class Files(unittest.TestCase):
         index = (WEB / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("<form", index)
         self.assertNotIn("<input", index)
+
+    def syntax(self, path):
+        """What the JavaScript shell of macOS, which has the engine of Safari, makes of the
+        syntax of a script: its exit status and what it prints."""
+        done = subprocess.run([str(JSC), "-e", "checkSyntax(arguments[0])", "--", str(path)], capture_output=True, text=True)
+        return done.returncode, done.stdout + done.stderr
+
+    def test_every_script_is_valid_for_the_javascript_engine_of_safari(self):
+        scripts = [path for path in page_files() if path.suffix == ".js"]
+        self.assertEqual(len(scripts), 4)
+        for path in scripts:
+            self.assertEqual(self.syntax(path), (0, ""), path.name)
+        with tempfile.TemporaryDirectory() as folder:
+            broken = pathlib.Path(folder, "broken.js")
+            broken.write_text("var layout = ;\n", encoding="utf-8")
+            status, printed = self.syntax(broken)
+            self.assertNotEqual(status, 0)
+            self.assertIn("SyntaxError", printed)
 
     def test_the_scripts_and_the_style_sheet_are_plain_ascii(self):
         for path in page_files():

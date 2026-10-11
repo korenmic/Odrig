@@ -558,3 +558,13 @@ Give the browser a window of 1280 x 800.
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
     `file-missing dvd.odrg`, in the LEDs view and in the mapping view, and every LED is
     dark.
+
+### What has been checked
+
+Every step has been gone through in Chrome 154 without a window (headless), by a program
+that drives the browser through its remote-debugging port: it reads the page, moves the
+pointer, and takes screenshots, which were looked at. All twelve steps were as described,
+and Chrome reported no error of the page. No step has been gone through in Safari yet. The
+scripts of the page are valid for the JavaScript engine of Safari, which the suite checks
+in the JavaScript shell of macOS; that is all that is known about Safari. A person at a
+screen has not gone through the list in either browser.

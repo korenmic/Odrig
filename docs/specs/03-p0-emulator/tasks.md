@@ -222,3 +222,7 @@ Rules for every task:
     of every step for each browser in the commit message.
   - Set `"state": "completed"` and `completedAt` in `project-seeds/03-p0-emulator/state.json`.
   - Requirements: 4.2, 4.6, 4.8, 4.9, 8.1, 8.4, 9.1, 9.5, 9.8, 10.1, 14.5, 15.2
+  - Open: Safari. The twelve steps were gone through in headless Chrome 154 by a program
+    and were as described; `docs/drifts.md`, "Seed 03: What is verified", has the result of
+    each step. Nothing was opened in Safari and no person has looked at a screen, so the
+    task is not ticked and the seed's state stays `in_progress`.
