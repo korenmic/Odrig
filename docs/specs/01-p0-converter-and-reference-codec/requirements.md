@@ -45,13 +45,15 @@ and by every other implementation.
 ### Acceptance Criteria
 
 1. Every rejection SHALL carry exactly one reason, taken from the reason tables in
-   Requirements 3, 6, 7, 10, 11, 13, 14 and 15 or from criterion 3 below.
+   Requirements 3, 6, 7, 10, 11, 13, 14 and 15 or from criteria 3 and 5 below.
 2. A reason SHALL be a fixed name made of lower-case letters, digits and hyphens. The detail
    that follows it SHALL be free text for people and SHALL name the file concerned.
 3. IF an input path given on the command line does not exist or cannot be read, and no more
    specific reason applies, THEN the tool SHALL reject with `not-found`.
 4. WHEN a file has more than one defect THEN the tool SHALL report the reason of the defect
    it meets first when reading the file from front to back.
+5. IF an output file or folder cannot be written THEN the tool SHALL reject with
+   `cannot-write`.
 
 ## Requirement 3: JSON frames files are read strictly
 

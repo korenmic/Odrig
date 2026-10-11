@@ -1,0 +1,37 @@
+# The converter
+
+`odrig` is the command-line tool that works with the animation formats of
+[format.md](format.md). It is a Python package at the repository root, started as
+`python -m odrig <subcommand>`.
+
+## Setup
+
+The tool needs Python 3.10 or later. Create a virtual environment inside the repository
+once:
+
+```
+python3 -m venv .venv
+```
+
+Every command on this page is run from the repository root with the Python of that
+environment, written `python` below: `.venv/bin/python` on macOS and Linux,
+`.venv\Scripts\python` on Windows. Nothing is installed outside the `.venv` folder, and git
+ignores it.
+
+## Exit statuses
+
+| Status | Meaning |
+|---:|---|
+| 0 | The subcommand did its work. |
+| 1 | An input was rejected. One line `error: <reason>: <detail>` is written to standard error and no output is left behind. The reasons are listed in [reasons.md](reasons.md). |
+| 2 | The command line was not understood. A usage message is written to standard error and nothing else is written. |
+
+## Tests
+
+```
+python -m unittest discover -s tests/converter -t .
+```
+
+This one command runs the whole suite of the tool. It finds the tests by itself: every file
+named `test_*.py` in `tests/converter/` is run, so a new test file needs no change anywhere
+else. The suite needs no hardware and no network connection.

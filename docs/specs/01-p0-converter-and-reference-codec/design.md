@@ -9,7 +9,7 @@ seeds without installing anything. `import` alone uses three third-party librari
 
 The package has one direction of dependency: `cli` calls the subcommand modules, the
 subcommand modules call the format modules (`jsonframes`, `odrg`, `mapping`, `show`), and
-those call `strictjson` and `errors`. No format module imports a subcommand module.
+those call `strictjson`, `files` and `errors`. No format module imports a subcommand module.
 
 Decisions taken where the seed and the documents left a point open are listed in
 `docs/drifts.md` under "Seed 01".
@@ -18,12 +18,13 @@ Decisions taken where the seed and the documents left a point open are listed in
 
 ```
 requirements.txt                 third-party libraries, needed by import only
-.gitignore                       /.venv/, /build/, __pycache__/
+.gitignore                       /.venv/, /build/, /.codex/, __pycache__/
 odrig/
   __init__.py
   __main__.py                    runs cli.main()
   cli.py                         arguments, exit statuses, the error line
   errors.py                      Rejection and the reason names
+  files.py                       reading an input file and writing an output file whole
   strictjson.py                  strict JSON loading shared by every reader
   jsonframes.py                  JSON frames: read, canonical write, merge
   odrg.py                        ODRG reference decoder and encoder
@@ -48,6 +49,7 @@ tests/
   converter/
     __init__.py
     test_*.py                    the suite of this seed
+    support.py                   runs the tool for the tests
     media_fixtures.py            builds the short GIF, mp4 and mov inputs at run time
     build_vectors.py             writes tests/vectors; run by hand
   vectors/

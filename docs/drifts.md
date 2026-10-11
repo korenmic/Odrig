@@ -630,3 +630,40 @@ ready-made package for the Python in use, the implementer chooses another reader
 with pip alone and records that choice here.
 
 **Resolution.** Seed 01 `tasks.md`, task 13.
+
+## Seed 01: Modules the design does not list
+
+**Question.** The design gives `read` functions to `jsonframes`, `mapping` and `show`, a
+`write` function to `jsonframes`, and describes under `cli` how an output goes through a
+`.part` file. It names no place for the code that opens a file, which the format modules and
+the command line both need, and no place for the code the tests share to run the tool.
+
+**Answer.** `odrig/files.py` holds the one function that reads an input file, turning a
+missing or unreadable file into a rejection, and the one that writes an output file through
+`<name>.part`. The format modules and `cli` call it, and it calls only `errors`, so the
+direction of dependency of the design is kept. `tests/converter/support.py` runs the command
+line for the tests, in the test's own interpreter or in a fresh one.
+
+**Resolution.** Seed 01 `design.md`, "Overview" and "Repository layout".
+
+## Seed 01: Queue and session files
+
+**Question.** The tasks are run from a local queue with session notes, kept in a folder
+`.codex/` at the repository root. The design's `.gitignore` does not cover it, and it must
+never be committed.
+
+**Answer.** `.gitignore` also lists `/.codex/`.
+
+**Resolution.** Seed 01 `design.md`, "Repository layout"; `.gitignore`.
+
+## Seed 01: An output that cannot be written
+
+**Question.** The requirements name a reason for every input that is refused. They say
+nothing about an output file whose folder does not exist or may not be written, which would
+end the tool with a Python traceback.
+
+**Answer.** It is a rejection like the others, with the reason `cannot-write`: one error
+line, status 1 and nothing left behind.
+
+**Resolution.** Seed 01 `requirements.md`, Requirement 2 criterion 5; `docs/reasons.md`,
+"Any output".

@@ -17,7 +17,7 @@ Rules for every task:
   that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Package skeleton, command-line frame and test command
+- [x] 1. Package skeleton, command-line frame and test command
   - Create `.gitignore` (`/.venv/`, `/build/`, `__pycache__/`), `odrig/__init__.py`,
     `odrig/__main__.py`, `odrig/errors.py` (`Rejection`, `NOT_FOUND`) and `odrig/cli.py`:
     `main(argv)` with `argparse` subcommands, status 0 on success, status 2 on a usage
