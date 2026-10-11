@@ -34,6 +34,13 @@ def parser():
     restore.add_argument("--port", metavar="P", help="the board's USB serial port")
     restore.add_argument("--full", action="store_true", help="also write the stock bootloader and partition table")
     restore.add_argument("--stock-dir", metavar="DIR", type=pathlib.Path, default=stock.FOLDER, help="the folder of the stock files")
+    install = commands.add_parser("install-show", help="put a show folder into the board's storage")
+    install.add_argument("dir", metavar="DIR", type=pathlib.Path, help="the folder of an installed file set")
+    install.add_argument("--port", metavar="P", help="the board's USB serial port")
+    install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
+    read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
+    read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
+    read.add_argument("--port", metavar="P", help="the board's USB serial port")
     commands.add_parser("test", help="run the tests that need no board")
     on_board = commands.add_parser("test-board", help="run the tests that need the board on USB")
     on_board.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -91,6 +98,62 @@ def _restore_stock(arguments):
     return 0
 
 
+def storage_of(port):
+    """esptool on the port, the board's storage region, and a file that holds the storage as
+    it is now. The chip is left in its bootloader."""
+    from . import storage
+    on_port = flasher.Flasher(port)
+    _, partition = partitions.check(on_port.read_table(), 0)
+    region = flasher.storage_region(partition)
+    return on_port, region, storage.from_board(on_port, region)
+
+
+def _install_show(arguments):
+    from . import storage
+    files = storage.folder_files(arguments.dir, check=not arguments.no_check)
+    port = board.find(arguments.port)
+    on_port, region, before_path = storage_of(port)
+    try:
+        before = before_path.read_bytes()
+        after = storage.with_show(before, files)
+        after_path = storage.keep(after, region.size)
+        changed = storage.runs(before, after, storage.geometry(before)[1])
+        pieces = []
+        for number, (offset, content) in enumerate(changed):
+            piece = after_path.with_name(f"{after_path.stem}.run-{number}")
+            piece.write_bytes(content)
+            pieces.append((region.address + offset, piece))
+        try:
+            on_port.write(pieces, [region], restart=False)
+        finally:
+            for _, piece in pieces:
+                piece.unlink()
+        on_port.verify(region.address, after_path, [region], restart=True)
+    except Failure:
+        on_port.restart()
+        raise
+    reply = board.EXPECTED["status"](port)
+    print(reply)
+    return 0 if storage.status_error(reply) is None else 1
+
+
+def _read_show(arguments):
+    from . import storage
+    out = paths.output(arguments.out)
+    if out.exists() and (not out.is_dir() or any(out.iterdir())):
+        raise Failure("output-not-empty", f"{out} exists and is not an empty folder")
+    port = board.find(arguments.port)
+    on_port, _, image_path = storage_of(port)
+    try:
+        files = storage.show_of(image_path.read_bytes())
+    finally:
+        on_port.restart()
+    storage.write_folder(out, files)
+    for name in sorted(files):
+        print(f"{name}: {len(files[name])} bytes")
+    return 0
+
+
 def run_suite(folder, extra=None):
     """Runs every test of a folder, found by discovery, from the repository root."""
     command = [sys.executable, "-m", "unittest", "discover", "-s", folder, "-t", "."]
@@ -107,7 +170,10 @@ def _test_board(arguments):
     return run_suite(SUITES["test-board"], {board.PORT_VARIABLE: board.find(arguments.port)})
 
 
-ACTIONS = {"setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock, "test": _test, "test-board": _test_board}
+ACTIONS = {
+    "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
+    "install-show": _install_show, "read-show": _read_show, "test": _test, "test-board": _test_board,
+}
 
 
 def module_environment():

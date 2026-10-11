@@ -123,6 +123,50 @@ class RestoreStock(Temporary):
         self.assertEqual(support.cli.parser().parse_args(["restore-stock"]).stock_dir, stock.FOLDER)
 
 
+class InstallShow(Temporary):
+    def install(self):
+        with support.example_show() as show:
+            esptool = support.RecordedEsptool(support.partition_table(support.small_layout()), {0x610000: support.storage_image()})
+            with mock.patch.object(flasher.paths, "STORAGE", self.folder / "storage"), support.no_board(esptool, answer='{"ok":true,"error":null}'):
+                result = support.run_main("install-show", show)
+        self.assertEqual(result.status, 0, result.err)
+        return esptool
+
+    def test_it_writes_only_inside_the_storage_partition(self):
+        esptool = self.install()
+        start, end = 0x610000, 0x610000 + 64 * 4096
+        self.assertGreater(len(esptool.wrote), 0)
+        for address, content in esptool.wrote:
+            self.assertTrue(start <= address and address + len(content) <= end, hex(address))
+
+    def test_it_writes_all_its_stretches_in_one_call_and_erases_nothing(self):
+        esptool = self.install()
+        self.assertEqual(esptool.commands().count("write-flash"), 1)
+        self.assertNotIn("erase-region", esptool.commands())
+        write = next(call for call in esptool.calls if "write-flash" in call)
+        for setting in ("--flash-mode", "--flash-freq", "--flash-size"):
+            self.assertEqual(write[write.index(setting) + 1], "keep")
+
+    def test_it_reads_only_the_partition_table_and_storage(self):
+        reads = [call[call.index("read-flash") + 1:][:2] for call in self.install().calls if "read-flash" in call]
+        self.assertEqual(reads, [["0x8000", "0xc00"], ["0x610000", "0x40000"]])
+
+    def test_no_word_of_any_call_erases_the_flash_or_names_a_fuse_program(self):
+        words = self.install().words()
+        for word in FORBIDDEN_WORDS:
+            self.assertNotIn(word, words)
+
+    def test_a_write_beside_the_storage_partition_is_refused(self):
+        region = flasher.Region("storage", 0x610000, 64 * 4096)
+        esptool = support.RecordedEsptool()
+        on_port = flasher.Flasher("/dev/cu.test", esptool)
+        piece = self.image(size=8192)
+        for address in (0x610000 - 4096, 0x610000 + 63 * 4096, 0x10000, 0xFF0000):
+            action = lambda: on_port.write([(address, piece)], [region], restart=False)
+            self.assertEqual(support.reason_of(self, action), "esptool-failed", hex(address))
+        self.assertEqual(esptool.calls, [])
+
+
 class Regions(Temporary):
     def flasher(self):
         esptool = support.RecordedEsptool()

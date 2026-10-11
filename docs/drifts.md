@@ -2058,3 +2058,57 @@ show. A test file added to the folder still runs without a change anywhere.
 
 **Resolution.** `tests/board/__init__.py`, `load_tests`; `tests/board/support.py`,
 `leave_the_board`.
+
+## Seed 04: Reading the board's storage only when it changed
+
+**Question.** The design reads the whole storage partition at the start of every
+`install-show` and `read-show`. That takes 64 seconds, and the board suite installs dozens
+of shows. The design also keeps every image it reads and writes, 10 MB each, in the work
+folder, without end.
+
+**Answer.** The tool keeps the newest eight storage images in `build/firmware/storage/`.
+Before it reads the partition it has esptool compare the board's storage with the newest
+image it kept, which the chip does by working out a checksum, in 17 seconds. When the
+checksum agrees, that image is the copy of storage as it is now; when it does not, the
+partition is read as designed. The copy from before a write is so still in the work folder
+when the write begins. `install-show` takes 36 seconds this way, plus the wait for the
+reply.
+
+Installing the files that `/odrig` already holds changes no block and writes nothing.
+
+**Resolution.** `firmware/fwtool/storage.py`, `from_board`, `keep` and `with_show`;
+`tests/firmware/test_storage.py`; `docs/firmware.md`, "install-show".
+
+## Seed 04: A folder that is no show folder, and the order of the checks
+
+**Question.** The design refuses, unless `--no-check` is given, a folder that is not a
+valid installed file set "and no other entry in the folder", with seed 01's reason. Seed 01
+has no reason for a file the show does not name, for a folder inside the folder, or for a
+path that is no folder. `read-show` needs a reason for an output folder that is not empty.
+
+**Answer.** A path that is no folder, an entry that is no file, and, with the check, a
+file the show does not name are `not-a-show-folder`, a reason of the tool. An output
+folder that exists and is not empty is `output-not-empty`, the name the converter gives
+the same condition. The valid file set is checked in the order of `docs/reasons.md`:
+mapping, show, then each named file: present, decodable, of the mapping's size. A file
+that is both damaged and of another size is `file-malformed` here, where the core, which
+reads the header first, may say `size-mismatch`; the folder is refused either way.
+
+**Resolution.** `firmware/fwtool/storage.py`, `folder_files` and `write_folder`;
+`docs/firmware.md`, the table of reasons.
+
+## Seed 04: What the install tests of task 4 can see
+
+**Question.** Task 4 runs `install-show` against the probe build of task 3, which answers
+no `status`, and asks for assumption A13 "as far as it can be seen here". What can be
+seen?
+
+**Answer.** The test expects `no-reply` after every check of the tool passed, as the task
+says. It then reads the board's storage back, after the board has started on it: the
+storage still has the checksum of the image the tool wrote. WLED formats a file system it
+cannot mount, so this shows that WLED mounted the edited image and did not change it. The
+show that the suite leaves on the board is the dim example show, which its last step
+installs when `/odrig` holds something else.
+
+**Resolution.** `tests/board/test_install.py`; `tests/board/support.py`,
+`leave_the_board`.

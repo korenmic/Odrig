@@ -62,7 +62,7 @@ build/firmware/
   pip-cache/       pip's cache
   WLED/            WLED's source at the pinned commit
   out/             the built images
-  storage/         storage images read from the board
+  storage/         storage images read from the board and written to it, the newest eight
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
@@ -89,6 +89,8 @@ python3 firmware/fw.py setup
 python3 firmware/fw.py build [--stock | --probe] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check]
+python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
 ```
@@ -117,7 +119,11 @@ with that environment's Python.
 | `layout-mismatch` | The board's partition table has no application partition at `0x10000` that the image fits in, or no data partition named `spiffs`. |
 | `esptool-failed` | esptool ended with an error, or was asked for an address outside the regions below. |
 | `no-reply` | The board did not answer within 20 seconds after its restart. |
-| `verify-failed` | What is in the flash differs from what was written. |
+| `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
+| `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
+| `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
+| `output-not-empty` | The folder `read-show` is to write exists and is not an empty folder. |
+| a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
 **The port.** A command that talks to the board uses the port given with `--port`, else the
@@ -226,6 +232,59 @@ chip in its header, 16 MB on this board; every other file goes to the flash as i
 
 Storage is not written, so WLED's settings and the show it played before are still there.
 
+### install-show
+
+```
+python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+    --sources animations --out build/example-show
+python3 firmware/fw.py install-show build/example-show
+```
+
+Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
+of the board's storage, checks what was written, restarts the board and prints the board's
+reply to `status`. The status is 0 when the reply reports a valid show and 1 when it
+reports a reason.
+
+1. The folder is checked before the board is touched: it must be a valid installed file
+   set as the readers of the converter judge it, and hold no other file. The reason of a
+   refusal is the converter's, for example `file-missing`. `--no-check` installs any flat
+   folder of files, for trying what the board does with an invalid show.
+2. The tool reads the partition table and takes the place and size of `spiffs` from it.
+3. It gets the storage as it is now into `build/firmware/storage/`: it takes the newest
+   image it kept there when esptool has the chip confirm that storage has that image's
+   checksum, which takes 17 seconds, and reads the whole partition otherwise, which takes
+   64 seconds.
+4. In that image it removes `/odrig` with everything in it, creates it again and writes the
+   files of the folder. The file system keeps the disk version it had. Files that do not
+   fit are `no-space`, and nothing has been written to the board then. An image that
+   already holds exactly these files is left as it is.
+5. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
+   and every file outside `/odrig` is as it was.
+6. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
+   the chip compare the whole partition with the new image, and restarts the board.
+
+A copy of storage from before the write and the new image stay in
+`build/firmware/storage/`, named by time; the newest eight images are kept. Every file of
+storage outside `/odrig`, WLED's settings among them, keeps its content.
+
+Every show installed on the board while one 60-LED strip is fed from the board's 3.3 V pin
+must have a brightness of 40 or less in its `show.json`. The tool does not check this; the
+board tests do, for every show they install.
+
+### read-show
+
+```
+python3 firmware/fw.py read-show build/show-from-board
+```
+
+Copies the files of `/odrig` on the board into a folder that is new or empty, prints each
+name with its size, and restarts the board. The folder can then be compared with the one
+the emulator ran:
+
+```
+diff -r build/example-show build/show-from-board
+```
+
 ### test
 
 ```
@@ -295,6 +354,7 @@ touches these regions only:
 | Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
 | Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash` and `restore-stock` |
 | First application (`app0`) | `0x10000` | `0x300000` | `flash`, `restore-stock` |
+| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
 partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
@@ -332,6 +392,8 @@ letters are those of the design's table "Assumed, to be verified by an early tas
 | A10 | In live mode nothing of WLED writes to the outputs between two refreshes, and the outputs hold exactly the colours written. | Nothing else writes: `overwritten` stayed 0 over 30 seconds, and `realtime` was 1. With ten legs of 180 LEDs the limiter dims every refresh to its lowest level, so the outputs do not hold the bytes written; each holds exactly what that dimming makes of its own leg's bytes, for all ten outputs. Exact bytes are shown in task 6, with fewer LEDs. |
 | A11 | With `WLED_DISABLE_ADALIGHT` the firmware writes nothing to the port by itself, and the usermod can read and write the port from its loop. | It does: nothing arrived in 5 seconds without a command, the byte `v` got no answer, and `#probe` was answered every time. |
 | A12 | A pass of WLED's loop and the push of 1,800 LEDs fit well inside 20 ms. | They do. Over 20 seconds the loop made 981 to 1,006 passes a second, a send of 1,800 LEDs took 7.2 ms at most with the limiter's dimming in it, the longest time between two sends was 25 ms, and 49 to 51 refreshes were sent in every second. 227,940 bytes of internal memory were free. |
+
+| A13 | littlefs-python 0.19.0 edits the board's storage image so that WLED still mounts it. | As far as task 4 shows: after `install-show` the board started, sent its 49 refreshes a second, and its storage still had the checksum of the image the tool wrote, so WLED mounted the file system and neither formatted nor changed it. The file system has disk version 2.0 and keeps it. That the firmware reads the files of `/odrig` is task 5's. `install-show` took 36 seconds with the kept image taken, plus the wait for the reply. |
 
 With the usermod's two calls that hold the LEDs taken out, WLED kept its own two outputs and
 played its own show: the report had `realtime` 0, two outputs, and `overwritten` rising by

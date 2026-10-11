@@ -115,7 +115,7 @@ Rules for every task:
   - The board is left with the probe build of this task and the storage it had.
   - Requirements: 1.1, 1.4, 1.7, 3.3, 8.4, 9.2, 9.3, 9.4, 10.1, 10.2, 11.2, 11.3
 
-- [ ] 4. Installing a show into the board's storage
+- [x] 4. Installing a show into the board's storage
   - Create `firmware/fwtool/storage.py` and the subcommands `install-show` with
     `--no-check` and `read-show`.
   - `tests/firmware/test_storage.py` as the design lists it; extend `test_flasher.py` with

@@ -84,10 +84,12 @@ def partition_table(layout=LAYOUT, magic=b"\xaa\x50", checksum=True):
 class RecordedEsptool:
     """Stands in for esptool: keeps the arguments of every call and serves what is read."""
 
-    def __init__(self, table=None, flash=None):
+    def __init__(self, table=None, flash=None, failing_verifies=0):
         self.calls = []
         self.table = partition_table() if table is None else table
         self.flash = flash or {}
+        self.failing_verifies = failing_verifies
+        self.wrote = []
 
     def __call__(self, arguments):
         self.calls.append(list(arguments))
@@ -97,7 +99,19 @@ class RecordedEsptool:
             content = self.table if address == 0x8000 else self.flash[address]
             with open(path, "wb") as file:
                 file.write(content[:size])
+        if "write-flash" in arguments:
+            for address, name in self.pairs(arguments[arguments.index("write-flash") + 1:]):
+                with open(name, "rb") as file:
+                    self.wrote.append((int(address, 16), file.read()))
+        if "verify-flash" in arguments and self.failing_verifies:
+            self.failing_verifies -= 1
+            return 2, "A fatal error occurred: Verification failed"
         return 0, "done"
+
+    @staticmethod
+    def pairs(arguments):
+        words = [word for word in arguments if not word.startswith("--") and word not in ("keep", "detect")]
+        return [(words[i], words[i + 1]) for i in range(0, len(words), 2)]
 
     def commands(self):
         """The esptool command of every call, in order."""
@@ -112,8 +126,7 @@ class RecordedEsptool:
 
     def written(self):
         """`(address, file name)` for everything the one write call writes."""
-        arguments = [word for word in self.call("write-flash") if not word.startswith("--") and word not in ("keep", "detect")]
-        return [(arguments[i], arguments[i + 1].rsplit("/", 1)[-1]) for i in range(0, len(arguments), 2)]
+        return [(address, name.rsplit("/", 1)[-1]) for address, name in self.pairs(self.call("write-flash"))]
 
     def words(self):
         return [word for call in self.calls for word in call]
@@ -136,3 +149,61 @@ def untouched_board():
         raise AssertionError("the board was touched")
     with mock.patch.object(flasher, "run_esptool", touched), mock.patch.object(board, "find", touched):
         yield
+
+
+DISK_VERSION_2_0 = 0x00020000
+BLOCK_SIZE = 4096
+
+# Files like the ones WLED keeps in its file system, beside an older installed show.
+WLED_FILES = {
+    "/cfg.json": b'{"rev":[1,0],"vid":2606300,"id":{"mdns":"wled-test","name":"WLED"}}',
+    "/presets.json": b'{"0":{},"5":{"n":"hello"},"6":{"playlist":{"ps":[5,4]}}}',
+    "/wsec.json": b'{"ap":{"psk":"not a real one"}}',
+    "/hello.gif": bytes(range(256)) * 40,
+    "/odrig/mapping.json": b"an older mapping",
+    "/odrig/old.odrg": b"an older animation" * 100,
+}
+
+
+def storage_image(files=None, blocks=64, version=DISK_VERSION_2_0):
+    """A storage image with a LittleFS file system of the given disk version."""
+    from littlefs import LittleFS
+    system = LittleFS(block_size=BLOCK_SIZE, block_count=blocks, disk_version=version)
+    for path, content in (WLED_FILES if files is None else files).items():
+        folder = path.rsplit("/", 1)[0]
+        if folder:
+            system.makedirs(folder, exist_ok=True)
+        with system.open(path, "wb") as file:
+            file.write(content)
+    system.unmount()
+    return bytes(system.context.buffer)
+
+
+def small_layout(blocks=64):
+    """WLED's layout with a storage partition of a few blocks, for images made in a test."""
+    return tuple(entry if entry[0] != "spiffs" else ("spiffs", 1, 0x82, 0x610000, blocks * BLOCK_SIZE) for entry in LAYOUT)
+
+
+@contextlib.contextmanager
+def example_show(brightness=None):
+    """The example show, packed on the two-leg mapping into a temporary folder."""
+    import json
+    import pathlib
+    import tempfile
+    from odrig import pack
+    with tempfile.TemporaryDirectory() as folder:
+        show = ROOT / "shows" / "example" / "show.json"
+        if brightness is not None:
+            changed = json.loads(show.read_text())
+            changed["brightness"] = brightness
+            show = pathlib.Path(folder, "show.json")
+            show.write_text(json.dumps(changed))
+        out = pathlib.Path(folder, "show")
+        pack.pack(show, ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
+        yield out
+
+
+def files_of(folder):
+    """The files of a folder: the content of each by its name."""
+    import pathlib
+    return {path.name: path.read_bytes() for path in sorted(pathlib.Path(folder).iterdir())}
