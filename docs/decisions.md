@@ -111,6 +111,13 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - A ready-made emulator that runs the real firmware build may be added later as an extra. It
   is only considered if it needs no paid subscription, runs locally, and does not cap the
   emulated chip below the real ESP32-S3's speed.
+- Espressif's emulator (version 0.48.0) was tried with the stock WLED 16.0.1 image and is not
+  used. WLED boots and plays the installed show, but the emulator runs at about a third of
+  real time, does not expose the USB serial console that carries commands, and the firmware
+  panics intermittently when its web interface is polled.
+- FastLED's browser compiler was tried and is not used. It held 50 frames per second on a
+  60 x 30 matrix, but it has no command input and needs about 4.4 GB of toolchain. The
+  native Mac emulator makes it unnecessary.
 
 ## Open questions
 
@@ -119,8 +126,6 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Decode speed of the custom format on the board at 50 frames per second for 1,800 LEDs.
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
   hardware.
-- Whether any ready-made emulator can run the real firmware build. Local trials are in
-  progress.
 
 ## Change log
 
@@ -141,3 +146,5 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   hosted by the emulator and by the firmware, plain-text commands with JSON replies, and the
   emulator as our own native Mac program. Show and command specifications written. Seeds
   created for the converter, the shared core, the emulator and the firmware build.
+- 2026-10-11: Local trials of ready-made emulators finished. Espressif's emulator and
+  FastLED's browser compiler are not used; the reasons are in the Emulator section.
