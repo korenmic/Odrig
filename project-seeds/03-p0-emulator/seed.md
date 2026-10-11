@@ -3,7 +3,9 @@
 ## Summary
 
 A Mac program that runs the shared core on an installed file set, shows the physical LEDs in
-a local web page, and accepts commands through a virtual serial port. It lets conversions,
+a local web page, and accepts commands through a virtual serial port and over HTTP. The page
+also shows how the legs, their snakes and the board's pins map onto the canvas. A command-line
+tool sends the commands to the emulator or to the real board. Together they let conversions,
 shows and playback be tested without the hardware.
 
 ## Priority
@@ -30,7 +32,15 @@ along the chain, using the mapping file. A mapping mistake in the core then show
 scrambled picture.
 
 Commands arrive through a virtual serial port, so the serial tools that talk to the board
-work against the emulator with only the port name changed.
+work against the emulator with only the port name changed. They also arrive over HTTP, which
+stands in for the board's Wi-Fi: a phone app or a script talks to the emulator the way it
+will talk to the board.
+
+When a command arrives, the page shows it at once: the command, how it arrived, the reply,
+and the LEDs changing.
+
+The mapping is easier to trust when it can be seen. The page draws the board and its pins,
+and shows which pin feeds which leg and how each leg's 180 LEDs snake through its three rows.
 
 ## Technical Constraints
 
@@ -41,6 +51,7 @@ work against the emulator with only the port name changed.
 - It does not depend on any third-party emulator or simulator.
 - The page works in current Safari and Chrome with no plug-ins.
 - It listens only on 127.0.0.1 and needs no network connection.
+- The command tool uses only the Python standard library.
 - The canvas size comes from `mapping.json` in the file set. The emulator has no size setting.
 - The test command selects its suite by directory or discovery, never by a list of files.
 
@@ -57,14 +68,32 @@ work against the emulator with only the port name changed.
 5. A line written to the virtual serial port goes to the core's command front-end and the
    reply line is written back.
 6. The repository's command tool is brought to the commands in `docs/commands.md`: play, on,
-   off, brightness and status. It works against the emulator and the board, chosen by port
-   name. The generic line sender stays as it is.
+   off, brightness and status. It reaches its target over serial, given a port name, or over
+   HTTP, given an address, and works the same against the emulator and the board. It prints
+   the reply and exits with a non-zero status when the reply is not ok or the target cannot
+   be reached. The generic line sender stays as it is.
 7. A record mode runs on a virtual clock without waiting: given a length of time and an
    optional script of timed command lines, it writes the per-leg LED data of every tick to a
    file.
 8. When the show is invalid, the page shows the reason the core reports.
 9. A wrong folder, a port that cannot be created, or a page address already in use gives a
    clear message and a non-zero exit.
+10. The page's address also accepts commands over HTTP as `docs/commands.md` defines. They go
+    to the same command front-end as serial lines.
+11. The page shows a live command log: for each command, when it arrived, whether it came by
+    serial or HTTP, the line, and the reply. It also shows the current status: on or off,
+    brightness, the item playing and the animation on the LEDs.
+12. The page has a mapping view, drawn from `mapping.json`:
+    - a drawing of the ESP32-S3 board with its two rows of pins labelled as on the real board;
+    - for every leg in the mapping, a line from its pin to the first LED of its snake;
+    - the path of each snake through its three rows, with its direction and the LED numbers
+      at the row ends;
+    - one colour per leg, used for its pin, its line and its outline on the canvas;
+    - pointing at a leg, its pin or its rows highlights that leg everywhere.
+    The LEDs in this view are live: they show the animation as it plays.
+13. A tracked demo show for the ten-leg mapping: Hello world and DVD bounce made for the
+    60 x 30 canvas, alternating every 15 seconds and starting at power-on. The generators
+    take the canvas size from a mapping file.
 
 ## Definition Of Done
 
@@ -76,10 +105,15 @@ work against the emulator with only the port name changed.
 3. Record-mode output for 60 seconds of the example show, including two cycle switches,
    equals the reference from seed 01 with the mapping rule applied.
 4. A session through the virtual serial port with the repository's command tool gives the
-   expected reply to every command, and the page changes accordingly.
+   expected reply to every command, and the page changes accordingly. The same session over
+   HTTP gives the same replies.
 5. With a mapping file in which one leg's `first_led` is flipped, the recorded picture
    differs from the reference in exactly that leg's rows.
-6. How to start it and use it is documented.
+6. Each command sent, by either transport, appears in the page's command log with its
+   reply, and the status shown matches what `status` returns.
+7. With the ten-leg demo show, the mapping view shows the board, ten legs on pins 1 to 10,
+   and each leg's snake across its three rows, with the animation playing on the LEDs.
+8. How to start the emulator and use the command tool is documented.
 
 ## Open Questions
 
