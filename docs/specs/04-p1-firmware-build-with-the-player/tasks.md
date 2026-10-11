@@ -36,7 +36,7 @@ Rules for every task:
   untracked files that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The tool, the work folder and the toolchain
+- [x] 1. The tool, the work folder and the toolchain
   - Create `firmware/fw.py`, `firmware/fwtool/__init__.py`, `cli.py`, `paths.py`, `env.py`,
     `toolchain.py` and `wled.py` (fetch, commit check, patches), `firmware/requirements.txt`
     and `firmware/patches/README.md`, with the subcommands `setup` and `test`.

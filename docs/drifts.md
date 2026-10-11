@@ -1866,3 +1866,68 @@ sent to the board. A network other than the loopback address.
 
 **Resolution.** `docs/emulator.md`, "The check list by eye". Seed 04 `tasks.md` uses the
 tool against the board.
+
+## Seed 04: Where Node.js comes from
+
+**Question.** The design installs Node.js 20.18 with the Python package `nodeenv`, which
+fetches it from nodejs.org, and names the Node.js already on the Mac as the fallback. The
+run that implemented the seed was allowed to fetch from PyPI, PlatformIO's registry,
+Espressif and WLED's repository only, and the Mac's own Node.js is version 26, which
+nothing pins.
+
+**Answer.** Node.js and npm come from PyPI: the package `nodejs-wheel` 20.18.0, which
+carries Node.js 20.18.0 and npm 10.8.2, pinned in `firmware/requirements.txt` in the place
+the design gives `nodeenv`. It installs into the tool's Python environment, so the work
+folder has no `node/` of its own and `PATH` gets `build/firmware/venv/bin` only.
+Assumption A2 was therefore not tried. The version is the one WLED's `.nvmrc` asks for.
+The owner may prefer `nodeenv` and nodejs.org; it is a change of one line of the
+requirements file and one step of `toolchain.py`.
+
+WLED's own build fetches more than the tool does: the packages of WLED's
+`package-lock.json` from the npm registry, and the platform, toolchains and libraries of
+WLED's `platformio.ini` from PlatformIO's registry and from the GitHub repositories that
+file names. Those cannot be chosen by this project; task 2 lists them in
+`docs/firmware.md`.
+
+**Resolution.** `firmware/requirements.txt`; `firmware/fwtool/toolchain.py`,
+`firmware/fwtool/env.py`; `docs/firmware.md`, "What the tool needs" and "Verified on the
+board".
+
+## Seed 04: Details of the tool's setup that the design leaves open
+
+**Question.** The design lists the steps of `setup` and says each is skipped when its
+result is there. It does not say what the result of the package step is, what a command
+does when the work folder is missing, when a usage error is found, or what becomes of a
+file that a patch added when the build runs again.
+
+**Answer.** After the packages are installed the tool keeps the SHA-256 of the two
+requirement files in `build/firmware/venv/odrig-requirements.sha256`; the step runs again
+when a requirement file changes. Every command, `test` included, first makes sure the work
+folder has WLED's source and the Python environment, because WLED's `requirements.txt` is
+one of the two files; so the first command on a new checkout needs the network whichever
+it is. The command line is checked before that, so a usage error sets nothing up. The
+commit check also refuses a folder that is not a git checkout of its own, so that no git
+command meant for WLED can act on this repository. Before the patches are applied, files
+that are neither tracked nor ignored by WLED are removed with `git clean`, so a patch that
+adds a file applies again; what WLED ignores, its build folders and `node_modules`
+included, stays.
+
+**Resolution.** `firmware/fwtool/toolchain.py`, `firmware/fwtool/wled.py`,
+`firmware/fwtool/cli.py`; `tests/firmware/test_wled.py`, `tests/firmware/test_cli.py`.
+
+## Seed 04: Comparing the home folder before and after
+
+**Question.** Tasks 1, 2 and 9 list the entries of the home folder with their modification
+times before and after a step and expect the two lists to be the same. The agent that ran
+the steps is itself a program on this Mac that writes into the home folder while it works,
+and a cache of pip or npm would not show in the top level at all: it would land in
+`~/Library/Caches` or in `~/.npm`, whose own times do not change.
+
+**Answer.** The list also covers the folders where such things land: `~/.cache`, `~/.npm`,
+`~/.config`, `~/.local`, `~/.local/share`, `~/Library/Caches`,
+`~/Library/Application Support` and `~/Library/Preferences`, each with the time of every
+entry. The lists are compared, and an entry that differs is named in `docs/firmware.md`
+with the program it belongs to. A difference that belongs to the tool or to a program it
+started would be a failure of the task.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board".
