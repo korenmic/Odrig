@@ -17,6 +17,8 @@ it stands now.
   commands only and no web page.
 - The board's Wi-Fi network has a password known to the operators. The password may be kept
   in this repository.
+- WLED's own web interface stays reachable and unchanged for now; the owner wants to explore
+  it.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
   queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
   with its own state file.
@@ -33,8 +35,9 @@ it stands now.
   the three rows below the previous one. Every leg's chain starts at the right end of its
   top row.
 - Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
-- Target: a 60 x 60 canvas, 3,600 LEDs. The mapping files, the demo show and everything else
-  sized for 60 x 30 are still to be brought to this target.
+- Target: a 60 x 60 canvas, 3,600 LEDs, on ten legs of six rows each (360 LEDs per pin). The
+  mapping files, the demo show and everything else sized for 60 x 30 are brought to this
+  target by seed 05.
 - The mapping is defined by the files in `mapping/` and described in
   [mapping.md](mapping.md). The board and the emulator both read the installed mapping file
   at runtime; it is the only definition of the layout.
@@ -151,10 +154,9 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
   hardware.
 
-- For the 60 x 60 target: how the 60 rows are shared among the board's pins. The firmware
-  drives at most 12 outputs, so 20 legs of three rows cannot each have a pin.
-- Whether WLED's own web interface stays reachable, is locked, or is removed.
-- The exact commands for free space, listing, removing and uploading animations.
+- The Wi-Fi password. A Wi-Fi password needs 8 to 63 characters, and the one the owner gave
+  has 7.
+- Who accepts the Android SDK licence that building the app requires.
 
 ## Change log
 
@@ -186,3 +188,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   Android APK built with Capacitor, with no web page served by our own server. Conversion
   runs only on phones and PCs, in one JavaScript converter. Every command exists on all
   routes and additions need the owner's approval. The Wi-Fi password may be kept in git.
+- 2026-10-11: Seeds 05 to 09 created: the 60 x 60 canvas, the JavaScript converter, the
+  content commands, the Wi-Fi name and password, and the operators' app. Two points were
+  put to the owner and, with no objection, settled as recommended: the 60 rows go on ten
+  pins with six rows each, and the commands `space`, `list`, `remove` and `upload` take the
+  form written in seed 07. WLED's web interface stays as it is.
