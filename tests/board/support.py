@@ -13,7 +13,7 @@ import time
 
 from emulator import recfile
 from odrig import jsonframes, mapping as mapping_file, odrg, pack
-from odrig.generators import dense
+from odrig.generators import dense, dvd_bounce, hello_world
 from odrigctl import cli as command_tool
 from odrigctl import client
 
@@ -23,7 +23,7 @@ from . import PORT, ROOT
 
 EXAMPLE_SHOW = ROOT / "shows" / "example" / "show.json"
 TWO_LEGS = ROOT / "mapping" / "legs-2.json"
-TEN_LEGS = ROOT / "mapping" / "legs-10.json"
+TARGET = ROOT / "mapping" / "legs-20.json"
 ANIMATIONS = ROOT / "animations"
 
 # The pins of the twenty legs of the target installation, in the order of the legs.
@@ -323,17 +323,25 @@ def each_second(seconds, read=probe):
     return reports
 
 
-def legs_mapping(width, legs=10, rows_per_leg=3, pins=None):
-    """The text of a mapping file: legs of some rows each, leg 1 at the top, every chain
-    starting on the right, on the pins given or on pins 1, 2, 3 and so on."""
+def legs_mapping(length, legs=10, strips_per_leg=3, pins=None, columns=False):
+    """The text of a mapping file: legs of some strips each, of `length` LEDs, on the pins
+    given or on pins 1, 2, 3 and so on. As rows: leg 1 at the top, every chain starting on
+    the right. As columns: leg 1 at the left, every chain starting at the bottom."""
     pins = list(range(1, legs + 1)) if pins is None else list(pins)
-    height = legs * rows_per_leg
+    strips = legs * strips_per_leg
+    if columns:
+        described = [
+            {"leg": number + 1, "pin": pins[number], "first_led": "bottom",
+             "columns": [number * strips_per_leg + strip + 1 for strip in range(strips_per_leg)]}
+            for number in range(legs)
+        ]
+        return json.dumps({"version": 1, "height": length, "legs": described})
     described = [
         {"leg": number + 1, "pin": pins[number], "first_led": "right",
-         "rows": [height - number * rows_per_leg - row for row in range(rows_per_leg)]}
+         "rows": [strips - number * strips_per_leg - strip for strip in range(strips_per_leg)]}
         for number in range(legs)
     ]
-    return json.dumps({"version": 1, "width": width, "legs": described})
+    return json.dumps({"version": 1, "width": length, "legs": described})
 
 
 def own_colour(position):
@@ -350,11 +358,37 @@ def show_folder(mapping, animations, brightness=DIM, start=1):
     with tempfile.TemporaryDirectory() as work:
         folder = pathlib.Path(work, "show")
         folder.mkdir()
-        text = pathlib.Path(mapping).read_text() if isinstance(mapping, pathlib.Path) else mapping
-        (folder / "mapping.json").write_text(text)
+        data = mapping.read_bytes() if isinstance(mapping, pathlib.Path) else mapping.encode()
+        (folder / "mapping.json").write_bytes(data)
         items = [{"id": number, "file": name} for number, (name, _) in enumerate(animations, 1)]
         (folder / "show.json").write_text(json.dumps({"version": 1, "brightness": brightness, "items": items, "start": start}))
         for name, content in animations:
+            (folder / name).write_bytes(content)
+        yield folder
+
+
+@contextlib.contextmanager
+def demo_show(mapping=TARGET, brightness=DIM):
+    """A temporary show folder with the demo show made for a mapping, dimmed: Hello world
+    and DVD bounce as their generators write them for the mapping's canvas, taking turns
+    every 15 seconds from power-on."""
+    width, height = canvas_of(mapping)
+    animations = {
+        "hello.odrg": odrg.encode(jsonframes.Animation(width, height, tuple(hello_world.frames(width, height)))),
+        "dvd.odrg": odrg.encode(jsonframes.Animation(width, height, tuple(dvd_bounce.frames(width, height)))),
+    }
+    show = {
+        "version": 1,
+        "brightness": brightness,
+        "items": [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}, {"id": 3, "cycle": [1, 2], "seconds": 15}],
+        "start": 3,
+    }
+    with tempfile.TemporaryDirectory() as work:
+        folder = pathlib.Path(work, "show")
+        folder.mkdir()
+        (folder / "mapping.json").write_bytes(pathlib.Path(mapping).read_bytes())
+        (folder / "show.json").write_text(json.dumps(show))
+        for name, content in animations.items():
             (folder / name).write_bytes(content)
         yield folder
 
@@ -379,7 +413,7 @@ def one_frame_show(mapping=TWO_LEGS, brightness=DIM, ms=1000):
     return show_folder(mapping, [("frame.odrg", one_frame(mapping, ms))], brightness)
 
 
-def dense_clip(compressed, seconds=10, width=60, height=30):
+def dense_clip(compressed, seconds=10, width=60, height=60):
     """The dense clip of some seconds for a canvas: a smooth full-colour field, every LED
     lit."""
     return odrg.encode(jsonframes.Animation(width, height, tuple(dense.frames(width, height, seconds))), compressed=compressed)

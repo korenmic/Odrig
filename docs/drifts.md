@@ -3421,3 +3421,32 @@ places with the second.
 **Resolution.** `docs/mapping.md`; `tests/emulator/test_board.py`;
 `tests/emulator/test_layout.py`, `sections_of_the_mapping_document`;
 `tests/converter/test_mapping_page.py`, `ChangedMappingFile`.
+
+## Seed 05: The board tests for the target file, written and not run
+
+**Question.** Task 8 moves the board tests to the target file, runs the whole board suite
+and writes the measurements. The board stopped answering on USB during task 2 and no
+program on this Mac can bring it back. Task 9 then removes the ten-leg file, which the
+board tests still named.
+
+**Answer.** The tests are written now, so that nothing names the ten-leg file when it
+goes, and task 8 stays open until they have run. `tests/board/test_probe.py` takes the two
+tests of the spike in the form the task gives them: the target file, with the limiter's
+lowest level, the pulses, the wire time and 49 sends a second of a picture that does not
+change, and twenty column legs of three columns of 6 with exact bytes; they stand where
+the two ten-leg tests stood. The spike's third test, which only measured the dense clips,
+is not carried over: `tests/board/test_measure.py` has those rows. The demo show for the
+board is made in the test's support from the two generators and the same items as
+`shows/demo-20/show.json`, dimmed, because that file is added one task later. Storage is
+filled with six dense 60 x 60 clips of 10 seconds and one of 5: 9,009,652 bytes, which the
+tool's own check says fit.
+
+What could be run without the board was run by hand: every helper up to the point where a
+test talks to the board. The firmware's `status` on the board is expected to stay below 49
+with the dense clip, so the two tests of `tests/board/test_fps.py` for it will fail there
+until Requirement 13 is met; see "Seed 05: The request in a task of its own, and the rate
+it reaches".
+
+**Resolution.** `tests/board/support.py`, `tests/board/test_probe.py`,
+`tests/board/test_fps.py`, `tests/board/test_measure.py`;
+`docs/specs/05-p0-canvas-60-by-60/tasks.md`, the note under task 8.

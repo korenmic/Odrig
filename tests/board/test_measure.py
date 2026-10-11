@@ -8,25 +8,30 @@ from . import PORT, support
 
 SECONDS = 10
 RESULT = paths.OUT / "measurements.json"
-VALUES = ("start_ms", "loops", "sent", "fps", "gap_ms", "poll_us", "poll_mean_us", "send_us", "send_mean_us", "install_seconds", "bytes")
+VALUES = ("outputs", "start_ms", "loops", "sent", "fps", "gap_ms", "poll_us", "poll_mean_us", "send_us", "send_mean_us", "heap", "install_seconds", "bytes")
 # The longest the core may take to start on a full storage before the tool gives up.
 LONG_START_SECONDS = 240
 
 
+def dense_on_the_target(compressed):
+    return support.show_folder(support.TARGET, [("dense.odrg", support.dense_clip(compressed=compressed))])
+
+
 def full_storage():
-    """A show of dense clips that fills storage with 9 MB: twelve clips of 10 seconds and
-    one shorter one, each a file of its own."""
+    """A show of dense 60 x 60 clips that fills storage with 9 MB: six clips of 10 seconds
+    and one shorter one, each a file of its own."""
     clip = support.dense_clip(compressed=True)
-    last = support.dense_clip(compressed=True, seconds=4)
-    animations = [(f"dense-{number:02d}.odrg", clip) for number in range(1, 13)] + [("dense-13.odrg", last)]
-    return support.show_folder(support.TEN_LEGS, animations)
+    last = support.dense_clip(compressed=True, seconds=5)
+    animations = [(f"dense-{number:02d}.odrg", clip) for number in range(1, 7)] + [("dense-07.odrg", last)]
+    return support.show_folder(support.TARGET, animations)
 
 
 SHOWS = (
     ("example show, two legs", support.dim_show),
-    ("dense 60 x 30 clip, compressed, ten legs", lambda: support.show_folder(support.TEN_LEGS, [("dense.odrg", support.dense_clip(compressed=True))])),
-    ("dense 60 x 30 clip, uncompressed, ten legs", lambda: support.show_folder(support.TEN_LEGS, [("dense.odrg", support.dense_clip(compressed=False))])),
-    ("9 MB of dense clips, ten legs", full_storage),
+    ("demo show, the target", support.demo_show),
+    ("dense 60 x 60 clip, compressed, the target", lambda: dense_on_the_target(True)),
+    ("dense 60 x 60 clip, uncompressed, the target", lambda: dense_on_the_target(False)),
+    ("9 MB of dense 60 x 60 clips, the target", full_storage),
 )
 
 
@@ -44,6 +49,7 @@ def measured(name, folder):
     sent = sum(report["sent"] for report in reports)
     return {
         "show": name,
+        "outputs": [sum(1 for output in reports[-1]["outputs"] if output["ok"]), len(reports[-1]["outputs"])],
         "bytes": size,
         "install_seconds": install_seconds,
         "start_ms": reports[-1]["start_ms"],

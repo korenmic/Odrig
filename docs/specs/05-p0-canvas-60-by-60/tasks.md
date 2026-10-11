@@ -240,6 +240,18 @@ Rules for every task:
     bytes fails for that leg's output and for no other. Undo it.
   - The board is left with the firmware and the dim example show.
   - Requirements: 12.1, 12.3, 12.4, 12.5, 12.6, 12.7, 13.1, 13.2, 13.4, 15.5, 17.1, 17.2
+  - Left open. Done, without the board: `tests/board/support.py` has the target file, the
+    dense clip at 60 x 60, column legs in `legs_mapping` and the dimmed demo show for a
+    mapping; `tests/board/test_probe.py` has the two tests of the twenty outputs, on the
+    target file and on twenty column legs of three columns of 6, and `test_twenty.py` is
+    removed; `tests/board/test_fps.py` and `tests/board/test_measure.py` use the target
+    file. What these tests do before they talk to the board was run: the mappings are
+    valid, the emulator records twenty legs for each show, and the 9 MB show fits the
+    storage image. Not done, because the board does not answer on USB (see
+    `docs/drifts.md`, "Seed 05: A trial build at another optimisation level, and a board
+    that no longer answers"): none of these tests has run on the board, the measurements
+    are not taken and `docs/firmware.md`, "Measurements on the board", still has the
+    figures of seed 04, and the test of the exact bytes was not shown to fail.
 
 - [ ] 9. The target takes the place of the ten-leg file
   - Add `shows/demo-20/show.json`. Remove `shows/demo-10/` and `mapping/legs-10.json` with

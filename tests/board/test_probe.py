@@ -11,6 +11,14 @@ from fwtool import storage
 from . import PORT, support
 
 UNKNOWN = b'{"ok":false,"error":"unknown-command"}'
+LEGS = len(support.TARGET_PINS)
+SECONDS = 10
+# The time 180 LEDs take on the wire is 5.7 ms; the timer that takes it looks every tenth
+# of a millisecond.
+WIRE_US = (4500, 7500)
+# A picture that does not change: one frame that lasts a minute, so that the core opens
+# its file once in the time of a test.
+STILL_MS = 60000
 
 
 def crc(colours):
@@ -33,6 +41,25 @@ def report_after_a_moment():
     support.probe()
     time.sleep(0.3)
     return support.probe()
+
+
+def report_with_every_pulse_count():
+    """A report in which every output has been counted once: one output is counted at
+    each send."""
+    deadline = time.monotonic() + 10.0
+    report = report_after_a_moment()
+    while any(output["pulses"] is None for output in report["outputs"]) and time.monotonic() < deadline:
+        time.sleep(0.5)
+        report = support.probe()
+    return report
+
+
+def pulses_of(report):
+    return [output["pulses"] for output in report["outputs"]]
+
+
+def drivers_of(report):
+    return [output["driver"] for output in report["outputs"]]
 
 
 def outputs_of(report):
@@ -86,33 +113,46 @@ class Outputs(unittest.TestCase):
         self.assertEqual(held(support.probe()), [crc(colours) for colours in support.leg_bytes(recording, 44500)])
         self.assertEqual(support.command(PORT, "brightness", str(support.DIM)), (0, {"ok": True}))
 
-    def test_ten_outputs_hold_exactly_the_bytes_of_their_legs(self):
-        mapping = support.legs_mapping(6)
+    def test_twenty_column_legs_of_18_leds_hold_exactly_the_bytes_of_their_legs(self):
+        mapping = support.legs_mapping(6, legs=LEGS, pins=support.TARGET_PINS, columns=True)
         with support.one_frame_show(mapping, 40) as folder:
             support.ensure_installed(folder)
             expected = support.leg_bytes(support.recorded(folder, 1), 980)
-        report = report_after_a_moment()
-        self.assertEqual(outputs_of(report), [(number, number, 18, True) for number in range(1, 11)])
-        self.assertEqual([output["driver"] for output in report["outputs"]], ["rmt"] * 4 + ["parallel"] * 6)
+        report = report_with_every_pulse_count()
+        self.assertEqual(outputs_of(report), [(number + 1, pin, 18, True) for number, pin in enumerate(support.TARGET_PINS)])
+        self.assertEqual(drivers_of(report), ["rmt"] * 4 + ["parallel"] * 16)
         self.assertEqual(report["limited"], 0)
         self.assertEqual(held(report), [crc(colours) for colours in expected])
-        self.assertEqual(len(set(held(report))), 10)
+        self.assertEqual(len(set(held(report))), LEGS)
+        self.assertEqual(pulses_of(report), [24 * 18] * LEGS)
 
-    def test_ten_legs_of_180_leds_all_work_and_the_limiter_holds_them(self):
-        with support.one_frame_show(support.TEN_LEGS, support.DIM) as folder:
+    def test_the_target_has_twenty_working_outputs_that_carry_a_whole_refresh_49_times_a_second(self):
+        with support.one_frame_show(support.TARGET, support.DIM, ms=STILL_MS) as folder:
             support.ensure_installed(folder)
             expected = support.leg_bytes(support.recorded(folder, 1), 980)
-        report = report_after_a_moment()
-        self.assertEqual(outputs_of(report), [(number, number, 180, True) for number in range(1, 11)])
-        self.assertEqual([output["driver"] for output in report["outputs"]], ["rmt"] * 4 + ["parallel"] * 6)
-        if report["limit_ma"] > 1800:
+        report = report_with_every_pulse_count()
+        self.assertEqual(outputs_of(report), [(number + 1, pin, 180, True) for number, pin in enumerate(support.TARGET_PINS)])
+        self.assertEqual(drivers_of(report), ["rmt"] * 4 + ["parallel"] * 16)
+        if report["limit_ma"] > 180 * LEGS:
             self.assertEqual(held(report), [crc(colours) for colours in expected])
         else:
             self.assertGreater(report["limited"], 0)
-            self.assertEqual(report["used_ma"], 1800)
+            self.assertEqual(report["used_ma"], 180 * LEGS)
             self.assertEqual(held(report), [crc(at_the_limiters_minimum(colours)) for colours in expected])
+        self.assertEqual(pulses_of(report), [24 * 180] * LEGS)
         status = support.command(PORT, "status")[1]
         self.assertEqual((status["brightness"], status["error"]), (support.DIM, None))
+        time.sleep(3.0)
+        support.probe()
+        reports = support.each_second(SECONDS)
+        for seen in reports:
+            self.assertIsNotNone(seen["wire_us"], seen)
+            self.assertGreaterEqual(seen["wire_us"][0], WIRE_US[0], seen["wire_us"])
+            self.assertLessEqual(seen["wire_us"][1], WIRE_US[1], seen["wire_us"])
+        sent = [seen["sent"] for seen in reports]
+        self.assertGreaterEqual(min(sent), 49, sent)
+        self.assertEqual([seen["overwritten"] for seen in reports], [0] * SECONDS)
+        self.assertEqual(pulses_of(reports[-1]), [24 * 180] * LEGS)
 
     def test_a_leg_on_a_pin_the_board_cannot_use_leaves_the_other_outputs_working(self):
         mapping = support.legs_mapping(6, legs=3, pins=[1, 60, 2])
