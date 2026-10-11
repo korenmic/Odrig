@@ -46,6 +46,13 @@ class CoreDocument(unittest.TestCase):
             for name in names:
                 self.assertRegex(self.text, rf"(?m)^\| `{name}` \|", f"{struct}.{name}")
 
+    def test_it_gives_the_led_count_of_a_leg_for_both_kinds_of_leg(self):
+        row = re.search(r"(?m)^\| `led_count` \| (.+) \|$", self.text).group(1)
+        self.assertIn("the strip length of the mapping file times the leg's number of strips", row)
+        for kind in ("rows of the canvas in a row-leg file", "columns in a column-leg file"):
+            self.assertIn(kind, row)
+        self.assertIn("(mapping.md)", row)
+
     def test_it_names_the_types_and_the_limits_of_the_header(self):
         types = set(re.findall(r"\b(odrig_[a-z_]+)\b", self.header)) - set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
         self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_reply_fn"})

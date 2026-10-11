@@ -11,33 +11,54 @@ namespace {
 const uint32_t kMostLegs = 255;
 const uint32_t kNameSize = 12;
 
-// What one reading of the file has seen so far.
+// The two kinds of mapping file: the strips of its legs are rows of the canvas, or columns.
+const uint8_t kUnknown = 0;
+const uint8_t kRows = 1;
+const uint8_t kColumns = 2;
+
+// What one reading of the file has seen so far. A strip is one row of a row leg or one
+// column of a column leg, and the length is the number of LEDs in every strip.
 struct Seen {
-    uint32_t width;
+    uint8_t kind;       // the kind of the legs: the first reading finds it, the second is given it
+    uint32_t length;
     uint32_t legs;
-    uint32_t rows;
+    uint32_t strips;
 };
 
-// Whether row y has been marked before; marks it.
-bool mark_row(uint8_t *row_check, uint32_t y) {
-    uint8_t bit = static_cast<uint8_t>(1u << ((y - 1) & 7));
-    uint8_t &byte = row_check[(y - 1) >> 3];
+// Whether strip `at`, a row or a column of the canvas, has been marked before; marks it.
+bool mark_strip(uint8_t *strip_check, uint32_t at) {
+    uint8_t bit = static_cast<uint8_t>(1u << ((at - 1) & 7));
+    uint8_t &byte = strip_check[(at - 1) >> 3];
     bool marked = (byte & bit) != 0;
     byte |= bit;
     return marked;
 }
 
-// Reads one entry of `legs`. The second reading of the file also checks the leg against
-// those before it and the rows against the height, and fills the tables by the width and
-// the height the first reading found.
-bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
-    const bool fill = row_check != nullptr;
+// Reads one entry of `legs`. Every leg is of the kind of the first one. The second reading
+// of the file also checks the leg against those before it and its strips against their
+// number, and fills the tables by the kind, the width and the height the first reading
+// found.
+bool read_leg(Core &core, JsonReader &json, uint8_t *strip_check, Seen &seen) {
+    const bool fill = strip_check != nullptr;
+    // For the second reading: the number of LEDs in a strip, and the number of strips of
+    // the canvas.
+    uint32_t length = 0;
+    uint32_t across = 0;
+    if (fill) {
+        length = seen.kind == kColumns ? core.height : core.width;
+        across = seen.kind == kColumns ? core.width : core.height;
+    }
     char name[kNameSize];
     uint32_t members = 0;
     uint32_t leg = 0;
     uint32_t pin = 0;
-    uint32_t rows = 0;
-    bool starts_right = false;
+    uint32_t strips = 0;
+    uint8_t kind = kUnknown;
+    // `first_led` is one of four words: the kind it belongs to, and whether it is the end
+    // of a strip where x or y is largest. It may come before `rows` or `columns`, so it is
+    // held against the kind of the leg when the leg has ended.
+    uint8_t word_kind = kUnknown;
+    bool starts_far = false;
 
     if (!json.object_begin()) {
         return false;
@@ -50,7 +71,8 @@ bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
             member = 2;
         } else if (same_text(name, "first_led")) {
             member = 4;
-        } else if (same_text(name, "rows")) {
+        } else if (same_text(name, "rows") || same_text(name, "columns")) {
+            // One bit for the two: a leg has exactly one of them.
             member = 8;
         } else {
             return false;
@@ -69,41 +91,52 @@ bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
                 return false;
             }
         } else if (member == 4) {
-            char side[8];
-            if (!json.string(side, sizeof side)) {
+            char word[8];
+            if (!json.string(word, sizeof word)) {
                 return false;
             }
-            if (same_text(side, "right")) {
-                starts_right = true;
-            } else if (!same_text(side, "left")) {
+            if (same_text(word, "left") || same_text(word, "right")) {
+                word_kind = kRows;
+                starts_far = same_text(word, "right");
+            } else if (same_text(word, "bottom") || same_text(word, "top")) {
+                word_kind = kColumns;
+                starts_far = same_text(word, "top");
+            } else {
                 return false;
             }
         } else {
+            kind = same_text(name, "rows") ? kRows : kColumns;
+            if (seen.kind == kUnknown) {
+                seen.kind = kind;
+            } else if (seen.kind != kind) {
+                return false;
+            }
             if (!json.array_begin()) {
                 return false;
             }
             while (json.array_next()) {
-                uint32_t y;
-                if (!json.integer(&y)) {
+                uint32_t at;
+                if (!json.integer(&at)) {
                     return false;
                 }
                 if (fill) {
-                    if (seen.rows + rows >= core.height || y < 1 || y > core.height || mark_row(row_check, y)) {
+                    if (seen.strips + strips >= across || at < 1 || at > across || mark_strip(strip_check, at)) {
                         return false;
                     }
-                    // The row's y waits in the row's first entry until the side is known.
-                    core.led_pixel[(seen.rows + rows) * core.width] = static_cast<uint16_t>(y);
+                    // The strip's y or x waits in the strip's first entry until the end
+                    // it starts at is known.
+                    core.led_pixel[(seen.strips + strips) * length] = static_cast<uint16_t>(at);
                 }
-                if (rows < kLargestPicture + 1) {
-                    ++rows;
+                if (strips < kLargestPicture + 1) {
+                    ++strips;
                 }
             }
-            if (json.failed || rows == 0) {
+            if (json.failed || strips == 0) {
                 return false;
             }
         }
     }
-    if (json.failed || members != 15) {
+    if (json.failed || members != 15 || word_kind != kind) {
         return false;
     }
 
@@ -120,32 +153,40 @@ bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
         LegInfo &info = core.legs[seen.legs];
         info.leg = static_cast<uint16_t>(leg);
         info.pin = static_cast<uint16_t>(pin);
-        info.first = seen.rows * width;
-        info.count = rows * width;
-        for (uint32_t r = 0; r < rows; ++r) {
-            uint16_t *row = core.led_pixel + info.first + r * width;
-            const uint32_t y = row[0];
-            const bool from_right = starts_right != ((r & 1) != 0);
-            for (uint32_t i = 0; i < width; ++i) {
-                const uint32_t x = from_right ? width - i : 1 + i;
-                row[i] = static_cast<uint16_t>((y - 1) * width + (x - 1));
+        info.first = seen.strips * length;
+        info.count = strips * length;
+        for (uint32_t s = 0; s < strips; ++s) {
+            uint16_t *strip = core.led_pixel + info.first + s * length;
+            const uint32_t at = strip[0];
+            // The strips of a leg alternate their direction along the chain.
+            const bool from_far = starts_far != ((s & 1) != 0);
+            for (uint32_t i = 0; i < length; ++i) {
+                // Where the LED is along its strip: its x in a row, its y in a column.
+                const uint32_t along = from_far ? length - i : 1 + i;
+                const uint32_t x = kind == kRows ? along : at;
+                const uint32_t y = kind == kRows ? at : along;
+                strip[i] = static_cast<uint16_t>((y - 1) * width + (x - 1));
             }
         }
     }
     if (seen.legs <= kMostLegs) {
         ++seen.legs;
     }
-    seen.rows += rows;
-    if (seen.rows > kLargestPicture + 1) {
-        seen.rows = kLargestPicture + 1;
+    seen.strips += strips;
+    if (seen.strips > kLargestPicture + 1) {
+        seen.strips = kLargestPicture + 1;
     }
     return true;
 }
 
 // Reads the whole file once. False when it breaks a rule that this reading checks.
-bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
+bool read_file(Core &core, JsonReader &json, uint8_t *strip_check, Seen &seen) {
+    const bool fill = strip_check != nullptr;
     char name[kNameSize];
     uint32_t members = 0;
+    // The kind the top level tells: rows with `width`, columns with `height`. `legs` may
+    // come before it, so it is held against the kind of the legs when the object has ended.
+    uint8_t top_kind = kUnknown;
     if (!json.object_begin()) {
         return false;
     }
@@ -153,7 +194,8 @@ bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
         uint32_t member;
         if (same_text(name, "version")) {
             member = 1;
-        } else if (same_text(name, "width")) {
+        } else if (same_text(name, "width") || same_text(name, "height")) {
+            // One bit for the two: a file has exactly one of them.
             member = 2;
         } else if (same_text(name, "legs")) {
             member = 4;
@@ -171,10 +213,11 @@ bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
                 return false;
             }
         } else if (member == 2) {
-            if (!json.integer(&seen.width) || seen.width < 1 || seen.width > 65535) {
+            top_kind = same_text(name, "width") ? kRows : kColumns;
+            if (!json.integer(&seen.length) || seen.length < 1 || seen.length > 65535) {
                 return false;
             }
-            if (row_check != nullptr && seen.width != core.width) {
+            if (fill && seen.length != (seen.kind == kColumns ? core.height : core.width)) {
                 return false;
             }
         } else {
@@ -182,7 +225,7 @@ bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
                 return false;
             }
             while (json.array_next()) {
-                if (!read_leg(core, json, row_check, seen)) {
+                if (!read_leg(core, json, strip_check, seen)) {
                     return false;
                 }
                 if (seen.legs > kMostLegs) {
@@ -194,14 +237,16 @@ bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
             }
         }
     }
-    return !json.failed && members == 7 && json.end();
+    return !json.failed && members == 7 && top_kind == seen.kind && json.end();
 }
 
-// Opens the file and reads it once. With `row_check` it is the second reading.
-Reason read_once(Core &core, uint8_t *row_check, Seen &seen) {
-    seen.width = 0;
+// Opens the file and reads it once. With `strip_check` it is the second reading, and
+// `kind` is the kind the first reading found.
+Reason read_once(Core &core, uint8_t *strip_check, uint8_t kind, Seen &seen) {
+    seen.kind = kind;
+    seen.length = 0;
     seen.legs = 0;
-    seen.rows = 0;
+    seen.strips = 0;
     Reason opened = core.file.open(core.host, "mapping.json");
     if (opened == kFileMissing) {
         return kMappingMissing;
@@ -211,7 +256,7 @@ Reason read_once(Core &core, uint8_t *row_check, Seen &seen) {
     }
     JsonReader json;
     json.start(&core.file);
-    bool sound = read_file(core, json, row_check, seen);
+    bool sound = read_file(core, json, strip_check, seen);
     core.file.close();
     if (json.read_failed) {
         return kReadError;
@@ -222,14 +267,16 @@ Reason read_once(Core &core, uint8_t *row_check, Seen &seen) {
 }  // namespace
 
 Reason read_mapping(Core &core) {
-    // The first reading checks the form of the file and counts the legs and the rows.
+    // The first reading checks the form of the file, finds its kind and counts the legs and
+    // the strips. The strips are the rows of a row-leg file and the columns of a column-leg
+    // file, so the other side of the canvas is the length of a strip.
     Seen first;
-    Reason reason = read_once(core, nullptr, first);
+    Reason reason = read_once(core, nullptr, kUnknown, first);
     if (reason != kNone) {
         return reason;
     }
-    const uint32_t width = first.width;
-    const uint32_t height = first.rows;
+    const uint32_t width = first.kind == kColumns ? first.strips : first.length;
+    const uint32_t height = first.kind == kColumns ? first.length : first.strips;
     if (static_cast<uint64_t>(width) * height > kLargestPicture) {
         return kMappingMalformed;
     }
@@ -238,19 +285,19 @@ Reason read_mapping(Core &core) {
     core.legs = static_cast<LegInfo *>(arena_take(core, first.legs * static_cast<uint32_t>(sizeof(LegInfo))));
     core.led_pixel = static_cast<uint16_t *>(arena_take(core, leds * 2));
     core.led_data = static_cast<uint8_t *>(arena_take(core, leds * 3));
-    uint8_t *row_check = static_cast<uint8_t *>(arena_take(core, (height + 7) / 8));
-    if (core.legs == nullptr || core.led_pixel == nullptr || core.led_data == nullptr || row_check == nullptr) {
+    uint8_t *strip_check = static_cast<uint8_t *>(arena_take(core, (first.strips + 7) / 8));
+    if (core.legs == nullptr || core.led_pixel == nullptr || core.led_data == nullptr || strip_check == nullptr) {
         return kOutOfMemory;
     }
 
-    // The second reading checks the legs against each other and the rows against the
-    // height, and fills the tables. The legs are counted only when it has ended well.
+    // The second reading checks the legs against each other and the strips against their
+    // number, and fills the tables. The legs are counted only when it has ended well.
     core.width = static_cast<uint16_t>(width);
     core.height = static_cast<uint16_t>(height);
     core.leg_count = first.legs;
     Seen second;
-    reason = read_once(core, row_check, second);
-    if (reason == kNone && (second.legs != first.legs || second.rows != first.rows)) {
+    reason = read_once(core, strip_check, first.kind, second);
+    if (reason == kNone && (second.legs != first.legs || second.strips != first.strips)) {
         reason = kMappingMalformed;
     }
     if (reason != kNone) {

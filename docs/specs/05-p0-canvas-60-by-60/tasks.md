@@ -134,7 +134,7 @@ Rules for every task:
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.1, 2.2, 2.3, 2.4, 4.1, 4.2, 4.3,
     4.4, 4.5
 
-- [ ] 4. The core reads column legs
+- [x] 4. The core reads column legs
   - `core/src/mapping.cpp` as the design's "The core" describes: the two kinds in the
     first reading, whatever the order of the members; the strip check; the table of a
     column leg in the second reading. Reword the comments on rows in

@@ -112,28 +112,53 @@ class OneLoopAndIntoTheNext(Playback):
 
 class EveryLedShowsItsPixel(Playback):
     def test_on_every_mapping_each_led_shows_the_pixel_the_rule_gives_it(self):
-        for name, text in support.mapping_texts().items():
+        texts = {**support.mapping_texts(), **support.column_mapping_texts()}
+        kinds = set()
+        for name, text in texts.items():
             with self.subTest(mapping=name):
                 listed = json.loads(text)
-                width = listed["width"]
-                height = sum(len(leg["rows"]) for leg in listed["legs"])
+                if "width" in listed:
+                    kinds.add("rows")
+                    width = listed["width"]
+                    height = sum(len(leg["rows"]) for leg in listed["legs"])
+                else:
+                    kinds.add("columns")
+                    height = listed["height"]
+                    width = sum(len(leg["columns"]) for leg in listed["legs"])
                 # Pixel (x, y) has the colour (x, y, 200), so an LED tells which pixel it shows.
                 picture = b"".join(bytes((x, y, 200)) for y in range(1, height + 1) for x in range(1, width + 1))
                 clip = odrg.encode(jsonframes.Animation(width, height, ((1000, picture),)))
                 produced, _ = refreshes(support.start(one_clip(text, clip), every_20_ms(3)).lines)
                 self.assertEqual(len(produced), 3)
                 self.assertEqual([leg["leg"] for leg in listed["legs"]], list(produced[0][1]))
+                shown = []
                 for leg in listed["legs"]:
                     data = produced[2][1][leg["leg"]]
-                    self.assertEqual(len(data), 3 * width * len(leg["rows"]))
-                    for n in range(1, width * len(leg["rows"]) + 1):
-                        r = (n - 1) // width
-                        i = (n - 1) % width
-                        y = leg["rows"][r]
-                        starts_on_the_first_side = r % 2 == 0
-                        from_the_right = (leg["first_led"] == "right") == starts_on_the_first_side
-                        x = width - i if from_the_right else 1 + i
-                        self.assertEqual(tuple(data[3 * (n - 1):3 * n]), (x, y, 200), f"LED {n} of leg {leg['leg']}")
+                    if "width" in listed:
+                        self.assertEqual(len(data), 3 * width * len(leg["rows"]))
+                        for n in range(1, width * len(leg["rows"]) + 1):
+                            r = (n - 1) // width
+                            i = (n - 1) % width
+                            y = leg["rows"][r]
+                            starts_on_the_first_side = r % 2 == 0
+                            from_the_right = (leg["first_led"] == "right") == starts_on_the_first_side
+                            x = width - i if from_the_right else 1 + i
+                            self.assertEqual(tuple(data[3 * (n - 1):3 * n]), (x, y, 200), f"LED {n} of leg {leg['leg']}")
+                            shown.append((x, y))
+                    else:
+                        self.assertEqual(len(data), 3 * height * len(leg["columns"]))
+                        for n in range(1, height * len(leg["columns"]) + 1):
+                            s = (n - 1) // height
+                            i = (n - 1) % height
+                            x = leg["columns"][s]
+                            starts_at_the_first_end = s % 2 == 0
+                            from_the_bottom = (leg["first_led"] == "bottom") == starts_at_the_first_end
+                            y = 1 + i if from_the_bottom else height - i
+                            self.assertEqual(tuple(data[3 * (n - 1):3 * n]), (x, y, 200), f"LED {n} of leg {leg['leg']}")
+                            shown.append((x, y))
+                # Every pixel of the canvas is shown by exactly one LED.
+                self.assertEqual(sorted(shown), [(x, y) for x in range(1, width + 1) for y in range(1, height + 1)])
+        self.assertEqual(kinds, {"rows", "columns"})
 
     def test_the_first_and_last_leds_of_the_two_leg_mapping_are_where_the_document_says(self):
         text = support.mapping_texts()["legs-2"]
@@ -166,6 +191,63 @@ class EveryLedShowsItsPixel(Playback):
         self.assertEqual(first, second)
 
 
+class ColumnLegs(Playback):
+    def leds(self, text, width, height):
+        """The pixel `(x, y)` each LED of each leg shows, read from a picture in which
+        every pixel has a colour of its own."""
+        picture = b"".join(bytes((x, y, 200)) for y in range(1, height + 1) for x in range(1, width + 1))
+        clip = odrg.encode(jsonframes.Animation(width, height, ((20, picture),)))
+        produced, _ = refreshes(support.start(one_clip(text, clip), every_20_ms(1)).lines)
+        return {leg: [tuple(data[at:at + 2]) for at in range(0, len(data), 3)] for leg, data in produced[0][1].items()}
+
+    def test_the_ends_of_the_columns_of_legs_that_start_at_the_bottom(self):
+        text = json.dumps({
+            "version": 1,
+            "height": 60,
+            "legs": [
+                {"leg": 1, "pin": 1, "first_led": "bottom", "columns": [1, 2, 3]},
+                {"leg": 2, "pin": 2, "first_led": "bottom", "columns": [4, 5, 6]},
+            ],
+        })
+        legs = self.leds(text, 6, 60)
+        self.assertEqual([len(places) for places in legs.values()], [180, 180])
+        self.assertEqual([legs[1][n - 1] for n in (1, 60, 61, 120, 121, 180)], [(1, 1), (1, 60), (2, 60), (2, 1), (3, 1), (3, 60)])
+        self.assertEqual([legs[2][n - 1] for n in (1, 60, 61, 120, 121, 180)], [(4, 1), (4, 60), (5, 60), (5, 1), (6, 1), (6, 60)])
+
+    def test_the_ends_of_the_columns_of_a_leg_that_starts_at_the_top(self):
+        legs = self.leds(support.column_mapping_texts()["top-start"], 3, 7)
+        self.assertEqual([legs[1][n - 1] for n in (1, 2, 7, 8, 14, 15, 21)], [(1, 7), (1, 6), (1, 1), (2, 1), (2, 7), (3, 7), (3, 1)])
+
+    def test_columns_that_are_not_neighbours_are_sent_in_the_order_of_the_chain(self):
+        legs = self.leds(support.column_mapping_texts()["columns-apart"], 5, 4)
+        self.assertEqual(legs[7], [(2, 1), (2, 2), (2, 3), (2, 4), (4, 4), (4, 3), (4, 2), (4, 1)])
+        self.assertEqual(legs[2], [(1, 4), (1, 3), (1, 2), (1, 1), (5, 1), (5, 2), (5, 3), (5, 4), (3, 4), (3, 3), (3, 2), (3, 1)])
+
+    def test_a_clip_plays_on_every_column_leg_mapping_as_the_reference_plays_it(self):
+        for name, text in support.column_mapping_texts().items():
+            for compressed in (True, False):
+                with self.subTest(mapping=name, compressed=compressed):
+                    canvas = mapping.loads(text.encode("utf-8"))
+                    self.assertEqual(canvas.kind, mapping.COLUMNS)
+                    clip = support.clip(8, canvas.width, canvas.height, (20, 40, 7, 13, 60, 20, 20), compressed=compressed)
+                    files = one_clip(text, clip, brightness=128)
+                    produced, idle = refreshes(self.assert_as_the_reference(files, polls(range(T0, T0 + 500, 4))))
+                    self.assertEqual(len(produced), 25)
+                    self.assertEqual(len(idle), 100)
+                    self.assertEqual({leg: len(data) for leg, data in produced[0][1].items()},
+                                     {leg.leg: 3 * canvas.height * len(leg.strips) for leg in canvas.legs})
+                    self.assertTrue(any(any(data) for data in produced[0][1].values()))
+                    # The loop of 180 ms starts again: the picture after one loop is that of its start.
+                    self.assertEqual(produced[9][1], produced[0][1])
+                    self.assertGreater(len({tuple(sorted(data.items())) for _, data in produced}), 1)
+
+    def test_a_row_leg_file_and_a_column_leg_file_of_one_canvas_send_the_same_pixels_in_another_order(self):
+        rows = json.dumps({"version": 1, "width": 3, "legs": [{"leg": 1, "pin": 1, "first_led": "left", "rows": [1, 2]}]})
+        columns = json.dumps({"version": 1, "height": 2, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [1, 2, 3]}]})
+        self.assertEqual(self.leds(rows, 3, 2)[1], [(1, 1), (2, 1), (3, 1), (3, 2), (2, 2), (1, 2)])
+        self.assertEqual(self.leds(columns, 3, 2)[1], [(1, 1), (1, 2), (2, 2), (2, 1), (3, 1), (3, 2)])
+
+
 class Brightness(Playback):
     def test_hello_world_at_brightness_255_128_1_and_0(self):
         script = every_20_ms(40)
@@ -190,7 +272,7 @@ class Brightness(Playback):
         picture = source.frames[0][1]
         canvas = mapping.loads(files["mapping.json"])
         for leg in canvas.legs:
-            expected = b"".join(picture[3 * place:3 * place + 3] for place in support.led_pixels(canvas.width, leg))
+            expected = b"".join(picture[3 * place:3 * place + 3] for place in support.led_pixels(canvas, leg))
             self.assertEqual(produced[0][1][leg.leg], expected)
 
 

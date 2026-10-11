@@ -1,3 +1,5 @@
+import itertools
+import json
 import random
 import unittest
 
@@ -112,6 +114,76 @@ MAPPING_TEXTS = {
     "-0 for a leg": MAPPING.replace('"leg": 1', '"leg": -0'),
 }
 
+COLUMNS = '{"version": 1, "height": 60, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [2, 1]}]}'
+
+
+def with_height(text):
+    return COLUMNS.replace('"height": 60', f'"height": {text}')
+
+
+def with_end(text):
+    return COLUMNS.replace('"bottom"', text)
+
+
+# Texts of a column-leg file used as mapping.json. Each is judged by the core and by the
+# converter's reader.
+COLUMN_TEXTS = {
+    "the plain text": COLUMNS,
+    "white space of every kind": " \t\r\n" + COLUMNS.replace(" ", " \n\t\r ") + "\r\n\t ",
+    "no white space": COLUMNS.replace(" ", ""),
+    "legs before height": '{"version": 1, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [2, 1]}], "height": 60}',
+    "legs before height and version": '{"legs": [{"leg": 1, "pin": 1, "first_led": "top", "columns": [2, 1]}], "height": 60, "version": 1}',
+    "first_led before columns": '{"version": 1, "height": 60, "legs": [{"first_led": "top", "columns": [2, 1], "leg": 1, "pin": 1}]}',
+    "columns before first_led": '{"version": 1, "height": 60, "legs": [{"columns": [2, 1], "first_led": "top", "leg": 1, "pin": 1}]}',
+    "legs before height with first_led before columns": '{"legs": [{"first_led": "bottom", "pin": 1, "leg": 1, "columns": [2, 1]}], "version": 1, "height": 60}',
+    "legs before a width, with columns": '{"version": 1, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [2, 1]}], "width": 60}',
+    "legs before a height, with rows": '{"version": 1, "legs": [{"leg": 1, "pin": 1, "first_led": "right", "rows": [2, 1]}], "height": 60}',
+    "left before columns": '{"version": 1, "height": 60, "legs": [{"first_led": "left", "columns": [2, 1], "leg": 1, "pin": 1}]}',
+    "left after columns": '{"version": 1, "height": 60, "legs": [{"columns": [2, 1], "first_led": "left", "leg": 1, "pin": 1}]}',
+    "top before rows": '{"version": 1, "width": 60, "legs": [{"first_led": "top", "rows": [2, 1], "leg": 1, "pin": 1}]}',
+    "top after rows": '{"version": 1, "width": 60, "legs": [{"rows": [2, 1], "first_led": "top", "leg": 1, "pin": 1}]}',
+    "a repeated height": COLUMNS.replace('"height": 60', '"height": 60, "height": 60'),
+    "a repeated height written with an escape": COLUMNS.replace('"height": 60', '"height": 60, "\\u0068eight": 60'),
+    "a height and a width": COLUMNS.replace('"height": 60', '"height": 60, "width": 60'),
+    "a width and a height": COLUMNS.replace('"height": 60', '"width": 60, "height": 60'),
+    "a height after the legs and a width before them": COLUMNS.replace('"height": 60', '"width": 60')[:-1] + ', "height": 60}',
+    "repeated columns": COLUMNS.replace('"columns": [2, 1]', '"columns": [2, 1], "columns": [2, 1]'),
+    "columns and rows": COLUMNS.replace('"columns": [2, 1]', '"columns": [2, 1], "rows": [2, 1]'),
+    "rows and columns": COLUMNS.replace('"columns": [2, 1]', '"rows": [2, 1], "columns": [2, 1]'),
+    "a repeated pin": COLUMNS.replace('"pin": 1', '"pin": 1, "pin": 1'),
+    "a byte-order mark": b"\xef\xbb\xbf" + COLUMNS.encode(),
+    "text after the closing brace": COLUMNS + "]",
+    "an empty array at the top": "[]",
+    "60.0": with_height("60.0"),
+    "6e1": with_height("6e1"),
+    "060": with_height("060"),
+    "-0 for the height": with_height("-0"),
+    "-60": with_height("-60"),
+    "a height as text": with_height('"60"'),
+    "a height of 5,000 digits": with_height("1" + "0" * 4999),
+    "4294967297 for the height, which is 1 in 32 bits": with_height("4294967297"),
+    "an escaped member name": COLUMNS.replace('"height"', '"\\u0068eight"'),
+    "an escaped capital in a member name": COLUMNS.replace('"height"', '"\\u0048eight"'),
+    "columns with an escaped letter": COLUMNS.replace('"columns"', '"\\u0063olumns"'),
+    "column without its s": COLUMNS.replace('"columns"', '"column"'),
+    "columns with a letter more": COLUMNS.replace('"columns"', '"columnss"'),
+    "an escaped value": with_end('"b\\u006fttom"'),
+    "an escaped value that is top": with_end('"\\u0074op"'),
+    "an escaped line feed in a value": with_end('"top\\n"'),
+    "an escaped zero in a value": with_end('"top\\u0000"'),
+    "a value in capitals": with_end('"TOP"'),
+    "bottom with a letter more": with_end('"bottoms"'),
+    "a value of 300 letters": with_end('"' + "bottom" * 50 + '"'),
+    "a value that is both words": with_end('"bottomtop"'),
+    "a column with a fraction": COLUMNS.replace("[2, 1]", "[2, 1.0]"),
+    "a column with an exponent": COLUMNS.replace("[2, 1]", "[2, 1e0]"),
+    "a column of -0": COLUMNS.replace("[2, 1]", "[2, -0]"),
+    "a comma after the last column": COLUMNS.replace("[2, 1]", "[2, 1,]"),
+    "columns nested 3,000 deep": COLUMNS.replace("[2, 1]", "[" * 3000 + "]" * 3000),
+    "the text cut before its last brace": COLUMNS[:-1],
+    "the text cut in a string": COLUMNS[:60],
+}
+
 
 def accepted_by_the_converter(data):
     try:
@@ -120,7 +192,7 @@ def accepted_by_the_converter(data):
         if rejection.reason != "mapping-malformed":
             raise
         return None
-    return tuple((leg.leg, leg.pin, canvas.width * len(leg.strips)) for leg in canvas.legs)
+    return tuple((leg.leg, leg.pin, canvas.strip_length * len(leg.strips)) for leg in canvas.legs)
 
 
 def as_bytes(text):
@@ -194,6 +266,122 @@ class MappingTexts(unittest.TestCase):
         accepted = self.judge(copies)
         self.assertGreater(accepted, 10)
         self.assertLess(accepted, 150)
+
+    def test_the_core_accepts_exactly_the_texts_of_a_column_leg_file_the_converter_accepts(self):
+        self.assertGreaterEqual(len(COLUMN_TEXTS), 40)
+        runs = support.start_each([{"mapping.json": text} for text in COLUMN_TEXTS.values()])
+        for (name, text), run in zip(COLUMN_TEXTS.items(), runs):
+            with self.subTest(text=name):
+                expected = accepted_by_the_converter(as_bytes(text))
+                if expected is None:
+                    self.assertEqual(run.error, "mapping-malformed")
+                    self.assertEqual(run.legs, ())
+                else:
+                    self.assertNotEqual(run.error, "mapping-malformed")
+                    self.assertEqual(run.legs, expected)
+
+    def test_the_texts_of_a_column_leg_file_it_must_accept_are_accepted(self):
+        for name in (
+            "the plain text",
+            "white space of every kind",
+            "legs before height",
+            "legs before height and version",
+            "first_led before columns",
+            "columns before first_led",
+            "legs before height with first_led before columns",
+            "an escaped member name",
+            "columns with an escaped letter",
+            "an escaped value",
+            "an escaped value that is top",
+        ):
+            with self.subTest(text=name):
+                self.assertEqual(accepted_by_the_converter(as_bytes(COLUMN_TEXTS[name])), ((1, 1, 120),))
+
+    def test_the_texts_of_a_column_leg_file_it_must_refuse_are_refused(self):
+        for name in (
+            "legs before a width, with columns",
+            "legs before a height, with rows",
+            "left before columns",
+            "left after columns",
+            "top before rows",
+            "top after rows",
+            "a repeated height",
+            "a height and a width",
+            "a width and a height",
+            "a height after the legs and a width before them",
+            "columns and rows",
+            "rows and columns",
+            "60.0",
+            "-0 for the height",
+            "column without its s",
+            "a value in capitals",
+            "a value that is both words",
+        ):
+            with self.subTest(text=name):
+                self.assertIsNone(accepted_by_the_converter(as_bytes(COLUMN_TEXTS[name])))
+
+    def test_the_members_of_a_file_of_either_kind_may_come_in_any_order(self):
+        # Every order of the three members of the top level with every order of the four
+        # members of a leg. The words of one kind are a valid file in every order; with one
+        # word of the other kind among them the file is refused in every order.
+        words = {
+            "columns": ("height", "top", "columns"),
+            "rows": ("width", "right", "rows"),
+            "a width over columns": ("width", "top", "columns"),
+            "a height over rows": ("height", "right", "rows"),
+            "left with columns": ("height", "left", "columns"),
+            "bottom with rows": ("width", "bottom", "rows"),
+        }
+        texts = []
+        for length, end, strips in words.values():
+            leg = {"leg": 5, "pin": 6, "first_led": end, strips: [2, 3, 1]}
+            for leg_order in itertools.permutations(leg):
+                top = {"version": 1, length: 4, "legs": [{name: leg[name] for name in leg_order}]}
+                for top_order in itertools.permutations(top):
+                    texts.append(json.dumps({name: top[name] for name in top_order}))
+        self.assertEqual(len(texts), 6 * 24 * 6)
+        runs = support.start_each([{"mapping.json": text} for text in texts])
+        for position, (text, run) in enumerate(zip(texts, runs)):
+            expected = accepted_by_the_converter(as_bytes(text))
+            self.assertEqual(expected, ((5, 6, 12),) if position < 2 * 144 else None, text)
+            if expected is None:
+                self.assertEqual((run.error, run.legs), ("mapping-malformed", ()), text)
+            else:
+                self.assertEqual((run.error, run.legs), ("show-missing", expected), text)
+
+    def test_copies_of_column_leg_files_with_one_piece_changed_are_judged_as_the_converter_judges_them(self):
+        rng = random.Random(5)
+        made_up = support.column_mapping_texts()
+        originals = [COLUMNS, made_up["columns-apart"], made_up["two-and-four-columns"], support.mapping_texts()["another-order"]]
+        pieces = list('"\'{}[],:.-+eE0123456789 \n\t\\/ulrx') + ["\x00", "\u00e9", "true", "null", "1e1", "\\u0031", '"', "[]", "{}", ",,"]
+        # The words of the two kinds: a copy may have one of them in the place of another.
+        words = ["width", "height", "rows", "columns", "left", "right", "bottom", "top"]
+        copies = []
+        while len(copies) < 400:
+            text = rng.choice(originals)
+            at = rng.randrange(len(text) + 1)
+            change = rng.randrange(6)
+            if change == 0:
+                copy = text[:at] + text[at + 1:]
+            elif change == 1:
+                copy = text[:at] + rng.choice(pieces) + text[at:]
+            elif change == 2:
+                copy = text[:at] + rng.choice(pieces) + text[at + 1:]
+            elif change == 3:
+                other = rng.randrange(len(text) + 1)
+                low, high = min(at, other), max(at, other)
+                copy = text[:low] + text[low:high] * 2 + text[high:]
+            else:
+                present = [word for word in words if f'"{word}"' in text]
+                old = rng.choice(present)
+                places = [place for place in range(len(text)) if text.startswith(f'"{old}"', place)]
+                place = rng.choice(places)
+                copy = text[:place] + f'"{rng.choice(words)}"' + text[place + len(old) + 2:]
+            if copy != text:
+                copies.append(copy)
+        accepted = self.judge(copies)
+        self.assertGreater(accepted, 10)
+        self.assertLess(accepted, 250)
 
 
 SHOW = (

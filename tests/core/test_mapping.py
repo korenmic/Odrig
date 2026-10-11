@@ -86,25 +86,209 @@ ALLOWED = {
 }
 
 
+def row_leg(leg=1, pin=1, first_led="right", rows=(1,), **more):
+    """One entry of `legs` of a row-leg file; `...` leaves a member out."""
+    entry = {"leg": leg, "pin": pin, "first_led": first_led, "rows": rows, **more}
+    return {name: value for name, value in entry.items() if value is not ...}
+
+
+def row_file(width=60, legs=None, version=1, **more):
+    """A row-leg file, of two legs of three rows unless it is given legs; `...` leaves a
+    member out."""
+    if legs is None:
+        legs = [row_leg(1, 1, rows=(6, 5, 4)), row_leg(2, 2, rows=(3, 2, 1))]
+    top = {"version": version, "width": width, "legs": legs, **more}
+    return {name: value for name, value in top.items() if value is not ...}
+
+
+def column_leg(leg=1, pin=1, first_led="bottom", columns=(1,), **more):
+    """One entry of `legs` of a column-leg file; `...` leaves a member out."""
+    entry = {"leg": leg, "pin": pin, "first_led": first_led, "columns": columns, **more}
+    return {name: value for name, value in entry.items() if value is not ...}
+
+
+def column_file(height=60, legs=None, version=1, **more):
+    """A column-leg file, of two legs of three columns unless it is given legs; `...` leaves
+    a member out."""
+    if legs is None:
+        legs = [column_leg(1, 1, columns=(1, 2, 3)), column_leg(2, 2, columns=(4, 5, 6))]
+    top = {"version": version, "height": height, "legs": legs, **more}
+    return {name: value for name, value in top.items() if value is not ...}
+
+
+# One column-leg mapping for each rule of docs/mapping.md, broken.
+BROKEN_COLUMNS = {
+    "version is missing": column_file(version=...),
+    "version 2": column_file(version=2),
+    "version 0": column_file(version=0),
+    "version as text": column_file(version="1"),
+    "legs is an object": column_file(legs={}),
+    "legs is empty": column_file(legs=[]),
+    "a leg that is a number": column_file(legs=[7]),
+    "a second leg that is an array": column_file(legs=[column_leg(), [1]]),
+    "leg 0": column_file(legs=[column_leg(0)]),
+    "leg 256": column_file(legs=[column_leg(256)]),
+    "leg as text": column_file(legs=[column_leg("1")]),
+    "two legs with one number": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(1, 2, columns=(2,))]),
+    "256 legs": column_file(height=1, legs=[column_leg(1 + n % 255, n % 256, columns=(n + 1,)) for n in range(256)]),
+    "pin -1": column_file(legs=[column_leg(pin=-1)]),
+    "pin 256": column_file(legs=[column_leg(pin=256)]),
+    "pin null": column_file(legs=[column_leg(pin=None)]),
+    "pin true": column_file(legs=[column_leg(pin=True)]),
+    "two legs with one pin": column_file(legs=[column_leg(1, 4, columns=(1,)), column_leg(2, 4, columns=(2,))]),
+    "a canvas of 1 x 65,535": column_file(height=65535, legs=[column_leg(columns=(1,))]),
+    "a canvas of 2 x 32,768": column_file(height=32768, legs=[column_leg(columns=(1, 2))]),
+    "a canvas of 256 x 256": column_file(height=256, legs=[column_leg(columns=list(range(1, 257)))]),
+    "legs is missing": column_file(legs=...),
+    "a member too many": column_file(name="west"),
+    "columns at the top level": column_file(columns=[1]),
+    "height 0": column_file(height=0),
+    "height -60": column_file(height=-60),
+    "height 65536": column_file(height=65536),
+    "height as text": column_file(height="60"),
+    "height true": column_file(height=True),
+    "height null": column_file(height=None),
+    "a leg without leg": column_file(legs=[column_leg(leg=...)]),
+    "a leg without pin": column_file(legs=[column_leg(pin=...)]),
+    "a leg without first_led": column_file(legs=[column_leg(first_led=...)]),
+    "a leg without columns": column_file(legs=[column_leg(columns=...)]),
+    "a leg with a member too many": column_file(legs=[column_leg(name="east")]),
+    "a leg with a height": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, columns=(2,), height=60)]),
+    "first_led up": column_file(legs=[column_leg(first_led="up")]),
+    "first_led with a capital": column_file(legs=[column_leg(first_led="Bottom")]),
+    "first_led in capitals": column_file(legs=[column_leg(first_led="TOP")]),
+    "first_led empty": column_file(legs=[column_leg(first_led="")]),
+    "first_led after a space": column_file(legs=[column_leg(first_led=" top")]),
+    "first_led as a number": column_file(legs=[column_leg(first_led=1)]),
+    "first_led null": column_file(legs=[column_leg(first_led=None)]),
+    "first_led in an array": column_file(legs=[column_leg(first_led=["top"])]),
+    "first_led down in a second leg": column_file(legs=[column_leg(4, 1, "top", columns=(1,)), column_leg(9, 2, "down", columns=(2,))]),
+    "columns is empty": column_file(legs=[column_leg(columns=())]),
+    "columns of a second leg is empty": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, columns=())]),
+    "columns is a number": column_file(legs=[column_leg(columns=1)]),
+    "columns is text": column_file(legs=[column_leg(columns="1")]),
+    "columns is an object": column_file(legs=[column_leg(columns={"1": 1})]),
+    "a column as text": column_file(legs=[column_leg(columns=("1",))]),
+    "a column that is true": column_file(legs=[column_leg(columns=(True,))]),
+    "a column that is an array": column_file(legs=[column_leg(columns=(1, [2]))]),
+    "a column twice in one leg": column_file(legs=[column_leg(columns=(1, 1))]),
+    "a column twice in two legs": column_file(legs=[column_leg(1, 1, columns=(2, 1)), column_leg(2, 2, columns=(3, 2))]),
+    "a column left out": column_file(legs=[column_leg(1, 1, columns=(1, 3)), column_leg(2, 2, columns=(4,))]),
+    "column 2 of one": column_file(legs=[column_leg(columns=(2,))]),
+    "a column above the width": column_file(legs=[column_leg(columns=(1, 2, 4))]),
+    "column 0": column_file(legs=[column_leg(columns=(0, 1, 2))]),
+    "column -1": column_file(legs=[column_leg(columns=(-1,))]),
+}
+
+# Files that are of no kind, of both, or that hold a member or a word of the other kind.
+# Each would be valid if the kind were not judged.
+MIXED_KINDS = {
+    "a column-leg file with a width too": column_file(width=6),
+    "a row-leg file with a height too": row_file(height=6),
+    "height, then width": {"version": 1, "height": 60, "width": 60, "legs": [column_leg()]},
+    "a row-leg file with a height of null": row_file(height=None),
+    "a row-leg file without width": row_file(width=...),
+    "a column-leg file without height": column_file(height=...),
+    "version alone": {"version": 1},
+    "Height with a capital": column_file(height=..., Height=60),
+    "rows in a leg of a column-leg file": column_file(legs=[column_leg(columns=..., rows=[1])]),
+    "a row leg in a column-leg file": column_file(legs=[row_leg(1, 1, rows=(1,))]),
+    "a row leg after a column leg": column_file(legs=[column_leg(1, 1, columns=(1,)), row_leg(2, 2, rows=(2,))]),
+    "a row leg before a column leg": column_file(legs=[row_leg(1, 1, rows=(1,)), column_leg(2, 2, columns=(2,))]),
+    "columns in a leg of a row-leg file": row_file(legs=[row_leg(rows=..., columns=[1])]),
+    "a column leg in a row-leg file": row_file(legs=[column_leg(1, 1, columns=(1,))]),
+    "a column leg after a row leg": row_file(legs=[row_leg(1, 1, rows=(1,)), column_leg(2, 2, columns=(2,))]),
+    "a column leg before a row leg": row_file(legs=[column_leg(1, 1, columns=(1,)), row_leg(2, 2, rows=(2,))]),
+    "rows and columns in a leg of a column-leg file": column_file(legs=[column_leg(rows=[1])]),
+    "rows and columns in a leg of a row-leg file": row_file(legs=[row_leg(columns=[1])]),
+    "neither rows nor columns in a leg of a row-leg file": row_file(legs=[row_leg(rows=...)]),
+    "left in a column-leg file": column_file(legs=[column_leg(first_led="left")]),
+    "right in a column-leg file": column_file(legs=[column_leg(first_led="right")]),
+    "bottom in a row-leg file": row_file(legs=[row_leg(first_led="bottom")]),
+    "top in a row-leg file": row_file(legs=[row_leg(first_led="top")]),
+    "right in the second leg of a column-leg file": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, "right", columns=(2,))]),
+    "top in the second leg of a row-leg file": row_file(legs=[row_leg(1, 1, rows=(1,)), row_leg(2, 2, "top", rows=(2,))]),
+}
+
+# Column-leg files that break two rules.
+BROKEN_TWICE = {
+    "version 2 and a width too": column_file(version=2, width=60),
+    "no version and a width too": column_file(version=..., width=60),
+    "version as text and no height": column_file(version="1", height=...),
+    "a width too, no legs and a member too many": column_file(width=60, legs=..., name="west"),
+    "a width and a height of 0": column_file(width=0, height=0),
+    "no height, no legs and a member too many": column_file(height=..., legs=..., name="west"),
+    "no legs and a member too many": column_file(legs=..., name="west"),
+    "a leg with rows for columns and a member too many": column_file(legs=[column_leg(columns=..., rows=[1], name="east")]),
+    "height 0 and a member too many": column_file(height=0, name="west"),
+    "height 0 and legs empty": column_file(height=0, legs=[]),
+    "height as text and legs an object": column_file(height="60", legs={}),
+    "leg 0 without pin": column_file(legs=[column_leg(0, pin=...)]),
+    "leg 0, pin 256, left and no column": column_file(legs=[column_leg(0, 256, "left", columns=())]),
+    "a leg number twice, pin 256, left and no column": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(1, 256, "left", columns=())]),
+    "pin 256, left and no column": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 256, "left", columns=())]),
+    "a pin twice, left and no column": column_file(legs=[column_leg(1, 4, columns=(1,)), column_leg(2, 4, "left", columns=())]),
+    "left and no column": column_file(legs=[column_leg(1, 4, columns=(1,)), column_leg(2, 5, "left", columns=())]),
+    "columns a number in a second leg": column_file(legs=[column_leg(1, 4, columns=(1,)), column_leg(2, 5, "top", columns=7)]),
+    "columns as text and a leg that is a number": column_file(legs=[column_leg(1, 1, columns="x"), 7]),
+    "left and right": column_file(legs=[column_leg(8, 1, "left", columns=(1,)), column_leg(9, 2, "right", columns=(2,))]),
+    "column 9 and a pin as text": column_file(legs=[column_leg(1, 1, columns=(9,)), column_leg(2, "x", columns=(1,))]),
+    "a column twice and columns empty": column_file(legs=[column_leg(1, 1, columns=(1, 1)), column_leg(2, 2, columns=())]),
+    "a column twice and column 9": column_file(legs=[column_leg(columns=(1, 1, 9))]),
+    "column 9 and a column twice": column_file(legs=[column_leg(columns=(9, 1, 1))]),
+    "a column twice and column 0": column_file(legs=[column_leg(1, 1, columns=(2, 2)), column_leg(2, 2, columns=(0,))]),
+    "column 2 of one and a canvas above 65,534 pixels": column_file(height=65535, legs=[column_leg(columns=(2,))]),
+}
+
+# Column-leg mappings at the edges of the rules.
+ALLOWED_COLUMNS = {
+    "two legs of three columns of 60": column_file(),
+    "one column of 9": column_file(height=9, legs=[column_leg(columns=(1,))]),
+    "five columns that are not in order": column_file(height=2, legs=[column_leg(columns=(4, 1, 3, 2, 5))]),
+    "legs of two and of four columns": column_file(height=5, legs=[column_leg(7, 0, "top", columns=(1, 2)), column_leg(3, 255, "bottom", columns=(6, 5, 4, 3))]),
+    "leg 1 on pin 0 and leg 255 on pin 255": column_file(legs=[column_leg(1, 0, columns=(1,)), column_leg(255, 255, columns=(2,))]),
+    "255 legs": column_file(height=2, legs=[column_leg(255 - n, n, "top" if n % 2 else "bottom", columns=(n + 1,)) for n in range(255)]),
+    "a canvas of 1 x 65,534": column_file(height=65534, legs=[column_leg(columns=(1,))]),
+    "a canvas of 2 x 32,767": column_file(height=32767, legs=[column_leg(columns=(1, 2))]),
+    "a canvas of 65,534 x 1": column_file(height=1, legs=[column_leg(columns=list(range(1, 65535)))]),
+    "columns before the end": {"legs": [{"columns": [2, 1], "pin": 3, "leg": 9, "first_led": "top"}], "height": 3, "version": 1},
+}
+
+# What the core lists for each made-up column-leg mapping: `(leg, pin, LED count)`.
+LEGS_OF_THE_COLUMN_MAPPINGS = {
+    "top-start": ((1, 4, 21),),
+    "two-and-four-columns": ((3, 9, 10), (1, 0, 20)),
+    "columns-apart": ((7, 12, 8), (2, 3, 12)),
+    "one-led-column": ((255, 255, 1),),
+}
+
+
 def leg_list(text):
     """The leg list the converter's reader gives: `(leg, pin, LED count)` in file order."""
     canvas = mapping.loads(text.encode("utf-8"))
-    return tuple((leg.leg, leg.pin, canvas.width * len(leg.strips)) for leg in canvas.legs)
+    return tuple((leg.leg, leg.pin, canvas.strip_length * len(leg.strips)) for leg in canvas.legs)
 
 
 class LegList(unittest.TestCase):
     def test_every_mapping_gives_its_legs_in_the_order_of_the_file(self):
-        texts = support.mapping_texts()
-        self.assertGreaterEqual(len(texts), 6)
+        texts = {**support.mapping_texts(), **support.column_mapping_texts()}
+        self.assertGreaterEqual(len(texts), 10)
         runs = support.start_each([{"mapping.json": text} for text in texts.values()])
+        kinds = set()
         for (name, text), run in zip(texts.items(), runs):
             with self.subTest(mapping=name):
-                listed = json.loads(text)["legs"]
-                width = json.loads(text)["width"]
+                file = json.loads(text)
+                listed = file["legs"]
+                # A leg has the strip length times the number of its strips: the width
+                # times its rows in a row-leg file, the height times its columns in a
+                # column-leg file.
+                length, strips = ("width", "rows") if "width" in file else ("height", "columns")
+                kinds.add(strips)
                 self.assertEqual(run.core, "ok")
                 self.assertNotIn(run.error, MAPPING_REASONS)
-                self.assertEqual(run.legs, tuple((leg["leg"], leg["pin"], width * len(leg["rows"])) for leg in listed))
+                self.assertEqual(run.legs, tuple((leg["leg"], leg["pin"], file[length] * len(leg[strips])) for leg in listed))
                 self.assertEqual(run.legs, leg_list(text))
+        self.assertEqual(kinds, {"rows", "columns"})
 
     def test_the_two_tracked_mappings_have_legs_of_180_leds_on_the_pins_of_their_numbers(self):
         for name, count in (("legs-2", 2), ("legs-10", 10)):
@@ -116,6 +300,25 @@ class LegList(unittest.TestCase):
         for (name, value), run in zip(ALLOWED.items(), runs):
             with self.subTest(mapping=name):
                 self.assertNotIn(run.error, MAPPING_REASONS)
+                self.assertEqual(run.legs, leg_list(json.dumps(value)))
+
+    def test_the_made_up_column_leg_mappings_have_these_legs(self):
+        texts = support.column_mapping_texts()
+        self.assertEqual(sorted(texts), sorted(LEGS_OF_THE_COLUMN_MAPPINGS))
+        runs = support.start_each([{"mapping.json": text} for text in texts.values()])
+        for name, run in zip(texts, runs):
+            with self.subTest(mapping=name):
+                self.assertEqual(run.core, "ok")
+                self.assertEqual(run.error, "show-missing")
+                self.assertEqual(run.legs, LEGS_OF_THE_COLUMN_MAPPINGS[name])
+
+    def test_column_leg_mappings_at_the_edges_of_the_rules_are_accepted(self):
+        runs = support.start_each([{"mapping.json": json.dumps(value)} for value in ALLOWED_COLUMNS.values()])
+        for (name, value), run in zip(ALLOWED_COLUMNS.items(), runs):
+            with self.subTest(mapping=name):
+                self.assertEqual(run.core, "ok")
+                self.assertNotIn(run.error, MAPPING_REASONS)
+                self.assertEqual(run.legs, tuple((leg["leg"], leg["pin"], value["height"] * len(leg["columns"])) for leg in value["legs"]))
                 self.assertEqual(run.legs, leg_list(json.dumps(value)))
 
 
@@ -145,12 +348,99 @@ class RefusedMappings(unittest.TestCase):
                 self.assertEqual(run.legs, ())
                 self.assertEqual(run.lines, ["error mapping-malformed"])
 
+    def assert_each_refused(self, files):
+        """Every one of these files is refused by the converter's reader and by the core,
+        which gives the reason name alone and lists no leg."""
+        runs = support.start_each([{"mapping.json": json.dumps(value)} for value in files.values()], ["error"])
+        for (name, value), run in zip(files.items(), runs):
+            with self.subTest(file=name):
+                with self.assertRaises(errors.Rejection) as refused:
+                    mapping.loads(json.dumps(value).encode("utf-8"))
+                self.assertEqual(refused.exception.reason, "mapping-malformed")
+                self.assertEqual(run.core, "ok")
+                self.assertEqual(run.error, "mapping-malformed")
+                self.assertEqual(run.legs, ())
+                self.assertEqual(run.logs, ("mapping-malformed",))
+                self.assertEqual(run.lines, ["error mapping-malformed"])
+
+    def test_each_rule_broken_in_a_column_leg_file_gives_mapping_malformed_and_no_legs(self):
+        self.assertGreaterEqual(len(BROKEN_COLUMNS), 50)
+        self.assert_each_refused(BROKEN_COLUMNS)
+
+    def test_a_file_of_no_kind_of_both_or_with_a_part_of_the_other_kind_is_refused(self):
+        self.assertGreaterEqual(len(MIXED_KINDS), 20)
+        self.assert_each_refused(MIXED_KINDS)
+
+    def test_a_column_leg_file_that_breaks_two_rules_is_refused(self):
+        self.assertGreaterEqual(len(BROKEN_TWICE), 20)
+        self.assert_each_refused(BROKEN_TWICE)
+
     def test_a_refused_mapping_asks_for_no_more_memory_than_its_checks_need(self):
         missing = support.start({})
         self.assertEqual(missing.memory[1], 1)
         cut = support.start({"mapping.json": support.mapping_texts()["legs-10"][:-3]})
         self.assertEqual(cut.error, "mapping-malformed")
         self.assertEqual(cut.memory, missing.memory)
+
+
+class ChangedBetweenTheReadings(unittest.TestCase):
+    """The core reads the mapping file twice. The test host gives the second reading
+    another file, and stops the run when the core writes outside a block of its memory."""
+
+    def read_twice(self, first, second):
+        files = {"mapping.json": json.dumps(first), "second.json": json.dumps(second)}
+        run = support.start(files, ["error", "poll 0"], ["--swap-after", "mapping.json", "1", "second.json", "--trace-files"])
+        self.assertEqual(run.opened[:2], (("mapping.json", 1), ("mapping.json", 1)))
+        self.assertEqual(run.core, "ok")
+        return run
+
+    def assert_refused(self, first, second):
+        run = self.read_twice(first, second)
+        self.assertEqual(run.error, "mapping-malformed")
+        self.assertEqual(run.legs, ())
+        self.assertEqual(run.lines, ["error mapping-malformed", "idle 0"])
+
+    def test_a_file_of_the_other_kind_at_the_second_reading_is_refused(self):
+        rows = row_file(width=3, legs=[row_leg(1, 1, "left", rows=(1, 2))])
+        columns = column_file(height=3, legs=[column_leg(1, 1, "bottom", columns=(1, 2))])
+        self.assert_refused(rows, columns)
+        self.assert_refused(columns, rows)
+        # The same canvas of 2 x 2, and of 1 x 1, held as rows and as columns.
+        self.assert_refused(row_file(width=2, legs=[row_leg(rows=(1, 2))]), column_file(height=2, legs=[column_leg(columns=(1, 2))]))
+        self.assert_refused(column_file(height=2, legs=[column_leg(columns=(1, 2))]), row_file(width=2, legs=[row_leg(rows=(1, 2))]))
+        self.assert_refused(column_file(height=1, legs=[column_leg()]), row_file(width=1, legs=[row_leg()]))
+        self.assert_refused(row_file(width=1, legs=[row_leg()]), column_file(height=1, legs=[column_leg()]))
+
+    def test_a_column_leg_file_of_another_size_at_the_second_reading_is_refused(self):
+        first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))])
+        others = {
+            "a longer strip": column_file(height=5, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))]),
+            "a shorter strip": column_file(height=3, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))]),
+            "a column more in the first leg": column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2, 4)), column_leg(2, 2, "top", columns=(3,))]),
+            "a column more in the last leg": column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3, 4))]),
+            "a column less": column_file(height=4, legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, "top", columns=(2,))]),
+            "a leg more": column_file(height=4, legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, columns=(2,)), column_leg(3, 3, columns=(3,))]),
+            "a leg less": column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2, 3))]),
+            "a leg more and its columns": column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, columns=(3,)), column_leg(3, 3, columns=(4, 5))]),
+            "the height after legs with a column more": {"version": 1, "legs": [column_leg(1, 1, columns=(1, 2, 3, 4))], "height": 4},
+            "65,534 columns of one LED": column_file(height=1, legs=[column_leg(columns=list(range(1, 65535)))]),
+            "one column of 65,534": column_file(height=65534, legs=[column_leg()]),
+            "255 legs": column_file(height=4, legs=[column_leg(n, n, columns=(n,)) for n in range(1, 256)]),
+            "a file that is refused": column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 1, "top", columns=(3,))]),
+        }
+        for name, second in others.items():
+            with self.subTest(second=name):
+                self.assert_refused(first, second)
+                if name != "a file that is refused":
+                    self.assert_refused(second, first)
+
+    def test_a_column_leg_file_of_the_same_size_at_the_second_reading_gives_its_own_legs(self):
+        first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2)), column_leg(2, 2, "top", columns=(3,))])
+        second = column_file(height=4, legs=[column_leg(8, 5, "top", columns=(3,)), column_leg(9, 6, columns=(2, 1))])
+        run = self.read_twice(first, second)
+        self.assertEqual(run.error, "show-missing")
+        self.assertEqual(run.legs, ((8, 5, 4), (9, 6, 8)))
+        self.assertEqual(run.lines, ["error show-missing", "refresh 0", "data 8 " + "00" * 12, "data 9 " + "00" * 24])
 
 
 if __name__ == "__main__":

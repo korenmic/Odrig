@@ -86,7 +86,7 @@ no clock.
 |---|---|
 | `leg` | The leg's number in the mapping file. |
 | `pin` | The data pin the leg is wired to. |
-| `led_count` | The number of its LEDs: the canvas width times its number of rows. |
+| `led_count` | The number of its LEDs: the strip length of the mapping file times the leg's number of strips. The strips are rows of the canvas in a row-leg file and columns in a column-leg file, see [mapping.md](mapping.md). |
 | `rgb` | Its LED data from the last refresh: `led_count * 3` bytes. The pointer stays the same for as long as the core is used; the bytes change at every refresh. |
 
 `odrig_reply_fn` is the function `odrig_core_feed` calls:

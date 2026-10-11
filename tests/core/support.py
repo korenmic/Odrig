@@ -147,10 +147,40 @@ MADE_UP_MAPPINGS = {
 
 
 def mapping_texts():
-    """Every mapping the suite plays on, by name: the tracked files and the made-up ones."""
+    """The mappings the suites of the core and of the emulator play on, by name: the tracked
+    files and the made-up row-leg ones."""
     texts = {path.stem: path.read_text(encoding="utf-8") for path in sorted((ROOT / "mapping").glob("*.json"))}
     texts.update({name: json.dumps(mapping) for name, mapping in MADE_UP_MAPPINGS.items()})
     return texts
+
+
+# Column-leg mappings: a leg that starts at the top, legs of two and of four columns of 5
+# LEDs, columns that are not neighbours and not in order, and one LED.
+MADE_UP_COLUMN_MAPPINGS = {
+    "top-start": {"version": 1, "height": 7, "legs": [{"leg": 1, "pin": 4, "first_led": "top", "columns": [1, 2, 3]}]},
+    "two-and-four-columns": {
+        "version": 1,
+        "height": 5,
+        "legs": [
+            {"leg": 3, "pin": 9, "first_led": "bottom", "columns": [1, 2]},
+            {"leg": 1, "pin": 0, "first_led": "top", "columns": [6, 5, 4, 3]},
+        ],
+    },
+    "columns-apart": {
+        "version": 1,
+        "height": 4,
+        "legs": [
+            {"leg": 7, "pin": 12, "first_led": "bottom", "columns": [2, 4]},
+            {"leg": 2, "pin": 3, "first_led": "top", "columns": [1, 5, 3]},
+        ],
+    },
+    "one-led-column": {"version": 1, "height": 1, "legs": [{"leg": 255, "pin": 255, "first_led": "top", "columns": [1]}]},
+}
+
+
+def column_mapping_texts():
+    """The made-up column-leg mappings, by name. The suite of the core plays on them as well."""
+    return {name: json.dumps(listed) for name, listed in MADE_UP_COLUMN_MAPPINGS.items()}
 
 
 @contextlib.contextmanager
@@ -309,20 +339,34 @@ def show_refusal(rejection):
     return f"{rejection.reason} {max(-4294967295, min(4294967295, number))}"
 
 
-def led_pixels(width, leg):
-    """For LED 1, 2, ... of a leg, the place in pixel order of the canvas pixel it shows.
+def led_pixels(canvas, leg):
+    """For LED 1, 2, ... of a leg of a mapping, the place in pixel order of the canvas pixel
+    it shows.
 
-    This is the rule of docs/mapping.md, "Where each LED is", written out once more.
+    This is the rule of docs/mapping.md, "Where each LED is", written out once more for a
+    row leg and for a column leg.
     """
+    width = canvas.width
+    height = canvas.height
     places = []
-    for n in range(1, width * len(leg.strips) + 1):
-        r = (n - 1) // width
-        i = (n - 1) % width
-        y = leg.strips[r]
-        on_the_first_side = r % 2 == 0
-        starts_right = (leg.first_led == "right") == on_the_first_side
-        x = width - i if starts_right else 1 + i
-        places.append((y - 1) * width + (x - 1))
+    if canvas.kind == mapping.ROWS:
+        for n in range(1, width * len(leg.strips) + 1):
+            r = (n - 1) // width
+            i = (n - 1) % width
+            y = leg.strips[r]
+            on_the_first_side = r % 2 == 0
+            starts_right = (leg.first_led == "right") == on_the_first_side
+            x = width - i if starts_right else 1 + i
+            places.append((y - 1) * width + (x - 1))
+    else:
+        for n in range(1, height * len(leg.strips) + 1):
+            s = (n - 1) // height
+            i = (n - 1) % height
+            x = leg.strips[s]
+            at_the_first_end = s % 2 == 0
+            starts_at_the_bottom = (leg.first_led == "bottom") == at_the_first_end
+            y = 1 + i if starts_at_the_bottom else height - i
+            places.append((y - 1) * width + (x - 1))
     return places
 
 
@@ -387,7 +431,7 @@ class ReferencePlayer:
             canvas = mapping.loads(files["mapping.json"])
         except errors.Rejection:
             raise _Invalid("mapping-malformed") from None
-        self.legs = [(leg.leg, leg.pin, led_pixels(canvas.width, leg)) for leg in canvas.legs]
+        self.legs = [(leg.leg, leg.pin, led_pixels(canvas, leg)) for leg in canvas.legs]
 
         if "show.json" not in files:
             raise _Invalid("show-missing")

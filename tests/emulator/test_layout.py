@@ -37,7 +37,7 @@ def rule(canvas):
     docs/mapping.md, as the core's suite states it in Python."""
     places = []
     for leg in canvas.legs:
-        places.append([[place % canvas.width + 1, place // canvas.width + 1] for place in core_support.led_pixels(canvas.width, leg)])
+        places.append([[place % canvas.width + 1, place // canvas.width + 1] for place in core_support.led_pixels(canvas, leg)])
     return places
 
 

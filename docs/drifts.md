@@ -3054,3 +3054,55 @@ what it does with a number below 1 or above the leg's LED count.
 reason name of `docs/reasons.md` applies. The page's `position` gives null there.
 
 **Resolution.** `odrig/mapping.py`; `tests/converter/test_mapping.py`, `Positions`.
+
+## Seed 05: The comments on rows in the two headers of the core
+
+**Question.** Task 4 and the design's "The core" say to reword the comments of
+`core/src/core_state.h` and `core/include/odrig_core.h` that say "rows" where both kinds of
+leg are meant.
+
+**Answer.** Neither file has such a comment. `core_state.h` says of a leg that its LEDs are
+entries of the LED tables, and `odrig_core.h` that a leg is as the mapping file lists it,
+with its LED data in chain order; both sentences hold for a column leg as they stand. The
+two files are unchanged. What said "rows" was in `core/src/mapping.cpp`, which is rewritten
+for strips, and in the row of `led_count` in `docs/core.md`.
+
+**Resolution.** `core/src/mapping.cpp`; `docs/core.md`, "What the core offers";
+`tests/core/test_docs.py`.
+
+## Seed 05: The tests of the core that run on every mapping, before the page reads column legs
+
+**Question.** The tasks say that a test that concerns a row-leg file passes unchanged, and
+that the made-up column-leg mappings are given by a function of their own until the page
+reads both kinds. Two tests of the core run on every mapping of `mapping_texts()` and read
+`width` and `rows` from the file: the leg list in `tests/core/test_mapping.py` and the pixel
+of every LED in `tests/core/test_playback.py`. And `led_pixels` of `tests/core/support.py`
+took the width of the canvas alone, which does not give the place of an LED of a column leg.
+
+**Answer.** The two tests run on the mappings of both functions, `mapping_texts()` and
+`column_mapping_texts()`, and state the rule for both kinds. What they check for a row-leg
+file is what they checked. The task of the page can so join the column-leg mappings to
+`mapping_texts()` without a change to these tests. `led_pixels` takes the mapping in place
+of its width, and its one caller outside the core's tests, `rule` in
+`tests/emulator/test_layout.py`, passes the mapping; no other line of `tests/emulator/`
+changes with the core's reader.
+
+**Resolution.** `tests/core/support.py`, `column_mapping_texts` and `led_pixels`;
+`tests/core/test_mapping.py`, `LegList`; `tests/core/test_playback.py`,
+`EveryLedShowsItsPixel`; `tests/emulator/test_layout.py`, `rule`.
+
+## Seed 05: A test of the emulator's suite that refuses an uncommitted change of the core
+
+**Question.** The tasks say that the four suites pass before a task is committed.
+`tests/emulator/test_scope.py` has a test of seed 03,
+`test_no_commit_of_this_seed_changes_a_source_or_the_header_of_the_core`, that fails while
+a file under `core/src` or `core/include` differs from what is committed. Task 4 changes
+`core/src/mapping.cpp`, so the emulator's suite cannot pass before the commit of that task.
+
+**Answer.** The test stays as it is; it belongs to seed 03. Before the commit of task 4 the
+emulator's suite ran with that one failure, `' M core/src/mapping.cpp\n' != ''`, and its
+other 258 tests passed. The test itself was run on a copy of the repository in which the
+change was committed, and passed there. The whole suite is run once more after the commit.
+The same holds for any later commit that changes a source of the core.
+
+**Resolution.** The commit of task 4. `tests/emulator/test_scope.py` is unchanged.
