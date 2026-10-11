@@ -249,7 +249,9 @@ valid.
 
 ## Measured sizes
 
-File sizes in bytes for this exact format, with the guidance above applied:
+File sizes in bytes for this exact format, with the guidance above applied. The row of
+60 x 30 is a size the target had before the target became twenty upright legs; the last
+row is the target of today, 60 x 60.
 
 | Animation | Canvas | Stored frames | Uncompressed | Compressed |
 |---|---|---:|---:|---:|
@@ -258,13 +260,31 @@ File sizes in bytes for this exact format, with the guidance above applied:
 | Square ping-pong, 3.4 s | 60 x 3 | 114 | 2,985 | 1,403 |
 | Dense full-colour, 10 s | 60 x 6 | 500 | 163,188 | 156,344 |
 | Dense full-colour, 10 s | 60 x 30 | 500 | 765,984 | 725,162 |
+| Dense full-colour, 10 s | 60 x 60 | 500 | 1,462,236 | 1,383,766 |
 
-Each of these files was decoded with a decoder written from this text alone, and every pixel
-of every frame matched the source. The dense clips are synthetic. Decoding has not yet been
-run or timed on the board.
+The dense clips are synthetic. The rows above the last were measured with the prototype of
+the frame coder; each of those files was decoded with a decoder written from this text
+alone, and every pixel of every frame matched the source. The converter of this repository
+writes DVD bounce, Hello world and the dense clips of 60 x 6 and 60 x 30 at the same
+uncompressed sizes. Its compressed files differ a little: 1,612 and 1,138 bytes for DVD
+bounce and Hello world. Among frame records of equal size in bytes it chooses by a fixed
+rule where the prototype kept the one with the fewest bits, so DEFLATE sees slightly
+different bytes.
 
-The table was measured with the prototype of the frame coder. The converter of this
-repository writes DVD bounce, Hello world and the two dense clips at the same uncompressed
-sizes. Its compressed files differ a little: 1,612 and 1,138 bytes for DVD bounce and Hello
-world. Among frame records of equal size in bytes it chooses by a fixed rule where the
-prototype kept the one with the fewest bits, so DEFLATE sees slightly different bytes.
+The last row was measured with the converter of this repository, with zlib 1.2.12: it is
+the clip the generator `dense` writes for the target file `mapping/legs-20.json`, see
+[converter.md](converter.md), "Generators". The reference decoder gives back every frame of
+both files, and the suite of the core plays the clip on the target file and compares every
+LED of every refresh with the reference.
+
+Decoding has been run and timed on the board: see [firmware.md](firmware.md), "Measurements
+on the board" and "Verified on the board".
+
+**What fits.** The board's storage partition has 10,354,688 bytes, and 9,001,905 bytes of
+animations have been installed in it and played. A dense 60 x 60 clip takes 138,377 bytes
+for a second compressed and 146,224 uncompressed, so storage holds 65 to 74 seconds of it
+compressed and 61 to 70 seconds uncompressed: the first figure of each pair is what has
+been shown to fit, the second what the whole partition would hold. A picture that nothing
+predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
+canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
+changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.

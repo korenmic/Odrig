@@ -3510,3 +3510,113 @@ commands give.
 
 **Resolution.** `docs/emulator.md`, "Two shows to run" and "The check list by eye";
 `tests/emulator/test_docs.py`; `docs/specs/05-p0-canvas-60-by-60/tasks.md`, task 10.
+
+## Seed 05: A record of what was measured on ten row legs, told apart from a statement about the target
+
+**Question.** Task 10 asks for a test that no document, outside the change log of the
+decisions, the drifts, the seeds and the specs, says that the target is 60 x 30 or has ten
+legs. The documents hold figures that were measured before the target changed and that
+nothing has replaced: the sizes of the prototype's dense clip at 60 x 30 in `docs/format.md`
+and `docs/decisions.md`, and in `docs/firmware.md` everything seed 04 measured on the
+board with ten row legs, 1,800 LEDs. A test that forbids the words would forbid the
+records.
+
+**Answer.** A record says itself that it is one. The test looks in every tracked `.md`
+file outside those four places for a canvas of 60 x 30, ten legs, ten outputs, 1,800 LEDs
+or 1,800 mA, legs 2 or 3 to 10, pins 1, 2 or 3 to 10, and 30 rows. Such a mention is allowed
+only in a
+section that holds the words "before the target became twenty upright legs" at or before
+the paragraph of the mention; a section is the text from one heading to the next, and a
+paragraph ends at an empty line. So the sentence that opens a record covers what follows
+it in its section, and a mention above it, or in another section, fails the test. "Ten row
+legs" is the name the records use for the layout they were measured on, as the made-up
+mapping of the suites is called; the test does not take it for a mention, because the
+target has column legs. The sections that carry the words are "Measured sizes" of
+`docs/format.md`, "Measurements behind the choice", the bullet on FastLED's compiler and
+"Open questions" of `docs/decisions.md`, and "Measurements on the board" and "Verified on
+the board" of `docs/firmware.md`. A second test says what the documents that name the
+target must name: 60 x 60, twenty legs, both kinds of leg and both mapping files.
+
+**Resolution.** `tests/converter/test_docs.py`, `TheTarget`; the sections named above.
+
+## Seed 05: The measurements of the board, kept as a record until the board tests have run
+
+**Question.** Requirement 13 criterion 4 and Requirement 16 criterion 5 ask that
+`docs/firmware.md` state the measurements made on the board with the target file. The
+board tests that take them are written and have not run, because the board does not answer
+on USB. "Measurements on the board" still held the figures of seed 04, written as if they
+were the firmware's of today.
+
+**Answer.** The figures stay and the section says what they are: taken with the firmware
+of seed 04 on the bench file and on ten row legs of three rows of 60, 1,800 LEDs, and that
+the measurements with the target file are not taken yet, with the test that will take
+them. What was measured with twenty outputs and the dense 60 x 60 clip before the board
+stopped answering is under "Verified on the board", where tasks 1 and 2 wrote it. The
+limiter is written for 3,600 LEDs: 3,600 mA at rest against the 730 mA that WLED's maximum
+of 850 mA leaves, so every LED is held at the lowest level; WLED's source, read in the
+work folder, has that level as a brightness of 1 of 255, for every mapping of 730 LEDs or
+more. The open question of the decisions on decode speed gives the figures of both sizes,
+and the one on legs 3 to 10 became the one on twenty wired legs. The two criteria are not
+met until task 8 is done.
+
+**Resolution.** `docs/firmware.md`, "What the firmware does" and "Measurements on the
+board"; `docs/decisions.md`, "Open questions"; `docs/mapping.md`, "What is confirmed";
+`docs/specs/05-p0-canvas-60-by-60/tasks.md`, the note under task 8.
+
+## Seed 05: The owner's check of a strip on the parallel driver, and what the limiter leaves of it
+
+**Question.** The design gives the fifth owner's check a mapping of twenty legs of one row
+of 60 that lists the leg on pin 1 last, so that the one wired strip is on the sixteenth
+lane of the parallel driver, and says the strip must show the first row of that leg. It
+names no animation, no row and no file, and such a mapping has 1,200 LEDs: WLED's limiter
+counts 1,200 mA at rest against 730 mA and holds every LED at its lowest level.
+
+**Answer.** The check prints the mapping file in full, to be saved as
+`build/lane/mapping.json`: the legs 2 to 20 on the pins of the target, one row each from
+the top of a 60 x 20 canvas down, and last the leg on pin 1 with the row y = 8. The show is
+Hello world for that canvas at brightness 32, and y = 8 is the bottom row of its letters,
+the row with the most LEDs lit: 29 of 60. What must be seen is given LED by LED, as a line
+of `X` and `.`, and the check says that the LEDs glow faintly, because of the limiter.
+Fewer LEDs would keep the limiter out, but Hello world needs 53 columns, and a strip of 60
+that shows one row of it is the plainest thing to compare. A test reads the mapping from
+the document, has the converter's reader accept it, finds pin 1 on the sixteenth lane, and
+compares the printed line with the row the generator lights. The commands of the check
+were run on this Mac up to `install-show`, and the emulator's record of the show has that
+row on the leg of pin 1.
+
+**Resolution.** `docs/firmware.md`, "The owner's checks", step 5;
+`tests/firmware/test_docs.py`.
+
+## Seed 05: The check list by eye for the target, and how it was gone through
+
+**Question.** Task 10 rewrites the check list for the demo show of twenty legs and the
+dense 60 x 60 clip, adds a step for each criterion of Requirement 18, and has it gone
+through in windows of 1280 x 800 and 756 x 900. Two of the new steps are themselves about
+the size of the window. Three numbers, 9.5, 9.8 and 10.1, are criteria of seed 03 and of
+seed 05 alike. The step for Requirement 8 criterion 9 needs two shows. And a browser that
+a program drives on this Mac has no window.
+
+**Answer.** The list has 22 steps: twelve for the eleven criteria of seed 03, with the
+target in them, and ten marked `(seed 05, N.M)`. Its test reads the two sets apart by the
+mark, each against the requirements file that names it. The list is written for a window
+of 1280 x 800; the step for the narrow arrangement makes the window 756 x 900 and back.
+It was gone through twice in headless Chrome 154.0.8037.98, driven through its debugging
+port by a program of Node.js in `build/t10/`: once as written, and once with a window of
+756 x 900 from the first step on. All 86 screenshots in `build/t10/shots/` were looked
+at; nothing on the page had to be changed, and no file of `emulator/web/` is touched.
+
+Requirement 8 criterion 9 was read from the page's own figure: 49 to 51 in every one of
+ten seconds with the demo show and with the dense 60 x 60 clip, in both views and both
+windows, with Chrome's animation frames at 60 a second, and the same in a run of Chrome
+with `--disable-gpu`. The remedy of the design's "Drawing 3,600 LEDs", squares in place
+of circles, is not applied. A headless browser draws to no screen, so that the figure
+holds on a real screen stays with the pass a person makes; it is listed under "What has
+been checked" with Safari, the clarity of 88 crossings and the twenty colours.
+
+The sizes the document gives for the target file, the two channels and the count of
+crossings are compared with the layout script by the document's test. The sketch of the
+mapping view of row legs showed a canvas of 30 rows; it now shows the bench file, whose
+two lines cross once, as the suite has it.
+
+**Resolution.** `docs/emulator.md`, "The LEDs view", "The mapping view", "The check list by
+eye" and "What has been checked"; `tests/emulator/test_docs.py`.

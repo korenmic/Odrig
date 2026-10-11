@@ -280,7 +280,7 @@ Rules for every task:
   - Requirements: 3.3, 3.4, 5.4, 5.6, 6.1, 6.2, 6.3, 6.4, 6.5, 14.1, 14.2, 14.3, 14.4,
     14.5, 15.1, 15.3, 15.4
 
-- [ ] 10. The documents, the measured sizes, and the check list by eye
+- [x] 10. The documents, the measured sizes, and the check list by eye
   - `docs/format.md`: the row of the dense clip at 60 x 60, measured with the converter,
     and the statement of what fits, computed as the design's "Measured sizes and what
     fits" says. `docs/decisions.md`: the section on the canvas, what fits, the emulator's
@@ -304,6 +304,12 @@ Rules for every task:
     under "What has been checked" what was checked, how, and what is left.
   - Without a tool that drives a browser: leave this task open and say so in the hand-over.
   - Requirements: 8.9, 9.8, 9.9, 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 18.1, 18.2, 18.3
+  - Done with a tool that drives a browser: headless Chrome, both windows, 86 screenshots
+    in `build/t10/shots/`, each looked at; no file of the page had to change. Of
+    Requirement 16 criterion 5, the measurements of Requirement 13 with the target file
+    are task 8's and are not taken: `docs/firmware.md`, "Measurements on the board", says
+    so and keeps the figures of seed 04 as a record. Left for a person: the list in Safari
+    and at a real screen, and the owner's checks 5 and 6 of `docs/firmware.md`.
 
 - [ ] 11. The last check, and the board left as it was found
   - Read every acceptance criterion of Requirements 1 to 18 once more and name, for each

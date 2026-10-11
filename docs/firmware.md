@@ -350,8 +350,11 @@ python -m odrigctl --port /dev/cu.usbmodem101 status
 The first command also sets up the tools and fetches WLED, which needs the network once.
 `pack` is the converter's command of [converter.md](converter.md); `shows/example/show.json`
 has brightness 128, so for a strip fed from the board's 3.3 V pin pack a copy of it with a
-brightness of 40 or less. After `install-show` the board plays the show from every
-power-on, with no command sent. To go back to stock WLED:
+brightness of 40 or less. The example show is for today's build of two legs. The show for
+the target build of twenty legs, 60 x 60, is the demo show: [emulator.md](emulator.md),
+"Two shows to run", gives the commands that pack it into `build/demo-20/show`. After
+`install-show` the board plays the show from every power-on, with no command sent. To go
+back to stock WLED:
 
 ```
 python3 firmware/fw.py restore-stock
@@ -479,12 +482,18 @@ chip, and 55 mA for one LED at full white. It counts 1 mA for every LED at rest.
 estimate is above the maximum it dims the refresh; `status` still reports the core's
 brightness.
 
-> With ten legs of 180 LEDs the estimate at rest alone is 1,800 mA. With WLED's maximum of
-> 850 mA the limiter then holds every LED at its lowest level, whatever plays. Before ten
+> With the twenty legs of the target, 3,600 LEDs, the estimate at rest alone is 3,600 mA.
+> With WLED's maximum of 850 mA the limiter then holds every LED at its lowest level,
+> whatever plays: as WLED's source has it, every channel of a colour that is lit is then
+> sent as 1 of 255. The same holds for every mapping of 730 LEDs or more. Before twenty
 > legs are lit, the maximum current must be raised to what the power supply gives, in
 > WLED's LED settings, "Maximum PSU Current". The firmware does not change it. With two
 > legs, 360 LEDs, the limiter also dims a bright picture such as Hello world, at any
 > brightness at which the estimate passes 730 mA.
+
+The limiter is also part of the time a refresh takes: when it dims, it reads and writes
+every LED of every output once more. With 3,600 LEDs that is about 8 ms of the 16.3 ms a
+send takes; see [Verified on the board](#verified-on-the-board).
 
 **Calls to the core** are made one at a time: a lock is held for every call after the
 start. The task holds it for as long as the core works on a refresh, 9 to 17 ms with a
@@ -571,27 +580,42 @@ own rate can be a refresh or two below the firmware's.
 
 ## Measurements on the board
 
-Taken by the board test `tests/board/test_measure.py` with the probe build, at brightness
-32, over ten seconds for each show; the test writes them to
+**These figures are those of the firmware of seed 04.** They were taken on 2026-10-11,
+before the target became twenty upright legs: on the bench file, and on a mapping of ten
+row legs of three rows of 60, 1,800 LEDs, on pins 1 to 10, with a dense 60 x 30 clip. That
+firmware drove ten outputs. The firmware of today drives twenty: with the target file,
+four through WLED's RMT driver and sixteen through its parallel driver.
+
+**The measurements with the target file are not taken yet.** The board tests that take
+them are written: `tests/board/test_measure.py` measures the example show on its two legs
+and, on the target file, the demo show of [emulator.md](emulator.md), the dense 60 x 60
+clip, compressed and uncompressed, and 9 MB of dense 60 x 60 clips. They have not run,
+because the board stopped answering on USB; see
+[Verified on the board](#verified-on-the-board), which also has what was measured with
+twenty outputs and the dense 60 x 60 clip before that.
+
+The figures below were taken by the board test of that time with the probe build, at
+brightness 32, over ten seconds for each show; the test writes them to
 `build/firmware/out/measurements.json`. The one 60-LED strip was wired, on leg 1; the other
-outputs sent to pins with nothing on them. WLED's maximum current was 850 mA, so on ten legs
-the limiter dimmed every refresh.
+outputs sent to pins with nothing on them. WLED's maximum current was 850 mA, so on ten row
+legs the limiter dimmed every refresh.
 
 | Show | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Example show, two legs, 360 LEDs | 3,096 bytes | 36 s | 171 ms | 2,275 to 2,341 | 49 to 51 | 50 | 39 ms | 0.81 ms | 18.8 ms | 1.04 ms | 1.12 ms |
-| Dense 60 x 30 clip of 10 s, compressed, ten legs, 1,800 LEDs | 725,779 bytes | 48 s | 3,107 ms | 325 to 423 | 49 to 51 | 50 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
+| Dense 60 x 30 clip of 10 s, compressed, ten row legs, 1,800 LEDs | 725,779 bytes | 48 s | 3,107 ms | 325 to 423 | 49 to 51 | 50 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
 | The same clip, uncompressed | 766,815 bytes | 48 s | 2,163 ms | 578 to 655 | 49 to 51 | 50 | 37 ms | 4.72 ms | 21.4 ms | 7.68 ms | 7.81 ms |
 | 9 MB of dense clips: twelve of 10 s and one of 4 s, compressed | 9,001,905 bytes | 178 s | 37,821 ms | 344 to 426 | 48 to 51 | 50 | 44 ms | 6.63 ms | 29.0 ms | 7.68 ms | 7.85 ms |
 
-What the figures say:
+What the figures say, of that firmware and those ten row legs:
 
-- **Decoding keeps up.** The core's work for one frame of the dense clip on 1,800 LEDs,
-  reading from storage, decoding and placing every LED, takes 6.6 ms on average for the
-  compressed file and 4.7 ms for the uncompressed one. The firmware's `status` reported 49
-  or 50 refreshes in every second for both, on ten outputs. The uncompressed format is not
-  needed for speed.
-- **Ten outputs work.** A send to ten outputs of 180 LEDs takes 7.7 ms with the limiter's
+- **Decoding kept up with 1,800 LEDs.** The core's work for one frame of the dense
+  60 x 30 clip, reading from storage, decoding and placing every LED, takes 6.6 ms on
+  average for the compressed file and 4.7 ms for the uncompressed one. The firmware's
+  `status` reported 49 or 50 refreshes in every second for both, on ten outputs. With the
+  3,600 LEDs of the target it does not keep up: see
+  [Verified on the board](#verified-on-the-board).
+- **Ten outputs worked.** A send to ten outputs of 180 LEDs takes 7.7 ms with the limiter's
   dimming of every LED in it. The LEDs need 5.4 ms on the wire after that; the core works
   on the next frame meanwhile.
 - **The long requests** are those in which the core opens a file, at the start of every
@@ -599,17 +623,17 @@ What the figures say:
   to another block. They delay one refresh by up to 29 ms and cost one refresh of a second
   at most.
 - **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 171 ms for the example show, 3.1 s for one dense clip of 10 seconds, and
-  38 s for a storage filled with 9 MB of dense clips. For that time the LEDs are dark and
-  the board answers nothing, on the port or on the network; WLED opens its access point
-  only afterwards. `install-show` and `flash` wait 20 seconds for the board's answer;
-  `--wait SECONDS` makes them wait longer for a large show.
+  by decoding it: 171 ms for the example show, 3.1 s for one dense 60 x 30 clip of 10
+  seconds, and 38 s for a storage filled with 9 MB of such clips. For that time the LEDs
+  are dark and the board answers nothing, on the port or on the network; WLED opens its
+  access point only afterwards. `install-show` and `flash` wait 20 seconds for the board's
+  answer; `--wait SECONDS` makes them wait longer for a large show.
 - **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. 9 MB take
   three minutes.
 
-Not measured, because the hardware is not wired: light on legs 2 to 10, and the current the
-LEDs really draw.
+Not measured, because the hardware is not wired: light on any leg but the one strip on
+pin 1, and the current the LEDs really draw.
 
 ## The regions of the flash
 
@@ -643,9 +667,16 @@ written back by hand with esptool, at address `0x0`, after its checksum has been
 
 What a program on this Mac cannot establish: what the LEDs show, and what a device joined to
 the board's Wi-Fi network gets. Each step says what to do and what must be seen. The number
-in brackets is the criterion of Requirement 16 of
-`docs/specs/04-p1-firmware-build-with-the-player/requirements.md` the step covers. The seed
-is completed when all four are done.
+in brackets is the criterion the step covers: in steps 1 to 4 a criterion of Requirement 16
+of `docs/specs/04-p1-firmware-build-with-the-player/requirements.md`, and in steps 5 and 6,
+marked `seed 05`, criterion 3 of Requirement 18 of
+`docs/specs/05-p0-canvas-60-by-60/requirements.md`.
+
+Seed 04 is completed when steps 1 to 4 are done. Steps 5 and 6 stay listed as open and do
+not hold seed 05 open; criterion 4 of that Requirement 18 says so. What holds seed 05 open
+is not for eyes: the board does not reach 49 refreshes a second with a dense 60 x 60 clip,
+and the board tests with the target file have not run. See
+[Verified on the board](#verified-on-the-board).
 
 1. **The show plays from power-on (16.1).** Install the example show at the brightness
    chosen for the power supply in use; one strip fed from the board's 3.3 V pin allows 40
@@ -663,21 +694,104 @@ is completed when all four are done.
    network, open `http://4.3.2.1/`. *Seen:* WLED's interface opens, and its Info page shows
    the entries `odrig show` with `ok`, `odrig outputs` with `2/2` for two legs, and
    `odrig start`.
+5. **A strip on the parallel driver shows its picture (seed 05, 18.3).** The one wired
+   strip is on pin 1, and pin 1 is the first leg of both tracked mapping files: one of the
+   four RMT outputs. The mapping below has twenty legs of one row of 60 and lists the leg
+   on pin 1 last. That makes pin 1 the twentieth output, the sixteenth lane of the parallel
+   driver. Save it as `build/lane/mapping.json`:
 
-Before ten legs are lit, raise WLED's maximum current as [What the firmware
+   ```json
+   {
+     "version": 1,
+     "width": 60,
+     "legs": [
+       {"leg": 2, "pin": 2, "first_led": "right", "rows": [20]},
+       {"leg": 3, "pin": 3, "first_led": "right", "rows": [19]},
+       {"leg": 4, "pin": 4, "first_led": "right", "rows": [18]},
+       {"leg": 5, "pin": 5, "first_led": "right", "rows": [17]},
+       {"leg": 6, "pin": 6, "first_led": "right", "rows": [16]},
+       {"leg": 7, "pin": 7, "first_led": "right", "rows": [15]},
+       {"leg": 8, "pin": 8, "first_led": "right", "rows": [14]},
+       {"leg": 9, "pin": 9, "first_led": "right", "rows": [13]},
+       {"leg": 10, "pin": 10, "first_led": "right", "rows": [12]},
+       {"leg": 11, "pin": 11, "first_led": "right", "rows": [11]},
+       {"leg": 12, "pin": 12, "first_led": "right", "rows": [10]},
+       {"leg": 13, "pin": 13, "first_led": "right", "rows": [9]},
+       {"leg": 14, "pin": 14, "first_led": "right", "rows": [7]},
+       {"leg": 15, "pin": 15, "first_led": "right", "rows": [6]},
+       {"leg": 16, "pin": 16, "first_led": "right", "rows": [5]},
+       {"leg": 17, "pin": 17, "first_led": "right", "rows": [4]},
+       {"leg": 18, "pin": 18, "first_led": "right", "rows": [3]},
+       {"leg": 19, "pin": 21, "first_led": "right", "rows": [2]},
+       {"leg": 20, "pin": 47, "first_led": "right", "rows": [1]},
+       {"leg": 1, "pin": 1, "first_led": "right", "rows": [8]}
+     ]
+   }
+   ```
+
+   Its canvas is 60 x 20. Write Hello world for it, pack it at brightness 32 and install
+   it:
+
+   ```
+   mkdir -p build/lane/sources
+   python -m odrig.generators.hello_world build/lane/sources/hello.json --mapping build/lane/mapping.json
+   printf '{"version": 1, "brightness": 32, "items": [{"id": 1, "file": "hello.odrg"}], "start": 1}\n' > build/lane/show.json
+   python -m odrig pack --show build/lane/show.json --mapping build/lane/mapping.json \
+       --sources build/lane/sources --out build/lane/show
+   python3 firmware/fw.py install-show build/lane/show
+   ```
+
+   The leg on pin 1 has the row y = 8, the bottom row of the letters, and its first LED is
+   the right end of that row. *Seen:* the strip shows that row. Read from the end away from
+   the board to the wired end, these of its 60 LEDs are lit, `X`, and these are dark, `.`:
+
+   ```
+   ...X..X.XXXX.XXXX.XXXX..XX.....X...X..XX..X..X.XXXX.XXX.....
+   ```
+
+   The lit LEDs glow faintly, and their colours move along the strip towards the wired
+   end: the limiter counts the 1,200 LEDs of this mapping and holds every LED at its lowest
+   level. `python -m emulator build/lane/show` shows the same row on its page, as the row
+   of leg 1. Afterwards install the example show again, as in step 1.
+6. **Twenty wired legs show the demo show (seed 05, 18.3).** With the twenty legs of the
+   target wired as [mapping.md](mapping.md) has them, and WLED's maximum current raised to
+   what the power supply gives, pack the demo show with the commands of
+   [emulator.md](emulator.md), "Two shows to run", giving `pack` a copy of
+   `shows/demo-20/show.json` that has the brightness chosen for the power supply. Install
+   it with `python3 firmware/fw.py install-show build/demo-20/show`, switch the board's
+   power off and on and send no command. *Seen:* the words HELLO WORLD stand upright in the middle of
+   the canvas, in the rows 28 to 33, readable from left to right across the legs 2 to 19.
+   After 15 seconds a square of four LEDs takes their place and runs along the diagonal,
+   from the top-left corner to the bottom-right one and back, over every one of the twenty
+   legs. The two take turns every 15 seconds.
+   `python -m odrigctl --port /dev/cu.usbmodem101 status` reports `"playing":3` and
+   `"error":null`, and WLED's Info page shows `odrig outputs` with `20/20`. The `fps` of
+   that reply is worth writing down: the rate of the demo show on the board has not been
+   measured.
+
+Before twenty legs are lit, raise WLED's maximum current as [What the firmware
 does](#what-the-firmware-does) says.
 
 What a program established without the owner, over USB: the board plays the installed show
 from its start with no command sent, as `status` reports `playing` 3 after every restart;
 the outputs hold the bytes the emulator records for the same show; `status` reports 49 or
 more with the example show, with one strip wired; WLED reports its access point as up; and
-the tests of `test-air` that send commands pass against the emulator. The four steps above
-have not been done.
+the tests of `test-air` that send commands pass against the emulator. For steps 5 and 6:
+with twenty legs in the mapping the firmware makes twenty working outputs, each of the
+twenty pins carries 24 pulses for every LED of a refresh, and the parallel driver is busy
+after a send for the time its LEDs take on the wire. That the pulses have the right widths,
+and that an LED on a lane of the parallel driver lights, no program can see. The six steps
+above have not been done.
 
 ## Verified on the board
 
 What the design assumed and an early task then tried, on this Mac and on the board. The
 letters are those of the design's table "Assumed, to be verified by an early task".
+
+The first part, down to "Twenty outputs", is the record of seed 04. It was tried with the
+firmware of that seed, before the target became twenty upright legs: on the bench file,
+and on mappings of ten row legs on pins 1 to 10, with a dense 60 x 30 clip. From "Twenty
+outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60.
 
 | # | Assumption | What was found |
 |---|---|---|
@@ -724,8 +838,8 @@ The outputs and playback, tried with the probe build and with the firmware:
   recorded for its leg: at the brightness 40, 32 and 1 of the show file, after every
   `brightness` command from 0 to 40, and after `off` and `on`. The limiter did not dim
   these pictures.
-- **Ten outputs.** On a ten-leg mapping of 18 LEDs for each leg, pins 1 to 10, all ten
-  outputs, four `rmt` and six `parallel`, held exactly their own leg's bytes. On a mapping
+- **Ten outputs.** On a mapping of ten row legs of 18 LEDs for each leg, pins 1 to 10, all
+  ten outputs, four `rmt` and six `parallel`, held exactly their own leg's bytes. On a mapping
   of ten row legs of three rows of 60 on the same pins, 180 LEDs for each leg, all ten
   outputs work and each holds what the limiter's lowest level makes of its own leg's
   bytes; `status` still reports the show's brightness.
@@ -736,21 +850,21 @@ The outputs and playback, tried with the probe build and with the firmware:
 - **Nothing else writes** to the outputs: `overwritten` stayed 0 over 30 seconds of the
   example show, `realtime` 1.
 - **The rate.** With the firmware `status` reported 49 or 50 in every one of ten seconds
-  for the dim example show, for the dense 60 x 30 clip on the ten-leg mapping, compressed
-  and uncompressed, and while `status` was asked five times a second.
+  for the dim example show, for the dense 60 x 30 clip on ten row legs, compressed and
+  uncompressed, and while `status` was asked five times a second.
 
 Measured with the probe build over 25 seconds each, at brightness 32:
 
 | Show | Start of the core | Passes of the loop a second | Refreshes a second | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Example show, two legs, 360 LEDs | 171 ms | 2,725 to 2,934 | 49 to 51 | 38 ms | 0.80 ms | 18.8 ms | 0.76 ms | 1.21 ms |
-| Dense 60 x 30 clip, compressed, ten legs, 1,800 LEDs | 3,105 ms | 359 to 475 | 49 to 51 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
-| Dense 60 x 30 clip, uncompressed, ten legs, 1,800 LEDs | 2,163 ms | 652 to 746 | 49 to 51 | 38 ms | 4.73 ms | 21.2 ms | 7.68 ms | 7.86 ms |
+| Dense 60 x 30 clip, compressed, ten row legs, 1,800 LEDs | 3,105 ms | 359 to 475 | 49 to 51 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
+| Dense 60 x 30 clip, uncompressed, ten row legs, 1,800 LEDs | 2,163 ms | 652 to 746 | 49 to 51 | 38 ms | 4.73 ms | 21.2 ms | 7.68 ms | 7.86 ms |
 
 A request for a refresh is the core's work for one frame: reading the next part of the
 file from storage, decoding it, and placing 1,800 LEDs. The long requests are the ones in
 which a file is opened or the file system goes on to another block; they delay one refresh
-and skip none or one. The sends on ten legs include the limiter's dimming of all 1,800
+and skip none or one. The sends on ten row legs include the limiter's dimming of all 1,800
 LEDs; without it a send is about half as long. With the first form of the loop, which
 asked the core only once the outputs were free, the probe build sent 46 to 49 refreshes of
 the compressed dense clip a second; see "Seed 04: Asking the core while the LEDs are still

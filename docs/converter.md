@@ -237,8 +237,8 @@ Builds the folder that is installed on the board and run by the emulator (see
   the sources folder as `encode` does. `--uncompressed` writes every one of them without
   compression.
 
-The example show plays Hello world and DVD bounce in turn, 15 seconds each. It is packed
-with the two-leg mapping:
+The example show plays Hello world and DVD bounce in turn, 15 seconds each. It is for
+today's build and is packed with the two-leg mapping:
 
 ```
 python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
@@ -246,6 +246,9 @@ python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.jso
 ```
 
 `build/example-show` then holds `mapping.json`, `show.json`, `hello.odrg` and `dvd.odrg`.
+The show for the target build of twenty legs, 60 x 60, is the demo show
+`shows/demo-20/show.json`; its sources are written by the generators, and
+[emulator.md](emulator.md), "Two shows to run", gives the commands.
 
 The output folder must be new or empty; otherwise `pack` refuses with `output-not-empty`.
 `pack` makes the folder, and the folders above it when they do not exist.
@@ -258,7 +261,8 @@ folder around it are left as they were.
 ## Generators
 
 A generator is a program that writes an animation as a JSON frames file. It takes the
-canvas size from a mapping file and needs only Python.
+canvas size from a mapping file of either kind, a row-leg file or a column-leg file, and
+needs only Python.
 
 ```
 python -m odrig.generators.hello_world OUT.json --mapping MAPPING
@@ -269,7 +273,7 @@ python -m odrig.generators.dense OUT.json --mapping MAPPING [--seconds N]
 | Generator | Animation |
 |---|---|
 | `hello_world` | The words HELLO WORLD, six rows high and 53 columns wide, centred on the canvas, with a rainbow that flows through the letters from left to right. 255 frames of 20 ms; after the last frame the rainbow is where it started. |
-| `dvd_bounce` | A 2 x 2 square that starts in the top-left corner, moves one pixel diagonally every 180 ms and turns back at every edge. Each of its pixels has the colour that a rainbow fixed to the canvas gives to that place. On the 60 x 6 canvas the loop has 232 frames. |
+| `dvd_bounce` | A 2 x 2 square that starts in the top-left corner, moves one pixel diagonally every 180 ms and turns back at every edge. Each of its pixels has the colour that a rainbow fixed to the canvas gives to that place. On the 60 x 6 canvas the loop has 232 frames. On a canvas as wide as it is high, such as the 60 x 60 of the target file, the square meets two edges at once and runs to and fro along one diagonal: 116 frames. |
 | `dense` | A full-colour test clip: every pixel is lit and changes at every 20 ms tick, and there are far more than 256 colours. `--seconds` gives its length in whole seconds, 10 by default. |
 
 The two tracked sources are the output of these generators for the two-leg mapping, byte

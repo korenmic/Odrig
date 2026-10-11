@@ -1,7 +1,9 @@
 # odrig
 
-LED animation system for a Midburn installation: ESP32-S3 boards driving a canvas of
-addressable LED strips.
+LED animation system for a Midburn installation: an ESP32-S3 board driving a canvas of
+addressable LED strips. The target is a canvas of 60 x 60 LEDs on twenty legs, each a data
+pin of the board with three upright strips of 60 LEDs; the build on the bench today has two
+legs of three flat strips, 60 x 6.
 
 ## Workstreams
 
@@ -11,7 +13,8 @@ addressable LED strips.
   the list of animations that can be triggered, the playback order, and what starts at
   power-on.
 - **Mapping** — the translation between canvas coordinates ((1,1) at the bottom-left LED) and
-  the physical LEDs: which data pin, and which position along that pin's snake of rows.
+  the physical LEDs: which data pin, and which position along that pin's snake of rows or of
+  columns.
 - **Animations** — the animations themselves and the code that generates them.
 - **Formats and conversion** — the defined file formats an animation passes through, from
   computer formats such as video to the format the board plays, and the tools that convert
@@ -29,9 +32,10 @@ Hardware and power wiring are not a workstream: they are handled on site by the 
 
 Decisions made so far, and the questions still open, are in [docs/decisions.md](docs/decisions.md).
 The animation file formats are specified in [docs/format.md](docs/format.md), the mapping
-between canvas coordinates and physical LEDs in [docs/mapping.md](docs/mapping.md), what a
-show is in [docs/show.md](docs/show.md), and the commands in
-[docs/commands.md](docs/commands.md). Wi-Fi is covered in [docs/wifi.md](docs/wifi.md) and
+between canvas coordinates and physical LEDs in [docs/mapping.md](docs/mapping.md), for legs
+of rows and legs of columns, with the bench build of two legs and the target build of
+twenty upright legs, 60 x 60. What a show is is specified in [docs/show.md](docs/show.md),
+and the commands in [docs/commands.md](docs/commands.md). Wi-Fi is covered in [docs/wifi.md](docs/wifi.md) and
 the first notes on the operators' app in [docs/android-app.md](docs/android-app.md). Planned
 work is in [project-seeds/](project-seeds/).
 
@@ -42,9 +46,10 @@ The core, the C++ library that plays those files on the board and in the emulato
 to build it, test it and host it, is described in [docs/core.md](docs/core.md).
 
 The emulator, the Mac program that runs the core on a packed show and draws the LEDs in a
-web page, and the command tool that talks to it and to the board, are described in
-[docs/emulator.md](docs/emulator.md).
+web page, the demo show for the target build, and the command tool that talks to the
+emulator and to the board, are described in [docs/emulator.md](docs/emulator.md).
 
-The firmware, the WLED build that hosts the core on the board, and the tool that builds it,
-flashes it, installs a show and restores stock WLED, are described in
-[docs/firmware.md](docs/firmware.md).
+The firmware, the WLED build that hosts the core on the board and drives one output for
+each of the twenty legs, and the tool that builds it, flashes it, installs a show and
+restores stock WLED, are described in [docs/firmware.md](docs/firmware.md), with what was
+measured on the board and what a person has still to check.

@@ -146,7 +146,8 @@ its LEDs: red, green and blue, in chain order, starting with the LED that is wir
 board. The host sends them to the leg's pin as they are.
 
 - Which canvas pixel an LED shows is the rule of [mapping.md](mapping.md), "Where each LED
-  is". The core reads the mapping file at startup; nothing else defines the layout.
+  is", for a leg of rows and for a leg of columns. The core reads the mapping file at
+  startup; nothing else defines the layout.
 - Brightness is already applied: a colour value v is given as
   `(v * brightness + 127) / 255`, rounded down. The host applies no brightness of its own.
 - Every byte is 0 while the show is invalid, nothing is playing, or the LEDs are switched

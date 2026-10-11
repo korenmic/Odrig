@@ -327,10 +327,17 @@ x=60  | 121 -------------------------------------------> 180 |
 
 - Legs 1 and 2 of today's build are confirmed on the hardware: an image drawn in canvas
   coordinates appears correctly across both.
-- The legs of the target build are not wired. The firmware makes twenty working outputs on
-  pins 1 to 18, 21 and 47, and every one of those pins carries the signal of a whole
-  refresh: measured on the board with one strip wired, on pin 1, see
-  [firmware.md](firmware.md), "Verified on the board". With that firmware LEDs on pins 2 to
-  18, 21 and 47 have not been seen.
-- Pin 3 is one of the chip's boot-mode pins. It is expected to work for LED data, and LEDs
-  on it have not been seen.
+- The legs of the target build are not wired: one strip of 60 LEDs is on the board, on
+  pin 1. With a mapping of twenty row legs on the pins of the target file, the firmware
+  makes twenty working outputs on pins 1 to 18, 21 and 47, four through WLED's RMT driver
+  and sixteen through its parallel driver, and every one of those pins carries the signal
+  of a whole refresh, 24 pulses for every LED: measured on the board, see
+  [firmware.md](firmware.md), "Verified on the board". The board tests that do the same
+  with the target file itself are written and have not run on the board.
+- With that firmware LEDs on pins 2 to 18, 21 and 47 have not been seen, and no LED has
+  been seen on a pin of the parallel driver. Pin 3 is one of the chip's boot-mode pins. It
+  is expected to work for LED data.
+- That leg 1 of the target build stands at the left and that every snake starts at the
+  bottom of its left column is how the owner's description was read. It has not been
+  compared with the installation. If the installation is wired another way, only
+  `mapping/legs-20.json` changes.

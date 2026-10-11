@@ -2,7 +2,8 @@ import re
 import subprocess
 import unittest
 
-from odrig import cli, errors
+from odrig import cli, errors, jsonframes, mapping, odrg
+from odrig.generators import dense
 
 from . import support
 
@@ -133,6 +134,130 @@ class TheTenLegFile(unittest.TestCase):
             if any(gone in name.encode("utf-8") or gone in content for gone in self.NAMES):
                 naming.append(name)
         self.assertEqual(len(naming), 0, "tracked files that name the ten-leg mapping or its demo show: " + ", ".join(naming))
+
+
+def paragraph(text, start):
+    """The paragraph of a text that begins with these words, with its line breaks as spaces."""
+    return " ".join((start + text.split("\n" + start)[1].split("\n\n")[0]).split())
+
+
+class MeasuredSizes(unittest.TestCase):
+    """The row of the dense clip at 60 x 60 in the table of measured sizes of the format
+    document, and what that document and the decisions say fits into the board's storage."""
+
+    STARTS = "**What fits.**"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.section = (DOCS / "format.md").read_text(encoding="utf-8").split("\n## Measured sizes\n")[1]
+        cls.rows = re.findall(r"(?m)^\| (.+?) \| ([0-9]+) x ([0-9]+) \| ([0-9,]+) \| ([0-9,]+) \| ([0-9,]+) \|$", cls.section)
+        cls.frames, cls.plain, cls.compressed = (int(number.replace(",", "")) for number in cls.rows[-1][3:])
+        cls.fits = paragraph(cls.section, cls.STARTS)
+
+    def test_the_last_row_is_the_dense_clip_at_60_by_60_with_the_sizes_the_converter_gives(self):
+        self.assertEqual(self.rows[-1][:3], ("Dense full-colour, 10 s", "60", "60"))
+        canvas = mapping.read(support.ROOT / "mapping" / "legs-20.json")
+        self.assertEqual((canvas.width, canvas.height), (60, 60))
+        animation = jsonframes.Animation(canvas.width, canvas.height, tuple(dense.frames(canvas.width, canvas.height, 10)))
+        self.assertEqual(self.frames, len(odrg.decode(odrg.encode(animation, compressed=False)).records))
+        self.assertEqual(self.plain, len(odrg.encode(animation, compressed=False)))
+        # A compressed size depends on the version of zlib.
+        compressed = len(odrg.encode(animation, compressed=True))
+        self.assertLessEqual(abs(compressed - self.compressed) * 100, 2 * self.compressed, compressed)
+
+    def test_the_document_says_which_rows_the_prototype_measured_and_which_the_converter(self):
+        self.assertEqual(sum(row[:3] == ("Dense full-colour, 10 s", "60", "60") for row in self.rows), 1)
+        text = " ".join(self.section.split())
+        self.assertIn("prototype of the frame coder", text)
+        self.assertIn("The last row was measured with the converter of this repository", text)
+        self.assertIn("`mapping/legs-20.json`", text)
+        self.assertIn("zlib 1.2.12", text)
+
+    def test_it_points_to_the_measurements_on_the_board(self):
+        self.assertNotIn("not yet been run", " ".join(self.section.split()))
+        self.assertRegex(self.section, r"\[firmware\.md\]\(firmware\.md\),\s+\"Measurements\s+on\s+the\s+board\"")
+
+    def test_what_fits_follows_from_the_sizes_of_the_row_and_the_two_sizes_of_storage(self):
+        firmware = (DOCS / "firmware.md").read_text(encoding="utf-8")
+        partition, played = 0x9E0000, 9001905
+        self.assertIn("| Storage (`spiffs`) | `0x610000` | `0x9E0000` |", firmware)
+        self.assertIn(f"| {played:,} bytes |", firmware)
+        self.assertIn(f"{partition:,} bytes", self.fits)
+        self.assertIn(f"{played:,} bytes", self.fits)
+        # A picture that nothing predicts is a stored frame record, one for each 20 ms.
+        stored = 5 + 3 * 60 * 60
+        self.assertIn(f"{stored:,} bytes for each 20 ms", self.fits)
+        for what, ten_seconds in (("compressed", self.compressed), ("uncompressed", self.plain), ("stored frame by frame", 500 * stored)):
+            least, most = played * 10 // ten_seconds, partition * 10 // ten_seconds
+            self.assertIn(f"{least} to {most} seconds", self.fits, what)
+            self.assertRegex(self.fits, rf"{least} to {most} seconds [^.;,]*{what}", what)
+
+    def test_the_decisions_state_what_fits_in_the_same_words(self):
+        decisions = (DOCS / "decisions.md").read_text(encoding="utf-8")
+        measured = decisions.split("\n### Measurements behind the choice\n")[1].split("\n## ")[0]
+        self.assertEqual(paragraph(measured, "- " + self.STARTS)[2:], self.fits)
+        self.assertNotIn("noisy", measured)
+
+
+class TheTarget(unittest.TestCase):
+    """No document presents a canvas of 60 x 30, ten legs or 1,800 LEDs as what is built.
+
+    A document may still hold what was measured on ten row legs. Such a record says so
+    itself: it stands in a section that has the words of MARK, at or before the paragraph
+    that names what was measured. A section is the text from one heading to the next, and
+    a paragraph ends at an empty line. The seeds, the specs, the drifts and the change log
+    of the decisions keep what they recorded."""
+
+    MARK = "before the target became twenty upright legs"
+    GIVEN_UP = re.compile(r"60 ?x ?30|\b(?:ten|10)[- ]legs?\b|\b(?:ten|10) outputs\b|1,800 (?:LEDs|mA)|\blegs [23] to 10\b|\bpins [123] to 10\b|\b30 rows\b", re.IGNORECASE)
+    RECORDS = ("project-seeds/", "docs/specs/", "docs/drifts.md")
+    DECISIONS = "docs/decisions.md"
+    CHANGE_LOG = "\n## Change log\n"
+
+    @classmethod
+    def documents(cls):
+        listed = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=support.ROOT, capture_output=True, check=True).stdout
+        for name in sorted(name for name in listed.decode("utf-8").split("\0") if name and not name.startswith(cls.RECORDS)):
+            text = (support.ROOT / name).read_text(encoding="utf-8")
+            yield name, text.split(cls.CHANGE_LOG)[0] if name == cls.DECISIONS else text
+
+    @classmethod
+    def unmarked(cls, text):
+        """The lines of a text that name what was given up outside a record."""
+        found = {}
+        for section in re.split(r"(?m)^(?=#+ )", text):
+            for mention in cls.GIVEN_UP.finditer(section):
+                end = section.find("\n\n", mention.end())
+                if cls.MARK not in " ".join(section[:end if end >= 0 else len(section)].split()):
+                    found[section[section.rfind("\n", 0, mention.start()) + 1:].split("\n")[0].strip()] = True
+        return list(found)
+
+    def test_the_rule_tells_a_record_from_a_statement(self):
+        record = f"## Measured\n\nTaken {self.MARK}, on ten row legs.\n\n| Dense 60 x 30 clip, 1,800 LEDs |\n\nTen outputs work.\n"
+        self.assertEqual(self.unmarked(record), [])
+        self.assertEqual(self.unmarked(record + "\n## The page\n\nAll ten legs are drawn.\n"), ["All ten legs are drawn."])
+        self.assertEqual(self.unmarked(f"## Measured\n\nA 60 x 30 canvas.\n\nTaken {self.MARK}.\n"), ["A 60 x 30 canvas."])
+        self.assertEqual(self.unmarked(f"## Tried\n\n- It held the rate on a 60 x 30 matrix,\n  the target's size {self.MARK}.\n"), [])
+        for statement in ("the 60x30 canvas", "the ten-leg mapping", "10 legs", "on ten outputs", "placing 1,800 LEDs", "1,800 mA at rest", "Legs 3 to 10", "pins 1 to 10", "all 30 rows"):
+            self.assertEqual(self.unmarked(f"## Now\n\nIt has {statement}.\n"), [f"It has {statement}."], statement)
+        for statement in ("ten row legs of three rows of 60", "ten seconds", "60 x 60", "twenty legs", "pins 1 to 18", "a 60 x 6 canvas"):
+            self.assertEqual(self.unmarked(f"## Now\n\nIt has {statement}.\n"), [], statement)
+
+    def test_no_document_names_what_was_given_up_outside_a_record(self):
+        documents = dict(self.documents())
+        self.assertLessEqual({"README.md", "docs/emulator.md", "docs/firmware.md", "docs/format.md", "docs/mapping.md", self.DECISIONS}, set(documents))
+        self.assertIn(self.CHANGE_LOG, (support.ROOT / self.DECISIONS).read_text(encoding="utf-8"))
+        found = [f"{name}: {line[:90]}" for name, text in documents.items() for line in self.unmarked(text)]
+        self.assertEqual(len(found), 0, "documents that name a 60 x 30 canvas, ten legs or 1,800 LEDs outside a record:\n" + "\n".join(found))
+
+    def test_the_documents_that_name_the_target_name_60_by_60_on_twenty_legs(self):
+        documents = dict(self.documents())
+        canvas = " ".join(documents[self.DECISIONS].split("\n## Canvas and coordinates\n")[1].split("\n## ")[0].split())
+        for phrase in ("Target: a 60 x 60 canvas, 3,600 LEDs, on twenty legs", "row legs", "column legs", "`mapping/legs-20.json`", "`mapping/legs-2.json`"):
+            self.assertIn(phrase, canvas)
+        self.assertIn("\n## Target build: 20 legs, 60 x 60\n", documents["docs/mapping.md"])
+        self.assertIn("snake of rows or of columns", " ".join(documents["README.md"].split()))
+        self.assertIn("twenty upright legs, 60 x 60", " ".join(documents["README.md"].split()))
 
 
 if __name__ == "__main__":

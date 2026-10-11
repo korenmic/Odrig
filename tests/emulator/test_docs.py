@@ -13,11 +13,27 @@ from odrig import odrg
 from odrigctl import cli
 
 from . import support
+from .test_layout import dump, meetings
 
 DOCUMENT = support.ROOT / "docs" / "emulator.md"
+SPECS = support.ROOT / "docs" / "specs"
 
-# The criteria that a person, or a tool that drives a browser, checks by looking at the page.
+# The criteria that a person, or a tool that drives a browser, checks by looking at the
+# page: those of the emulator's requirements, and those of the requirements of the 60 x 60
+# canvas, which the check list marks with the name of their seed.
 BY_EYE = ("4.2", "4.6", "4.8", "4.9", "8.1", "8.4", "9.1", "9.5", "9.8", "10.1", "14.5")
+BY_EYE_ON_THE_TARGET = ("8.2", "8.6", "8.9", "9.2", "9.3", "9.4", "9.5", "9.8", "9.9", "10.1")
+MARK_OF_THE_TARGET = "seed 05"
+
+
+def criteria(listed):
+    """The criteria a sentence of a requirements file names, as "8.2": it lists them as
+    "Requirement 8 criteria 2, 6 and 9" and a run of them as "criteria 2 to 5"."""
+    named = set()
+    for number, numbers in re.findall(r"Requirement ([0-9]+)\s+criteri(?:a|on)\s+((?:[0-9]+|to|and|,|\s)+)", listed):
+        numbers = re.sub(r"([0-9]+)\s+to\s+([0-9]+)", lambda run: " ".join(map(str, range(int(run.group(1)), int(run.group(2)) + 1))), numbers)
+        named |= {f"{number}.{criterion}" for criterion in re.findall(r"[0-9]+", numbers)}
+    return named
 
 
 def section(text, heading):
@@ -159,24 +175,69 @@ class EmulatorDocument(unittest.TestCase):
             self.assertRegex(text, rf"(?m)^\| {status} \| ")
         self.assertIn("error: <reason>: <detail>", text)
 
+    def test_it_describes_both_views_for_both_kinds_of_leg(self):
+        leds = " ".join(self.text.split("\n### The LEDs view\n")[1].split("\n### ")[0].split())
+        for phrase in ("**Row legs**", "**Column legs**", "feed edge", "leg band", "bracket", "written upright", "9 pixels or more", "twenty colours"):
+            self.assertIn(phrase, leds)
+        wired = " ".join(self.text.split("\n### The mapping view\n")[1].split("\n## ")[0].split())
+        for phrase in ("**Row legs.**", "**Column legs.**", "level channel", "upright channel", "*Wide: the board beside the canvas.*", "*Narrow: the board below the canvas.*",
+                       "*Level tracks.*", "*Upright tracks of the left row of pads*", "The short way", "The long way", "far edge", "turned over from top to bottom",
+                       "**The snake of a leg**", "arrow head", "a bar"):
+            self.assertIn(phrase, wired)
+
+    def test_the_crossings_it_counts_for_the_target_file_are_those_of_the_lines_the_page_draws(self):
+        wired = " ".join(self.text.split("\n### The mapping view\n")[1].split("\n## ")[0].split())
+        counted = re.search(r"the lines of the target file cross ([0-9]+) times, in both arrangements", wired)
+        self.assertIsNotNone(counted)
+        arrangements = set()
+        for mapped in dump(support.TARGET.read_text(encoding="utf-8"), areas=[[1280, 546], [756, 627]])["mapped"]:
+            wires = mapped["wires"]
+            crossings = [meetings(first["points"], second["points"])[0] for index, first in enumerate(wires) for second in wires[index + 1:]]
+            self.assertEqual(sum(crossings), int(counted.group(1)), mapped["fit"]["arrangement"])
+            self.assertLessEqual(max(crossings), 1)
+            arrangements.add(mapped["fit"]["arrangement"])
+        self.assertEqual(arrangements, {"wide", "narrow"})
+
+    def test_the_sizes_it_gives_for_the_target_file_are_those_of_the_layout_script(self):
+        wired = self.text.split("\n### The mapping view\n")[1].split("\n## ")[0]
+        rows = re.findall(r"(?m)^\| ([0-9]+) x ([0-9]+) \| cells of ([0-9]+), (with|without) the LED numbers \| (wide|narrow), cells of ([0-9]+), the drawing ([0-9]+) x ([0-9]+) \|$", wired)
+        areas = [[int(width), int(height)] for width, height, *_ in rows]
+        self.assertLessEqual({(1280, 546), (756, 627)}, set(map(tuple, areas)))
+        self.assertIn("1280 x 546 of a window of 1280 x 800", " ".join(wired.split()))
+        self.assertIn("756 x 627 of a window of 756 x 900", " ".join(wired.split()))
+        dumped = dump(support.TARGET.read_text(encoding="utf-8"), areas=areas)
+        for row, fitted, mapped in zip(rows, dumped["fits"], dumped["mapped"]):
+            f = mapped["fit"]
+            found = (str(fitted["cell"]), "with" if fitted["numberTop"] else "without", f["arrangement"], str(f["cell"]), str(f["content"]["width"]), str(f["content"]["height"]))
+            self.assertEqual(found, row[2:], row[:2])
+        f = dumped["mapped"][0]["fit"]
+        text = " ".join(wired.split())
+        self.assertIn(f"the level channel is {f['level']['height']} pixels deep and the upright channel {f['upright']['width']} pixels wide", text)
+        self.assertIn(f"the number bands are {f['numberTop']['height']} pixels high", text)
+
     def test_its_check_list_has_a_numbered_step_for_every_criterion_that_needs_eyes(self):
         text = section(self.text, "The check list by eye")
-        steps = re.findall(r"(?m)^([0-9]+)\. \*\*(.+?) \(([0-9]+\.[0-9]+)\)\.\*\*", text)
-        self.assertEqual([int(number) for number, _, _ in steps], list(range(1, len(steps) + 1)))
-        self.assertEqual({criterion for _, _, criterion in steps}, set(BY_EYE))
-        self.assertGreaterEqual(len(steps), len(BY_EYE))
-        bodies = re.split(r"(?m)^[0-9]+\. \*\*", text)[1:]
+        steps = re.findall(rf"(?m)^([0-9]+)\. \*\*(.+?) \(({MARK_OF_THE_TARGET}, )?([0-9]+\.[0-9]+)\)\.\*\*", text)
+        self.assertEqual([int(number) for number, _, _, _ in steps], list(range(1, len(steps) + 1)))
+        self.assertEqual({criterion for _, _, marked, criterion in steps if not marked}, set(BY_EYE))
+        self.assertEqual({criterion for _, _, marked, criterion in steps if marked}, set(BY_EYE_ON_THE_TARGET))
+        bodies = re.split(r"(?m)^[0-9]+\. \*\*", text.split("\n### ")[0])[1:]
         self.assertEqual(len(bodies), len(steps))
         for body in bodies:
-            self.assertIn("*Seen:*", body)
-        for phrase in ("Safari", "Chrome", "1280 x 800", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "file-missing dvd.odrg"):
+            self.assertEqual(body.count("*Seen:*"), 1, body[:60])
+        for phrase in ("Safari", "Chrome", "1280 x 800", "756 x 900", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "file-missing dvd.odrg",
+                       "docs/specs/03-p0-emulator/requirements.md", "docs/specs/05-p0-canvas-60-by-60/requirements.md"):
             self.assertIn(phrase, text)
-        requirements = (support.ROOT / "docs" / "specs" / "03-p0-emulator" / "requirements.md").read_text(encoding="utf-8")
-        listed = requirements.split("each to be checked in Safari and in\n   Chrome:")[1].split("\n\n")[0]
-        named = set()
-        for number, criteria in re.findall(r"Requirement ([0-9]+)\s+criteri(?:a|on)\s+([0-9, and\n]+)", listed):
-            named |= {f"{number}.{criterion}" for criterion in re.findall(r"[0-9]+", criteria)}
-        self.assertEqual(named, set(BY_EYE))
+        requirements = (SPECS / "03-p0-emulator" / "requirements.md").read_text(encoding="utf-8")
+        self.assertEqual(criteria(requirements.split("each to be checked in Safari and in\n   Chrome:")[1].split("\n\n")[0]), set(BY_EYE))
+        requirements = (SPECS / "05-p0-canvas-60-by-60" / "requirements.md").read_text(encoding="utf-8")
+        asked = requirements.split("\n## Requirement 18:")[1].split("\n1. ")[1].split("\n2. ")[0]
+        self.assertEqual(criteria(asked), set(BY_EYE_ON_THE_TARGET))
+
+    def test_it_says_what_was_checked_how_and_what_is_left_for_a_person(self):
+        checked = " ".join(section(self.text, "The check list by eye").split("\n### What has been checked\n")[1].split())
+        for phrase in ("Chrome", "headless", "1280 x 800", "756 x 900", "screenshots", "`build/", "`page`", "Safari", "A person at a screen"):
+            self.assertIn(phrase, checked)
 
 
 class DocumentedShows(unittest.TestCase):

@@ -32,16 +32,23 @@ it stands now.
 ## Canvas and coordinates
 
 - The canvas is 60 columns wide. A **leg** is one data pin of the board together with the
-  three 60-LED rows wired to it as a snake (180 LEDs).
-- Leg N uses the pin labelled N. Leg 1 holds the top three rows and each following leg holds
-  the three rows below the previous one. Every leg's chain starts at the right end of its
-  top row.
-- Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
+  three strips of 60 LEDs wired to it as a snake (180 LEDs). Legs are not chained to each
+  other.
+- A strip lies flat or stands upright, so it is a row or a column of the canvas. The
+  mapping file format has both kinds of leg: row legs, whose strips are rows, and column
+  legs, whose strips are columns. All legs of one mapping file are of one kind.
+- Leg N uses the pin labelled N, except legs 19 and 20, which use pins 21 and 47: the pins
+  labelled 19 and 20 carry the board's USB connection.
+- The bench build, today's: 2 row legs, a 60 x 6 canvas, 360 LEDs, confirmed working. Leg 1
+  holds the top three rows and leg 2 the three rows below them, and each chain starts at
+  the right end of its top row. Its mapping file is `mapping/legs-2.json`.
 - Target: a 60 x 60 canvas, 3,600 LEDs, on twenty legs. In the target the strips stand
-  upright: a leg is three columns of 60, and its snake starts at the bottom of its first
-  column. Leg 1 is the leftmost and starts at (1,1). The mapping file format, the mapping
-  files, the firmware's outputs, the demo show and everything else are brought to this target
-  by seed 05.
+  upright: its legs are column legs, each three columns of 60, and each snake starts at the
+  bottom of its first column. Leg 1 is the leftmost and starts at (1,1), and each following
+  leg holds the three columns to the right of the previous one. Its mapping file is
+  `mapping/legs-20.json`. The mapping file format, the core, the emulator, the demo show
+  and the firmware's twenty outputs are at this target; what is not yet reached on the
+  board is under [Open questions](#open-questions).
 - The mapping is defined by the files in `mapping/` and described in
   [mapping.md](mapping.md). The board and the emulator both read the installed mapping file
   at runtime; it is the only definition of the layout.
@@ -66,6 +73,10 @@ it stands now.
   runtime format needs a custom WLED build with our player added.
 - In the custom build WLED is the platform: LED output, storage and Wi-Fi. Playback and
   commands belong to the shared core, and the USB serial port carries the core's commands.
+- One board drives all twenty legs of the target: four through WLED's RMT driver and
+  sixteen through its parallel driver. Stock WLED drives twelve outputs on this chip, so
+  the build applies one patch to WLED's source, kept as a patch file. See
+  [firmware.md](firmware.md), "What the firmware changes in WLED".
 
 ## Conversion
 
@@ -92,7 +103,10 @@ Both formats are specified in [format.md](format.md). The custom binary format i
 
 Sizes in bytes of the same animations in each format. Every lossless file was decoded back
 and matched the original frames exactly. The dense clip is synthetic (a smooth full-colour
-field, every LED lit, 10 seconds). Nothing here was measured on the board.
+field, every LED lit, 10 seconds). Nothing here was measured on the board. The formats were
+compared before the target became twenty upright legs, when it was 60 x 30, and the table
+keeps the clip of that size; the sizes of the chosen format on the target of today, 60 x 60,
+are in [format.md](format.md), "Measured sizes".
 
 | Format | DVD bounce | Hello world | Square ping-pong | Dense 60x30, 10 s |
 |---|---:|---:|---:|---:|
@@ -108,8 +122,14 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   using a palette when the animation has at most 256 colours. "With deflate" wraps that
   stream in deflate with a 32 KB window.
 - Schemes that only store changed pixels or runs stayed at raw size on dense content.
-- The board has about 10 MB of file storage. That holds roughly 130 to 140 seconds of the
-  dense 60x30 clip in the custom format, and about 78 seconds when the content is noisy.
+- **What fits.** The board's storage partition has 10,354,688 bytes, and 9,001,905 bytes of
+  animations have been installed in it and played. A dense 60 x 60 clip takes 138,377 bytes
+  for a second compressed and 146,224 uncompressed, so storage holds 65 to 74 seconds of it
+  compressed and 61 to 70 seconds uncompressed: the first figure of each pair is what has
+  been shown to fit, the second what the whole partition would hold. A picture that nothing
+  predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
+  canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
+  changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.
 
 ## Commands
 
@@ -134,7 +154,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Commands reach it through a virtual serial port, so the serial tools that talk to the board
   work against it unchanged, and over HTTP, which stands in for the board's Wi-Fi.
 - Its page shows each command as it arrives, and a mapping view: the board and its pins, the
-  line from each pin to its leg, and each leg's snake through its three rows.
+  line from each pin to its leg, and each leg's snake through its three strips, rows or
+  columns.
 - It draws the physical LEDs in a web view: it takes what the player sends to each leg and
   places every LED using the tracked mapping file, so a wrong mapping is visible.
 - It has no size setting of its own. The canvas size comes from the mapping file, the same
@@ -147,33 +168,36 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   real time, does not expose the USB serial console that carries commands, and the firmware
   panics intermittently when its web interface is polled.
 - FastLED's browser compiler was tried and is not used. It held 50 frames per second on a
-  60 x 30 matrix, but it has no command input and needs about 4.4 GB of toolchain. The
-  native Mac emulator makes it unnecessary.
+  60 x 30 matrix, the size of the target at the time, before the target became twenty
+  upright legs. It has no command input and needs about 4.4 GB of toolchain. The native Mac
+  emulator makes it unnecessary.
 
 ## Open questions
 
-- Whether large video-derived JSON sources are tracked as they are (the dense clip is 7 MB of
-  JSON per 10 seconds).
-- Decode speed of the custom format on the board at 50 frames per second for 1,800 LEDs.
-  Measured on the board on 2026-10-11, with the dense 60 x 30 clip on the ten-leg mapping:
-  the core's work for one frame, reading from storage, decoding and placing 1,800 LEDs,
-  takes 6.6 ms on average for the compressed file and 4.7 ms for the uncompressed one, and
-  the board reports 49 or 50 refreshes in every second for both. The compressed format is
-  fast enough; the uncompressed one is not needed for speed. What stays open is the time at
-  power-on: every file is checked by decoding it, which takes 3.1 seconds for one dense
-  clip of 10 seconds and 38 seconds for 9 MB of them, with the LEDs dark meanwhile. See
-  [firmware.md](firmware.md), "Measurements on the board".
-- Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
-  hardware. Measured on the board on 2026-10-11: the firmware makes ten outputs on pins 1
-  to 10 from the ten-leg mapping, four through WLED's RMT driver and six through its
-  parallel driver, all ten report as working, each holds its own leg's data, and a refresh
-  of all ten is sent in 7.7 ms, 50 times a second. What stays open until ten legs are
-  wired: that LEDs light on pins 2 to 10, pin 3 being one of the chip's boot-mode pins and
-  six legs being on the parallel driver, which no LED of this project has been on; and the
-  current. WLED's current limiter counts 1,800 mA for 1,800 LEDs at rest, so with WLED's
-  maximum of 850 mA it holds ten legs at their lowest level until that maximum is raised in
-  WLED's LED settings to what the power supply gives.
-
+- Whether large video-derived JSON sources are tracked as they are (the dense 60 x 60 clip
+  is 16 MB of JSON per 10 seconds).
+- Decode speed of the custom format on the board at 50 frames per second. Measured on the
+  board on 2026-10-11, before the target became twenty upright legs, with the firmware of
+  seed 04 and a dense 60 x 30 clip on ten row legs, 1,800 LEDs: the core's work for one
+  frame, reading from storage, decoding and placing every LED, takes 6.6 ms on average for
+  the compressed file and 4.7 ms for the uncompressed one, and the board reported 49 or 50
+  refreshes in every second for both. For the target, a dense 60 x 60 clip on twenty legs,
+  3,600 LEDs, the same work takes 12.3 ms for a compressed frame and 8.6 ms for an
+  uncompressed one, and beside the send to twenty outputs that is too slow for 50 frames
+  per second: the figures are in the entry on the rate below. What also stays open is the
+  time at power-on: every file is checked by decoding it, which takes 6.0 seconds for one
+  dense 60 x 60 clip of 10 seconds, 4.2 seconds for the same clip uncompressed, and took 38
+  seconds for 9 MB of dense 60 x 30 clips, with the LEDs dark meanwhile. See
+  [firmware.md](firmware.md), "Measurements on the board" and "Verified on the board".
+- Twenty wired legs. One strip is wired, on pin 1; the other legs of the target are not
+  wired. What stays open until twenty legs are wired: that LEDs light on pins 2 to 18, 21
+  and 47, pin 3 being one of the chip's boot-mode pins and sixteen of the twenty legs
+  being on WLED's parallel driver, which no LED of this project has been on; that the
+  picture stands on the installation as the mapping file has it, leg 1 at the left with its
+  first LED at the bottom; and the current. WLED's current limiter counts 3,600 mA for
+  3,600 LEDs at rest, so with WLED's maximum of 850 mA it holds twenty legs at their lowest
+  level until that maximum is raised in WLED's LED settings to what the power supply
+  gives. The owner's checks 5 and 6 of [firmware.md](firmware.md) are the steps.
 - Whether one board can drive twenty LED outputs. Stock WLED drives twelve on this chip;
   seed 05 tries for twenty and reports. Measured on the board on 2026-10-11: with one
   patch to WLED the firmware makes twenty working outputs, four through WLED's RMT driver
@@ -235,3 +259,12 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - 2026-10-11: The firmware of seed 04 measured on the board. The two open questions about
   the board, decode speed and ten outputs, have what was measured; what needs ten wired
   legs stays open.
+- 2026-10-12: Seed 05 brought the project to the target of twenty upright legs, 60 x 60.
+  The mapping file format has column legs beside row legs, `mapping/legs-20.json` and the
+  demo show `shows/demo-20` take the place of the ten-leg file and its show, the core, the
+  emulator and its page read both kinds, and with one patch to WLED the firmware makes
+  twenty outputs. Measured on the board: twenty working outputs, and a dense 60 x 60 clip
+  at 22 to 34 refreshes a second compressed and 32 to 45 uncompressed, below the 49 asked
+  for, so seed 05 stays in progress. What fits into storage is computed again for 60 x 60:
+  65 to 74 seconds of the dense clip. The open question about legs 3 to 10 is now the one
+  about twenty wired legs.
