@@ -2353,3 +2353,37 @@ the owner's to set for the power supply in use.
 
 **Resolution.** Seed 04 `tasks.md`, task 10, which stays open; `docs/firmware.md`, "The
 owner's checks".
+
+## Seed 05: Where leg 1 stands and where its snake begins
+
+**Question.** The owner said the strips of the target stand upright and each snake begins at
+the bottom, but not which leg is leftmost or which of a leg's three columns comes first.
+
+**Answer.** Leg 1 is the leftmost leg and its snake begins at the bottom of its left column,
+so its first LED is the bottom-left LED of the canvas, (1,1), which is where the coordinates
+start. Legs are numbered left to right. The owner was shown this reading and has not yet
+confirmed it by eye.
+
+**Resolution.** Seed 05 `seed.md`, "Product Context" and Required Behavior 2. If the real
+installation differs, only `mapping/legs-20.json` changes.
+
+## Seed 05: Pins for legs 19 and 20
+
+**Question.** Leg N uses the pin labelled N, but pins 19 and 20 carry the USB connection.
+
+**Answer.** Leg 19 uses pin 21 and leg 20 uses pin 47. Both are free, are on the board's pin
+rows, and are not boot-mode pins.
+
+**Resolution.** Seed 05 `seed.md`, Required Behavior 2.
+
+## Seed 07: The form of the new commands
+
+**Question.** The owner approves every addition to the command list. The owner asked for
+commands for free space, the installed animations, removing and uploading, and was shown
+`space`, `list`, `remove <id>` and `upload begin` / `upload data` / `upload end` with their
+replies. The owner then ordered the seeds to proceed without commenting on the form.
+
+**Answer.** The commands take the form shown to the owner. Proceeding after seeing them is
+taken as approval.
+
+**Resolution.** Seed 07 `seed.md`, Required Behavior 1 to 5.
