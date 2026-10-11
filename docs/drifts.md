@@ -1470,3 +1470,34 @@ checking each byte written. A record asked for after the last one of the file is
 `truncated`. The functions keep the names and arguments the design gives them.
 
 **Resolution.** `core/src/odrg_decoder.h`, `core/src/odrg_decoder.cpp`.
+
+## Seed 02: Bytes outside ASCII in the JSON reader
+
+**Question.** The converter refuses a mapping or show file that is not UTF-8, and the core
+has to accept and refuse the same files. The design describes the core's JSON reader
+without saying whether it checks UTF-8.
+
+**Answer.** It does not need to. The reader refuses any byte of 128 or more at the place
+where it stands. Outside a string such a byte is not JSON. Inside a string it would be
+part of a member name, of `first_led` or of a file name, and none of those can hold it, so
+the converter refuses the file too, as not UTF-8 or as an unknown name or a wrong value.
+The verdict is the same in every case, and the suite compares it for hand-written texts
+and for 250 seeded copies with one character changed.
+
+**Resolution.** `core/src/json_reader.h`, `core/src/json_reader.cpp`;
+`tests/core/test_json.py`.
+
+## Seed 02: Lines of the test host that the design does not list
+
+**Question.** The design gives the lines `odrig_host session` prints at startup and for
+each input line. It has no line for the text the core passes to the host's `log` function,
+and nothing marks where the startup lines end and the answers begin, although both can
+start with `error`.
+
+**Answer.** The host prints `log <text>` for every diagnostic text, at the moment the core
+gives it, and `ready` after the last startup line. The guard's flag is declared in
+`tests/core/host/guard.h`, shared by the two source files of the host. The suite runs
+sessions side by side where a test needs hundreds of them.
+
+**Resolution.** `tests/core/host/host.cpp`, `tests/core/host/guard.h`;
+`tests/core/support.py`.

@@ -17,6 +17,7 @@ TESTS = ../tests/core
 SOURCES = $(wildcard src/*.cpp)
 HEADERS = $(wildcard src/*.h) $(wildcard include/*.h)
 HOST_SOURCES = $(wildcard $(TESTS)/host/*.cpp)
+HOST_HEADERS = $(wildcard $(TESTS)/host/*.h)
 
 OBJECTS = $(patsubst src/%.cpp,$(BUILD)/core/%.o,$(SOURCES))
 CHECKED_OBJECTS = $(patsubst src/%.cpp,$(BUILD)/checked/%.o,$(SOURCES))
@@ -47,7 +48,7 @@ $(BUILD)/checked/%.o: src/%.cpp $(HEADERS) Makefile
 	@mkdir -p $(dir $@)
 	$(CXX) $(CORE_FLAGS) $(SANITIZERS) -c $< -o $@
 
-$(BUILD)/host/%.o: $(TESTS)/host/%.cpp $(HEADERS) Makefile
+$(BUILD)/host/%.o: $(TESTS)/host/%.cpp $(HEADERS) $(HOST_HEADERS) Makefile
 	@mkdir -p $(dir $@)
 	$(CXX) $(HOST_FLAGS) -c $< -o $@
 

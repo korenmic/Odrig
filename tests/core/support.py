@@ -1,8 +1,13 @@
 """Helpers shared by the tests of the core: where things are and how the test host is run."""
 
 import collections
+import concurrent.futures
+import contextlib
+import json
+import os
 import pathlib
 import subprocess
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
@@ -108,3 +113,99 @@ def decode_each(files):
     if next(lines, None) is not None:
         raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
     return results
+
+
+# Mappings beyond the two tracked ones: a leg that starts on the left, legs of two and of
+# four rows, legs listed in another order than their numbers and their rows, and one LED.
+MADE_UP_MAPPINGS = {
+    "left-start": {"version": 1, "width": 7, "legs": [{"leg": 1, "pin": 4, "first_led": "left", "rows": [1, 2, 3]}]},
+    "two-and-four-rows": {
+        "version": 1,
+        "width": 5,
+        "legs": [
+            {"leg": 3, "pin": 9, "first_led": "right", "rows": [6, 5]},
+            {"leg": 1, "pin": 0, "first_led": "left", "rows": [4, 3, 2, 1]},
+        ],
+    },
+    "another-order": {
+        "version": 1,
+        "width": 4,
+        "legs": [
+            {"leg": 7, "pin": 12, "first_led": "left", "rows": [2, 4]},
+            {"leg": 2, "pin": 3, "first_led": "right", "rows": [1, 5, 3]},
+        ],
+    },
+    "one-led": {"version": 1, "width": 1, "legs": [{"leg": 255, "pin": 255, "first_led": "right", "rows": [1]}]},
+}
+
+
+def mapping_texts():
+    """Every mapping the suite plays on, by name: the tracked files and the made-up ones."""
+    texts = {path.stem: path.read_text(encoding="utf-8") for path in sorted((ROOT / "mapping").glob("*.json"))}
+    texts.update({name: json.dumps(mapping) for name, mapping in MADE_UP_MAPPINGS.items()})
+    return texts
+
+
+@contextlib.contextmanager
+def installed(files):
+    """A temporary folder that holds these files, given as a mapping from name to content."""
+    with tempfile.TemporaryDirectory() as folder:
+        for name, content in files.items():
+            data = content if isinstance(content, bytes) else content.encode("utf-8")
+            pathlib.Path(folder, name).write_bytes(data)
+        yield folder
+
+
+Run = collections.namedtuple("Run", "status core memory error legs logs lines")
+Run.__doc__ = """One run of `odrig_host session`.
+
+`core` is "ok" or "null". `memory` is `(bytes, blocks)`: what the core asked the host for
+while it started. `error` is the reason the show is invalid after startup, or `None`.
+`legs` holds `(leg, pin, LED count)` for each leg. `logs` are the diagnostic texts the core
+gave the host while it started, and `lines` is everything printed after startup.
+"""
+
+
+def session(folder, script=(), options=(), status=0):
+    """Starts the core on a folder with the test host and gives it the lines of a script."""
+    result = host("session", folder, *options, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
+    if result.status != status or result.err:
+        raise AssertionError(f"odrig_host session: status {result.status}, not {status}\n{result.out[-400:]}\n{result.err}")
+    printed = result.out.splitlines()
+    core = None
+    memory = None
+    error = None
+    legs = []
+    logs = []
+    position = 0
+    for position, line in enumerate(printed):
+        word, _, rest = line.partition(" ")
+        if word == "log" and core is None:
+            logs.append(rest)
+        elif word == "core":
+            core = rest
+        elif word == "memory":
+            memory = tuple(int(number) for number in rest.split())
+        elif word == "error":
+            error = None if rest == "none" else rest
+        elif word == "leg":
+            legs.append(tuple(int(number) for number in rest.split()))
+        else:
+            break
+    else:
+        position = len(printed)
+    lines = printed[position + 1:] if position < len(printed) and printed[position] == "ready" else printed[position:]
+    return Run(result.status, core, memory, error, tuple(legs), tuple(logs), lines)
+
+
+def start(files, script=(), options=(), status=0):
+    """Installs the files in a temporary folder and runs a session on it."""
+    with installed(files) as folder:
+        return session(folder, script, options, status)
+
+
+def start_each(file_sets, script=(), options=()):
+    """A session for each set of files, run side by side; the results are in the given order."""
+    workers = min(16, 2 * (os.cpu_count() or 2))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(lambda files: start(files, script, options), file_sets))

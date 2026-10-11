@@ -74,7 +74,7 @@ Rules for every task:
     rejected as the reference decoder does, with equal frames when accepted.
   - Requirements: 3.2, 7.5, 13.3, 17.2
 
-- [ ] 4. JSON reader, mapping, startup memory and the allocation guard
+- [x] 4. JSON reader, mapping, startup memory and the allocation guard
   - Create `core/src/json_reader.h`, `.cpp`, `mapping.h`, `.cpp`, `arena.h`, `core_state.h`
     and `core.cpp` with `odrig_core_begin` up to step 3 of the design's startup, and
     `odrig_core_leg_count`, `odrig_core_leg` and `odrig_core_error`.
