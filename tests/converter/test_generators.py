@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from odrig import errors, jsonframes, mapping, odrg
-from odrig.generators import dvd_bounce, hello_world, rainbow
+from odrig.generators import dense, dvd_bounce, hello_world, rainbow
 
 from . import support
 
@@ -325,6 +325,78 @@ class EncodedSources(unittest.TestCase):
         palette = odrg.palette_for(animation.frames)
         self.assertEqual(palette[0], BLACK)
         self.assertEqual(palette[1:], rainbow.COLOURS)
+
+
+class Dense(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        canvas = mapping.read(LEGS_10)
+        cls.canvas = (canvas.width, canvas.height)
+        cls.frames = dense.frames(canvas.width, canvas.height, 10)
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+
+    def test_ten_seconds_for_the_ten_leg_mapping_are_500_frames_of_20_ms_on_60_by_30(self):
+        self.assertEqual(self.canvas, (60, 30))
+        self.assertEqual(len(self.frames), 500)
+        self.assertEqual({ms for ms, _ in self.frames}, {20})
+        self.assertEqual({len(picture) for _, picture in self.frames}, {3 * 60 * 30})
+
+    def test_it_has_more_than_256_different_colours(self):
+        self.assertGreater(jsonframes.colour_count(self.frames), 256)
+        self.assertGreater(jsonframes.colour_count(self.frames[:1]), 256)
+
+    def test_every_pixel_is_lit_in_every_frame(self):
+        for _, picture in self.frames:
+            self.assertNotIn(0, jsonframes.colours(picture))
+
+    def test_every_pixel_changes_from_each_frame_to_the_next_almost_everywhere(self):
+        self.assertEqual(len(jsonframes.merged(self.frames)), 500)
+        first, second = self.frames[0][1], self.frames[1][1]
+        changed = sum(1 for a, b in zip(jsonframes.colours(first), jsonframes.colours(second)) if a != b)
+        self.assertGreater(changed, 1800 * 9 // 10)
+
+    def test_it_encodes_and_decodes_back_to_identical_frames(self):
+        animation = jsonframes.Animation(60, 30, tuple(self.frames))
+        for compressed in (True, False):
+            with self.subTest(compressed=compressed):
+                decoded = odrg.decode(odrg.encode(animation, compressed=compressed))
+                self.assertIs(decoded.compressed, compressed)
+                self.assertEqual(decoded.palette_size, 0)
+                self.assertEqual(decoded.records, animation.frames)
+
+    def test_ten_seconds_is_the_default_length(self):
+        self.assertEqual(dense.frames(4, 2), dense.frames(4, 2, 10))
+        self.assertEqual(len(dense.frames(4, 2)), 500)
+
+    def test_the_same_clip_every_time(self):
+        self.assertEqual(dense.frames(60, 30, 1), self.frames[:50])
+
+    def test_one_second_for_the_two_leg_mapping_is_50_frames_on_60_by_6(self):
+        output = self.folder / "dense.json"
+        result = support.run_module(output, "--mapping", LEGS_2, "--seconds", 1, module="odrig.generators.dense")
+        self.assertEqual(result, support.Result(0, "", ""))
+        animation = jsonframes.read(output)
+        self.assertEqual((animation.width, animation.height), (60, 6))
+        self.assertEqual(len(animation.frames), 50)
+        self.assertEqual({ms for ms, _ in animation.frames}, {20})
+        self.assertEqual(list(animation.frames), dense.frames(60, 6, 1))
+
+    def test_the_length_is_a_whole_number_of_seconds_of_at_least_1(self):
+        output = self.folder / "dense.json"
+        for seconds in ("0", "-1", "1.5", "ten"):
+            with self.subTest(seconds=seconds):
+                self.assertEqual(dense.main([str(output), "--mapping", str(LEGS_2), "--seconds", seconds]), 2)
+                self.assertFalse(output.exists())
+
+    def test_the_clip_is_written_only_where_it_is_asked_for(self):
+        before = sorted(entry.name for entry in (support.ROOT / "animations").iterdir())
+        self.assertEqual(dense.main([str(self.folder / "dense.json"), "--mapping", str(LEGS_2), "--seconds", "1"]), 0)
+        self.assertEqual(sorted(entry.name for entry in (support.ROOT / "animations").iterdir()), before)
+        self.assertEqual([entry.name for entry in self.folder.iterdir()], ["dense.json"])
 
 
 if __name__ == "__main__":

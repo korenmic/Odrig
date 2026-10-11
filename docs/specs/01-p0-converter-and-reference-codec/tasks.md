@@ -122,7 +122,7 @@ Rules for every task:
   - Add a generators section to `docs/converter.md`.
   - Requirements: 7.10, 7.11, 10.1, 15.1, 15.2, 15.3, 15.4, 15.5
 
-- [ ] 8. Dense test clip generator
+- [x] 8. Dense test clip generator
   - Create `odrig/generators/dense.py` with the expressions of the design and the arguments
     `OUT --mapping MAPPING [--seconds N]`.
   - Extend `test_generators.py`: for `mapping/legs-10.json` and 10 seconds the clip is

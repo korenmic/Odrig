@@ -264,7 +264,7 @@ of every frame matched the source. The dense clips are synthetic. Decoding has n
 run or timed on the board.
 
 The table was measured with the prototype of the frame coder. The converter of this
-repository writes DVD bounce and Hello world at the same uncompressed sizes, and at 1,612
-and 1,138 bytes compressed. Among frame records of equal size in bytes it chooses by a fixed
-rule where the prototype kept the one with the fewest bits, so DEFLATE sees slightly
-different bytes.
+repository writes DVD bounce, Hello world and the two dense clips at the same uncompressed
+sizes. Its compressed files differ a little: 1,612 and 1,138 bytes for DVD bounce and Hello
+world. Among frame records of equal size in bytes it chooses by a fixed rule where the
+prototype kept the one with the fewest bits, so DEFLATE sees slightly different bytes.
