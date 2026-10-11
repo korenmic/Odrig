@@ -1,0 +1,10 @@
+{
+  "number": 2,
+  "slug": "02-p0-shared-runtime-core",
+  "state": "remaining",
+  "title": "Shared runtime core",
+  "priority": "P0",
+  "addedAt": "2026-10-11T05:10:44+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Portable C++ library that decodes ODRG files, applies the mapping file, runs the show, keeps time and handles commands; used unchanged by the emulator and the firmware."
+}
