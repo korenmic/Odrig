@@ -3,6 +3,7 @@
 #   make -C core          builds build/libodrig_core.a
 #   make -C core test     builds the library and the test host, then runs the suite
 #   make -C core bench    builds the benchmark and the dense test clip, then times decoding
+#   make -C core shared   builds build/libodrig_core.dylib, the library the emulator loads
 #   make -C core clean    removes build/
 #
 # Written for GNU Make 3.81. Sources are found, never listed.
@@ -25,6 +26,7 @@ CHECKED_OBJECTS = $(patsubst src/%.cpp,$(BUILD)/checked/%.o,$(SOURCES))
 HOST_OBJECTS = $(patsubst $(TESTS)/host/%.cpp,$(BUILD)/host/%.o,$(HOST_SOURCES))
 
 LIBRARY = $(BUILD)/libodrig_core.a
+SHARED = $(BUILD)/libodrig_core.dylib
 HOST = $(BUILD)/odrig_host
 BENCH = $(BUILD)/odrig_bench
 BENCH_CLIPS = $(BUILD)/bench/dense-compressed.odrg $(BUILD)/bench/dense-plain.odrg
@@ -34,7 +36,7 @@ CORE_FLAGS = -std=c++11 -O2 $(WARNINGS) -Wframe-larger-than=512 -fno-exceptions 
 SANITIZERS = -fsanitize=address,undefined -fno-sanitize-recover=undefined -O1 -g
 HOST_FLAGS = -std=c++17 $(WARNINGS) $(SANITIZERS) -Iinclude -Isrc
 
-.PHONY: all test bench clean python
+.PHONY: all test bench shared clean python
 
 all: $(LIBRARY)
 
@@ -82,6 +84,12 @@ $(BUILD)/bench/dense-plain.odrg: $(BUILD)/bench/dense.json
 
 bench: python $(BENCH) $(BENCH_CLIPS)
 	$(BENCH) $(BENCH_CLIPS)
+
+# The same objects as the static library, linked as a library a program loads when it runs.
+shared: $(SHARED)
+
+$(SHARED): $(OBJECTS)
+	$(CXX) -dynamiclib -o $@ $(OBJECTS)
 
 clean:
 	rm -rf $(BUILD)

@@ -1,7 +1,7 @@
 {
   "number": 3,
   "slug": "03-p0-emulator",
-  "state": "remaining",
+  "state": "in_progress",
   "title": "Emulator",
   "priority": "P0",
   "addedAt": "2026-10-11T05:10:44+03:00",

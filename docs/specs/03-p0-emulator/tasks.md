@@ -24,7 +24,7 @@ Rules for every task:
   that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Shared library, binding to the core, and the test command
+- [x] 1. Shared library, binding to the core, and the test command
   - Add the target `shared` to `core/Makefile`: `core/build/libodrig_core.dylib` from
     `src/*.cpp` with the flags of the static library, linked with `-dynamiclib`.
   - Create `emulator/__init__.py`, `emulator/failure.py` (`Failure` and the reason names of
