@@ -4289,3 +4289,417 @@ has an item only a person can check.
 `completed`; an agent leaves it open.
 
 **Resolution.** Seed 07 `tasks.md`, tasks 1 and 9.
+
+## Seed 09: Seeds 06, 07 and 08 are not implemented
+
+**Question.** The seed depends on the converter library, the content commands and the
+board's network. None of the three exists while the spec is written: there is no
+`converter/`, the core has five commands, and the board's network still has WLED's name.
+
+**Answer.** The spec is written against the designs of the three seeds: what the library
+offers and how it is given frames, the commands with their replies, codes and limits, and
+the network `odrig` at `4.3.2.1`. Each task follows the code it finds and records a
+difference. The first task stops when the core's limits are still those from before seed
+07 or `converter/lib/` is not there.
+
+**Resolution.** Seed 09 `requirements.md`, the opening; `design.md`, "What this design
+relies on"; `tasks.md`, the opening and task 1.
+
+## Seed 09: `status` with the canvas size, and replies that were to keep their bytes
+
+**Question.** The owner settled that `status` gains `width` and `height`. Nothing says
+where in the reply they stand, what "the mapping is unusable" is for the core, or how this
+goes with seed 07's Requirement 1 criterion 6, by which `status` keeps its reply byte for
+byte.
+
+**Answer.** The two members come last, after `error`, so that everything before them
+keeps its place. They are numbers whenever the core holds a mapping, also while the show
+is invalid for another reason, and both `null` when it holds none: the file is missing,
+breaks a rule, or got no memory. Seed 07's criterion gives way for `status` alone, by the
+owner's decision; every other reply keeps its bytes. The board reports the size only after
+the firmware was built and flashed again, so a task with the board does that, and the app
+has a message for an installation that does not report it yet.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 1; `design.md`, "`status` with the
+canvas size" and "Messages"; `tasks.md`, tasks 1 and 2.
+
+## Seed 09: Where the app lives, and what of it is tracked
+
+**Question.** The seed names no folder and no file. It asks for plain web code, a
+Capacitor project, and a copy of the library that the build makes and the repository does
+not keep.
+
+**Answer.** Everything is in `app/`: the web code in `app/www/`, the Capacitor project
+for Android in `app/android/`, the tool in `app/app.py` with `app/apptool/`. The Android
+project is tracked as Capacitor creates it, which is how Capacitor means it to be kept:
+it holds our manifest, our plugin and the wrapper of the build. The web code imports the
+library from `lib/` beside itself, and no such folder is tracked: the build puts the files
+of `app/www/` and of `converter/lib/` together in `build/app/www/` and hands that folder
+to Capacitor, and the suite's server serves `converter/lib/` under that path.
+
+**Resolution.** Seed 09 `requirements.md`, Requirements 3 and 5; `design.md`, "Repository
+layout" and "`build`"; `tasks.md`, task 4.
+
+## Seed 09: The tool that builds the app, and what it takes from the Mac
+
+**Question.** The seed says the tools needed to build the app install into the project
+folder, and that one documented command builds the APK. It does not say what runs that
+command, and Capacitor's command line itself needs Node.js.
+
+**Answer.** A tool in Python's standard library, `python3 app/app.py`, as the firmware has
+one: `setup`, `build`, `serve` for a browser on the Mac, and `install` for a phone on USB.
+It installs the Capacitor packages, a JDK, the Android SDK's command-line tools and
+packages into `app/node_modules/` and `build/app/`, and gives every program it starts a
+home for its caches and settings there: npm, Gradle, the Android tools with their debug
+key, and Capacitor's command line. Node.js is not installed into the project folder. It
+is taken from the Mac, version 22 or later, as the converter of seed 06 takes it: the
+working assumption is that "the tools needed to build the app" are the ones the app adds.
+
+**Resolution.** Seed 09 `requirements.md`, Requirements 4 and 5; `design.md`, "The tool";
+`tasks.md`, task 4.
+
+## Seed 09: Which versions, and where each download comes from
+
+**Question.** The spec has to name the packages, the JDK and the SDK with versions and
+sources, from what is current, and nothing may be installed to find out.
+
+**Answer.** Read on 2026-10-12: Capacitor 8.5.3, whose Android project is at API level
+36 with the Android Gradle plugin 8.13.0, Gradle 8.14.3 and Java 21; Temurin JDK
+21.0.12.1+1; the command-line tools 15859902 from the Android download page; and the SDK
+packages `platform-tools`, `platforms;android-36` and `build-tools;35.0.0`. Each archive
+is fixed by its size and SHA-256 in `app/toolchain.json`, and the Gradle distribution by
+its checksum in the wrapper's properties. The documented downloads are 739,587,796 bytes;
+what Gradle fetches beside them is not documented and is measured by the task. That the
+versions install and build together on this Mac is assumed and is the first thing the
+build task settles. The page of the SDK tool calls it deprecated in favour of a newer
+program; it is used because it is in the pinned archive.
+
+**Resolution.** Seed 09 `design.md`, "Read for this design", "Assumed, to be verified"
+and "`app/toolchain.json`"; `tasks.md`, task 4.
+
+## Seed 09: Which licence the build accepts
+
+**Question.** The owner accepted the Android SDK's licence terms, so the build may accept
+them. The SDK tool has a command that accepts every licence it knows, the licences of
+preview packages among them.
+
+**Answer.** The setup accepts one licence, `android-sdk-license`, which the three packages
+of the build are under, by answering the one question their installation asks. It does
+not run the command that accepts all. Afterwards the SDK's folder of licences must hold
+that licence and no other; anything else ends the setup as `licence-refused`.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 4 criterion 4; `design.md`,
+"`setup`".
+
+## Seed 09: How a request reaches a network without internet
+
+**Question.** The seed says the app's requests must go to the board although its network
+has no internet. Android sends an app's traffic through mobile data in that case. The
+seed leaves open whether a Capacitor plugin or code of our own binds the traffic.
+
+**Answer.** A plugin of our own inside the app's Android project, the sender: it asks
+Android for the Wi-Fi network without asking for internet access, and opens every request
+on that network with `Network.openConnection`, the interface that Android documents for
+sending some of an app's traffic to such a network. It sends a line once, on a new
+connection, and looks into nothing. No package from outside is used for it. Nothing of
+this can be tried without a phone, so the connection screen shows what the phone reports:
+whether there is a Wi-Fi network, whether Android found internet on it, and what carries
+the phone's other traffic. If the owner's check finds that requests do not arrive, the
+next step is named in the design: the sender also binds the process.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 7; `design.md`, "Reaching the
+target" and assumption P1; `tasks.md`, tasks 11 and 13.
+
+## Seed 09: A `fetch` of the web view
+
+**Question.** The app's code is web code, and web code sends with `fetch`. The spec has to
+say how a `fetch` from the app's page is affected on the phone.
+
+**Answer.** It leaves through the phone's default network, which is mobile data while the
+board's network has no internet; it is a plain request from a page that Capacitor serves
+as `https://localhost`, which the web view blocks unless mixed content is allowed; and it
+needs plain HTTP allowed. Binding the whole process to the Wi-Fi network would carry it,
+as far as the web view's network code follows the binding, which no interface promises.
+So the web code does not use `fetch` for the target on the phone. It uses it in a browser
+on a computer, where there is no sender, and that is the way the suite runs. The price:
+the sender and the few lines that call it are proven on a phone alone.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 7 criteria 4 and 8; `design.md`,
+"How a `fetch` of the web view is affected, and why the app does not use one" and "Risks".
+
+## Seed 09: Who joins the network, and what the phone makes of it
+
+**Question.** `docs/android-app.md` left open whether the operator joins the board's
+network by hand or the app asks Android to join it. Nothing says what a phone shows for
+`odrig`.
+
+**Answer.** The operator joins `odrig` in the phone's Wi-Fi settings. The app does not
+join networks, does not hold the password and does not read the network's name, which
+would need the location permission. Read in WLED's source: its access point answers every
+name with its own address and redirects every page, so a phone is expected to offer a
+sign-in for `odrig` or to say that it has no internet, and to keep its other traffic on
+mobile data. What a real phone shows, and what to answer, is noted in the owner's check
+and written into the app's page then.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 6 criterion 8 and Requirement 23
+criterion 2; `design.md`, "What the phone does with the board's network", assumption P2.
+
+## Seed 09: The lowest Android and the lowest web view
+
+**Question.** The spec has to name the minimum Android version and why.
+
+**Answer.** API level 24, Android 7.0: the lowest the chosen Capacitor supports, and
+nothing in the app needs more. What decides is the web view, which is updated apart from
+Android: the app needs version 94, the first with the two decoding interfaces, and shows
+a page that says so on an older one. The app targets API level 36. From Android 17 on, an
+app that targets level 37 needs a permission of its own for addresses on the local
+network; raising the target level is not part of this seed and will need that permission.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 6; `design.md`, "The Capacitor
+project".
+
+## Seed 09: How a video is read without a decoder in the package
+
+**Question.** The seed says video and GIF files are decoded with what the web view
+provides and no decoder is bundled. The web view decodes video samples, but it has no
+interface that takes a video file and gives its frames with their times.
+
+**Answer.** The app reads the file's own table of samples, a reader of about 350 lines
+that makes no picture, and gives the samples to the web view's `VideoDecoder`. Every frame
+then has the time the file records, as a whole number of units of the track's time scale,
+which goes to the library as an exact fraction: the ticks are the ones the converter on a
+computer builds. Frames before the part are given to the library as stand-ins with their
+true times and are not decoded, so the timeline stays exact and a part deep in a long file
+costs only itself. A `<video>` element was the other way: it plays every file the phone
+plays, but it gives its times through the player and has to seek for every tick. It is
+named as the alternative if the owner's check finds videos that cannot be read.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 14; `design.md`, "Reading media"
+and "Risks".
+
+## Seed 09: Which videos are read
+
+**Question.** The seed says "a video". Phones hold MP4 and QuickTime files with H.264 or
+HEVC, and now and then other containers and codecs.
+
+**Answer.** An MP4 or QuickTime file that is not fragmented, whose first video track is
+H.264 or HEVC, when the web view says it can decode it. A fragmented file, a file without
+video and any other codec are refused with a message each; WebM and other containers are
+refused as no video the app reads. Edit lists are not read: one that only shifts a track
+changes nothing, because time is counted from the first frame.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 14 criterion 6; `design.md`, "An
+MP4 or QuickTime file" and "Messages".
+
+## Seed 09: A video recorded upright, and a frame larger than the phone should read
+
+**Question.** The converter on a computer applies no rotation that a file records, and
+fits the full picture. A phone records upright videos as lying pictures with a rotation,
+and its frames have two to eight million pixels.
+
+**Answer.** The app differs from the converter on a computer in two places. It applies a
+rotation of 90, 180 or 270 degrees, so that the preview and the LEDs show the picture as
+the phone's gallery shows it; an operator has no other way to turn it. And a frame of more
+than 1,048,576 pixels is drawn smaller by a whole divisor before the library fits it, so
+that a frame read back is at most 4 MiB and the fitting takes milliseconds. The app's page
+states both.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 14 criteria 8 and 9, Requirement
+23 criterion 3; `design.md`, "A frame read back".
+
+## Seed 09: GIF delays and GIF pictures
+
+**Question.** The library wants each GIF frame as it is on screen, with the delay the file
+records. The web view's image decoder gives pictures and a duration, and a browser changes
+a very short delay before it reports it.
+
+**Answer.** The pictures come from the web view's `ImageDecoder`. The delays are read from
+the file's own blocks by the app, so that the library gets what the file records and
+applies its own rule to a short delay, as on the command line. A GIF of more than 64 MiB
+is refused: the web view holds a GIF whole while it decodes it. That the decoder's
+pictures follow the rules of seed 06's design is assumed and is compared with the
+converter in the suite.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 14 criteria 3, 4 and 10;
+`design.md`, "A GIF" and assumption C4.
+
+## Seed 09: How long a part may be
+
+**Question.** The seed lets the operator choose which part to use and gives no limit. The
+spec has to say what happens with long videos and with the phone's memory.
+
+**Answer.** A part is at least 20 ms and at most 120 seconds, and its pictures may take at
+most 134,217,728 bytes. On the 60 x 60 canvas 120 seconds are 64,800,000 bytes of
+pictures, and storage holds about 70 seconds of a dense clip, so the limit is beyond what
+can be installed. At first the part is the whole file, or its first 30 seconds. The
+controls do not let a part outside the limits be chosen. Memory that runs out all the same
+is caught and shown as a part too long for the phone.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 15 criteria 4, 5 and 12;
+`design.md`, "Long and large files".
+
+## Seed 09: Compressed or uncompressed
+
+**Question.** The converter writes a file compressed or, with an option, uncompressed.
+The seed names the fit and the part as the operator's choices and not this one.
+
+**Answer.** A switch, on at first: compressed. It is there because of what was measured
+on the board for the target: a dense 60 x 60 clip is about 5 percent smaller compressed,
+and the core needs 12.3 ms for one of its frames where it needs 8.6 ms for an
+uncompressed one. So for a video an operator may want the uncompressed file. This goes
+beyond the seed and is a working assumption until the owner rules.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 15 criterion 6; `design.md`, "The
+add screen".
+
+## Seed 09: The id and the file name of an uploaded item
+
+**Question.** `upload begin` takes an id and a file name, and the client chooses both.
+The seed says the operator uploads an animation and nothing about either.
+
+**Answer.** The operator chooses between a new item and the place of an animation item.
+For a new item the app proposes the smallest id from 1 that the list does not have, and a
+file name made from the picked file's name under the naming rule of `docs/show.md`, with
+a number at its end while another item has it. In the place of an item the id and the
+file name are that item's. The name can be changed and is checked before anything is
+sent.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 17 criteria 1 to 4; `design.md`,
+"Uploading".
+
+## Seed 09: A reply that is lost, and an upload that is already open
+
+**Question.** Seed 07 gives the offset rule and one resend for its command tool. On Wi-Fi
+at the event replies will be lost more often, a reply can be lost after its line was
+taken, and one upload is open for all clients, with no way to tell whose it is.
+
+**Answer.** A line without a reply is sent again, up to four more times, a second apart,
+which stays inside the minute the target waits. A piece answered with `bad-offset` does
+not end the upload: the next piece is sent, and the target takes it only if it holds
+exactly the bytes before it, which tells a piece that had arrived from an upload out of
+step. An `upload end` that was sent again and is answered with `no-upload` is settled by
+reading the list. An `upload begin` answered with `busy` is never cleared by the app
+itself, because `upload cancel` would end another operator's upload as well as a dead one
+of this phone: the app says so and sends `upload cancel` only when the operator confirms.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 18; `design.md`, "What a reply
+means".
+
+## Seed 09: How often the app asks, and how long it waits
+
+**Question.** The seed says the status refreshes on its own and that a target not
+answering is shown. It gives no times.
+
+**Answer.** `status` once a second while the app is in front, on every screen, also
+between the pieces of an upload; the list and the storage when a screen that shows them
+is opened, after every change the app made, and every five seconds while such a screen is
+shown. A request waits five seconds for its reply. One request is under way at a time,
+and what the operator asked for goes first. While the app is not in front it asks for
+nothing.
+
+**Resolution.** Seed 09 `requirements.md`, Requirements 8, 10 and 12; `design.md`, "The
+client".
+
+## Seed 09: The emulator's option: its name, what it prints, and seed 03's rule
+
+**Question.** The seed adds an option to listen on the local network and names neither
+the option nor what the emulator prints. Seed 03 requires that the emulator listens on
+127.0.0.1 only and prints exactly two lines, and its tests say that no option names an
+address.
+
+**Answer.** A flag, `--lan`, off unless given. With it the server is bound to every IPv4
+address of the Mac, the two lines stay as they are, a third line `lan:` names the address
+a phone uses, and a warning on standard error says that anyone on that network can send
+commands and open the page. The flag names no address, so there is still no option that
+does; record mode refuses it. Seed 03's rule holds without the flag, and its tests are
+changed to say that.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 2; `design.md`, "The emulator on
+the local network"; `tasks.md`, task 3.
+
+## Seed 09: The test mp4
+
+**Question.** The definition of done has the app convert and upload "the test GIF and the
+test mp4". The mp4 that the Python suite builds is MPEG-4 Part 2, which Chrome does not
+decode, and a web view decodes what Chrome decodes.
+
+**Answer.** The suite builds its videos with the same fixture and the codec H.264, which
+the PyAV of this project can write. The result is compared with what
+`node converter/odrig.js import` gives for the same file: the same number of frames and
+durations, and each picture the list colour of the frame on screen; the largest
+difference of a colour value is recorded, not required. For the GIFs the frames are
+required to be identical.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 15 criteria 7 and 8, Requirement
+21 criterion 5; `design.md`, "The media"; `tasks.md`, task 5.
+
+## Seed 09: How the suite drives the page, and which checks need what
+
+**Question.** The definition of done wants the web code driven in headless Chrome against
+the emulator, and tests that need a phone kept apart. No browser driver may be installed.
+
+**Answer.** A driver page of the suite holds the app's page in a frame and works it as an
+operator does: it presses buttons by their words, fills fields and gives the file input a
+file. A server of the suite can stand between the app and the emulator to drop or delay a
+reply. Three kinds of check are kept apart: the suite in `tests/app/`, which needs no
+phone and no Android tool; `tests/apk/`, which looks into a built APK and needs the work
+folder; and the owner's numbered list for a phone, which is no program. The sender is
+compiled by the build and run by no test.
+
+**Resolution.** Seed 09 `requirements.md`, Requirements 21 and 22; `design.md`, "Testing
+strategy".
+
+## Seed 09: The language, the look in numbers, and back
+
+**Question.** The seed asks for a dark design with large controls for use outdoors at
+night, and plain words for every failure. It gives no sizes and no language.
+
+**Answer.** English, with every text in one file. Black behind everything; text with a
+contrast of at least 7 to 1 and at least 18 CSS pixels high; everything that is pressed
+at least 56 CSS pixels in both directions and 8 from its neighbour; nothing that needs a
+long press or a swipe; four screens behind four buttons that are always there. A message
+stays until it is dismissed. The system's back gesture goes to the screen before and does
+not leave the app while a conversion or an upload runs. While the app is in front the
+screen stays on.
+
+**Resolution.** Seed 09 `requirements.md`, Requirements 6, 19 and 20; `design.md`, "The
+look".
+
+## Seed 09: The app's identifier, its name, its picture and the build's stamp
+
+**Question.** An Android app needs an identifier and a name. Several operators will have
+the app, and nothing says how to tell which build a phone has.
+
+**Answer.** The identifier is `app.odrig.operators` and the name `odrig`. The launcher
+picture and the start screen are the ones Capacitor's project comes with. The build writes
+the commit it was made from into the package, and the connection screen shows it. The
+debug key that signs the APK is kept in the work folder: a new work folder means a new
+key, and an app signed with the old one has to be removed from a phone first.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 5 criteria 3 and 6, Requirement 6
+criterion 9; `design.md`, "The Capacitor project".
+
+## Seed 09: docs/android-app.md
+
+**Question.** `docs/android-app.md` holds first notes and questions for the owner, and
+says that nothing in it is decided. The owner has answered its questions, and seeds 07
+and 08 left the page to this seed.
+
+**Answer.** The page becomes the app's page: building, installing, using, the messages,
+the limits, the tests and the owner's check. The notes and the questions go, with their
+answers in `docs/decisions.md` already. The spec does not edit the page; the
+documentation task does.
+
+**Resolution.** Seed 09 `requirements.md`, Requirement 23; `design.md`, "Documents";
+`tasks.md`, task 12.
+
+## Seed 09: Recording the seed's progress
+
+**Question.** As for the other seeds: the definition of done has an item only a person
+can check, with a phone.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task is the owner's check on a phone and sets `completed`; an
+agent leaves it open.
+
+**Resolution.** Seed 09 `tasks.md`, tasks 1 and 13.
