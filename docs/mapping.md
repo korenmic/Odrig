@@ -80,18 +80,44 @@ One JSON file describes one physical build:
 | `first_led` | The side of the leg's first row where its first LED sits: `"left"` or `"right"`. |
 | `rows` | The canvas row (y) of each of the leg's rows, in chain order. |
 
-The canvas height is the total number of rows in the file. Every y from 1 to the height
-appears exactly once.
+The canvas width W is the file's `width`. The canvas height H is the total number of rows in
+the file. Every y from 1 to H appears exactly once.
 
-For LED number n (1 to 180) on a leg:
+### Rules
 
-- r = (n - 1) div 60 is the position of its row in `rows` (0, 1 or 2), and
-  i = (n - 1) mod 60 is how far along that row it is.
+A mapping file is valid when all of these hold:
+
+- It is read as strictly as a JSON frames file (see [format.md](format.md)): UTF-8 without a
+  byte-order mark, exactly one JSON value, no member named twice in one object, and integers
+  written without a fraction and without an exponent.
+- The top level is an object with exactly the members `version`, `width` and `legs`.
+- `version` is 1, and `width` is an integer from 1 to 65,535.
+- `legs` is an array of one or more objects, each with exactly the members `leg`, `pin`,
+  `first_led` and `rows`.
+- Every `leg` is an integer from 1 to 255, and no two legs have the same number.
+- Every `pin` is an integer from 0 to 255, and no two legs have the same pin.
+- Every `first_led` is `"left"` or `"right"`.
+- Every `rows` is an array of one or more integers. A leg may have any number of rows, and
+  the legs need not have the same number of rows.
+- The rows of all legs together hold every y from 1 to H exactly once.
+- W * H is at most 65,534, the largest canvas an ODRG file can have.
+
+A file that breaks a rule is not used: the tools refuse it as `mapping-malformed`, and a
+missing file as `mapping-missing` (see [reasons.md](reasons.md)).
+
+### Where each LED is
+
+A leg whose `rows` has R entries has W * R LEDs. For LED number n (1 to W * R) on that leg:
+
+- r = (n - 1) div W is the position of its row in `rows` (0 to R - 1), and
+  i = (n - 1) mod W is how far along that row it is.
 - y = `rows[r]`.
 - The row starts on the `first_led` side when r is even and on the opposite side when r is
   odd.
-- x = 60 - i when the row starts on the right, and x = 1 + i when it starts on the
+- x = W - i when the row starts on the right, and x = 1 + i when it starts on the
   left.
+
+In the two files below W is 60 and every leg has three rows, so each leg has 180 LEDs.
 
 ## Today's build: 2 legs, 60 x 6
 

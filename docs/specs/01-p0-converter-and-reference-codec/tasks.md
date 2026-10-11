@@ -92,7 +92,7 @@ Rules for every task:
   - Add a `check` section to `docs/converter.md`.
   - Requirements: 9.1, 9.2, 9.3
 
-- [ ] 6. Mapping file reader
+- [x] 6. Mapping file reader
   - Create `odrig/mapping.py` (`Leg`, `Mapping`, `read`).
   - `tests/converter/test_mapping.py`: `mapping/legs-2.json` gives 60 x 6 with two legs and
     `mapping/legs-10.json` gives 60 x 30 with ten; one rejected file for every rule of

@@ -83,6 +83,15 @@ read whole before its value is judged, so a code cut off by the end of the data 
 
 The canvas is judged before the number of frame records.
 
+## Mapping files
+
+Rules: [mapping.md](mapping.md), "Rules".
+
+| Reason | Condition |
+|---|---|
+| `mapping-missing` | The mapping file does not exist. |
+| `mapping-malformed` | The mapping file breaks a rule. The detail says which. |
+
 ## Any output
 
 | Reason | Condition |
