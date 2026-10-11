@@ -112,7 +112,7 @@ Rules for every task:
     firmware build, the 25-second measurements, the whole board suite with this firmware,
     and leaving the board with this firmware and the dim example show.
 
-- [ ] 3. The mapping format with column legs: the document and the converter's reader
+- [x] 3. The mapping format with column legs: the document and the converter's reader
   - `docs/mapping.md`: rewrite "Mapping file", "Rules" and "Where each LED is" for both
     kinds, as the design's "The mapping file format" has them. The drawings and tables stay
     as they are until task 7. `docs/reasons.md`, "Mapping files": the two reasons hold for

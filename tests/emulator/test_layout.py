@@ -59,7 +59,7 @@ class Positions(unittest.TestCase):
 
     def test_the_mappings_are_the_tracked_ones_and_made_up_ones(self):
         self.assertLessEqual({"legs-2", "legs-10", "left-start", "two-and-four-rows", "another-order", "one-led"}, set(self.texts))
-        apart_rows = [leg.rows for leg in self.canvases["another-order"].legs]
+        apart_rows = [leg.strips for leg in self.canvases["another-order"].legs]
         self.assertEqual(apart_rows, [(2, 4), (1, 5, 3)])
 
     def test_read_gives_the_width_the_height_and_the_legs_of_the_file(self):
@@ -68,7 +68,7 @@ class Positions(unittest.TestCase):
                 read = self.dumps[name]["mapping"]
                 self.assertEqual((read["width"], read["height"]), (canvas.width, canvas.height))
                 self.assertEqual([(leg["leg"], leg["pin"], leg["first_led"], tuple(leg["rows"]), leg["count"]) for leg in read["legs"]],
-                                 [(leg.leg, leg.pin, leg.first_led, tuple(leg.rows), canvas.width * len(leg.rows)) for leg in canvas.legs])
+                                 [(leg.leg, leg.pin, leg.first_led, tuple(leg.strips), canvas.width * len(leg.strips)) for leg in canvas.legs])
 
     def test_position_of_every_led_is_the_rule_of_the_mapping_document(self):
         for name, canvas in self.canvases.items():
@@ -103,7 +103,7 @@ class Positions(unittest.TestCase):
             with self.subTest(name):
                 places = rule(canvas)
                 for index, (leg, rows) in enumerate(zip(canvas.legs, self.dumps[name]["rows"])):
-                    self.assertEqual([row["y"] for row in rows], list(leg.rows))
+                    self.assertEqual([row["y"] for row in rows], list(leg.strips))
                     for r, row in enumerate(rows):
                         self.assertEqual((row["first"], row["last"]), (r * canvas.width + 1, (r + 1) * canvas.width))
                         first_x = places[index][row["first"] - 1][0]
@@ -138,7 +138,7 @@ class Positions(unittest.TestCase):
             canvas = self.canvases[name]
             self.assertEqual(len(table), len(canvas.legs))
             for (leg, pin, ys, *numbers), listed, rows, places in zip(table, canvas.legs, self.dumps[name]["rows"], self.dumps[name]["positions"]):
-                self.assertEqual((int(leg), int(pin), [int(y) for y in ys.split(",")]), (listed.leg, listed.pin, list(listed.rows)))
+                self.assertEqual((int(leg), int(pin), [int(y) for y in ys.split(",")]), (listed.leg, listed.pin, list(listed.strips)))
                 ends = [number for row in rows for number in (row["first"], row["last"])]
                 self.assertEqual(ends, [1, 60, 61, 120, 121, 180])
                 pairs = list(zip(map(int, numbers[0::2]), map(int, numbers[1::2])))
@@ -148,7 +148,7 @@ class Positions(unittest.TestCase):
         for name, canvas in self.canvases.items():
             with self.subTest(name):
                 for leg, corners, places in zip(canvas.legs, self.dumps[name]["paths"], rule(canvas)):
-                    self.assertEqual(len(corners), 2 * len(leg.rows))
+                    self.assertEqual(len(corners), 2 * len(leg.strips))
                     walked = []
                     for start, end in zip(corners[0::2], corners[1::2]):
                         self.assertEqual(start[1], end[1])

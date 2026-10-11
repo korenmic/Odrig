@@ -315,10 +315,10 @@ def led_pixels(width, leg):
     This is the rule of docs/mapping.md, "Where each LED is", written out once more.
     """
     places = []
-    for n in range(1, width * len(leg.rows) + 1):
+    for n in range(1, width * len(leg.strips) + 1):
         r = (n - 1) // width
         i = (n - 1) % width
-        y = leg.rows[r]
+        y = leg.strips[r]
         on_the_first_side = r % 2 == 0
         starts_right = (leg.first_led == "right") == on_the_first_side
         x = width - i if starts_right else 1 + i

@@ -37,6 +37,19 @@ def mapping_file(folder, width, height):
     return path
 
 
+def column_mapping_file(folder, width, height):
+    """A column-leg mapping file for a canvas of the given size: legs of up to three columns
+    that start at the bottom."""
+    path = Path(folder) / f"columns-{width}x{height}.json"
+    columns = list(range(1, width + 1))
+    legs = [
+        {"leg": number, "pin": number, "first_led": "bottom", "columns": columns[3 * number - 3:3 * number]}
+        for number in range(1, (width + 2) // 3 + 1)
+    ]
+    path.write_text(json.dumps({"version": 1, "height": height, "legs": legs}))
+    return path
+
+
 class Rainbow(unittest.TestCase):
     def test_255_different_fully_saturated_colours(self):
         self.assertEqual(len(rainbow.COLOURS), 255)
@@ -281,6 +294,54 @@ class TrackedSources(unittest.TestCase):
         result = support.run_module(output, module="odrig.generators.hello_world")
         self.assertEqual(result.status, 2)
         self.assertIn("usage:", result.err)
+        self.assertFalse(output.exists())
+
+
+class ColumnLegMapping(unittest.TestCase):
+    """The generators with a mapping file whose legs are columns."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+
+    def test_the_made_up_file_has_as_many_columns_as_the_canvas_is_wide(self):
+        canvas = mapping.read(column_mapping_file(self.folder, 56, 8))
+        self.assertEqual(canvas.kind, mapping.COLUMNS)
+        self.assertEqual((canvas.width, canvas.height), (56, 8))
+        self.assertEqual([len(leg.strips) for leg in canvas.legs], [3] * 18 + [2])
+
+    def test_each_generator_writes_for_the_canvas_of_the_mapping(self):
+        cases = (
+            (hello_world, (56, 8), [], hello_world.frames(56, 8)),
+            (dvd_bounce, (5, 9), [], dvd_bounce.frames(5, 9)),
+            (dense, (7, 4), ["--seconds", "1"], dense.frames(7, 4, 1)),
+        )
+        for generator, (width, height), options, frames in cases:
+            with self.subTest(generator=generator.__name__):
+                output = self.folder / "out.json"
+                made = column_mapping_file(self.folder, width, height)
+                self.assertEqual(generator.main([str(output), "--mapping", str(made), *options]), 0)
+                animation = jsonframes.read(output)
+                self.assertEqual((animation.width, animation.height), (width, height))
+                self.assertEqual(list(animation.frames), list(frames))
+
+    def test_a_generator_started_as_a_module_writes_for_the_canvas_of_the_mapping(self):
+        output = self.folder / "dvd.json"
+        made = column_mapping_file(self.folder, 4, 7)
+        result = support.run_module(output, "--mapping", made, module="odrig.generators.dvd_bounce")
+        self.assertEqual(result, support.Result(0, "", ""))
+        animation = jsonframes.read(output)
+        self.assertEqual((animation.width, animation.height), (4, 7))
+
+    def test_the_width_is_the_number_of_columns_and_not_the_height_of_the_file(self):
+        # Six columns of 53 LEDs are a canvas of 6 x 53: high enough for the text, too narrow.
+        narrow = column_mapping_file(self.folder, 6, 53)
+        output = self.folder / "hello.json"
+        result = support.run_module(output, "--mapping", narrow, module="odrig.generators.hello_world")
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith(f"error: canvas-too-small: {narrow}: "), result.err)
+        self.assertIn("6 x 53", result.err)
         self.assertFalse(output.exists())
 
 

@@ -89,7 +89,7 @@ ALLOWED = {
 def leg_list(text):
     """The leg list the converter's reader gives: `(leg, pin, LED count)` in file order."""
     canvas = mapping.loads(text.encode("utf-8"))
-    return tuple((leg.leg, leg.pin, canvas.width * len(leg.rows)) for leg in canvas.legs)
+    return tuple((leg.leg, leg.pin, canvas.width * len(leg.strips)) for leg in canvas.legs)
 
 
 class LegList(unittest.TestCase):

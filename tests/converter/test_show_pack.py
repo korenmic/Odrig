@@ -14,6 +14,13 @@ LEGS_2 = support.ROOT / "mapping" / "legs-2.json"
 LEGS_10 = support.ROOT / "mapping" / "legs-10.json"
 ANIMATIONS = support.ROOT / "animations"
 
+# A column-leg mapping for a canvas of 5 x 4, laid out as no tool would write it.
+COLUMN_LEGS = (
+    b'{\r\n  "version": 1,\n\t"height": 4,\n  "legs": [\n'
+    b'    {"leg": 1, "pin": 5, "first_led": "bottom", "columns": [1, 2, 3]},\n'
+    b'    {"columns": [5,4], "first_led": "top", "pin": 6, "leg": 2}\n  ]\n}\n\n'
+)
+
 
 def source(version=1, brightness=128, items=None, start=..., **more):
     """The bytes of a show file; `...` leaves a member out."""
@@ -316,6 +323,30 @@ class Pack(unittest.TestCase):
         self.clip("a.json", 60, 30)
         self.assertEqual(self.pack(self.show_file(), LEGS_10, self.sources).status, 0)
         self.assertEqual(odrg.decode((self.out / "a.odrg").read_bytes()).height, 30)
+
+    def column_legs(self):
+        path = self.folder / "columns.json"
+        path.write_bytes(COLUMN_LEGS)
+        return path
+
+    def test_a_column_leg_mapping_is_copied_byte_for_byte_and_gives_the_canvas(self):
+        self.clip("a.json", 5, 4)
+        result = self.pack(self.show_file(), self.column_legs(), self.sources)
+        self.assertEqual(result, support.Result(0, "", ""))
+        self.assertEqual(sorted(entry.name for entry in self.out.iterdir()), ["a.odrg", "mapping.json", "show.json"])
+        self.assertEqual((self.out / "mapping.json").read_bytes(), COLUMN_LEGS)
+        decoded = odrg.decode((self.out / "a.odrg").read_bytes())
+        self.assertEqual((decoded.width, decoded.height), (5, 4))
+
+    def test_size_mismatch_with_a_column_leg_mapping(self):
+        mapping_path = self.column_legs()
+        for width, height in ((4, 5), (5, 3), (6, 4), (5, 5), (60, 6)):
+            with self.subTest(source=(width, height)):
+                self.clip("a.json", width, height)
+                result = self.pack(self.show_file(), mapping_path, self.sources)
+                self.refused("size-mismatch", result)
+                self.assertIn(f"the canvas is {width} x {height} and the mapping's is 5 x 4", result.err)
+                self.assertFalse(self.out.exists())
 
     # Refusals, in the order of the table.
 

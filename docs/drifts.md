@@ -3011,3 +3011,46 @@ had; it is left to try once the board answers again.
 
 **Resolution.** `docs/firmware.md`, "Verified on the board"; `docs/decisions.md`, "Open
 questions"; `docs/specs/05-p0-canvas-60-by-60/tasks.md`, the notes under tasks 2, 8 and 11.
+
+## Seed 05: A file with both `width` and `height`, or with neither, in the converter's tests
+
+**Question.** The tasks say that a test that concerns a row-leg file passes unchanged. Two
+lines of `tests/converter/test_mapping.py` expected the detail of a file made from a
+row-leg file: with a `height` added, `unknown-member`, and with its `width` taken out,
+`missing-member`. The design's order of the checks judges the kind of a file before the
+members of its top level.
+
+**Answer.** The order of the design holds, because a second reader must give the same
+details. Such a file is of no kind, so it is not a row-leg file. Its reason is
+`mapping-malformed` as before, and its detail is now `the file has both "width" and
+"height"` or `the file has neither "width" nor "height"`. The two lines moved to the tests
+of the kinds with these details. Every other test of a row-leg file is as it was, apart
+from `Leg.rows`, which is `Leg.strips`, and from the one place that builds a `Mapping` by
+hand, which now gives the kind first.
+
+**Resolution.** `odrig/mapping.py`; `tests/converter/test_mapping.py`, `Kinds` and `Order`;
+`tests/converter/test_import_timeline.py`.
+
+## Seed 05: What the reader said of a column-leg file before it knew the kind
+
+**Question.** Task 3 says its new tests, run against the reader as it was, fail with a
+valid column-leg file refused for its member `height`.
+
+**Answer.** They failed, and the file was refused, but the detail named the member that was
+absent: `mapping-malformed: missing-member: the file has no member "width"`. The check of
+the members reports a missing member before an unknown one. `height` was named, as
+`unknown-member: the file has the unknown member "height"`, only for a file with both
+`width` and `height`. The commit message of the task gives both texts as they were
+observed.
+
+**Resolution.** The commit of task 3.
+
+## Seed 05: An LED number that a leg does not have, asked of `position`
+
+**Question.** The design gives `odrig.mapping.position(canvas, leg, n)` and does not say
+what it does with a number below 1 or above the leg's LED count.
+
+**Answer.** It raises `ValueError`. It is a call from Python and reads no file, so no
+reason name of `docs/reasons.md` applies. The page's `position` gives null there.
+
+**Resolution.** `odrig/mapping.py`; `tests/converter/test_mapping.py`, `Positions`.

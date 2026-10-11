@@ -85,7 +85,9 @@ The canvas is judged before the number of frame records.
 
 ## Mapping files
 
-Rules: [mapping.md](mapping.md), "Rules".
+Rules: [mapping.md](mapping.md), "Rules". The two reasons hold for both kinds of mapping
+file, the row-leg file and the column-leg file. A file that is of neither kind, or that
+mixes the two, breaks a rule.
 
 | Reason | Condition |
 |---|---|

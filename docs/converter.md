@@ -67,8 +67,11 @@ python -m odrig import MEDIA OUT.json --mapping MAPPING [--fit fill|fit|stretch]
 ```
 
 Turns a video or a GIF into a JSON frames file for the canvas of a mapping file. The media
-file's name ends in `.mp4`, `.mov` or `.gif`, in any letter case. The canvas is as wide as
-the mapping's `width` and as high as the number of rows the mapping lists.
+file's name ends in `.mp4`, `.mov` or `.gif`, in any letter case. The canvas is the one
+the mapping file describes: with a row-leg file it is as wide as the mapping's `width` and
+as high as the number of rows the mapping lists, and with a column-leg file it is as wide as
+the number of columns the mapping lists and as high as the mapping's `height`
+(see [mapping.md](mapping.md)).
 
 ```
 python -m odrig import clip.mp4 build/clip.json --mapping mapping/legs-2.json
@@ -370,7 +373,8 @@ The modules that other programs and tests build on need only the Python standard
 | `odrig.odrg.decode(data)` | The reference decoder: the canvas size, the palette size, whether the body is compressed, and for every frame record its duration, the picture after it and its mode byte. |
 | `odrig.odrg.encode(animation, compressed=True)` | The bytes of the ODRG file of an animation. |
 | `odrig.jsonframes.read(path)`, `loads(data)`, `dumps(animation)`, `write(path, animation)` | JSON frames files, read strictly and written in the canonical layout. |
-| `odrig.mapping.read(path)` | The canvas size and the legs of a mapping file. |
+| `odrig.mapping.read(path)` | The kind, the canvas size and the legs of a mapping file: for each leg its number, its pin, its `first_led` and its strips in chain order. |
+| `odrig.mapping.position(canvas, leg, n)` | The canvas position (x, y) of LED n of a leg, by the rule of [mapping.md](mapping.md). |
 | `odrig.show.read(path)` | The items of a show file. |
 | `odrig.pack.pack(show, mapping, sources, out, compressed=True)` | What the `pack` subcommand does. |
 

@@ -120,7 +120,7 @@ def accepted_by_the_converter(data):
         if rejection.reason != "mapping-malformed":
             raise
         return None
-    return tuple((leg.leg, leg.pin, canvas.width * len(leg.rows)) for leg in canvas.legs)
+    return tuple((leg.leg, leg.pin, canvas.width * len(leg.strips)) for leg in canvas.legs)
 
 
 def as_bytes(text):

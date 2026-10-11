@@ -179,7 +179,7 @@ class Gif(Fixtures):
         self.assertEqual(tuple(picture[0, 0]), C[0])
         self.assertEqual(tuple(picture[0, 7]), BLACK)
         # On a canvas of the picture's shape, stretched: the left half red, the right half dark.
-        canvas = mapping.Mapping(8, 4, ())
+        canvas = mapping.Mapping(mapping.ROWS, 8, 4, ())
         animation = media.import_media(path, canvas, "stretch")
         self.assertEqual(animation.frames[0][1], (bytes(C[0]) * 4 + bytes(BLACK) * 4) * 4)
 
