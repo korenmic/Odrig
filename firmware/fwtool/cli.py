@@ -20,6 +20,16 @@ SUITES = {"test": "tests/firmware", "test-board": "tests/board", "test-air": "te
 ADDRESS_VARIABLE = "ODRIG_BOARD_HTTP"
 
 
+def _seconds(text):
+    try:
+        seconds = float(text)
+    except ValueError:
+        seconds = -1.0
+    if not 0 < seconds < float("inf"):
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of seconds above 0")
+    return seconds
+
+
 def parser():
     made = argparse.ArgumentParser(prog="python3 firmware/fw.py", description="Builds the firmware, flashes it, installs a show and restores stock WLED.")
     commands = made.add_subparsers(dest="command", metavar="COMMAND", required=True)
@@ -33,6 +43,7 @@ def parser():
     flash.add_argument("--port", metavar="P", help="the board's USB serial port")
     flash.add_argument("--image", metavar="PATH", type=pathlib.Path, help="the image to write, with its .sha256 beside it")
     flash.add_argument("--expect", choices=sorted(board.EXPECTED), default="status", help="what must answer afterwards: the firmware's status, WLED's handshake, or the probe build")
+    flash.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's answer after its restart (default: 20)")
     restore = commands.add_parser("restore-stock", help="write the stock WLED image to the board")
     restore.add_argument("--port", metavar="P", help="the board's USB serial port")
     restore.add_argument("--full", action="store_true", help="also write the stock bootloader and partition table")
@@ -41,6 +52,7 @@ def parser():
     install.add_argument("dir", metavar="DIR", type=pathlib.Path, help="the folder of an installed file set")
     install.add_argument("--port", metavar="P", help="the board's USB serial port")
     install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
+    install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
     read.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -69,7 +81,7 @@ def _build(arguments):
     return 0
 
 
-def write_application(port, image, extra=(), table=None, expect="status"):
+def write_application(port, image, extra=(), table=None, expect="status", wait=board.WAIT_SECONDS):
     """Puts an application image on the board and waits for what must answer.
 
     Only the first application partition is written and the boot selection data cleared,
@@ -82,14 +94,14 @@ def write_application(port, image, extra=(), table=None, expect="status"):
     on_port.erase(flasher.BOOT_SELECTION)
     regions = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE] if extra else [])
     on_port.write([*extra, (flasher.APPLICATION.address, image)], regions, restart=True)
-    return board.EXPECTED[expect](port)
+    return board.EXPECTED[expect](port, wait)
 
 
 def _flash(arguments):
     image = build.checked_image(arguments.image if arguments.image is not None else build.image_path("firmware"))
     build.check_size(image)
     port = board.find(arguments.port)
-    print(write_application(port, image, expect=arguments.expect))
+    print(write_application(port, image, expect=arguments.expect, wait=arguments.wait))
     return 0
 
 
@@ -142,7 +154,7 @@ def _install_show(arguments):
             storage.discard(new_path)
         on_port.restart()
         raise
-    reply = board.EXPECTED["status"](port)
+    reply = board.EXPECTED["status"](port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
 

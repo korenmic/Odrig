@@ -189,6 +189,13 @@ class Commands(Temporary):
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), support.files_of(self.show))
         self.assertEqual(storage.other_files(self.on_the_board(esptool)), storage.other_files(self.old))
 
+    def test_the_reply_is_waited_for_20_seconds_or_as_long_as_told(self):
+        esptool = self.esptool()
+        self.install(esptool)
+        self.install(esptool, "--wait", "240")
+        self.assertEqual(esptool.waited, [20.0, 240.0])
+        self.assertEqual(self.install(esptool, "--wait", "0").status, 2)
+
     def test_a_reply_that_reports_a_reason_is_status_1(self):
         answer = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"show-missing"}'
         result = self.install(self.esptool(), "--no-check", answer=answer)

@@ -194,7 +194,7 @@ Rules for every task:
   - The board is left with the firmware of this task and the dim example show.
   - Requirements: 9.8, 12.1, 12.2, 12.3, 12.4, 13.1, 13.2, 13.3, 13.4, 15.3
 
-- [ ] 8. Measurements and acceptance by program
+- [x] 8. Measurements and acceptance by program
   - `tests/board/test_measure.py` as the design lists it.
   - Run `python3 firmware/fw.py test-board` in full, twice in a row. It leaves the firmware
     and the dim example show on the board both times.

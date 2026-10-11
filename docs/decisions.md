@@ -155,8 +155,24 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Whether large video-derived JSON sources are tracked as they are (the dense clip is 7 MB of
   JSON per 10 seconds).
 - Decode speed of the custom format on the board at 50 frames per second for 1,800 LEDs.
+  Measured on the board on 2026-10-11, with the dense 60 x 30 clip on the ten-leg mapping:
+  the core's work for one frame, reading from storage, decoding and placing 1,800 LEDs,
+  takes 6.6 ms on average for the compressed file and 4.7 ms for the uncompressed one, and
+  the board reports 49 or 50 refreshes in every second for both. The compressed format is
+  fast enough; the uncompressed one is not needed for speed. What stays open is the time at
+  power-on: every file is checked by decoding it, which takes 3.1 seconds for one dense
+  clip of 10 seconds and 38 seconds for 9 MB of them, with the LEDs dark meanwhile. See
+  [firmware.md](firmware.md), "Measurements on the board".
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
-  hardware.
+  hardware. Measured on the board on 2026-10-11: the firmware makes ten outputs on pins 1
+  to 10 from the ten-leg mapping, four through WLED's RMT driver and six through its
+  parallel driver, all ten report as working, each holds its own leg's data, and a refresh
+  of all ten is sent in 7.7 ms, 50 times a second. What stays open until ten legs are
+  wired: that LEDs light on pins 2 to 10, pin 3 being one of the chip's boot-mode pins and
+  six legs being on the parallel driver, which no LED of this project has been on; and the
+  current. WLED's current limiter counts 1,800 mA for 1,800 LEDs at rest, so with WLED's
+  maximum of 850 mA it holds ten legs at their lowest level until that maximum is raised in
+  WLED's LED settings to what the power supply gives.
 
 - Whether one board can drive twenty LED outputs. Stock WLED drives twelve on this chip;
   seed 05 tries for twenty and reports.
@@ -201,3 +217,6 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   at the bottom. This replaces the ten-pins-of-six-rows reading recorded earlier today. Seed
   05 was rewritten before any work on it began. The owner supplied a Wi-Fi password of valid
   length and accepted the Android SDK licence terms.
+- 2026-10-11: The firmware of seed 04 measured on the board. The two open questions about
+  the board, decode speed and ten outputs, have what was measured; what needs ten wired
+  legs stays open.

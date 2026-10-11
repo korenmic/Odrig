@@ -7,9 +7,9 @@ show into the board's storage.
 
 This page covers [what the tool needs](#what-the-tool-needs), [the work folder](#the-work-folder),
 the [commands](#commands) of the tool, [what the firmware does](#what-the-firmware-does),
-[the probe build](#the-probe-build), [the regions of the flash](#the-regions-of-the-flash)
-the tool writes, [rolling back](#rolling-back) and what was
-[verified on the board](#verified-on-the-board).
+[the probe build](#the-probe-build), the [measurements](#measurements-on-the-board) made
+on the board, [the regions of the flash](#the-regions-of-the-flash) the tool writes,
+[rolling back](#rolling-back) and what was [verified on the board](#verified-on-the-board).
 
 ## What the tool needs
 
@@ -88,9 +88,9 @@ Run from the repository root.
 ```
 python3 firmware/fw.py setup
 python3 firmware/fw.py build [--stock | --probe] [--verbose]
-python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe]
+python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
@@ -204,7 +204,8 @@ Writes a built image to the board over USB and prints what the board answers aft
 3. It clears the boot selection data, so that the board starts the first application
    partition, and writes the image there. esptool compares a checksum of what it wrote and
    restarts the board.
-4. It waits up to 20 seconds for the answer: with `--expect wled`, for an image of
+4. It waits up to 20 seconds, or as long as `--wait SECONDS` says, for the answer: with
+   `--expect wled`, for an image of
    `build --stock`, WLED's handshake, the line `WLED ` and a number in answer to the byte
    `v`; with `--expect probe` the probe build's report; without the option the firmware's
    reply to `status`.
@@ -247,7 +248,8 @@ python3 firmware/fw.py install-show build/example-show
 Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
 of the board's storage, checks what was written, restarts the board and prints the board's
 reply to `status`. The status is 0 when the reply reports a valid show and 1 when it
-reports a reason.
+reports a reason. The tool waits 20 seconds for that reply, or as long as `--wait SECONDS`
+says: the core checks every file at start, which takes 38 seconds for 9 MB of animations.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
@@ -488,6 +490,48 @@ interface for its information, and once saves WLED's LED settings, with the pin 
 output changed, to see the mapping's outputs come back; WLED then stores the mapping's
 outputs as its LED settings. Without a board, or when the address answers no command, it
 stops with `no-board` and runs nothing.
+
+## Measurements on the board
+
+Taken by the board test `tests/board/test_measure.py` with the probe build, at brightness
+32, over ten seconds for each show; the test writes them to
+`build/firmware/out/measurements.json`. The one 60-LED strip was wired, on leg 1; the other
+outputs sent to pins with nothing on them. WLED's maximum current was 850 mA, so on ten legs
+the limiter dimmed every refresh.
+
+| Show | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Example show, two legs, 360 LEDs | 3,096 bytes | 36 s | 171 ms | 2,275 to 2,341 | 49 to 51 | 50 | 39 ms | 0.81 ms | 18.8 ms | 1.04 ms | 1.12 ms |
+| Dense 60 x 30 clip of 10 s, compressed, ten legs, 1,800 LEDs | 725,779 bytes | 48 s | 3,107 ms | 325 to 423 | 49 to 51 | 50 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
+| The same clip, uncompressed | 766,815 bytes | 48 s | 2,163 ms | 578 to 655 | 49 to 51 | 50 | 37 ms | 4.72 ms | 21.4 ms | 7.68 ms | 7.81 ms |
+| 9 MB of dense clips: twelve of 10 s and one of 4 s, compressed | 9,001,905 bytes | 178 s | 37,821 ms | 344 to 426 | 48 to 51 | 50 | 44 ms | 6.63 ms | 29.0 ms | 7.68 ms | 7.85 ms |
+
+What the figures say:
+
+- **Decoding keeps up.** The core's work for one frame of the dense clip on 1,800 LEDs,
+  reading from storage, decoding and placing every LED, takes 6.6 ms on average for the
+  compressed file and 4.7 ms for the uncompressed one. The firmware's `status` reported 49
+  or 50 refreshes in every second for both, on ten outputs. The uncompressed format is not
+  needed for speed.
+- **Ten outputs work.** A send to ten outputs of 180 LEDs takes 7.7 ms with the limiter's
+  dimming of every LED in it. The LEDs need 5.4 ms on the wire after that; the core works
+  on the next frame meanwhile.
+- **The long requests** are those in which the core opens a file, at the start of every
+  loop of an animation and at every turn of a cycle, or in which the file system goes on
+  to another block. They delay one refresh by up to 29 ms and cost one refresh of a second
+  at most.
+- **The start takes as long as the files are large.** The core checks every file at start
+  by decoding it: 171 ms for the example show, 3.1 s for one dense clip of 10 seconds, and
+  38 s for a storage filled with 9 MB of dense clips. For that time the LEDs are dark and
+  the board answers nothing, on the port or on the network; WLED opens its access point
+  only afterwards. `install-show` and `flash` wait 20 seconds for the board's answer;
+  `--wait SECONDS` makes them wait longer for a large show.
+- **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
+  work out the checksum of storage, before and after, and the write between. 9 MB take
+  three minutes.
+
+Not measured, because the hardware is not wired: light on legs 2 to 10, and the current the
+LEDs really draw.
 
 ## The regions of the flash
 

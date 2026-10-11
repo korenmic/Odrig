@@ -39,6 +39,10 @@ ANSWERS = {"firmware": "status", "probe": "probe", "stock": "wled"}
 # The kind of image the suite leaves on the board.
 LEFT_ON_THE_BOARD = "firmware"
 
+# How long the board is given to answer after a restart. The core checks every file at its
+# start, which takes most of a minute when storage is full of animations.
+START_SECONDS = 90
+
 # Every command of docs/commands.md and every error code the command tool can cause on a
 # valid show, with no brightness above what the wired strip allows. It begins with the
 # state after power-on and asks for the status after every change.
@@ -114,7 +118,7 @@ def flash(kind):
     """Flashes the image of one kind and waits for its answer."""
     global _running
     _running = None
-    done = on_port("flash", "--image", built(kind), "--expect", ANSWERS[kind])
+    done = on_port("flash", "--image", built(kind), "--expect", ANSWERS[kind], "--wait", START_SECONDS)
     if done.status != 0:
         raise AssertionError(f"flashing the {kind} image failed: {done.err}")
     _running = kind
@@ -282,9 +286,9 @@ def installed():
 
 def wait_for_the_board():
     """Waits until the image the board runs answers again after a restart."""
-    kind = running()
+    kind = _running
     if kind is not None:
-        board.EXPECTED[ANSWERS[kind]](PORT)
+        board.EXPECTED[ANSWERS[kind]](PORT, START_SECONDS)
 
 
 def probe():

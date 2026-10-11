@@ -93,6 +93,7 @@ class RecordedEsptool:
 
     def __init__(self, table=None, flash=None, failing_verifies=0):
         self.calls = []
+        self.waited = []
         self.table = partition_table() if table is None else table
         self.flash = flash or {}
         self.failing_verifies = failing_verifies
@@ -149,7 +150,9 @@ def no_board(esptool=None, answer="WLED 2606300", port="/dev/cu.test"):
     """Runs the tool without a board: esptool is the stand-in, the port is found, and
     whatever must answer after a restart does."""
     esptool = RecordedEsptool() if esptool is None else esptool
-    answers = {name: (lambda found, wait=0: answer) for name in board.EXPECTED}
+    if not hasattr(esptool, "waited"):
+        esptool.waited = []
+    answers = {name: (lambda found, wait=0: esptool.waited.append(wait) or answer) for name in board.EXPECTED}
     with mock.patch.object(flasher, "run_esptool", esptool), mock.patch.object(board, "find", lambda given=None: given or port), mock.patch.dict(board.EXPECTED, answers):
         yield esptool
 

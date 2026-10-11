@@ -57,6 +57,12 @@ class Flash(Temporary):
         self.assertEqual(esptool.written(), [("0x10000", "odrig-firmware.bin")])
         self.assertEqual(result.out, "WLED 2606300\n")
 
+    def test_the_answer_is_waited_for_20_seconds_or_as_long_as_told(self):
+        with support.no_board() as esptool:
+            support.run_main("flash", "--image", self.image())
+            support.run_main("flash", "--image", self.image(), "--wait", "90")
+        self.assertEqual(esptool.waited, [20.0, 90.0])
+
     def test_every_call_names_the_chip_and_the_port(self):
         with support.no_board() as esptool:
             support.run_main("flash", "--image", self.image(), "--port", "/dev/cu.given")

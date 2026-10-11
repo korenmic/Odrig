@@ -620,6 +620,16 @@ than two seconds with realistic content.
 **Resolution.** Seed 02 `requirements.md` and `design.md` stand as written. Seed 04 measures
 start-up time.
 
+**Measured in seed 04, on the board, 2026-10-11.** The start of the core took 171 ms for the
+example show, 3.1 seconds for one dense 60 x 30 clip of 10 seconds, compressed, and 2.2
+seconds for the same clip uncompressed, and 38 seconds for a storage filled with 9 MB of
+compressed dense clips. The limit of two seconds named above was not passed with today's
+shows and was passed with dense content: by one second for a single dense clip, and by far
+for a full storage. During the start the LEDs are dark and the board answers nothing. The
+rule itself is not changed here; whether start-up should check less is the owner's to
+decide before shows of that size are installed. See `docs/firmware.md`, "Measurements on
+the board".
+
 ## Seed 01: Library versions for media import
 
 **Question.** The exact versions of numpy, Pillow and PyAV, and whether PyAV installs with
@@ -2276,3 +2286,19 @@ does not take for the board's.
 `firmware/fwtool/storage.py`, `pending` and `keep`; `firmware/fwtool/cli.py`,
 `_install_show`; `tests/firmware/test_flasher.py`, `tests/firmware/test_storage.py`. The
 board suite found it; the tests were run against the code without the change first.
+
+## Seed 04: Waiting for a board that starts slowly
+
+**Question.** The design gives `flash` and `install-show` 20 seconds to wait for the
+board's answer after its restart. The core checks every file at start; with storage filled
+with 9 MB of dense clips that took 38 seconds on the board, during which it answers
+nothing, so `install-show` of such a show would end with `no-reply` although nothing is
+wrong.
+
+**Answer.** Both commands take `--wait SECONDS`; without it they wait 20 seconds as
+designed. The measurement test gives the full storage 240 seconds. The 9 MB are twelve
+copies of the dense clip of 10 seconds under names of their own and one of 4 seconds,
+9,001,905 bytes with the two JSON files, which is what fits beside WLED's own files.
+
+**Resolution.** `firmware/fwtool/cli.py`; `tests/board/test_measure.py`;
+`docs/firmware.md`, "flash", "install-show" and "Measurements on the board".
