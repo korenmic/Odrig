@@ -20,6 +20,62 @@ The emulator never builds the library itself. The suite is every `test_*.py` fil
 first, and when that fails no test runs and make's output is the failure. The suite needs
 no hardware, no network connection and no browser.
 
+## Starting
+
+```
+python -m emulator SHOW_DIR [--port N] [--core PATH] [--verbose]
+```
+
+Started from the repository root with the folder of an installed show, the emulator starts
+the core on that folder, opens its address on 127.0.0.1 and prints it:
+
+```
+page: http://127.0.0.1:8600/
+```
+
+It then asks the core for a refresh at every grid time, 20 ms apart, with a timestamp in
+whole milliseconds from a clock that does not go backwards. When a request is late it
+carries the current time; the grid times that were missed are not asked for again. The
+emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, and then
+exits with status 0.
+
+| Option | Meaning | Without it |
+|---|---|---|
+| `--port N` | The port of the address on 127.0.0.1; 0 takes any free port. | 8600 |
+| `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root |
+| `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
+
+There is no option for a size and none for an address: the canvas is the one of
+`mapping.json` in the folder, and the address is always 127.0.0.1.
+
+Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
+an invalid show the LEDs stay dark, `status` gives the reason and every command is still
+answered.
+
+## Commands over HTTP
+
+The address accepts the commands of [commands.md](commands.md) as that document defines
+them for HTTP, and hands each to the core's entry for one line:
+
+```
+curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
+{"ok":true}
+```
+
+| Request | Answer |
+|---|---|
+| `POST /odrig` | Status 200, content type `application/json`, and the reply line as the core returned it, with its newline. The status is 200 for a reply with `"ok":false` too. |
+| Any other method on `/odrig` | Status 405 with `Allow: POST` and no body. The core is not called. |
+| `POST /odrig` without a `Content-Length` that is a whole number | Status 411. The core is not called. |
+| Any other path | Status 404. |
+
+- The body is the command line, with or without a final newline. Of a body longer than 128
+  bytes the first 128 are passed on, which the core answers with `line-too-long`.
+- The content type of the request is not looked at.
+- The path is `/odrig` exactly. What follows a `?` is ignored.
+- The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
+- An answer without a body closes its connection.
+
 ## Record mode
 
 ```
@@ -114,6 +170,7 @@ the ticks to a Python program.
 |---|---|
 | `not-a-folder` | `SHOW_DIR` does not exist or is not a folder. |
 | `core-not-built` | The core's shared library is not found or cannot be loaded. The detail names the command that builds it. |
+| `address-in-use` | The address is already in use or cannot be opened. |
 | `bad-length` | In record mode, the length is not above 0. |
 | `bad-script` | In record mode, the script cannot be read or breaks one of its rules. |
 | `cannot-write` | In record mode, the record file cannot be written, for example because its folder does not exist. |

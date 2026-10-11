@@ -78,7 +78,7 @@ Rules for every task:
     `docs/emulator.md`.
   - Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 12.1, 12.2, 12.3
 
-- [ ] 3. Real-time engine, start and stop, and commands over HTTP
+- [x] 3. Real-time engine, start and stop, and commands over HTTP
   - Create `emulator/engine.py` (`Engine`, `RealTime`), `emulator/hub.py` with the log
     entries and the latest status, and `emulator/httpd.py` with `POST /odrig`, status 405
     for other methods, 411 and 404.

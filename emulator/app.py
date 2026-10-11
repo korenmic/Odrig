@@ -9,12 +9,15 @@ import argparse
 import decimal
 import os
 import pathlib
+import signal
 import sys
+import threading
 
-from . import failure, record
+from . import binding, engine, failure, host, httpd, hub, record
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LIBRARY = ROOT / "core" / "build" / "libodrig_core.dylib"
+PORT = 8600
 
 
 def _milliseconds(text):
@@ -28,30 +31,87 @@ def _milliseconds(text):
     return int((seconds * 1000).quantize(decimal.Decimal(1), rounding=decimal.ROUND_HALF_UP))
 
 
+def _port(text):
+    if not text.isascii() or not text.isdigit() or int(text) > 65535:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a port number from 0 to 65535")
+    return int(text)
+
+
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m emulator",
-        description="Runs the core on the installed show of a folder and records what it gives the LEDs.",
+        description="Runs the core on the installed show of a folder: in real time, with commands over HTTP, "
+        "or in record mode on a virtual clock.",
     )
     made.add_argument("show_dir", metavar="SHOW_DIR", help="the folder that holds the installed show")
+    made.add_argument("--port", metavar="N", type=_port, help=f"the port of the page on 127.0.0.1; 0 takes any free port (default: {PORT})")
     made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help="the core's shared library (default: core/build/libodrig_core.dylib)")
-    made.add_argument("--record", metavar="OUT", required=True, help="record mode: the record file to write")
-    made.add_argument("--seconds", metavar="S", type=_milliseconds, required=True, help="record mode: the length of the recording")
+    made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
+    made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
+    made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
     return made
 
 
-def run(arguments):
-    if not os.path.isdir(arguments.show_dir):
-        raise failure.Failure(failure.NOT_A_FOLDER, f"{arguments.show_dir}: there is no such folder")
-    record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core)
+def parse(argv):
+    made = parser()
+    arguments = made.parse_args(argv)
+    if arguments.record is None:
+        if arguments.seconds is not None or arguments.script is not None:
+            made.error("--seconds and --script belong to record mode, which --record OUT starts")
+    else:
+        if arguments.seconds is None:
+            made.error("record mode needs its length: --seconds S")
+        if arguments.port is not None or arguments.verbose:
+            made.error("record mode opens no page: --port and --verbose do not go with --record")
+    return arguments
+
+
+def serve(arguments, out):
+    """Real time: starts the core, opens the page address, and runs until a signal."""
+    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose)
+    server = None
+    try:
+        core = binding.Core(arguments.core, files)
+        running = engine.Engine(core, hub.Hub())
+        running.tick()
+        running.refresh_status()
+        server = httpd.Server(PORT if arguments.port is None else arguments.port, running)
+
+        stopped = threading.Event()
+        for number in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(number, lambda *_: stopped.set())
+
+        print(f"page: {server.url}", file=out, flush=True)
+
+        loop = engine.RealTime(running)
+        loop.start()
+        server.start()
+        stopped.wait()
+        server.stop()
+        server = None
+        loop.stop()
+        loop.join()
+    finally:
+        if server is not None:
+            server.server_close()
+        files.close()
     return 0
 
 
+def run(arguments, out):
+    if not os.path.isdir(arguments.show_dir):
+        raise failure.Failure(failure.NOT_A_FOLDER, f"{arguments.show_dir}: there is no such folder")
+    if arguments.record is not None:
+        record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core, out)
+        return 0
+    return serve(arguments, out)
+
+
 def main(argv=None):
-    arguments = parser().parse_args(argv)
+    arguments = parse(argv)
     try:
-        return run(arguments)
+        return run(arguments, sys.stdout)
     except failure.Failure as failed:
         print(failed.line(), file=sys.stderr)
         return 1

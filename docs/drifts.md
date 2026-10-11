@@ -1650,3 +1650,20 @@ be empty: the line `100 ` gives the core an empty line at 100 ms.
 
 **Resolution.** `emulator/failure.py`; `emulator/record.py`; `docs/emulator.md`, "The
 script" and "Exit statuses".
+
+## Seed 03: The line of a log entry for a command that came over HTTP
+
+**Question.** The log shows each command line as the core read it. The core's entry for
+bytes hands that line back to its host; the entry for one line, which HTTP uses, hands back
+only the reply. Requirement 2 keeps every interpretation of a command line out of the
+emulator.
+
+**Answer.** For a command that came over HTTP the emulator writes the log line as the core's
+entry for bytes would hand it back: the body without one final newline and one final
+carriage return, and its first 64 characters, marked as cut, when it is longer. This is how
+a line is shown, not how it is obeyed: the reply and every effect come from the core, which
+is given the body as it arrived. A test compares the lines with the ones the reference
+player's entry for bytes hands back. A newline inside a body stays part of its one line and
+is shown as `\x0A`.
+
+**Resolution.** `emulator/engine.py`, `Engine.line`; `tests/emulator/test_engine.py`.
