@@ -23,25 +23,28 @@ no hardware, no network connection and no browser.
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--core PATH] [--verbose]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
-the core on that folder, opens its address on 127.0.0.1 and prints it:
+the core on that folder, opens its virtual serial port and its address on 127.0.0.1, and
+prints exactly these two lines:
 
 ```
 page: http://127.0.0.1:8600/
+serial: /Users/you/odrig/build/emulator/serial
 ```
 
 It then asks the core for a refresh at every grid time, 20 ms apart, with a timestamp in
 whole milliseconds from a clock that does not go backwards. When a request is late it
 carries the current time; the grid times that were missed are not asked for again. The
 emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, and then
-exits with status 0.
+removes the link to its port and exits with status 0.
 
 | Option | Meaning | Without it |
 |---|---|---|
 | `--port N` | The port of the address on 127.0.0.1; 0 takes any free port. | 8600 |
+| `--serial-link PATH` | Where the link to the serial port is made. | `build/emulator/serial` under the repository root, whatever folder the command is run from |
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
 
@@ -51,6 +54,30 @@ There is no option for a size and none for an address: the canvas is the one of
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
 answered.
+
+## The serial port
+
+The emulator creates a pseudo-terminal and a symbolic link to it, so the port has the same
+name on every run although the device behind it, such as `/dev/ttys012`, changes. A serial
+tool that talks to the board talks to the emulator with only the port name changed.
+
+- Every byte written to the port reaches the core's entry for bytes, unchanged and in
+  order, and every reply of the core is written back. A line may arrive in pieces, and
+  several lines may arrive at once.
+- The port passes bytes unchanged in both directions. It does not echo, and it adds,
+  removes and changes no newline and no carriage return.
+- A program may open and close the port any number of times while the emulator runs. One
+  emulator has one port: a line begun by one program is ended by the next.
+- A pseudo-terminal has no speed and no modem lines. Setting a speed succeeds and changes
+  nothing; a request to change DTR or RTS is refused by the system or does nothing.
+- Replies that no program reads wait in the port, about a thousand bytes of them. When
+  that room is full and stays full for a second, what waits is dropped to make room for the
+  newer replies, as the output of a board is lost when nobody listens. A program should
+  discard what is waiting when it opens the port.
+
+A link left at the path by an earlier run is replaced. If the path holds anything that is
+not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
+at once need two link paths and two page ports.
 
 ## Commands over HTTP
 
@@ -163,13 +190,14 @@ the ticks to a Python program.
 | Status | Meaning |
 |---:|---|
 | 0 | The emulator did its work. |
-| 1 | It could not start. One line `error: <reason>: <detail>` is written to standard error, and no partly written file is left behind. |
+| 1 | It could not start. One line `error: <reason>: <detail>` is written to standard error, and no link, no listening address and no partly written file is left behind. |
 | 2 | The command line was not understood. A usage message is written to standard error. |
 
 | Reason | Condition |
 |---|---|
 | `not-a-folder` | `SHOW_DIR` does not exist or is not a folder. |
 | `core-not-built` | The core's shared library is not found or cannot be loaded. The detail names the command that builds it. |
+| `serial-unavailable` | The pseudo-terminal or its link cannot be created, or the link's path holds something that is not a symbolic link. |
 | `address-in-use` | The address is already in use or cannot be opened. |
 | `bad-length` | In record mode, the length is not above 0. |
 | `bad-script` | In record mode, the script cannot be read or breaks one of its rules. |

@@ -13,10 +13,11 @@ import signal
 import sys
 import threading
 
-from . import binding, engine, failure, host, httpd, hub, record
+from . import binding, engine, failure, host, httpd, hub, record, serialport
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LIBRARY = ROOT / "core" / "build" / "libodrig_core.dylib"
+SERIAL_LINK = ROOT / "build" / "emulator" / "serial"
 PORT = 8600
 
 
@@ -40,11 +41,12 @@ def _port(text):
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m emulator",
-        description="Runs the core on the installed show of a folder: in real time, with commands over HTTP, "
-        "or in record mode on a virtual clock.",
+        description="Runs the core on the installed show of a folder: in real time, with commands through a "
+        "virtual serial port and over HTTP, or in record mode on a virtual clock.",
     )
     made.add_argument("show_dir", metavar="SHOW_DIR", help="the folder that holds the installed show")
     made.add_argument("--port", metavar="N", type=_port, help=f"the port of the page on 127.0.0.1; 0 takes any free port (default: {PORT})")
+    made.add_argument("--serial-link", metavar="PATH", help="where the link to the virtual serial port is made (default: build/emulator/serial)")
     made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help="the core's shared library (default: core/build/libodrig_core.dylib)")
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
@@ -62,28 +64,33 @@ def parse(argv):
     else:
         if arguments.seconds is None:
             made.error("record mode needs its length: --seconds S")
-        if arguments.port is not None or arguments.verbose:
-            made.error("record mode opens no page: --port and --verbose do not go with --record")
+        if arguments.port is not None or arguments.serial_link is not None or arguments.verbose:
+            made.error("record mode opens no page and no port: --port, --serial-link and --verbose do not go with --record")
     return arguments
 
 
 def serve(arguments, out):
-    """Real time: starts the core, opens the page address, and runs until a signal."""
+    """Real time: starts the core, opens the port and the page address, and runs until a
+    signal. A step that fails undoes the ones before it."""
     files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose)
+    port = None
     server = None
     try:
         core = binding.Core(arguments.core, files)
         running = engine.Engine(core, hub.Hub())
         running.tick()
         running.refresh_status()
+        port = serialport.Port(SERIAL_LINK if arguments.serial_link is None else arguments.serial_link, lambda data: running.feed(data, "serial"))
         server = httpd.Server(PORT if arguments.port is None else arguments.port, running)
 
         stopped = threading.Event()
         for number in (signal.SIGINT, signal.SIGTERM):
             signal.signal(number, lambda *_: stopped.set())
 
-        print(f"page: {server.url}", file=out, flush=True)
+        print(f"page: {server.url}", file=out)
+        print(f"serial: {port.link}", file=out, flush=True)
 
+        port.start()
         loop = engine.RealTime(running)
         loop.start()
         server.start()
@@ -95,6 +102,8 @@ def serve(arguments, out):
     finally:
         if server is not None:
             server.server_close()
+        if port is not None:
+            port.close()
         files.close()
     return 0
 

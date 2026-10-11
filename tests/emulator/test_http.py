@@ -127,6 +127,19 @@ class Commands(unittest.TestCase):
             self.emulator.command("brightness 128")
         self.assertEqual(replies, {b'{"ok":true}\n'})
 
+    def test_what_one_transport_changes_status_over_the_other_reports(self):
+        with support.Serial(self.emulator.serial) as port:
+            self.assertEqual(self.emulator.command("brightness 7"), b'{"ok":true}\n')
+            through_the_port = json.loads(port.ask("status"))
+            self.assertEqual((through_the_port["brightness"], through_the_port["on"]), (7, True))
+            self.assertEqual(port.ask("off"), b'{"ok":true}\n')
+            over_http = self.emulator.status()
+            self.assertEqual((over_http["brightness"], over_http["on"]), (7, False))
+            self.assertEqual(support.without_fps(port.ask("status")), support.without_fps(self.emulator.command("status")))
+            self.assertEqual(port.ask("on"), b'{"ok":true}\n')
+            self.assertEqual(self.emulator.command("brightness 128"), b'{"ok":true}\n')
+            self.assertEqual(json.loads(port.ask("status"))["brightness"], 128)
+
     def test_requests_at_the_same_time_are_all_answered(self):
         failures = []
 
@@ -171,6 +184,9 @@ class InvalidShow(unittest.TestCase):
                     self.assertEqual(support.without_fps(answer.body), support.without_fps(player.command(50, line.encode("ascii"))), line)
                 self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"show-invalid"}\n')
                 self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+                with support.Serial(emulator.serial) as port:
+                    for line in ("status", "play 2", "brightness 200", "off", "on", "status", "dance"):
+                        self.assertEqual(support.without_fps(port.ask(line)), support.without_fps(player.command(60, line.encode("ascii"))), line)
 
 
 if __name__ == "__main__":

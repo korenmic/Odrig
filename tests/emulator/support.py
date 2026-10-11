@@ -5,7 +5,9 @@ import contextlib
 import http.client
 import io
 import json
+import os
 import pathlib
+import select
 import signal
 import socket
 import subprocess
@@ -116,15 +118,20 @@ Response = collections.namedtuple("Response", "status headers body")
 class Emulator:
     """The emulator in real time, as a child process on a free port.
 
-    `lines` holds what it has printed to standard output so far, and `port` the port of
-    the page address it named.
+    `lines` holds what it has printed to standard output so far, `port` the port of the
+    page address it named, and `serial` the path of its serial port. Without `serial_link`
+    the link to the port is made in a temporary folder.
     """
 
     START_SECONDS = 15
 
-    def __init__(self, folder, *options, port=0):
+    def __init__(self, folder, *options, port=0, serial_link=None):
+        self._temporary = None
+        if serial_link is None:
+            self._temporary = tempfile.TemporaryDirectory()
+            serial_link = pathlib.Path(self._temporary.name, "serial")
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "emulator", str(folder), "--port", str(port), *(str(option) for option in options)],
+            [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--serial-link", str(serial_link), *(str(option) for option in options)],
             cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         self.lines = []
@@ -140,6 +147,7 @@ class Emulator:
         try:
             self.url = self._printed_line("page: ")
             self.port = int(self.url.rstrip("/").rsplit(":", 1)[1])
+            self.serial = self._printed_line("serial: ")
         except BaseException:
             self.stop()
             raise
@@ -206,6 +214,8 @@ class Emulator:
             self.process.stdout.close()
             self.process.stderr.close()
             self._result = Result(self.process.returncode, "".join(f"{line}\n" for line in self.lines), "".join(f"{line}\n" for line in self._errors))
+            if self._temporary is not None:
+                self._temporary.cleanup()
         return self._result
 
     def __enter__(self):
@@ -257,3 +267,50 @@ def entered(case, context):
     cleanup = case.addClassCleanup if isinstance(case, type) else case.addCleanup
     cleanup(context.__exit__, None, None, None)
     return value
+
+
+class Serial:
+    """A program's end of a serial port. Opening it changes none of the port's settings."""
+
+    def __init__(self, path):
+        self.fd = os.open(str(path), os.O_RDWR | os.O_NOCTTY)
+
+    def write(self, data):
+        while data:
+            data = data[os.write(self.fd, data):]
+
+    def read_lines(self, count=1, seconds=5):
+        """What arrives until it holds `count` newlines, or until the time is over."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while received.count(b"\n") < count:
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([self.fd], [], [], left)[0]:
+                break
+            received += os.read(self.fd, 4096)
+        return received
+
+    def read_for(self, seconds):
+        """Everything that arrives within a length of time."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return received
+            if select.select([self.fd], [], [], left)[0]:
+                received += os.read(self.fd, 4096)
+
+    def ask(self, line, seconds=5):
+        """Sends one command line and gives its reply."""
+        self.write(line if isinstance(line, bytes) else line.encode("utf-8") + b"\n")
+        return self.read_lines(1, seconds)
+
+    def close(self):
+        os.close(self.fd)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()

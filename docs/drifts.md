@@ -1667,3 +1667,20 @@ player's entry for bytes hands back. A newline inside a body stays part of its o
 is shown as `\x0A`.
 
 **Resolution.** `emulator/engine.py`, `Engine.line`; `tests/emulator/test_engine.py`.
+
+## Seed 03: Replies that no program reads
+
+**Question.** The design has the port's reader block in a read and write every reply back
+with a plain write. A pseudo-terminal holds about a thousand unread bytes. A program that
+sends commands and never reads, such as a shell's `echo status > build/emulator/serial`
+used a dozen times, fills it, the write then waits for ever, and the port takes no more
+commands from anyone until the emulator is started again.
+
+**Answer.** The near end of the pseudo-terminal does not block. The reader waits for bytes
+with a time limit, so it can also be stopped, and a write that finds the port full waits up
+to a second for a program to read. After that the unread replies are dropped and the newer
+ones are written, as the output of a board is lost when nobody listens. A program that
+reads in time loses nothing.
+
+**Resolution.** `emulator/serialport.py`, `Port._read` and `Port._write`; `docs/emulator.md`,
+"The serial port"; `tests/emulator/test_serial.py`.

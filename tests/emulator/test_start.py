@@ -1,6 +1,10 @@
+import os
 import pathlib
 import signal
 import socket
+import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -32,6 +36,69 @@ class Start(unittest.TestCase):
         self.assertFalse(support.refused(emulator.port))
         self.assertEqual(emulator.status()["playing"], 3)
 
+    def test_exactly_the_two_lines_are_printed_in_order(self):
+        link = self.work / "serial"
+        emulator = self.started(self.example(), serial_link=link)
+        self.assertEqual(emulator.serial, str(link))
+        self.assertEqual(emulator.status()["ok"], True)
+        with support.Serial(link) as port:
+            self.assertEqual(port.ask("on"), b'{"ok":true}\n')
+        result = emulator.stop()
+        self.assertEqual(result.out, f"page: http://127.0.0.1:{emulator.port}/\nserial: {link}\n")
+        self.assertEqual((result.status, result.err), (0, ""))
+
+    def test_the_link_is_a_symbolic_link_to_a_terminal_device_and_is_gone_after_the_end(self):
+        link = self.work / "serial"
+        for number in (signal.SIGTERM, signal.SIGINT):
+            with self.subTest(signal=number.name):
+                emulator = support.Emulator(self.example(), serial_link=link)
+                self.assertTrue(link.is_symlink())
+                self.assertRegex(os.readlink(link), r"\A/dev/ttys[0-9]+\Z")
+                self.assertTrue(stat.S_ISCHR(os.stat(link).st_mode))
+                self.assertEqual(emulator.stop(number).status, 0)
+                self.assertFalse(os.path.lexists(link))
+        self.assertEqual(list(self.work.iterdir()), [])
+
+    def test_a_link_left_by_an_earlier_run_is_replaced(self):
+        link = self.work / "serial"
+        os.symlink("/dev/ttys999", link)
+        emulator = self.started(self.example(), serial_link=link)
+        self.assertNotEqual(os.readlink(link), "/dev/ttys999")
+        with support.Serial(link) as port:
+            self.assertEqual(port.ask("on"), b'{"ok":true}\n')
+        emulator.stop()
+        self.assertFalse(os.path.lexists(link))
+
+    def test_a_regular_file_at_the_link_path_is_serial_unavailable_and_stays_untouched(self):
+        link = self.work / "serial"
+        link.write_bytes(b"something of the user's")
+        port = support.free_port()
+        result = support.run_module(self.example(), "--port", port, "--serial-link", link)
+        self.assert_refused(result, "serial-unavailable")
+        self.assertIn(str(link), result.err)
+        self.assertEqual(link.read_bytes(), b"something of the user's")
+        self.assertTrue(support.refused(port))
+
+    def test_without_the_option_the_link_is_in_the_build_folder_of_the_repository_whatever_the_working_folder(self):
+        expected = support.ROOT / "build" / "emulator" / "serial"
+        process = subprocess.Popen(
+            [sys.executable, "-m", "emulator", str(self.example()), "--port", "0"],
+            cwd=self.work, env={**os.environ, "PYTHONPATH": str(support.ROOT)}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            lines = [process.stdout.readline(), process.stdout.readline()]
+            self.assertRegex(lines[0], r"\Apage: http://127\.0\.0\.1:[0-9]+/\n\Z")
+            self.assertEqual(lines[1], f"serial: {expected}\n")
+            self.assertTrue(expected.is_symlink())
+            with support.Serial(expected) as port:
+                self.assertEqual(port.ask("on"), b'{"ok":true}\n')
+        finally:
+            process.send_signal(signal.SIGTERM)
+            out, err = process.communicate(timeout=10)
+        self.assertEqual((process.returncode, out, err), (0, "", ""))
+        self.assertFalse(os.path.lexists(expected))
+        self.assertEqual(list(self.work.iterdir()), [])
+
     def test_the_port_option_names_the_port(self):
         port = support.free_port()
         emulator = self.started(self.example(), port=port)
@@ -53,20 +120,25 @@ class Start(unittest.TestCase):
             holder.bind(("127.0.0.1", 0))
             holder.listen(1)
             port = holder.getsockname()[1]
-            result = support.run_module(self.example(), "--port", port)
+            link = self.work / "serial"
+            result = support.run_module(self.example(), "--port", port, "--serial-link", link)
             self.assert_refused(result, "address-in-use")
             self.assertIn(f"127.0.0.1:{port}", result.err)
+            self.assertFalse(os.path.lexists(link))
+            self.assertEqual(list(self.work.iterdir()), [])
 
     def test_a_path_that_is_no_folder_is_not_a_folder(self):
         a_file = self.work / "file"
         a_file.write_bytes(b"")
         for path in (self.work / "none", a_file):
-            self.assert_refused(support.run_module(path, "--port", 0), "not-a-folder")
+            self.assert_refused(support.run_module(path, "--port", 0, "--serial-link", self.work / "serial"), "not-a-folder")
+        self.assertEqual([entry.name for entry in self.work.iterdir()], ["file"])
 
     def test_a_wrong_core_is_core_not_built_and_names_the_command(self):
-        result = support.run_module(self.example(), "--port", 0, "--core", self.work / "libodrig_core.dylib")
+        result = support.run_module(self.example(), "--port", 0, "--serial-link", self.work / "serial", "--core", self.work / "libodrig_core.dylib")
         self.assert_refused(result, "core-not-built")
         self.assertIn("make -C core shared", result.err)
+        self.assertEqual(list(self.work.iterdir()), [])
 
     def test_a_folder_without_a_show_starts_and_reports_mapping_missing(self):
         emulator = self.started(self.work)
@@ -103,6 +175,8 @@ class Start(unittest.TestCase):
             [folder, "--port", "http"],
             [folder, "--record", self.work / "out.odrr", "--seconds", 1, "--port", 0],
             [folder, "--record", self.work / "out.odrr", "--seconds", 1, "--verbose"],
+            [folder, "--record", self.work / "out.odrr", "--seconds", 1, "--serial-link", self.work / "serial"],
+            [folder, "--serial-link"],
             [folder, "--width", 60],
             [folder, "--address", "0.0.0.0"],
         ):
@@ -114,7 +188,7 @@ class Start(unittest.TestCase):
 
     def test_no_option_names_a_size_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--core", "--verbose", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--core", "--verbose", "--record", "--seconds", "--script"})
 
 
 if __name__ == "__main__":

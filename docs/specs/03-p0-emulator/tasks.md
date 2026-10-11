@@ -100,7 +100,7 @@ Rules for every task:
   - Requirements: 1.2, 1.4, 1.5, 2.4, 3.1, 3.2, 3.3, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7,
     10.4, 12.1, 12.2, 15.1
 
-- [ ] 4. The virtual serial port
+- [x] 4. The virtual serial port
   - Create `emulator/serialport.py` and complete the start order of `app.py`: the port and
     its link, the `serial:` line, `--serial-link`, and the removal of the link at exit and
     when a later step fails.
