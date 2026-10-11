@@ -364,9 +364,12 @@ class ReferencePlayer:
         self.brightness = 0
         self.playing = None     # the id of the item being played
         self.zero = None        # the time zero of that item, once a refresh has set it
+        self.shown = None       # the id of the animation item the latest refresh chose
         self.t0 = None          # the power-on moment
         self.latest = None
         self.next_due = None
+        self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
+        self.unfinished = b""   # the bytes of a transport since the last newline
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         try:
             start = self._check(content)
@@ -417,6 +420,8 @@ class ReferencePlayer:
     def _play(self, number):
         self.playing = number
         self.zero = None
+        item = self.items[number]
+        self.shown = number if item.cycle is None else item.cycle[0]
 
     def _touch(self, now):
         """Takes the timestamp of a call and gives the time the call happens at."""
@@ -438,6 +443,7 @@ class ReferencePlayer:
             # start of the turn.
             turn, elapsed = divmod(elapsed, 1000 * item.seconds)
             item = self.items[item.cycle[turn % len(item.cycle)]]
+        self.shown = item.id
         picture = self.clips[item.file].picture_at(elapsed)
         return picture if self.on else None
 
@@ -451,11 +457,88 @@ class ReferencePlayer:
             return None
         grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
         self.next_due = grid + self.GRID
+        self.refreshes_in[(now - self.t0) // 1000] += 1
         picture = self._picture(now, grid)
         if picture is None:
             return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+
+    COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0}
+    RANGES = {b"play": (1, 65535), b"brightness": (0, 255)}
+
+    def command(self, now, line):
+        """One command line, given as bytes: carries it out and returns its reply."""
+        now = self._touch(now)
+        if line.endswith(b"\n"):
+            line = line[:-1]
+        if line.endswith(b"\r"):
+            line = line[:-1]
+        code = self._obey(line)
+        if code is not None:
+            return b'{"ok":false,"error":"' + code.encode("ascii") + b'"}\n'
+        if line == b"status":
+            return self._status(now)
+        return b'{"ok":true}\n'
+
+    def _obey(self, line):
+        """Carries out a command line. Returns the error code of a line that is no valid
+        command, the first that applies, and changes nothing then."""
+        if len(line) > 64:
+            return "line-too-long"
+        name, *arguments = line.split(b" ")
+        if name not in self.COMMANDS:
+            return "unknown-command"
+        if len(arguments) != self.COMMANDS[name]:
+            return "bad-argument"
+        value = None
+        if arguments:
+            if not arguments[0] or arguments[0].strip(b"0123456789"):
+                return "bad-argument"
+            value = int(arguments[0])
+            low, high = self.RANGES[name]
+            if not low <= value <= high:
+                return "bad-argument"
+        if name == b"play":
+            if self.error is not None:
+                return "show-invalid"
+            if value not in self.items:
+                return "unknown-id"
+            self._play(value)
+        elif name == b"brightness":
+            self.brightness = value
+        elif name != b"status":
+            self.on = name == b"on"
+        return None
+
+    def _status(self, now):
+        second = (now - self.t0) // 1000
+        state = {
+            "ok": True,
+            "on": self.on,
+            "brightness": self.brightness,
+            "playing": self.playing,
+            "animation": self.shown if self.playing is not None else None,
+            "fps": self.refreshes_in[second - 1] if second >= 1 else 0,
+            "error": self.error,
+        }
+        return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
+
+    def feed(self, now, data):
+        """Bytes of a transport. Returns `(line, reply)` for every line they complete: the
+        line as it is handed to the host, and the reply."""
+        self._touch(now)
+        answered = []
+        for value in data:
+            if value != 0x0A:
+                self.unfinished += bytes([value])
+                continue
+            line, self.unfinished = self.unfinished, b""
+            reply = self.command(now, line)
+            if line.endswith(b"\r"):
+                line = line[:-1]
+            answered.append((line[:64], reply))
+        return answered
 
     def answer(self, line):
         """The lines the test host prints for one input line of a session."""
@@ -467,8 +550,29 @@ class ReferencePlayer:
             return [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
         if line == "error":
             return [f"error {self.error or 'none'}"]
+        if word in ("line", "linehex", "bytes"):
+            time, _, given = rest.partition(" ")
+            given = given.encode("ascii") if word == "line" else bytes.fromhex(given)
+            if word == "bytes":
+                return [printed for fed, reply in self.feed(int(time), given) for printed in (f"fed {fed.hex()}", f"reply {reply.decode('ascii')[:-1]}")]
+            return [f"reply {self.command(int(time), given).decode('ascii')[:-1]}"]
         raise ValueError(f"not an input line of a session: {line!r}")
 
     def run(self, script):
         """The lines the test host prints for the lines of a script."""
         return [printed for line in script for printed in self.answer(line)]
+
+
+def line(time, text):
+    """The input line of a session that gives the core a command line as text."""
+    return f"line {time} {text}"
+
+
+def linehex(time, data):
+    """The input line of a session that gives the core a command line as these bytes."""
+    return f"linehex {time} {data.hex()}"
+
+
+def fed(time, data):
+    """The input line of a session that feeds the core these bytes of a transport."""
+    return f"bytes {time} {data.hex()}"

@@ -141,7 +141,7 @@ Rules for every task:
     turn change; a turn of 1 second and one of 65,535 seconds.
   - Requirements: 8.1, 8.2, 8.3, 8.4
 
-- [ ] 8. Commands, replies and status
+- [x] 8. Commands, replies and status
   - Create `core/src/commands.h`, `.cpp` with `odrig_core_command`, `odrig_core_feed`, the
     status reply and the refresh rate.
   - Add the input lines `line`, `linehex` and `bytes` to the test host, and commands to the

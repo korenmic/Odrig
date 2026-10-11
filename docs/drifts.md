@@ -1534,3 +1534,38 @@ script each, the host keeps the files in memory, runs one session after the othe
 prints `end` after each.
 
 **Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`, `start_each`.
+
+## Seed 02: A carriage return without a newline, and the line handed back
+
+**Question.** Requirement 10 has the command entry ignore one newline at the end of a line
+"and one carriage return before it". It does not say what a carriage return at the end of
+a line without a newline is, which is what the byte entry passes on for a line that ended
+in a carriage return and a newline. It also does not say in which form the byte entry
+hands a line to the host.
+
+**Answer.** The command entry drops one final newline when there is one, and then one
+final carriage return when there is one, as the design's algorithm says: `on\r` is the
+command `on`. The byte entry hands the host each line as the command entry reads it:
+without the newline, without that one carriage return, and only its first 64 characters
+when it is longer. A command log made from these lines shows no line ends. For seed 03
+this means the line of a `log` event has no carriage return at its end; its design,
+"binding", says a line is shorter than what arrived only when it is cut, which holds
+apart from the line end.
+
+**Resolution.** `core/src/commands.cpp`; `tests/core/test_commands.py`. Seed 03
+`design.md`, "binding" and "Sending events", are met as described.
+
+## Seed 02: What the test host checks in every reply
+
+**Question.** Requirement 10 limits a reply to one line of 192 bytes, and the design has
+the core return 0 when the room for a reply is too small. The design's test host prints a
+reply and checks nothing about it.
+
+**Answer.** The test host ends with status 72 and the line `bad reply` when a reply is
+longer than 192 bytes, does not end in a newline, or holds a byte outside printable ASCII
+before it. It gives the core a block of exactly 192 bytes for a reply and one of exactly
+the line's length for the line, so the sanitizer reports a byte read or written outside
+them. At the start of every session it asks for `status` with room for 191 bytes and
+stops unless the core returns 0; that call carries no timestamp for the core.
+
+**Resolution.** `tests/core/host/host.cpp`.

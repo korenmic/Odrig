@@ -26,6 +26,10 @@ int player_poll(Core &core, uint64_t now_ms);
 
 void player_set_brightness(Core &core, uint8_t value);
 
+// The number of refreshes produced in the second that ended most recently before this time,
+// with the seconds counted from the power-on moment. 0 when no second has ended.
+uint32_t player_fps(const Core &core, uint64_t now);
+
 }  // namespace odrig
 
 #endif

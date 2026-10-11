@@ -148,6 +148,15 @@ int player_poll(Core &core, uint64_t now_ms) {
     const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
     core.next_due = grid + kGridStep;
 
+    const uint64_t second = (now - core.t0) / 1000;
+    if (second != core.second_running) {
+        core.second_before = core.second_running;
+        core.count_before = core.count_running;
+        core.second_running = second;
+        core.count_running = 0;
+    }
+    ++core.count_running;
+
     bool lit = false;
     if (!core.invalid && core.playing != kNothing) {
         if (core.zero_pending) {
@@ -162,6 +171,20 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     return 1;
+}
+
+uint32_t player_fps(const Core &core, uint64_t now) {
+    const uint64_t second = (now - core.t0) / 1000;
+    if (second == 0) {
+        return 0;
+    }
+    if (core.second_running == second - 1) {
+        return core.count_running;
+    }
+    if (core.second_before == second - 1) {
+        return core.count_before;
+    }
+    return 0;
 }
 
 }  // namespace odrig

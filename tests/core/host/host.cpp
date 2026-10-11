@@ -25,6 +25,7 @@ namespace {
 
 const int kUsage = 64;
 const int kFileMisuse = 71;
+const int kBadReply = 72;
 
 int usage() {
     std::fputs(
@@ -442,6 +443,7 @@ public:
                 std::printf("leg %u %u %u\n", leg.leg, leg.pin, leg.led_count);
             }
         }
+        refuse_a_small_reply();
         std::printf("ready\n");
 
         std::string line;
@@ -471,7 +473,93 @@ private:
             poll(now);
             return true;
         }
+        if (word == "line" || word == "linehex" || word == "bytes") {
+            // The timestamp, and after one space whatever the line is made of.
+            size_t gap = rest.find(' ');
+            std::string given = gap == std::string::npos ? "" : rest.substr(gap + 1);
+            uint64_t now;
+            if (!timestamp(rest.substr(0, gap), &now) || (word != "line" && !unhex(&given))) {
+                return false;
+            }
+            if (word == "bytes") {
+                feed(now, given);
+            } else {
+                command(now, given);
+            }
+            return true;
+        }
         return false;
+    }
+
+    // A reply needs room for ODRIG_REPLY_MAX bytes. With less the core writes nothing,
+    // returns 0 and does not take the call as one that carries a timestamp.
+    void refuse_a_small_reply() {
+        std::vector<char> small(ODRIG_REPLY_MAX - 1);
+        const char line[] = "status";
+        size_t length;
+        {
+            guard::InCore inside;
+            length = odrig_core_command(core_, 0, line, 6, small.data(), small.size());
+        }
+        if (length != 0) {
+            stop("a reply was written where there is too little room", 1);
+        }
+    }
+
+    // Turns hexadecimal digits into the bytes they stand for.
+    static bool unhex(std::string *text) {
+        if (text->size() % 2 != 0 || text->find_first_not_of("0123456789abcdef") != std::string::npos) {
+            return false;
+        }
+        std::string bytes;
+        for (size_t at = 0; at < text->size(); at += 2) {
+            bytes += static_cast<char>(std::stoi(text->substr(at, 2), nullptr, 16));
+        }
+        *text = bytes;
+        return true;
+    }
+
+    // Prints `reply <json>` for a reply of the core. A reply that is not one line of
+    // printable characters with a newline, of at most ODRIG_REPLY_MAX bytes, ends the program.
+    static void print_reply(const char *reply, size_t length) {
+        bool sound = length >= 2 && length <= ODRIG_REPLY_MAX && reply[length - 1] == '\n';
+        for (size_t at = 0; sound && at + 1 < length; ++at) {
+            sound = reply[at] >= 0x20 && reply[at] < 0x7F;
+        }
+        if (!sound) {
+            stop("bad reply", kBadReply);
+        }
+        std::printf("reply %.*s\n", static_cast<int>(length - 1), reply);
+    }
+
+    // One command line. The line and the reply are held in blocks of exactly their sizes, so
+    // that a byte read or written beyond either is reported.
+    void command(uint64_t now, const std::string &text) {
+        std::vector<char> line(text.begin(), text.end());
+        std::vector<char> reply(ODRIG_REPLY_MAX);
+        size_t length;
+        {
+            guard::InCore inside;
+            length = odrig_core_command(core_, now, line.data(), line.size(), reply.data(), reply.size());
+        }
+        print_reply(reply.data(), length);
+    }
+
+    // Bytes of a transport. Prints `fed <hex of the line>` and `reply <json>` for every
+    // line the bytes complete.
+    void feed(uint64_t now, const std::string &bytes) {
+        std::vector<uint8_t> given(bytes.begin(), bytes.end());
+        guard::InCore inside;
+        odrig_core_feed(core_, now, given.data(), given.size(), on_reply, nullptr);
+    }
+
+    static void on_reply(void *, const char *line, size_t line_length, const char *reply, size_t reply_length) {
+        guard::InHost lowered;
+        if (line_length > ODRIG_LINE_MAX) {
+            stop("bad reply", kBadReply);
+        }
+        std::printf("fed %s\n", hex(std::string(line, line_length)).c_str());
+        print_reply(reply, reply_length);
     }
 
     // A timestamp: decimal digits, at most 19 of them.

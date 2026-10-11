@@ -1,9 +1,28 @@
+import json
 import unittest
 
 from . import support
 
 VECTORS = support.ROOT / "tests" / "vectors" / "invalid"
 EXAMPLE_LEGS = ((1, 1, 180), (2, 2, 180))
+T0 = 1000
+OK = 'reply {"ok":true}'
+
+# What an invalid show is asked: for its reason, to play, to switch and dim, and for LED
+# data before and after.
+QUESTIONS = [
+    "error",
+    support.line(T0, "status"),
+    f"poll {T0}",
+    support.line(T0, "play 1"),
+    support.line(T0, "play 3"),
+    support.line(T0, "off"),
+    support.line(T0, "on"),
+    support.line(T0, "brightness 200"),
+    f"poll {T0 + 20}",
+    f"poll {T0 + 5000}",
+    support.line(T0 + 5000, "status"),
+]
 
 
 def example(**changes):
@@ -81,13 +100,33 @@ class EachReason(unittest.TestCase):
     """One case at least for each text of the table of invalid shows."""
 
     def check(self, files, text, options=(), legs=EXAMPLE_LEGS):
-        run = support.start(files, ["error"], options)
+        run = support.start(files, QUESTIONS, options)
+        self.assert_invalid(run, text, legs)
+        return run
+
+    def assert_invalid(self, run, text, legs):
+        """The show is invalid with this text: `status` reports it, the LEDs stay dark,
+        `play` is refused, and the other commands work as ever."""
         self.assertEqual(run.core, "ok")
         self.assertEqual(run.error, text)
         self.assertEqual(run.logs, (text,))
-        self.assertEqual(run.lines, [f"error {text}"])
         self.assertEqual(run.legs, legs)
-        return run
+        if legs:
+            dark = [f"data {leg} {bytes(3 * count).hex()}" for leg, _, count in legs]
+            polled = [[f"refresh {time}"] + dark for time in (T0, T0 + 20, T0 + 5000)]
+        else:
+            polled = [[f"idle {time}"] for time in (T0, T0 + 20, T0 + 5000)]
+        lines = list(run.lines)
+        self.assertEqual(lines.pop(0), f"error {text}")
+        first = json.loads(lines.pop(0)[len("reply "):])
+        self.assertEqual((first["error"], first["playing"], first["animation"], first["on"]), (text, None, None, True))
+        self.assertEqual([lines.pop(0) for _ in polled[0]], polled[0])
+        self.assertEqual([lines.pop(0) for _ in range(2)], ['reply {"ok":false,"error":"show-invalid"}'] * 2)
+        self.assertEqual([lines.pop(0) for _ in range(3)], [OK] * 3)
+        self.assertEqual([lines.pop(0) for _ in polled[1] + polled[2]], polled[1] + polled[2])
+        last = json.loads(lines.pop(0)[len("reply "):])
+        self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text})
+        self.assertEqual(lines, [])
 
     def test_mapping_missing(self):
         self.check(example(mapping_json=None), "mapping-missing", legs=())
@@ -157,13 +196,11 @@ class EachReason(unittest.TestCase):
             usable = 1 <= width and 1 <= height and width * height <= 65534
             mapping = support.one_leg_mapping(width, height) if usable else support.one_leg_mapping(3, 3)
             file_sets.append({"mapping.json": mapping, "show.json": support.show_text([animation(1, "vector.odrg")]), "vector.odrg": data})
-        runs = support.start_each(file_sets, ["error"])
+        runs = support.start_each(file_sets, QUESTIONS)
         for path, run in zip(vectors, runs):
             with self.subTest(vector=path.name):
-                text = f"file-malformed vector.odrg {path.name.split('.')[0]}"
-                self.assertEqual(run.error, text)
-                self.assertEqual(run.lines, [f"error {text}"])
                 self.assertEqual(len(run.legs), 1)
+                self.assert_invalid(run, f"file-malformed vector.odrg {path.name.split('.')[0]}", run.legs)
 
     def test_size_mismatch_names_the_file(self):
         self.check(example(dvd_odrg=support.clip(1, 60, 5)), "size-mismatch dvd.odrg")

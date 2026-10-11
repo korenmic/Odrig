@@ -85,6 +85,19 @@ struct Core {
     uint64_t latest;        // the latest timestamp
     uint64_t next_due;      // the first grid time that is neither used nor skipped
 
+    // The refreshes produced in the running second, counted from the power-on moment, and
+    // in the second before it that had any.
+    uint64_t second_running;
+    uint64_t second_before;
+    uint32_t count_running;
+    uint32_t count_before;
+
+    // The unfinished line of odrig_core_feed: its first bytes, 64 characters and a carriage
+    // return at most, and whether more than those have arrived.
+    char line[ODRIG_LINE_MAX + 1];
+    uint8_t line_length;
+    uint8_t line_over;
+
     // Playback.
     uint8_t on;
     uint8_t scale[256];     // what each colour value is sent as, at the current brightness
