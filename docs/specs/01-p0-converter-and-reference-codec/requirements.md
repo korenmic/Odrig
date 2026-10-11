@@ -223,10 +223,10 @@ file is valid and what it contains, so that I can trust a file before using it.
 
 ### Acceptance Criteria
 
-1. WHEN the file name ends in `.json` THEN `check` SHALL treat the file as JSON frames, and
-   WHEN it ends in `.odrg` THEN as ODRG. The option `--format json` or `--format odrg` SHALL
-   override the file name. IF neither tells the format THEN the tool SHALL exit with
-   status 2.
+1. WHEN the file name ends in `.json`, in any letter case, THEN `check` SHALL treat the file
+   as JSON frames, and WHEN it ends in `.odrg` THEN as ODRG. The option `--format json` or
+   `--format odrg` SHALL override the file name. IF neither tells the format THEN the tool
+   SHALL exit with status 2.
 2. WHEN the file is valid THEN `check` SHALL print these lines to standard output, in this
    order, and nothing else:
    - `format: json-frames` or `format: odrg`

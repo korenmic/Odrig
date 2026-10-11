@@ -685,3 +685,14 @@ the invalid test vectors carry both cases.
 **Resolution.** `docs/format.md`, "What a reader rejects"; seed 01 `requirements.md`,
 Requirement 6 and Requirement 19 criterion 2; `design.md`, "Reference decoder", step 6;
 `docs/reasons.md`, "ODRG files".
+
+## Seed 01: Letter case of the file name given to `check`
+
+**Question.** `check` tells the format from a name ending in `.json` or `.odrg`. The
+requirement does not say whether `CLIP.JSON` counts, while `import` accepts its endings "in
+any letter case".
+
+**Answer.** `check` accepts the two endings in any letter case too, so the two subcommands
+read a file name the same way.
+
+**Resolution.** Seed 01 `requirements.md`, Requirement 9 criterion 1.

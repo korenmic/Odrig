@@ -83,7 +83,7 @@ Rules for every task:
     `docs/reasons.md`.
   - Requirements: 1.6, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.2
 
-- [ ] 5. The `check` subcommand
+- [x] 5. The `check` subcommand
   - Add `check` with `--format`, printing the lines of Requirement 9.
   - `tests/converter/test_check.py`: the exact output for a JSON frames file, for a
     compressed palette ODRG file and for an uncompressed ODRG file without a palette;

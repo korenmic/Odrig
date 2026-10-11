@@ -80,6 +80,46 @@ A file that breaks the format is rejected with one of the reasons under "ODRG fi
 A source in which no two frames that follow each other have the same pixels comes back from
 `encode` and `decode` with the same frames, byte for byte.
 
+## check
+
+```
+python -m odrig check FILE [--format json|odrg]
+```
+
+Says whether a file is valid and what it holds. A name ending in `.json` is read as JSON
+frames and one ending in `.odrg` as ODRG, in any letter case. `--format` overrides the name
+and is needed for any other name; without it such a name is a usage error (status 2).
+
+```
+python -m odrig check clip.odrg
+```
+
+For a valid file these lines are printed, and nothing else:
+
+```
+format: odrg
+canvas: 60x6
+frames: 255
+duration_ms: 5100
+colours: 256
+file_bytes: 1138
+palette: 256
+compressed: yes
+```
+
+| Line | Value |
+|---|---|
+| `format` | `json-frames` or `odrg`. |
+| `canvas` | W and H. |
+| `frames` | The number of frames the file lists: frame objects in a JSON frames file, frame records in an ODRG file. |
+| `duration_ms` | The sum of all durations. |
+| `colours` | The number of different colours that appear in the pictures. |
+| `file_bytes` | The size of the file. |
+| `palette` | ODRG only: the palette size C, 0 for a file without a palette. |
+| `compressed` | ODRG only: `yes` or `no`. |
+
+An invalid file is rejected with its reason and nothing is printed to standard output.
+
 ## Tests
 
 ```
