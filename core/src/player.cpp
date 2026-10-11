@@ -41,15 +41,21 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
 // Brings the pixel buffer to the picture of the item being played, `elapsed` milliseconds
 // after its time zero. False when there is no picture to show.
 bool advance(Core &core, uint64_t elapsed) {
+    // An animation item is one turn without end. A cycle is a row of turns of equal
+    // length, each with the next animation of its list, counted from the turn's start.
     const ItemInfo &item = core.items[core.playing];
+    uint32_t animation = core.playing;
+    uint64_t turn = 0;
+    uint64_t in_turn = elapsed;
     if (item.is_cycle) {
-        return false;
+        const uint64_t turn_ms = 1000ull * item.seconds;
+        turn = elapsed / turn_ms;
+        in_turn = elapsed % turn_ms;
+        animation = core.entries[item.first + turn % item.count];
     }
-    const uint32_t animation = core.playing;
-    const uint64_t turn = 0;
-    const FileInfo &file = core.files[item.first];
-    const uint64_t loop = elapsed / file.total_ms;
-    const uint64_t within = elapsed % file.total_ms;
+    const FileInfo &file = core.files[core.items[animation].first];
+    const uint64_t loop = in_turn / file.total_ms;
+    const uint64_t within = in_turn % file.total_ms;
 
     Reason reason = kNone;
     if (!core.stream_open || core.stream_item != animation || core.stream_turn != turn || core.stream_loop != loop) {

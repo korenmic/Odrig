@@ -132,7 +132,7 @@ Rules for every task:
   - Requirements: 2.4, 4.1, 4.2, 5.1, 5.2, 5.3, 5.4, 5.5, 5.7, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3,
     7.4, 9.1, 17.3
 
-- [ ] 7. Cycles
+- [x] 7. Cycles
   - Add cycles to `player.cpp` and to the reference player.
   - `tests/core/test_cycle.py`: the example show for 65 seconds, with the turn changing at
     exactly 15, 30, 45 and 60 seconds after power-on and each turn starting from the first

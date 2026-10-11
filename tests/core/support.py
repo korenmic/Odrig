@@ -432,7 +432,13 @@ class ReferencePlayer:
         if self.zero is None:
             self.zero = grid
         item = self.items[self.playing]
-        picture = self.clips[item.file].picture_at(now - self.zero)
+        elapsed = now - self.zero
+        if item.cycle is not None:
+            # Turn t shows the animation at place t mod n, with its time counted from the
+            # start of the turn.
+            turn, elapsed = divmod(elapsed, 1000 * item.seconds)
+            item = self.items[item.cycle[turn % len(item.cycle)]]
+        picture = self.clips[item.file].picture_at(elapsed)
         return picture if self.on else None
 
     def poll(self, now):
