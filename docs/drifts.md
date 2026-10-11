@@ -3699,3 +3699,223 @@ what the owner accepts; see "The rate the owner accepts on the board: from 20 to
 **Resolution.** `docs/firmware.md`, "Measurements on the board" and "Verified on the
 board"; `docs/mapping.md`, "What is confirmed"; `docs/specs/05-p0-canvas-60-by-60/tasks.md`,
 the note under task 8.
+
+## Seed 05: What is verified
+
+**Question.** The last task reads every acceptance criterion of Requirements 1 to 18 once
+more, names for each one a program can check the test that checks it, and adds a test where
+one is missing. Which test checks which criterion, which tests were missing, and what has
+no program checked?
+
+**Answer.** The four suites that need no board pass on macOS 26.5 on Apple Silicon with
+Apple clang 21, Python 3.14.6 and zlib 1.2.12: the converter's suite with 618 tests, the
+core's with 246, the emulator's with 346 and the firmware tool's with 230. They were not
+run with Python 3.10 to 3.13; tests parse the sources of the converter, the emulator and
+the command tool in the grammar of 3.10. The board suite, `tests/board/`, has 30 tests. It
+passed with the target file when task 8 ran it, and the last task runs it once more as its
+own step.
+
+A criterion is written as 8.2. A test is named by the folder of its suite under `tests/`,
+its file and its class; where a file was named for a requirement, a class alone is of that
+file.
+
+- **Requirement 1, the format.** 1.1 to 1.6: `converter/test_mapping.py`, `Accepted`,
+  `AcceptedColumns`, `Rejected`, `RejectedColumns`, which has a test for each of the eight
+  rules, `Kinds` and `Order`. 1.7: `Files`, and every refusal those classes look at is
+  `mapping-malformed`; `converter/test_docs.py`, `ReasonsDocument`. 1.8: the tests of
+  row-leg files, which did not change, and `TrackedFiles`.
+- **Requirement 2, where each LED is.** 2.1 to 2.3: `converter/test_mapping.py`,
+  `Positions`, on five row-leg and six column-leg files. 2.4: `core/test_playback.py`,
+  `EveryLedShowsItsPixel`, which finds the pixel of every LED in the LED data.
+- **Requirement 3, the target file.** 3.1, 3.2: `converter/test_mapping.py`, `TargetFile`;
+  `core/test_mapping.py`, `LegList`. 3.3: `converter/test_docs.py`, `TheTenLegFile`. 3.4:
+  `TrackedFiles`.
+- **Requirement 4, the converter.** 4.1, 4.2: `converter/test_mapping.py`,
+  `AcceptedColumns` and `Files`. 4.3: `converter/test_generators.py`, `TrackedSources`,
+  `ColumnLegMapping` and `Dense`; `converter/test_import_timeline.py`, `Video` and
+  `ColumnLegMapping`; `converter/test_show_pack.py`, `Pack`. 4.4: `Pack`. 4.5:
+  `converter/test_cli.py`, `Subcommands`, and the tests of every subcommand, which did not
+  change; `converter/test_mapping_page.py`, `CommandLine`.
+- **Requirement 5, the core.** 5.1: `core/test_json.py`, `MappingTexts`;
+  `core/test_mapping.py`, `RefusedMappings` and `ChangedBetweenTheReadings`. 5.2:
+  `LegList`. 5.3: `core/test_playback.py`, `EveryLedShowsItsPixel` and `ColumnLegs`. 5.4:
+  `OneLoopAndIntoTheNext`. 5.5: `core/test_build.py`, `HostInterface`;
+  `emulator/test_binding.py`, `Declarations`. 5.6: `core/test_memory.py`, `FixedMemory`
+  and `Guard`; `core/test_docs.py`, `CoreDocument`, for the table of blocks. 5.7:
+  `core/test_build.py`, `Sources` and `Library`; `core/test_memory.py`, `Guard`.
+- **Requirement 6, the emulator and the command tool.** 6.1 to 6.3:
+  `emulator/test_demo.py`, `DemoShow`; `emulator/test_record.py`, `Recording`, on the
+  made-up column-leg files; `emulator/test_start.py`, that no option names a size. 6.4:
+  `emulator/test_realtime.py`, `SpeedOfThisMac`, over five full seconds for each show.
+  6.5: `emulator/test_tool.py`, `Session`.
+- **Requirement 7, the page places the LEDs.** 7.1: `emulator/test_layout.py`, `Positions`
+  and `WithoutABrowser`; `emulator/test_view.py`, `Painted`; `emulator/test_page_files.py`,
+  `Files`. 7.2: `Positions`, the place of every LED and the LED at every place, on eleven
+  mappings. 7.3: `WithoutABrowser`. 7.4: `emulator/test_record.py`, `Recording`, for what
+  is recorded, and `Positions`, for where the page puts the LEDs.
+- **Requirement 8, the LEDs view.** In `emulator/test_layout.py`, `UprightLeds` holds what
+  the layout script gives, and in `emulator/test_view.py`, `UprightLedsView` and `Painted`
+  hold what the view script draws from it. 8.1: `UprightLeds`, `Painted`. 8.2:
+  `UprightLeds`, `UprightLedsView`. 8.3: `ColoursAndCurve`. 8.4, 8.5: `UprightLeds`,
+  `UprightLedsView`. 8.6, 8.7: `UprightLeds`. 8.8: `Painted`, for the ring of a dark LED
+  and the display curve; `ColoursAndCurve`; `emulator/test_page_files.py`, `Files`, for
+  the curve and for the drawing made again when the size changes. 8.9: no test; see below.
+- **Requirement 9, the mapping view.** In `emulator/test_layout.py`, `UprightMapping` and
+  `UprightLines` hold what the layout script gives and `UprightView` what the view script
+  draws, on the target file, the four made-up column-leg files and five more. 9.1:
+  `emulator/test_board.py`, `BoardOfThePage`; `emulator/test_view.py`,
+  `BoardInTheMappingView`. 9.2 to 9.6: `UprightLines`, `UprightView`. 9.7: `UprightView`,
+  for the leg that is pointed at and the LED at a pixel; `emulator/test_page_files.py`,
+  `Files`, for the words of the readout. 9.8, 9.9: `UprightMapping`. 9.10:
+  `UprightMapping`, `UprightLines`, `UprightView`. 9.11: `UprightView`, `Painted`.
+- **Requirement 10, row legs.** 10.1: `emulator/test_layout.py`, `Fit`, `Board`, `Lines`
+  and the test of a row-leg file in `UprightView`; `emulator/test_view.py`,
+  `BenchLedsView`. 10.2: `BenchFile`. 10.3: `ColoursAndCurve`.
+- **Requirement 11, the tool that writes the page.** 11.1 to 11.8:
+  `converter/test_mapping_page.py`, `TrackedFiles`, `MadeUpFiles`, `ChangedMappingFile`,
+  `EveryRun`, `OutsideTheGeneratedParts`, `Refused` and `StandardLibraryOnly`. 11.9:
+  `emulator/test_board.py`, `BoardOfThePage`.
+- **Requirement 12, twenty outputs.** 12.1, 12.3 to 12.7: `board/test_probe.py`, `Outputs`,
+  the test of the target file and the test of twenty column legs of 18 LEDs; without the
+  board, `firmware/test_usermod_files.py`, `Host`, reads how a leg becomes an output. 12.2:
+  `firmware/test_patches.py`; `firmware/test_wled.py`, `Patches`; `firmware/test_cli.py`,
+  `Building`. 12.8 is the order of the commits. 12.9 and 12.10 did not arise: twenty
+  outputs work, and no pin was replaced. 12.11: the board tests of seed 04, which run as
+  before, `board/test_install.py`, `board/test_commands.py`, `board/test_autostart.py` and
+  the other tests of `board/test_probe.py`; `firmware/test_usermod_files.py`.
+- **Requirement 13, the rate on the board.** 13.1, as the entry "The rate the owner accepts
+  on the board: from 20 to 50" reads it, and 13.2: `board/test_fps.py`, `Fps`. 13.3:
+  `firmware/test_usermod_files.py`, `TheTask` and `Host`; on the board, `overwritten`
+  stays 0 in `board/test_probe.py`. 13.4: `board/test_measure.py` takes the figures and
+  `firmware/test_docs.py`, `Firmware`, reads the table. 13.5 does not hold; the measured
+  rates are in both documents, which `Firmware` reads.
+- **Requirement 14, the demo show.** 14.1, 14.2, 14.4: `emulator/test_demo.py`, `DemoShow`;
+  `converter/test_generators.py`, `TrackedSources`, for the bytes of the bench sources.
+  14.3: `converter/test_docs.py`, `TheTenLegFile`. 14.5: `emulator/test_docs.py`,
+  `DocumentedShows`, which runs the commands as they are written.
+- **Requirement 15, the tests.** 15.1: `TheTenLegFile`, and the tests named above for the
+  target file. 15.2: `COLUMN_LEG_FILES` of `converter/test_mapping.py`,
+  `MADE_UP_COLUMN_MAPPINGS` of `core/support.py`, which the core, the emulator and the
+  page are run on, and `upright_mappings` of `emulator/test_layout.py`. 15.3: the tests
+  on those files, with strips of 1, 4, 5 and 7 LEDs and legs of one to four strips; for
+  the usermod, the board test of twenty column legs of 18 LEDs and the one of three legs;
+  no test reads the sources for a size. 15.4: the four suites, run by discovery. 15.5:
+  `firmware/test_cli.py`, `Commands`.
+- **Requirement 16, the documents.** 16.1: `converter/test_docs.py`, `BothKindsOfLeg`;
+  `converter/test_mapping_page.py`. 16.2: `TheTarget`, `BothKindsOfLeg`. 16.3:
+  `MeasuredSizes`. 16.4: `emulator/test_docs.py`, `EmulatorDocument` and `DocumentedShows`.
+  16.5: `firmware/test_docs.py`, `Firmware`. 16.6: `core/test_docs.py`, `CoreDocument`;
+  `converter/test_docs.py`, `BothKindsOfLeg`, `ReasonsDocument` and `TheTarget`. 16.7:
+  `TheTarget`.
+- **Requirement 17, the board.** 17.1: `install` of `board/support.py` refuses a show
+  above 40, which `board/test_install.py` tests. 17.2: `LeaveTheBoard` of
+  `board/__init__.py`; `board/test_autostart.py`. 17.3: `firmware/test_flasher.py`,
+  `Regions` and `NeverTheWholeFlashAndNoFuse`; `firmware/test_paths.py`, `BackupGuard`;
+  `board/test_flash_restore.py`.
+- **Requirement 18, what needs eyes.** 18.1, 18.2: `emulator/test_docs.py`,
+  `EmulatorDocument`. 18.3: `firmware/test_docs.py`, `Firmware`. 18.4 is the last task
+  itself.
+
+Tests that were missing, and are added:
+
+- The bytes of `mapping/legs-2.json`, written out, and that the row-leg file the mapping
+  document shows is that file (1.8, 3.4). Its content was tested, its bytes were not.
+- A mapping file has two reasons in the reasons document and in the converter, and no
+  reason is named after a part or a kind of a mapping file (1.7).
+- What the view script paints. A script for the JavaScript shell,
+  `tests/emulator/js/dump_painted.js`, keeps every dot the page paints on its canvas. For
+  every mapping of the suites, in the LEDs view and in the mapping view: each LED of a
+  refresh is painted in the cell of its canvas position in the colour its own bytes give
+  through the display curve, with every LED in a colour of its own, so that an exchange of
+  two LEDs or of two bytes fails; a dark LED is a ring, lighter than the stage, and an LED
+  with any light is a filled dot (7.1, 8.1, 8.8, 9.11). Until now the tests held where the
+  layout script puts an LED and read the lines of `view.js` that paint it.
+- What the view script draws in the LEDs view, which no test built: for a column-leg file
+  the band and the bracket of every run of columns with the leg's number and pin in its
+  colour, the marks of the rows and the columns, and the LED numbers at the ends of every
+  column where the cells are 9 pixels or more and none where they are smaller (8.2, 8.4,
+  8.5); for the bench file the brackets, the y of every row and the LED numbers at its
+  ends (10.1).
+- The board as the view script draws it: the antenna above the first pads, the two sockets
+  at the lower edge, and the labels of the two rows in the order of `board.js` (9.1).
+- With the `first_led` of leg 7 of the target file changed to `"top"`, the page puts every
+  LED of that leg at the other end of its column and moves no other LED (7.4). The test of
+  the recording held this for the core.
+- The emulator records each of the four made-up column-leg mappings with the legs of that
+  file, as the reference plays it (6.1, 15.2, 15.3). The core and the page ran on those
+  files; of valid mappings the emulator itself ran on the two tracked files and on copies
+  of them with one `first_led` changed.
+- Read in `app.js`: the drawing is made again for the size of the stage when it changes
+  (8.8), and the readout names the leg, the pin, the LED number and the coordinates (9.7).
+- The mapping document has both kinds of file with their members, eight numbered rules,
+  each with a test of the reader, the rule for both kinds of leg, both builds and what is
+  confirmed; the decisions have what was measured for twenty outputs and the target in
+  their change log; the converter's document has both kinds (16.1, 16.2, 16.6).
+- The firmware document's table of measurements has every value that 13.4 names for the
+  demo show and for the dense clip in both forms, with twenty of twenty outputs and rates
+  from 20 to 50; the document says how many outputs the firmware drives and how, and names
+  every patch file and every file of WLED a patch changes; it and the decisions give the
+  rates of the dense clip beside what the owner accepts (13.4, 13.5, 16.5).
+
+The tests of what the view script paints and draws, and the test of leg 7, were each seen
+to fail against a copy of `view.js` or of `layout.js` with one fault put in: two bytes of
+an LED exchanged, the canvas upside down, a dark LED filled, a dark LED not drawn, the
+display curve left out, a ring in the colour of the stage, the two end numbers of a column
+exchanged, the marks of the tenth rows left out, a bracket in another colour, the pin
+replaced by the leg's number, the two end numbers of a row exchanged, the labels of the
+pads counted from the sockets, the antenna at the lower end of the board, the sockets at
+its top, and `"top"` read as `"bottom"`. The tests that read `app.js` and the documents
+were not tried in that way.
+
+No program checked:
+
+- **The page in Safari, and at a real screen.** No step of the check list of
+  `docs/emulator.md` has been gone through in Safari; the suite only has Safari's
+  JavaScript engine accept the scripts. The list was gone through in Chrome without a
+  window by the program of task 10, which is not tracked, and its screenshots were looked
+  at once. So 8.9, 49 refreshes drawn in every second, rests on the page's own count in a
+  browser that draws to no screen, and on no test. Whether the bands and the rings are
+  faint enough and yet seen, whether 88 crossings can be followed and twenty colours told
+  apart, the page in a light appearance, and a file with legs from the top or with pins
+  the board lacks in a browser: these are the owner's, with the list in Safari.
+- **Light on the target.** The owner's checks 5 and 6 of `docs/firmware.md`: a strip on a
+  lane of the parallel driver, and twenty wired legs. A program counted 24 pulses for
+  every LED on each pin and timed the wire, and read back what each output holds; it saw
+  neither the widths of the pulses nor an LED. LEDs on pins 2 to 18, 21 and 47 have never
+  been lit, nobody looked at the one wired strip, and the current of twenty legs was not
+  measured. That leg 1 stands at the left with its first LED at the bottom is the reading
+  of the first entry of this seed, and has not been compared with the installation.
+- **49 refreshes a second with the dense clip on the board.** Criterion 13.1 as it is
+  written is not met: the firmware reports 36 to 42 for the compressed clip and 45 to 47
+  for the uncompressed one. The owner accepts 20 to 50, and the tests assert that.
+- **Commands over the board's network.** `tests/air/` was not run with this firmware; the
+  firmware tool's suite reads the handler in the usermod. The owner's checks 1 to 4, of
+  seed 04, are open as before.
+- **What only the probe build can see.** The pulses, the wire time and what the outputs
+  hold are taken with the probe build; the firmware has no probe, and of it the tests know
+  the replies to its commands and its rate.
+- **The core for the chip.** Its suite compiles and runs it on the Mac, and the memory of
+  5.6 is the Mac's figure. For the chip it is compiled by the firmware build, which the
+  board suite uses; no test of the four suites compiles it there.
+- **What did not change.** "No reason name is added" (1.7), "every function and every type
+  as it is" and "no change to host a column-leg file" (5.5, 6.5) are held by tests of what
+  is there now. That nothing changed was read once from the history: since the commit of
+  the spec, of `core/include`, `core/src`, `emulator/*.py`, `odrigctl/` and
+  `odrig/errors.py` only `core/src/mapping.cpp` differs, and `firmware/usermod/` has not
+  changed since before the core read column legs.
+- **Sizes written out in a source (15.3).** No test looks for them. Searched once in the
+  tracked sources of the converter, the core, the emulator, the page, the command tool,
+  the firmware tool and the usermod: none names a mapping file or a show of the repository,
+  and of the numbers 60, 180, 540, 3,600 and 10,800 only the 180 ms of a frame of DVD
+  bounce is there.
+- **The real-time tests** of the emulator measure five full seconds, not the ten of the
+  clip, on a Mac that does other work meanwhile. None of them failed in the runs of this
+  task.
+
+**Resolution.** `tests/converter/test_mapping.py`, `TrackedFiles`;
+`tests/converter/test_docs.py`, `ReasonsDocument` and `BothKindsOfLeg`;
+`tests/emulator/js/dump_painted.js`; `tests/emulator/test_view.py`;
+`tests/emulator/test_layout.py`, `Positions`; `tests/emulator/test_record.py`, `Recording`;
+`tests/emulator/test_page_files.py`, `Files`; `tests/firmware/test_docs.py`, `Firmware`.
+`docs/emulator.md`, "What has been checked", and `docs/firmware.md`, "The owner's checks",
+list what is left for the owner.

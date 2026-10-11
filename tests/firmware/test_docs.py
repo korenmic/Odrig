@@ -28,6 +28,11 @@ def section(text, title):
     return found.group(1)
 
 
+def cells(line):
+    """The cells of one line of a table."""
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
 class Firmware(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -144,6 +149,75 @@ class Firmware(unittest.TestCase):
         measured = section(self.text, "Measurements on the board")
         for expected in ("Start of the core", "Refreshes a second", "9 MB", "install-show"):
             self.assertIn(expected, measured)
+
+    def test_its_first_table_of_measurements_has_every_value_for_the_demo_show_and_the_dense_clip_on_the_target(self):
+        measured = section(self.text, "Measurements on the board")
+        said = " ".join(measured.split())
+        for expected in ("`tests/board/test_measure.py`", "`build/firmware/out/measurements.json`", "twenty outputs, four through WLED's RMT driver and sixteen through its parallel driver"):
+            self.assertIn(expected, said)
+        written = re.findall(r"(?m)((?:^\|.*\|\n)+)", measured)
+        tables = [[cells(line) for line in table.splitlines()] for table in written]
+        self.assertEqual(len(tables), 2)
+        heading, _, *rows = tables[0]
+        # The number of outputs, the start of the core, the refreshes sent in a second, the
+        # longest time between two sends, the mean and the longest time of a request and
+        # of a send, the free internal memory, and the time `install-show` takes.
+        columns = {"Working outputs": r"\d+ of \d+", "`install-show`": r"\d+ s", "Start of the core": r"[\d,]+ ms", "Refreshes a second": r"\d+(?: (?:to|or) \d+)?",
+                   "Longest gap": r"\d+ ms", "Request for a refresh, mean": r"[\d.]+ ms", "Send, mean": r"[\d.]+ ms", "Free internal memory": r"[\d,]+ bytes"}
+        for name in columns:
+            self.assertEqual(heading.count(name), 1, name)
+        self.assertEqual([heading[heading.index(name) + 1] for name in ("Request for a refresh, mean", "Send, mean")], ["longest", "longest"])
+        by_show = {row[0]: dict(zip(heading, row)) for row in rows}
+        on_the_target = [show for show in by_show if show.startswith(("Demo show, the target file", "Dense 60 x 60 clip of 10 s, compressed, the target file", "The same clip, uncompressed"))]
+        self.assertEqual(len(on_the_target), 3)
+        for row in rows:
+            self.assertEqual(len(row), len(heading), row[0])
+            for name, figure in columns.items():
+                self.assertRegex(row[heading.index(name)], rf"\A{figure}\Z", f"{row[0]}: {name}")
+            for name in ("Request for a refresh, mean", "Send, mean"):
+                self.assertRegex(row[heading.index(name) + 1], r"\A[\d.]+ ms\Z", f"{row[0]}: {name}, longest")
+        for show in on_the_target:
+            self.assertEqual(by_show[show]["Working outputs"], "20 of 20", show)
+            # Every rate is one the owner accepts on the board: from 20 to 50, and a second
+            # can count one refresh more than was due in it.
+            rates = [int(number) for number in re.findall(r"\d+", by_show[show]["Refreshes a second"] + " " + by_show[show]["`fps` in `status`"])]
+            self.assertTrue(all(20 <= rate <= 51 for rate in rates), (show, rates))
+        # The second table is a record, and the text that leads to it says so.
+        between = measured[measured.index(written[0]) + len(written[0]):measured.index(written[1])]
+        self.assertIn("before the target became twenty upright legs", " ".join(between.split()))
+        self.assertNotIn("Working outputs", tables[1][0])
+
+    def test_it_says_how_many_outputs_the_firmware_drives_and_how(self):
+        does = " ".join(section(self.text, "What the firmware does").split())
+        for expected in ("one output for each leg, in the order of the mapping file, on the leg's pin, with the leg's number of LEDs, for WS2812B LEDs with the colour order green, red, blue",
+                         "the first four legs of the mapping file get WLED's four RMT outputs and the next sixteen its parallel driver, so the board can drive 20 legs",
+                         "An output that cannot be made, for a twenty-first leg or a pin the board cannot use, does not work; the other outputs do, and the core runs unchanged."):
+            self.assertIn(expected, does)
+        self.assertIn("**The firmware drives twenty outputs.** With the target file all twenty work, on pins 1 to 18, 21 and 47.", " ".join(section(self.text, "Measurements on the board").split()))
+
+    def test_it_names_every_patch_file_and_every_file_of_wled_a_patch_changes(self):
+        from .test_patches import changed_files, tracked_patches
+
+        changes = section(self.text, "What the firmware changes in WLED")
+        patches = tracked_patches()
+        self.assertGreaterEqual(len(patches), 1)
+        changed = sorted(name for patch in patches for name in changed_files(patch))
+        self.assertEqual(sorted(re.findall(r"`firmware/patches/([^`]+\.patch)`", changes)), [patch.name for patch in patches])
+        self.assertEqual(sorted(re.findall(r"(?m)^\| `([^`]+)` \| .+ \|$", changes)), changed)
+        said = " ".join(changes.split())
+        for expected in ("which `build` and `build --probe` apply and `build --stock` does not", "`WLED_MAX_I2S_CHANNELS` is 16 in place of 8", "sixteen-lane", "The usermod cannot do this from outside"):
+            self.assertIn(expected, said)
+
+    def test_the_rates_of_the_dense_clip_on_the_target_are_given_beside_what_the_owner_accepts(self):
+        verified = " ".join(section(self.text, "Verified on the board").split())
+        for expected in ("**What the owner accepts.** Any rate from 20 to 50 refreshes a second is fine on the board, for any content",
+                         "| Compressed, 1,383,766 bytes | 22 to 24 | 36 to 42 |", "| Uncompressed, 1,462,236 bytes | 32 to 34 | 45 to 47 |",
+                         "50 for the demo show on the target file, 36 to 42 for the dense 60 x 60 clip compressed and 45 to 47 uncompressed"):
+            self.assertIn(expected, verified)
+        decisions = (ROOT / "docs" / "decisions.md").read_text(encoding="utf-8")
+        firmware = " ".join(decisions.split("\n## Firmware\n")[1].split("\n## ")[0].split())
+        for expected in ("On the board any refresh rate from 20 to 50 a second is accepted, for any content.", "36 to 42 times for the compressed file and 45 to 47 for the uncompressed one"):
+            self.assertIn(expected, firmware)
 
     def test_the_readme_points_to_it(self):
         self.assertIn("[docs/firmware.md](docs/firmware.md)", (ROOT / "README.md").read_text(encoding="utf-8"))

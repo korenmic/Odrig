@@ -280,6 +280,23 @@ class Positions(unittest.TestCase):
         asked = dump(self.texts["legs-20"], leds=[[1, 1], [1, 60], [1, 61], [1, 120], [1, 121], [47, 180]])["asked"]
         self.assertEqual(asked["leds"], [[1, 1], [1, 60], [2, 60], [2, 1], [3, 1], [60, 60]])
 
+    def test_a_first_led_at_the_top_reverses_every_column_of_that_leg_of_the_target_file_and_moves_no_other_led(self):
+        listed = json.loads(self.texts["legs-20"])
+        self.assertEqual((listed["legs"][6]["leg"], listed["legs"][6]["first_led"], listed["legs"][6]["columns"]), (7, "bottom", [19, 20, 21]))
+        listed["legs"][6]["first_led"] = "top"
+        moved = dump(json.dumps(listed))["positions"]
+        plain = self.dumps["legs-20"]["positions"]
+        self.assertEqual(len(moved), 20)
+        for index, (now, before) in enumerate(zip(moved, plain)):
+            if index != 6:
+                self.assertEqual(now, before, f"an LED of leg {index + 1} moved")
+                continue
+            self.assertEqual(len(now), 180)
+            for column in range(3):
+                self.assertEqual(now[60 * column:60 * column + 60], before[60 * column:60 * column + 60][::-1], f"column {column} of leg 7")
+            # A column of 60 has no LED in its middle, so every LED of the leg moved.
+            self.assertTrue(all(place != old for place, old in zip(now, before)))
+
     def test_position_in_a_column_leg_file_takes_the_pin_not_the_place_of_the_leg_in_the_file(self):
         swapped = json.loads(self.texts["columns-apart"])
         swapped["legs"].reverse()

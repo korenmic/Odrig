@@ -67,6 +67,23 @@ class TrackedFiles(unittest.TestCase):
         self.assertEqual(result.strip_length, 60)
         self.assertEqual({result.led_count(entry) for entry in result.legs}, {180})
 
+    def test_the_two_leg_mapping_has_these_bytes_which_are_the_row_leg_file_of_the_mapping_document(self):
+        lines = [
+            "{",
+            '  "version": 1,',
+            '  "width": 60,',
+            '  "legs": [',
+            '    {"leg": 1, "pin": 1, "first_led": "right", "rows": [6, 5, 4]},',
+            '    {"leg": 2, "pin": 2, "first_led": "right", "rows": [3, 2, 1]}',
+            "  ]",
+            "}",
+        ]
+        held = (support.ROOT / "mapping" / "legs-2.json").read_bytes()
+        self.assertEqual(held, ("\n".join(lines) + "\n").encode("ascii"))
+        text = (support.ROOT / "docs" / "mapping.md").read_text(encoding="utf-8")
+        shown = re.findall(r"```json\n(.*?)```", text.split("\n## Mapping file\n")[1].split("\n### Rules\n")[0], re.DOTALL)
+        self.assertEqual(shown[0].encode("ascii"), held)
+
 
 class TargetFile(unittest.TestCase):
     PINS = (*range(1, 19), 21, 47)

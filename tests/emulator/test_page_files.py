@@ -155,6 +155,26 @@ class Files(unittest.TestCase):
         self.assertEqual(re.findall(r'"rgb\(" \+ (.+?) \+ "\)"', view), ['CURVE[red] + "," + CURVE[green] + "," + CURVE[blue]'])
         self.assertEqual(len(re.findall(r"fillStyle\s*=", view)), 1)
 
+    def test_the_drawing_is_made_again_for_the_size_the_stage_has_whenever_that_size_changes(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        self.assertIn("new ResizeObserver(resized).observe(stage);", app)
+        self.assertIn('window.addEventListener("resize", resized);', app)
+        resized = app[app.index("function resized() {"):app.index("if (window.ResizeObserver) {")]
+        self.assertEqual(resized.count("build();"), 1)
+        build = app[app.index("function build() {"):app.index("function shortPath(")]
+        steps = [build.index(step) for step in ("var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight, board);", "drawing = OdrigView.build(host, mapping, hello.legs, f, board);", "drawing.paint(newest);")]
+        self.assertEqual(steps, sorted(steps))
+
+    def test_the_readout_names_the_leg_and_the_pin_and_for_an_led_its_number_and_its_canvas_coordinates(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        pointer = app[app.index("function onPointer(event) {"):app.index("function show(name) {")]
+        for step in ('readout.textContent = "leg " + pointed.leg + ", pin " + pointed.pin;',
+                     "var found = drawing.at(event.clientX - box.left, event.clientY - box.top);",
+                     'readout.textContent = "leg " + leg.leg + ", pin " + leg.pin + ", LED " + found.led + " (" + found.x + "," + found.y + ")";'):
+            self.assertEqual(pointer.count(step), 1, step)
+        self.assertEqual(pointer.count("drawing.focus("), 3)
+        self.assertIn('host.addEventListener("pointermove", onPointer);', app)
+
 
 if __name__ == "__main__":
     unittest.main()

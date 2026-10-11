@@ -42,6 +42,17 @@ class ReasonsDocument(unittest.TestCase):
     def test_the_error_line_is_described(self):
         self.assertIn("error: <reason>: <detail>", self.text)
 
+    def test_a_mapping_file_of_either_kind_has_two_reasons_and_no_other(self):
+        section = self.text.split("\n## Mapping files\n")[1].split("\n## ")[0]
+        self.assertEqual(re.findall(r"(?m)^\| `([a-z0-9-]+)` \| ", section), ["mapping-missing", "mapping-malformed"])
+        self.assertEqual(sorted(reason for reason in reasons_in_code() if "mapping" in reason), ["mapping-malformed", "mapping-missing"])
+        self.assertEqual((errors.MAPPING_MISSING, errors.MAPPING_MALFORMED), ("mapping-missing", "mapping-malformed"))
+        said = " ".join(section.split())
+        self.assertIn("The two reasons hold for both kinds of mapping file, the row-leg file and the column-leg file.", said)
+        # No reason is named after a part of a mapping file or after one of its kinds.
+        for word in ("row", "rows", "column", "columns", "leg", "legs", "strip", "kind", "pin"):
+            self.assertEqual([reason for reason in reasons_in_code() if word in reason.split("-")], [], word)
+
 
 class ConverterDocument(unittest.TestCase):
     @classmethod
@@ -258,6 +269,89 @@ class TheTarget(unittest.TestCase):
         self.assertIn("\n## Target build: 20 legs, 60 x 60\n", documents["docs/mapping.md"])
         self.assertIn("snake of rows or of columns", " ".join(documents["README.md"].split()))
         self.assertIn("twenty upright legs, 60 x 60", " ".join(documents["README.md"].split()))
+
+
+def said(text):
+    """A text with every run of white space as one space."""
+    return " ".join(text.split())
+
+
+class BothKindsOfLeg(unittest.TestCase):
+    """What the documents say of the two kinds of mapping file and of the two builds."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mapping = (DOCS / "mapping.md").read_text(encoding="utf-8")
+        cls.decisions = (DOCS / "decisions.md").read_text(encoding="utf-8")
+
+    def part(self, heading):
+        """The text of the mapping document under one heading, up to the next heading."""
+        return re.split(r"(?m)^#+ ", self.mapping.split(f"\n{heading}\n")[1])[0]
+
+    def test_the_mapping_document_has_its_sections_in_this_order(self):
+        headings = re.findall(r"(?m)^(#+ .+)$", self.mapping)
+        wanted = ["## Mapping file", "### Rules", "### Where each LED is", "## Today's build: 2 legs, 60 x 6", "## Target build: 20 legs, 60 x 60", "## What is confirmed"]
+        self.assertEqual([heading for heading in headings if heading in wanted], wanted)
+
+    def test_the_mapping_document_gives_the_members_of_both_kinds_of_file(self):
+        described = self.part("## Mapping file")
+        rows = {name: (of_rows, of_columns) for name, of_rows, of_columns in re.findall(r"(?m)^\| `([a-z_]+)` \| (.+) \| (.+) \|$", described)}
+        self.assertEqual(sorted(rows), ["columns", "first_led", "height", "leg", "legs", "pin", "rows", "version", "width"])
+        self.assertEqual((rows["width"][1], rows["height"][0], rows["rows"][1], rows["columns"][0]), ("Absent.",) * 4)
+        self.assertIn('`"left"` or `"right"`', rows["first_led"][0])
+        self.assertIn('`"bottom"` or `"top"`', rows["first_led"][1])
+        for phrase in ("All legs of one file are of one kind.", "a file with `width` and without `height` is a row-leg file", "a file with `height` and without `width` is a column-leg file",
+                       "| Canvas width W | `width` | the number of columns of all legs |", "| Canvas height H | the number of rows of all legs | `height` |"):
+            self.assertIn(phrase, said(described))
+
+    def test_the_mapping_document_numbers_eight_rules_and_the_reader_has_a_test_for_each(self):
+        rules = self.part("### Rules")
+        self.assertEqual(re.findall(r"(?m)^([0-9]+)\. ", rules), [str(number) for number in range(1, 9)])
+        for phrase in ("`version` is 1", "from 1 to 255", "from 0 to 255", "W * H is at most 65,534", "an integer from 1 to 65,535", "an array of one or more integers",
+                       "every y from 1 to H in a row-leg file, every x from 1 to W in a column-leg file", "a file with both `width` and `height`, or with neither",
+                       "`mapping-malformed`", "`mapping-missing`", "The two reasons are the same for both kinds."):
+            self.assertIn(phrase, said(rules))
+        from .test_mapping import RejectedColumns
+
+        tested = {int(name.split("_")[2]) for name in dir(RejectedColumns) if name.startswith("test_rule_")}
+        self.assertEqual(tested, set(range(1, 9)))
+
+    def test_the_mapping_document_says_where_each_led_is_for_both_kinds(self):
+        rule = said(self.part("### Where each LED is"))
+        for phrase in ("A row leg whose `rows` has R entries has W * R LEDs.", "r = (n - 1) div W", "i = (n - 1) mod W", "y = `rows[r]`",
+                       "x = W - i when the row starts on the right, and x = 1 + i when it starts on the left",
+                       "A column leg whose `columns` has C entries has H * C LEDs.", "s = (n - 1) div H", "i = (n - 1) mod H", "x = `columns[s]`",
+                       "The column starts at the `first_led` end when s is even and at the opposite end when s is odd.",
+                       "y = 1 + i when the column starts at the bottom, and y = H - i when it starts at the top"):
+            self.assertIn(phrase, rule)
+
+    def test_the_mapping_document_has_both_builds_with_their_files_and_what_is_confirmed(self):
+        self.assertIn("File: [`mapping/legs-2.json`](../mapping/legs-2.json).", self.part("## Today's build: 2 legs, 60 x 6"))
+        self.assertIn("File: [`mapping/legs-20.json`](../mapping/legs-20.json).", self.part("## Target build: 20 legs, 60 x 60"))
+        confirmed = said(self.part("## What is confirmed"))
+        for phrase in ("Legs 1 and 2 of today's build are confirmed on the hardware", "The legs of the target build are not wired",
+                       "twenty working outputs on pins 1 to 18, 21 and 47", "have not been seen", "It has not been compared with the installation."):
+            self.assertIn(phrase, confirmed)
+
+    def test_the_decisions_state_what_was_measured_for_twenty_outputs_and_have_the_target_in_their_change_log(self):
+        questions = said(self.decisions.split("\n## Open questions\n")[1].split("\n## ")[0])
+        asked = questions.split("- Whether one board can drive twenty LED outputs.")[1].split(" - ")[0]
+        for phrase in ("Measured on the board", "twenty working outputs", "four through WLED's RMT driver and sixteen through its parallel driver", "on pins 1 to 18, 21 and 47"):
+            self.assertIn(phrase, asked)
+        entries = [said(entry) for entry in re.split(r"(?m)^- (?=[0-9]{4}-[0-9]{2}-[0-9]{2}: )", self.decisions.split("\n## Change log\n")[1])[1:]]
+        self.assertEqual(entries, sorted(entries, key=lambda entry: entry[:10]))
+        named = [entry for entry in entries if "the target of twenty upright legs, 60 x 60" in entry]
+        self.assertEqual(len(named), 1)
+        for phrase in ("column legs beside row legs", "`mapping/legs-20.json`", "`shows/demo-20`", "twenty working outputs"):
+            self.assertIn(phrase, named[0])
+
+    def test_the_converter_document_describes_both_kinds_and_names_the_target(self):
+        text = said((DOCS / "converter.md").read_text(encoding="utf-8"))
+        for phrase in ("with a row-leg file it is as wide as the mapping's `width` and as high as the number of rows the mapping lists",
+                       "with a column-leg file it is as wide as the number of columns the mapping lists and as high as the mapping's `height`",
+                       "from a mapping file of either kind, a row-leg file or a column-leg file",
+                       "The show for the target build of twenty legs, 60 x 60, is the demo show `shows/demo-20/show.json`", "--mapping mapping/legs-20.json"):
+            self.assertIn(phrase, text)
 
 
 if __name__ == "__main__":

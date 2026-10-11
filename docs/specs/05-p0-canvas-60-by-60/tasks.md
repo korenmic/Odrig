@@ -304,7 +304,7 @@ Rules for every task:
     a person: the list in Safari
     and at a real screen, and the owner's checks 5 and 6 of `docs/firmware.md`.
 
-- [ ] 11. The last check, and the board left as it was found
+- [x] 11. The last check, and the board left as it was found
   - Read every acceptance criterion of Requirements 1 to 18 once more and name, for each
     one a program can check, the test that checks it; add a test where one is missing.
   - Run the four suites that need no board, `make -C core bench`, and
@@ -317,3 +317,7 @@ Rules for every task:
     or task 10 is open, leave the state `in_progress`, leave this task open, and say in
     the hand-over what is left.
   - Requirements: 13.5, 15.4, 15.5, 17.1, 17.2, 17.3, 18.4
+  - The state is `completed`: Requirement 13 criterion 5 does not hold the seed open since
+    the owner ruled that any rate from 20 to 50 a second is fine on the board, and task 10
+    is done. `docs/drifts.md`, "Seed 05: What is verified", names the test of every
+    criterion and what is left for the owner's eyes.

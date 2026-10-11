@@ -200,6 +200,31 @@ class Recording(unittest.TestCase):
         self.assertEqual(len(recording.ticks), 50)
         self.assertEqual(differing, 50)
 
+    def test_every_made_up_column_leg_mapping_is_recorded_with_its_own_legs_as_the_reference_plays_it(self):
+        texts = core_support.column_mapping_texts()
+        self.assertEqual(sorted(texts), ["columns-apart", "one-led-column", "top-start", "two-and-four-columns"])
+        sizes = set()
+        for name, text in texts.items():
+            with self.subTest(mapping=name):
+                listed = json.loads(text)
+                height = listed["height"]
+                width = sum(len(leg["columns"]) for leg in listed["legs"])
+                sizes.add((width, height))
+                files = {
+                    "mapping.json": text,
+                    "show.json": core_support.show_text([{"id": 1, "file": "clip.odrg"}], brightness=255, start=1),
+                    "clip.odrg": core_support.clip(name, width, height, durations=(20, 40, 20, 60, 20)),
+                }
+                recording, printed = self.record(self.installed(files), 1)
+                self.assertEqual(printed, [])
+                self.assertEqual(recording.legs, tuple((leg["leg"], leg["pin"], height * len(leg["columns"])) for leg in listed["legs"]))
+                self.assertEqual(recording.led_bytes, 3 * width * height)
+                refreshes, _ = support.reference(files, tick_times(1))
+                self.assert_equals_reference(recording, refreshes)
+                self.assertTrue(all(tick.produced for tick in recording.ticks))
+                self.assertGreater(len({tick.data for tick in recording.ticks}), 1)
+        self.assertEqual(sizes, {(5, 4), (1, 1), (3, 7), (6, 5)})
+
     def test_an_invalid_mapping_gives_no_legs_and_no_refresh(self):
         files = core_support.example_show()
         files["mapping.json"] = b'{"version": 1, "width": 60}'

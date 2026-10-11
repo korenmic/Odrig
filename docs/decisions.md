@@ -255,12 +255,12 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-11: The firmware of seed 04 measured on the board. The two open questions about
   the board, decode speed and ten outputs, have what was measured; what needs ten wired
   legs stays open.
-- 2026-10-12: Seed 05 brought the project to the target of twenty upright legs, 60 x 60.
-  The mapping file format has column legs beside row legs, `mapping/legs-20.json` and the
-  demo show `shows/demo-20` take the place of the ten-leg file and its show, the core, the
+- 2026-10-12: Seed 05 brought the project to the target of twenty upright legs, 60 x 60. The
+  mapping file format has column legs beside row legs, `mapping/legs-20.json` and the demo
+  show `shows/demo-20` take the place of the ten-leg file and its show, the core, the
   emulator and its page read both kinds, and with one patch to WLED the firmware makes
-  twenty outputs. Measured on the board: twenty working outputs, and a dense 60 x 60 clip
-  at 36 to 42 refreshes a second compressed and 45 to 47 uncompressed. The owner ruled that
-  any rate from 20 to 50 a second is fine on the board, for any content. What fits into storage is computed again for 60 x 60:
-  65 to 74 seconds of the dense clip. The open question about legs 3 to 10 is now the one
-  about twenty wired legs.
+  twenty outputs. Measured on the board: twenty working outputs, and a dense 60 x 60 clip at
+  36 to 42 refreshes a second compressed and 45 to 47 uncompressed. The owner ruled that any
+  rate from 20 to 50 a second is fine on the board, for any content. What fits into storage
+  is computed again for 60 x 60: 65 to 74 seconds of the dense clip. The open question about
+  legs 3 to 10 is now the one about twenty wired legs.
