@@ -210,7 +210,7 @@ Rules for every task:
     was passed.
   - Requirements: 7.7, 15.6, 16.2, 16.3, 16.4, 16.5, 16.6, 17.3
 
-- [ ] 9. Documentation and final check by program
+- [x] 9. Documentation and final check by program
   - Complete `docs/firmware.md` as Requirement 17 lists, with the owner's checks written as
     numbered steps that name what to run and what must be seen. Add one sentence to
     `README.md` pointing to `docs/firmware.md`.

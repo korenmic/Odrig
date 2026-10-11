@@ -157,3 +157,58 @@ class TheCore(unittest.TestCase):
     def test_the_usermod_has_no_decoder_mapping_show_or_command_code_of_its_own(self):
         for path in SOURCES:
             self.assertNotRegex(text_of(path), r"inflate|first_led|\bcycle\b|\"play\"|\"brightness\"|unknown-command", path.name)
+
+
+class Host(unittest.TestCase):
+    """What the usermod gives the core, read in its sources."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.files = text_of(USERMOD / "odrig_files.cpp")
+        cls.leds = text_of(USERMOD / "odrig_leds.cpp")
+
+    def test_memory_comes_from_the_internal_memory_before_the_external(self):
+        internal, external = self.files.index("MALLOC_CAP_INTERNAL"), self.files.index("MALLOC_CAP_SPIRAM")
+        self.assertLess(internal, external)
+        self.assertRegex(self.files, r"if \(block == nullptr\) block = heap_caps_aligned_alloc\(8, bytes, MALLOC_CAP_SPIRAM")
+        self.assertNotRegex(self.files, r"\bfree\(|heap_caps_free")
+
+    def test_the_time_is_the_64_bit_clock_since_start_in_milliseconds(self):
+        self.assertIn("uint64_t OdrigFiles::nowMs() { return (uint64_t)esp_timer_get_time() / 1000; }", self.files)
+        for path in SOURCES:
+            self.assertNotRegex(text_of(path).replace("lastAsked = millis();", "").replace("const uint32_t now = millis();", ""), r"odrig_core_\w+\([^)]*millis\(\)", path.name)
+
+    def test_files_are_read_from_the_shows_folder_in_the_pieces_the_core_asks_for(self):
+        self.assertIn('const char FOLDER[] = "/odrig/";', self.files)
+        self.assertIn('WLED_FS.open(path, "r")', self.files)
+        self.assertIn("openFile.read(buffer, capacity)", self.files)
+
+    def test_nothing_writes_creates_or_deletes_a_file(self):
+        for path in SOURCES:
+            text = text_of(path)
+            self.assertNotRegex(text, r"WLED_FS\.(remove|mkdir|rmdir|rename|format)\b", path.name)
+            self.assertNotRegex(text, r'\.open\([^)]*"(w|a|r\+)[^"]*"\)', path.name)
+            self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
+
+    def test_each_leg_becomes_a_ws2812b_output_in_green_red_blue_with_wleds_led_current(self):
+        described = self.leds[self.leds.index("void describeOutputs()"):self.leds.index("void startOutputsAfterAFailedOne()")]
+        self.assertRegex(described, r"busConfigs\.emplace_back\(TYPE_WS2812_RGB, pins, keptStart\(start\), keptLength\(leg\.led_count\), COL_ORDER_GRB,")
+        self.assertIn("LED_MILLIAMPS_DEFAULT", described)
+        self.assertIn("(uint8_t)leg.pin, 255, 255, 255, 255", described)
+
+    def test_a_refresh_goes_to_the_outputs_directly_at_full_brightness(self):
+        send = self.leds[self.leds.index("void OdrigLeds::send()"):self.leds.index("void OdrigLeds::dark()")]
+        for expected in ("BusManager::setBrightness(255);", "Bus::setCCT(-1);", "bus->setPixelColor(n, RGBW32(rgb[0], rgb[1], rgb[2], 0));", "BusManager::show();"):
+            self.assertIn(expected, send)
+        self.assertNotRegex(send, r"\bstrip\.")
+
+    def test_wled_is_held_in_its_live_mode_at_every_pass(self):
+        hold = self.leds[self.leds.index("void OdrigLeds::hold()"):self.leds.index("void OdrigLeds::send()")]
+        for expected in ("realtimeOverride = REALTIME_OVERRIDE_NONE;", "useMainSegmentOnly = false;", "realtimeLock(65000, REALTIME_MODE_GENERIC);", "if (doInitBusses)", "else if (!matches())"):
+            self.assertIn(expected, hold)
+        usermod = text_of(USERMOD / "odrig_usermod.cpp")
+        self.assertEqual(usermod.count("OdrigLeds::hold();"), 2)
+
+    def test_the_limiters_maximum_is_never_set_by_the_usermod(self):
+        for path in SOURCES:
+            self.assertNotRegex(text_of(path), r"setMilliampsMax|_gMilliAmpsMax\s*=", path.name)

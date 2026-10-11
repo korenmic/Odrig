@@ -6,10 +6,13 @@ tools the build needs, fetches WLED, builds, flashes, restores stock WLED and in
 show into the board's storage.
 
 This page covers [what the tool needs](#what-the-tool-needs), [the work folder](#the-work-folder),
-the [commands](#commands) of the tool, [what the firmware does](#what-the-firmware-does),
-[the probe build](#the-probe-build), the [measurements](#measurements-on-the-board) made
-on the board, [the regions of the flash](#the-regions-of-the-flash) the tool writes,
-[rolling back](#rolling-back) and what was [verified on the board](#verified-on-the-board).
+the [commands](#commands) of the tool, [from nothing to a playing board](#from-nothing-to-a-playing-board),
+[what the firmware does](#what-the-firmware-does),
+[what it changes in WLED](#what-the-firmware-changes-in-wled), [the probe build](#the-probe-build),
+the [measurements](#measurements-on-the-board) made on the board,
+[the regions of the flash](#the-regions-of-the-flash) the tool writes,
+[rolling back](#rolling-back), [the owner's checks](#the-owners-checks) and what was
+[verified on the board](#verified-on-the-board).
 
 ## What the tool needs
 
@@ -310,8 +313,49 @@ python3 firmware/fw.py test-board
 ```
 
 Runs the suite in `tests/board/`, found by discovery in the same way. It needs the board on
-USB and writes to it: it flashes images and restores stock WLED. Without a board it stops
-with `no-board` and runs nothing.
+USB and writes to it: it flashes the firmware, the probe build and stock WLED, and installs
+shows, each with a brightness of 40 or less; a brighter show is refused before the tool is
+started. It builds an image the work folder does not hold. Its last step leaves the board
+with the firmware and the example show at brightness 32, playing. A run takes about half
+an hour. Without a board it stops with `no-board` and runs nothing.
+
+### test-air
+
+```
+python3 firmware/fw.py test-air --http 4.3.2.1
+```
+
+Runs the suite in `tests/air/`, found by discovery. It needs the board on USB and this Mac
+joined to the board's Wi-Fi network; `ADDRESS` is the board's address on that network,
+`4.3.2.1` on the board's own access point. Joining the network is done by a person. The
+suite sends commands over HTTP and through the port and compares them, asks WLED's own
+interface for its information, and once saves WLED's LED settings, with the pin of the last
+output changed, to see the mapping's outputs come back; WLED then stores the mapping's
+outputs as its LED settings. Without a board, or when the address answers no command, it
+stops with `no-board` and runs nothing.
+
+## From nothing to a playing board
+
+With the board on USB, from the repository root:
+
+```
+python3 firmware/fw.py build
+python3 firmware/fw.py flash
+python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+    --sources animations --out build/example-show
+python3 firmware/fw.py install-show build/example-show
+python -m odrigctl --port /dev/cu.usbmodem101 status
+```
+
+The first command also sets up the tools and fetches WLED, which needs the network once.
+`pack` is the converter's command of [converter.md](converter.md); `shows/example/show.json`
+has brightness 128, so for a strip fed from the board's 3.3 V pin pack a copy of it with a
+brightness of 40 or less. After `install-show` the board plays the show from every
+power-on, with no command sent. To go back to stock WLED:
+
+```
+python3 firmware/fw.py restore-stock
+```
 
 ## What the firmware does
 
@@ -438,6 +482,20 @@ brightness.
 **Calls to the core** are made one at a time: a lock is held for every call after the
 start.
 
+## What the firmware changes in WLED
+
+| Changed | Left as it is |
+|---|---|
+| The LEDs show only the core's data. WLED's effects, presets, playlists, its boot preset and its nightlight do not run. | Wi-Fi, the access point and all network settings. |
+| The outputs are the mapping's. WLED's LED output settings are replaced by them when WLED's LED settings are saved. | The web interface, the JSON interface and WebSocket. |
+| WLED's switch, its brightness slider and its live override do not change the LEDs. | The current limiter and its maximum in WLED's LED settings. |
+| The USB serial port speaks only [commands.md](commands.md): WLED's serial handling, Adalight, TPM2, Improv and JSON over serial, is switched off. | The file system and every file of WLED on it. |
+| WLED's information shows the three `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface. |
+| The audio usermod of the stock build is not included. | Buttons, relay and infrared settings. |
+| The web server also answers `POST /odrig`. | Every page and address WLED serves. |
+
+No file of WLED is changed for this: `firmware/patches/` holds no patch.
+
 ## The probe build
 
 The probe build exists so that a program can check what the LEDs are given without eyes on
@@ -475,21 +533,6 @@ core; every other byte is passed on to the core, unchanged and in order.
 
 The probe build plays as the firmware does. Reading the outputs back takes time, so its
 own rate can be a refresh or two below the firmware's.
-
-### test-air
-
-```
-python3 firmware/fw.py test-air --http 4.3.2.1
-```
-
-Runs the suite in `tests/air/`, found by discovery. It needs the board on USB and this Mac
-joined to the board's Wi-Fi network; `ADDRESS` is the board's address on that network,
-`4.3.2.1` on the board's own access point. Joining the network is done by a person. The
-suite sends commands over HTTP and through the port and compares them, asks WLED's own
-interface for its information, and once saves WLED's LED settings, with the pin of the last
-output changed, to see the mapping's outputs come back; WLED then stores the mapping's
-outputs as its LED settings. Without a board, or when the address answers no command, it
-stops with `no-board` and runs nothing.
 
 ## Measurements on the board
 
@@ -560,6 +603,41 @@ for a board whose first 64 KB were changed by something else.
 The last resort is the factory backup of the board: one image of the whole 16 MB flash with
 its own checksum file, kept beside this repository. No tool reads or writes it. It is
 written back by hand with esptool, at address `0x0`, after its checksum has been compared.
+
+## The owner's checks
+
+What a program on this Mac cannot establish: what the LEDs show, and what a device joined to
+the board's Wi-Fi network gets. Each step says what to do and what must be seen. The number
+in brackets is the criterion of Requirement 16 of
+`docs/specs/04-p1-firmware-build-with-the-player/requirements.md` the step covers. The seed
+is completed when all four are done.
+
+1. **The show plays from power-on (16.1).** Install the example show at the brightness
+   chosen for the power supply in use; one strip fed from the board's 3.3 V pin allows 40
+   at most. Switch the board's power off and on and send no command. *Seen:* the words
+   HELLO WORLD, upright and readable from left to right, and the bouncing square take turns
+   every 15 seconds.
+2. **49 refreshes a second with two legs wired (16.2).** With legs 1 and 2 wired and the
+   example show playing, run `python -m odrigctl --port /dev/cu.usbmodem101 status`.
+   *Seen:* `"fps":49` or more, `"error":null`, and the picture across both legs.
+3. **Commands over the board's own network (16.7).** After power-on, find the board's Wi-Fi
+   network, join it with this Mac, with the board still on USB, and run
+   `python3 firmware/fw.py test-air --http 4.3.2.1`. *Seen:* the suite ends with `OK`.
+   One of its tests saves WLED's LED settings; see [test-air](#test-air).
+4. **WLED's interface beside the player (16.7).** With a phone joined to the board's
+   network, open `http://4.3.2.1/`. *Seen:* WLED's interface opens, and its Info page shows
+   the entries `odrig show` with `ok`, `odrig outputs` with `2/2` for two legs, and
+   `odrig start`.
+
+Before ten legs are lit, raise WLED's maximum current as [What the firmware
+does](#what-the-firmware-does) says.
+
+What a program established without the owner, over USB: the board plays the installed show
+from its start with no command sent, as `status` reports `playing` 3 after every restart;
+the outputs hold the bytes the emulator records for the same show; `status` reports 49 or
+more with the example show, with one strip wired; WLED reports its access point as up; and
+the tests of `test-air` that send commands pass against the emulator. The four steps above
+have not been done.
 
 ## Verified on the board
 
@@ -658,6 +736,13 @@ played its own show: the report had `realtime` 0, two outputs, and `overwritten`
 
 The probe build reported `ap` 1 from the first second after its start: WLED's access point
 was up, with no network to join configured.
+
+**From nothing.** With `build/firmware/` removed, `python3 firmware/fw.py build` set up the
+tools, fetched WLED and built the firmware in 2 minutes. The lists of the home folder from
+before and after were the same in every entry. The image has the size it had, 1,211,600
+bytes; its bytes are not those of the build before, so its SHA-256 differs from one fresh
+work folder to the next, while a build repeated in the same work folder gives the same
+bytes. That image was flashed, the dim example show installed, and both suites run.
 
 The board's partition table, read with the tool, is the one WLED's source has for this
 environment and byte for byte the stock file `partitions_s3_16m.bin`:

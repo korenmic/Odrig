@@ -44,3 +44,7 @@ to build it, test it and host it, is described in [docs/core.md](docs/core.md).
 The emulator, the Mac program that runs the core on a packed show and draws the LEDs in a
 web page, and the command tool that talks to it and to the board, are described in
 [docs/emulator.md](docs/emulator.md).
+
+The firmware, the WLED build that hosts the core on the board, and the tool that builds it,
+flashes it, installs a show and restores stock WLED, are described in
+[docs/firmware.md](docs/firmware.md).

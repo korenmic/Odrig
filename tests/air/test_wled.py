@@ -46,6 +46,18 @@ class Information(unittest.TestCase):
         self.assertIn("on", json.loads(body))
 
 
+class WledsOwnControls(unittest.TestCase):
+    def test_wleds_switch_brightness_and_live_override_do_not_reach_the_player(self):
+        before = support.over_the_port("status")[1]
+        for state in ({"on": False}, {"bri": 255}, {"lor": 2}, {"live": False}, {"on": True, "bri": 128, "lor": 0}):
+            self.assertEqual(support.request("POST", "/json/state", json.dumps(state).encode(), "application/json")[0], 200)
+            time.sleep(0.5)
+            now = support.over_the_port("status")[1]
+            self.assertEqual((now["on"], now["brightness"], now["playing"], now["error"]), (before["on"], before["brightness"], before["playing"], before["error"]), state)
+        time.sleep(1.5)
+        self.assertGreaterEqual(support.over_the_port("status")[1]["fps"], 49)
+
+
 class LedSettings(unittest.TestCase):
     def test_the_mappings_outputs_come_back_after_wleds_led_settings_are_saved(self):
         before = info()["u"]["odrig outputs"][0]

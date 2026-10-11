@@ -2302,3 +2302,30 @@ copies of the dense clip of 10 seconds under names of their own and one of 4 sec
 
 **Resolution.** `firmware/fwtool/cli.py`; `tests/board/test_measure.py`;
 `docs/firmware.md`, "flash", "install-show" and "Measurements on the board".
+
+## Seed 04: Criteria that had no test, and a test of the start without a command
+
+**Question.** Task 9 reads the acceptance criteria of Requirements 1 to 15 again and adds a
+test where a program can check a criterion and none does. Which were missing, and what of
+the owner's first check can a program see?
+
+**Answer.** Added in `tests/firmware/`: that the tool's own packages are pinned at exact
+versions and WLED's pinned PlatformIO comes first, that nothing is fetched or installed
+when the work folder has it all, that a Python below 3.10 is refused, and that every tool
+is taken from the work folder (Requirements 1.6, 2.1, 2.3, 2.4); and, read in the
+usermod's sources, where the core's memory comes from, which clock it is given, that files
+are opened for reading only and in the show's folder, how a leg becomes an output, that a
+refresh goes to the outputs directly at full brightness, and that WLED is held in its live
+mode at every pass (Requirements 7.2, 7.3, 7.4, 7.6, 8.1, 9.2, 9.3, 10.1, 10.2). Added in
+`tests/board/`: after a restart with no command sent to the core, `status` reports the
+cycle playing, its two animations take turns after 15 seconds, and the rate is 49 or more
+(Requirements 7.1 and 16.1, as far as a program sees them: what the LEDs show stays the
+owner's). Added in `tests/air/`: WLED's own switch, brightness and live override do not
+change what `status` reports (Requirement 9.4, for the owner to run).
+
+Requirement 3.2, the core compiled with the flags of the environment, has no test of its
+own: the flags were compared in the verbose build of task 5, and the tests hold what makes
+it so, that `core/library.json` and the override give the core no flag.
+
+**Resolution.** `tests/firmware/test_toolchain.py`, `tests/firmware/test_usermod_files.py`,
+`tests/firmware/test_docs.py`, `tests/board/test_autostart.py`, `tests/air/test_wled.py`.
