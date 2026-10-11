@@ -1604,3 +1604,49 @@ benchmark figures are those of the Mac.
 
 **Resolution.** `docs/core.md`; `tests/core/test_build.py`. Seed 04 `tasks.md`, tasks 5
 and 8, build the core for the board and measure there.
+
+## Seed 03: The ticks of a recording whose length is not a multiple of 20 ms
+
+**Question.** Requirement 11 puts the ticks of a recording at "0 ms, 20 ms, 40 ms and so on
+below S seconds". The design counts them as `floor(S * 1000 / 20)` and calls a length that
+gives no tick `bad-length`. For a length of 30 ms the first gives the ticks 0 and 20 and the
+second the tick 0 only; for 5 ms the first gives one tick and the second refuses the length.
+The two agree for every length that is a multiple of 20 ms.
+
+**Answer.** The requirement decides: every grid time below the length is a tick, so the
+number of ticks is the length in milliseconds over 20, rounded up. `bad-length` is a length
+that is not above 0 after rounding to the nearest millisecond, as Requirement 12 has it. A
+scripted time is refused when it is at or after the length, as Requirement 11 criterion 4
+says, not at `20 * T`.
+
+**Resolution.** `emulator/record.py`, `tick_count` and `read_script`; `docs/emulator.md`,
+"Record mode"; `tests/emulator/test_record.py`.
+
+## Seed 03: A scripted command later than the last tick
+
+**Question.** A scripted command is given to the core "before the first tick that is not
+earlier than that time". A command whose time is after the last tick and below the length,
+such as 59990 in a recording of 60 seconds, has no such tick. The loop of the design never
+sends it, and Requirement 11 criterion 3 wants every command given and its reply printed.
+
+**Answer.** Such a command is given to the core after the last tick, with its own time,
+and its reply is printed like any other. It changes no tick of the file.
+
+**Resolution.** `emulator/record.py`, `ticks`; `docs/emulator.md`, "The script".
+
+## Seed 03: A record file that cannot be written, and details of the script
+
+**Question.** Requirement 12 lists six reasons for a failed start. None fits a record file
+whose folder does not exist or cannot be written. The design also leaves open what an empty
+line of a script is when the file has carriage returns, and what is done with a script that
+is not UTF-8.
+
+**Answer.** A record file that cannot be written is `cannot-write`, the name the converter
+gives the same condition, with status 1 and no `.part` file left. A script is read as
+UTF-8, and one that is not is `bad-script`. Lines end at a newline. A line that is empty,
+or holds only a carriage return, is skipped; the command of any other line is given to the
+core as it is, a carriage return at its end included, which the core drops. A command may
+be empty: the line `100 ` gives the core an empty line at 100 ms.
+
+**Resolution.** `emulator/failure.py`; `emulator/record.py`; `docs/emulator.md`, "The
+script" and "Exit statuses".

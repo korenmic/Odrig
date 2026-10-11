@@ -50,7 +50,7 @@ Rules for every task:
     any test runs. Undo both before committing.
   - Requirements: 2.1, 2.2, 2.3, 2.5, 16.1, 16.2, 16.3
 
-- [ ] 2. Record mode on a virtual clock
+- [x] 2. Record mode on a virtual clock
   - Create `emulator/recfile.py`, `emulator/record.py`, `emulator/app.py` and
     `emulator/__main__.py` with the record options, the checks of the folder, the length
     and the script, and the error line and exit statuses of the design.
