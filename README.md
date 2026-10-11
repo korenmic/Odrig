@@ -31,4 +31,6 @@ Decisions made so far, and the questions still open, are in [docs/decisions.md](
 The animation file formats are specified in [docs/format.md](docs/format.md), the mapping
 between canvas coordinates and physical LEDs in [docs/mapping.md](docs/mapping.md), what a
 show is in [docs/show.md](docs/show.md), and the commands in
-[docs/commands.md](docs/commands.md). Planned work is in [project-seeds/](project-seeds/).
+[docs/commands.md](docs/commands.md). Wi-Fi is covered in [docs/wifi.md](docs/wifi.md) and
+the first notes on the operators' app in [docs/android-app.md](docs/android-app.md). Planned
+work is in [project-seeds/](project-seeds/).

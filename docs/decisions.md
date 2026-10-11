@@ -7,7 +7,11 @@ it stands now.
 
 - The workstreams are the ones listed in the [README](../README.md).
 - Hardware and power wiring are out of scope: operators handle them on site.
-- On-site control is over Wi-Fi, with an Android app for operators.
+- On-site control is over Wi-Fi, with an Android app for operators. The board hosts the Wi-Fi
+  network and phones join it. See [wifi.md](wifi.md) and the first notes on the app in
+  [android-app.md](android-app.md).
+- Questions that come up while writing specs or implementing are answered without asking the
+  owner, and each one is recorded with its answer and resolution in [drifts.md](drifts.md).
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
   queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
   with its own state file.
@@ -94,6 +98,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   ID, switch on, switch off, set brightness, and report status.
 - Commands are plain text lines and every reply is one JSON line. See
   [commands.md](commands.md).
+- Commands travel over serial and over HTTP, on the board and on the emulator alike. A
+  command-line tool sends them to either target by either route.
 
 ## Emulator
 
@@ -103,7 +109,9 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - It is our own Mac program around the shared core, built natively. It does not depend on
   any third-party emulator.
 - Commands reach it through a virtual serial port, so the serial tools that talk to the board
-  work against it unchanged. A Wi-Fi channel is added when the Android app needs it.
+  work against it unchanged, and over HTTP, which stands in for the board's Wi-Fi.
+- Its page shows each command as it arrives, and a mapping view: the board and its pins, the
+  line from each pin to its leg, and each leg's snake through its three rows.
 - It draws the physical LEDs in a web view: it takes what the player sends to each leg and
   places every LED using the tracked mapping file, so a wrong mapping is visible.
 - It has no size setting of its own. The canvas size comes from the mapping file, the same
@@ -148,3 +156,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   created for the converter, the shared core, the emulator and the firmware build.
 - 2026-10-11: Local trials of ready-made emulators finished. Espressif's emulator and
   FastLED's browser compiler are not used; the reasons are in the Emulator section.
+- 2026-10-11: Scope widened by the owner. Commands also travel over HTTP on the emulator and
+  the board; the emulator page gains a live command log and a mapping view of the board, legs
+  and snakes; the command tool reaches the board or the emulator by serial or HTTP. The board
+  hosts the Wi-Fi network. Seeds 03 and 04 were updated before any work on them began.
+  Questions met along the way are answered without asking and recorded in drifts.md.

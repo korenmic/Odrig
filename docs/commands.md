@@ -55,7 +55,15 @@ Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounde
 
 ## Transports
 
-| Where | How commands arrive |
-|---|---|
-| Board | The USB serial port. |
-| Emulator | A virtual serial port on the Mac. |
+A transport only carries lines to the command front-end and replies back. The commands and
+replies are the same on every transport.
+
+| Where | Serial | Network |
+|---|---|---|
+| Board | The USB serial port. | HTTP over Wi-Fi, on the board's web server. |
+| Emulator | A virtual serial port on the Mac. | HTTP on the emulator's page address. |
+
+**HTTP.** A command is sent as `POST /odrig` with the command line as the request body, with
+or without the final newline. The response body is the reply line, with content type
+`application/json`. The response status is 200 whenever the line reached the command
+front-end, including replies with `"ok":false`. Any other method on `/odrig` gets status 405.
