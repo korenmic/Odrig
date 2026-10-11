@@ -94,6 +94,7 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `POST /odrig` | Status 200, content type `application/json`, and the reply line as the core returned it, with its newline. The status is 200 for a reply with `"ok":false` too. |
 | Any other method on `/odrig` | Status 405 with `Allow: POST` and no body. The core is not called. |
 | `POST /odrig` without a `Content-Length` that is a whole number | Status 411. The core is not called. |
+| `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
 | Any other path | Status 404. |
 
 - The body is the command line, with or without a final newline. Of a body longer than 128
@@ -102,6 +103,45 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
 - An answer without a body closes its connection.
+
+## The event stream
+
+The page learns everything it shows from one stream of server-sent events, `GET /events`,
+and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
+byte (404 when the folder has none). Another program may read both in the same way.
+
+The stream is a response of type `text/event-stream` that stays open. It has four kinds of
+event:
+
+```
+event: hello
+data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+
+event: log
+data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","cut":false,"reply":"{\"ok\":true}"}
+
+event: status
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
+
+event: frame
+data: 123460 <base64 of the refresh>
+```
+
+| Event | What it carries |
+|---|---|
+| `hello` | First on every connection. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the line as the core read it, and `reply` the reply without its newline. A line of more than 64 characters is given with its first 64 and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
+| `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
+
+A new connection gets `hello`, the log entries kept so far, the latest status, and then
+everything that happens. The emulator keeps the last 500 log entries.
+
+Log and status events are never dropped. Refreshes do not queue: each connection has one
+place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
+skips refreshes and does not fall behind. What the system has already taken for a
+connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to
+send for 15 seconds is sent the comment line `: keep-alive`.
 
 ## Record mode
 

@@ -1,5 +1,6 @@
 """Helpers shared by the tests of the emulator: where things are and how shows are packed."""
 
+import base64
 import collections
 import contextlib
 import http.client
@@ -314,3 +315,91 @@ class Serial:
 
     def __exit__(self, *_):
         self.close()
+
+
+Event = collections.namedtuple("Event", "kind data")
+
+
+class EventStream:
+    """A page's end of the event stream, read only when a test asks.
+
+    `receive_buffer` asks the system for a small buffer, so that a test which stops
+    reading is soon felt by the emulator.
+    """
+
+    def __init__(self, port, receive_buffer=None, path="/events"):
+        self.socket = socket.socket()
+        if receive_buffer is not None:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, receive_buffer)
+        self.socket.settimeout(10)
+        self.socket.connect(("127.0.0.1", port))
+        self.socket.sendall(f"GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAccept: text/event-stream\r\n\r\n".encode("ascii"))
+        self._buffer = b""
+        while b"\r\n\r\n" not in self._buffer:
+            piece = self.socket.recv(4096)
+            if not piece:
+                raise AssertionError(f"the event stream ended inside its headers: {self._buffer!r}")
+            self._buffer += piece
+        head, self._buffer = self._buffer.split(b"\r\n\r\n", 1)
+        status_line, *header_lines = head.decode("iso-8859-1").split("\r\n")
+        self.status = int(status_line.split(" ")[1])
+        self.headers = {name.strip().lower(): value.strip() for name, value in (line.split(":", 1) for line in header_lines)}
+        self.ended = False
+
+    def _parsed(self):
+        events = []
+        while b"\n\n" in self._buffer:
+            block, self._buffer = self._buffer.split(b"\n\n", 1)
+            lines = block.decode("utf-8").split("\n")
+            if lines[0].startswith(":"):
+                events.append(Event("comment", lines[0][1:].strip()))
+                continue
+            fields = dict(line.split(": ", 1) for line in lines)
+            if set(fields) != {"event", "data"}:
+                raise AssertionError(f"an event with other fields than event and data: {block!r}")
+            events.append(Event(fields["event"], fields["data"]))
+        return events
+
+    def read_until(self, enough, seconds=10):
+        """Reads events until `enough(events)` is true for the ones read by this call, or
+        the time is over. Returns them."""
+        events = self._parsed()
+        deadline = time.monotonic() + seconds
+        while not enough(events) and not self.ended:
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([self.socket], [], [], left)[0]:
+                break
+            piece = self.socket.recv(65536)
+            if not piece:
+                self.ended = True
+            self._buffer += piece
+            events += self._parsed()
+        return events
+
+    def read_for(self, seconds):
+        """The events that arrive within a length of time."""
+        return self.read_until(lambda events: False, seconds)
+
+    def close(self):
+        self.socket.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+
+def frames(events):
+    """`(timestamp, LED bytes)` of every `frame` event among these events."""
+    found = []
+    for event in events:
+        if event.kind == "frame":
+            ms, _, encoded = event.data.partition(" ")
+            found.append((int(ms), base64.b64decode(encoded, validate=True)))
+    return found
+
+
+def of_kind(events, kind):
+    """The data of every event of one kind, read as JSON."""
+    return [json.loads(event.data) for event in events if event.kind == kind]

@@ -43,6 +43,7 @@ class Engine:
         kept = data[:-1] if data.endswith(b"\n") else data
         kept = kept[:-1] if kept.endswith(b"\r") else kept
         self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, reply)
+        self.refresh_status()
         return reply
 
     def feed(self, data, transport):
@@ -53,6 +54,8 @@ class Engine:
             answered = self.core.feed(now, data)
         for line, reply, cut in answered:
             self.hub.log(now, transport, line, cut, reply)
+        if answered:
+            self.refresh_status()
         return b"".join(reply for _, reply, _ in answered)
 
     def refresh_status(self):
@@ -62,18 +65,25 @@ class Engine:
             reply = self.core.command(self.now_ms(), b"status")
         self.hub.status(reply)
 
+    def error(self):
+        """The reason the show is invalid, as the core gives it now, or `None`."""
+        with self._lock:
+            return self.core.error()
+
 
 class RealTime(threading.Thread):
     """Asks for a refresh at every grid time, 20 ms apart from the power-on moment.
 
     A wake-up that comes late asks with the current time. The core skips the grid times
-    that were missed; nothing is replayed.
+    that were missed; nothing is replayed. Once in every second after the power-on moment
+    the loop also has the status for the page asked for.
     """
 
     def __init__(self, engine, sleep=time.sleep):
         super().__init__(name="real-time", daemon=True)
         self.engine = engine
         self.sleep = sleep
+        self._second = 0
         self._stopping = threading.Event()
 
     def step(self):
@@ -85,6 +95,10 @@ class RealTime(threading.Thread):
         if wait_ns > 0:
             self.sleep(wait_ns / 1_000_000_000)
         engine.tick()
+        second = (engine.now_ms() - engine.t0) // 1000
+        if second != self._second:
+            self._second = second
+            engine.refresh_status()
 
     def run(self):
         while not self._stopping.is_set():

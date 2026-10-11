@@ -1684,3 +1684,26 @@ reads in time loses nothing.
 
 **Resolution.** `emulator/serialport.py`, `Port._read` and `Port._write`; `docs/emulator.md`,
 "The serial port"; `tests/emulator/test_serial.py`.
+
+## Seed 03: How much a page that does not read still receives
+
+**Question.** The design gives each page connection one place for the newest refresh, and
+its test has a connection that reads nothing for 2 seconds receive "the newest refresh, not
+an old one". Between the emulator and a page are the buffers of the system. On this Mac
+they take about half a megabyte for one connection whatever size a program asks for, which
+is more than 4 seconds of refreshes of the two-leg canvas. The emulator cannot see what a
+page has read, so for that long a silent page is not noticed, and when it reads again it
+first gets what the system held.
+
+**Answer.** The rule stands as the design has it, and holds from the moment the buffers of
+the system are full: the emulator keeps no queue of refreshes of its own, and gives its
+event connections a send buffer of 32,768 bytes. The suite proves the one place on the
+connection object itself, and over a real connection with a canvas of 60 x 300, whose
+refreshes fill the buffers within a few: after 2 silent seconds the timestamps jump by more
+than a second and the refreshes that follow are the newest. In a browser the page reads at
+once and draws only the newest refresh it has, so the picture does not lag either way.
+`hello` carries the reason of an invalid show as the core gives it when the page connects,
+not as it was at start.
+
+**Resolution.** `emulator/hub.py`, `Connection`; `emulator/httpd.py`, `events`;
+`tests/emulator/test_events.py`, `SlowPage`; `docs/emulator.md`, "The event stream".

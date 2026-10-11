@@ -1,7 +1,10 @@
-"""The HTTP server on the page address: commands as `POST /odrig`."""
+"""The HTTP server on the page address: commands as `POST /odrig`, the event stream for
+the page, and the mapping file of the show."""
 
 import http.server
+import os
 import re
+import socket
 import sys
 import threading
 
@@ -9,8 +12,28 @@ from . import failure
 
 ADDRESS = "127.0.0.1"
 COMMAND_PATH = "/odrig"
+EVENTS_PATH = "/events"
+MAPPING_PATH = "/show/mapping.json"
+MAPPING_NAME = "mapping.json"
 BODY_KEPT = 128
 CHUNK = 65536
+KEEP_ALIVE_SECONDS = 15
+STREAM_SEND_BUFFER = 32768
+
+
+def stream(connection, write, keep_alive_seconds=KEEP_ALIVE_SECONDS):
+    """Writes what a connection of the hub has to send, each event at once, until the
+    connection is closed or a write fails. A connection with nothing to send for a while
+    is sent a comment line."""
+    while True:
+        events = connection.take(keep_alive_seconds)
+        if events is None:
+            return
+        text = "".join(f"event: {kind}\ndata: {data}\n\n" for kind, data in events) if events else ": keep-alive\n\n"
+        try:
+            write(text.encode("utf-8"))
+        except OSError:
+            return
 
 WHOLE_NUMBER = re.compile(r"[0-9]+")
 
@@ -38,6 +61,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.command_line()
             else:
                 self.empty(405, {"Allow": "POST"})
+        elif self.command == "GET" and path == EVENTS_PATH:
+            self.events()
+        elif self.command == "GET" and path == MAPPING_PATH:
+            self.mapping()
         else:
             self.empty(404)
 
@@ -75,12 +102,52 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(reply)
 
+    def content(self, content_type, data):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def mapping(self):
+        """The mapping file of the show folder, byte for byte."""
+        try:
+            with open(os.path.join(self.server.show_dir, MAPPING_NAME), "rb") as file:
+                data = file.read()
+        except OSError:
+            self.empty(404)
+            return
+        self.content("application/json", data)
+
+    def events(self):
+        """The event stream: a response without a length that stays open."""
+        self.close_connection = True
+        self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, STREAM_SEND_BUFFER)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        connection = self.server.engine.hub.connect(self.server.hello())
+        try:
+            stream(connection, self.write_now)
+        finally:
+            self.server.engine.hub.disconnect(connection)
+
+    def write_now(self, data):
+        self.wfile.write(data)
+        self.wfile.flush()
+
 
 class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, port, engine):
+    def __init__(self, port, engine, show_dir, hello):
         self.engine = engine
+        self.show_dir = os.fspath(show_dir)
+        self.hello = hello
         try:
             super().__init__((ADDRESS, port), Handler)
         except OSError as error:

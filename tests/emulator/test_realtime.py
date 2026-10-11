@@ -56,6 +56,7 @@ class Core:
 
     def __init__(self):
         self.polled = []
+        self.commands = []
 
     def poll(self, now):
         self.polled.append(now)
@@ -65,6 +66,7 @@ class Core:
         return b""
 
     def command(self, now, line):
+        self.commands.append((now, line))
         return b'{"ok":true}\n'
 
 
@@ -125,6 +127,14 @@ class Loop(unittest.TestCase):
         for _ in range(6):
             loop.step()
         self.assertEqual(core.polled, [3, 30, 62, 63, 95, 103, 123])
+
+    def test_the_status_for_the_page_is_asked_for_once_in_every_second(self):
+        _, core, running, loop = self.loop()
+        for _ in range(250):
+            loop.step()
+        self.assertEqual(core.commands, [(3 + 1000 * second, b"status") for second in range(1, 6)])
+        self.assertEqual(len(running.hub.entries()), 0)
+        self.assertEqual(running.hub.latest_status(), '{"ok":true}')
 
     def test_timestamps_are_whole_milliseconds_from_the_start_of_the_engine(self):
         clock, core, running, _ = self.loop(start_ns=987_654_321_000, before_first_tick_ns=0)

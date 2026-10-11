@@ -81,7 +81,11 @@ def serve(arguments, out):
         running.tick()
         running.refresh_status()
         port = serialport.Port(SERIAL_LINK if arguments.serial_link is None else arguments.serial_link, lambda data: running.feed(data, "serial"))
-        server = httpd.Server(PORT if arguments.port is None else arguments.port, running)
+        described = {"show": os.path.abspath(arguments.show_dir), "serial": port.link, "legs": [list(leg) for leg in core.legs], "t0": running.t0}
+        server = httpd.Server(
+            PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
+            lambda: {"show": described["show"], "page": server.url, "serial": described["serial"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
+        )
 
         stopped = threading.Event()
         for number in (signal.SIGINT, signal.SIGTERM):
@@ -99,6 +103,7 @@ def serve(arguments, out):
         server = None
         loop.stop()
         loop.join()
+        running.hub.close()
     finally:
         if server is not None:
             server.server_close()

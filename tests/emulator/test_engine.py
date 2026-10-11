@@ -65,6 +65,50 @@ class OnTheExampleShow(unittest.TestCase):
         self.engine.refresh_status()
         self.assertEqual(json.loads(self.hub.latest_status())["on"], True)
 
+    def test_the_status_is_asked_for_after_every_command_that_arrived(self):
+        self.engine.feed(b"brightness 11\noff\n", "serial")
+        self.assertEqual((json.loads(self.hub.latest_status())["brightness"], json.loads(self.hub.latest_status())["on"]), (11, False))
+        self.engine.line(b"on", "http")
+        self.assertEqual(json.loads(self.hub.latest_status())["on"], True)
+        self.engine.feed(b"brightness 2", "serial")
+        self.assertEqual(json.loads(self.hub.latest_status())["brightness"], 11)
+        self.assertEqual(len(self.hub.entries()), 3)
+
+    def test_a_connection_starts_with_hello_the_kept_entries_and_the_latest_status(self):
+        self.engine.line(b"brightness 1", "http")
+        self.engine.feed(b"off\n", "serial")
+        connection = self.hub.connect({"legs": [[1, 1, 180]], "error": None})
+        self.addCleanup(self.hub.disconnect, connection)
+        events = connection.take(0)
+        self.assertEqual([kind for kind, _ in events], ["hello", "log", "log", "status"])
+        self.assertEqual(json.loads(events[0][1]), {"legs": [[1, 1, 180]], "error": None})
+        self.assertEqual([json.loads(data)["line"] for kind, data in events if kind == "log"], ["brightness 1", "off"])
+        self.assertEqual(json.loads(events[3][1])["on"], False)
+        self.assertEqual(connection.take(0), [])
+
+    def test_a_connection_keeps_every_log_and_status_event_and_only_the_newest_refresh(self):
+        connection = self.hub.connect({})
+        self.addCleanup(self.hub.disconnect, connection)
+        connection.take(0)
+        for number in range(30):
+            self.engine.line(b"brightness %d" % number, "http")
+            self.hub.refresh(1000 + number, bytes([number]) * 3)
+        events = connection.take(0)
+        self.assertEqual([kind for kind, _ in events], ["log", "status"] * 30 + ["frame"])
+        self.assertEqual([json.loads(data)["line"] for kind, data in events if kind == "log"], [f"brightness {number}" for number in range(30)])
+        self.assertEqual(events[-1], ("frame", "1029 HR0d"))
+        self.assertEqual(connection.take(0), [])
+
+    def test_a_closed_connection_gives_none_and_is_told_nothing_more(self):
+        connection = self.hub.connect({})
+        self.hub.disconnect(connection)
+        self.assertIsNone(connection.take(0))
+        self.engine.line(b"on", "http")
+        self.assertIsNone(connection.take(0))
+        other = self.hub.connect({})
+        self.hub.close()
+        self.assertIsNone(other.take(5))
+
     def test_a_long_line_is_entered_with_its_first_64_characters_and_marked_as_cut(self):
         long_line = b"play " + b"7" * 75
         self.engine.feed(long_line + b"\n", "serial")
@@ -87,8 +131,10 @@ class OnTheExampleShow(unittest.TestCase):
 
     def test_the_status_for_the_page_is_the_reply_of_the_core_and_is_not_logged(self):
         self.assertIsNone(self.hub.latest_status())
-        self.engine.line(b"brightness 42", "http")
         self.engine.refresh_status()
+        self.assertEqual(json.loads(self.hub.latest_status())["brightness"], 128)
+        self.assertEqual(self.hub.entries(), [])
+        self.engine.line(b"brightness 42", "http")
         status = self.hub.latest_status()
         self.assertEqual(json.loads(status), {"ok": True, "on": True, "brightness": 42, "playing": 3, "animation": 1, "fps": 0, "error": None})
         self.assertTrue(re.fullmatch(r"\{.*\}", status))
@@ -137,7 +183,7 @@ class OneCallAtATime(unittest.TestCase):
             thread.start()
         for thread in threads:
             thread.join()
-        self.assertEqual(core.calls, 480)
+        self.assertEqual(core.calls, 120 + 2 * 120 + 2 * 120 + 120)
         self.assertEqual(core.together, 1)
         self.assertEqual(core.times, sorted(core.times))
         self.assertEqual(len(running.hub.entries()), 240)

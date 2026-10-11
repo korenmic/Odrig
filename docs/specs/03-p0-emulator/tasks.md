@@ -118,7 +118,7 @@ Rules for every task:
   - Add the port to `docs/emulator.md`.
   - Requirements: 1.1, 1.3, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.8, 10.4, 12.1, 12.2
 
-- [ ] 5. The event stream to the page
+- [x] 5. The event stream to the page
   - Add `GET /events` and `GET /show/mapping.json` to `httpd.py`, the connections with
     their queue and their slot for the newest refresh to `hub.py`, and to the engine the
     status request after every command and once a second.
