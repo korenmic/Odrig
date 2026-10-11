@@ -59,7 +59,11 @@ answered.
 
 The emulator creates a pseudo-terminal and a symbolic link to it, so the port has the same
 name on every run although the device behind it, such as `/dev/ttys012`, changes. A serial
-tool that talks to the board talks to the emulator with only the port name changed.
+tool that talks to the board talks to the emulator with only the port name changed:
+
+```
+python -m odrigctl --port build/emulator/serial status
+```
 
 - Every byte written to the port reaches the core's entry for bytes, unchanged and in
   order, and every reply of the core is written back. A line may arrive in pieces, and
@@ -73,7 +77,7 @@ tool that talks to the board talks to the emulator with only the port name chang
 - Replies that no program reads wait in the port, about a thousand bytes of them. When
   that room is full and stays full for a second, what waits is dropped to make room for the
   newer replies, as the output of a board is lost when nobody listens. A program should
-  discard what is waiting when it opens the port.
+  discard what is waiting when it opens the port, as the command tool does.
 
 A link left at the path by an earlier run is replaced. If the path holds anything that is
 not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
@@ -142,6 +146,78 @@ place for the newest refresh, and a newer one replaces it, so a page that cannot
 skips refreshes and does not fall behind. What the system has already taken for a
 connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to
 send for 15 seconds is sent the comment line `: keep-alive`.
+
+## The command tool
+
+`odrigctl` sends the commands of [commands.md](commands.md) to the emulator or to the
+board, through a serial port or over HTTP. It is a second small Python package at the
+repository root, uses only the Python standard library, and treats the two targets alike:
+only the port name or the address says which one is meant.
+
+```
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] play ID
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] on
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] off
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] brightness N
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] status
+```
+
+Through the serial port, here the emulator's; for the board the name is its USB serial
+port, such as `/dev/cu.usbmodem101`:
+
+```
+python -m odrigctl --port build/emulator/serial play 2
+python -m odrigctl --port build/emulator/serial on
+python -m odrigctl --port build/emulator/serial off
+python -m odrigctl --port build/emulator/serial brightness 40
+python -m odrigctl --port build/emulator/serial status
+```
+
+Over HTTP, here to the emulator's address; for the board the address is the one it has on
+its Wi-Fi network:
+
+```
+python -m odrigctl --http 127.0.0.1:8600 play 2
+python -m odrigctl --http 127.0.0.1:8600 on
+python -m odrigctl --http 127.0.0.1:8600 off
+python -m odrigctl --http 127.0.0.1:8600 brightness 40
+python -m odrigctl --http 127.0.0.1:8600 status
+```
+
+The tool prints the reply line to standard output:
+
+```
+{"ok":true,"on":true,"brightness":40,"playing":2,"animation":2,"fps":50,"error":null}
+```
+
+| Status | Meaning |
+|---:|---|
+| 0 | The reply has `"ok":true`. |
+| 1 | The reply has `"ok":false`. It is printed all the same. |
+| 2 | The command line was not understood. |
+| 3 | The target could not be reached, or no reply arrived within the time limit. One line `error: unreachable: <detail>` is written to standard error. |
+
+- The line sent is `play <ID>`, `on`, `off`, `brightness <N>` or `status`, followed by a
+  newline. ID and N are sent as they were typed and are not checked: `play abc` is sent and
+  the reply says `bad-argument`. Every judgement is the command front-end's.
+- `--timeout SECONDS` is how long the tool waits for the reply; 2 seconds without it.
+- `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
+  8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
+  what arrives in the next 0.1 seconds, and sends the line. The reply is the first received
+  line that is a JSON object with a member `ok`; every other line, such as a boot message,
+  is ignored. A port without modem lines, which the emulator's is, refuses the two requests,
+  and the tool goes on.
+- `--http ADDRESS`: `host` or `host:port`, with or without `http://` in front and a `/` at
+  the end; without a port it is 80. The tool sends `POST http://ADDRESS/odrig` with the line
+  as the body and the content type `application/octet-stream`, and takes the body of a
+  response with status 200 as the reply. Any other status counts as not reached.
+- The options may stand before or after the command.
+
+Another program can use the two exchanges directly: `odrigctl.client.serial_exchange(port,
+data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` return the reply
+or raise `Unreachable`. `serial_exchange` takes a fourth argument, a function that says
+which received line is the answer, for a target whose answer is not a reply of
+[commands.md](commands.md).
 
 ## Record mode
 

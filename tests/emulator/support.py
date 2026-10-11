@@ -62,6 +62,19 @@ def run(*argv):
     return Result(status, out.getvalue(), err.getvalue())
 
 
+def run_tool(*argv):
+    """Runs one command line of the command tool in this interpreter."""
+    from odrigctl import cli
+
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            status = cli.main([str(argument) for argument in argv])
+        except SystemExit as stopped:
+            status = stopped.code
+    return Result(status, out.getvalue(), err.getvalue())
+
+
 def run_module(*argv, module="emulator", cwd=ROOT):
     """Runs `python -m <module>` in a fresh interpreter, from the repository root."""
     done = subprocess.run(

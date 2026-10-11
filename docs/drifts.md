@@ -1707,3 +1707,21 @@ not as it was at start.
 
 **Resolution.** `emulator/hub.py`, `Connection`; `emulator/httpd.py`, `events`;
 `tests/emulator/test_events.py`, `SlowPage`; `docs/emulator.md`, "The event stream".
+
+## Seed 03: Details of the command tool that the design leaves open
+
+**Question.** The design gives the command line of the tool and its two exchanges. It does
+not say whether an option may follow the command, what an argument with a newline in it is,
+what a path that opens but is no serial port is, or what a response with status 200 is whose
+body is no reply.
+
+**Answer.** The options may stand before or after the command, so the command and its
+argument are two positions of one parser and not sub-commands. An argument with a newline
+is a usage error, status 2: the tool sends one line, and this is the one thing about an
+argument it looks at. A path that is no serial port, and a response with status 200 whose
+body is not a JSON object with a member `ok`, count as a target that is not reached,
+status 3. An address without a port means port 80. The sources of the tool hold no word for
+the emulator or for the board, and a test says so.
+
+**Resolution.** `odrigctl/cli.py`, `odrigctl/client.py`; `docs/emulator.md`, "The command
+tool"; `tests/emulator/test_tool.py`, `tests/emulator/test_scope.py`.

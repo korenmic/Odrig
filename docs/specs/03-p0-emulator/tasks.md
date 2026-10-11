@@ -128,7 +128,7 @@ Rules for every task:
     Undo it.
   - Requirements: 4.5, 5.1, 5.2, 8.1, 8.2, 8.3, 8.5, 8.6
 
-- [ ] 6. The command tool
+- [x] 6. The command tool
   - Create `odrigctl/__init__.py`, `__main__.py`, `cli.py` and `client.py` as the design
     describes.
   - `tests/emulator/test_tool.py`: every case the design lists for it. The session of
