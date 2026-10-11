@@ -14,6 +14,8 @@ stays as the independent check that tests compare it against.
 ## Depends On
 
 - Seed 01, for the Python tool, the test vectors and the documents it is checked against.
+- Seed 05, which changes the mapping file format. This converter reads both kinds of mapping
+  file that seed 05 defines.
 
 ## Product Context
 
