@@ -6,9 +6,10 @@ tools the build needs, fetches WLED, builds, flashes, restores stock WLED and in
 show into the board's storage.
 
 This page covers [what the tool needs](#what-the-tool-needs), [the work folder](#the-work-folder),
-the [commands](#commands) of the tool, [the probe build](#the-probe-build),
-[the regions of the flash](#the-regions-of-the-flash) the tool writes,
-[rolling back](#rolling-back) and what was [verified on the board](#verified-on-the-board).
+the [commands](#commands) of the tool, [what the firmware does](#what-the-firmware-does),
+[the probe build](#the-probe-build), [the regions of the flash](#the-regions-of-the-flash)
+the tool writes, [rolling back](#rolling-back) and what was
+[verified on the board](#verified-on-the-board).
 
 ## What the tool needs
 
@@ -166,7 +167,7 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 
 | Command | Environment | Image | What it is |
 |---|---|---|---|
-| `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
+| `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
 | `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
 
@@ -175,8 +176,10 @@ every patch of `firmware/patches/`, and writes `platformio_override.ini` into WL
 from `firmware/platformio_override.ini.in`, with the repository's path in place of
 `@REPO@`. That file adds the two environments and changes nothing of WLED's own; everything
 it does not name, the board, the platform, the partition table and the flash settings, is
-inherited from WLED's environment. The usermod is used where it is, as a library outside
-WLED's folder; nothing is copied. A repository path with a space in it is refused.
+inherited from WLED's environment. The usermod and the core are used where they are, as
+libraries outside WLED's folder: the build compiles `core/src/*.cpp` from `core/`, with the
+compiler flags of the environment, and nothing is copied. `core/library.json` is what lets
+PlatformIO take `core/` as a library. A repository path with a space in it is refused.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -304,6 +307,46 @@ Runs the suite in `tests/board/`, found by discovery in the same way. It needs t
 USB and writes to it: it flashes images and restores stock WLED. Without a board it stops
 with `no-board` and runs nothing.
 
+## What the firmware does
+
+The firmware is WLED with one usermod, `firmware/usermod/`, that hosts the core of
+[core.md](core.md). The usermod decides nothing about files, time or commands; it only
+carries.
+
+**At start** the usermod starts the core on the files of the folder `/odrig` of storage:
+`mapping.json`, `show.json` and the `.odrg` files, as `install-show` put them there. It
+gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
+holds a whole file. The core's memory comes from the chip's internal memory, and from the
+external memory only when the internal memory has none. The time the core is given is the
+milliseconds since the chip started, from a 64-bit clock. The firmware never writes,
+creates or deletes a file in `/odrig`.
+
+**An invalid show** is the core's matter, as in the emulator: the LEDs stay dark, `status`
+reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
+answered.
+
+**The port.** Every byte the board receives on its USB serial port goes to the core,
+unchanged and in order, and every reply of the core is written back; the firmware writes
+nothing else. So the command tool of [emulator.md](emulator.md) works on the board as on
+the emulator:
+
+```
+python -m odrigctl --port /dev/cu.usbmodem101 status
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null}
+```
+
+WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
+serial, no answer to WLED's single-letter commands. The chip's own bootloader still prints
+a few lines at a reset; the command tool skips every line that is not a reply.
+
+**The LEDs** are held by the usermod: WLED stays in its live mode, in which it runs no
+effect, no preset and no playlist. In this state of the work the outputs are still those of
+WLED's settings and stay dark; the core is asked for its refreshes, so that `status` is
+what it is in the emulator, and its LED data is not sent yet.
+
+**Calls to the core** are made one at a time: a lock is held for every call after the
+start.
+
 ## The probe build
 
 The probe build exists so that a program can check what the LEDs are given without eyes on
@@ -318,7 +361,7 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 
 | Member | Meaning |
 |---|---|
-| `start_ms` | The milliseconds the player took to start. |
+| `start_ms` | The milliseconds the core took to start: to read and check the whole installed file set. |
 | `heap` | The free internal memory of the chip, in bytes. |
 | `realtime` | 1 while WLED is held in its live mode with no override, else 0. |
 | `loops`, `sent` | The passes of the usermod's loop and the refreshes sent, in the last full second. |
@@ -327,21 +370,20 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
 | `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
 | `ap` | 1 while WLED's access point is up, else 0. |
+| `error` | The reason the show is invalid, as `status` reports it, or `null`. |
 | `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt` or `parallel`, and `crc`, the CRC-32 of the colours it holds as WLED gives them back: red, green and blue for each LED. |
 
 While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
 dims, the output gives back the dimmed colours as WLED restores them, which at the
 limiter's lowest level is 128 for a channel that stayed lit and 0 for one that did not.
 
-In this state of the work the usermod has no player yet: it sends a fixed pattern of ten
-legs on pins 1 to 10 with 180 LEDs each, no value above 40, and the port answers `#probe`
-and nothing else.
+The port holds bytes at the start of a line back for as long as they are a beginning of
+`#probe` and a newline. The complete line is answered by the usermod and does not reach the
+core; every other byte is passed on to the core, unchanged and in order.
 
-**What a person sees with this build.** One 60-LED strip is wired, on leg 1. WLED's maximum
-current is 850 mA, and 1,800 LEDs are estimated at 1,800 mA at rest alone, so the limiter
-holds every LED at its lowest level: the 60 LEDs show a steady, very faint glow of red and
-green that does not move and does not flicker, and nothing else. Nothing of WLED's own show,
-the text and the square it played before, appears.
+**What a person sees** with the firmware or the probe build in this state of the work: the
+LEDs are dark, and nothing of WLED's own show, the text and the square it played before,
+appears.
 
 ## The regions of the flash
 
@@ -394,6 +436,25 @@ letters are those of the design's table "Assumed, to be verified by an early tas
 | A12 | A pass of WLED's loop and the push of 1,800 LEDs fit well inside 20 ms. | They do. Over 20 seconds the loop made 981 to 1,006 passes a second, a send of 1,800 LEDs took 7.2 ms at most with the limiter's dimming in it, the longest time between two sends was 25 ms, and 49 to 51 refreshes were sent in every second. 227,940 bytes of internal memory were free. |
 
 | A13 | littlefs-python 0.19.0 edits the board's storage image so that WLED still mounts it. | As far as task 4 shows: after `install-show` the board started, sent its 49 refreshes a second, and its storage still had the checksum of the image the tool wrote, so WLED mounted the file system and neither formatted nor changed it. The file system has disk version 2.0 and keeps it. That the firmware reads the files of `/odrig` is task 5's. `install-show` took 36 seconds with the kept image taken, plus the wait for the reply. |
+
+The core in the firmware, tried with the firmware and the probe build that host it:
+
+- **The core compiles unchanged** (A8). PlatformIO takes `core/` as the library
+  `odrig_core` where it is and compiles every `core/src/*.cpp` with exactly the compiler
+  flags of `wled00/wled.cpp`, `-std=gnu++11 -fno-exceptions -fno-rtti -Os` among them, and
+  the same macro definitions. The compiler gave no warning for a file of the core. No file
+  of `core/src` or `core/include` was changed.
+- **The firmware reads the files of `/odrig`** (A13). With the dim example show installed,
+  `status` on the board answers `"playing":3,"animation":1,"error":null`, and the four
+  invalid folders of the install test each give the reason the emulator gives.
+- **The start of the core** took 171 ms for the dim example show, as the probe build
+  reports it. 211,696 bytes of internal memory were free afterwards.
+- **A request for a refresh** took 0.2 to 0.6 ms at the longest in most seconds, and 18.5 ms
+  in the seconds in which the core opened a file: at the start of every loop of an
+  animation and at every turn of the cycle. The loop made about 3,100 passes a second with
+  nothing sent to the LEDs.
+- **The replies** of one session with every command were those of the emulator for the same
+  folder, `fps` aside.
 
 With the usermod's two calls that hold the LEDs taken out, WLED kept its own two outputs and
 played its own show: the report had `realtime` 0, two outputs, and `overwritten` rising by

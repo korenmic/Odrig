@@ -2,34 +2,18 @@ import json
 import pathlib
 import re
 import subprocess
-import tempfile
 import unittest
 
 from . import FIRMWARE, ROOT
 
 USERMOD = FIRMWARE / "usermod"
 SOURCES = sorted(path for path in USERMOD.iterdir() if path.suffix in (".cpp", ".h"))
-ALLOWED_HEADERS = {"wled.h", "stddef.h", "stdint.h"}
+CORE = ROOT / "core"
+ALLOWED_HEADERS = {"wled.h", "odrig_core.h", "stddef.h", "stdint.h"}
+# The one header of the chip's own software that a source names: the USB unit behind the
+# port, which the port's driver does not let through.
+ALLOWED_IN = {"odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"}}
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}
-
-PATTERN_MAIN = r"""
-#include <stdio.h>
-#include "odrig_pattern.h"
-int main() {
-  OdrigPattern::begin();
-  OdrigLegSource legs = OdrigPattern::legs();
-  for (uint32_t i = 0; i < legs.count(); i++) {
-    OdrigLeg leg;
-    if (!legs.leg(i, &leg)) return 1;
-    printf("%u %u %u", (unsigned)leg.leg, (unsigned)leg.pin, (unsigned)leg.led_count);
-    for (uint32_t n = 0; n < leg.led_count * 3; n++) printf(" %u", (unsigned)leg.rgb[n]);
-    printf("\n");
-  }
-  OdrigLeg none;
-  return legs.leg(legs.count(), &none) ? 1 : 0;
-}
-"""
-
 
 def text_of(path):
     return path.read_text(encoding="utf-8")
@@ -69,8 +53,9 @@ class TheLibrary(unittest.TestCase):
 
     def test_it_has_the_sources_this_test_reads(self):
         names = {path.name for path in SOURCES}
-        for expected in ("odrig_usermod.cpp", "odrig_leds.h", "odrig_leds.cpp", "odrig_serial.h", "odrig_serial.cpp", "odrig_probe.h", "odrig_probe.cpp"):
+        for expected in ("odrig_usermod.cpp", "odrig_files.h", "odrig_files.cpp", "odrig_leds.h", "odrig_leds.cpp", "odrig_serial.h", "odrig_serial.cpp", "odrig_probe.h", "odrig_probe.cpp"):
             self.assertIn(expected, names)
+        self.assertNotIn("odrig_pattern.cpp", names)
 
     def test_one_object_is_registered_as_a_usermod(self):
         registered = [(path.name, name) for path in SOURCES for name in re.findall(r"^REGISTER_USERMOD\((\w+)\);", text_of(path), re.M)]
@@ -83,11 +68,23 @@ class Includes(unittest.TestCase):
         own = {path.name for path in SOURCES if path.suffix == ".h"}
         for path in SOURCES:
             for header in included(path):
-                self.assertIn(header, ALLOWED_HEADERS | own, f"{path.name} includes {header}")
+                self.assertIn(header, ALLOWED_HEADERS | own | ALLOWED_IN.get(path.name, set()), f"{path.name} includes {header}")
 
     def test_the_port_is_named_only_where_it_is_handled(self):
         naming = {path.name for path in SOURCES if re.search(r"\bSerial\b", text_of(path))}
-        self.assertEqual(naming, {"odrig_serial.cpp", "odrig_probe.cpp"})
+        self.assertEqual(naming, {"odrig_serial.cpp"})
+
+    def test_the_core_is_called_only_by_the_usermod_itself(self):
+        calling = {path.name for path in SOURCES if re.search(r"\bodrig_core_\w+\(", text_of(path))}
+        self.assertEqual(calling, {"odrig_usermod.cpp"})
+
+    def test_every_call_to_the_core_after_its_start_is_made_with_the_lock_held(self):
+        text = text_of(USERMOD / "odrig_usermod.cpp")
+        calls = [match for match in re.finditer(r"\bodrig_core_(\w+)\(", text) if match.group(1) != "begin"]
+        self.assertGreaterEqual(len(calls), 3)
+        for call in calls:
+            block = text[text.rfind("\n}", 0, call.start()):call.start()]
+            self.assertRegex(block, r"\bLocked held;", f"odrig_core_{call.group(1)}")
 
     def test_the_usermod_names_no_function_of_wleds_serial_handling(self):
         for path in SOURCES:
@@ -112,23 +109,22 @@ class ProbeCode(unittest.TestCase):
         self.assertEqual(outside_probe_blocks(text), "a\nplain\nb")
 
 
-class ThePattern(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        with tempfile.TemporaryDirectory() as folder:
-            main = pathlib.Path(folder, "main.cpp")
-            main.write_text(PATTERN_MAIN)
-            program = pathlib.Path(folder, "pattern")
-            subprocess.run(["c++", "-std=c++11", "-Wall", "-Werror", f"-I{USERMOD}", str(main), str(USERMOD / "odrig_pattern.cpp"), "-o", str(program)], check=True, cwd=ROOT)
-            printed = subprocess.run([str(program)], capture_output=True, text=True, check=True).stdout
-        cls.legs = [[int(word) for word in line.split()] for line in printed.splitlines()]
+class TheCore(unittest.TestCase):
+    def test_the_core_is_a_library_named_odrig_core_for_every_platform(self):
+        self.assertEqual(json.loads(text_of(CORE / "library.json")), {"name": "odrig_core", "version": "1.0.0", "frameworks": "*", "platforms": "*"})
 
-    def test_it_lists_ten_legs_on_pins_1_to_10_with_180_leds_each(self):
-        self.assertEqual([leg[:3] for leg in self.legs], [[number, number, 180] for number in range(1, 11)])
+    def test_no_file_under_firmware_has_the_name_of_a_file_of_the_core(self):
+        core_names = {path.name for path in (CORE / "src").iterdir()} | {path.name for path in (CORE / "include").iterdir()}
+        self.assertIn("player.cpp", core_names)
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "firmware"], capture_output=True, text=True, check=True).stdout.split()
+        under_firmware = {pathlib.Path(name).name for name in tracked} | {path.name for path in USERMOD.iterdir()}
+        self.assertEqual(under_firmware & core_names, set())
 
-    def test_no_value_is_above_40(self):
-        self.assertEqual(max(max(leg[3:]) for leg in self.legs), 40)
+    def test_the_build_names_the_core_as_a_library_where_it_is(self):
+        template = text_of(FIRMWARE / "platformio_override.ini.in")
+        self.assertRegex(template, r"(?m)^lib_deps = \$\{esp32s3\.lib_deps\}\n  odrig_core = symlink://@REPO@/core$")
+        self.assertRegex(template, r"(?m)^  -I@REPO@/core/include$")
 
-    def test_every_led_has_a_colour_of_its_own(self):
-        colours = [tuple(leg[3 + 3 * n:6 + 3 * n]) for leg in self.legs for n in range(180)]
-        self.assertEqual(len(set(colours)), 1800)
+    def test_the_usermod_has_no_decoder_mapping_show_or_command_code_of_its_own(self):
+        for path in SOURCES:
+            self.assertNotRegex(text_of(path), r"inflate|first_led|\bcycle\b|\"play\"|\"brightness\"|unknown-command", path.name)

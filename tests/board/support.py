@@ -6,13 +6,16 @@ import contextlib
 import io
 import json
 import pathlib
+import subprocess
+import sys
 import tempfile
 import time
 
 from odrig import pack
+from odrigctl import cli as command_tool
 from odrigctl import client
 
-from fwtool import Failure, board, build, cli, paths, storage
+from fwtool import Failure, board, build, cli, flasher, paths, storage
 
 from . import PORT, ROOT
 
@@ -29,10 +32,29 @@ DIM = 32
 Result = collections.namedtuple("Result", "status out err")
 
 # What must answer after an image of each kind was flashed.
-ANSWERS = {"probe": "probe", "stock": "wled"}
+ANSWERS = {"firmware": "status", "probe": "probe", "stock": "wled"}
 
 # The kind of image the suite leaves on the board.
-LEFT_ON_THE_BOARD = "probe"
+LEFT_ON_THE_BOARD = "firmware"
+
+# Every command of docs/commands.md and every error code the command tool can cause on a
+# valid show, with no brightness above what the wired strip allows. It begins with the
+# state after power-on and asks for the status after every change.
+SESSION = (
+    "status",
+    "brightness 20", "status",
+    "play 2", "status",
+    "off", "status",
+    "on", "status",
+    "play 1", "status",
+    "play 99",
+    "play abc",
+    "brightness 256",
+    "play " + "7" * 70,
+    "brightness 0", "status",
+    "brightness 40", "status",
+    "play 3", "status",
+)
 
 _running = None
 
@@ -72,12 +94,14 @@ def answers(ask):
 
 
 def running():
-    """The kind of image the board runs: `probe`, `stock`, or None when nothing known
-    answers. The questions are asked in an order in which none disturbs the next."""
+    """The kind of image the board runs: `probe`, `firmware`, `stock`, or None when nothing
+    known answers. The questions are asked in an order in which none disturbs the next."""
     global _running
     if _running is None:
         if answers(board.probe):
             _running = "probe"
+        elif answers(board.status):
+            _running = "firmware"
         elif answers(board.handshake):
             _running = "stock"
     return _running
@@ -111,11 +135,84 @@ def ensure(kind):
 
 
 def leave_the_board():
-    """Puts on the board what the suite leaves there: the image and the dim example show."""
+    """Puts on the board what the suite leaves there: the firmware and the dim example
+    show, playing."""
     ensure(LEFT_ON_THE_BOARD)
     with dim_show() as folder:
-        if installed() != files_of(folder):
-            install(folder)
+        ensure_installed(folder)
+
+
+def ensure_installed(folder):
+    """Makes the board hold a show folder, installing only when it holds something else."""
+    if installed() != files_of(folder):
+        done = install(folder)
+        if done.status != 0:
+            raise AssertionError(f"installing {folder} failed: {done.out}{done.err}")
+
+
+def restart():
+    """Restarts the board and waits until what it runs answers again."""
+    flasher.Flasher(PORT).restart()
+    wait_for_the_board()
+
+
+def command(port, *words, timeout=3.0):
+    """Sends one command with the command tool. Returns the tool's exit status and the
+    reply as it printed it, read as JSON."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            status = command_tool.main(["--port", str(port), "--timeout", str(timeout), *words])
+        except SystemExit as stopped:
+            status = stopped.code
+    if status not in (0, 1):
+        raise AssertionError(f"`{' '.join(words)}` on {port}: status {status}: {err.getvalue()}")
+    return status, json.loads(out.getvalue())
+
+
+def without_fps(reply):
+    """A reply without the one member that differs between a board and an emulator."""
+    return {name: value for name, value in reply.items() if name != "fps"}
+
+
+def session(port, lines=SESSION):
+    """Sends the lines of a session one by one. Returns, for each, the tool's exit status
+    and the reply without its `fps`."""
+    answers_given = []
+    for line in lines:
+        status, reply = command(port, *line.split(" "))
+        answers_given.append((line, status, without_fps(reply)))
+    return answers_given
+
+
+@contextlib.contextmanager
+def emulator(folder):
+    """Runs the emulator on a show folder and gives the path of its serial port."""
+    built = subprocess.run(["make", "-C", str(ROOT / "core"), "shared"], capture_output=True, text=True)
+    if built.returncode != 0:
+        raise AssertionError(f"`make -C core shared` failed:\n{built.stdout}{built.stderr}")
+    with tempfile.TemporaryDirectory() as work:
+        link = pathlib.Path(work, "serial")
+        process = subprocess.Popen(
+            [sys.executable, "-m", "emulator", str(folder), "--port", "0", "--serial-link", str(link)],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            started = [process.stdout.readline(), process.stdout.readline()]
+            if not started[1].startswith("serial: "):
+                raise AssertionError(f"the emulator did not start: {started} {process.stderr.read()}")
+            yield link
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
+            process.stdout.close()
+            process.stderr.close()
+
+
+def reason_in_the_emulator(folder):
+    """The reason the emulator's `status` reports for a show folder, or None."""
+    with emulator(folder) as link:
+        return command(link, "status")[1]["error"]
 
 
 @contextlib.contextmanager
@@ -173,7 +270,7 @@ def wait_for_the_board():
     """Waits until the image the board runs answers again after a restart."""
     kind = running()
     if kind is not None:
-        {"probe": board.probe, "stock": board.handshake}[kind](PORT)
+        board.EXPECTED[ANSWERS[kind]](PORT)
 
 
 def probe():

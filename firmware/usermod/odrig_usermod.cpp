@@ -1,9 +1,12 @@
-// The usermod that makes WLED the platform of the player: it sets WLED's outputs from the
-// legs, keeps WLED from the LEDs, and sends the LED data to the outputs.
+// The usermod that makes WLED the platform of the player. It hosts the core: it gives it
+// memory, the time and the files of the installed show, carries bytes between the USB
+// serial port and the core, and keeps WLED from the LEDs. Every decision about files, time
+// and commands is the core's.
 #include "wled.h"
 
+#include "odrig_core.h"
+#include "odrig_files.h"
 #include "odrig_leds.h"
-#include "odrig_pattern.h"
 #include "odrig_serial.h"
 
 #ifdef ODRIG_PROBE
@@ -12,10 +15,45 @@
 
 namespace {
 
-// Milliseconds since the chip started, from a 64-bit clock that does not wrap.
-uint64_t nowMs() { return (uint64_t)esp_timer_get_time() / 1000; }
+odrig_core *core = nullptr;
+
+// Held for every call to the core after its start, so that the calls follow one another
+// whichever task makes them.
+SemaphoreHandle_t lock = nullptr;
+
+struct Locked {
+  Locked() { xSemaphoreTake(lock, portMAX_DELAY); }
+  ~Locked() { xSemaphoreGive(lock); }
+};
+
+struct Reply {
+  char *text;
+  size_t capacity;
+  size_t length;
+};
+
+void keepReply(void *ctx, const char *, size_t, const char *reply, size_t reply_length) {
+  Reply *kept = static_cast<Reply *>(ctx);
+  kept->length = std::min(reply_length, kept->capacity);
+  memcpy(kept->text, reply, kept->length);
+}
+
+// One byte of the port for the core. The timestamp is read after the lock is taken.
+size_t feedByte(uint8_t byte, char *reply, size_t capacity) {
+  if (core == nullptr) return 0;
+  Reply kept = {reply, capacity, 0};
+  Locked held;
+  odrig_core_feed(core, OdrigFiles::nowMs(), &byte, 1, keepReply, &kept);
+  return kept.length;
+}
 
 #ifdef ODRIG_PROBE
+const char *errorNow() {
+  if (core == nullptr) return "no core";
+  Locked held;
+  return odrig_core_error(core);
+}
+
 uint32_t microsSince(int64_t from) { return (uint32_t)(esp_timer_get_time() - from); }
 #endif
 
@@ -24,38 +62,39 @@ uint32_t microsSince(int64_t from) { return (uint32_t)(esp_timer_get_time() - fr
 class OdrigUsermod : public Usermod {
  public:
   void setup() override {
-    const uint64_t before = nowMs();
-    OdrigPattern::begin();
-    OdrigLeds::source(OdrigPattern::legs());
+    lock = xSemaphoreCreateMutex();
+    const uint64_t before = OdrigFiles::nowMs();
+    const odrig_host host = OdrigFiles::host();
+    core = odrig_core_begin(&host);
+    startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE
-    OdrigProbe::started((uint32_t)(nowMs() - before));
-#else
-    (void)before;
+    OdrigProbe::started(startMs, errorNow);
 #endif
     OdrigLeds::hold();
-    if (OdrigLeds::legs() == 0) OdrigLeds::dark();
+    OdrigLeds::dark();
   }
 
   void loop() override {
 #ifdef ODRIG_PROBE
-    OdrigProbe::pass(nowMs());
+    OdrigProbe::pass(OdrigFiles::nowMs());
 #endif
     OdrigLeds::hold();
-    OdrigSerial::poll();
-    if (!BusManager::canAllShow()) return;
+    OdrigSerial::poll(feedByte);
+    if (core == nullptr) return;
 #ifdef ODRIG_PROBE
     const int64_t pollStart = esp_timer_get_time();
-    const bool due = OdrigPattern::poll(nowMs());
+#endif
+    {
+      Locked held;
+      odrig_core_poll(core, OdrigFiles::nowMs());
+    }
+#ifdef ODRIG_PROBE
     OdrigProbe::polled(microsSince(pollStart));
-    if (!due) return;
-    OdrigProbe::beforeSend();
-    const int64_t sendStart = esp_timer_get_time();
-    OdrigLeds::send();
-    OdrigProbe::afterSend(nowMs(), microsSince(sendStart));
-#else
-    if (OdrigPattern::poll(nowMs())) OdrigLeds::send();
 #endif
   }
+
+ private:
+  uint32_t startMs = 0;
 };
 
 static OdrigUsermod odrigUsermod;

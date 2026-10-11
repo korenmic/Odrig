@@ -137,7 +137,7 @@ Rules for every task:
   - The board is left with the probe build of task 3 and the dim example show in `/odrig`.
   - Requirements: 14.2, 14.3, 14.4, 14.5, 14.6, 14.8, 15.5
 
-- [ ] 5. The core in the firmware: files, start and the port
+- [x] 5. The core in the firmware: files, start and the port
   - Create `core/library.json`. Add the core's lines to
     `firmware/platformio_override.ini.in`.
   - Create `firmware/usermod/odrig_files.h`, `.cpp`. Start the core in `setup()`, add the

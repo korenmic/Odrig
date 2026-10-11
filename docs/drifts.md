@@ -2112,3 +2112,76 @@ installs when `/odrig` holds something else.
 
 **Resolution.** `tests/board/test_install.py`; `tests/board/support.py`,
 `leave_the_board`.
+
+## Seed 04: Replies that waited in the port's driver
+
+**Question.** The design writes a reply with `Serial.write` and relies on fact R19 for the
+rest. On the board, with the first build of task 5, about one reply in twenty did not
+arrive: the command tool waited in vain, and the reply came out together with the reply to
+the next command, however long that took. Measurements in the firmware showed that the
+reply was written at once and then stayed in the driver's buffer. The driver of the
+Arduino core hands a packet to the chip's USB unit when that unit reports that the
+computer took the packet before; when it writes, it first offers the computer an empty
+packet and then waits for that report, and the report can be cleared in the moment it
+arrives. Nothing brings it back until the next byte comes in. How often this happens
+depends on the timing of the build: one build lost 3 replies of 14, another none of 500.
+
+**Answer.** The usermod watches the driver's buffer. For as long as something waits in it,
+the usermod asks the USB unit every 2 ms to offer the computer a packet again, which brings
+the report back; with nothing waiting it does nothing. For this one thing
+`odrig_serial.cpp` includes a header of the chip's own software,
+`hal/usb_serial_jtag_ll.h`, beside WLED's header. WLED's files and the Arduino core are
+not changed. With the watch, 600 exchanges in a row and the board suite got every reply.
+Stock WLED and the probe build of task 3 did not show the fault, because they write a
+reply in several pieces or in one long piece, which the driver keeps pushing.
+
+**Resolution.** `firmware/usermod/odrig_serial.cpp`, `keepSending`;
+`tests/board/test_commands.py`, `test_every_reply_arrives_while_the_tool_waits_for_it`;
+`tests/firmware/test_usermod_files.py`, the one allowed header.
+
+## Seed 04: Asking the core for refreshes before the outputs are the mapping's
+
+**Question.** Task 5 leaves the outputs WLED's and dark and gives task 6 "step 5 of the
+design's loop: ask the core when the outputs can take data and send every refresh". Task 5
+also compares the replies of the board with the emulator's. The `animation` of a reply to
+`status` is the item the latest refresh chose, so a core that is never asked for a refresh
+answers `null` where the emulator answers 1.
+
+**Answer.** From task 5 on the usermod asks the core for a refresh in every pass of its
+loop and, in task 5, throws the LED data away. Task 6 makes the request wait for the
+outputs and sends the data. In task 5 `fps` is therefore the rate of the requests, 50, and
+not yet the rate of what the LEDs get.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `loop`.
+
+## Seed 04: The session that the board and the emulator are compared with
+
+**Question.** The design compares the replies to one session of commands on the board and
+in an emulator that runs the same folder. The emulator of the test is started for the
+session; the board has been running, with whatever brightness and item earlier tests left,
+and both count the turns of a cycle from their own start.
+
+**Answer.** The test restarts the board before the session, so both begin in the state
+after power-on, and the session begins with `status`, which compares that state too. Every
+`status` under the cycle comes within a few seconds of the start or of `play 3`, so both
+are in the first turn. The replies are compared as JSON objects without the member `fps`,
+together with the exit status of the command tool. The session holds every command and the
+three error codes the tool can cause on a valid show; `show-invalid` is caused in the
+install test, with an invalid show, and `unknown-command` cannot be caused with the tool.
+
+**Resolution.** `tests/board/support.py`, `SESSION`, `session` and `emulator`;
+`tests/board/test_commands.py`; `tests/board/test_install.py`.
+
+## Seed 04: Details of the host functions on the board
+
+**Question.** The design gives the host functions in a table. It leaves open how the
+memory is aligned, what `open` does with a file that is still open, and what a name longer
+than a show can have is.
+
+**Answer.** Memory is taken aligned to 8 bytes, since the core's interface asks for memory
+"aligned for any object" and the chip's allocator gives 4. `open` closes a file that is
+still open first, although the core closes its file before it opens another. A name longer
+than 32 characters, which no show can name, is answered with the failure value. The probe build's report takes its `error` from the core through
+a function the usermod gives it, under the lock.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`; `firmware/usermod/odrig_usermod.cpp`.

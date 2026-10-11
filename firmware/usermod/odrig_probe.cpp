@@ -5,6 +5,7 @@
 #include "wled.h"
 
 #include "odrig_leds.h"
+#include "odrig_serial.h"
 
 namespace {
 
@@ -13,8 +14,10 @@ const size_t LINE_LENGTH = sizeof(LINE) - 1;
 const uint32_t MAX_OUTPUTS = 32;
 
 size_t matched = 0;
+bool atLineStart = true;
 
 uint32_t startMs = 0;
+const char *(*errorNow)() = nullptr;
 bool counting = false;
 uint64_t secondStart = 0;
 uint32_t loopsNow = 0, loopsLast = 0;
@@ -89,7 +92,16 @@ void report() {
   line += usedMa();
   line += F(",\"ap\":");
   line += apActive ? 1 : 0;
-  line += F(",\"error\":null,\"outputs\":[");
+  line += F(",\"error\":");
+  const char *error = errorNow != nullptr ? errorNow() : nullptr;
+  if (error != nullptr) {
+    line += '"';
+    line += error;
+    line += '"';
+  } else {
+    line += F("null");
+  }
+  line += F(",\"outputs\":[");
   const uint32_t count = outputs();
   for (uint32_t i = 0; i < count; i++) {
     Bus *bus = BusManager::getBus(i);
@@ -114,14 +126,17 @@ void report() {
     line += F("\"}");
   }
   line += F("]}\n");
-  Serial.write((const uint8_t *)line.c_str(), line.length());
+  OdrigSerial::write(line.c_str(), line.length());
   longestGapMs = longestPollUs = longestSendUs = 0;
   limited = 0;
 }
 
 }  // namespace
 
-void OdrigProbe::started(uint32_t start_ms) { startMs = start_ms; }
+void OdrigProbe::started(uint32_t start_ms, const char *(*error)()) {
+  startMs = start_ms;
+  errorNow = error;
+}
 
 void OdrigProbe::pass(uint64_t now_ms) {
   if (!counting) {
@@ -165,7 +180,7 @@ void OdrigProbe::afterSend(uint64_t now_ms, uint32_t send_us) {
 }
 
 void OdrigProbe::feed(uint8_t byte, void (*pass)(uint8_t byte)) {
-  if (byte == (uint8_t)LINE[matched]) {
+  if ((matched > 0 || atLineStart) && byte == (uint8_t)LINE[matched]) {
     if (++matched == LINE_LENGTH) {
       matched = 0;
       report();
@@ -174,11 +189,8 @@ void OdrigProbe::feed(uint8_t byte, void (*pass)(uint8_t byte)) {
   }
   for (size_t i = 0; i < matched; i++) pass((uint8_t)LINE[i]);
   matched = 0;
-  if (byte == (uint8_t)LINE[0]) {
-    matched = 1;
-  } else {
-    pass(byte);
-  }
+  pass(byte);
+  atLineStart = byte == '\n';
 }
 
 #endif

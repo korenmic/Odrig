@@ -8,6 +8,7 @@ extends = env:esp32s3dev_16MB_opi
 custom_usermods =
   odrig = symlink://@REPO@/firmware/usermod
 lib_deps = ${esp32s3.lib_deps}
+  odrig_core = symlink://@REPO@/core
 build_unflags = ${common.build_unflags}
 build_flags = ${common.build_flags} ${esp32s3.build_flags}
   -D WLED_RELEASE_NAME=\"odrig_ESP32-S3_16MB_opi\"
@@ -15,6 +16,7 @@ build_flags = ${common.build_flags} ${esp32s3.build_flags}
   -D ARDUINO_USB_CDC_ON_BOOT=1
   -DBOARD_HAS_PSRAM
   -D WLED_DISABLE_ADALIGHT
+  -I@REPO@/core/include
 
 [env:odrig_probe]
 extends = env:odrig
