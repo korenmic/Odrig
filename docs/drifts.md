@@ -2387,3 +2387,237 @@ replies. The owner then ordered the seeds to proceed without commenting on the f
 taken as approval.
 
 **Resolution.** Seed 07 `seed.md`, Required Behavior 1 to 5.
+
+## Seed 05: Reasons for a column-leg file, and files that mix the two kinds
+
+**Question.** The seed gives the members of a column-leg file and says that a file uses one
+kind for all its legs. It names no reason for a file that breaks a new rule, and does not
+say what a file with both `width` and `height`, a leg with `rows` in a column-leg file, or
+a `first_led` of `"left"` beside `columns` is. `docs/mapping.md` and `docs/reasons.md` are
+the authority and know only row legs.
+
+**Answer.** No reason name is added. Every broken rule of either kind is
+`mapping-malformed`, as every broken rule of a row-leg file is today, and a missing file is
+`mapping-missing`; seeds 06 and 07 so meet the two names they know. The kind of a file is
+told by its top level: `width` without `height`, or `height` without `width`. Both, neither,
+a leg whose strips member is of the other kind, and a `first_led` of the other kind are all
+invalid. The converter's reader checks in a fixed order, given in the design, so that a
+second reader can give the same detail; the core gives the name alone and may check in any
+order, because its reader takes the members as the file lists them.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 1; `design.md`, "The mapping file
+format", "The reader" and "The core"; `tasks.md`, tasks 3 and 4.
+
+## Seed 05: The spike comes first, and uses row legs
+
+**Question.** The seed wants twenty outputs established "first, by itself, on the board".
+The target file is a column-leg file, which no reader can read before most of this seed is
+done.
+
+**Answer.** The spike is task 1 and needs none of the new format: twenty outputs of 180
+LEDs are twenty row legs of three rows of 60 on the pins of the target file, which today's
+format and today's core describe. The rate with a dense 60 x 60 clip is task 2, measured
+on the same mapping. The board meets the target file itself in task 8, and the ten-leg
+file goes only in task 9, when no test of any suite names it, so that every commit passes
+its suites.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 12 criterion 8; `design.md`, "The
+spike" and "Order of work"; `tasks.md`, tasks 1, 2, 8 and 9.
+
+## Seed 05: Where twenty outputs come from
+
+**Question.** The seed says the chip's parallel driver can carry sixteen outputs, and
+leaves open whether WLED is patched or the usermod drives the extra outputs itself.
+
+**Answer.** Read in WLED 16.0.1 at the pinned commit and in the NeoPixelBus copy it pins:
+the limit of twelve is two constants of `wled00/const.h`, four RMT channels and eight
+parallel ones, and the eight-lane form of the library's parallel method that
+`wled00/bus_wrapper.h` names. The library has the same method in a sixteen-lane form for
+the ESP32-S3, and the chip's LCD unit has sixteen data lines. One patch file changes the
+constant to sixteen, switches the parallel types to the sixteen-lane form and corrects
+WLED's memory estimate; the usermod stays as it is. The usermod does not drive outputs of
+its own: the chip has one LCD unit, and outputs outside WLED would be outside its current
+limiter and its information, which seed 04 keeps. What reading cannot settle is whether the
+sixteen-lane form sends correct data: the library's maintainer reported in 2024 that it
+gave him a single pulse. The spike proves or disproves it. A fault inside the library's own
+file is not patched in this seed; the fallback is the seed's: the largest number of outputs
+that works, twelve with stock limits.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 12; `design.md`, "Twenty outputs in
+the firmware"; `tasks.md`, task 1.
+
+## Seed 05: Proving an output that has no LED on it
+
+**Question.** One strip is wired, on pin 1, and nobody looks at it. Seed 04 called an
+output working when WLED made it and it held its leg's bytes. For a driver form that is
+reported to hold data and send nothing, that proves too little.
+
+**Answer.** The probe build measures the signal itself in two ways. It counts the pulses on
+each output's pin during one refresh with the chip's pulse counter, which must give 24 for
+every LED, and it times how long the parallel driver is busy after a send, which must be
+the time the LEDs take on the wire, 5.7 ms for 180. Neither says that the pulses have the
+right widths; that an LED strip on a lane of the parallel driver shows its picture stays an
+owner's check, with a mapping that puts pin 1 on the sixteenth lane. If the pulse counter
+cannot be attached to a driven pin, the wire time stands alone and the finding is recorded
+here.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 12 criteria 5 and 6 and
+Requirement 18 criterion 3; `design.md`, "What a program can prove without LEDs";
+`tasks.md`, tasks 1 and 10.
+
+## Seed 05: The pins of the twenty legs
+
+**Question.** The seed fixes pins 1 to 18, 21 and 47. Is one of them unusable on this
+board: a pin of the flash, of the PSRAM, of USB, a boot-mode pin, or the on-board LED?
+
+**Answer.** None was found unusable, and no pin was changed. All twenty pass WLED's own pin
+check for this build. Espressif's pages give the pins to avoid as 19 and 20 (USB), 26 to 37
+(flash and octal PSRAM), 0, 45 and 46 (boot-mode pins that boards pull), 43 and 44 (the
+serial lines of the second USB socket) and 48 or 38 (the on-board LED). Pin 3 is a
+boot-mode pin too, read at reset only, and seed 04 already made a working output on it.
+Pin 47 runs at 1.8 V on modules with 1.8 V memory, which the N16R8 is not; the module's
+datasheet was not read again for this. The spike proves every pin by its output and its
+pulses; a pin that fails gets a replacement and an entry here.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 12 criterion 10; `design.md`, "The
+pins"; `tasks.md`, task 1.
+
+## Seed 05: Fifty refreshes a second with 3,600 LEDs
+
+**Question.** The seed asks for 49 refreshes a second on the board with a dense 60 x 60
+clip. Seed 04 measured 6.6 ms for a request and 7.7 ms for a send with 1,800 LEDs while the
+limiter dims every LED. Twice the LEDs are about 13 ms and 15 ms, more than the 20 ms there
+are, and the limiter dims every refresh of 3,600 LEDs at WLED's maximum of 850 mA.
+
+**Answer.** The spike measures. If the firmware holds 49 with the loop as it is, nothing
+changes. Otherwise the request for a refresh moves to a task of its own on the chip's other
+processor core, so that decoding runs beside the limiter and the transfer; the design gives
+the hand-over, which keeps every call to the core one at a time and every counted refresh
+sent. The core's decoder and WLED's limiter are not changed. If the rate still stays below
+49, the measured rates are recorded as an open question and the seed stays `in_progress`.
+The figures above are estimates until task 1 has measured.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 13; `design.md`, "The time of one
+refresh"; `tasks.md`, tasks 1 and 2.
+
+## Seed 05: The tool that writes docs/mapping.md
+
+**Question.** The seed asks for a tracked tool that produces the drawings and tables of
+`docs/mapping.md`, and for a test. It does not say where the tool lives, how the page tells
+its generated parts from the rest, or how sixty columns are drawn in a text file.
+`docs/mapping.md` says today that its drawings are generated, and no tool is tracked.
+
+**Answer.** The tool is the module `odrig/mapdoc.py`, started as `python -m odrig.mapdoc`,
+beside the reader it uses. It is not a subcommand of `python -m odrig`, whose five
+subcommands seed 06 mirrors. Generated parts stand between marker comments in the page; the
+tool replaces them and leaves the rest. `--check` writes nothing and fails when the page
+differs; the test runs it on the tracked files and on copies with a mapping file changed. A
+column-leg file is drawn as a row-leg file is, one line for each strip with its two end
+numbers and an arrow, so each column lies on its side with the bottom of the canvas at the
+left; an upright drawing of sixty columns with numbers does not fit a text page. The order
+of the board's pins is a table in the tool, and the test of seed 03 goes on comparing the
+page's own table with the drawing. For the bench file the tool writes the bytes the page
+has.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 11; `design.md`, "The tool that
+writes docs/mapping.md"; `tasks.md`, task 7.
+
+## Seed 05: The page with twenty upright snakes
+
+**Question.** The seed asks that both views show the 60 x 60 canvas with twenty upright
+snakes "clearly, in a wide and in a narrow window", with the board, twenty lines, the paths
+and the LED numbers. It gives no layout. Today's layout is written for rows, has twelve
+colours, and draws at most ten lines in one channel.
+
+**Answer.** The labels of the legs move to a band along the canvas, the LED numbers stand
+upright at the ends of the columns, and twenty colours make every leg its own. The LEDs
+view shows the whole canvas in a window of 1280 x 800 with cells of 7 or 8 pixels and
+leaves the end numbers out where the cells are under 9 pixels. The mapping view keeps its
+cells at 9 pixels or more and is then higher than a window of 1280 x 800: it scrolls up and
+down and never sideways. Its lines run in two channels by fixed rules. The pins of the
+board are not in the order of the legs, so lines cross: at least 76 times in any drawing
+in which they reach the snakes from below, 88 times with the rules chosen, never twice for
+one pair and never one on another.
+Whether that is clear is judged by eye in the check list. Row-leg files keep the drawing
+they have.
+
+**Resolution.** Seed 05 `requirements.md`, Requirements 8, 9 and 10; `design.md`, "The
+page"; `tasks.md`, tasks 5, 6 and 10.
+
+## Seed 05: The demo show, its name and its sources
+
+**Question.** The seed says the demo show for the target replaces the ten-leg demo show,
+and not what it is called or whether its sources are tracked.
+
+**Answer.** It is `shows/demo-20/show.json`, with the content the ten-leg one had, and
+`shows/demo-10/` is removed. Only the show file is tracked: the two sources are 4.2 MB of
+JSON, written by the generators into `build/`, as seed 03 settled for the ten-leg show. Its
+brightness is 128, for the emulator; the board tests install it dimmed.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 14; `design.md`, "The demo show";
+`tasks.md`, task 9.
+
+## Seed 05: DVD bounce on a square canvas
+
+**Question.** The seed wants DVD bounce "made for 60 x 60". The generator of seed 01 moves
+the square one pixel in each direction per frame from the top-left corner. On a canvas as
+wide as it is high the square meets a side wall and the top or bottom wall in the same
+frame, so it only runs to and fro along one diagonal, in a loop of 116 frames.
+
+**Answer.** The generator is left as it is. Its rule is seed 01's, the sources of the bench
+show must keep their bytes, and the seed asks for no change. The demo show is correct and
+passes over every leg; it is duller than on the bench. A livelier path, for example a start
+away from the corner on a square canvas, is the owner's to ask for.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 14 criterion 4; `design.md`, "What
+uses the reader" and "Risks".
+
+## Seed 05: What fits into storage, and the noisy figure
+
+**Question.** The seed asks that the statement of how much dense content fits into the
+board's storage be recomputed. That statement is in `docs/decisions.md`, not in
+`docs/format.md`, and beside the dense figure it has one for noisy content that came from a
+prototype clip which is not in this repository.
+
+**Answer.** The statement is written into `docs/format.md` and, in the same words, into
+`docs/decisions.md`. It is computed from the measured size of the dense 60 x 60 clip of 10
+seconds and from two sizes of storage: the partition, 10,354,688 bytes, and the 9,001,905
+bytes of animations that seed 04 installed and played. The noisy figure is replaced by what
+the format alone gives: content that nothing predicts is stored frame by frame, 10,805
+bytes for each 20 ms. With the sizes measured when the spec was written that is 65 to 74
+seconds of the dense clip compressed and 16 to 19 seconds stored.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 16 criterion 3; `design.md`,
+"Measured sizes and what fits"; `tasks.md`, task 10.
+
+## Seed 05: Criteria of earlier specs that name the ten-leg build
+
+**Question.** The specs of seeds 03 and 04 have criteria about the ten-leg mapping, a
+60 x 30 canvas and `shows/demo-10`, and the check list by eye of `docs/emulator.md` and its
+test cite them by number. This seed removes what they name, and the earlier specs are not
+to be edited.
+
+**Answer.** The earlier spec files keep their text as a record. The requirements of this
+seed take the place of those criteria. The check list by eye keeps one step for each
+criterion of seed 03 it had, done with the twenty-leg demo show and the dense 60 x 60 clip,
+and gains steps for this seed's criteria, marked with the seed's number; its test reads
+both.
+
+**Resolution.** Seed 05 `requirements.md`, the introduction and Requirement 18; `design.md`,
+"Documents"; `tasks.md`, tasks 9 and 10.
+
+## Seed 05: What needs eyes, and when the seed is completed
+
+**Question.** Whether the two views are clear, and whether LEDs light, cannot be settled by
+a program, and the owner is not available. Seeds 03 and 04 stay `in_progress` for checks
+only the owner can make.
+
+**Answer.** The check list by eye is gone through in Chrome by a person or by a tool that
+drives the browser and takes screenshots that are looked at, as seed 03 did; that is part
+of this seed's work. What no program on this Mac can establish is listed as owner's checks
+and does not hold the seed open: a strip on a lane of the parallel driver, twenty wired
+legs, and the check list in Safari. The seed stays `in_progress` only if the board does not
+reach 49 refreshes a second, or if no tool that drives a browser is at hand.
+
+**Resolution.** Seed 05 `requirements.md`, Requirement 18 and Requirement 13 criterion 5;
+`tasks.md`, tasks 10 and 11.
