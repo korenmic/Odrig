@@ -78,7 +78,7 @@ Rules for every task:
   - Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10, 12.11, 17.1,
     17.3
 
-- [ ] 2. Fifty refreshes a second with a dense 60 x 60 clip on twenty outputs
+- [x] 2. Fifty refreshes a second with a dense 60 x 60 clip on twenty outputs
   - Add to `tests/board/test_fps.py`: on the twenty row legs of task 1, with the dense
     60 x 60 clip of 10 seconds, compressed and then uncompressed, the firmware's `status`
     reports 49 or more in every one of ten full seconds in a row.
@@ -101,16 +101,15 @@ Rules for every task:
     with the rates it read. Undo it.
   - The board is left with the firmware of this task and the dim example show.
   - Requirements: 13.1, 13.2, 13.3, 13.5, 12.11
-  - Left open. Done: the two tests of the rate, which fail with the firmware of task 1
-    (22 to 24 and 32 to 34 refreshes a second); the request in a task of its own with the
-    line-at-a-time port and the probe's timing in the task; the tests of the usermod's
-    files; the figures as far as measured, in `docs/firmware.md`, `docs/decisions.md` and
-    `docs/drifts.md`. Found: 27 to 34 and 44 or 45 with the probe build, below 49, so
-    Requirement 13 criterion 5 holds. Not done, because the board stopped answering on USB
-    after a trial build (see `docs/drifts.md`, "Seed 05: A trial build at another
-    optimisation level, and a board that no longer answers"): the rate read from the
-    firmware build, the 25-second measurements, the whole board suite with this firmware,
-    and leaving the board with this firmware and the dim example show.
+  - Done in two commits. The first has the request in a task of its own and what was
+    measured before the board stopped answering on USB after a trial build. The second,
+    after the owner had unplugged the board and plugged it in again, has the rate read
+    from the firmware build, 36 to 42 refreshes a second for the compressed clip and 45 to
+    47 for the uncompressed one, the 25-second measurements, and the whole board suite
+    with this firmware. The owner then ruled that any rate from 20 to 50 a second is fine
+    on the board, for any content, and the tests of the rate on the target assert that;
+    see `docs/drifts.md`, "Seed 05: The rate the owner accepts on the board: from 20 to
+    50".
 
 - [x] 3. The mapping format with column legs: the document and the converter's reader
   - `docs/mapping.md`: rewrite "Mapping file", "Rules" and "Where each LED is" for both

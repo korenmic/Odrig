@@ -54,7 +54,8 @@ it stands now.
   at runtime; it is the only definition of the layout.
 - Coordinates are 1-based, with (1,1) at the bottom-left LED. The proof-of-concept scripts in
   `animations/` and `tools/` still use the earlier convention (0-based, origin top-left).
-- Playback target: 50 frames per second.
+- Playback target: 50 frames per second. On the board any rate from 20 to 50 is accepted;
+  see "Firmware".
 
 ## Runtime architecture
 
@@ -73,10 +74,16 @@ it stands now.
   runtime format needs a custom WLED build with our player added.
 - In the custom build WLED is the platform: LED output, storage and Wi-Fi. Playback and
   commands belong to the shared core, and the USB serial port carries the core's commands.
-- One board drives all twenty legs of the target: four through WLED's RMT driver and
-  sixteen through its parallel driver. Stock WLED drives twelve outputs on this chip, so
-  the build applies one patch to WLED's source, kept as a patch file. See
-  [firmware.md](firmware.md), "What the firmware changes in WLED".
+- On the board any refresh rate from 20 to 50 a second is accepted, for any content. The
+  owner only minds a rate above 50 or below 20. Measured on the board on 2026-10-12 with
+  the 60 x 60 target file: the demo show and a picture that does not change are refreshed
+  50 times a second, and the dense test clip, in which every LED changes at every frame,
+  36 to 42 times for the compressed file and 45 to 47 for the uncompressed one. So a dense
+  file plays faster uncompressed on the board. The core needs 12.3 ms for a dense
+  compressed frame and 8.6 ms for an uncompressed one, a send to twenty outputs 16.3 ms
+  with WLED's limiter dimming every LED, and side by side, on the chip's two processor
+  cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
+  on the board".
 
 ## Conversion
 
@@ -183,8 +190,8 @@ are in [format.md](format.md), "Measured sizes".
   the compressed file and 4.7 ms for the uncompressed one, and the board reported 49 or 50
   refreshes in every second for both. For the target, a dense 60 x 60 clip on twenty legs,
   3,600 LEDs, the same work takes 12.3 ms for a compressed frame and 8.6 ms for an
-  uncompressed one, and beside the send to twenty outputs that is too slow for 50 frames
-  per second: the figures are in the entry on the rate below. What also stays open is the
+  uncompressed one, and the board plays that clip at 36 to 47 frames per second, inside the
+  20 to 50 the owner accepts; see "Firmware" above. What stays open is the
   time at power-on: every file is checked by decoding it, which takes 6.0 seconds for one
   dense 60 x 60 clip of 10 seconds, 4.2 seconds for the same clip uncompressed, and took 38
   seconds for 9 MB of dense 60 x 30 clips, with the LEDs dark meanwhile. See
@@ -204,17 +211,6 @@ are in [format.md](format.md), "Measured sizes".
   and sixteen through its parallel driver, on pins 1 to 18, 21 and 47, and every pin
   carries the signal of a whole refresh. See [firmware.md](firmware.md), "Verified on the
   board".
-- Whether one board plays a dense 60 x 60 animation at 50 frames per second. Measured on
-  the board on 2026-10-11: it does not. A picture that does not change is sent to twenty
-  outputs 50 times a second. With the dense 60 x 60 clip the firmware reaches 22 to 24
-  refreshes a second for the compressed file and 32 to 34 for the uncompressed one with
-  the core asked in WLED's loop, and 27 to 34 and 44 or 45 in the probe build with the
-  core asked by a task on the chip's other processor core. The core needs 12.3 ms for a
-  compressed frame and 8.6 ms for an uncompressed one, a send to twenty outputs 16.3 ms
-  with WLED's limiter dimming every LED, and side by side both take a quarter to a third
-  longer. What is left to try is in [firmware.md](firmware.md), "Verified on the board",
-  and in [drifts.md](drifts.md), "Seed 05: The request in a task of its own, and the rate
-  it reaches". Seed 05 stays in progress for this.
 
 ## Change log
 
@@ -264,7 +260,7 @@ are in [format.md](format.md), "Measured sizes".
   demo show `shows/demo-20` take the place of the ten-leg file and its show, the core, the
   emulator and its page read both kinds, and with one patch to WLED the firmware makes
   twenty outputs. Measured on the board: twenty working outputs, and a dense 60 x 60 clip
-  at 22 to 34 refreshes a second compressed and 32 to 45 uncompressed, below the 49 asked
-  for, so seed 05 stays in progress. What fits into storage is computed again for 60 x 60:
+  at 36 to 42 refreshes a second compressed and 45 to 47 uncompressed. The owner ruled that
+  any rate from 20 to 50 a second is fine on the board, for any content. What fits into storage is computed again for 60 x 60:
   65 to 74 seconds of the dense clip. The open question about legs 3 to 10 is now the one
   about twenty wired legs.

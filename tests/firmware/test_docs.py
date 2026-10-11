@@ -107,7 +107,7 @@ class Firmware(unittest.TestCase):
         self.assertIn("twenty wired legs show the demo show", asked)
         opening = " ".join(checks.split("\n1. **")[0].split())
         self.assertIn("Steps 5 and 6 stay listed as open and do not hold seed 05 open", opening)
-        self.assertIn("does not reach 49 refreshes a second with a dense 60 x 60 clip", opening)
+        self.assertIn("the owner accepts any rate from 20 to 50", opening)
 
     def test_the_mapping_of_the_fifth_check_puts_the_wired_strip_on_the_last_lane_and_the_strip_shows_what_the_check_says(self):
         body = re.split(r"(?m)^\d+\. \*\*", section(self.text, "The owner's checks"))[5]

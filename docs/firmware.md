@@ -674,9 +674,9 @@ marked `seed 05`, criterion 3 of Requirement 18 of
 
 Seed 04 is completed when steps 1 to 4 are done. Steps 5 and 6 stay listed as open and do
 not hold seed 05 open; criterion 4 of that Requirement 18 says so. What holds seed 05 open
-is not for eyes: the board does not reach 49 refreshes a second with a dense 60 x 60 clip,
-and the board tests with the target file have not run. See
-[Verified on the board](#verified-on-the-board).
+is not for eyes: the board tests with the target file have not run. The rate does not hold
+it open: the board plays a dense 60 x 60 clip at 36 to 47 refreshes a second, and the owner
+accepts any rate from 20 to 50. See [Verified on the board](#verified-on-the-board).
 
 1. **The show plays from power-on (16.1).** Install the example show at the brightness
    chosen for the power supply in use; one strip fed from the board's 3.3 V pin allows 40
@@ -919,30 +919,50 @@ that is copied while the last one is on the wire" in [drifts.md](drifts.md).
 
 **The request in a task of its own.** The second task of seed 05 moved the request for a
 refresh out of WLED's loop, as the design of that seed plans it for a loop that cannot hold
-the rate. What was measured, with the probe build, the dense 60 x 60 clip on the same
-twenty row legs, at brightness 32, in five reports a second apart for each clip:
+the rate. `status` of the firmware, in ten seconds for each form of the dense 60 x 60 clip
+of 10 seconds, at brightness 32, in refreshes a second:
 
-| Clip | Request in | Refreshes a second | Longest gap | The core's work in a second | for one frame | Send, mean | longest |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Compressed | WLED's loop | 21 to 23 | 57 ms | 610 to 650 ms | 12.3 ms | 16.3 ms | 16.5 ms |
-| Compressed | the task | 27 to 34 | 43 ms | 796 to 857 ms | 16 to 17 ms | 20.0 ms | 20.9 ms |
-| Uncompressed | WLED's loop | 31 or 32 | 47 ms | 430 to 440 ms | 8.6 ms | 16.3 ms | 16.5 ms |
-| Uncompressed | the task | 44 or 45 | 29 ms | 573 to 586 ms | 12.7 ms | 19.7 ms | 22.2 ms |
+| Clip | Request in WLED's loop, twenty row legs | Request in the task, the target file |
+|---|---:|---:|
+| Compressed, 1,383,766 bytes | 22 to 24 | 36 to 42 |
+| Uncompressed, 1,462,236 bytes | 32 to 34 | 45 to 47 |
 
-With the firmware of the first task `status` reported 22 to 24 for the compressed clip and
-32 to 34 for the uncompressed one, in ten seconds each. The rate with the task was not read
-from the firmware build, and the 25-second measurements of the task were not taken: the
-board stopped answering first, see below. **The board does not hold 49 refreshes a second
-with a dense 60 x 60 clip.**
+**What the owner accepts.** Any rate from 20 to 50 refreshes a second is fine on the
+board, for any content; only a rate above 50 or below 20 is a fault. Every figure of this
+page is inside that. A dense file plays faster uncompressed than compressed on the board,
+45 to 47 against 36 to 42, and the uncompressed file is 5 percent larger. A show that is
+not dense plays at the full rate: the demo show on the target file is refreshed 50 times a
+second, and so is the bench show. The board tests assert from 20 to 50 for the demo show
+on the target and for the dense 60 x 60 clip in both forms, with one count more allowed at
+the top, because a second can count one refresh more than was due in it; they go on
+asserting 49 or more for the bench show and for a picture that does not change on twenty
+outputs, which the board reaches.
+
+Measured with the probe build and the task over 25 seconds each, at brightness 32, on the
+target file except for the bench show:
+
+| Show | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | The core's work in a second | Longest request | Send, mean | longest |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Bench show, two legs, 360 LEDs | 171 ms | 2,295 to 2,460 | 50 | 50 | 43 ms | 26 to 67 ms | 23.3 ms | 0.75 ms | 1.22 ms |
+| Demo show, twenty legs, 3,600 LEDs | 174 ms | 368 to 439 | 49 to 51 | 50 | 43 ms | 61 to 106 ms | 24.0 ms | 15.7 ms | 16.1 ms |
+| Dense 60 x 60 clip, compressed | 6,011 ms | 515 to 982 | 26 to 36 | 36 | 57 ms | 765 to 903 ms | 52.3 ms | 20.0 ms | 32.1 ms |
+| Dense 60 x 60 clip, uncompressed | 4,183 ms | 134 to 161 | 44 or 45 | 46 | 36 ms | 552 to 607 ms | 33.5 ms | 19.8 ms | 33.4 ms |
+
+126,500 bytes of internal memory were free with the target file. The probe build's own
+work costs the compressed clip refreshes that the firmware does not lose: 26 to 36 against
+the firmware's 36 to 42.
 
 - The task works: a task on processor core 0 reads the files of `/odrig` while WLED's loop
   runs on core 1, the outputs get every refresh the core counts, `overwritten` stays 0,
-  and commands are answered. Over the minutes it ran no watchdog restarted the chip.
+  and commands are answered. No watchdog restarted the chip, in these measurements and in
+  the whole board suite.
 - The two cores slow each other. Side by side a send takes 20 ms where it takes 16.3 ms
-  alone, and the core's work for a frame 12.7 ms and 16 to 17 ms where it takes 8.6 ms and
-  12.3 ms alone. The sum that has to fit into the 20 ms of a frame on core 0, the core's
-  work and then the copy of 4.1 ms, fits for the uncompressed clip and not for the
-  compressed one; the send of 20 ms on core 1 leaves no room for anything else.
+  alone, and the core's work for a dense frame 12 to 13 ms uncompressed and 16 to 17 ms
+  compressed where it takes 8.6 ms and 12.3 ms alone. On core 0 the core's work and then
+  the copy of 4.1 ms have to fit into the 20 ms of a frame; they fit for the uncompressed
+  clip and not for the compressed one, and the send of 20 ms on core 1 leaves no room for
+  anything else. Once a refresh is late the core decodes every frame up to the one that
+  is due, so the rate settles well below what the sums suggest.
 - Reading the file is not what takes the time: with the file read 4,096 bytes at a time in
   place of the 512 the core asks for, every figure was the same, and so was the start of
   the core, 6.0 s. The work is the core's decoding and placing, and WLED's show.
@@ -950,14 +970,15 @@ with a dense 60 x 60 clip.**
   dimming of 3,600 LEDs is about 8 ms. On the bench the limiter dims every refresh, because
   WLED's maximum of 850 mA is below the 3,600 mA it counts for 3,600 LEDs at rest.
 
-What is left to try, none of it tried on the board:
+What could make dense content faster. None of it was tried, and nothing asks for it:
 
+- Raising WLED's maximum current to what the power supply of the installation gives, in
+  WLED's LED settings, which has to be done before twenty legs are lit anyway. The limiter
+  then dims only a picture that is too bright, and a send that it does not dim is about
+  8 ms shorter. The firmware does not change that setting.
 - Building the core alone at `-O2`, as a library of its own, and leaving WLED's files at
   the platform's `-Os`. The core is compiled at `-Os` in the firmware and at `-O2` on the
-  Mac.
-- Raising WLED's maximum current to what the power supply of the installation gives, in
-  WLED's LED settings. The limiter then dims only a picture that is too bright, and a send
-  that it does not dim is about 8 ms shorter. The firmware does not change that setting.
+  Mac. The whole firmware must not be built at `-O2`: see the next paragraph.
 - Measuring where the cores lose time to each other. The chip's instruction cache has 16
   KB for both.
 
@@ -975,7 +996,7 @@ settings files to the port again and again. The change of the build was taken ba
 anything was committed; `firmware/platformio_override.ini.in` is as it was, and the images
 in `build/firmware/out/` are built from the tracked sources.
 
-What brings the board back, by a person at the desk:
+What brings a board in that state back, by a person at the desk:
 
 1. Unplug the board's USB cable and plug it in again.
 2. At once: `python3 firmware/fw.py flash`, which writes the firmware of
@@ -983,8 +1004,15 @@ What brings the board back, by a person at the desk:
 3. If WLED's settings were renamed, `/rst.cfg.json` in the board's storage holds them, and
    so do the storage images the tool keeps in `build/firmware/storage/`; `install-show`
    leaves every file outside `/odrig` as it finds it.
-4. `python3 firmware/fw.py test-board`, which has not run with the firmware of the second
-   task.
+4. `python3 firmware/fw.py test-board`.
+
+That is how this board came back. The owner unplugged it and plugged it in, it answered at
+once, and the firmware as committed was flashed. WLED had renamed its settings file:
+storage held `/rst.cfg.json` with the 392 bytes `/cfg.json` had before, WLED's LED outputs
+and its start preset and no Wi-Fi setting. The file was given its name back in the board's
+storage with the tool's own steps for storage, read, change in the image, check, write the
+changed block, compare; afterwards every file outside `/odrig` had the bytes it had before
+the trial.
 
 **From nothing.** With `build/firmware/` removed, `python3 firmware/fw.py build` set up the
 tools, fetched WLED and built the firmware in 2 minutes. The lists of the home folder from

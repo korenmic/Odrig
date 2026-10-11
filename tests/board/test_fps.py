@@ -9,6 +9,9 @@ from . import PORT, support
 
 SECONDS = 10
 LOWEST = 49
+# What the owner accepts on the target for any content: from 20 to 50 refreshes a second.
+# A second can count one refresh more than was due in it.
+ACCEPTED = (20, 51)
 
 
 def status():
@@ -55,17 +58,23 @@ class Fps(unittest.TestCase):
         fps = self.refreshes_in_each_second()
         self.assertGreaterEqual(min(fps), LOWEST, fps)
 
-    def dense_clip_on_the_target(self, compressed):
-        with support.show_folder(support.TARGET, [("dense.odrg", support.dense_clip(compressed=compressed))]) as folder:
-            support.ensure_installed(folder)
+    def accepted_on_the_target(self, folder):
+        support.ensure_installed(folder)
         fps = self.refreshes_in_each_second()
-        self.assertGreaterEqual(min(fps), LOWEST, fps)
+        self.assertGreaterEqual(min(fps), ACCEPTED[0], fps)
+        self.assertLessEqual(max(fps), ACCEPTED[1], fps)
+
+    def test_the_demo_show_on_the_target_is_refreshed_20_to_50_times_in_every_second(self):
+        with support.demo_show() as folder:
+            self.accepted_on_the_target(folder)
 
     def test_the_target_with_the_dense_60_x_60_clip_compressed(self):
-        self.dense_clip_on_the_target(compressed=True)
+        with support.show_folder(support.TARGET, [("dense.odrg", support.dense_clip(compressed=True))]) as folder:
+            self.accepted_on_the_target(folder)
 
     def test_the_target_with_the_dense_60_x_60_clip_uncompressed(self):
-        self.dense_clip_on_the_target(compressed=False)
+        with support.show_folder(support.TARGET, [("dense.odrg", support.dense_clip(compressed=False))]) as folder:
+            self.accepted_on_the_target(folder)
 
     def test_the_rate_holds_while_status_is_asked_five_times_a_second(self):
         with support.dim_show() as folder:

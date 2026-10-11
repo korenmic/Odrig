@@ -3620,3 +3620,59 @@ two lines cross once, as the suite has it.
 
 **Resolution.** `docs/emulator.md`, "The LEDs view", "The mapping view", "The check list by
 eye" and "What has been checked"; `tests/emulator/test_docs.py`.
+
+## Seed 05: The board is back, and what WLED had done to its settings file
+
+**Question.** The entry "A trial build at another optimisation level, and a board that no
+longer answers" left the board unreachable and WLED's settings probably renamed.
+
+**Answer.** The owner unplugged the board's USB cable and plugged it in again. The board
+answered at once, and the session that coordinates this run flashed the firmware as
+committed and installed the dim example show; nothing but a cut of the board's power had
+been missing. Storage then held `/rst.cfg.json` and no `/cfg.json`: WLED had renamed its
+settings file, as its source says it does after ten quick restarts. The file has 392
+bytes, WLED's two LED outputs of the bench build and its start preset, and no Wi-Fi
+setting, so no Wi-Fi setting was changed by the trial. It was given its name back in the
+board's storage by a one-off script that used the firmware tool's own steps for storage:
+the kept image confirmed by the chip, the rename in the image, the check that `/odrig` and
+every other file are untouched, the one changed block written, the whole partition
+compared. Afterwards the files outside `/odrig` were byte for byte those of the storage
+image kept before the trial. The script is not tracked: the tool has no command for it and
+this seed adds none.
+
+The images in `build/firmware/out/` are rebuilt from the tracked sources before the board
+tests run. The probe image of that folder had been built before the core read column
+legs, and the board suite builds an image only when it is missing; with that old image a
+show on the target file is `mapping-malformed`.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board".
+
+## Seed 05: The rate the owner accepts on the board: from 20 to 50
+
+**Question.** Requirement 13 asks for 49 refreshes a second on the board with a dense
+60 x 60 clip, compressed and uncompressed, and holds the seed `in_progress` when the board
+stays below. With the request in a task of its own the firmware reports 36 to 42 for the
+compressed clip and 45 to 47 for the uncompressed one.
+
+**Answer.** The owner ruled on it while this run was under way, and the rulings reached
+this run through the session that coordinates it. The first accepted 30 frames per second
+for dense video content; the second, which replaces it, is the one that stands: any
+refresh rate from 20 to 50 a second is fine on the board, for any content, and the owner
+only minds a rate above 50 or below 20. The measured rate is not a defect to fix, and no
+other build of the whole firmware is to be tried for it.
+
+So criteria 1 and 2 of Requirement 13 read, from here on: with the target file, `status`
+reports 20 or more and 50 or fewer in every one of ten seconds, for the dense 60 x 60 clip
+in both forms and for the demo show. A second can count one refresh more than was due in
+it, as the tests of seed 04 already saw, so the tests allow 51 at the top. Criterion 5 no
+longer holds the seed open. The board tests of the bench show, of seed 04, and the test of
+a picture that does not change on twenty outputs, of Requirement 12, go on asserting 49 or
+more: the board reaches it, and they guard what was measured. The documents give the
+measured figures as they are, say which form of a dense file plays faster on the board,
+the uncompressed one, and `docs/decisions.md` has the ruling as a decision in place of the
+open question about the rate. The spec files are not edited; this entry is where the
+requirement is changed.
+
+**Resolution.** `tests/board/test_fps.py`; `docs/decisions.md`, "Firmware", "Canvas and
+coordinates" and the change log; `docs/firmware.md`, "Verified on the board" and "The
+owner's checks".
