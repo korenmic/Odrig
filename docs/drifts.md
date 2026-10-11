@@ -3353,3 +3353,71 @@ line, and files with legs started at the top and with pins the board lacks besid
 `UprightView`. The tab `Mapping` on a column-leg file now shows this view, which replaces
 what the entry "The tab Mapping on a column-leg file, before its mapping view is written"
 describes.
+
+## Seed 05: What the tool that writes docs/mapping.md says of a page it refuses, and what it draws for other files
+
+**Question.** The design names three failures of `python -m odrig.mapdoc` with status 1, a
+marker that names a file that is not there, a marker without an end and a name it does not
+know, and gives a word only for a page that differs, `page-differs`. It does not say what
+a marker is inside a line of text, what an end without a marker is, where the fence of a
+drawing stands, what the line under the board says, or how wide a drawing is for a file
+other than the two of the page.
+
+**Answer.** The tool writes the error line of the converter, `error: <word>: <detail>`.
+
+- A mapping file that is not there is the reader's `mapping-missing`, and one that breaks a
+  rule its `mapping-malformed`; a page that is not there is `not-found`. Those are the
+  reasons of `docs/reasons.md` for those files.
+- A marker without an end, before the next marker or before the end of the page, an end
+  without a marker, and a marker that does not name a board, a drawing or a table of a
+  file are `page-malformed`, with the page and the number of the line. Like `page-differs`
+  it is a word of the module and not a reason of `docs/reasons.md`. An end without a marker
+  is refused because a marker with a slip in its first words would otherwise leave its part
+  unwritten and unchecked without a word.
+- A marker and an end are whole lines: a line that starts with the marker's first words is
+  a marker, a line that is the end comment and nothing else is an end, and the same words
+  inside a line are text of the page. A file's name is made of letters, digits, `.`, `_`
+  and `-` and starts with a letter or a digit, so a marker names no file outside the
+  mapping folder.
+- Every failure is found before anything is compared or written: `page-differs` is said
+  only of a page whose markers are sound and whose files are read. Without `--check`, a
+  page that already holds what would be written is not written again.
+- The fence of a drawing is inside the generated part, and nothing but the marker and the
+  end stands around it. Under the board, after an empty line, a leg whose pin the board
+  lacks is named as `Not on the board: leg 2 on pin 60.`, with every such leg in the one
+  line.
+- For another file the numbers of a drawing are as wide as the largest LED number of the
+  file, its labels are 6 wide or two more than the longest, the arrow is always 44, and
+  the heading ends four places before the end of the lines, as in the drawing the page had.
+  The board moves to the right when a leg number has three digits.
+
+**Resolution.** `odrig/mapdoc.py`; `tests/converter/test_mapping_page.py`, `Refused`,
+`OutsideTheGeneratedParts` and `MadeUpFiles`. `docs/converter.md` names the program in one
+sentence and points to `docs/mapping.md`, which gives the command.
+
+## Seed 05: The ten-leg section and "What is confirmed" of docs/mapping.md, with the tool
+
+**Question.** Task 7 gives the page its section for twenty upright legs. The ten-leg file
+is removed in task 9 and "What is confirmed" is task 10's. The page had a section for the
+ten-leg file, and "What is confirmed" spoke of legs 3 to 10 and of ten outputs read from
+WLED's source. The design's row for the page says that LEDs on pins 2 to 18, 21 and 47
+have not been seen, and its list of risks says eighteen of the twenty pins.
+
+**Answer.** The ten-leg section goes with task 7: the page has one target, and its test
+reads the bench section and the twenty-leg section. `mapping/legs-10.json` stays tracked
+until task 9, and nothing on the page names it. "What is confirmed" is reworded as little
+as keeps the page true: legs 1 and 2 of today's build are confirmed on the hardware, as
+before; the firmware makes twenty working outputs on pins 1 to 18, 21 and 47 and every pin
+carries the signal of a whole refresh, measured with one strip wired, on pin 1; with that
+firmware LEDs on pins 2 to 18, 21 and 47 have not been seen. Both figures of the design are
+right: two legs were seen lit before this firmware, and one pin with it. Task 10 goes over
+the section again.
+
+`tests/emulator/test_board.py` reads the board from the generated part `board legs-20`
+and no longer from behind a sentence of the page, which is reworded. In the test of the
+tool, "the first row of `legs-2.json`" is the first row of its first leg, which changes
+places with the second.
+
+**Resolution.** `docs/mapping.md`; `tests/emulator/test_board.py`;
+`tests/emulator/test_layout.py`, `sections_of_the_mapping_document`;
+`tests/converter/test_mapping_page.py`, `ChangedMappingFile`.

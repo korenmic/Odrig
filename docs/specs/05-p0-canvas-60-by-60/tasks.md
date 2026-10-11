@@ -199,7 +199,7 @@ Rules for every task:
     test of the crossings fails with more than 88. Undo it.
   - Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 10.1, 10.2
 
-- [ ] 7. The tool that writes docs/mapping.md
+- [x] 7. The tool that writes docs/mapping.md
   - Create `odrig/mapdoc.py` as the design's "The tool that writes docs/mapping.md"
     describes: the markers, the board, the drawing and the table of a file of either kind,
     `--check`, `--page` and `--mapping-dir`.

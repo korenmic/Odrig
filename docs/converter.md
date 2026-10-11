@@ -16,6 +16,10 @@ The page also covers the [generators](#generators) of the tracked animations, th
 [test vectors](#test-vectors) for other ODRG readers, the [tests](#tests), and how to use
 the reference decoder [from Python](#from-python).
 
+The package holds one more program, `python -m odrig.mapdoc`, which writes the drawings and
+tables of [mapping.md](mapping.md) from the mapping files. It is not a subcommand of the
+tool, and that page describes it.
+
 ## Setup
 
 The tool needs Python 3.10 or later. Create a virtual environment inside the repository

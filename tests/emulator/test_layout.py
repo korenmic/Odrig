@@ -179,38 +179,52 @@ class Positions(unittest.TestCase):
                 {"x": 3 * index + 3, "start": "bottom", "first": 121, "last": 180},
             ])
 
-    def test_strips_gives_the_end_numbers_of_the_drawings_in_the_mapping_document(self):
+    def sections_of_the_mapping_document(self):
+        """The section of the bench build and the section of the target build, by the name
+        of the mapping file each one draws."""
         text = (support.ROOT / "docs" / "mapping.md").read_text(encoding="utf-8")
-        sections = {"legs-2": text.split("## Today's build")[1].split("\n## ")[0], "legs-10": text.split("## Target build")[1].split("\n## ")[0]}
+        sections = {"legs-2": text.split("## Today's build")[1].split("\n## ")[0], "legs-20": text.split("## Target build")[1].split("\n## ")[0]}
+        self.assertEqual((self.canvases["legs-2"].kind, self.canvases["legs-20"].kind), (mapping.ROWS, mapping.COLUMNS))
         for name, section in sections.items():
-            drawn = re.findall(r"(?m)^y=([0-9]+) +\| +([0-9]+) (<-+|-+>) +([0-9]+) \|(?: +leg ([0-9]+), pin ([0-9]+))?$", section)
+            self.assertIn(f"(../mapping/{name}.json)", section)
+        return sections
+
+    def test_strips_gives_the_end_numbers_of_the_drawings_in_the_mapping_document(self):
+        for name, section in self.sections_of_the_mapping_document().items():
             canvas = self.canvases[name]
-            self.assertEqual(len(drawn), canvas.height, name)
-            by_y = {}
-            for index, rows in enumerate(self.dumps[name]["strips"]):
-                for row in rows:
-                    by_y[row["y"]] = (index, row)
-            for y, at_left, arrow, at_right, leg, pin in drawn:
-                index, row = by_y[int(y)]
-                self.assertEqual(row["start"], "right" if arrow.startswith("<") else "left", (name, y))
-                at_x1, at_xw = (row["last"], row["first"]) if row["start"] == "right" else (row["first"], row["last"])
-                self.assertEqual((at_x1, at_xw), (int(at_left), int(at_right)), (name, y))
+            # A line of a drawing is one strip: a row, with the LED numbers at x = 1 and at
+            # x = W, or a column lying down, with the LED numbers at y = 1 and at y = H.
+            across, low_end, count = ("y", "left", canvas.height) if canvas.kind == mapping.ROWS else ("x", "bottom", canvas.width)
+            drawn = re.findall(r"(?m)^" + across + r"=([0-9]+) +\| +([0-9]+) (<-+|-+>) +([0-9]+) \|(?: +leg ([0-9]+), pin ([0-9]+))?$", section)
+            self.assertEqual(len(drawn), count, name)
+            self.assertEqual(len(re.findall(r"(?m)^[xy]=[0-9]+ +\|", section)), count, name)
+            by_place = {}
+            for index, strips in enumerate(self.dumps[name]["strips"]):
+                for place, strip in enumerate(strips):
+                    by_place[strip[across]] = (index, place, strip)
+            self.assertEqual([int(place) for place, *_ in drawn], sorted(by_place, reverse=canvas.kind == mapping.ROWS), name)
+            for place, at_the_low_end, arrow, at_the_far_end, leg, pin in drawn:
+                index, place_in_the_leg, strip = by_place[int(place)]
+                self.assertEqual(strip["start"] == low_end, arrow.endswith(">"), (name, place))
+                wanted = (strip["first"], strip["last"]) if strip["start"] == low_end else (strip["last"], strip["first"])
+                self.assertEqual(wanted, (int(at_the_low_end), int(at_the_far_end)), (name, place))
+                # The leg and the pin stand beside the first strip of a leg and nowhere else.
+                self.assertEqual(bool(leg), place_in_the_leg == 0, (name, place))
                 if leg:
                     self.assertEqual((canvas.legs[index].leg, canvas.legs[index].pin), (int(leg), int(pin)))
 
     def test_strips_gives_the_end_numbers_of_the_tables_in_the_mapping_document(self):
-        text = (support.ROOT / "docs" / "mapping.md").read_text(encoding="utf-8")
-        rows_of_tables = re.findall(r"(?m)^\| ([0-9]+) \| ([0-9]+) \| ([0-9, ]+) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \|$", text)
-        self.assertEqual(len(rows_of_tables), 12)
-        for name, table in (("legs-2", rows_of_tables[:2]), ("legs-10", rows_of_tables[2:])):
+        for name, section in self.sections_of_the_mapping_document().items():
             canvas = self.canvases[name]
-            self.assertEqual(len(table), len(canvas.legs))
-            for (leg, pin, ys, *numbers), listed, rows, places in zip(table, canvas.legs, self.dumps[name]["strips"], self.dumps[name]["positions"]):
-                self.assertEqual((int(leg), int(pin), [int(y) for y in ys.split(",")]), (listed.leg, listed.pin, list(listed.strips)))
-                ends = [number for row in rows for number in (row["first"], row["last"])]
+            self.assertIn("| Rows (y) |" if canvas.kind == mapping.ROWS else "| Columns (x) |", section)
+            table = re.findall(r"(?m)^\| ([0-9]+) \| ([0-9]+) \| ([0-9, ]+) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \| \(([0-9]+),([0-9]+)\) \|$", section)
+            self.assertEqual(len(table), len(canvas.legs), name)
+            for (leg, pin, listed_strips, *numbers), listed, strips, places in zip(table, canvas.legs, self.dumps[name]["strips"], self.dumps[name]["positions"]):
+                self.assertEqual((int(leg), int(pin), [int(strip) for strip in listed_strips.split(",")]), (listed.leg, listed.pin, list(listed.strips)))
+                ends = [number for strip in strips for number in (strip["first"], strip["last"])]
                 self.assertEqual(ends, [1, 60, 61, 120, 121, 180])
                 pairs = list(zip(map(int, numbers[0::2]), map(int, numbers[1::2])))
-                self.assertEqual([tuple(places[number - 1]) for number in ends], pairs)
+                self.assertEqual([tuple(places[number - 1]) for number in ends], pairs, (name, leg))
 
     def test_path_passes_through_every_led_in_chain_order(self):
         for name, canvas in self.of_kind(mapping.ROWS).items():
