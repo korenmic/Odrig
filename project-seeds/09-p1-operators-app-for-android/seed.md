@@ -49,8 +49,8 @@ A PC version built with Tauri is intended later and is not part of this seed.
   can also be pointed at the emulator.
 - The emulator listens only on the Mac itself unless started with an option to listen on the
   local network. That option is added here so a phone can reach the emulator.
-- Tools needed to build the app install into the project folder. The Android SDK's licence
-  is accepted by the owner, not by an agent.
+- Tools needed to build the app install into the project folder. The owner has accepted the
+  Android SDK's licence terms, so the build may accept them when it installs the SDK.
 - The screen is used outdoors at night: a dark design with large controls.
 - Tests that need a phone are kept apart from those that do not.
 
