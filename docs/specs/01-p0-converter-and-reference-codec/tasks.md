@@ -35,7 +35,7 @@ Rules for every task:
     before committing.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 20.1, 21.1, 21.2, 21.3
 
-- [ ] 2. Strict JSON, and reading and writing JSON frames
+- [x] 2. Strict JSON, and reading and writing JSON frames
   - Create `odrig/strictjson.py` (`loads`, `members`, `integer`) and `odrig/jsonframes.py`
     (`Animation`, `loads`, `read`, `merged`, `dumps`, `write`, `colour_count`) as the design
     describes, with the check order and the canonical layout given there.

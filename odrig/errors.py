@@ -8,6 +8,15 @@ import contextlib
 NOT_FOUND = "not-found"
 CANNOT_WRITE = "cannot-write"
 
+BAD_JSON = "bad-json"
+MISSING_MEMBER = "missing-member"
+BAD_TYPE = "bad-type"
+BAD_VERSION = "bad-version"
+UNKNOWN_MEMBER = "unknown-member"
+OUT_OF_RANGE = "out-of-range"
+NO_FRAMES = "no-frames"
+BAD_PIXEL_COUNT = "bad-pixel-count"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

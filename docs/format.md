@@ -55,8 +55,13 @@ Each frame is an object with exactly these members:
 | `ms` | integer | Duration in milliseconds, at least 1. |
 | `pixels` | array of W * H integers | One colour per pixel, in pixel order. A colour is the integer `red * 65536 + green * 256 + blue`, so 0 is off and 16777215 is full white. |
 
-A reader rejects a file with a different version, any other member, a wrong number of pixels,
-or a value out of range.
+The file is read strictly. It is UTF-8 without a byte-order mark and holds exactly one JSON
+value, and no object names a member twice. An integer is a JSON number written without a
+fraction and without an exponent, so `1.0`, `1e3` and `true` are not integers.
+
+A reader rejects a file that breaks these rules, and a file with a different version, a
+missing member, any other member, a value of the wrong type, no frames, a wrong number of
+pixels, or a value out of range. It checks `version` first.
 
 Consecutive frames with identical pixels should be written as one frame with the durations
 added together.
