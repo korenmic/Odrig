@@ -1,5 +1,5 @@
-/* The page: the event stream, the header, the reason band, the log, the readout and the
-   count of refreshes drawn. The page sends no command. */
+/* The page: the event stream, the header, the reason band, the log, the two views, the
+   readout and the count of refreshes drawn. The page sends no command. */
 
 (function () {
   "use strict";
@@ -24,6 +24,7 @@
   var drawn = 0;
   var second = Math.floor(performance.now() / 1000);
   var statusError = null;
+  var view = location.hash === "#mapping" ? "mapping" : "leds";
 
   /* The count of refreshes drawn in the last full second. */
   function roll() {
@@ -76,12 +77,14 @@
       return;
     }
     say("");
-    var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight);
-    drawing = OdrigView.build(host, mapping, hello.legs, f);
+    var board = view === "mapping" ? OdrigBoard : null;
+    var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight, board);
+    drawing = OdrigView.build(host, mapping, hello.legs, f, board);
     if (newest) {
       drawing.paint(newest);
     }
     showReason();
+    idle();
   }
 
   function shortPath(path) {
@@ -189,20 +192,49 @@
     }
   }
 
+  /* Pointing: at a part of a leg, which highlights the leg, or at an LED, which also
+     names it. */
+  /* What the readout says while the pointer is on nothing. */
+  function idle() {
+    var readout = byId("readout");
+    readout.textContent = drawing && view === "mapping" ? "point at a leg, a pin, a line or an LED" : "";
+    readout.dataset.idle = "true";
+  }
+
   function onPointer(event) {
     var readout = byId("readout");
     if (!drawing) {
-      readout.textContent = "";
+      idle();
+      return;
+    }
+    readout.dataset.idle = "false";
+    var part = event.target.closest ? event.target.closest("[data-leg]") : null;
+    if (part && host.contains(part)) {
+      var pointed = mapping.legs[Number(part.getAttribute("data-leg"))];
+      drawing.focus(Number(part.getAttribute("data-leg")));
+      readout.textContent = "leg " + pointed.leg + ", pin " + pointed.pin;
       return;
     }
     var box = host.getBoundingClientRect();
     var found = drawing.at(event.clientX - box.left, event.clientY - box.top);
     if (!found) {
-      readout.textContent = "";
+      drawing.focus(null);
+      idle();
       return;
     }
     var leg = mapping.legs[found.leg];
+    drawing.focus(found.leg);
     readout.textContent = "leg " + leg.leg + ", pin " + leg.pin + ", LED " + found.led + " (" + found.x + "," + found.y + ")";
+  }
+
+  function show(name) {
+    view = name;
+    byId("tab-leds").setAttribute("aria-pressed", String(name === "leds"));
+    byId("tab-mapping").setAttribute("aria-pressed", String(name === "mapping"));
+    if ((location.hash === "#mapping") !== (name === "mapping")) {
+      history.replaceState(null, "", name === "mapping" ? "#mapping" : location.pathname + location.search);
+    }
+    build();
   }
 
   var link = byId("link");
@@ -222,8 +254,15 @@
 
   host.addEventListener("pointermove", onPointer);
   host.addEventListener("pointerleave", function () {
-    byId("readout").textContent = "";
+    if (drawing) {
+      drawing.focus(null);
+    }
+    idle();
   });
+  byId("tab-leds").addEventListener("click", function () { show("leds"); });
+  byId("tab-mapping").addEventListener("click", function () { show("mapping"); });
+  window.addEventListener("hashchange", function () { show(location.hash === "#mapping" ? "mapping" : "leds"); });
+  show(view);
   /* The drawing is made again whenever the stage changes its size. */
   var sizing = false;
   function resized() {

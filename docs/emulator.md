@@ -129,8 +129,9 @@ From top to bottom the page has:
   reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
   LEDs to draw, and the page says so.
-- **The drawing**, described below, with a readout at its top right that names what the
-  pointer is on: `leg 2, pin 2, LED 61 (1,2)`.
+- **The drawing**, in two views chosen by the tabs `LEDs` and `Mapping`, both described
+  below, with a readout at its top right that names what the pointer is on:
+  `leg 2, pin 2, LED 61 (1,2)`.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than 64
   characters is shown with its first 64 and the mark `…`. A byte outside printable ASCII is
@@ -173,6 +174,60 @@ a window of 1280 x 800.
 - A colour value v is shown as `255 * (v / 255) ^ (1 / 2.2)`, rounded: a screen shows a low
   value much darker than an LED does. This one curve is the only change; the record file
   and the event stream carry the values unchanged.
+
+### The mapping view
+
+The second tab, `Mapping`, shows how the installation is wired: the board, which pin feeds
+which leg, and how each leg's chain runs through its rows. The address
+`http://127.0.0.1:8600/#mapping` opens it directly. It is the LEDs view with the board and
+the wiring added, and its LEDs are live in the same way.
+
+```
+  labels and canvas, as in the LEDs view          channel        board
+                                                            +-----------+
+ leg 1 | y=30   60 o-o-o-o-<-o-o-o-o-o (1)<-----+           |  antenna  |
+ pin 1 | y=29   61 o-o-o-o->-o-o-o-o-o 120 |    |       3V3 o           o GND
+       | y=28  180 o-o-o-o-<-o-o-o-o-o 121 |    |       RST o           o RX
+ leg 4 | y=21   60 o-o-o-o-<-o-o-o-o-o (1)<--+  +---------------over the board----( 1 ) leg 1
+ pin 4 | y=20   61 ...                       +--leg 4--( 4 )           o 2
+                                                            |  ESP32-S3 |
+                                                            | [USB][USB]|
+                                                            +-----------+
+```
+
+- **The board** is drawn as it lies on the desk in [mapping.md](mapping.md): the antenna at
+  the top, the two USB sockets at the bottom, and its two rows of pins with their labels in
+  that order. The labels are a small table in `emulator/web/board.js`; a test compares it
+  with the drawing of that document. Everything about the legs comes from the show's
+  `mapping.json`: other pins, another first side, another order or number of rows are drawn
+  without a change to the page.
+- **One colour for each leg**, used for its pad on the board, the line from the pad, the
+  path of its chain, the outline of its rows, its numbers and its labels.
+- **A line from each used pin to the first LED of its chain**, ending in an arrow head. The
+  number 1 of that LED sits on the line as a tag. The lines run side by side in a channel
+  between the canvas and the board, each on a track of its own. A pin in the row away from
+  the canvas is reached round the board, over its top or under its bottom, so that no line
+  hides a pin or its label. A first LED at the far edge of the canvas is reached through
+  the gap above the leg's first row.
+- **The path of each chain** runs through the centres of the LEDs of every row, behind the
+  dots, with small arrows along the row for its direction, a turn outside the edge of the
+  canvas into the next row, and a bar where the chain ends. The numbers at the two ends of
+  every row are the LED numbers there.
+- **A pin the board does not have** gets a pad of its own under the board, labelled
+  `GPIO <pin>`.
+- **Pointing** at a leg's label, its pin, its line or its rows highlights that leg in all
+  these places, fades the other legs and dims their rows. The readout names the leg and the
+  pin, and over an LED also the LED number and its canvas coordinates.
+
+The board stands on the side of the canvas where most legs have their first LED. In a
+window too narrow for the board beside the canvas, the canvas takes the width and the
+board stands below it; the drawing is then higher than the window and scrolls. For the
+ten-leg mapping in a window of 1280 x 800 the canvas has cells of 12 pixels beside the
+board.
+
+Where pins are out of order on the board, lines must cross: in the ten-leg mapping pin 3
+lies between pins 8 and 46, below the pins of legs 4 to 8, and pin 1 lies above pin 2 on
+the far row, which makes six crossings.
 
 ## The event stream
 

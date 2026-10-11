@@ -159,6 +159,7 @@ code, .value, .readout, .log td, .log th { font-family: var(--mono); }
   font-size: 12px;
   white-space: nowrap;
 }
+.readout[data-idle="true"] { color: #5d6773; font-family: var(--sans); }
 
 .stage {
   flex: 1 1 0;
@@ -187,6 +188,51 @@ code, .value, .readout, .log td, .log th { font-family: var(--mono); }
 .drawing .t-x { fill: #5d6773; }
 .drawing .tint { opacity: 0.055; }
 .drawing .bracket { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drawing .reach { fill: transparent; pointer-events: all; }
+.drawing .of-leg text { pointer-events: auto; cursor: default; }
+
+/* The mapping view: the outline and the path of each leg, the lines to the board. */
+.drawing .outline { fill: none; stroke-width: 1; opacity: 0.5; }
+.drawing .chain { fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: 0.6; }
+.drawing .chevron { fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+.drawing .wire { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.drawing .reach-line { fill: none; stroke: transparent; stroke-width: 11; pointer-events: stroke; }
+.drawing .tag { fill: var(--stage); stroke-width: 1.2; }
+.drawing .veil { fill: #000000; opacity: 0; transition: opacity 0.12s; }
+.drawing .t-wire { pointer-events: auto; cursor: default; }
+
+/* The board. */
+.drawing .pcb { stroke: #3d8f68; stroke-width: 1.5; }
+.drawing .module { fill: #171b20; stroke: #2a3038; stroke-width: 1; }
+.drawing .antenna { fill: none; stroke: #d8b56b; stroke-linejoin: miter; }
+.drawing .can { stroke: #6f7985; stroke-width: 1; }
+.drawing .t-chip { font-family: var(--sans); font-weight: 650; fill: #2a3038; }
+.drawing .t-chip.small { font-weight: 500; fill: #3a424d; }
+.drawing .part { fill: #12161a; stroke: #2f6f51; stroke-width: 1; }
+.drawing .button { fill: #c3c9d1; stroke: #6f7985; stroke-width: 1; }
+.drawing .button-top { fill: #20252b; }
+.drawing .socket { stroke: #6f7985; stroke-width: 1; }
+.drawing .slot { fill: #20252b; }
+.drawing .t-usb { font-family: var(--sans); font-weight: 650; fill: #3a424d; }
+.drawing .pin { pointer-events: auto; cursor: default; }
+.drawing .pin:not(.taken) .pad { fill: #0c1512; stroke: #8a95a1; stroke-width: 1.4; }
+.drawing .pin.taken .pad { stroke: #ffffff; stroke-width: 1.3; }
+.drawing .pin .halo { opacity: 0.28; }
+.drawing .pin:not(.taken) .t-pad { fill: #9fb3a8; }
+.drawing .pin.taken .t-pad { font-weight: 700; }
+
+/* Pointing at a leg: its parts stand out and the parts of the other legs fade. */
+.drawing [data-leg] { transition: opacity 0.12s; }
+.drawing .dim { opacity: 0.2; }
+.drawing .tint.dim { opacity: 0.02; }
+.drawing .tint.hot { opacity: 0.12; }
+.drawing .outline.hot { opacity: 1; stroke-width: 2.4; }
+.drawing .chain.hot { opacity: 1; }
+.drawing .wire.hot { stroke-width: 4; }
+.drawing .veil.dim { opacity: 0.5; }
+.drawing .veil.hot { opacity: 0; }
+.drawing .pin.hot .halo { opacity: 0.6; }
+.drawing[data-view="leds"] .veil { display: none; }
 
 .log {
   flex: none;

@@ -164,7 +164,7 @@ Rules for every task:
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 5.3, 5.4, 5.5, 8.1, 8.4, 8.7, 10.1, 10.2,
     10.3, 15.2, 15.3
 
-- [ ] 8. The page: mapping view
+- [x] 8. The page: mapping view
   - Create `emulator/web/board.js`. Add `side`, `place`, `tracks` and `fit` with the board
     to `layout.js`, and the board, the pads, the lines, the paths, the outlines, the view
     switch and the pointing to `view.js` and `app.js`.

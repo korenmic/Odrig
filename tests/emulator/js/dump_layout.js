@@ -1,8 +1,8 @@
 /* Prints what layout.js computes for a mapping file, as one JSON document.
    Run in the JavaScript shell after the page's scripts:
-   jsc layout.js dump_layout.js -- MAPPING [QUESTIONS]
+   jsc board.js layout.js dump_layout.js -- MAPPING [QUESTIONS]
    QUESTIONS is a JSON object: {"areas": [[width, height], ...], "points": [[x, y], ...],
-   "leds": [[pin, n], ...]}. */
+   "leds": [[pin, n], ...], "pins": [pin, ...]}. */
 
 var text = read(arguments[0]);
 var asked = arguments.length > 1 ? JSON.parse(arguments[1]) : {};
@@ -25,6 +25,22 @@ var out = {
   manyColours: [],
   shown: [],
   fits: (asked.areas || []).map(function (area) { return OdrigLayout.fit(m, area[0], area[1]); }),
+  board: OdrigBoard,
+  side: OdrigLayout.side(m),
+  tracks: OdrigLayout.tracks(m),
+  places: (asked.pins || []).map(function (pin) { return OdrigLayout.place(OdrigBoard, pin); }),
+  mapped: (asked.areas || []).map(function (area) {
+    var f = OdrigLayout.fit(m, area[0], area[1], OdrigBoard);
+    return {
+      fit: f,
+      wires: OdrigLayout.wires(m, f, OdrigBoard),
+      chains: m.legs.map(function (leg, i) { return OdrigLayout.chain(m, f, i); }),
+      firsts: m.legs.map(function (leg) {
+        var first = OdrigLayout.position(m, leg.pin, 1);
+        return OdrigLayout.centre(m, f, first[0], first[1]);
+      })
+    };
+  }),
   asked: {
     points: (asked.points || []).map(function (point) { return OdrigLayout.find(m, point[0], point[1]); }),
     leds: (asked.leds || []).map(function (led) { return OdrigLayout.position(m, led[0], led[1]); })

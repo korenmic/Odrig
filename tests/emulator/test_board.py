@@ -1,0 +1,70 @@
+import json
+import re
+import subprocess
+import unittest
+
+from . import support
+from .test_layout import JSC, WEB
+
+
+def board_of_the_page():
+    """The board as `board.js` defines it, read through the JavaScript shell."""
+    done = subprocess.run([str(JSC), str(WEB / "board.js"), "-e", "print(JSON.stringify(OdrigBoard))"], capture_output=True, text=True)
+    if done.returncode != 0 or done.stderr:
+        raise AssertionError(f"jsc ended with status {done.returncode}: {done.stderr[-400:]}")
+    return json.loads(done.stdout)
+
+
+def board_of_the_document():
+    """The two rows of pin labels of the board drawing in docs/mapping.md, from the
+    antenna end to the USB end, and the leg written beside each pin."""
+    text = (support.ROOT / "docs" / "mapping.md").read_text(encoding="utf-8")
+    drawing = text.split("The board seen from above, antenna at the top:")[1].split("```")[1]
+    left, right, legs = [], [], {}
+    for line in drawing.splitlines():
+        match = re.search(r"(?:leg ([0-9]+) +-- +)?(\S+) +o---\|.*\|---o +(\S+)(?: +-- +leg ([0-9]+))?", line)
+        if match:
+            left_leg, left_label, right_label, right_leg = match.groups()
+            left.append(left_label)
+            right.append(right_label)
+            if left_leg:
+                legs[int(left_leg)] = left_label
+            if right_leg:
+                legs[int(right_leg)] = right_label
+    return left, right, legs, drawing
+
+
+class BoardOfThePage(unittest.TestCase):
+    def test_its_two_rows_are_the_pin_labels_of_the_drawing_in_the_mapping_document_in_order(self):
+        board = board_of_the_page()
+        left, right, _, _ = board_of_the_document()
+        self.assertEqual((len(left), len(right)), (22, 22))
+        for name, drawn in (("left", left), ("right", right)):
+            self.assertEqual(len(board[name]), len(drawn), name)
+            for index, (label, wanted) in enumerate(zip(board[name], drawn)):
+                if label != wanted:
+                    self.fail(f"pad {index + 1} of the {name} row, counted from the antenna, is {label!r} in board.js and {wanted!r} in the drawing of docs/mapping.md")
+
+    def test_the_drawing_has_the_antenna_above_the_pins_and_the_usb_sockets_below(self):
+        _, _, _, drawing = board_of_the_document()
+        lines = [line for line in drawing.splitlines() if line.strip()]
+        self.assertIn("antenna", lines[1])
+        self.assertIn("[USB]   [USB]", lines[-2])
+        self.assertIn("ESP32-S3", drawing)
+        self.assertIn("N16R8", drawing)
+        self.assertEqual(board_of_the_page()["name"], "ESP32-S3 N16R8")
+
+    def test_no_gpio_is_on_the_board_twice(self):
+        board = board_of_the_page()
+        numbered = [label for label in board["left"] + board["right"] if label.isdigit()]
+        self.assertEqual(len(numbered), len(set(numbered)))
+        self.assertEqual(len(numbered), 34)
+
+    def test_the_legs_of_the_drawing_are_on_the_pins_of_the_ten_leg_mapping(self):
+        _, _, legs, _ = board_of_the_document()
+        mapping = json.loads((support.ROOT / "mapping" / "legs-10.json").read_text(encoding="utf-8"))
+        self.assertEqual(legs, {leg["leg"]: str(leg["pin"]) for leg in mapping["legs"]})
+
+
+if __name__ == "__main__":
+    unittest.main()

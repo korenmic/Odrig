@@ -28,6 +28,7 @@
 <div class="band" id="band" hidden>The core reports that the show is invalid: <code id="reason"></code></div>
 <nav class="tabs">
   <button type="button" class="tab" id="tab-leds" aria-pressed="true">LEDs</button>
+  <button type="button" class="tab" id="tab-mapping" aria-pressed="false">Mapping</button>
   <span class="readout" id="readout"></span>
 </nav>
 <main class="stage" id="stage">
@@ -41,6 +42,7 @@
   </table>
   <p class="empty" id="empty">No command has arrived yet. Send one through the serial port or as POST /odrig.</p>
 </section>
+<script src="board.js"></script>
 <script src="layout.js"></script>
 <script src="view.js"></script>
 <script src="app.js"></script>

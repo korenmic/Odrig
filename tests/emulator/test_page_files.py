@@ -47,7 +47,7 @@ class Served(unittest.TestCase):
 
     def test_every_file_of_the_folder_is_served_with_its_content_type(self):
         files = page_files()
-        self.assertGreaterEqual({path.name for path in files}, {"index.html", "style.css", "layout.js", "view.js", "app.js"})
+        self.assertEqual({path.name for path in files}, {"index.html", "style.css", "board.js", "layout.js", "view.js", "app.js"})
         for path in files:
             with self.subTest(path.name):
                 self.assertIn(path.suffix, CONTENT_TYPES)
@@ -101,6 +101,7 @@ class Files(unittest.TestCase):
         self.assertEqual(sorted(loaded.styles), sorted(path.name for path in page_files() if path.suffix == ".css"))
         self.assertEqual(loaded.inline_scripts, 0)
         self.assertEqual(loaded.others, ["data:,"])
+        self.assertLess(loaded.scripts.index("board.js"), loaded.scripts.index("layout.js"))
         self.assertLess(loaded.scripts.index("layout.js"), loaded.scripts.index("view.js"))
         self.assertLess(loaded.scripts.index("view.js"), loaded.scripts.index("app.js"))
 
@@ -108,7 +109,8 @@ class Files(unittest.TestCase):
         asked = {}
         for path in page_files():
             text = path.read_text(encoding="utf-8")
-            asked[path.name] = re.findall(r"(?:fetch|EventSource|import|url)\(\s*[\"']?([^\"')]+)", text)
+            found = re.findall(r"(?:fetch|EventSource|import|url)\(\s*[\"']?([^\"')]+)", text)
+            asked[path.name] = [address for address in found if not address.startswith("#")]
         self.assertEqual({name: found for name, found in asked.items() if found}, {"app.js": ["show/mapping.json", "events"]})
 
     def test_the_page_sends_no_command(self):

@@ -1762,3 +1762,45 @@ columns of the canvas are numbered every ten.
 **Resolution.** `emulator/web/style.css`, `emulator/web/layout.js`, `emulator/web/view.js`;
 `tests/emulator/test_page_files.py`, `tests/emulator/test_layout.py`; `docs/emulator.md`,
 "The page".
+
+## Seed 03: Lines to the far row of pins, and the path of a chain
+
+**Question.** The design draws the line of a pad in the row of pins away from the canvas
+level through the board, behind its body. The two rows of the board have their pads at the
+same heights, so that line lies exactly on the line of the pad opposite: in the ten-leg
+mapping pin 1 is opposite pin 4 and pin 2 opposite pin 5, and all four are used. The design
+also draws the path of each chain over the dots at 60 percent, which tints the live LEDs it
+is meant to show.
+
+**Answer.** A line to the far row goes round the board, over its top for a pad in the upper
+half and under its bottom for one in the lower half, in nested loops, and the leg's label
+stands outside the loops. No line passes through the board, and a test says so. The path of
+a chain is drawn behind the dots: it shows through the rings of dark LEDs and between lit
+ones, and a lit LED keeps its colour. Small arrows along every row, between two LEDs, give
+the direction, with an arrow head where the chain turns into a row and a bar at its end.
+The number of a leg's first LED is a tag on the line that feeds it.
+
+**Resolution.** `emulator/web/layout.js`, `wires` and `chain`; `emulator/web/view.js`;
+`tests/emulator/test_layout.py`, `Lines`; `docs/emulator.md`, "The mapping view".
+
+## Seed 03: The mapping view in a narrow window, and its sizes
+
+**Question.** The design has one arrangement, the board beside the canvas, sized for
+1280 x 800. Beside a board, a window 900 pixels wide leaves cells of 5 pixels, in which no
+row label can be read. The design also gives the board a fixed distance of 16 pixels
+between its pads, and fixes the order of the tracks: the highest leg nearest the canvas.
+
+**Answer.** Where the board beside the canvas would leave cells below 9 pixels, the board
+stands below the canvas, which then takes the whole width: at 900 pixels the cells are 10.
+The lines run down a channel beside the canvas; those for the row of pins on the other side
+of the board go through a band between canvas and board and down a second channel. In this
+arrangement the highest leg takes the track farthest from the canvas, which is what keeps
+the lines from crossing on their way down; beside the board the order is the design's. The
+drawing may then be higher than the window, and the stage scrolls. The distance between
+pads is 16 pixels at 1280 x 800, as in the design, shrinks to 10 where the height is short,
+and grows to 20 where the canvas leaves room. The labels take roomy widths where the cells
+are 16 pixels or more. In every arrangement the lines of the ten-leg mapping cross six
+times, which is the number of pairs of pins that are out of order on the board.
+
+**Resolution.** `emulator/web/layout.js`, `fitBeside`, `fitBelow` and `wiresBelow`;
+`tests/emulator/test_layout.py`, `Lines`; `docs/emulator.md`, "The mapping view".
