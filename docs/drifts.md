@@ -1501,3 +1501,36 @@ sessions side by side where a test needs hundreds of them.
 
 **Resolution.** `tests/core/host/host.cpp`, `tests/core/host/guard.h`;
 `tests/core/support.py`.
+
+## Seed 02: Ids that no item can have
+
+**Question.** The format of a show file lets an entry of a cycle, and `start`, be any
+integer: `-5`, `0`, `70000` and a number of forty digits all pass it, and the converter
+then refuses the show as `undefined-id`. The design's JSON reader fails on a minus sign
+before anything but zero, which would make such a show `show-malformed` in the core, and
+the entry table holds ids of 16 bits. Nothing says what `<id>` is in the reason text for a
+number that is no id.
+
+**Answer.** The core reports `undefined-id` as the converter does. Its JSON reader has a
+second way to read an integer, as a sign and a size. The text names the number as the file
+writes it: `undefined-id -5`, `undefined-id 0`, `undefined-id 70000`. A number beyond 32
+bits is named as 4294967295, with its sign. The suite compares the reason and the id with
+the converter's for 109 show texts and 250 seeded copies with one character changed.
+
+**Resolution.** `core/src/json_reader.h`, `any_integer`; `core/src/show.cpp`;
+`tests/core/test_json.py`, `tests/core/test_startup.py`.
+
+## Seed 02: Seeing which files the core opens, and sessions in one run
+
+**Question.** Task 5 asks for a test that a file named twice is opened for checking once.
+Nothing the test host prints shows which files the core opens. The tests of the JSON
+readers also start several hundred sessions, and a run of the test host under the
+sanitizers takes about 60 ms to start.
+
+**Answer.** `odrig_host session` takes the option `--trace-files`, which prints
+`open <name> <result>` for every call of the host's `open` function. It also takes
+`--batch` in place of the folder: standard input then holds any number of file sets with a
+script each, the host keeps the files in memory, runs one session after the other and
+prints `end` after each.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`, `start_each`.

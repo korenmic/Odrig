@@ -23,6 +23,24 @@ struct LegInfo {
     uint32_t count;
 };
 
+// One item of the show. An animation item: `first` is its entry of the file table. A cycle
+// item: its animations are `count` entries of the entry table, from `first` on, each the
+// position of an animation item in the item table.
+struct ItemInfo {
+    uint16_t id;
+    uint16_t seconds;
+    uint8_t is_cycle;
+    uint32_t first;
+    uint32_t count;
+};
+
+// One `.odrg` file the show names, with what the check at startup found in it.
+struct FileInfo {
+    char name[33];
+    uint32_t frames;
+    uint64_t total_ms;
+};
+
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
 struct Core {
@@ -43,6 +61,17 @@ struct Core {
     LegInfo *legs;
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order
     uint8_t *led_data;      // for each LED, red, green and blue of the last refresh
+
+    // From the show file. `brightness` is the show's once its ids are checked.
+    ItemInfo *items;
+    uint32_t item_count;
+    uint16_t *entries;
+    uint32_t entry_count;
+    FileInfo *files;
+    uint32_t file_count;
+    uint8_t brightness;
+    uint8_t has_start;
+    uint32_t start_item;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

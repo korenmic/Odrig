@@ -97,7 +97,7 @@ Rules for every task:
     session test stops with status 70 and `allocation after startup`. Remove it.
   - Requirements: 2.2, 2.5, 2.6, 5.6, 6.1, 13.1, 13.4, 15.4, 17.6
 
-- [ ] 5. Show reader and the check of every file at startup
+- [x] 5. Show reader and the check of every file at startup
   - Create `core/src/show.h`, `.cpp`, and add steps 4, 5 and 7 of the design's startup to
     `odrig_core_begin`.
   - Add the option `--read-fails` to the test host.

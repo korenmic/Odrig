@@ -7,6 +7,15 @@
 
 namespace odrig {
 
+// Whether two texts that end in a zero are the same.
+inline bool same_text(const char *a, const char *b) {
+    while (*a != '\0' && *a == *b) {
+        ++a;
+        ++b;
+    }
+    return *a == *b;
+}
+
 // A reader of a JSON text that hands out one piece at a time. The reader of a file calls it
 // in the order the file's format dictates, so the nesting is in that code and nothing here
 // calls itself.

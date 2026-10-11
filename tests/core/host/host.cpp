@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -29,7 +31,7 @@ int usage() {
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
         "       odrig_host decode FILE | --batch\n"
-        "       odrig_host session DIR [--alloc-fails-at N]\n"
+        "       odrig_host session DIR | --batch [--alloc-fails-at N] [--read-fails FILE OFFSET] [--trace-files]\n"
         "       odrig_host guard alloc | new\n",
         stderr);
     return kUsage;
@@ -87,11 +89,14 @@ std::vector<std::string> batch(const std::string &bytes) {
 
 // How a session differs from a plain one.
 struct Options {
-    long alloc_fails_at = 0;    // the number of the `alloc` call that returns NULL; 0 for none
+    long alloc_fails_at = 0;        // the number of the `alloc` call that returns NULL; 0 for none
+    std::string read_fails_file;    // the file whose reading fails,
+    long read_fails_offset = 0;     // and the offset at which `read` returns -1
+    bool trace_files = false;       // print `open <name> <result>` for every `open`
 };
 
-// What the core is given: memory, the files of a folder or one text that every name opens,
-// and a place for its diagnostic text. It checks how the core uses the file functions, and
+// What the core is given: memory, files, and a place for its diagnostic text. The files are
+// those of a folder on disk, or a set held in memory, or one text that every name opens. It checks how the core uses the file functions, and
 // with the guard it stops the program when the core asks for memory after startup.
 class Host {
 public:
@@ -102,9 +107,17 @@ public:
         return host;
     }
 
+    static Host of_files(const std::map<std::string, std::string> &files, const Options &options) {
+        Host host;
+        host.from_ = kFromFiles;
+        host.files_ = files;
+        host.options_ = options;
+        return host;
+    }
+
     static Host of_memory(const std::string &bytes) {
         Host host;
-        host.in_memory_ = true;
+        host.from_ = kFromMemory;
         host.memory_ = bytes;
         return host;
     }
@@ -163,15 +176,26 @@ private:
         if (host.is_open_) {
             stop("file misuse", kFileMisuse);
         }
-        if (host.in_memory_) {
+        int found = 1;
+        if (host.from_ == kFromMemory) {
             host.content_ = host.memory_;
-        } else {
-            int found = host.load(name);
-            if (found != 1) {
-                return found;
+        } else if (host.from_ == kFromFiles) {
+            auto file = host.files_.find(name);
+            found = file != host.files_.end() ? 1 : 0;
+            if (found) {
+                host.content_ = file->second;
             }
+        } else {
+            found = host.load(name);
+        }
+        if (host.options_.trace_files) {
+            std::printf("open %s %d\n", name, found);
+        }
+        if (found != 1) {
+            return found;
         }
         host.is_open_ = true;
+        host.open_name_ = name;
         host.offset_ = 0;
         host.reads_ = 0;
         return 1;
@@ -186,6 +210,13 @@ private:
         size_t count = kReadSizes[host.reads_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = std::min(count, host.content_.size() - host.offset_);
+        if (host.open_name_ == host.options_.read_fails_file) {
+            size_t fails_at = static_cast<size_t>(host.options_.read_fails_offset);
+            if (host.offset_ >= fails_at) {
+                return -1;
+            }
+            count = std::min(count, fails_at - host.offset_);
+        }
         std::memcpy(buffer, host.content_.data() + host.offset_, count);
         host.offset_ += count;
         return static_cast<int32_t>(count);
@@ -233,12 +264,16 @@ private:
         return failed ? -1 : 1;
     }
 
+    enum From { kFromFolder, kFromFiles, kFromMemory };
+
     Options options_;
+    From from_ = kFromFolder;
     std::string folder_;
-    bool in_memory_ = false;
+    std::map<std::string, std::string> files_;
     std::string memory_;
 
     std::string content_;
+    std::string open_name_;
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
@@ -373,12 +408,12 @@ int decode(const std::string &argument) {
     return 0;
 }
 
-// One core on a folder, and the lines of standard input given to it.
+// One core on a set of files, and the lines of a script given to it.
 class Session {
 public:
-    Session(const std::string &folder, const Options &options) : host_(Host::of_folder(folder, options)) {}
+    explicit Session(Host &&host) : host_(std::move(host)) {}
 
-    int run() {
+    int run(std::istream &script) {
         odrig_host functions = host_.interface();
         core_ = odrig_core_begin(&functions);
         if (core_ == nullptr) {
@@ -410,7 +445,7 @@ public:
         std::printf("ready\n");
 
         std::string line;
-        while (std::getline(std::cin, line)) {
+        while (std::getline(script, line)) {
             if (!obey(line)) {
                 std::printf("bad line\n");
                 return kUsage;
@@ -457,6 +492,32 @@ int guard_check(const std::string &what) {
     return 1;
 }
 
+// Runs one session for each job of a batch on standard input. A job is the number of its
+// files as text, then a name and a content for each file, then its script. After the lines
+// of each session comes the line `end`.
+int sessions(const Options &options) {
+    std::vector<std::string> pieces = batch(standard_input());
+    size_t at = 0;
+    while (at < pieces.size()) {
+        size_t count = static_cast<size_t>(std::atol(pieces[at++].c_str()));
+        if (pieces.size() - at < 2 * count + 1) {
+            stop("bad batch", kUsage);
+        }
+        std::map<std::string, std::string> files;
+        for (size_t file = 0; file < count; ++file) {
+            files[pieces[at]] = pieces[at + 1];
+            at += 2;
+        }
+        std::istringstream script(pieces[at++]);
+        int status = Session(Host::of_files(files, options)).run(script);
+        if (status != 0) {
+            return status;
+        }
+        std::printf("end\n");
+    }
+    return 0;
+}
+
 bool whole_number(const std::string &text, long *value) {
     if (text.empty() || text.size() > 9 || text.find_first_not_of("0123456789") != std::string::npos) {
         return false;
@@ -495,11 +556,21 @@ int main(int argc, char **argv) {
             if (arguments[at] == "--alloc-fails-at" && at + 1 < arguments.size() &&
                 whole_number(arguments[at + 1], &options.alloc_fails_at)) {
                 at += 2;
+            } else if (arguments[at] == "--read-fails" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.read_fails_offset)) {
+                options.read_fails_file = arguments[at + 1];
+                at += 3;
+            } else if (arguments[at] == "--trace-files") {
+                options.trace_files = true;
+                at += 1;
             } else {
                 return usage();
             }
         }
-        return Session(arguments[1], options).run();
+        if (arguments[1] == "--batch") {
+            return sessions(options);
+        }
+        return Session(Host::of_folder(arguments[1], options)).run(std::cin);
     }
     return usage();
 }

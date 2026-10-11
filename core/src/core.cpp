@@ -5,6 +5,7 @@
 #include "mapping.h"
 #include "odrig_core.h"
 #include "reasons.h"
+#include "show.h"
 
 namespace odrig {
 
@@ -44,6 +45,44 @@ void fail(Core &core, Reason reason, const char *about, Reason detail) {
     }
 }
 
+// Decodes one file of the show from its first frame record to its last, and notes its
+// number of frames and its total duration. The header is checked first, then the size
+// against the mapping, then the body.
+void check_file(Core &core, FileInfo &info) {
+    Reason reason = core.file.open(core.host, info.name);
+    if (reason != kNone) {
+        fail(core, reason, info.name, kNone);
+        return;
+    }
+    reason = core.decoder.open(&core.file, &core.inflate, core.window);
+    if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+        core.file.close();
+        fail(core, kSizeMismatch, info.name, kNone);
+        return;
+    }
+    uint64_t total = 0;
+    if (reason == kNone) {
+        memset(core.pixels, 0, core.decoder.n);
+        for (uint32_t record = 0; record < core.decoder.frames && reason == kNone; ++record) {
+            uint16_t duration = 0;
+            reason = core.decoder.next(core.pixels, &duration);
+            total += duration;
+        }
+    }
+    if (reason == kNone) {
+        reason = core.decoder.finish();
+    }
+    core.file.close();
+    if (reason == kReadError) {
+        fail(core, kReadError, info.name, kNone);
+    } else if (reason != kNone) {
+        fail(core, kFileMalformed, info.name, reason);
+    } else {
+        info.frames = core.decoder.frames;
+        info.total_ms = total;
+    }
+}
+
 void start(Core &core) {
     Reason reason = read_mapping(core);
     if (reason != kNone) {
@@ -57,6 +96,19 @@ void start(Core &core) {
     if (core.pixels == nullptr || core.window == nullptr) {
         fail(core, kOutOfMemory, nullptr, kNone);
         return;
+    }
+
+    char id_text[kIdTextSize];
+    reason = read_show(core, id_text);
+    if (reason != kNone) {
+        const char *about = id_text[0] != '\0' ? id_text : nullptr;
+        fail(core, reason, reason == kReadError ? "show.json" : about, kNone);
+        return;
+    }
+
+    // The files are checked in the order in which the show first names them.
+    for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
+        check_file(core, core.files[index]);
     }
 }
 

@@ -1,13 +1,15 @@
 """Helpers shared by the tests of the core: where things are and how the test host is run."""
 
 import collections
-import concurrent.futures
 import contextlib
+import functools
 import json
-import os
 import pathlib
+import random
 import subprocess
 import tempfile
+
+from odrig import jsonframes, odrg, pack
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
@@ -156,32 +158,46 @@ def installed(files):
         yield folder
 
 
-Run = collections.namedtuple("Run", "status core memory error legs logs lines")
+Run = collections.namedtuple("Run", "status core memory error legs logs opened lines")
 Run.__doc__ = """One run of `odrig_host session`.
 
 `core` is "ok" or "null". `memory` is `(bytes, blocks)`: what the core asked the host for
 while it started. `error` is the reason the show is invalid after startup, or `None`.
 `legs` holds `(leg, pin, LED count)` for each leg. `logs` are the diagnostic texts the core
-gave the host while it started, and `lines` is everything printed after startup.
+gave the host while it started. `opened` holds `(name, result)` for each file the core asked
+the host to open while it started, when the session has the option `--trace-files`.
+`lines` is everything printed after startup.
 """
+
+
+def _script_bytes(script):
+    return "".join(f"{line}\n" for line in script).encode("ascii")
 
 
 def session(folder, script=(), options=(), status=0):
     """Starts the core on a folder with the test host and gives it the lines of a script."""
-    result = host("session", folder, *options, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
+    result = host("session", folder, *options, stdin=_script_bytes(script))
     if result.status != status or result.err:
         raise AssertionError(f"odrig_host session: status {result.status}, not {status}\n{result.out[-400:]}\n{result.err}")
-    printed = result.out.splitlines()
+    return _run(result.status, result.out.splitlines())
+
+
+def _run(status, printed):
+    """The parts of what one session printed."""
     core = None
     memory = None
     error = None
     legs = []
     logs = []
+    opened = []
     position = 0
     for position, line in enumerate(printed):
         word, _, rest = line.partition(" ")
         if word == "log" and core is None:
             logs.append(rest)
+        elif word == "open" and core is None:
+            name, _, answer = rest.rpartition(" ")
+            opened.append((name, int(answer)))
         elif word == "core":
             core = rest
         elif word == "memory":
@@ -195,7 +211,7 @@ def session(folder, script=(), options=(), status=0):
     else:
         position = len(printed)
     lines = printed[position + 1:] if position < len(printed) and printed[position] == "ready" else printed[position:]
-    return Run(result.status, core, memory, error, tuple(legs), tuple(logs), lines)
+    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), lines)
 
 
 def start(files, script=(), options=(), status=0):
@@ -205,7 +221,64 @@ def start(files, script=(), options=(), status=0):
 
 
 def start_each(file_sets, script=(), options=()):
-    """A session for each set of files, run side by side; the results are in the given order."""
-    workers = min(16, 2 * (os.cpu_count() or 2))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(lambda files: start(files, script, options), file_sets))
+    """A session for each set of files, all in one run of the test host, which holds the
+    files in memory. The results are in the given order."""
+    pieces = []
+    for files in file_sets:
+        pieces.append(str(len(files)).encode("ascii"))
+        for name, content in files.items():
+            pieces.append(name.encode("utf-8"))
+            pieces.append(content if isinstance(content, bytes) else content.encode("utf-8"))
+        pieces.append(_script_bytes(script))
+    printed = iter(host_lines("session", "--batch", *options, stdin=batch(pieces)))
+    runs = []
+    for _ in file_sets:
+        lines = []
+        for line in printed:
+            if line == "end":
+                break
+            lines.append(line)
+        else:
+            raise AssertionError(f"odrig_host session --batch ended after {len(runs)} of {len(file_sets)} sessions")
+        runs.append(_run(0, lines))
+    return runs
+
+
+@functools.lru_cache(maxsize=None)
+def _example_show():
+    with tempfile.TemporaryDirectory() as folder:
+        out = pathlib.Path(folder, "show")
+        pack.pack(ROOT / "shows" / "example" / "show.json", ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
+        return tuple((path.name, path.read_bytes()) for path in sorted(out.iterdir()))
+
+
+def example_show():
+    """The installed files of the example show, packed by the converter on the two-leg mapping."""
+    return dict(_example_show())
+
+
+def show_text(items, brightness=128, start=None):
+    """A show file with these items, each written as docs/show.md has it."""
+    show = {"version": 1, "brightness": brightness, "items": list(items)}
+    if start is not None:
+        show["start"] = start
+    return json.dumps(show)
+
+
+def one_leg_mapping(width, height):
+    """A mapping file for a canvas of this size: one leg that starts on the right at the top."""
+    leg = {"leg": 1, "pin": 1, "first_led": "right", "rows": list(range(height, 0, -1))}
+    return json.dumps({"version": 1, "width": width, "legs": [leg]})
+
+
+def seeded_animation(seed, width, height, durations, colours=5):
+    """An animation with one seeded picture for each duration, in at most `colours` colours."""
+    rng = random.Random(f"{seed} {width} {height} {colours}")
+    palette = [rng.randbytes(3) for _ in range(colours)]
+    frames = tuple((ms, b"".join(rng.choice(palette) for _ in range(width * height))) for ms in durations)
+    return jsonframes.Animation(width, height, frames)
+
+
+def clip(seed, width, height, durations=(20, 20, 20), compressed=True):
+    """The bytes of an ODRG file of a seeded animation."""
+    return odrg.encode(seeded_animation(seed, width, height, durations), compressed=compressed)

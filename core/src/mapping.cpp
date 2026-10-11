@@ -11,14 +11,6 @@ namespace {
 const uint32_t kMostLegs = 255;
 const uint32_t kNameSize = 12;
 
-bool same(const char *a, const char *b) {
-    while (*a != '\0' && *a == *b) {
-        ++a;
-        ++b;
-    }
-    return *a == *b;
-}
-
 // What one reading of the file has seen so far.
 struct Seen {
     uint32_t width;
@@ -52,13 +44,13 @@ bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
     }
     while (json.object_next(name, sizeof name)) {
         uint32_t member;
-        if (same(name, "leg")) {
+        if (same_text(name, "leg")) {
             member = 1;
-        } else if (same(name, "pin")) {
+        } else if (same_text(name, "pin")) {
             member = 2;
-        } else if (same(name, "first_led")) {
+        } else if (same_text(name, "first_led")) {
             member = 4;
-        } else if (same(name, "rows")) {
+        } else if (same_text(name, "rows")) {
             member = 8;
         } else {
             return false;
@@ -81,9 +73,9 @@ bool read_leg(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
             if (!json.string(side, sizeof side)) {
                 return false;
             }
-            if (same(side, "right")) {
+            if (same_text(side, "right")) {
                 starts_right = true;
-            } else if (!same(side, "left")) {
+            } else if (!same_text(side, "left")) {
                 return false;
             }
         } else {
@@ -159,11 +151,11 @@ bool read_file(Core &core, JsonReader &json, uint8_t *row_check, Seen &seen) {
     }
     while (json.object_next(name, sizeof name)) {
         uint32_t member;
-        if (same(name, "version")) {
+        if (same_text(name, "version")) {
             member = 1;
-        } else if (same(name, "width")) {
+        } else if (same_text(name, "width")) {
             member = 2;
-        } else if (same(name, "legs")) {
+        } else if (same_text(name, "legs")) {
             member = 4;
         } else {
             return false;

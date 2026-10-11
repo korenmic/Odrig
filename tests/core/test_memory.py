@@ -4,8 +4,8 @@ from . import support
 
 
 def two_leg_show():
-    """The smallest installed file set this file needs: the two-leg mapping."""
-    return {"mapping.json": support.mapping_texts()["legs-2"]}
+    """The example show: two legs, two animations and a cycle."""
+    return support.example_show()
 
 
 class Guard(unittest.TestCase):
@@ -37,7 +37,7 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
     def test_without_any_later_block_the_show_is_invalid_with_out_of_memory(self):
         plain = support.start(two_leg_show(), ["error"])
         blocks = plain.memory[1]
-        self.assertGreaterEqual(blocks, 7)
+        self.assertEqual(blocks, 10)
         for number in range(2, blocks + 1):
             with self.subTest(block=number):
                 run = support.start(two_leg_show(), ["error"], ["--alloc-fails-at", str(number)])
@@ -59,7 +59,7 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
             self.assertEqual((run.error, run.legs), ("out-of-memory", ()))
 
     def test_memory_that_fails_after_the_mapping_is_set_up_leaves_the_legs(self):
-        for number in (6, 7):
+        for number in (6, 7, 8, 9, 10):
             run = support.start(two_leg_show(), options=["--alloc-fails-at", str(number)])
             self.assertEqual((run.error, run.legs), ("out-of-memory", ((1, 1, 180), (2, 2, 180))))
 
