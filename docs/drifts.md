@@ -3676,3 +3676,172 @@ requirement is changed.
 **Resolution.** `tests/board/test_fps.py`; `docs/decisions.md`, "Firmware", "Canvas and
 coordinates" and the change log; `docs/firmware.md`, "Verified on the board" and "The
 owner's checks".
+
+## Seed 10: The names of the new files, their length, and where their tests live
+
+**Question.** The seed names `AGENTS.md` and `CLAUDE.md` and describes four more pages
+without naming them. It limits the entry file to 150 lines and says of the others only that
+they are "short enough to be read in full at the start of a session". It asks for two tests
+and does not say where they go.
+
+**Answer.** The pages are `docs/vocabulary.md`, `docs/working-rules.md`,
+`docs/getting-started.md` and `docs/animation-guide.md`, each of at most 200 lines. The
+test that checks what the pages name is the suite `tests/onboarding/`, which needs Python
+alone. The test that follows the pages is a suite of its own, `tests/walkthrough/`: it
+installs libraries from the network and takes minutes, so no other test command starts it.
+
+**Resolution.** Seed 10 `requirements.md`, the terms and Requirement 7 criterion 4;
+`design.md`, "Repository layout".
+
+## Seed 10: What a fresh clone is, for a test that has to pass before the commit
+
+**Question.** The definition of done has a test follow the pages "from a fresh clone". A
+clone holds what is committed, and a task has to see its tests pass before it commits the
+page they follow.
+
+**Answer.** The test clones the repository into a temporary folder and then brings over
+every tracked file that differs in the working tree, is new or is gone, and commits that in
+the copy. With a clean working tree the copy is a plain clone. Nothing untracked or ignored
+reaches it, so a new file has to be staged before the test sees it.
+
+**Resolution.** Seed 10 `requirements.md`, the term "a fresh copy"; `design.md`, "The
+walk-through".
+
+## Seed 10: What the test that follows the pages does not run
+
+**Question.** The seed has that test run "the test suites", and has the getting-started
+page give every suite that needs no board. The firmware tool's suite needs no board, but
+its first run fetches WLED's source and installs PlatformIO, esptool and Node.js into the
+work folder, some hundreds of megabytes. The page also starts the emulator in real time and
+sends it commands from a second terminal, which wants somebody to look, and it gives the
+command of the test itself.
+
+**Answer.** The test runs the suites that need only what the page's own setup installs: the
+converter's, the core's, the emulator's and the quick one. The firmware tool's suite stands
+on the page under a heading of its own, with what its first run fetches, and the test does
+not run it. The emulator is run in record mode, which the definition of done names; the
+commands of the real-time run are given to the tools' parsers by the quick suite. Every
+heading with commands is in the test either as followed or as not followed with its reason,
+so a new heading cannot go unnoticed.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 4 criterion 6 and Requirement 8
+criterion 3; `design.md`, "The walk-through".
+
+## Seed 10: Which Python the pages name
+
+**Question.** `docs/converter.md` writes `python` for the Python of the virtual
+environment, and `docs/emulator.md` says any Python from 3.10 will do, `python3` on a Mac.
+A newcomer needs commands that can be copied, and an agent's shell does not keep an
+activated environment from one command to the next.
+
+**Answer.** The pages write `.venv/bin/python` wherever they call Python themselves, and
+say once that the other documents write `python` for it. `make -C core test` and
+`python3 firmware/fw.py` are given as their own documents give them.
+
+**Resolution.** Seed 10 `design.md`, "The pages".
+
+## Seed 10: What is added "at the end" of docs/decisions.md and of this file
+
+**Question.** The seed says `docs/drifts.md` and `docs/decisions.md` "are only ever added
+to at the end", and also that `docs/decisions.md` records the new rule "in place of" the
+old one. `docs/decisions.md` states each decision as it stands, in sections, with a change
+log at its end. In this file one entry of seed 02 was given a later paragraph in its
+middle.
+
+**Answer.** In this file a new entry goes at the end and an earlier entry is left as it
+is; a later finding is a new entry that names the earlier one. In `docs/decisions.md` it is
+the change log that is added to at the end. A statement in its sections changes only when
+the decision changes, which needs the owner, as it does here: the seed is the owner's.
+When two branches have both added at the end of either file, the merge keeps both
+additions, those of `master` first.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 3 criterion 7 and Requirement 6
+criteria 3 and 4.
+
+## Seed 10: Who merges, which suites, and where a clone comes from
+
+**Question.** The seed's rule has a branch "brought up to date with `master` before
+merging" and merged "only with every test suite passing". It does not say who merges. A
+contributor without a board cannot run the suites that need one. `docs/decisions.md` says
+there is no remote yet, and a second computer has to get the repository from somewhere.
+This is a gap in a governing document.
+
+**Answer.** The rule is written without naming who merges. "Every test suite" is every
+suite that needs no board. The sentence about the remote stays as it is, and the pages
+name no address: a newcomer clones from wherever the owner said. These are working
+assumptions until the owner rules.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 3 criterion 7.
+
+## Seed 10: An imported source: whether it is committed, and how large it may be
+
+**Question.** `docs/decisions.md` calls JSON frames "the tracked, lossless source of each
+animation" and lists as open "whether large video-derived JSON sources are tracked as they
+are". The animation guide has to say what is committed. This is a gap in a governing
+document.
+
+**Answer.** The working assumption, until the owner rules: a source made by an import is
+committed in `animations/` when it is at most 50 MB, the size at which the large hosting
+services warn; they refuse a file above 100 MB. A longer piece is cut into shorter
+animations. The video or GIF it came from is not committed. A source that a tracked
+generator writes for the target canvas is not committed either: it is written into
+`build/` when a show is packed, as the demo show's sources are. The open question in
+`docs/decisions.md` stays as it is.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 5 criteria 3 and 4.
+
+## Seed 10: The bench build, and the one strip that is wired
+
+**Question.** `README.md` and `docs/decisions.md` call the bench build of two legs
+"today's" and "confirmed working". `docs/firmware.md` and `docs/mapping.md` say that one
+strip of 60 LEDs is wired at present, on pin 1.
+
+**Answer.** Both are so, of different things, and the vocabulary says which: the bench
+build is the build that `mapping/legs-2.json` describes, two row legs, which was confirmed
+on the hardware; what is wired to the board at present is one strip. The brightness limit
+follows what is wired.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 2 criterion 4.
+
+## Seed 10: Files that a clone does not have
+
+**Question.** `docs/decisions.md` names proof-of-concept scripts in `animations/` and
+`tools/`. They are untracked: they exist on the first computer only, as do `esp32-backup/`,
+`firmware/wled-16.0.1/`, `scratch/` and a stock image at the root. A clone has none of
+them.
+
+**Answer.** The pages name only the two folders that nobody may change, say that they are
+on the first computer only, and give the rule for every other such file: an untracked file
+that you did not make is not yours. The sentence in `docs/decisions.md` is left as it is.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 1 criterion 5, Requirement 3
+criterion 5 and Requirement 7 criterion 1.
+
+## Seed 10: The rules taken from another project
+
+**Question.** `docs/decisions.md` records that the seed-based process and "agent policies,
+limited to the policies that are relevant to this project" were adopted. Their text exists
+only in the project they came from. Which of them bind here?
+
+**Answer.** Five rules of conduct: a commitment for later reaches the owner and is not left
+only in a file; the scope of a seed is fixed while it is being implemented; commits are
+staged by named paths; a test for a fault is seen failing before the fault is mended; and
+code carries no history. With them come the seed as a folder with its own state file, one
+seed to a commit, and one task to a commit with its checkbox. The rule there that agents
+never share a checkout is the root of this project's rule for several contributors. The
+rules about that project's background workers and its build service are not taken.
+`docs/working-rules.md` states all of this in this project's own words and does not name
+the other project.
+
+**Resolution.** Seed 10 `requirements.md`, Requirement 3.
+
+## Seed 10: Recording the seed's progress, and the queue
+
+**Question.** As for the other seeds.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress` and the last task sets `completed`. The queue records carry `Status`,
+`Source` and `Task` only, as "Seed 02: Queue records without task ids" has it.
+
+**Resolution.** Seed 10 `tasks.md`, tasks 1 and 6; `.codex/local-task-queue.md`, which is
+not tracked.
