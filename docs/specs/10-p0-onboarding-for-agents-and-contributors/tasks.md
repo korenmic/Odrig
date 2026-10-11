@@ -85,7 +85,7 @@ Rules for every task:
     and that command, and shows pip's message. Undo it.
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 8.2, 8.3, 8.4, 8.5
 
-- [ ] 4. The animation guide
+- [x] 4. The animation guide
   - Write `docs/animation-guide.md` with the headings of the design's table. Measure every
     size the page gives again with the tools as they are, and take the rates from
     `docs/firmware.md`.

@@ -17,7 +17,7 @@ if str(FIRMWARE) not in sys.path:
     sys.path.insert(0, str(FIRMWARE))
 
 # The pages a newcomer reads first, by their paths in the repository.
-PAGES = ("docs/vocabulary.md", "docs/working-rules.md", "docs/getting-started.md")
+PAGES = ("docs/vocabulary.md", "docs/working-rules.md", "docs/getting-started.md", "docs/animation-guide.md")
 
 ENTRY = "AGENTS.md"
 ENTRY_LINES = 150
@@ -29,6 +29,8 @@ MADE_ON_THE_COMPUTER = ("build/", "core/build/", ".venv/", ".codex/")
 FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 # The files of an installed file set that no tracked file is named after.
 INSTALLED_NAMES = ("mapping.json",)
+# What a page gives as something for the reader to make.
+TO_BE_MADE = ("odrig/generators/dot.py",)
 
 PYTHONS = (".venv/bin/python", "python", "python3")
 # Programs of the system a page may use in a command, which have nothing to check.
@@ -124,7 +126,7 @@ def is_path(word):
 
 def looked_for(word):
     """Whether a path must exist in a clone: not one that is made on the computer."""
-    return not word.startswith(MADE_ON_THE_COMPUTER + FIRST_COMPUTER_ONLY) and word not in INSTALLED_NAMES
+    return not word.startswith(MADE_ON_THE_COMPUTER + FIRST_COMPUTER_ONLY) and word not in INSTALLED_NAMES + TO_BE_MADE
 
 
 def exists(word):
@@ -134,13 +136,14 @@ def exists(word):
     plain = word.rstrip("/")
     if plain in present() or any(name.startswith(plain + "/") for name in present()):
         return True
-    if "/" not in word:
-        return any(name.rsplit("/", 1)[-1] == word for name in present())
+    names = present() if "/" in word else {name.rsplit("/", 1)[-1] for name in present()}
+    if plain in names:
+        return True
     pattern = re.sub(r"<[^>]*>|[A-Z]{2,}", "*", plain)
     if pattern == plain:
         return False
     shape = re.compile("[^/]+".join(re.escape(part) for part in pattern.split("*")) + r"(?:/.*)?")
-    return any(shape.fullmatch(name) for name in present())
+    return any(shape.fullmatch(name) for name in names)
 
 
 def understood(parse, arguments):

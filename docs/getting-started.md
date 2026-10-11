@@ -74,16 +74,17 @@ It runs the tests in `tests/firmware`. The first time any command of that tool r
 tool fetches WLED's source and installs its build tools into `build/firmware/`: about
 260 MB, over the network. Run it when you work on the firmware or on its tool.
 
-One suite, `tests/walkthrough`, follows this page in a fresh copy of the repository, to see
-that the commands above and below still work:
+One suite, `tests/walkthrough`, follows this page and the animation guide in a fresh copy
+of the repository, to see that their commands still work:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests/walkthrough -t .
 ```
 
 It clones the repository into a temporary folder, sets it up there as this page says, which
-needs the network, runs the four suites above, packs the demo show and checks it. It takes
-about four minutes. Run it when you have changed this page or a command it gives.
+needs the network, runs the four suites above, packs the demo show and checks it, and then
+makes, imports and packs an animation as the guide says. It takes about four minutes. Run
+it when you have changed one of the two pages or a command they give.
 
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
@@ -172,6 +173,7 @@ The record file holds the colour of every LED at every refresh;
 
 ## What to read next
 
+- [animation-guide.md](animation-guide.md), to make an animation and try it here.
 - [working-rules.md](working-rules.md), before you change anything.
 - [converter.md](converter.md), [format.md](format.md) and [show.md](show.md) for the
   tools and files used above, and [mapping.md](mapping.md) for how the canvas is wired.
