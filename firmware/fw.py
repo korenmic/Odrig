@@ -11,7 +11,8 @@ Python. `docs/firmware.md` describes every command.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+FIRMWARE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [FIRMWARE, os.path.dirname(FIRMWARE)]
 
 from fwtool import cli  # noqa: E402
 

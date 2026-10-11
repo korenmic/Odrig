@@ -42,14 +42,15 @@ def patch_files(folder=paths.PATCHES):
 
 
 def restore_and_patch(folder=paths.WLED, patches=paths.PATCHES, commit=COMMIT):
-    """Brings the tracked files back to the pinned commit and applies every patch file."""
+    """Brings the tracked files back to the pinned commit and applies every patch file.
+    Without a folder of patches the files stay WLED's own."""
     check(folder, commit)
     for arguments in (("checkout", "--", "."), ("clean", "-fdq")):
         done = _git(folder, *arguments)
         if done.returncode != 0:
             raise Failure("wled-mismatch", f"git {arguments[0]} in {folder} failed: {done.stderr.strip()[-300:]}")
     applied = []
-    for patch in patch_files(patches):
+    for patch in patch_files(patches) if patches is not None else []:
         done = _git(folder, "apply", "--whitespace=nowarn", str(patch.resolve()))
         if done.returncode != 0:
             raise Failure("patch-failed", f"{patch.name} does not apply: {done.stderr.strip()[-300:]}")

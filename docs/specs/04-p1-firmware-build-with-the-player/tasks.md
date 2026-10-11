@@ -59,7 +59,7 @@ Rules for every task:
   - The board is not touched.
   - Requirements: 1.2, 1.3, 2.1, 2.3, 2.4, 2.5, 6.1, 15.1, 15.4
 
-- [ ] 2. Spike: stock WLED built from source, flashed and restored
+- [x] 2. Spike: stock WLED built from source, flashed and restored
   - Create `firmware/fwtool/build.py`, `partitions.py`, `flasher.py`, `stock.py` and
     `board.py`, and `firmware/stock.sha256` with the three lines of the design. Add the
     subcommands `build --stock`, `flash` with `--image` and `--expect`, `restore-stock`

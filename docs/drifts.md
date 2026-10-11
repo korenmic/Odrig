@@ -1931,3 +1931,55 @@ with the program it belongs to. A difference that belongs to the tool or to a pr
 started would be a failure of the task.
 
 **Resolution.** `docs/firmware.md`, "Verified on the board".
+
+## Seed 04: The flash size in the stock bootloader
+
+**Question.** The design writes every file with `--flash-size keep`, and for
+`restore-stock --full` puts the stock bootloader and partition table into the same esptool
+call. The stock file `bootloader_s3.bin` has the flash size 8 MB in its header. The
+bootloader on the board is that file with 16 MB in the header and the checksum that follows
+from it, which is what esptool makes of it when it writes a bootloader and is told to use
+the size of the chip. Written as it is, the file would start a board that takes its 16 MB
+flash for 8 MB, with the storage partition beyond the end.
+
+**Answer.** A call that writes the bootloader passes `--flash-size detect`, with mode and
+frequency kept; every other call keeps all three, as designed. `--full` checks the layout
+in the stock partition table it is about to write, since the board's own table is what it
+replaces. `--full` was not run on the board: a bootloader that fails to write leaves a
+board that only the chip's own download mode recovers. Instead esptool compared the flash
+with the three stock files as the tool would write them, and they are what the board
+holds.
+
+**Resolution.** `firmware/fwtool/flasher.py`, `Flasher.write` and `Flasher.verify`;
+`firmware/fwtool/cli.py`, `_restore_stock`; `tests/firmware/test_flasher.py`;
+`docs/firmware.md`, "restore-stock" and "Verified on the board".
+
+## Seed 04: The C++ level the WLED build really uses
+
+**Question.** Fact R28 of the design had two sources that disagree about the C++ level, and
+read `-fexceptions` in the build script of the Arduino core.
+
+**Answer.** The verbose build of WLED's own environment compiles every C++ file with
+`-std=gnu++11 -fno-exceptions -fno-rtti -Os`. C++17 is not used, and exceptions are
+switched off, not on. The core is written for exactly this: C++11 without exceptions and
+without run-time type information.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board", A5. The entry "Seed 02: The
+C++ language level" is confirmed.
+
+## Seed 04: What the board suite compares in task 2, and the stock build's number
+
+**Question.** Task 2 writes `tests/board/test_flash_restore.py` "for now with the
+stock-built image in place of the firmware", and the design has that test compare the files
+of storage before and after. The module that reads the files of storage is task 4's. How
+does a test tell the stock-built image from the release image, when both are WLED 16.0.1?
+
+**Answer.** In task 2 the test restores stock, flashes the stock-built image and restores
+stock again, and checks WLED's handshake each time. The image built from source answers
+with the number in WLED's source at the tag, 2605010; the release image answers 2606300,
+so the test expects two different answers. Storage was compared once by hand in this
+task, as whole images read before and after: the same bytes. The comparison by files joins
+the test in task 5, as its task says.
+
+**Resolution.** `tests/board/test_flash_restore.py`; `docs/firmware.md`, "Verified on the
+board", A4 and A6.
