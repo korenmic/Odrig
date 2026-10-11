@@ -13,6 +13,19 @@ from . import errors, files, jsonframes, odrg
 Subcommand = collections.namedtuple("Subcommand", "name summary configure run")
 
 
+def _configure_encode(parser):
+    parser.add_argument("input", metavar="IN.json", help="the JSON frames file to read")
+    parser.add_argument("output", metavar="OUT.odrg", help="the ODRG file to write")
+    parser.add_argument("--uncompressed", action="store_true", help="write the body without compression")
+
+
+def _encode(arguments):
+    animation = jsonframes.read(arguments.input)
+    with errors.naming(arguments.input):
+        data = odrg.encode(animation, compressed=not arguments.uncompressed)
+    files.write(arguments.output, data)
+
+
 def _configure_decode(parser):
     parser.add_argument("input", metavar="IN.odrg", help="the ODRG file to read")
     parser.add_argument("output", metavar="OUT.json", help="the JSON frames file to write")
@@ -27,6 +40,7 @@ def _decode(arguments):
 
 
 SUBCOMMANDS = (
+    Subcommand("encode", "Turns a JSON frames file into an ODRG file.", _configure_encode, _encode),
     Subcommand("decode", "Turns an ODRG file back into a JSON frames file.", _configure_decode, _decode),
 )
 

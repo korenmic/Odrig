@@ -74,6 +74,15 @@ bits of the data, and last the palette indexes of the picture. A Gamma code or a
 read whole before its value is judged, so a code cut off by the end of the data is
 `out-of-bits`. Bytes after the last frame record are found last.
 
+## Sources that `encode` cannot write as ODRG
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large` | N would be above 65,534: W * H with a palette, 3 * W * H without one. |
+| `too-many-frames` | More than 4,294,967,295 frame records would be needed. |
+
+The canvas is judged before the number of frame records.
+
 ## Any output
 
 | Reason | Condition |

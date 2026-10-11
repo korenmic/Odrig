@@ -34,6 +34,8 @@ TOO_MUCH_PADDING = "too-much-padding"
 BAD_PALETTE_INDEX = "bad-palette-index"
 TRAILING_BYTES = "trailing-bytes"
 
+TOO_MANY_FRAMES = "too-many-frames"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

@@ -65,7 +65,7 @@ Rules for every task:
   - Add the ODRG table to `docs/reasons.md` and a `decode` section to `docs/converter.md`.
   - Requirements: 1.3, 1.5, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 8.1, 8.3, 22.4
 
-- [ ] 4. ODRG encoder and the `encode` subcommand
+- [x] 4. ODRG encoder and the `encode` subcommand
   - Add `palette_for`, `to_buffer`, `coded_record`, `stored_record`, `best_record`,
     `container` and `encode` to `odrig/odrg.py`, and the `encode` subcommand with
     `--uncompressed`.

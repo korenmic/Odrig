@@ -268,5 +268,84 @@ class Decode(unittest.TestCase):
         self.assertEqual(self.names(), ["clip.odrg"])
 
 
+SOURCE = (
+    b'{\n  "version": 1,\n  "width": 3,\n  "height": 2,\n  "frames": [\n'
+    b'    {"ms": 500, "pixels": [16711680, 0, 0, 0, 0, 255]},\n'
+    b'    {"ms": 70000, "pixels": [0, 0, 0, 0, 65280, 0]},\n'
+    b'    {"ms": 20, "pixels": [16711680, 0, 0, 0, 0, 255]}\n  ]\n}\n'
+)
+
+
+class Encode(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+        self.source = self.folder / "clip.json"
+        self.output = self.folder / "clip.odrg"
+        self.source.write_bytes(SOURCE)
+
+    def names(self):
+        return sorted(entry.name for entry in self.folder.iterdir())
+
+    def test_it_writes_a_compressed_file_unless_asked_otherwise(self):
+        self.assertEqual(support.run("encode", self.source, self.output), support.Result(0, "", ""))
+        packed = self.output.read_bytes()
+        self.assertEqual(packed[:4], b"ODRG")
+        self.assertEqual(packed[5], 1)
+        self.assertEqual(support.run("encode", self.source, self.output, "--uncompressed").status, 0)
+        plain = self.output.read_bytes()
+        self.assertEqual(plain[5], 0)
+        self.assertEqual(self.names(), ["clip.json", "clip.odrg"])
+
+    def test_encode_then_decode_of_a_merged_source_gives_a_byte_identical_file(self):
+        back = self.folder / "back.json"
+        for options in ((), ("--uncompressed",)):
+            with self.subTest(options=options):
+                self.assertEqual(support.run("encode", self.source, self.output, *options).status, 0)
+                self.assertEqual(support.run("decode", self.output, back).status, 0)
+                self.assertEqual(back.read_bytes(), SOURCE)
+
+    def test_two_runs_give_identical_bytes(self):
+        second = self.folder / "second.odrg"
+        for options in ((), ("--uncompressed",)):
+            with self.subTest(options=options):
+                self.assertEqual(support.run_module("encode", self.source, self.output, *options).status, 0)
+                self.assertEqual(support.run_module("encode", self.source, second, *options).status, 0)
+                self.assertEqual(self.output.read_bytes(), second.read_bytes())
+
+    def test_an_existing_output_is_replaced(self):
+        self.output.write_bytes(b"x" * 5000)
+        self.assertEqual(support.run("encode", self.source, self.output).status, 0)
+        self.assertEqual(self.output.read_bytes()[:4], b"ODRG")
+        self.assertLess(len(self.output.read_bytes()), 5000)
+
+    def test_an_invalid_source_is_rejected_with_its_json_frames_reason(self):
+        self.source.write_bytes(SOURCE.replace(b"0, 0, 0, 0, 65280, 0", b"0, 0, 0, 0, 65280"))
+        result = support.run("encode", self.source, self.output)
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith(f"error: bad-pixel-count: {self.source}: "), result.err)
+        self.assertEqual(result.out, "")
+        self.assertEqual(self.names(), ["clip.json"])
+
+    def test_a_source_that_cannot_be_written_as_odrg_is_rejected(self):
+        self.source.write_bytes(SOURCE.replace(b"70000", b"281470681743360"))
+        result = support.run("encode", self.source, self.output)
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith(f"error: too-many-frames: {self.source}: "), result.err)
+        self.assertEqual(self.names(), ["clip.json"])
+
+    def test_a_source_that_does_not_exist_is_not_found(self):
+        result = support.run("encode", self.folder / "absent.json", self.output)
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith("error: not-found: "), result.err)
+        self.assertEqual(self.names(), ["clip.json"])
+
+    def test_an_unknown_option_is_a_usage_error_and_writes_nothing(self):
+        result = support.run("encode", self.source, self.output, "--fast")
+        self.assertEqual(result.status, 2)
+        self.assertEqual(self.names(), ["clip.json"])
+
+
 if __name__ == "__main__":
     unittest.main()
