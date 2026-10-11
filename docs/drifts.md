@@ -3857,3 +3857,18 @@ contributors once, after the entry of the rule it takes the place of, and that t
 the entries never go backwards.
 
 **Resolution.** `tests/onboarding/test_rules.py`.
+
+## Seed 10: The core's test command with another Python
+
+**Question.** `docs/core.md` gives `make -C core test PYTHON=.venv/bin/python` for running
+the core's suite with another Python. Run from the repository root it stops with "the tests
+need Python 3.10 or later, and '.venv/bin/python' is older or missing": the makefile checks
+the Python from inside `core/`, where that path leads nowhere. The getting-started page has
+to give a command for the core's suite.
+
+**Answer.** The page gives `make -C core test`, which uses `python3`; the core's suite
+needs no library, and `python3` of 3.10 or later is what the page asks for anyway.
+`docs/core.md` and the makefile belong to seed 02 and are not changed here. The fault is
+reported to the owner with this seed's hand-over.
+
+**Resolution.** `docs/getting-started.md`, "Run the tests".

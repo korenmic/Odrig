@@ -72,7 +72,7 @@ Rules for every task:
     this task, fails naming the rule that all work goes directly on `master`.
   - Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 6.3, 6.4
 
-- [ ] 3. Getting started, and the walk-through
+- [x] 3. Getting started, and the walk-through
   - Write `docs/getting-started.md` with the headings of the design's table. Run every
     command of the page as it is written, in a clone that has nothing set up, and paste
     what the emulator and the record run print as they print it.

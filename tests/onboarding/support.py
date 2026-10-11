@@ -17,14 +17,14 @@ if str(FIRMWARE) not in sys.path:
     sys.path.insert(0, str(FIRMWARE))
 
 # The pages a newcomer reads first, by their paths in the repository.
-PAGES = ("docs/vocabulary.md", "docs/working-rules.md")
+PAGES = ("docs/vocabulary.md", "docs/working-rules.md", "docs/getting-started.md")
 
 ENTRY = "AGENTS.md"
 ENTRY_LINES = 150
 PAGE_LINES = 200
 
 # What a page may name although no clone holds it: what is made on the computer.
-MADE_ON_THE_COMPUTER = ("build/", ".venv/", ".codex/")
+MADE_ON_THE_COMPUTER = ("build/", "core/build/", ".venv/", ".codex/")
 # Folders that exist untracked on the first computer only, and that nobody changes.
 FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 # The files of an installed file set that no tracked file is named after.
@@ -161,6 +161,8 @@ def _python(words):
     from odrig import cli as converter
     from odrigctl import cli as tool
 
+    if words == ["--version"]:
+        return None
     if words[:1] == ["firmware/fw.py"]:
         return understood(firmware.parser().parse_args, words[1:])
     if words[:1] != ["-m"] or len(words) < 2:

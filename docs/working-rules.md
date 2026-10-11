@@ -56,7 +56,7 @@ What has been decided is in [decisions.md](decisions.md), each decision as it st
   `python -m unittest discover -s tests/converter -t .`. No command, script or document
   lists test files, so a new test file needs no change anywhere else.
 - **The suites pass before a commit.** The `tasks.md` of a spec says which suites a task
-  runs.
+  runs, and [getting-started.md](getting-started.md#run-the-tests) has the command of each.
 - **Leave alone what is not yours.** Nothing under `build/` or `.venv/` is committed, and
   nothing that was fetched or built. An untracked file that you did not make is not moved,
   edited, deleted or staged.
