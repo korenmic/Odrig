@@ -343,3 +343,251 @@ keep `remaining` after their spec is committed.
 and the last task sets `completed`.
 
 **Resolution.** Seed 01 `tasks.md`, tasks 1 and 14.
+
+## Seed 02: The C++ language level
+
+**Question.** The seed says the core "keeps to the language level that build's toolchain
+supports" and does not name the level.
+
+**Answer.** C++11, limited to what later standards also accept. WLED 16.0.1 builds for the
+ESP32-S3 with GCC 8.4.0 on Arduino core 2.0.18, and the Arduino core 2.0.x build script
+compiles C++ as `gnu++11`. The flag was read in the upstream core, not in the package WLED
+really uses, so the first firmware build of seed 04 confirms it. The choice is safe either
+way, because that compiler cannot be set lower than C++11 and C++11 code compiles under
+every higher setting.
+
+**Resolution.** `docs/specs/02-p0-shared-runtime-core/requirements.md`, Requirement 1
+criterion 1; `design.md`, "Language level and toolchain".
+
+## Seed 02: Rules beyond the ones the seed lists
+
+**Question.** The seed forbids exceptions, run-time type information and threads. It does
+not mention recursion, large local arrays, static state or floating point, which matter on
+a board whose tasks have small stacks and which must give the same output as the Mac.
+
+**Answer.** The core also has no recursion, no local array above 256 bytes, no state
+outside the object the host holds, and no floating-point arithmetic. The build and the
+suite enforce these where they can.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 1 criteria 4 to 6; `design.md`,
+"Language level and toolchain".
+
+## Seed 02: No third-party code in the core
+
+**Question.** The seed lets the core bring in third-party code for DEFLATE and JSON under a
+permissive licence, and does not say whether it should.
+
+**Answer.** The core brings in none and has its own small DEFLATE decoder and JSON reader.
+The usual small decompressor has the same names as the copy in the ESP32's ROM, the core
+needs to know the exact byte where a stream ends, and a decoder that returns one byte at a
+time fits a decoder that never holds a frame record. The suite checks it against zlib.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 15; `design.md`, "Third-party code"
+and "inflate".
+
+## Seed 02: Where startup memory comes from
+
+**Question.** The seed says time, file access and logging go through the host interface and
+that there is no heap allocation after startup. It does not say where the memory taken at
+startup comes from.
+
+**Answer.** The host supplies it, through a function the core calls during startup only.
+The firmware can then choose which kind of memory the core gets, and "no allocation after
+startup" becomes something the test host can check. Time is not a function of the host: it
+is passed with every call, as the seed's "the host calls the core with the current time"
+says.
+
+**Resolution.** Seed 02 `requirements.md`, Requirements 2 and 13; `design.md`, "The host
+interface".
+
+## Seed 02: How thorough the check at startup is
+
+**Question.** The seed says the core "checks every `.odrg` file the show names", and
+`docs/show.md` says a file that "breaks its format" makes the show invalid. Finding every
+such file means decoding each one completely at power-on. How long that takes on the board
+has not been measured; a store full of dense animations may take many seconds.
+
+**Answer.** The core decodes every file once at startup, as the documents say. The time
+grows with the amount of animation installed and is measured in seed 04. A host that must
+stay responsive meanwhile does its housekeeping in its `read` function.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 3 criterion 1; `design.md`,
+"Startup" and the rules of use of the host interface.
+
+## Seed 02: When refreshes happen
+
+**Question.** The seed says the host calls the core with the current time and "every 20 ms
+the core produces the LED data for that moment". It does not say where the 20 ms steps
+start, or what happens when the host calls late, early or with a time that goes backwards.
+
+**Answer.** The steps start at the timestamp of the first call. A call produces at most one
+refresh, and only when a step is due. A late call gets the picture of its own timestamp and
+the missed steps are skipped, not replayed. A timestamp earlier than the latest one counts
+as the latest.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 5; `design.md`, "Clock, grid and
+refreshes".
+
+## Seed 02: When an item's time starts
+
+**Question.** `docs/commands.md` says `play` starts an item "from its first frame". It does
+not say at which instant the item's time is zero.
+
+**Answer.** At the 20 ms step of the first refresh after the command, or after power-on for
+the `start` item. Frames then change exactly on the steps, so a refresh that comes a few
+milliseconds late still shows the right frame.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 7 criterion 3.
+
+## Seed 02: What is produced when there is nothing to show
+
+**Question.** The documents say the LEDs "stay dark" when the show is invalid, when nothing
+is playing and when switched off. They do not say whether the core still produces LED data
+then.
+
+**Answer.** With a valid mapping it produces a refresh of all zeros every 20 ms, which
+clears LEDs that still hold old colours and keeps the refresh rate meaningful. With an
+invalid mapping there are no legs and no refreshes.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 5 criteria 6 and 7 and Requirement 6
+criterion 4.
+
+## Seed 02: The text of `error` in the status reply
+
+**Question.** `docs/commands.md` says `error` is "the reason the show is invalid" and does
+not give its form.
+
+**Answer.** It is the reason name of seed 01, followed by the id or the file name it is
+about, and for a file that breaks its format by the reason of the format, for example
+`file-malformed hello.odrg bad-magic`. The text holds only lower-case letters, digits,
+`.`, `-`, `_` and spaces, so it needs no escaping in JSON.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 3 criterion 3.
+
+## Seed 02: Two reasons that docs/show.md does not have
+
+**Question.** `docs/show.md` lists the ways a show is invalid. A host can also fail to
+supply memory or to read a file, which is none of them.
+
+**Answer.** Both make the show invalid, with `out-of-memory` and `read-error <name>`.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 3 criterion 3 and Requirement 13
+criterion 4.
+
+## Seed 02: Brightness when show.json cannot be used
+
+**Question.** Brightness at power-on is "the value in `show.json`". Nothing says what it is
+when `show.json` is missing or wrong.
+
+**Answer.** It is 0. When `show.json` itself is sound and only an animation file fails, it
+is the value in `show.json`.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 4 criterion 3.
+
+## Seed 02: Edge cases of command lines
+
+**Question.** `docs/commands.md` does not say what an empty line, two spaces in a row,
+capital letters or leading zeros give, or which error code is reported when several apply.
+
+**Answer.** Every line gets one reply, an empty one included. Extra spaces make empty words,
+which fail as an unknown command or a bad argument. Command names are matched exactly, in
+lower case. An argument is decimal digits only, and leading zeros do not matter. The code
+reported is the first that applies of `line-too-long`, `unknown-command`, `bad-argument`,
+`show-invalid`, `unknown-id`.
+
+**Resolution.** Seed 02 `requirements.md`, Requirements 10 and 11.
+
+## Seed 02: Lines from bytes, lines from HTTP
+
+**Question.** `docs/commands.md` says a transport only carries lines. A serial port delivers
+bytes, and an HTTP request delivers one line with or without its newline. The documents do
+not say who cuts bytes into lines and applies the limit of 64 characters.
+
+**Answer.** The core has one entry that takes a line and returns its reply, and it ignores a
+final newline and carriage return, so an HTTP body can be passed as it is. The core also has
+an entry for bytes, which cuts them into lines, applies the limit without storing an endless
+line, and hands back each line with its reply. Both hosts then use the same code for it, and
+the emulator gets the lines it shows in its command log.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 10; `design.md`, "The host
+interface" and "Commands".
+
+## Seed 02: Exact bytes of a reply
+
+**Question.** `docs/commands.md` shows replies as examples. It does not say whether the
+order of members and the absence of spaces are fixed.
+
+**Answer.** They are fixed as in the examples, each reply ends with a newline, and no reply
+is longer than 192 bytes. A client can then compare replies as text.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 10 criterion 5 and Requirement 11
+criterion 4.
+
+## Seed 02: `animation` and `fps` in corner cases
+
+**Question.** `animation` is "the animation item on the LEDs right now" and `fps` is the
+"LED refreshes in the last full second". Neither is defined just after `play`, while the
+LEDs are off, or before a full second has passed.
+
+**Answer.** `animation` is the animation the latest refresh chose, or the item's first
+animation when no refresh has happened since `play`; it is reported while the LEDs are off
+too, because playback goes on. Seconds are counted from power-on, and `fps` is 0 until one
+has ended and for a second without refreshes.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 11 criterion 5 and Requirement 12.
+
+## Seed 02: A file that fails while it is playing
+
+**Question.** Files are checked at startup. Nothing says what happens when a file cannot be
+read later, or has been replaced.
+
+**Answer.** From that refresh on the show is invalid: the LEDs are dark, `status` gives the
+reason, and `play` is refused until the next startup.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 16.
+
+## Seed 02: The memory limit and the size of the show
+
+**Question.** The seed limits working memory "for a 60 x 30 canvas" to 128 KB. The tables
+of the show grow with the number of items, and `docs/show.md` sets no limit on that number.
+
+**Answer.** The tables are sized from the show at startup. The limit is proven for the
+ten-leg mapping with a show of 100 items, which needs under 60 KB. A larger show asks for
+more, and a host that cannot supply it gets `out-of-memory`.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 13; `design.md`, "Data structures".
+
+## Seed 02: What the tests need
+
+**Question.** The seed says the core builds with nothing beyond Apple's command-line
+developer tools, and that it is checked against seed 01's decoder, which is Python 3.10 or
+later. Apple's tools carry Python 3.9.
+
+**Answer.** The build needs only Apple's tools. The test command also needs Python 3.10 or
+later, without any third-party package. The suite is Python driving a small native test
+host.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 17; `design.md`, "Build" and
+"Testing strategy".
+
+## Seed 02: Proving there is no allocation after startup
+
+**Question.** The definition of done asks for "a test build that fails on any heap
+allocation after startup" and does not say how such a build detects one.
+
+**Answer.** The test host stops when the core asks it for memory, or calls `operator new`,
+after startup. A test on the compiled library shows that the core refers to no allocation
+routine at all, which covers every other way. The test host also runs with the address and
+undefined-behaviour sanitizers.
+
+**Resolution.** Seed 02 `requirements.md`, Requirement 17 criteria 6 and 7; `design.md`,
+"Allocation after startup".
+
+## Seed 02: Recording the seed's progress
+
+**Question.** As for seed 01: the seed convention has no state that means "spec written".
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets `in_progress`
+and the last task sets `completed`.
+
+**Resolution.** Seed 02 `tasks.md`, tasks 1 and 11.
