@@ -41,6 +41,16 @@ MAPPING_MALFORMED = "mapping-malformed"
 
 CANVAS_TOO_SMALL = "canvas-too-small"
 
+SHOW_MISSING = "show-missing"
+SHOW_MALFORMED = "show-malformed"
+DUPLICATE_ID = "duplicate-id"
+UNDEFINED_ID = "undefined-id"
+NESTED_CYCLE = "nested-cycle"
+FILE_MISSING = "file-missing"
+FILE_MALFORMED = "file-malformed"
+SIZE_MISMATCH = "size-mismatch"
+OUTPUT_NOT_EMPTY = "output-not-empty"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

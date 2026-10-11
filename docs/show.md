@@ -27,8 +27,12 @@ A UTF-8 JSON object with exactly these members:
 | `items` | array | One or more items that can be played. |
 | `start` | integer | Optional. The `id` of the item that plays at power-on. Without it the LEDs stay dark until a play command arrives. |
 
+The file is read as strictly as a JSON frames file (see [format.md](format.md)): UTF-8
+without a byte-order mark, exactly one JSON value, no member named twice in one object, and
+integers written without a fraction and without an exponent.
+
 Each item has an `id`, an integer from 1 to 65,535 that is unique in the file, and is one of
-two kinds:
+two kinds, with exactly the members of its kind:
 
 | Kind | Members | Meaning |
 |---|---|---|
@@ -65,3 +69,9 @@ a cycle, or when a listed `.odrg` file is missing, breaks its format, or has a c
 different from the mapping's.
 
 With an invalid show the LEDs stay dark, and the status command reports what is wrong.
+
+Each of these has a fixed name, listed under "Shows" in [reasons.md](reasons.md). When a show
+is invalid in more than one way, the first in this order is reported: the mapping file, the
+format of `show.json`, an id used twice, an id that does not exist, a cycle that names a
+cycle, and then the listed files in the order `show.json` names them. The ids are checked
+over the items in file order.

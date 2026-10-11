@@ -92,6 +92,29 @@ Rules: [mapping.md](mapping.md), "Rules".
 | `mapping-missing` | The mapping file does not exist. |
 | `mapping-malformed` | The mapping file breaks a rule. The detail says which. |
 
+## Shows
+
+Rules: [show.md](show.md). `pack` checks in the order of this table and reports the first
+reason that applies.
+
+| Reason | Condition |
+|---|---|
+| `mapping-missing`, `mapping-malformed` | As under "Mapping files". |
+| `show-missing` | The show file does not exist. |
+| `show-malformed` | The show file breaks its format: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `brightness` is not 0 to 255; there is no item; an item is neither an animation item nor a cycle item; an `id` is not 1 to 65,535; a `file` name is outside the naming rule; `seconds` is not 1 to 65,535; or a `cycle` is empty. The detail says which. |
+| `duplicate-id` | Two items have the same `id`. |
+| `undefined-id` | A cycle, or `start`, names an id that no item has. |
+| `nested-cycle` | A cycle names an item that is a cycle. |
+| `output-not-empty` | The output folder of `pack` exists and is not empty. |
+| `file-missing` | The source `X.json` of a named `X.odrg` is not in the sources folder. |
+| `file-malformed` | A source is rejected as a JSON frames file. The detail gives that reason too. |
+| `size-mismatch` | A source's canvas size differs from the mapping's. |
+| `canvas-too-large`, `too-many-frames` | A source cannot be written as ODRG, as under `encode`. |
+
+The ids are checked in three passes over the items in file order: every repeated id, then
+every id that a cycle or `start` names and no item has, then every cycle that names a
+cycle.
+
 ## Generators
 
 | Reason | Condition |

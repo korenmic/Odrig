@@ -9,6 +9,7 @@ import collections
 import sys
 
 from . import errors, files, jsonframes, odrg
+from . import pack as packing
 
 Subcommand = collections.namedtuple("Subcommand", "name summary configure run")
 
@@ -80,10 +81,29 @@ def _check(arguments):
     print("\n".join(lines + more))
 
 
+def _configure_pack(parser):
+    parser.add_argument("--show", required=True, help="the show file")
+    parser.add_argument("--mapping", required=True, help="the mapping file")
+    parser.add_argument("--sources", required=True, metavar="DIR", help="the folder of JSON frames sources")
+    parser.add_argument("--out", required=True, metavar="DIR", help="the folder to build, new or empty")
+    parser.add_argument("--uncompressed", action="store_true", help="write every ODRG file without compression")
+
+
+def _pack(arguments):
+    packing.pack(
+        arguments.show,
+        arguments.mapping,
+        arguments.sources,
+        arguments.out,
+        compressed=not arguments.uncompressed,
+    )
+
+
 SUBCOMMANDS = (
     Subcommand("encode", "Turns a JSON frames file into an ODRG file.", _configure_encode, _encode),
     Subcommand("decode", "Turns an ODRG file back into a JSON frames file.", _configure_decode, _decode),
     Subcommand("check", "Validates a JSON frames or ODRG file and summarises it.", _configure_check, _check),
+    Subcommand("pack", "Builds the folder of files that is installed for a show.", _configure_pack, _pack),
 )
 
 

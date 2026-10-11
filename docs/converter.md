@@ -120,6 +120,38 @@ compressed: yes
 
 An invalid file is rejected with its reason and nothing is printed to standard output.
 
+## pack
+
+```
+python -m odrig pack --show SHOW --mapping MAPPING --sources DIR --out DIR [--uncompressed]
+```
+
+Builds the folder that is installed on the board and run by the emulator (see
+[show.md](show.md)). The output folder then holds exactly:
+
+- `mapping.json`, a byte-for-byte copy of the mapping file;
+- `show.json`, a byte-for-byte copy of the show file;
+- for every different `X.odrg` the show names, the file `X.odrg`, encoded from `X.json` in
+  the sources folder as `encode` does. `--uncompressed` writes every one of them without
+  compression.
+
+The example show plays Hello world and DVD bounce in turn, 15 seconds each. It is packed
+with the two-leg mapping:
+
+```
+python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+    --sources animations --out build/example-show
+```
+
+`build/example-show` then holds `mapping.json`, `show.json`, `hello.odrg` and `dvd.odrg`.
+
+The output folder must be new or empty; otherwise `pack` refuses with `output-not-empty`.
+`pack` checks everything before it writes anything: the mapping file, then the show file
+and its ids, then the output folder, then each source in the order the show names them. A
+source must have the canvas size of the mapping. The first thing that is wrong is reported,
+with a reason from "Shows" in [reasons.md](reasons.md), and the output folder and the
+folder around it are left as they were.
+
 ## Generators
 
 A generator is a program that writes an animation as a JSON frames file. It takes the

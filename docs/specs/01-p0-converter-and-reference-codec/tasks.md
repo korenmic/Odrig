@@ -157,7 +157,7 @@ Rules for every task:
     fails stating the expected and the reported reason. Remove the copy.
   - Requirements: 6.1, 19.1, 19.2, 19.3, 19.4
 
-- [ ] 11. Show reader, the `pack` subcommand and the example show
+- [x] 11. Show reader, the `pack` subcommand and the example show
   - Create `odrig/show.py` (`Item`, `Show`, `read`, `files`) and `odrig/pack.py`, and add the
     `pack` subcommand with `--uncompressed`.
   - Create and track `shows/example/show.json` as in the design.
