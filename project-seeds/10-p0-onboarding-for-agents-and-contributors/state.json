@@ -1,0 +1,10 @@
+{
+  "number": 10,
+  "slug": "10-p0-onboarding-for-agents-and-contributors",
+  "state": "remaining",
+  "title": "Onboarding for agents and contributors",
+  "priority": "P0",
+  "addedAt": "2026-10-12T01:12:08+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Entry file for agents, vocabulary, working rules, getting-started page and animation guide, so a new agent or person can contribute from a fresh clone on another computer."
+}
