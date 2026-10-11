@@ -6,5 +6,5 @@
   "priority": "P0",
   "addedAt": "2026-10-11T14:58:22+03:00",
   "addedCommit": "pending-local",
-  "summary": "Bring the mapping, documents, demo show, emulator views, limits and board measurements to the new 60 x 60 target: ten legs of six rows."
+  "summary": "Bring the mapping file format, target mapping, firmware outputs, emulator views, documents, demo show, limits and board measurements to the 60 x 60 target: twenty legs of three upright strips."
 }
