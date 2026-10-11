@@ -12,6 +12,11 @@ it stands now.
   [android-app.md](android-app.md).
 - Questions that come up while writing specs or implementing are answered without asking the
   owner, and each one is recorded with its answer and resolution in [drifts.md](drifts.md).
+- The operators' app is an Android APK built with Capacitor. A PC version built with Tauri,
+  able to use serial as well as Wi-Fi, is intended later. Our own server on the board offers
+  commands only and no web page.
+- The board's Wi-Fi network has a password known to the operators. The password may be kept
+  in this repository.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
   queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
   with its own state file.
@@ -28,7 +33,8 @@ it stands now.
   the three rows below the previous one. Every leg's chain starts at the right end of its
   top row.
 - Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
-- Target: 10 legs, 30 rows, 1,800 LEDs.
+- Target: a 60 x 60 canvas, 3,600 LEDs. The mapping files, the demo show and everything else
+  sized for 60 x 30 are still to be brought to this target.
 - The mapping is defined by the files in `mapping/` and described in
   [mapping.md](mapping.md). The board and the emulator both read the installed mapping file
   at runtime; it is the only definition of the layout.
@@ -53,6 +59,14 @@ it stands now.
   runtime format needs a custom WLED build with our player added.
 - In the custom build WLED is the platform: LED output, storage and Wi-Fi. Playback and
   commands belong to the shared core, and the USB serial port carries the core's commands.
+
+## Conversion
+
+- Converting media to JSON frames and to ODRG runs on phones and PCs, never on the board and
+  never in the emulator.
+- There is to be one converter that runs from the command line without compiling and inside
+  the Capacitor and Tauri apps. It will be written in JavaScript, with the Python converter
+  kept as the independent check that tests compare it against.
 
 ## Animation formats
 
@@ -100,6 +114,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   [commands.md](commands.md).
 - Commands travel over serial and over HTTP, on the board and on the emulator alike. A
   command-line tool sends them to either target by either route.
+- There is one list of commands for every route. A command is added to all routes or to
+  none, and the owner approves every addition.
 
 ## Emulator
 
@@ -135,6 +151,11 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
   hardware.
 
+- For the 60 x 60 target: how the 60 rows are shared among the board's pins. The firmware
+  drives at most 12 outputs, so 20 legs of three rows cannot each have a pin.
+- Whether WLED's own web interface stays reachable, is locked, or is removed.
+- The exact commands for free space, listing, removing and uploading animations.
+
 ## Change log
 
 - 2026-10-08: Workstreams agreed. Hardware and power wiring ruled out of scope. Seed-based
@@ -161,3 +182,7 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   and snakes; the command tool reaches the board or the emulator by serial or HTTP. The board
   hosts the Wi-Fi network. Seeds 03 and 04 were updated before any work on them began.
   Questions met along the way are answered without asking and recorded in drifts.md.
+- 2026-10-11: The target canvas changed from 60 x 30 to 60 x 60. The operators' app is an
+  Android APK built with Capacitor, with no web page served by our own server. Conversion
+  runs only on phones and PCs, in one JavaScript converter. Every command exists on all
+  routes and additions need the owner's approval. The Wi-Fi password may be kept in git.
