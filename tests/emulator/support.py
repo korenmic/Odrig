@@ -19,6 +19,7 @@ import time
 
 from emulator import app
 from odrig import pack
+from tests.core import support as core_support
 from tests.core.support import ReferencePlayer
 
 from . import LIBRARY, ROOT
@@ -26,7 +27,8 @@ from . import LIBRARY, ROOT
 HEADER = ROOT / "core" / "include" / "odrig_core.h"
 EXAMPLE_SHOW = ROOT / "shows" / "example" / "show.json"
 TWO_LEGS = ROOT / "mapping" / "legs-2.json"
-TEN_LEGS = ROOT / "mapping" / "legs-10.json"
+TARGET = ROOT / "mapping" / "legs-20.json"
+DEMO_SHOW = ROOT / "shows" / "demo-20" / "show.json"
 
 
 @contextlib.contextmanager
@@ -41,6 +43,14 @@ def packed(show, mapping, sources, compressed=True):
 def example_show():
     """The example show, packed on the two-leg mapping into a temporary folder."""
     return packed(EXAMPLE_SHOW, TWO_LEGS, ROOT / "animations")
+
+
+@contextlib.contextmanager
+def demo_show():
+    """The demo show on the target file in a temporary folder: the files the converter
+    packs from what its generators write for that file."""
+    with tempfile.TemporaryDirectory() as folder:
+        yield installed(pathlib.Path(folder, "show"), core_support.demo_show())
 
 
 def files_of(folder):

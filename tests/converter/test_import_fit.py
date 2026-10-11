@@ -100,7 +100,7 @@ class Shrinking(unittest.TestCase):
     def test_a_large_white_picture_stays_white(self):
         picture = numpy.full((1080, 1920, 3), 255, dtype=numpy.uint8)
         for fit in ("fill", "stretch"):
-            self.assertEqual(media.resample(picture, media.source_rect(1920, 1080, 60, 30, fit), 60, 30), b"\xff" * 5400)
+            self.assertEqual(media.resample(picture, media.source_rect(1920, 1080, 60, 60, fit), 60, 60), b"\xff" * 10800)
 
 
 class Fill(unittest.TestCase):

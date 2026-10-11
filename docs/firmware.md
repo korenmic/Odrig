@@ -725,10 +725,10 @@ The outputs and playback, tried with the probe build and with the firmware:
   `brightness` command from 0 to 40, and after `off` and `on`. The limiter did not dim
   these pictures.
 - **Ten outputs.** On a ten-leg mapping of 18 LEDs for each leg, pins 1 to 10, all ten
-  outputs, four `rmt` and six `parallel`, held exactly their own leg's bytes. On
-  `mapping/legs-10.json`, 180 LEDs for each leg, all ten outputs work and each holds what
-  the limiter's lowest level makes of its own leg's bytes; `status` still reports the
-  show's brightness.
+  outputs, four `rmt` and six `parallel`, held exactly their own leg's bytes. On a mapping
+  of ten row legs of three rows of 60 on the same pins, 180 LEDs for each leg, all ten
+  outputs work and each holds what the limiter's lowest level makes of its own leg's
+  bytes; `status` still reports the show's brightness.
 - **A pin the board cannot use.** With three legs on pins 1, 60 and 2, the outputs of legs 1
   and 3 hold their bytes and are refreshed 49 times a second or more; the output of leg 2
   does not work; `status` reports no reason.

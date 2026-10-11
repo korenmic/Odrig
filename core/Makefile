@@ -71,10 +71,10 @@ test: python all $(HOST)
 $(BENCH): $(TESTS)/bench/bench.cpp $(LIBRARY) $(HEADERS) Makefile
 	$(CXX) -std=c++17 -O2 $(WARNINGS) -Iinclude -Isrc $< $(LIBRARY) -o $@
 
-# The dense 60 x 30 clip of 10 seconds, written and encoded by the converter.
-$(BUILD)/bench/dense.json: ../mapping/legs-10.json
+# The dense 60 x 60 clip of 10 seconds, written and encoded by the converter.
+$(BUILD)/bench/dense.json: ../mapping/legs-20.json
 	@mkdir -p $(dir $@)
-	cd .. && $(PYTHON) -m odrig.generators.dense core/$@ --mapping mapping/legs-10.json --seconds 10
+	cd .. && $(PYTHON) -m odrig.generators.dense core/$@ --mapping mapping/legs-20.json --seconds 10
 
 $(BUILD)/bench/dense-compressed.odrg: $(BUILD)/bench/dense.json
 	cd .. && $(PYTHON) -m odrig encode core/$< core/$@

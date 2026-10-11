@@ -41,34 +41,43 @@ class SpeedOfThisMac(unittest.TestCase):
             self.assertGreaterEqual(min(samples), 49, f"on this Mac the example show fell below 49 refreshes a second: {samples}")
             self.assertLessEqual(max(samples), 50, samples)
 
+    def test_the_demo_show_holds_49_refreshes_or_more_for_five_full_seconds(self):
+        with support.demo_show() as folder, support.Emulator(folder) as emulator:
+            self.assertEqual(emulator.status()["error"], None)
+            wait_for_the_second_full_second(emulator)
+            samples = fps_samples(emulator, 5.4)
+            self.assertGreaterEqual(len(samples), 20)
+            self.assertGreaterEqual(min(samples), 49, f"on this Mac the demo show fell below 49 refreshes a second: {samples}")
+            self.assertLessEqual(max(samples), 50, samples)
+
     def dense_show(self, compressed):
-        """A show on the ten-leg mapping that plays the dense 60 x 30 clip of 10 seconds of
-        the converter's generator."""
+        """A show on the target file that plays the dense 60 x 60 clip of 10 seconds of the
+        converter's generator."""
         work = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
         return support.installed(work / "show", {
-            "mapping.json": support.TEN_LEGS.read_bytes(),
+            "mapping.json": support.TARGET.read_bytes(),
             "show.json": core_support.show_text([{"id": 1, "file": "dense.odrg"}], brightness=255, start=1),
-            "dense.odrg": core_support.dense_clip(60, 30, 10, compressed),
+            "dense.odrg": core_support.dense_clip(60, 60, 10, compressed),
         })
 
-    def test_the_ten_leg_mapping_with_the_dense_clip_holds_49_refreshes_or_more_for_five_full_seconds(self):
+    def test_the_target_file_with_the_dense_clip_holds_49_refreshes_or_more_for_five_full_seconds(self):
         for compressed in (True, False):
             with self.subTest(compressed=compressed), support.Emulator(self.dense_show(compressed)) as emulator:
                 self.assertEqual(emulator.status()["error"], None)
                 wait_for_the_second_full_second(emulator)
                 samples = fps_samples(emulator, 5.4)
                 self.assertGreaterEqual(len(samples), 20)
-                self.assertGreaterEqual(min(samples), 49, f"on this Mac the dense 60 x 30 clip fell below 49 refreshes a second: {samples}")
+                self.assertGreaterEqual(min(samples), 49, f"on this Mac the dense 60 x 60 clip fell below 49 refreshes a second: {samples}")
                 self.assertLessEqual(max(samples), 50, samples)
 
-    def test_the_event_stream_delivers_147_refreshes_of_5400_bytes_in_3_seconds_on_this_mac(self):
+    def test_the_event_stream_delivers_147_refreshes_of_10800_bytes_in_3_seconds_on_this_mac(self):
         for compressed in (True, False):
             with self.subTest(compressed=compressed), support.Emulator(self.dense_show(compressed)) as emulator, support.EventStream(emulator.port) as stream:
                 stream.read_until(lambda events: any(event.kind == "frame" for event in events))
                 frames = support.frames(stream.read_for(3))
                 self.assertGreaterEqual(len(frames), 147, f"on this Mac only {len(frames)} refreshes of the dense clip arrived in 3 seconds")
                 self.assertLessEqual(len(frames), 152)
-                self.assertEqual({len(data) for _, data in frames}, {5400})
+                self.assertEqual({len(data) for _, data in frames}, {10800})
                 self.assertGreater(len({data for _, data in frames}), 140)
                 times = [ms for ms, _ in frames]
                 self.assertEqual(times, sorted(set(times)))

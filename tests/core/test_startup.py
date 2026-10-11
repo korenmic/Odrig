@@ -205,8 +205,8 @@ class EachReason(unittest.TestCase):
     def test_size_mismatch_names_the_file(self):
         self.check(example(dvd_odrg=support.clip(1, 60, 5)), "size-mismatch dvd.odrg")
         self.check(example(hello_odrg=support.clip(1, 59, 6)), "size-mismatch hello.odrg")
-        ten_legs = tuple((number, number, 180) for number in range(1, 11))
-        self.check(example(mapping_json=support.mapping_texts()["legs-10"]), "size-mismatch hello.odrg", legs=ten_legs)
+        twenty_legs = tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1))
+        self.check(example(mapping_json=support.mapping_texts()["legs-20"]), "size-mismatch hello.odrg", legs=twenty_legs)
 
     def test_read_error_names_the_file(self):
         self.check(example(), "read-error mapping.json", ["--read-fails", "mapping.json", "0"], legs=())

@@ -68,10 +68,10 @@ class EncodedFiles(unittest.TestCase):
             for number, (record, expected) in enumerate(zip(result.records, records), 1):
                 self.assertEqual(record, expected, f"file {position}, record {number}")
 
-    def test_files_of_the_encoder_on_canvases_from_1_x_1_to_60_x_30(self):
+    def test_files_of_the_encoder_on_canvases_from_1_x_1_to_60_x_60(self):
         files = []
         kinds = set()
-        for width, height in ((1, 1), (1, 7), (7, 1), (2, 2), (5, 4), (17, 3), (60, 6), (60, 30)):
+        for width, height in ((1, 1), (1, 7), (7, 1), (2, 2), (5, 4), (17, 3), (60, 6), (60, 60)):
             for colours in (2, 40, 0):
                 frames = 300 if width * height < 4 else 14
                 animation = seeded_animation(1, width, height, colours, frames)
@@ -131,12 +131,16 @@ class EncodedFiles(unittest.TestCase):
         self.check(files)
 
     def test_a_compressed_body_above_32768_bytes_with_matches_far_back(self):
+        # Three pictures of noise in turn on 60 x 60: every record is a stored picture of
+        # 10,805 bytes, which the stream holds again 32,415 bytes back, near the far end
+        # of the window.
         rng = random.Random(3)
-        noise = [rng.randbytes(3 * 60 * 30) for _ in range(4)]
-        animation = jsonframes.Animation(60, 30, tuple((20, noise[number % 4]) for number in range(12)))
+        noise = [rng.randbytes(3 * 60 * 60) for _ in range(3)]
+        animation = jsonframes.Animation(60, 60, tuple((20, noise[number % 3]) for number in range(12)))
         compressed = odrg.encode(animation, compressed=True)
         plain = odrg.encode(animation, compressed=False)
         body = zlib.decompress(compressed[16:], -15)
+        self.assertEqual(len(body), 12 * 10805)
         self.assertGreater(len(body), 32768)
         self.assertEqual(body, plain[16:])
         self.assertLess(len(compressed), len(plain) // 2)

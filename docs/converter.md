@@ -288,13 +288,14 @@ of [format.md](format.md). Compressed they are 1,138 and 1,612 bytes with zlib 1
 within 2 percent of the 1,134 and 1,594 bytes measured there.
 
 The dense clip is the worst case for the codec and is used by tests. It is written when it
-is needed and is not tracked: ten seconds for the ten-leg mapping are 8 MB of JSON.
+is needed and is not tracked: ten seconds for the target file, 60 x 60, are 16 MB of JSON.
 
 ```
-python -m odrig.generators.dense build/dense.json --mapping mapping/legs-10.json
+python -m odrig.generators.dense build/dense.json --mapping mapping/legs-20.json
 ```
 
-Encoded, that clip is 765,984 bytes uncompressed and about 725,000 bytes compressed.
+Encoded, that clip is 1,462,236 bytes uncompressed and
+1,383,766 bytes compressed with zlib 1.2.12.
 
 ## Test vectors
 

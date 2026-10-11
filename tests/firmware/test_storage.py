@@ -133,7 +133,7 @@ class ShowFolders(Temporary):
         (self.show / "dvd.odrg").write_bytes(kept[:-3])
         self.assertEqual(self.reason(), "file-malformed")
         (self.show / "dvd.odrg").write_bytes(kept)
-        (self.show / "mapping.json").write_bytes((support.ROOT / "mapping" / "legs-10.json").read_bytes())
+        (self.show / "mapping.json").write_bytes((support.ROOT / "mapping" / "legs-20.json").read_bytes())
         self.assertEqual(self.reason(), "size-mismatch")
 
     def test_a_file_the_show_does_not_name_and_a_folder_inside_are_refused(self):

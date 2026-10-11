@@ -253,7 +253,7 @@ Rules for every task:
     are not taken and `docs/firmware.md`, "Measurements on the board", still has the
     figures of seed 04, and the test of the exact bytes was not shown to fail.
 
-- [ ] 9. The target takes the place of the ten-leg file
+- [x] 9. The target takes the place of the ten-leg file
   - Add `shows/demo-20/show.json`. Remove `shows/demo-10/` and `mapping/legs-10.json` with
     `git rm`.
   - `core/Makefile`: the benchmark clip from `mapping/legs-20.json`.

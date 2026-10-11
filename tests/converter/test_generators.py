@@ -9,7 +9,7 @@ from odrig.generators import dense, dvd_bounce, hello_world, rainbow
 from . import support
 
 LEGS_2 = support.ROOT / "mapping" / "legs-2.json"
-LEGS_10 = support.ROOT / "mapping" / "legs-10.json"
+TARGET = support.ROOT / "mapping" / "legs-20.json"
 BLACK = b"\x00\x00\x00"
 
 
@@ -150,12 +150,14 @@ class HelloWorld(unittest.TestCase):
         self.assertEqual(jsonframes.merged(self.frames), self.frames)
 
     def test_on_a_larger_canvas_the_text_is_centred(self):
-        frames = hello_world.frames(60, 30)
+        frames = hello_world.frames(60, 60)
         self.assertEqual(len(frames), 255)
         pixels = lit(frames[0][1], 60)
         self.assertEqual(len(pixels), 122)
         self.assertEqual((min(x for x, _ in pixels), max(x for x, _ in pixels)), (4, 56))
-        self.assertEqual((min(y for _, y in pixels), max(y for _, y in pixels)), (13, 18))
+        self.assertEqual((min(y for _, y in pixels), max(y for _, y in pixels)), (28, 33))
+        # The words are those of the 60 x 6 canvas, 27 rows up.
+        self.assertEqual(pixels, {(x, y + 27) for x, y in self.lit})
         wide = lit(hello_world.frames(100, 6)[0][1], 100)
         self.assertEqual((min(x for x, _ in wide), max(x for x, _ in wide)), (24, 76))
 
@@ -225,7 +227,20 @@ class DvdBounce(unittest.TestCase):
         corners = [self.corner(lit(picture, 5)) for _, picture in frames]
         self.assertEqual({x for x, _ in corners}, {1, 2, 3, 4})
         self.assertEqual({y for _, y in corners}, {1, 2, 3})
-        self.assertEqual(len(dvd_bounce.frames(60, 30)), 1624)
+
+    def test_on_a_square_canvas_it_runs_to_and_fro_along_one_diagonal(self):
+        frames = dvd_bounce.frames(60, 60)
+        self.assertEqual(len(frames), 116)
+        self.assertEqual({ms for ms, _ in frames}, {180})
+        corners = [self.corner(lit(picture, 60)) for _, picture in frames]
+        self.assertEqual(corners[:3], [(1, 59), (2, 58), (3, 57)])
+        # It meets a side wall and the top or the bottom wall in the same frame.
+        self.assertEqual(corners[58:60], [(59, 1), (58, 2)])
+        self.assertEqual({x + y for x, y in corners}, {60})
+        self.assertEqual({x for x, _ in corners}, set(range(1, 60)))
+        for step in range(116):
+            (x0, y0), (x1, y1) = corners[step], corners[(step + 1) % 116]
+            self.assertEqual((abs(x1 - x0), abs(y1 - y0)), (1, 1), step)
 
     def test_a_canvas_too_small_for_the_square_to_move(self):
         dvd_bounce.frames(3, 3)
@@ -261,9 +276,9 @@ class TrackedSources(unittest.TestCase):
 
     def test_the_canvas_size_comes_from_the_mapping_file(self):
         output = self.folder / "hello.json"
-        self.assertEqual(hello_world.main([str(output), "--mapping", str(LEGS_10)]), 0)
+        self.assertEqual(hello_world.main([str(output), "--mapping", str(TARGET)]), 0)
         animation = jsonframes.read(output)
-        self.assertEqual((animation.width, animation.height), (60, 30))
+        self.assertEqual((animation.width, animation.height), (60, 60))
         output = self.folder / "dvd.json"
         self.assertEqual(dvd_bounce.main([str(output), "--mapping", str(mapping_file(self.folder, 9, 5))]), 0)
         animation = jsonframes.read(output)
@@ -391,20 +406,22 @@ class EncodedSources(unittest.TestCase):
 class Dense(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        canvas = mapping.read(LEGS_10)
+        canvas = mapping.read(TARGET)
         cls.canvas = (canvas.width, canvas.height)
         cls.frames = dense.frames(canvas.width, canvas.height, 10)
+        animation = jsonframes.Animation(canvas.width, canvas.height, tuple(cls.frames))
+        cls.encoded = {compressed: odrg.encode(animation, compressed=compressed) for compressed in (True, False)}
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.folder = Path(folder.name)
 
-    def test_ten_seconds_for_the_ten_leg_mapping_are_500_frames_of_20_ms_on_60_by_30(self):
-        self.assertEqual(self.canvas, (60, 30))
+    def test_ten_seconds_for_the_target_file_are_500_frames_of_20_ms_on_60_by_60(self):
+        self.assertEqual(self.canvas, (60, 60))
         self.assertEqual(len(self.frames), 500)
         self.assertEqual({ms for ms, _ in self.frames}, {20})
-        self.assertEqual({len(picture) for _, picture in self.frames}, {3 * 60 * 30})
+        self.assertEqual({len(picture) for _, picture in self.frames}, {3 * 60 * 60})
 
     def test_it_has_more_than_256_different_colours(self):
         self.assertGreater(jsonframes.colour_count(self.frames), 256)
@@ -418,23 +435,32 @@ class Dense(unittest.TestCase):
         self.assertEqual(len(jsonframes.merged(self.frames)), 500)
         first, second = self.frames[0][1], self.frames[1][1]
         changed = sum(1 for a, b in zip(jsonframes.colours(first), jsonframes.colours(second)) if a != b)
-        self.assertGreater(changed, 1800 * 9 // 10)
+        self.assertGreater(changed, 3600 * 9 // 10)
 
     def test_it_encodes_and_decodes_back_to_identical_frames(self):
-        animation = jsonframes.Animation(60, 30, tuple(self.frames))
         for compressed in (True, False):
             with self.subTest(compressed=compressed):
-                decoded = odrg.decode(odrg.encode(animation, compressed=compressed))
+                decoded = odrg.decode(self.encoded[compressed])
+                self.assertEqual((decoded.width, decoded.height), (60, 60))
                 self.assertIs(decoded.compressed, compressed)
                 self.assertEqual(decoded.palette_size, 0)
-                self.assertEqual(decoded.records, animation.frames)
+                self.assertEqual(decoded.records, tuple(self.frames))
+
+    def test_the_encoded_sizes_are_those_of_the_converter_document(self):
+        text = (support.ROOT / "docs" / "converter.md").read_text(encoding="utf-8")
+        self.assertIn("python -m odrig.generators.dense build/dense.json --mapping mapping/legs-20.json\n", text)
+        self.assertEqual(len(self.encoded[False]), 1462236)
+        self.assertIn("1,462,236 bytes uncompressed", text)
+        # The compressed size depends on the version of zlib: 1,383,766 bytes with 1.2.12.
+        self.assertIn("1,383,766 bytes compressed with zlib 1.2.12", text)
+        self.assertLessEqual(abs(len(self.encoded[True]) - 1383766) * 100, 2 * 1383766, len(self.encoded[True]))
 
     def test_ten_seconds_is_the_default_length(self):
         self.assertEqual(dense.frames(4, 2), dense.frames(4, 2, 10))
         self.assertEqual(len(dense.frames(4, 2)), 500)
 
     def test_the_same_clip_every_time(self):
-        self.assertEqual(dense.frames(60, 30, 1), self.frames[:50])
+        self.assertEqual(dense.frames(60, 60, 1), self.frames[:50])
 
     def test_one_second_for_the_two_leg_mapping_is_50_frames_on_60_by_6(self):
         output = self.folder / "dense.json"

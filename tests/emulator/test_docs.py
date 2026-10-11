@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from emulator import app, failure, hub, recfile
+from odrig import odrg
 from odrigctl import cli
 
 from . import support
@@ -77,7 +78,7 @@ class EmulatorDocument(unittest.TestCase):
         for line in given:
             arguments = app.parse(shlex.split(line)[3:])
             folders.add(arguments.show_dir)
-        self.assertLessEqual({"build/example-show", "build/demo-10/show", "build/dense/show", "build/example-broken"}, folders)
+        self.assertLessEqual({"build/example-show", "build/demo-20/show", "build/dense/show", "build/example-broken"}, folders)
         self.assertTrue(any("--record build/example.odrr --seconds 60" in line for line in given))
 
     def test_it_names_every_command_of_the_tool_by_each_transport(self):
@@ -168,7 +169,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertEqual(len(bodies), len(steps))
         for body in bodies:
             self.assertIn("*Seen:*", body)
-        for phrase in ("Safari", "Chrome", "1280 x 800", "build/example-show", "build/dense/show", "build/demo-10/show", "`Mapping`", "file-missing dvd.odrg"):
+        for phrase in ("Safari", "Chrome", "1280 x 800", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "file-missing dvd.odrg"):
             self.assertIn(phrase, text)
         requirements = (support.ROOT / "docs" / "specs" / "03-p0-emulator" / "requirements.md").read_text(encoding="utf-8")
         listed = requirements.split("each to be checked in Safari and in\n   Chrome:")[1].split("\n\n")[0]
@@ -204,12 +205,24 @@ class DocumentedShows(unittest.TestCase):
                     words[0] = sys.executable
                 done = subprocess.run(words, cwd=work, capture_output=True, text=True)
                 self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""), line)
-            for show, legs in (("build/example-show", 2), ("build/demo-10/show", 10), ("build/dense/show", 10)):
+            for show, legs in (("build/example-show", 2), ("build/demo-20/show", 20), ("build/dense/show", 20)):
                 result = support.run(work / show, "--record", work / "out.odrr", "--seconds", "0.1")
                 self.assertEqual((result.status, result.err), (0, ""), show)
                 recording = recfile.read(work / "out.odrr")
                 self.assertEqual(len(recording.legs), legs, show)
+                self.assertEqual(recording.led_bytes, 540 * legs, show)
                 self.assertTrue(all(tick.produced and any(tick.data) for tick in recording.ticks), show)
+            packed = {path.name: path.read_bytes() for path in sorted((work / "build/demo-20/show").glob("*.odrg"))}
+        # The table of the demo show's two files: the frames, and the sizes within 2 percent,
+        # because a compressed size depends on the version of zlib.
+        rows = re.findall(r"(?m)^\| `([a-z]+\.odrg)`, ([0-9.]+) s \| ([0-9]+) \| ([0-9,]+) \|$", section(text, "Two shows to run"))
+        self.assertEqual([name for name, _, _, _ in rows], ["hello.odrg", "dvd.odrg"])
+        for name, seconds, frames, size in rows:
+            records = odrg.decode(packed[name]).records
+            self.assertEqual(len(records), int(frames), name)
+            self.assertEqual(f"{sum(ms for ms, _ in records) / 1000:.1f}", seconds, name)
+            documented = int(size.replace(",", ""))
+            self.assertLessEqual(abs(len(packed[name]) - documented) * 100, 2 * documented, (name, len(packed[name])))
 
 
 class Readme(unittest.TestCase):

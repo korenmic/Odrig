@@ -61,23 +61,11 @@ class TrackedFiles(unittest.TestCase):
             (mapping.Leg(1, 1, "right", (6, 5, 4)), mapping.Leg(2, 2, "right", (3, 2, 1))),
         )
 
-    def test_the_ten_leg_mapping_is_60_by_30_with_ten_legs(self):
-        result = mapping.read(support.ROOT / "mapping" / "legs-10.json")
-        self.assertEqual((result.width, result.height), (60, 30))
-        self.assertEqual(len(result.legs), 10)
-        self.assertEqual([entry.leg for entry in result.legs], list(range(1, 11)))
-        self.assertEqual([entry.pin for entry in result.legs], list(range(1, 11)))
-        self.assertEqual(result.legs[0].strips, (30, 29, 28))
-        self.assertEqual(result.legs[9].strips, (3, 2, 1))
-        self.assertEqual({entry.first_led for entry in result.legs}, {"right"})
-
-    def test_the_tracked_row_leg_files_are_of_the_kind_rows_with_180_leds_on_every_leg(self):
-        for name in ("legs-2.json", "legs-10.json"):
-            with self.subTest(name=name):
-                result = mapping.read(support.ROOT / "mapping" / name)
-                self.assertEqual(result.kind, mapping.ROWS)
-                self.assertEqual(result.strip_length, 60)
-                self.assertEqual({result.led_count(entry) for entry in result.legs}, {180})
+    def test_the_two_leg_mapping_is_of_the_kind_rows_with_180_leds_on_every_leg(self):
+        result = mapping.read(support.ROOT / "mapping" / "legs-2.json")
+        self.assertEqual(result.kind, mapping.ROWS)
+        self.assertEqual(result.strip_length, 60)
+        self.assertEqual({result.led_count(entry) for entry in result.legs}, {180})
 
 
 class TargetFile(unittest.TestCase):
@@ -127,6 +115,17 @@ class Accepted(unittest.TestCase):
         result = mapping.loads(source(width=5, legs=legs))
         self.assertEqual((result.width, result.height), (5, 6))
         self.assertEqual(result.legs, (mapping.Leg(7, 0, "left", (1, 2)), mapping.Leg(3, 255, "right", (6, 5, 4, 3))))
+
+    def test_ten_legs_of_three_rows_of_60_from_the_top_row_down_are_60_by_30(self):
+        legs = [leg(n, n, rows=(33 - 3 * n, 32 - 3 * n, 31 - 3 * n)) for n in range(1, 11)]
+        result = mapping.loads(source(legs=legs))
+        self.assertEqual((result.kind, result.width, result.height), (mapping.ROWS, 60, 30))
+        self.assertEqual([entry.leg for entry in result.legs], list(range(1, 11)))
+        self.assertEqual([entry.pin for entry in result.legs], list(range(1, 11)))
+        self.assertEqual(result.legs[0].strips, (30, 29, 28))
+        self.assertEqual(result.legs[9].strips, (3, 2, 1))
+        self.assertEqual({entry.first_led for entry in result.legs}, {"right"})
+        self.assertEqual({result.led_count(entry) for entry in result.legs}, {180})
 
     def test_the_limits_of_leg_and_pin(self):
         legs = [leg(1, 0, rows=(1,)), leg(255, 255, rows=(2,))]

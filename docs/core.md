@@ -23,7 +23,7 @@ Run from the repository root.
 |---|---|---|
 | `make -C core` | Builds the library `core/build/libodrig_core.a` from every `core/src/*.cpp`, with every compiler warning treated as an error. | Apple's command-line developer tools: `make`, `c++` and `ar`. |
 | `make -C core test` | Builds the library and the test host `core/build/odrig_host`, then runs the suite of `tests/core/`. | The same, and Python 3.10 or later with no added package. |
-| `make -C core bench` | Builds `core/build/odrig_bench`, has the converter write the dense 60 x 30 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
+| `make -C core bench` | Builds `core/build/odrig_bench`, has the converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
 | `make -C core clean` | Removes `core/build/`. | |
 
 The test command uses `python3`. Another Python is named on the command line:
@@ -199,25 +199,25 @@ byte.
 ## Memory
 
 The core asks the host for memory only inside `odrig_core_begin`, in up to ten blocks sized
-from the mapping and the show. The figures are for the ten-leg mapping, 60 x 30, with a
-show of 100 items: 80 animations with a file each and 20 cycles of 10 entries. They are
-measured by the suite.
+from the mapping and the show. The figures are for the target file, `mapping/legs-20.json`,
+60 x 60 on twenty legs, with a show of 100 items: 80 animations with a file each and 20
+cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
 | The core object | fixed | 3,112 |
-| Legs | 12 for each leg | 120 |
-| The pixel of each LED | 2 for each LED | 3,600 |
-| LED data | 3 for each LED | 5,400 |
-| Row check | 1 bit for each row | 4 |
-| Pixel buffer | the smaller of 3 * W * H and 65,534 | 5,400 |
+| Legs | 12 for each leg | 240 |
+| The pixel of each LED | 2 for each LED | 7,200 |
+| LED data | 3 for each LED | 10,800 |
+| Strip check | 1 bit for each strip: each row of a row-leg file, each column of a column-leg file | 8 |
+| Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
 | Items | 16 for each item | 1,600 |
 | Cycle entries | 2 for each entry of a cycle | 400 |
 | Files | 48 for each animation item | 3,840 |
-| **Total** | | **56,244** |
+| **Total** | | **70,768** |
 
-That is 43 percent of the 131,072 bytes the core may use for this canvas. The example show
+That is 54 percent of the 131,072 bytes the core may use for this canvas. The example show
 on the two-leg mapping asks for 38,933 bytes. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
@@ -233,8 +233,8 @@ one frame record took to decode, in microseconds.
 
 ```
 file                     bytes  frames  mean_us  max_us
-dense-compressed.odrg   724948     500     42.2   115.1
-dense-plain.odrg        765984     500     23.3    73.8
+dense-compressed.odrg  1383766     500     83.7   188.2
+dense-plain.odrg       1462236     500     45.9   119.4
 ```
 
 These figures are from a Mac with Apple Silicon. They are a first figure to hold the board

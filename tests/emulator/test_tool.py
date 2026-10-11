@@ -12,6 +12,7 @@ import unittest
 from unittest import mock
 
 from emulator import serialport
+from odrig import mapping
 from odrigctl import cli, client
 from tests.core.support import ReferencePlayer
 
@@ -115,10 +116,10 @@ class AgainstTheEmulator(unittest.TestCase):
 
 
 class Session(unittest.TestCase):
-    def session(self, transport):
-        """Sends the whole session to a fresh emulator. Returns the files of its show, what
-        the tool did for each command, and the log entries of the page."""
-        with support.example_show() as folder, support.Emulator(folder) as emulator:
+    def session(self, show, transport):
+        """Sends the whole session to a fresh emulator that runs a show. Returns the files
+        of the show, what the tool did for each command, and the log entries of the page."""
+        with show() as folder, support.Emulator(folder) as emulator:
             target = ("--port", emulator.serial) if transport == "serial" else ("--http", f"127.0.0.1:{emulator.port}")
             results = [support.run_tool(*target, *words) for words in SESSION]
             with support.EventStream(emulator.port) as stream:
@@ -126,10 +127,17 @@ class Session(unittest.TestCase):
             return support.files_of(folder), results, logged
 
     def test_the_session_gives_the_replies_of_the_reference_by_each_transport_and_fills_the_log(self):
+        self.check_session(support.example_show, legs=2)
+
+    def test_the_session_against_the_demo_show_gives_the_replies_of_the_reference_by_each_transport(self):
+        self.check_session(support.demo_show, legs=20)
+
+    def check_session(self, show, legs):
         replies = {}
         for transport in ("serial", "http"):
             with self.subTest(transport=transport):
-                files, results, logged = self.session(transport)
+                files, results, logged = self.session(show, transport)
+                self.assertEqual(len(mapping.loads(files["mapping.json"]).legs), legs)
                 expected = reference_replies(files, SESSION)
                 self.assertEqual([result.err for result in results], [""] * len(SESSION))
                 for words, result, wanted in zip(SESSION, results, expected):

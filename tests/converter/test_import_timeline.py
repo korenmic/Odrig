@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 import unittest
@@ -11,7 +12,7 @@ from odrig import errors, jsonframes, mapping, media
 from . import media_fixtures, support
 
 LEGS_2 = support.ROOT / "mapping" / "legs-2.json"
-LEGS_10 = support.ROOT / "mapping" / "legs-10.json"
+TARGET = support.ROOT / "mapping" / "legs-20.json"
 C = media_fixtures.COLOURS
 BLACK = (0, 0, 0)
 
@@ -227,7 +228,7 @@ class Video(Fixtures):
 
     def test_the_subcommand_gives_the_canvas_size_multiples_of_20_and_the_requested_length(self):
         for ending, path in self.videos.items():
-            for mapping_path, size in ((LEGS_2, (60, 6)), (LEGS_10, (60, 30))):
+            for mapping_path, size in ((LEGS_2, (60, 6)), (TARGET, (60, 60))):
                 with self.subTest(ending=ending, size=size):
                     output = self.output()
                     result = support.run("import", path, output, "--mapping", mapping_path)
@@ -279,6 +280,76 @@ class Video(Fixtures):
 
         with av.open(str(self.videos["mp4"])) as container:
             self.assertEqual(len(container.streams.video), 1)
+
+
+class ColumnLegMapping(Fixtures):
+    """`import` with a mapping file whose legs are columns."""
+
+    def columns(self, width, height):
+        """A column-leg mapping file for a canvas of this size: legs of up to three columns
+        that start at the top."""
+        path = self.folder / f"columns-{width}x{height}.json"
+        numbers = list(range(1, width + 1))
+        legs = [
+            {"leg": number, "pin": number, "first_led": "top", "columns": numbers[3 * number - 3:3 * number]}
+            for number in range(1, (width + 2) // 3 + 1)
+        ]
+        path.write_text(json.dumps({"version": 1, "height": height, "legs": legs}))
+        return path
+
+    def rows(self, width, height):
+        """A row-leg mapping file of one leg for a canvas of this size."""
+        path = self.folder / f"rows-{width}x{height}.json"
+        leg = {"leg": 1, "pin": 1, "first_led": "right", "rows": list(range(height, 0, -1))}
+        path.write_text(json.dumps({"version": 1, "width": width, "legs": [leg]}))
+        return path
+
+    def test_the_canvas_is_as_wide_as_the_number_of_columns_and_as_high_as_the_height_of_the_file(self):
+        made = self.columns(5, 8)
+        canvas = mapping.read(made)
+        self.assertEqual((canvas.kind, canvas.width, canvas.height), (mapping.COLUMNS, 5, 8))
+        for name, path in (("gif", self.gif), *self.videos.items()):
+            with self.subTest(source=name):
+                output = self.output()
+                result = support.run("import", path, output, "--mapping", made)
+                self.assertEqual(result, support.Result(0, "", ""))
+                animation = jsonframes.read(output)
+                self.assertEqual((animation.width, animation.height), (5, 8))
+                self.assertEqual({len(picture) for _, picture in animation.frames}, {3 * 5 * 8})
+                self.assertEqual(list(animation.frames), list(jsonframes.merged(media.import_media(path, canvas).frames)))
+
+    def test_a_picture_keeps_its_left_its_right_its_top_and_its_bottom(self):
+        # Four colours, one in each quarter of the picture, stretched over 2 x 4.
+        top_left, top_right, bottom_left, bottom_right = C[:4]
+        picture = Image.new("RGB", (8, 4))
+        for (left, top), colour in (((0, 0), top_left), ((4, 0), top_right), ((0, 2), bottom_left), ((4, 2), bottom_right)):
+            picture.paste(colour, (left, top, left + 4, top + 2))
+        path = self.folder / "quarters.gif"
+        media_fixtures.save_gif(path, [picture], [100])
+        output = self.output()
+        result = support.run("import", path, output, "--mapping", self.columns(2, 4), "--fit", "stretch")
+        self.assertEqual(result, support.Result(0, "", ""))
+        animation = jsonframes.read(output)
+        self.assertEqual((animation.width, animation.height), (2, 4))
+        (_, pixels), = jsonframes.merged(animation.frames)
+        # Pixel order: row 1, the bottom row, first, each row from x = 1.
+        by_row = [bytes(bottom_left) + bytes(bottom_right)] * 2 + [bytes(top_left) + bytes(top_right)] * 2
+        self.assertEqual(pixels, b"".join(by_row))
+
+    def test_a_column_leg_file_and_a_row_leg_file_of_one_canvas_give_the_same_file(self):
+        for fit in media.FITS:
+            with self.subTest(fit=fit):
+                by_columns, by_rows = self.output("columns.json"), self.output("rows.json")
+                self.assertEqual(support.run("import", self.videos["mp4"], by_columns, "--mapping", self.columns(7, 5), "--fit", fit).status, 0)
+                self.assertEqual(support.run("import", self.videos["mp4"], by_rows, "--mapping", self.rows(7, 5), "--fit", fit).status, 0)
+                self.assertEqual(by_columns.read_bytes(), by_rows.read_bytes())
+
+    def test_the_width_is_not_the_height_of_the_file(self):
+        # Three columns of 60 LEDs are a canvas of 3 x 60, not one of 60 wide.
+        output = self.output()
+        self.assertEqual(support.run("import", self.gif, output, "--mapping", self.columns(3, 60)).status, 0)
+        animation = jsonframes.read(output)
+        self.assertEqual((animation.width, animation.height), (3, 60))
 
 
 class Refused(Fixtures):

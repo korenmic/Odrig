@@ -11,7 +11,7 @@ from . import support
 
 EXAMPLE_SHOW = support.ROOT / "shows" / "example" / "show.json"
 LEGS_2 = support.ROOT / "mapping" / "legs-2.json"
-LEGS_10 = support.ROOT / "mapping" / "legs-10.json"
+TARGET = support.ROOT / "mapping" / "legs-20.json"
 ANIMATIONS = support.ROOT / "animations"
 
 # A column-leg mapping for a canvas of 5 x 4, laid out as no tool would write it.
@@ -320,9 +320,18 @@ class Pack(unittest.TestCase):
         self.assertEqual(len(list(self.out.iterdir())), 4)
 
     def test_the_canvas_comes_from_the_mapping_file(self):
-        self.clip("a.json", 60, 30)
-        self.assertEqual(self.pack(self.show_file(), LEGS_10, self.sources).status, 0)
-        self.assertEqual(odrg.decode((self.out / "a.odrg").read_bytes()).height, 30)
+        self.clip("a.json", 60, 60)
+        self.assertEqual(self.pack(self.show_file(), TARGET, self.sources).status, 0)
+        decoded = odrg.decode((self.out / "a.odrg").read_bytes())
+        self.assertEqual((decoded.width, decoded.height), (60, 60))
+        self.assertEqual((self.out / "mapping.json").read_bytes(), TARGET.read_bytes())
+
+    def test_a_source_of_another_size_than_the_target_file_is_a_size_mismatch(self):
+        for width, height in ((60, 6), (60, 30), (20, 60), (60, 180)):
+            with self.subTest(source=(width, height)):
+                self.clip("a.json", width, height)
+                self.refused("size-mismatch", self.pack(self.show_file(), TARGET, self.sources))
+                self.assertFalse(self.out.exists())
 
     def column_legs(self):
         path = self.folder / "columns.json"

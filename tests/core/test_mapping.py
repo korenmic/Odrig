@@ -291,8 +291,8 @@ class LegList(unittest.TestCase):
                 self.assertEqual(run.legs, leg_list(text))
         self.assertEqual(kinds, {"rows", "columns"})
 
-    def test_the_two_tracked_mappings_have_legs_of_180_leds_on_the_pins_of_their_numbers(self):
-        for name, count in (("legs-2", 2), ("legs-10", 10)):
+    def test_the_row_leg_mappings_of_two_and_of_ten_legs_have_legs_of_180_leds_on_the_pins_of_their_numbers(self):
+        for name, count in (("legs-2", 2), ("ten-row-legs", 10)):
             run = support.start({"mapping.json": support.mapping_texts()[name]})
             self.assertEqual(run.legs, tuple((number, number, 180) for number in range(1, count + 1)))
 
@@ -427,7 +427,7 @@ class RefusedMappings(unittest.TestCase):
     def test_a_refused_mapping_asks_for_no_more_memory_than_its_checks_need(self):
         missing = support.start({})
         self.assertEqual(missing.memory[1], 1)
-        cut = support.start({"mapping.json": support.mapping_texts()["legs-10"][:-3]})
+        cut = support.start({"mapping.json": support.mapping_texts()["legs-20"][:-3]})
         self.assertEqual(cut.error, "mapping-malformed")
         self.assertEqual(cut.memory, missing.memory)
 

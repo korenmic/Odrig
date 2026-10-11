@@ -75,7 +75,7 @@ class Positions(unittest.TestCase):
         cls.canvases = {name: mapping.loads(text.encode("utf-8")) for name, text in cls.texts.items()}
 
     def test_the_mappings_are_the_tracked_ones_and_made_up_ones(self):
-        self.assertLessEqual({"legs-2", "legs-10", "left-start", "two-and-four-rows", "another-order", "one-led"}, set(self.texts))
+        self.assertLessEqual({"legs-2", "ten-row-legs", "left-start", "two-and-four-rows", "another-order", "one-led"}, set(self.texts))
         apart_rows = [leg.strips for leg in self.canvases["another-order"].legs]
         self.assertEqual(apart_rows, [(2, 4), (1, 5, 3)])
 
@@ -298,7 +298,7 @@ class Positions(unittest.TestCase):
 class ColoursAndCurve(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.dump = dump(core_support.mapping_texts()["legs-10"])
+        cls.dump = dump(core_support.mapping_texts()["ten-row-legs"])
 
     def test_ten_legs_have_ten_different_colours(self):
         colours = self.dump["colours"]
@@ -341,7 +341,7 @@ class Fit(unittest.TestCase):
     def setUpClass(cls):
         texts = core_support.mapping_texts()
         cls.areas = [[1280, 800], [1280, 546], [756, 500], [300, 200], [3000, 2000], [1920, 1000]]
-        cls.ten = dump(texts["legs-10"], areas=cls.areas)
+        cls.ten = dump(texts["ten-row-legs"], areas=cls.areas)
         cls.two = dump(texts["legs-2"], areas=cls.areas)
 
     def parts(self, f):
@@ -727,7 +727,7 @@ class Board(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.texts = core_support.mapping_texts()
-        cls.ten = dump(cls.texts["legs-10"], pins=list(range(0, 12)) + [48, 99, 255], areas=[[1280, 800]])
+        cls.ten = dump(cls.texts["ten-row-legs"], pins=list(range(0, 12)) + [48, 99, 255], areas=[[1280, 800]])
 
     def test_side_is_where_most_legs_have_their_first_led_and_right_when_equal(self):
         cases = {
@@ -798,7 +798,7 @@ class Lines(unittest.TestCase):
         texts = core_support.mapping_texts()
         cls.areas = [[1280, 800], [1280, 546], [1100, 600], [900, 465], [756, 400], [1920, 1000]]
         cls.mappings = {
-            "legs-10": texts["legs-10"],
+            "ten-row-legs": texts["ten-row-legs"],
             "legs-2": texts["legs-2"],
             "board on the left": mapping_text(40, [(1, 4, "left", [12, 11, 10, 9]), (2, 38, "left", [8, 7, 6, 5]), (3, 21, "right", [4, 3]), (4, 14, "left", [2, 1])]),
             "pins the board lacks, rows apart": mapping_text(30, [(7, 99, "right", [10, 8, 6]), (2, 13, "left", [9, 7]), (5, 47, "right", [5, 4, 3, 2, 1]), (9, 200, "left", [11])]),
@@ -813,14 +813,14 @@ class Lines(unittest.TestCase):
                 yield name, tuple(area), dumped, mapped
 
     def test_a_wide_area_has_the_board_beside_the_canvas_and_a_narrow_one_below_it(self):
-        arrangements = {area: mapped["fit"]["arrangement"] for name, area, _, mapped in self.each() if name == "legs-10"}
+        arrangements = {area: mapped["fit"]["arrangement"] for name, area, _, mapped in self.each() if name == "ten-row-legs"}
         self.assertEqual(arrangements, {(1280, 800): "beside", (1280, 546): "beside", (1100, 600): "beside", (900, 465): "below", (756, 400): "below", (1920, 1000): "beside"})
-        cells = {area: mapped["fit"]["cell"] for name, area, _, mapped in self.each() if name == "legs-10"}
+        cells = {area: mapped["fit"]["cell"] for name, area, _, mapped in self.each() if name == "ten-row-legs"}
         self.assertEqual((cells[(1280, 800)], cells[(1280, 546)]), (12, 12))
         self.assertGreaterEqual(cells[(900, 465)], 9)
         self.assertGreaterEqual(cells[(1100, 600)], 9)
         self.assertGreaterEqual(cells[(1920, 1000)], 20)
-        below = next(mapped["fit"] for name, area, _, mapped in self.each() if name == "legs-10" and area == (900, 465))
+        below = next(mapped["fit"] for name, area, _, mapped in self.each() if name == "ten-row-legs" and area == (900, 465))
         self.assertGreaterEqual(below["board"]["y"], below["canvas"]["y"] + below["canvas"]["height"] + below["band"]["height"])
         self.assertEqual(below["width"], 900)
         self.assertGreater(below["height"], 465)
@@ -861,7 +861,7 @@ class Lines(unittest.TestCase):
                     segments(wire["points"])
 
     def test_the_pads_of_one_row_are_one_pitch_apart_from_the_antenna_end_to_the_usb_end(self):
-        mapped = self.dumps["legs-10"]["mapped"][0]
+        mapped = self.dumps["ten-row-legs"]["mapped"][0]
         f = mapped["fit"]
         pads = {(wire["pad"]["row"], wire["pad"]["index"]): (wire["pad"]["x"], wire["pad"]["y"]) for wire in mapped["wires"]}
         self.assertEqual(pads[("left", 4)][1] - pads[("left", 3)][1], f["board"]["pitch"])
@@ -880,8 +880,8 @@ class Lines(unittest.TestCase):
                     for second in mapped["wires"][index + 1:]:
                         self.assertEqual(meetings(first["points"], second["points"])[1], 0, (first["leg"], second["leg"]))
 
-    def test_the_lines_of_the_tracked_mappings_cross_only_where_the_pins_are_out_of_order(self):
-        for area, mapped in zip(self.areas, self.dumps["legs-10"]["mapped"]):
+    def test_the_lines_of_the_ten_leg_and_the_two_leg_mapping_cross_only_where_the_pins_are_out_of_order(self):
+        for area, mapped in zip(self.areas, self.dumps["ten-row-legs"]["mapped"]):
             wires = mapped["wires"]
             crossings = sum(meetings(first["points"], second["points"])[0] for index, first in enumerate(wires) for second in wires[index + 1:])
             self.assertEqual(crossings, 6, f"{area}: the lines of the ten-leg mapping cross {crossings} times")
@@ -1863,7 +1863,7 @@ class UprightView(UprightCase):
                     self.assertIn("chevron", places)
 
     def test_a_row_leg_file_is_drawn_with_its_rows_and_its_one_channel(self):
-        drawing = drawn(core_support.mapping_texts()["legs-10"], [[1280, 800]])[0]
+        drawing = drawn(core_support.mapping_texts()["ten-row-legs"], [[1280, 800]])[0]
         elements = drawing["elements"]
         self.assertEqual((drawing["view"], drawing["fit"]["arrangement"], drawing["dots"]), ("mapping", "beside", 1800))
         counts = {kind: len(self.of(elements, kind)) for kind in ("wires", "wires close", "wire", "reach-line", "tag", "outline", "veil", "chain", "head", "chevron", "wire ending", "pin taken", "t-leg t-wire")}

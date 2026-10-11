@@ -96,16 +96,36 @@ class OneLoopAndIntoTheNext(Playback):
         self.assertEqual(total % 20, 0)
         self.play_one_loop(files, total // 20)
 
-    def test_the_dense_clip_on_the_ten_leg_mapping(self):
-        files = one_clip(support.mapping_texts()["legs-10"], support.dense_clip(60, 30, 10), brightness=128)
+    def test_hello_world_on_the_target_file(self):
+        files = playing(support.demo_show(), 1)
+        decoded = odrg.decode(files["hello.odrg"])
+        self.assertEqual((decoded.width, decoded.height), (60, 60))
+        self.assertEqual(sum(duration for duration, _ in decoded.records), 5100)
+        produced = self.play_one_loop(files, 255)
+        self.assertEqual({leg: len(data) for leg, data in produced[0][1].items()}, {leg: 540 for leg in range(1, 21)})
+        self.assertEqual(len({tuple(sorted(legs.items())) for _, legs in produced[:255]}), 255)
+
+    def test_dvd_bounce_on_the_target_file(self):
+        files = playing(support.demo_show(), 2)
+        decoded = odrg.decode(files["dvd.odrg"])
+        self.assertEqual((decoded.width, decoded.height), (60, 60))
+        total = sum(duration for duration, _ in decoded.records)
+        self.assertEqual(total, 116 * 180)
+        produced = self.play_one_loop(files, total // 20)
+        # The square passes over LEDs of every leg in one loop.
+        lit = {leg for _, legs in produced for leg, data in legs.items() if any(data)}
+        self.assertEqual(lit, set(range(1, 21)))
+
+    def test_the_dense_clip_on_the_target_file(self):
+        files = one_clip(support.mapping_texts()["legs-20"], support.dense_clip(60, 60, 10), brightness=128)
         self.assertEqual(files["clip.odrg"][5], 1)
         produced = self.play_one_loop(files, 500)
-        self.assertEqual(sorted(produced[0][1]), list(range(1, 11)))
+        self.assertEqual(sorted(produced[0][1]), list(range(1, 21)))
         self.assertEqual({len(data) for data in produced[0][1].values()}, {540})
         self.assertNotEqual(produced[0][1], produced[1][1])
 
     def test_the_dense_clip_without_compression(self):
-        files = one_clip(support.mapping_texts()["legs-10"], support.dense_clip(60, 30, 1, compressed=False))
+        files = one_clip(support.mapping_texts()["legs-20"], support.dense_clip(60, 60, 1, compressed=False))
         self.assertEqual(files["clip.odrg"][5], 0)
         self.play_one_loop(files, 50)
 

@@ -1,3 +1,4 @@
+import json
 import random
 import unittest
 import zlib
@@ -70,39 +71,44 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
 
 
 def hundred_items():
-    """A show of 100 items on the ten-leg mapping: 80 animations, each with a file of its
-    own, and 20 cycles of 10 entries."""
-    clip = support.clip(1, 60, 30, (20, 20))
+    """A show of 100 items on the target file: 80 animations, each with a file of its own,
+    and 20 cycles of 10 entries."""
+    clip = support.clip(1, 60, 60, (20, 20))
     items = [{"id": number, "file": f"clip-{number:02d}.odrg"} for number in range(1, 81)]
     items += [{"id": 80 + number, "cycle": [1 + (7 * number + entry) % 80 for entry in range(10)], "seconds": number} for number in range(1, 21)]
-    files = {"mapping.json": support.mapping_texts()["legs-10"], "show.json": support.show_text(items, 128, 100)}
+    files = {"mapping.json": support.mapping_texts()["legs-20"], "show.json": support.show_text(items, 128, 100)}
     files.update({item["file"]: clip for item in items[:80]})
     return files
 
 
 def stored_clip(frames, compressed):
-    """An ODRG file for the 60 x 30 canvas with this many frames of 20 ms, each stored."""
+    """An ODRG file for the 60 x 60 canvas with this many frames of 20 ms, each stored."""
     rng = random.Random(4)
     palette = [rng.randbytes(3) for _ in range(9)]
-    pictures = [bytes(rng.randrange(9) for _ in range(1800)) for _ in range(8)]
+    pictures = [bytes(rng.randrange(9) for _ in range(3600)) for _ in range(8)]
     records = [odrg.stored_record(pictures[number % 8], 20) for number in range(frames)]
     deflate = (lambda body: zlib.compress(body, 6, wbits=-15)) if compressed else None
-    return odrg.container(60, 30, palette, records, deflate)
+    return odrg.container(60, 60, palette, records, deflate)
 
 
 class FixedMemory(unittest.TestCase):
-    def test_the_ten_leg_mapping_with_a_show_of_100_items_asks_for_less_than_131072_bytes(self):
-        run = support.start(hundred_items(), [support.line(0, "status")])
+    def test_the_target_file_with_a_show_of_100_items_asks_for_less_than_131072_bytes(self):
+        files = hundred_items()
+        listed = json.loads(files["show.json"])["items"]
+        self.assertEqual(len(listed), 100)
+        self.assertEqual(len({item["file"] for item in listed if "file" in item}), 80)
+        self.assertEqual([len(item["cycle"]) for item in listed if "cycle" in item], [10] * 20)
+        run = support.start(files, [support.line(0, "status")])
         self.assertIsNone(run.error)
-        self.assertEqual(len(run.legs), 10)
+        self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1)))
         asked, blocks = run.memory
         self.assertLess(asked, 131072)
         self.assertEqual(blocks, 10)
         # Every block but the core object has a size that follows from the mapping and
-        # the show: legs, the pixel of each LED, LED data, row check, pixel buffer, window,
-        # items, cycle entries, files.
-        tables = 10 * 12 + 1800 * 2 + 1800 * 3 + 4 + 5400 + 32768 + 100 * 16 + 200 * 2 + 80 * 48
-        self.assertEqual(tables, 53132)
+        # the show: legs, the pixel of each LED, LED data, strip check, pixel buffer,
+        # window, items, cycle entries, files.
+        tables = 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 100 * 16 + 200 * 2 + 80 * 48
+        self.assertEqual(tables, 67656)
         core_object = asked - tables
         self.assertGreater(core_object, 2000)
         self.assertLessEqual(core_object, 4096)
@@ -114,7 +120,7 @@ class FixedMemory(unittest.TestCase):
             for compressed in (False, True):
                 clip = stored_clip(frames, compressed)
                 files = {
-                    "mapping.json": support.mapping_texts()["legs-10"],
+                    "mapping.json": support.mapping_texts()["legs-20"],
                     "show.json": support.show_text([{"id": 1, "file": "clip.odrg"}], 255, 1),
                     "clip.odrg": clip,
                 }
@@ -126,9 +132,9 @@ class FixedMemory(unittest.TestCase):
                 self.assertIn('"error":null', run.lines[-1])
                 sizes[frames, compressed] = len(clip)
                 memory.add(run.memory)
-        # A clip of 1 second and one of 60 seconds: 90 KB and 5.4 MB without compression.
-        self.assertLess(sizes[50, False], 100000)
-        self.assertGreater(sizes[3000, False], 5000000)
+        # A clip of 1 second and one of 60 seconds: 180 KB and 10.8 MB without compression.
+        self.assertLess(sizes[50, False], 200000)
+        self.assertGreater(sizes[3000, False], 10000000)
         self.assertLess(sizes[3000, True], sizes[3000, False] // 50)
         self.assertEqual(len(memory), 1)
 

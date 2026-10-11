@@ -1,4 +1,5 @@
 import re
+import subprocess
 import unittest
 
 from odrig import cli, errors
@@ -104,6 +105,34 @@ class Readme(unittest.TestCase):
     def test_it_points_to_the_converter_document(self):
         text = (support.ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("(docs/converter.md)", text)
+
+
+class TheTenLegFile(unittest.TestCase):
+    """No tracked file names the mapping file of ten row legs or its demo show, apart from
+    the records of what was done: the seeds, the specs, the drifts and the change log of
+    the decisions."""
+
+    NAMES = tuple(f"{stem}-10".encode("ascii") for stem in ("legs", "demo"))
+    RECORDS = ("project-seeds/", "docs/specs/", "docs/drifts.md")
+    DECISIONS = "docs/decisions.md"
+    CHANGE_LOG = b"\n## Change log\n"
+
+    def test_no_tracked_file_names_them_outside_the_records(self):
+        listed = subprocess.run(["git", "ls-files", "-z"], cwd=support.ROOT, capture_output=True, check=True).stdout
+        tracked = sorted(name for name in listed.decode("utf-8").split("\0") if name)
+        self.assertIn(self.DECISIONS, tracked)
+        self.assertIn(self.CHANGE_LOG, (support.ROOT / self.DECISIONS).read_bytes())
+        naming = []
+        for name in tracked:
+            if name.startswith(self.RECORDS):
+                continue
+            path = support.ROOT / name
+            content = path.read_bytes() if path.is_file() else b""
+            if name == self.DECISIONS:
+                content = content.split(self.CHANGE_LOG)[0]
+            if any(gone in name.encode("utf-8") or gone in content for gone in self.NAMES):
+                naming.append(name)
+        self.assertEqual(len(naming), 0, "tracked files that name the ten-leg mapping or its demo show: " + ", ".join(naming))
 
 
 if __name__ == "__main__":

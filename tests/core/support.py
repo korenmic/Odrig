@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 from odrig import errors, jsonframes, mapping, odrg, pack, show
-from odrig.generators import dense
+from odrig.generators import dense, dvd_bounce, hello_world
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
@@ -122,8 +122,9 @@ def decode_each(files):
     return results
 
 
-# Row-leg mappings beyond the tracked ones: a leg that starts on the left, legs of two and
-# of four rows, legs listed in another order than their numbers and their rows, and one LED.
+# Row-leg mappings beyond the tracked one: a leg that starts on the left, legs of two and
+# of four rows, legs listed in another order than their numbers and their rows, one LED, and
+# ten legs of three rows of 60 from the top row down, leg N on pin N.
 MADE_UP_MAPPINGS = {
     "left-start": {"version": 1, "width": 7, "legs": [{"leg": 1, "pin": 4, "first_led": "left", "rows": [1, 2, 3]}]},
     "two-and-four-rows": {
@@ -143,6 +144,11 @@ MADE_UP_MAPPINGS = {
         ],
     },
     "one-led": {"version": 1, "width": 1, "legs": [{"leg": 255, "pin": 255, "first_led": "right", "rows": [1]}]},
+    "ten-row-legs": {
+        "version": 1,
+        "width": 60,
+        "legs": [{"leg": n, "pin": n, "first_led": "right", "rows": [33 - 3 * n, 32 - 3 * n, 31 - 3 * n]} for n in range(1, 11)],
+    },
 }
 
 
@@ -291,6 +297,23 @@ def _example_show():
 def example_show():
     """The installed files of the example show, packed by the converter on the two-leg mapping."""
     return dict(_example_show())
+
+
+@functools.lru_cache(maxsize=None)
+def _demo_show():
+    target = ROOT / "mapping" / "legs-20.json"
+    canvas = mapping.read(target)
+    files = [("mapping.json", target.read_bytes()), ("show.json", (ROOT / "shows" / "demo-20" / "show.json").read_bytes())]
+    for name, generator in (("hello.odrg", hello_world), ("dvd.odrg", dvd_bounce)):
+        frames = tuple(generator.frames(canvas.width, canvas.height))
+        files.append((name, odrg.encode(jsonframes.Animation(canvas.width, canvas.height, frames))))
+    return tuple(files)
+
+
+def demo_show():
+    """The installed files of the demo show: the target file, the show file, and the two
+    animations as the generators make them for the canvas of the target file."""
+    return dict(_demo_show())
 
 
 def show_text(items, brightness=128, start=None):

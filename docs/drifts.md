@@ -3450,3 +3450,63 @@ it reaches".
 **Resolution.** `tests/board/support.py`, `tests/board/test_probe.py`,
 `tests/board/test_fps.py`, `tests/board/test_measure.py`;
 `docs/specs/05-p0-canvas-60-by-60/tasks.md`, the note under task 8.
+
+## Seed 05: The tests of row legs that used the ten-leg file, once the file is gone
+
+**Question.** Task 9 removes the ten-leg file and says that every test that used it uses
+the target file. The tasks also say that a test that concerns a row-leg file passes
+unchanged, and the design that the page's tests keep "everything of today for the row-leg
+files". Many tests of the row views read the ten-leg file by its name: the cells and the
+parts of the LEDs view, the board beside and below the canvas, the tracks, the six
+crossings of the lines, the drawing of a row-leg file. They cannot run on a file of
+columns. The core's and the page's tests that run on every mapping also played on it. The
+task's list of files leaves out three that named the file: `tests/converter/test_mapping.py`,
+`tests/core/test_mapping.py` and `tests/emulator/test_layout.py`.
+
+**Answer.** The made-up mappings of `tests/core/support.py` gain `ten-row-legs`: ten legs
+of three rows of 60 from the top row down, leg N on pin N, which is what the file held.
+The tests of row legs read it under that name and are otherwise unchanged, and every suite
+that plays on all mappings plays on the same eleven as before. The converter's test of the
+ten-leg file is kept on a file made up in the test. Everything else moved to the target
+file and 60 x 60: playback, memory, startup, the cycle, the decoder's list of canvases, the
+generators, `import`, `pack`, the firmware's storage check, the demo show, the real-time
+rate and the documented commands.
+
+Three tests changed more than their size. The noise clip of `tests/core/test_decoder.py`
+takes its pictures in turns of three, not four: on 60 x 60 a stored picture is 10,805
+bytes, so four of them put a repeat 43,220 bytes back, outside the window of 32,768, and
+the file would not compress; three put it 32,415 back, near the far end of the window. The
+clips of `test_the_memory_does_not_depend_on_the_length_of_a_clip` are 180 KB and 10.8 MB.
+The command tool's session runs against the example show, as before, and against the demo
+show. A white picture in `tests/converter/test_import_fit.py` is resampled to 60 x 60.
+
+The suites that play the demo show without the converter's command line take its files
+from `demo_show()` of `tests/core/support.py`, which encodes what the two generators give
+for the canvas of the target file; `tests/emulator/test_demo.py` runs the generators and
+`pack` as the document gives them and compares the folder with those files.
+`tests/board/support.py` still makes its own dimmed demo show and is not changed: the board
+tests cannot be run.
+
+**Resolution.** `tests/core/support.py`, `MADE_UP_MAPPINGS` and `demo_show`;
+`tests/emulator/support.py`, `demo_show`; the tests named above.
+
+## Seed 05: The check list by eye, between the task that removes the ten-leg file and the task that rewrites the list
+
+**Question.** Task 9 changes "Two shows to run" of `docs/emulator.md` and the commands of
+its check list, because no tracked file may name the ten-leg file or its demo show. The
+steps of the list are rewritten in task 10, which also goes through them in a browser.
+With the commands changed, steps 6, 9 and 10 still say what is seen with ten row legs on a
+60 x 30 canvas, and "What has been checked" reports a pass through the list made with the
+ten-leg shows. The sections on the two views speak of the ten-leg mapping too.
+
+**Answer.** Only the commands and the sentence that introduces them change in the check
+list: the demo show is `build/demo-20/show`, and the dense clip is made with the target
+file. The steps keep their text until task 10 rewrites them for twenty upright legs and
+goes through them; rewording them now would leave "What has been checked" reporting a pass
+that nobody made. Until task 10 is done, the list is not a description of what the page
+shows for the target. "Two shows to run" is rewritten for the target and gains the frames
+and the sizes of the demo show's two packed files, which its test compares with what the
+commands give.
+
+**Resolution.** `docs/emulator.md`, "Two shows to run" and "The check list by eye";
+`tests/emulator/test_docs.py`; `docs/specs/05-p0-canvas-60-by-60/tasks.md`, task 10.

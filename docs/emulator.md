@@ -46,23 +46,31 @@ python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.jso
 python -m emulator build/example-show
 ```
 
-**The demo show**, for the target build of ten legs, 60 x 30: the same two animations made
-for that canvas, alternating every 15 seconds and starting at power-on. Only
-`shows/demo-10/show.json` is tracked. The two sources come to about 10 MB, so they are
-written by the generators into `build/`, which git ignores:
+**The demo show**, for the target build of twenty legs, 60 x 60: the same two animations
+made for that canvas, alternating every 15 seconds and starting at power-on. Only
+`shows/demo-20/show.json` is tracked. The two sources come to 4.2 MB, so they are written
+by the generators into `build/`, which git ignores:
 
 ```
-mkdir -p build/demo-10/sources
-python -m odrig.generators.hello_world build/demo-10/sources/hello.json --mapping mapping/legs-10.json
-python -m odrig.generators.dvd_bounce  build/demo-10/sources/dvd.json   --mapping mapping/legs-10.json
-python -m odrig pack --show shows/demo-10/show.json --mapping mapping/legs-10.json \
-    --sources build/demo-10/sources --out build/demo-10/show
-python -m emulator build/demo-10/show
+mkdir -p build/demo-20/sources
+python -m odrig.generators.hello_world build/demo-20/sources/hello.json --mapping mapping/legs-20.json
+python -m odrig.generators.dvd_bounce  build/demo-20/sources/dvd.json   --mapping mapping/legs-20.json
+python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
+    --sources build/demo-20/sources --out build/demo-20/show
+python -m emulator build/demo-20/show
 ```
 
-The canvas size comes from `mapping/legs-10.json` in every one of these commands; none
-names 60 or 30. The generators centre Hello world on the canvas and let the square use all
-of it.
+The canvas size comes from `mapping/legs-20.json` in every one of these commands; none
+names 60. The generators centre Hello world on the canvas, where it stands in the rows 28
+to 33. On a canvas as wide as it is high the square runs to and fro along one diagonal,
+from the top-left corner to the bottom-right one, and so passes over every leg.
+
+| Packed file | Frames | Bytes |
+|---|---:|---:|
+| `hello.odrg`, 5.1 s | 255 | 1,210 |
+| `dvd.odrg`, 20.9 s | 116 | 1,052 |
+
+The sizes are those the converter gives with zlib 1.2.12.
 
 ## Starting
 
@@ -501,15 +509,15 @@ requirement and the criterion of `docs/specs/03-p0-emulator/requirements.md` the
 covers.
 
 Before the first step, build the library and pack three shows: the example show and the
-demo show as under [Two shows to run](#two-shows-to-run), and a dense 60 x 30 clip of 10
-seconds on the ten-leg mapping:
+demo show as under [Two shows to run](#two-shows-to-run), and a dense 60 x 60 clip of 10
+seconds on the target file:
 
 ```
 make -C core shared
 mkdir -p build/dense/sources
-python -m odrig.generators.dense build/dense/sources/dense.json --mapping mapping/legs-10.json --seconds 10
+python -m odrig.generators.dense build/dense/sources/dense.json --mapping mapping/legs-20.json --seconds 10
 printf '{"version": 1, "brightness": 255, "items": [{"id": 1, "file": "dense.odrg"}], "start": 1}\n' > build/dense/show.json
-python -m odrig pack --show build/dense/show.json --mapping mapping/legs-10.json \
+python -m odrig pack --show build/dense/show.json --mapping mapping/legs-20.json \
     --sources build/dense/sources --out build/dense/show
 ```
 
@@ -537,7 +545,7 @@ Give the browser a window of 1280 x 800.
    again at the new size each time.
 7. **The page keeps up with a dense picture (4.9).** With the dense show, watch the header
    for ten seconds. *Seen:* `page` shows 49 or more in every second.
-8. **The board (9.1).** Stop the emulator, start `python -m emulator build/demo-10/show`
+8. **The board (9.1).** Stop the emulator, start `python -m emulator build/demo-20/show`
    and choose `Mapping`. *Seen:* a drawing of the board with the antenna at the top, the
    two USB sockets at the bottom, and two rows of pins labelled, from the top, 3V3, 3V3,
    RST, 4, 5, 6, 7 ... on the left and GND, TX, RX, 1, 2, 42 ... on the right, as in

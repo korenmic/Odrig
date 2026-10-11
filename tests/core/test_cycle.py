@@ -148,12 +148,12 @@ class Cycles(Playback):
         self.assertEqual(shown[10000], self.alone[1][0])
 
     def test_a_cycle_plays_files_with_and_without_a_palette_in_turn(self):
-        text = support.mapping_texts()["legs-10"]
+        text = support.mapping_texts()["legs-20"]
         files = {
             "mapping.json": text,
             "show.json": support.show_text([animation_item(1, "few.odrg"), animation_item(2, "dense.odrg"), cycle_item(3, [1, 2], 1)], 200, 3),
-            "few.odrg": support.clip(2, 60, 30, (20,) * 10),
-            "dense.odrg": support.dense_clip(60, 30, 1),
+            "few.odrg": support.clip(2, 60, 60, (20,) * 10),
+            "dense.odrg": support.dense_clip(60, 60, 1),
         }
         self.assertNotEqual(files["few.odrg"][10:12], b"\0\0")
         self.assertEqual(files["dense.odrg"][10:12], b"\0\0")
