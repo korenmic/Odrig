@@ -262,3 +262,9 @@ File sizes in bytes for this exact format, with the guidance above applied:
 Each of these files was decoded with a decoder written from this text alone, and every pixel
 of every frame matched the source. The dense clips are synthetic. Decoding has not yet been
 run or timed on the board.
+
+The table was measured with the prototype of the frame coder. The converter of this
+repository writes DVD bounce and Hello world at the same uncompressed sizes, and at 1,612
+and 1,138 bytes compressed. Among frame records of equal size in bytes it chooses by a fixed
+rule where the prototype kept the one with the fewest bits, so DEFLATE sees slightly
+different bytes.

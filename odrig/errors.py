@@ -39,6 +39,8 @@ TOO_MANY_FRAMES = "too-many-frames"
 MAPPING_MISSING = "mapping-missing"
 MAPPING_MALFORMED = "mapping-malformed"
 
+CANVAS_TOO_SMALL = "canvas-too-small"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

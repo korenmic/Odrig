@@ -696,3 +696,20 @@ any letter case".
 read a file name the same way.
 
 **Resolution.** Seed 01 `requirements.md`, Requirement 9 criterion 1.
+
+## Seed 01: Compressed sizes of Hello world and DVD bounce
+
+**Question.** The design says the tool encodes the two animations to exactly the sizes in
+`docs/format.md`. The uncompressed files are exactly 17,731 and 3,799 bytes. The compressed
+ones are 1,138 and 1,612 bytes, not 1,134 and 1,594.
+
+**Answer.** The tool keeps the rule of Requirement 7 criterion 6. The figures in
+`docs/format.md` were measured with the prototype, which among frame records of the same
+size in bytes kept the one with the fewest bits; the tool takes the lowest predictor, then
+plain mode, then the lowest k. The records have the same sizes and different bytes, so
+DEFLATE gives a slightly different result. Both files are within the 2 percent that
+Requirement 7 criterion 10 allows (0.4 and 1.1 percent). The table in `docs/format.md` is
+kept, with a note.
+
+**Resolution.** `docs/format.md`, "Measured sizes"; seed 01 `design.md`, "Encoder", step 2;
+`docs/converter.md`, "Generators".

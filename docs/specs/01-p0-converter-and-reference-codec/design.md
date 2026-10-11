@@ -327,7 +327,9 @@ stream.
 
    `h` and `s` are exact fractions (`fractions.Fraction`), so the order does not depend on
    floating-point rounding. With this key the proof-of-concept animations encode to exactly
-   the sizes in `docs/format.md` (17,731 / 1,134 and 3,799 / 1,594 bytes).
+   the uncompressed sizes in `docs/format.md` (17,731 and 3,799 bytes). Compressed they are
+   1,138 and 1,612 bytes with zlib 1.2.12, against 1,134 and 1,594 in the document, because
+   of the tie-break of step 3.
 3. **Each record.** With `old` the buffer before the record and `new` the buffer after it,
    and `nb` the neighbour rule of the document, the four residual arrays are:
 

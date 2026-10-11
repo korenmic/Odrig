@@ -120,6 +120,36 @@ compressed: yes
 
 An invalid file is rejected with its reason and nothing is printed to standard output.
 
+## Generators
+
+A generator is a program that writes an animation as a JSON frames file. It takes the
+canvas size from a mapping file and needs only Python.
+
+```
+python -m odrig.generators.hello_world OUT.json --mapping MAPPING
+python -m odrig.generators.dvd_bounce OUT.json --mapping MAPPING
+```
+
+| Generator | Animation |
+|---|---|
+| `hello_world` | The words HELLO WORLD, six rows high and 53 columns wide, centred on the canvas, with a rainbow that flows through the letters from left to right. 255 frames of 20 ms; after the last frame the rainbow is where it started. |
+| `dvd_bounce` | A 2 x 2 square that starts in the top-left corner, moves one pixel diagonally every 180 ms and turns back at every edge. Each of its pixels has the colour that a rainbow fixed to the canvas gives to that place. On the 60 x 6 canvas the loop has 232 frames. |
+
+The two tracked sources are the output of these generators for the two-leg mapping, byte
+for byte:
+
+```
+python -m odrig.generators.hello_world animations/hello.json --mapping mapping/legs-2.json
+python -m odrig.generators.dvd_bounce animations/dvd.json --mapping mapping/legs-2.json
+```
+
+A canvas below 53 x 6 for Hello world, or below 3 x 3 for DVD bounce, is rejected with
+`canvas-too-small`.
+
+Encoded, `hello.json` is 17,731 bytes uncompressed and `dvd.json` 3,799 bytes, the figures
+of [format.md](format.md). Compressed they are 1,138 and 1,612 bytes with zlib 1.2.12,
+within 2 percent of the 1,134 and 1,594 bytes measured there.
+
 ## Tests
 
 ```

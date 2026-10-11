@@ -92,6 +92,12 @@ Rules: [mapping.md](mapping.md), "Rules".
 | `mapping-missing` | The mapping file does not exist. |
 | `mapping-malformed` | The mapping file breaks a rule. The detail says which. |
 
+## Generators
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-small` | The canvas of the mapping file is too small for the animation: below 53 x 6 for Hello world, below 3 x 3 for DVD bounce. |
+
 ## Any output
 
 | Reason | Condition |

@@ -104,7 +104,7 @@ Rules for every task:
   - Add the mapping table to `docs/reasons.md`.
   - Requirements: 10.1, 10.2, 10.3, 22.4
 
-- [ ] 7. Hello world and DVD bounce generators and their tracked sources
+- [x] 7. Hello world and DVD bounce generators and their tracked sources
   - Create `odrig/generators/__init__.py`, `rainbow.py`, `hello_world.py` and
     `dvd_bounce.py` with the expressions, the font and the layout of the design.
   - Write `animations/hello.json` and `animations/dvd.json` with the generators and

@@ -104,9 +104,18 @@ def build_parser():
 
 def main(argv=None):
     """Runs one command line and returns the exit status."""
-    try:
+
+    def action():
         arguments = build_parser().parse_args(argv)
         arguments.run(arguments)
+
+    return status_of(action)
+
+
+def status_of(action):
+    """Runs `action` and returns the exit status, writing the error line for a rejection."""
+    try:
+        action()
     except SystemExit as stop:
         return stop.code
     except errors.Rejection as rejection:
