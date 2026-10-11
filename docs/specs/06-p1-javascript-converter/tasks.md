@@ -64,7 +64,7 @@ Rules for every task:
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.8, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.10, 3.1, 3.5,
     3.7, 17.4, 18.1, 18.2, 18.4
 
-- [ ] 2. Whole numbers, strict JSON and JSON frames
+- [x] 2. Whole numbers, strict JSON and JSON frames
   - Create `lib/whole.js`, `lib/strictjson.js` and `lib/jsonframes.js` as the design's
     sections of those names describe them.
   - Create `converter/tests/reference.py` with its first requests, as the tests of this

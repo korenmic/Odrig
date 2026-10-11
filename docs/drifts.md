@@ -4381,3 +4381,56 @@ appended to the main checkout's queue, whose numbers are lower. The records have
 script does not run on this Mac.
 
 **Resolution.** `.codex/local-task-queue.md` of the worktree, records Q-201 to Q-210.
+
+## Seed 06: When the reader of JSON finds a member named twice, and how deep Python reads
+
+**Question.** The design refuses a member name "that is already there". The Python tool
+finds a name given twice when the object ends, and a `NaN` when it reads it, so a text
+with two defects gets the detail of the one Python meets first. The design's test of
+depth compares both tools at 512 and 513 levels.
+
+**Answer.** The reader keeps the names and values of an object as they come and checks
+the names when the object ends, in the order of the text, so `{"a": 1, "a": NaN}` gets
+`NaN is not a JSON value` and `{"a": {"b": 1, "b": 2}, "a": 3}` names `b`, as in the
+Python tool. `NaN`, `Infinity` and `-Infinity` are refused where they stand.
+
+Python 3.14 on this Mac reads arrays nested 100,000 deep and refuses a million. A text of
+513 or 600 levels is `bad-json` in both tools here, because its top level is an array,
+with another detail in each; the test compares the reason for these and the whole line
+for texts of 512 levels and of a million.
+
+**Resolution.** `converter/lib/strictjson.js`; `converter/tests/strictjson.test.js`.
+
+## Seed 06: Six significant digits, where the rounding of JavaScript is not Python's
+
+**Question.** The design writes the end of the media in a `bad-range` detail with
+`toPrecision(6)` of the fraction as a `Number`. `toPrecision` takes a half at the last
+digit upward, and Python's `format(x, ".6g")` takes it to the even digit: 123456.5 is
+`123457` in JavaScript and `123456` in Python. A fraction of two numbers beyond 2 to the
+power 53 is also not turned into the nearest `Number` by dividing two `Number`s.
+
+**Answer.** `sixDigits` of `whole.js` does both by itself. It finds the floating-point
+number nearest to the fraction, halves to the even one, from the two `BigInt`s; it takes
+that number as the exact fraction it is and rounds it to six significant digits, halves to
+the even digit; and it writes the digits in the form of Python's `g`. The suite compares
+it with Python for 600 fractions from seeds, for halves at the sixth digit, and for
+fractions beside a half of the floating-point grid.
+
+**Resolution.** `converter/lib/whole.js`, `sixDigits`; `converter/tests/whole.test.js`.
+
+## Seed 06: What the tests ask of reference.py, and test files the design does not list
+
+**Question.** The design lists seven requests of `converter/tests/reference.py` and
+fifteen test files. The tests need more of the Python side than the list has.
+
+**Answer.** `reference.py` gets a request wherever a test needs a value only Python has;
+the requests are named in its `REQUESTS`. With the second task these are: `check`, which
+runs `check --format` of the Python tool on many files in one interpreter, each under the
+name `case.json` or `case.odrg` in an empty folder, because a new Python for each of some
+hundred texts would take most of the suite's time; `dumps`, the bytes of
+`odrig.jsonframes.dumps`; `sixdigits`, Python's `format(x, ".6g")`; and `milliseconds`,
+the seconds of the command line as the Python tool reads them. The tests of `whole.js`
+are in a file of their own, `converter/tests/whole.test.js`.
+
+**Resolution.** `converter/tests/reference.py`; `converter/tests/support.js`,
+`pythonChecks`.

@@ -7,6 +7,9 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 
+import {errorLine} from "../cli/main.js";
+import {errors, jsonframes, whole} from "../lib/index.js";
+
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CONVERTER = path.join(ROOT, "converter");
 export const TOOL = path.join(CONVERTER, "odrig.js");
@@ -178,4 +181,61 @@ export function hex(bytes) {
 
 export function unhex(text) {
   return new Uint8Array(Buffer.from(text, "hex"));
+}
+
+// The bytes of a text in UTF-8.
+export function utf8(text) {
+  return new Uint8Array(Buffer.from(text, "utf8"));
+}
+
+// What `python -m odrig check --format <kind>` gives for each of the files, which are given
+// as bytes: `{status, out, err}`. The file is named case.json or case.odrg.
+export function pythonChecks(kind, files) {
+  return reference("check", [kind], files.map(hex)).map(([status, out, err]) => ({status, out, err}));
+}
+
+// What the library says of a JSON frames file named case.json, in the form of `check`:
+// `{status, out, err}`.
+export function libraryJsonCheck(bytes) {
+  try {
+    const animation = errors.naming("case.json", () => jsonframes.loads(bytes));
+    const duration = animation.frames.reduce((sum, frame) => whole.plus(sum, frame.ms), 0);
+    const lines = [
+      "format: json-frames",
+      `canvas: ${animation.width}x${animation.height}`,
+      `frames: ${animation.frames.length}`,
+      `duration_ms: ${duration}`,
+      `colours: ${jsonframes.colourCount(animation.frames)}`,
+      `file_bytes: ${bytes.length}`,
+    ];
+    return {status: 0, out: `${lines.join("\n")}\n`, err: ""};
+  } catch (error) {
+    if (!(error instanceof errors.Rejection)) {
+      throw error;
+    }
+    return {status: 1, out: "", err: errorLine(error)};
+  }
+}
+
+// Whether the detail of an error line of the Python tool holds text of a library, which
+// the JavaScript tool words itself.
+export function libraryText(line) {
+  return /^error: bad-json: [^:]+: line \d+, column \d+: /.test(line) || /^error: bad-deflate: /.test(line);
+}
+
+// Compares what the two tools say of one file: the same status; for an accepted file the
+// same standard output; for a rejected one the same reason, and the same error line where
+// the Python tool words the detail itself.
+export function sameVerdict(assert, ours, theirs, label) {
+  assert.equal(ours.status, theirs.status, `${label}: ${ours.err || ours.out} / ${theirs.err || theirs.out}`);
+  assert.equal(ours.out, theirs.out, label);
+  if (theirs.status === 0) {
+    assert.equal(ours.err, "", label);
+    return;
+  }
+  const reason = (line) => line.split(": ")[1];
+  assert.equal(reason(ours.err), reason(theirs.err), `${label}: ${ours.err} / ${theirs.err}`);
+  if (!libraryText(theirs.err)) {
+    assert.equal(ours.err, theirs.err, label);
+  }
 }

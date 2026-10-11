@@ -19,8 +19,8 @@ function sources() {
 function specifiers(text) {
   const found = [];
   const patterns = [
-    /\bfrom\s*(["'`])([^"'`]*)\1/g,
-    /\bimport\s*(["'`])([^"'`]*)\1/g,
+    /\bfrom\s*(["'])([^"']*)\1/g,
+    /\bimport\s*(["'])([^"']*)\1/g,
     /\bimport\s*\(\s*(["'`])([^"'`]*)\1/g,
   ];
   for (const pattern of patterns) {
