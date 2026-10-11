@@ -40,8 +40,8 @@ the entry links to it.
 - **frame**: One picture of an animation together with the time it is shown.
 - **refresh**: One sending of colours to every LED. Refreshes are due every 20
   milliseconds, 50 a second, and each one puts the frame that is due at that moment on the
-  LEDs. The board refreshes more slowly when the pictures are costly to work out; the
-  working rules say which rates are acceptable.
+  LEDs. The board refreshes more slowly when the pictures are costly to work out;
+  [working-rules.md](working-rules.md#the-frame-rate) says which rates are acceptable.
 - **source**: The file in which an animation is kept and changed. It is tracked by git
   like program code.
 - **JSON frames**: The format of a source: a JSON file that lists every frame with its
@@ -92,7 +92,8 @@ the entry links to it.
 ## How the work is organised
 
 - **owner**: The person who owns the installation and decides what this project does.
-  The working rules list what only the owner decides.
+  [working-rules.md](working-rules.md#what-needs-the-owner) lists what only the owner
+  decides.
 - **seed**: One piece of planned work, written down before it is started: a folder in
   `project-seeds/` that holds the text, `seed.md`, and the seed's state, `state.json`.
 - **spec**: What a seed is turned into before it is built: the three files

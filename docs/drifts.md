@@ -3845,3 +3845,15 @@ the other project.
 
 **Resolution.** Seed 10 `tasks.md`, tasks 1 and 6; `.codex/local-task-queue.md`, which is
 not tracked.
+
+## Seed 10: The test of the change log
+
+**Question.** The design has the quick suite check that the last entry of the change log of
+`docs/decisions.md` is the new one. Every later change adds an entry after it, and the test
+would then fail although nothing is wrong.
+
+**Answer.** The test checks that the change log has the entry of the rule for several
+contributors once, after the entry of the rule it takes the place of, and that the dates of
+the entries never go backwards.
+
+**Resolution.** `tests/onboarding/test_rules.py`.

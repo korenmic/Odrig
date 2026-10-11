@@ -17,7 +17,7 @@ if str(FIRMWARE) not in sys.path:
     sys.path.insert(0, str(FIRMWARE))
 
 # The pages a newcomer reads first, by their paths in the repository.
-PAGES = ("docs/vocabulary.md",)
+PAGES = ("docs/vocabulary.md", "docs/working-rules.md")
 
 ENTRY = "AGENTS.md"
 ENTRY_LINES = 150

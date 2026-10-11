@@ -24,10 +24,16 @@ it stands now.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
   queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
   with its own state file.
-- All work is committed directly on `master`, and every significant advance is committed.
-  There is no remote yet.
-- The repository will carry a vocabulary file and agent policies, limited to the policies
-  that are relevant to this project.
+- Several contributors work at once, on separate computers. Each works on a branch of
+  their own, and nothing is committed directly on `master`. A branch is brought up to date
+  with `master` before it is merged, and it is merged only with every test suite that
+  needs no board passing. [drifts.md](drifts.md) and the change log of this file are only
+  ever added to at the end, so that two contributors' additions can both be kept. Every
+  significant advance is committed. There is no remote yet. See
+  [working-rules.md](working-rules.md), "Several contributors at once".
+- The repository carries a vocabulary, [vocabulary.md](vocabulary.md), and the working
+  rules, [working-rules.md](working-rules.md), which hold the agent policies that are
+  relevant to this project.
 
 ## Canvas and coordinates
 
@@ -264,3 +270,8 @@ are in [format.md](format.md), "Measured sizes".
   any rate from 20 to 50 a second is fine on the board, for any content. What fits into storage is computed again for 60 x 60:
   65 to 74 seconds of the dense clip. The open question about legs 3 to 10 is now the one
   about twenty wired legs.
+- 2026-10-12: Several contributors now work at once, on separate computers. The rule that
+  all work goes directly on `master` gives way to a branch for each contributor, brought
+  up to date with `master` and merged only with every suite that needs no board passing.
+  `drifts.md` and this change log are added to at the end only. The repository carries the
+  vocabulary and the working rules.

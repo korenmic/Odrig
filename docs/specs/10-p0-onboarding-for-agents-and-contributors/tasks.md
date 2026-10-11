@@ -59,7 +59,7 @@ Rules for every task:
     for the moment, the three tests of `test_pages.py` fail naming each. Undo it.
   - Requirements: 2.1, 2.2, 2.3, 2.4, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 8.1, 8.7
 
-- [ ] 2. The working rules, and the rule for several contributors in the decisions
+- [x] 2. The working rules, and the rule for several contributors in the decisions
   - Write `docs/working-rules.md` with the seven headings of the design. Check every rule
     about the board against `docs/firmware.md` and every figure against its source in the
     design's table of facts.
