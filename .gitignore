@@ -2,3 +2,6 @@
 /build/
 /.codex/
 __pycache__/
+/.claude/
+/scratch/
+.DS_Store
