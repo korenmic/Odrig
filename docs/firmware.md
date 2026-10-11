@@ -453,12 +453,15 @@ WLED](#what-the-firmware-changes-in-wled) switches it to the sixteen it can carr
 that cannot be made, for a twenty-first leg or a pin the board cannot use, does not work;
 the other outputs do, and the core runs unchanged.
 
-**Playback.** The usermod asks the core for a refresh in every pass of its loop, until the
-core has produced one. That refresh is copied into the outputs at once, also while the
+**Playback.** A task of the usermod's own, named `odrig`, on the chip's other processor
+core, asks the core for a refresh, again after a millisecond while none is due. When the
+core has produced one, WLED's loop copies it into the outputs at once, also while the
 refresh before it is still on the wire: an output keeps what it is sending apart from what
-it is given. It is sent as soon as the outputs can take new data, and only then is the core
-asked again. Every refresh the core counts is so sent to the outputs, and `fps` in `status`
-is the board's real rate. A refresh goes to the outputs directly: each leg's bytes to that
+it is given. Then the task may ask for the next refresh, and the loop sends the copy as
+soon as the outputs can take new data. So the core's work for a frame, reading, decoding
+and placing every LED, runs beside the send of the frame before it. The core keeps one
+picture of LED data, which is why the task waits for the copy; every refresh the core
+counts is so sent to the outputs, and `fps` in `status` is the board's real rate. A refresh goes to the outputs directly: each leg's bytes to that
 leg's output, LED number n of the leg to position n of the output. WLED's pixel buffer, LED
 map, matrix layout, gamma correction, white balance and segments take no part, and the
 outputs are set to WLED's full brightness before every refresh, so the only scaling of a
@@ -484,7 +487,11 @@ brightness.
 > brightness at which the estimate passes 730 mA.
 
 **Calls to the core** are made one at a time: a lock is held for every call after the
-start.
+start. The task holds it for as long as the core works on a refresh, 9 to 17 ms with a
+dense 60 x 60 clip and longer when a file is opened, so a command waits for one request at
+most: the port hands the core a whole line under one hold of the lock, and a command over
+HTTP is one call. The legs are read from the core once, at the start, so the loop needs no
+lock to know them.
 
 ## What the firmware changes in WLED
 
@@ -795,6 +802,75 @@ core's work compressed and 8.6 ms uncompressed: reading it from storage, decodin
 placing 3,600 LEDs. With the 16.3 ms of a send that is more than the 20 ms there are, so
 the request has to run beside the send. See "Seed 05: What the spike found, and a refresh
 that is copied while the last one is on the wire" in [drifts.md](drifts.md).
+
+**The request in a task of its own.** The second task of seed 05 moved the request for a
+refresh out of WLED's loop, as the design of that seed plans it for a loop that cannot hold
+the rate. What was measured, with the probe build, the dense 60 x 60 clip on the same
+twenty row legs, at brightness 32, in five reports a second apart for each clip:
+
+| Clip | Request in | Refreshes a second | Longest gap | The core's work in a second | for one frame | Send, mean | longest |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Compressed | WLED's loop | 21 to 23 | 57 ms | 610 to 650 ms | 12.3 ms | 16.3 ms | 16.5 ms |
+| Compressed | the task | 27 to 34 | 43 ms | 796 to 857 ms | 16 to 17 ms | 20.0 ms | 20.9 ms |
+| Uncompressed | WLED's loop | 31 or 32 | 47 ms | 430 to 440 ms | 8.6 ms | 16.3 ms | 16.5 ms |
+| Uncompressed | the task | 44 or 45 | 29 ms | 573 to 586 ms | 12.7 ms | 19.7 ms | 22.2 ms |
+
+With the firmware of the first task `status` reported 22 to 24 for the compressed clip and
+32 to 34 for the uncompressed one, in ten seconds each. The rate with the task was not read
+from the firmware build, and the 25-second measurements of the task were not taken: the
+board stopped answering first, see below. **The board does not hold 49 refreshes a second
+with a dense 60 x 60 clip.**
+
+- The task works: a task on processor core 0 reads the files of `/odrig` while WLED's loop
+  runs on core 1, the outputs get every refresh the core counts, `overwritten` stays 0,
+  and commands are answered. Over the minutes it ran no watchdog restarted the chip.
+- The two cores slow each other. Side by side a send takes 20 ms where it takes 16.3 ms
+  alone, and the core's work for a frame 12.7 ms and 16 to 17 ms where it takes 8.6 ms and
+  12.3 ms alone. The sum that has to fit into the 20 ms of a frame on core 0, the core's
+  work and then the copy of 4.1 ms, fits for the uncompressed clip and not for the
+  compressed one; the send of 20 ms on core 1 leaves no room for anything else.
+- Reading the file is not what takes the time: with the file read 4,096 bytes at a time in
+  place of the 512 the core asks for, every figure was the same, and so was the start of
+  the core, 6.0 s. The work is the core's decoding and placing, and WLED's show.
+- A send is 4.1 ms for the copy and 12.3 ms for WLED's show, of which the limiter's
+  dimming of 3,600 LEDs is about 8 ms. On the bench the limiter dims every refresh, because
+  WLED's maximum of 850 mA is below the 3,600 mA it counts for 3,600 LEDs at rest.
+
+What is left to try, none of it tried on the board:
+
+- Building the core alone at `-O2`, as a library of its own, and leaving WLED's files at
+  the platform's `-Os`. The core is compiled at `-Os` in the firmware and at `-O2` on the
+  Mac.
+- Raising WLED's maximum current to what the power supply of the installation gives, in
+  WLED's LED settings. The limiter then dims only a picture that is too bright, and a send
+  that it does not dim is about 8 ms shorter. The firmware does not change that setting.
+- Measuring where the cores lose time to each other. The chip's instruction cache has 16
+  KB for both.
+
+**A firmware built at another optimisation level took the board off USB.** To see whether
+the compiler's level `-O2` in place of the platform's `-Os` buys the missing time, the
+probe build was built once with `-O2` for every file and flashed. It does not start: WLED
+stops with a null pointer on processor core 1 a moment after its start, and the chip
+restarts, several times a second. For the first minute the port showed the restarts. After
+that the board no longer answers on its USB port at all, and esptool cannot bring it into
+its bootloader: `Failed to connect to ESP32-S3: No serial data received`. The USB device is
+still listed by the Mac. WLED counts restarts that follow each other quickly, and after
+five it puts its settings file back from its copy, after ten it renames `/cfg.json` to
+`/rst.cfg.json`, which leaves WLED with its default settings, and then it writes its
+settings files to the port again and again. The change of the build was taken back before
+anything was committed; `firmware/platformio_override.ini.in` is as it was, and the images
+in `build/firmware/out/` are built from the tracked sources.
+
+What brings the board back, by a person at the desk:
+
+1. Unplug the board's USB cable and plug it in again.
+2. At once: `python3 firmware/fw.py flash`, which writes the firmware of
+   `build/firmware/out/odrig-firmware.bin`, or `python3 firmware/fw.py restore-stock`.
+3. If WLED's settings were renamed, `/rst.cfg.json` in the board's storage holds them, and
+   so do the storage images the tool keeps in `build/firmware/storage/`; `install-show`
+   leaves every file outside `/odrig` as it finds it.
+4. `python3 firmware/fw.py test-board`, which has not run with the firmware of the second
+   task.
 
 **From nothing.** With `build/firmware/` removed, `python3 firmware/fw.py build` set up the
 tools, fetched WLED and built the firmware in 2 minutes. The lists of the home folder from

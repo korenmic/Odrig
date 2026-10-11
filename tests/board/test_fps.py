@@ -5,7 +5,7 @@ import unittest
 
 from odrigctl import client
 
-from . import PORT, support
+from . import PORT, support, test_twenty
 
 SECONDS = 10
 LOWEST = 49
@@ -66,6 +66,19 @@ class Fps(unittest.TestCase):
             support.ensure_installed(folder)
         fps = self.refreshes_in_each_second()
         self.assertGreaterEqual(min(fps), LOWEST, fps)
+
+    def dense_60_x_60_on_twenty_legs(self, compressed):
+        clip = support.dense_clip(compressed=compressed, width=60, height=60)
+        with support.show_folder(test_twenty.row_legs(60), [("dense.odrg", clip)]) as folder:
+            support.ensure_installed(folder)
+        fps = self.refreshes_in_each_second()
+        self.assertGreaterEqual(min(fps), LOWEST, fps)
+
+    def test_twenty_legs_with_the_dense_60_x_60_clip_compressed(self):
+        self.dense_60_x_60_on_twenty_legs(compressed=True)
+
+    def test_twenty_legs_with_the_dense_60_x_60_clip_uncompressed(self):
+        self.dense_60_x_60_on_twenty_legs(compressed=False)
 
     def test_the_rate_holds_while_status_is_asked_five_times_a_second(self):
         with support.dim_show() as folder:

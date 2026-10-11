@@ -175,7 +175,22 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   WLED's LED settings to what the power supply gives.
 
 - Whether one board can drive twenty LED outputs. Stock WLED drives twelve on this chip;
-  seed 05 tries for twenty and reports.
+  seed 05 tries for twenty and reports. Measured on the board on 2026-10-11: with one
+  patch to WLED the firmware makes twenty working outputs, four through WLED's RMT driver
+  and sixteen through its parallel driver, on pins 1 to 18, 21 and 47, and every pin
+  carries the signal of a whole refresh. See [firmware.md](firmware.md), "Verified on the
+  board".
+- Whether one board plays a dense 60 x 60 animation at 50 frames per second. Measured on
+  the board on 2026-10-11: it does not. A picture that does not change is sent to twenty
+  outputs 50 times a second. With the dense 60 x 60 clip the firmware reaches 22 to 24
+  refreshes a second for the compressed file and 32 to 34 for the uncompressed one with
+  the core asked in WLED's loop, and 27 to 34 and 44 or 45 in the probe build with the
+  core asked by a task on the chip's other processor core. The core needs 12.3 ms for a
+  compressed frame and 8.6 ms for an uncompressed one, a send to twenty outputs 16.3 ms
+  with WLED's limiter dimming every LED, and side by side both take a quarter to a third
+  longer. What is left to try is in [firmware.md](firmware.md), "Verified on the board",
+  and in [drifts.md](drifts.md), "Seed 05: The request in a task of its own, and the rate
+  it reaches". Seed 05 stays in progress for this.
 
 ## Change log
 

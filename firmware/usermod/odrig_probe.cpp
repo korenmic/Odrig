@@ -33,6 +33,9 @@ uint64_t secondStart = 0;
 uint32_t loopsNow = 0, loopsLast = 0;
 uint32_t sentNow = 0, sentLast = 0;
 uint32_t pollUsNow = 0, pollUsLast = 0, sendUsNow = 0, sendUsLast = 0;
+// The requests for a refresh are timed on the task that makes them, on the chip's other
+// processor core; their sums are kept under this guard.
+portMUX_TYPE pollGuard = portMUX_INITIALIZER_UNLOCKED;
 uint64_t lastSendMs = 0;
 bool sentBefore = false;
 uint32_t longestGapMs = 0, longestPollUs = 0, longestSendUs = 0;
@@ -302,7 +305,10 @@ void report() {
   }
   line += F("]}\n");
   OdrigSerial::writeLong(line.c_str(), line.length());
-  longestGapMs = longestPollUs = longestSendUs = 0;
+  longestGapMs = longestSendUs = 0;
+  portENTER_CRITICAL(&pollGuard);
+  longestPollUs = 0;
+  portEXIT_CRITICAL(&pollGuard);
   limited = 0;
   wireMeasured = false;
 }
@@ -322,9 +328,12 @@ void OdrigProbe::pass(uint64_t now_ms) {
   while (now_ms - secondStart >= 1000) {
     loopsLast = loopsNow;
     sentLast = sentNow;
-    pollUsLast = pollUsNow;
     sendUsLast = sendUsNow;
-    loopsNow = sentNow = pollUsNow = sendUsNow = 0;
+    loopsNow = sentNow = sendUsNow = 0;
+    portENTER_CRITICAL(&pollGuard);
+    pollUsLast = pollUsNow;
+    pollUsNow = 0;
+    portEXIT_CRITICAL(&pollGuard);
     secondStart += 1000;
   }
   loopsNow++;
@@ -332,8 +341,10 @@ void OdrigProbe::pass(uint64_t now_ms) {
 }
 
 void OdrigProbe::polled(uint32_t poll_us) {
+  portENTER_CRITICAL(&pollGuard);
   pollUsNow += poll_us;
   if (poll_us > longestPollUs) longestPollUs = poll_us;
+  portEXIT_CRITICAL(&pollGuard);
 }
 
 void OdrigProbe::beforeFill() {

@@ -2928,3 +2928,86 @@ takes the length of its frame. That an open costs refreshes is not new, seed 04 
 is measured in task 2.
 
 **Resolution.** `tests/board/support.py`, `one_frame`; `tests/board/test_twenty.py`.
+
+## Seed 05: The request in a task of its own, and the rate it reaches
+
+**Question.** The design plans, for a loop that cannot hold 49 refreshes a second with the
+dense 60 x 60 clip, a task on the chip's other processor core that asks the core for
+refreshes, and estimates 17 ms for a refresh with it. It leaves three things to be found:
+whether such a task can read the files, whether core 0 has the time, and whether the
+watchdog stays quiet. It also has every call to the core take the lock, and the usermod
+asks the core for its legs in every pass of the loop.
+
+**Answer.** The task is in: `odrig`, on processor core 0, stack 8,192 bytes, priority 1.
+It asks the core, again after a millisecond while no refresh is due, and waits while the
+loop has not taken the last one. The loop copies a ready refresh into the outputs at once,
+wakes the task, and shows the copy when the outputs can take data. Three things follow
+from the lock being held for a whole request, 9 to 17 ms:
+
+- The legs are read from the core once, in `setup()`, into a list of the usermod's own.
+  The mapping does not change after the start, and a leg's LED data stays where it is, so
+  the loop's check of the outputs in every pass and the copy need no lock. Only a request
+  writes LED data, and the task makes none between a ready refresh and its copy.
+- The port hands the core the bytes of a pass a line at a time, each line under one hold
+  of the lock, as the design asks.
+- The probe build times the request in the task and keeps its sums under a guard of their
+  own.
+
+Found on the board with the probe build: the task reads the files of `/odrig` while WLED's
+loop runs, commands are answered, and no watchdog restarted the chip in the minutes it
+ran. Core 0 does not have the time. The rate rose from 21 to 23 refreshes a second to 27
+to 34 for the compressed clip and from 31 or 32 to 44 or 45 for the uncompressed one, and
+not to 49: side by side a send takes 20 ms in place of 16.3 ms and the core's work for a
+frame 16 to 17 ms and 12.7 ms in place of 12.3 ms and 8.6 ms. Reading the file in larger
+pieces changes nothing; the time is the decoding, the placing and WLED's show. The design
+forbids changing the core's decoder and WLED's limiter here, so step 3 of "The time of one
+refresh" applies: the figures are in `docs/firmware.md` and in the open questions of
+`docs/decisions.md`, Requirement 13 criterion 5 holds, and the seed stays `in_progress`.
+The two tests of the rate in `tests/board/test_fps.py` state the requirement and fail on
+the board until it is met.
+
+The task could not be finished as its text asks. The firmware build's `status` with the
+task, the 25-second measurements and the whole board suite were not run, and the board is
+not left with the firmware of this task: see the next entry. Task 2 stays open.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `requestRefreshes`, `readLegs` and
+`loop`; `firmware/usermod/odrig_serial.cpp`, `handOn`; `tests/firmware/test_usermod_files.py`,
+`TheTask`; `tests/board/test_fps.py`; `docs/firmware.md`, "What the firmware does" and
+"Verified on the board"; `docs/decisions.md`, "Open questions".
+
+## Seed 05: A trial build at another optimisation level, and a board that no longer answers
+
+**Question.** With the task in place the board was 15 to 40 percent short of 49 refreshes
+a second. The platform compiles every file at `-Os`. Would `-O2` buy the time?
+
+**Answer.** It was tried for the whole firmware, with a change to the tool's build file
+that was never committed, and it must not be tried that way again. WLED built at `-O2`
+stops with a null pointer a moment after it starts and restarts several times a second.
+For the first minute the restarts could be read on the port. Then the board stopped
+answering on its USB port: no line arrives, no byte is taken, and esptool's reset into the
+bootloader gets no reply, with its own sequence, with more attempts and without a reset.
+The Mac still lists the USB device, it answers the requests every USB device answers, and
+making the Mac list it afresh changed nothing. A look at the chip's debug unit showed the
+first processor core being restarted about every 1.3 seconds and the second one never
+released, so the chip is alive and restarting before the application is up. Further probing
+through the debug unit was refused by the permission system of the session and was
+stopped there.
+
+What WLED itself does in such a loop was read in its source: after five quick restarts it
+puts `/cfg.json` back from its copy, after ten it renames `/cfg.json` to `/rst.cfg.json`,
+so WLED's settings, the Wi-Fi ones among them, are probably at their defaults until that
+file is put back, and after fifteen it would switch to the second application partition
+if that held a program, which the factory backup says it does not. No tool of this
+repository wrote any of that; WLED did, on the board.
+
+No program on this Mac can cut the board's power. It needs a person: unplug the USB cable,
+plug it in, and run `python3 firmware/fw.py flash` at once. `docs/firmware.md`, "Verified
+on the board", has the steps. Until then no task that needs the board can be done: the
+rest of task 2, tasks 8 and 11, and the state the seed asks the board to be left in. The
+tasks that need no board go on.
+
+A build of the core alone at `-O2`, as its own library, is the form this trial should have
+had; it is left to try once the board answers again.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board"; `docs/decisions.md`, "Open
+questions"; `docs/specs/05-p0-canvas-60-by-60/tasks.md`, the notes under tasks 2, 8 and 11.

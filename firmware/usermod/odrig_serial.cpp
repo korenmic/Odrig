@@ -54,12 +54,25 @@ bool longLineWaits() {
 }
 #endif
 
-// Hands one byte on and writes the reply it completed. The reply is written after the
-// player has returned.
-void pass(uint8_t byte) {
+// The bytes of this pass that wait to be handed on: at most a line, and what the probe
+// build held back of a line that was not its own.
+uint8_t waiting[BYTES_PER_PASS + 16];
+size_t waitingBytes = 0;
+
+// Hands the waiting bytes on in one call and writes the reply they completed. The reply
+// is written after the player has returned.
+void handOn() {
+  if (waitingBytes == 0) return;
   char reply[ODRIG_REPLY_MAX];
-  const size_t length = feedNow != nullptr ? feedNow(byte, reply, sizeof(reply)) : 0;
+  const size_t length = feedNow != nullptr ? feedNow(waiting, waitingBytes, reply, sizeof(reply)) : 0;
+  waitingBytes = 0;
   if (length > 0) OdrigSerial::write(reply, length);
+}
+
+// Takes one byte for the player. A line is handed on when it has ended.
+void pass(uint8_t byte) {
+  waiting[waitingBytes++] = byte;
+  if (byte == '\n' || waitingBytes == sizeof(waiting)) handOn();
 }
 
 }  // namespace
@@ -80,6 +93,7 @@ void OdrigSerial::poll(Feed feed) {
     pass((uint8_t)byte);
 #endif
   }
+  handOn();
 }
 
 void OdrigSerial::write(const char *bytes, size_t length) {

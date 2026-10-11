@@ -41,12 +41,14 @@ void keepReply(void *ctx, const char *, size_t, const char *reply, size_t reply_
   memcpy(kept->text, reply, kept->length);
 }
 
-// One byte of the port for the core. The timestamp is read after the lock is taken.
-size_t feedByte(uint8_t byte, char *reply, size_t capacity) {
+// Bytes of the port for the core, up to the end of a line at most, under one hold of the
+// lock: a command so waits for one request for a refresh at most. The timestamp is read
+// after the lock is taken.
+size_t feedBytes(const uint8_t *bytes, size_t length, char *reply, size_t capacity) {
   if (core == nullptr) return 0;
   Reply kept = {reply, capacity, 0};
   Locked held;
-  odrig_core_feed(core, OdrigFiles::nowMs(), &byte, 1, keepReply, &kept);
+  odrig_core_feed(core, OdrigFiles::nowMs(), bytes, length, keepReply, &kept);
   return kept.length;
 }
 
@@ -58,24 +60,35 @@ size_t commandLine(const char *line, size_t length, char *reply, size_t capacity
   return odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity);
 }
 
-// The legs as the core lists them, for the outputs.
-uint32_t legCount() {
-  if (core == nullptr) return 0;
+// The legs as the core lists them, for the outputs. They are read once, after the core's
+// start: the mapping does not change afterwards, and the LED data of a leg stays where it
+// is. So the loop needs no call to the core, and no lock, to know them.
+OdrigLeg *legs = nullptr;
+uint32_t legsRead = 0;
+
+void readLegs() {
+  if (core == nullptr) return;
   Locked held;
-  return odrig_core_leg_count(core);
+  const uint32_t count = odrig_core_leg_count(core);
+  if (count == 0) return;
+  legs = static_cast<OdrigLeg *>(malloc(count * sizeof(OdrigLeg)));
+  if (legs == nullptr) return;
+  for (uint32_t i = 0; i < count; i++) {
+    odrig_leg leg;
+    if (!odrig_core_leg(core, i, &leg)) return;
+    legs[i].leg = leg.leg;
+    legs[i].pin = leg.pin;
+    legs[i].led_count = leg.led_count;
+    legs[i].rgb = leg.rgb;
+  }
+  legsRead = count;
 }
 
+uint32_t legCount() { return legsRead; }
+
 bool legAt(uint32_t index, OdrigLeg *out) {
-  if (core == nullptr) return false;
-  odrig_leg leg;
-  {
-    Locked held;
-    if (!odrig_core_leg(core, index, &leg)) return false;
-  }
-  out->leg = leg.leg;
-  out->pin = leg.pin;
-  out->led_count = leg.led_count;
-  out->rgb = leg.rgb;
+  if (index >= legsRead) return false;
+  *out = legs[index];
   return true;
 }
 
@@ -83,6 +96,41 @@ bool legAt(uint32_t index, OdrigLeg *out) {
 bool refreshDue() {
   Locked held;
   return odrig_core_poll(core, OdrigFiles::nowMs()) == 1;
+}
+
+// The request for a refresh has a task of its own on the chip's other processor core, so
+// that the core's work for the next frame, reading, decoding and placing every LED, runs
+// beside the send of the last one. The core keeps one picture of LED data: the task asks
+// again only when the loop has copied that picture into the outputs.
+const char TASK_NAME[] = "odrig";
+const uint32_t TASK_STACK = 8192;
+const UBaseType_t TASK_PRIORITY = 1;
+const BaseType_t TASK_PROCESSOR = 0;
+TaskHandle_t requester = nullptr;
+volatile bool refreshReady = false;
+// While WLED writes a new firmware, no file is read and nothing is sent to the LEDs.
+volatile bool updating = false;
+
+void requestRefreshes(void *) {
+  for (;;) {
+    if (refreshReady || updating) {
+      // The loop wakes the task when it has taken the refresh.
+      ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(50));
+      continue;
+    }
+#ifdef ODRIG_PROBE
+    const int64_t pollStart = esp_timer_get_time();
+    const bool due = refreshDue();
+    OdrigProbe::polled((uint32_t)(esp_timer_get_time() - pollStart));
+#else
+    const bool due = refreshDue();
+#endif
+    if (due) {
+      refreshReady = true;
+    } else {
+      vTaskDelay(1);
+    }
+  }
 }
 
 #ifdef ODRIG_PROBE
@@ -108,15 +156,18 @@ class OdrigUsermod : public Usermod {
 #ifdef ODRIG_PROBE
     OdrigProbe::started(startMs, errorNow);
 #endif
-    const OdrigLegSource legs = {legCount, legAt};
-    OdrigLeds::source(legs);
+    readLegs();
+    const OdrigLegSource source = {legCount, legAt};
+    OdrigLeds::source(source);
     OdrigLeds::hold();
     if (OdrigLeds::legs() == 0) OdrigLeds::dark();
     OdrigHttp::begin(commandLine);
+    if (core != nullptr) {
+      xTaskCreatePinnedToCore(requestRefreshes, TASK_NAME, TASK_STACK, nullptr, TASK_PRIORITY, &requester, TASK_PROCESSOR);
+    }
   }
 
   void loop() override {
-    // While WLED writes a new firmware, no file is read and nothing is sent to the LEDs.
     if (updating) return;
 #ifdef ODRIG_PROBE
     OdrigProbe::pass(OdrigFiles::nowMs());
@@ -124,24 +175,14 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::hold();
     // WLED answers the lookups of its captive portal only outside its live mode.
     if (apActive) dnsServer.processNextRequest();
-    OdrigSerial::poll(feedByte);
-    if (core == nullptr) return;
-    // The core is asked for the next refresh while the outputs may still be busy with
-    // the last one, and not again before that refresh is sent: so every refresh the core
-    // counts reaches the outputs, and decoding does not wait for the LEDs.
-    if (!refreshWaits) {
-#ifdef ODRIG_PROBE
-      const int64_t pollStart = esp_timer_get_time();
-      refreshWaits = refreshDue();
-      OdrigProbe::polled(microsSince(pollStart));
-#else
-      refreshWaits = refreshDue();
-#endif
-    }
-    if (!refreshWaits) return;
-    // The refresh is copied into the outputs at once, also while the last one is still
-    // on the wire, and sent as soon as the outputs can take data.
+    OdrigSerial::poll(feedBytes);
+    if (requester == nullptr) return;
+    // A refresh the task has ready is copied into the outputs at once, also while the
+    // last one is still on the wire. Then the task may ask for the next one, and the
+    // copy is sent as soon as the outputs can take data. So every refresh the core
+    // counts reaches the outputs, and neither decoding nor the copy waits for the LEDs.
     if (!refreshFilled) {
+      if (!refreshReady) return;
 #ifdef ODRIG_PROBE
       OdrigProbe::beforeFill();
       const int64_t fillStart = esp_timer_get_time();
@@ -151,6 +192,8 @@ class OdrigUsermod : public Usermod {
       OdrigLeds::fill();
 #endif
       refreshFilled = true;
+      refreshReady = false;
+      xTaskNotifyGive(requester);
     }
     if (!BusManager::canAllShow()) return;
 #ifdef ODRIG_PROBE
@@ -161,7 +204,7 @@ class OdrigUsermod : public Usermod {
 #else
     OdrigLeds::show();
 #endif
-    refreshWaits = refreshFilled = false;
+    refreshFilled = false;
   }
 
   // WLED's information page: whether the show is valid, how many outputs work, and how
@@ -188,9 +231,7 @@ class OdrigUsermod : public Usermod {
 
  private:
   uint32_t startMs = 0;
-  bool refreshWaits = false;
   bool refreshFilled = false;
-  bool updating = false;
 #ifdef ODRIG_PROBE
   uint32_t fillUs = 0;
 #endif

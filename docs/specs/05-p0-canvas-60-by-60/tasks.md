@@ -101,6 +101,16 @@ Rules for every task:
     with the rates it read. Undo it.
   - The board is left with the firmware of this task and the dim example show.
   - Requirements: 13.1, 13.2, 13.3, 13.5, 12.11
+  - Left open. Done: the two tests of the rate, which fail with the firmware of task 1
+    (22 to 24 and 32 to 34 refreshes a second); the request in a task of its own with the
+    line-at-a-time port and the probe's timing in the task; the tests of the usermod's
+    files; the figures as far as measured, in `docs/firmware.md`, `docs/decisions.md` and
+    `docs/drifts.md`. Found: 27 to 34 and 44 or 45 with the probe build, below 49, so
+    Requirement 13 criterion 5 holds. Not done, because the board stopped answering on USB
+    after a trial build (see `docs/drifts.md`, "Seed 05: A trial build at another
+    optimisation level, and a board that no longer answers"): the rate read from the
+    firmware build, the 25-second measurements, the whole board suite with this firmware,
+    and leaving the board with this firmware and the dim example show.
 
 - [ ] 3. The mapping format with column legs: the document and the converter's reader
   - `docs/mapping.md`: rewrite "Mapping file", "Rules" and "Where each LED is" for both

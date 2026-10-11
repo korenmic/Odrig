@@ -15,7 +15,7 @@ void started(uint32_t start_ms, const char *(*error)());
 // One pass of loop().
 void pass(uint64_t now_ms);
 
-// How long one request for a refresh took.
+// How long one request for a refresh took. Called by the task that makes the requests.
 void polled(uint32_t poll_us);
 
 // Around one send. After the show the time of the send is kept, the fill and the show

@@ -163,6 +163,48 @@ class ProbeCode(unittest.TestCase):
         self.assertEqual(outside_probe_blocks(text), "a\nplain\nb")
 
 
+class TheTask(unittest.TestCase):
+    """The task that asks the core for refreshes, read in the usermod's sources."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.usermod = text_of(USERMOD / "odrig_usermod.cpp")
+        cls.task = outside_probe_blocks(cls.usermod[cls.usermod.index("void requestRefreshes(void *) {"):cls.usermod.index("#ifdef ODRIG_PROBE\nconst char *errorNow() {")])
+
+    def test_the_usermod_starts_one_task_in_its_own_file_only(self):
+        starting = {path.name: len(re.findall(r"\bxTaskCreate\w*\(", text_of(path))) for path in SOURCES}
+        self.assertEqual({name: count for name, count in starting.items() if count}, {"odrig_usermod.cpp": 1})
+        self.assertIn("xTaskCreatePinnedToCore(requestRefreshes, TASK_NAME, TASK_STACK, nullptr, TASK_PRIORITY, &requester, TASK_PROCESSOR);", self.usermod)
+        for constant in ('const char TASK_NAME[] = "odrig";', "const uint32_t TASK_STACK = 8192;", "const UBaseType_t TASK_PRIORITY = 1;", "const BaseType_t TASK_PROCESSOR = 0;"):
+            self.assertIn(constant, self.usermod)
+
+    def test_the_task_is_started_after_the_core_and_only_with_a_core(self):
+        setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
+        self.assertLess(setup.index("core = odrig_core_begin(&host);"), setup.index("xTaskCreatePinnedToCore("))
+        self.assertRegex(setup, r"if \(core != nullptr\) \{\n\s+xTaskCreatePinnedToCore\(")
+
+    def test_the_task_asks_again_only_when_the_loop_has_taken_the_last_refresh(self):
+        steps = [self.task.index(step) for step in ("if (refreshReady || updating) {", "ulTaskNotifyTake(", "continue;", "const bool due = refreshDue();", "refreshReady = true;", "vTaskDelay(1);")]
+        self.assertEqual(steps, sorted(steps))
+        self.assertEqual(self.usermod.count("refreshDue()"), 3)
+        self.assertNotIn("refreshDue()", self.usermod[self.usermod.index("class OdrigUsermod"):])
+
+    def test_the_legs_are_read_once_so_that_the_loop_needs_no_lock_for_them(self):
+        legs = self.usermod[self.usermod.index("void readLegs() {"):self.usermod.index("// Asks the core for a refresh.")]
+        self.assertIn("Locked held;", legs[:legs.index("uint32_t legCount()")])
+        self.assertNotIn("Locked held;", legs[legs.index("uint32_t legCount()"):])
+        self.assertNotRegex(legs[legs.index("uint32_t legCount()"):], r"odrig_core_")
+        self.assertEqual(self.usermod.count("readLegs();"), 1)
+
+    def test_the_port_hands_a_line_on_under_one_hold_of_the_lock(self):
+        feed = self.usermod[self.usermod.index("size_t feedBytes("):self.usermod.index("// One command line of the web server")]
+        self.assertEqual((feed.count("Locked held;"), feed.count("odrig_core_feed(core, OdrigFiles::nowMs(), bytes, length, keepReply, &kept);")), (1, 1))
+        serial = text_of(USERMOD / "odrig_serial.cpp")
+        self.assertIn("if (byte == '\\n' || waitingBytes == sizeof(waiting)) handOn();", serial)
+        self.assertRegex(serial, r"(?s)void OdrigSerial::poll\(Feed feed\) \{.*\n  handOn\(\);\n\}")
+        self.assertEqual(serial.count("feedNow(waiting, waitingBytes, reply, sizeof(reply))"), 1)
+
+
 class TheCore(unittest.TestCase):
     def test_the_core_is_a_library_named_odrig_core_for_every_platform(self):
         self.assertEqual(json.loads(text_of(CORE / "library.json")), {"name": "odrig_core", "version": "1.0.0", "frameworks": "*", "platforms": "*"})
@@ -233,10 +275,11 @@ class Host(unittest.TestCase):
     def test_a_refresh_is_filled_at_once_and_shown_when_the_outputs_can_take_data(self):
         usermod = text_of(USERMOD / "odrig_usermod.cpp")
         loop = outside_probe_blocks(usermod[usermod.index("void loop() override {"):usermod.index("void addToJsonInfo")])
-        steps = [loop.index(step) for step in ("refreshWaits = refreshDue();", "OdrigLeds::fill();", "if (!BusManager::canAllShow()) return;", "OdrigLeds::show();", "refreshWaits = refreshFilled = false;")]
+        steps = [loop.index(step) for step in ("if (!refreshReady) return;", "OdrigLeds::fill();", "refreshReady = false;", "xTaskNotifyGive(requester);", "if (!BusManager::canAllShow()) return;", "OdrigLeds::show();", "refreshFilled = false;")]
         self.assertEqual(steps, sorted(steps))
-        self.assertEqual((loop.count("OdrigLeds::fill();"), loop.count("OdrigLeds::show();"), loop.count("refreshDue()")), (1, 1, 1))
+        self.assertEqual((loop.count("OdrigLeds::fill();"), loop.count("OdrigLeds::show();")), (1, 1))
         self.assertIn("if (!refreshFilled) {", loop)
+        self.assertNotRegex(loop, r"refreshDue|odrig_core_")
 
     def test_wled_is_held_in_its_live_mode_at_every_pass(self):
         hold = self.leds[self.leds.index("void OdrigLeds::hold()"):self.leds.index("void OdrigLeds::fill()")]
