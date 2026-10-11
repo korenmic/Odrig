@@ -2185,3 +2185,46 @@ than 32 characters, which no show can name, is answered with the failure value. 
 a function the usermod gives it, under the lock.
 
 **Resolution.** `firmware/usermod/odrig_files.cpp`; `firmware/usermod/odrig_usermod.cpp`.
+
+## Seed 04: Asking the core while the LEDs are still being written
+
+**Question.** The design's loop asks the core for a refresh only when the outputs can take
+new data, and sends at once. With ten legs and the dense 60 x 30 clip, measured on the
+board, a refresh then costs the time the LEDs need on the wire, 5.4 ms, then the core's
+work for a frame, 6.6 ms on average for the compressed clip, then the send, 7.7 ms with
+the limiter's dimming: 19.7 ms of the 20 there are. The firmware still reported 49 or 50,
+and the probe build, which also reads the outputs back, 46 to 49.
+
+**Answer.** The usermod asks the core in every pass until the core has produced a refresh,
+keeps that refresh until the outputs are free, sends it, and only then asks again. The
+core's work for the next frame so happens while the last one is on the wire. What the
+design wanted from its rule still holds: every refresh the core counts is sent, none is
+overwritten before it is sent, and `fps` is the real rate. With this loop the probe build
+sends 49 to 51 refreshes a second for both dense clips. Playback stays in WLED's main
+loop; the measurements gave no reason for a task of its own.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `loop`; `docs/firmware.md`, "What
+the firmware does" and "Verified on the board".
+
+## Seed 04: What the board tests of the outputs use, and the probe's sums
+
+**Question.** The design's `test_probe.py` compares each output's CRC with the emulator's
+recording for the example show's mappings and the ten-leg mapping. The limiter dims every
+refresh of ten legs of 180 LEDs, and a bright picture on two legs, so those cannot be
+compared byte for byte. The design also has no test for an output that cannot be made or
+for an invalid mapping, which Requirement 8 names, and its probe reports only the longest
+times.
+
+**Answer.** The one-frame show gives every pixel a small colour of its own, which the
+limiter does not dim on two legs. Ten outputs are compared byte for byte on a ten-leg
+mapping of 18 LEDs for each leg, and on `mapping/legs-10.json` against what the limiter's
+lowest level makes of the recording. Two tests are added: a mapping with a leg on pin 60,
+which the board does not have, and a show folder with a broken `mapping.json`. The probe
+build's report gets `poll_total_us` and `send_total_us`, the sums over the last full
+second, so that means can be given, and it reads the outputs back around one send in five
+only, so that its own work costs little of what it measures. The test of the rate while
+`status` is asked five times a second keeps the port open, with the command tool's own
+way of opening it.
+
+**Resolution.** `tests/board/test_probe.py`, `tests/board/test_fps.py`,
+`tests/board/support.py`; `firmware/usermod/odrig_probe.cpp`.

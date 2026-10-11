@@ -339,10 +339,47 @@ WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no 
 serial, no answer to WLED's single-letter commands. The chip's own bootloader still prints
 a few lines at a reset; the command tool skips every line that is not a reply.
 
-**The LEDs** are held by the usermod: WLED stays in its live mode, in which it runs no
-effect, no preset and no playlist. In this state of the work the outputs are still those of
-WLED's settings and stay dark; the core is asked for its refreshes, so that `status` is
-what it is in the emulator, and its LED data is not sent yet.
+**The outputs** are set from the mapping file. When the core has started with a valid
+mapping, the usermod replaces WLED's outputs with one output for each leg, in the order of
+the mapping file, on the leg's pin, with the leg's number of LEDs, for WS2812B LEDs with
+the colour order green, red, blue. Whatever outputs WLED's stored settings hold, these are
+the outputs after start; WLED's settings file is not written for it. When WLED's LED
+settings are saved while the firmware runs, the mapping's outputs are put back in the same
+pass of WLED's loop. With an invalid mapping the usermod leaves WLED's outputs as they are
+and keeps them dark.
+
+On the ESP32-S3 the first four legs of the mapping file get WLED's four RMT outputs and the
+next eight its parallel driver, so the board can drive 12 legs. An output that cannot be
+made, for a thirteenth leg or a pin the board cannot use, does not work; the other outputs
+do, and the core runs unchanged.
+
+**Playback.** The usermod asks the core for a refresh in every pass of its loop, until the
+core has produced one; that refresh is sent as soon as the outputs can take new data, and
+only then is the core asked again. Every refresh the core counts is so sent to the
+outputs, and `fps` in `status` is the board's real rate. A refresh goes to the outputs
+directly: each leg's bytes to that leg's output, LED number n of the leg to position n of
+the output. WLED's pixel buffer, LED map, matrix layout, gamma correction, white balance
+and segments take no part, and the outputs are set to WLED's full brightness before every
+refresh, so the only scaling of a colour value is the core's.
+
+**WLED is kept from the LEDs.** The usermod holds WLED in its live mode, the one network
+pixel senders use, in which WLED runs no effect, no preset, no playlist and no transition,
+and checks at every pass that WLED is still in it. WLED's switch, its brightness slider and
+its live override therefore do not change the LEDs; only the commands of
+[commands.md](commands.md) do.
+
+**The current limiter stays active.** WLED's limiter acts inside every send, with the
+maximum current of WLED's LED settings, 850 mA unless it was changed, less 120 mA for the
+chip, and 55 mA for one LED at full white. It counts 1 mA for every LED at rest. When its
+estimate is above the maximum it dims the refresh; `status` still reports the core's
+brightness.
+
+> With ten legs of 180 LEDs the estimate at rest alone is 1,800 mA. With WLED's maximum of
+> 850 mA the limiter then holds every LED at its lowest level, whatever plays. Before ten
+> legs are lit, the maximum current must be raised to what the power supply gives, in
+> WLED's LED settings, "Maximum PSU Current". The firmware does not change it. With two
+> legs, 360 LEDs, the limiter also dims a bright picture such as Hello world, at any
+> brightness at which the estimate passes 730 mA.
 
 **Calls to the core** are made one at a time: a lock is held for every call after the
 start.
@@ -366,7 +403,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `realtime` | 1 while WLED is held in its live mode with no override, else 0. |
 | `loops`, `sent` | The passes of the usermod's loop and the refreshes sent, in the last full second. |
 | `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. |
-| `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. |
+| `poll_total_us`, `send_total_us` | The time all requests for a refresh and all sends took, in the last full second. |
+| `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. One send in five is checked. |
 | `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
 | `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
 | `ap` | 1 while WLED's access point is up, else 0. |
@@ -381,9 +419,8 @@ The port holds bytes at the start of a line back for as long as they are a begin
 `#probe` and a newline. The complete line is answered by the usermod and does not reach the
 core; every other byte is passed on to the core, unchanged and in order.
 
-**What a person sees** with the firmware or the probe build in this state of the work: the
-LEDs are dark, and nothing of WLED's own show, the text and the square it played before,
-appears.
+The probe build plays as the firmware does. Reading the outputs back takes time, so its
+own rate can be a refresh or two below the firmware's.
 
 ## The regions of the flash
 
@@ -455,6 +492,48 @@ The core in the firmware, tried with the firmware and the probe build that host 
   nothing sent to the LEDs.
 - **The replies** of one session with every command were those of the emulator for the same
   folder, `fps` aside.
+
+The outputs and playback, tried with the probe build and with the firmware:
+
+- **Exact bytes** (A10). With a one-frame show in which every pixel has a colour of its
+  own, on the two-leg mapping, each output's CRC-32 was that of the bytes the emulator
+  recorded for its leg: at the brightness 40, 32 and 1 of the show file, after every
+  `brightness` command from 0 to 40, and after `off` and `on`. The limiter did not dim
+  these pictures.
+- **Ten outputs.** On a ten-leg mapping of 18 LEDs for each leg, pins 1 to 10, all ten
+  outputs, four `rmt` and six `parallel`, held exactly their own leg's bytes. On
+  `mapping/legs-10.json`, 180 LEDs for each leg, all ten outputs work and each holds what
+  the limiter's lowest level makes of its own leg's bytes; `status` still reports the
+  show's brightness.
+- **A pin the board cannot use.** With three legs on pins 1, 60 and 2, the outputs of legs 1
+  and 3 hold their bytes and are refreshed 49 times a second or more; the output of leg 2
+  does not work; `status` reports no reason.
+- **An invalid mapping.** WLED's own two outputs stay, dark, and no refresh is sent.
+- **Nothing else writes** to the outputs: `overwritten` stayed 0 over 30 seconds of the
+  example show, `realtime` 1.
+- **The rate.** With the firmware `status` reported 49 or 50 in every one of ten seconds
+  for the dim example show, for the dense 60 x 30 clip on the ten-leg mapping, compressed
+  and uncompressed, and while `status` was asked five times a second.
+
+Measured with the probe build over 25 seconds each, at brightness 32:
+
+| Show | Start of the core | Passes of the loop a second | Refreshes a second | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Example show, two legs, 360 LEDs | 171 ms | 2,725 to 2,934 | 49 to 51 | 38 ms | 0.80 ms | 18.8 ms | 0.76 ms | 1.21 ms |
+| Dense 60 x 30 clip, compressed, ten legs, 1,800 LEDs | 3,105 ms | 359 to 475 | 49 to 51 | 41 ms | 6.61 ms | 26.5 ms | 7.67 ms | 7.86 ms |
+| Dense 60 x 30 clip, uncompressed, ten legs, 1,800 LEDs | 2,163 ms | 652 to 746 | 49 to 51 | 38 ms | 4.73 ms | 21.2 ms | 7.68 ms | 7.86 ms |
+
+A request for a refresh is the core's work for one frame: reading the next part of the
+file from storage, decoding it, and placing 1,800 LEDs. The long requests are the ones in
+which a file is opened or the file system goes on to another block; they delay one refresh
+and skip none or one. The sends on ten legs include the limiter's dimming of all 1,800
+LEDs; without it a send is about half as long. With the first form of the loop, which
+asked the core only once the outputs were free, the probe build sent 46 to 49 refreshes of
+the compressed dense clip a second; see "Seed 04: Asking the core while the LEDs are still
+being written" in [drifts.md](drifts.md).
+
+With `BusManager::setBrightness(255)` taken out of the usermod, the outputs were scaled by
+WLED's own brightness and the CRC tests failed for every output.
 
 With the usermod's two calls that hold the LEDs taken out, WLED kept its own two outputs and
 played its own show: the report had `realtime` 0, two outputs, and `overwritten` rising by

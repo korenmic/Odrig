@@ -12,6 +12,9 @@ namespace {
 const char LINE[] = "#probe\n";
 const size_t LINE_LENGTH = sizeof(LINE) - 1;
 const uint32_t MAX_OUTPUTS = 32;
+// The outputs are read back around one send in this many, so that the reading takes
+// little of the time it is there to measure.
+const uint32_t CHECKED_SENDS = 5;
 
 size_t matched = 0;
 bool atLineStart = true;
@@ -22,6 +25,8 @@ bool counting = false;
 uint64_t secondStart = 0;
 uint32_t loopsNow = 0, loopsLast = 0;
 uint32_t sentNow = 0, sentLast = 0;
+uint32_t pollUsNow = 0, pollUsLast = 0, sendUsNow = 0, sendUsLast = 0;
+uint32_t sends = 0;
 uint64_t lastSendMs = 0;
 bool sentBefore = false;
 uint32_t longestGapMs = 0, longestPollUs = 0, longestSendUs = 0;
@@ -82,6 +87,10 @@ void report() {
   line += longestPollUs;
   line += F(",\"send_us\":");
   line += longestSendUs;
+  line += F(",\"poll_total_us\":");
+  line += pollUsLast;
+  line += F(",\"send_total_us\":");
+  line += sendUsLast;
   line += F(",\"overwritten\":");
   line += overwritten;
   line += F(",\"limited\":");
@@ -146,18 +155,22 @@ void OdrigProbe::pass(uint64_t now_ms) {
   while (now_ms - secondStart >= 1000) {
     loopsLast = loopsNow;
     sentLast = sentNow;
-    loopsNow = sentNow = 0;
+    pollUsLast = pollUsNow;
+    sendUsLast = sendUsNow;
+    loopsNow = sentNow = pollUsNow = sendUsNow = 0;
     secondStart += 1000;
   }
   loopsNow++;
 }
 
 void OdrigProbe::polled(uint32_t poll_us) {
+  pollUsNow += poll_us;
   if (poll_us > longestPollUs) longestPollUs = poll_us;
 }
 
 void OdrigProbe::beforeSend() {
   if (!heldValid) return;
+  heldValid = false;
   const uint32_t count = outputs();
   for (uint32_t i = 0; i < count; i++) {
     if (crcOfOutput(BusManager::getBus(i)) != held[i]) {
@@ -169,14 +182,16 @@ void OdrigProbe::beforeSend() {
 
 void OdrigProbe::afterSend(uint64_t now_ms, uint32_t send_us) {
   sentNow++;
+  sendUsNow += send_us;
   if (send_us > longestSendUs) longestSendUs = send_us;
   if (sentBefore && now_ms - lastSendMs > longestGapMs) longestGapMs = (uint32_t)(now_ms - lastSendMs);
   sentBefore = true;
   lastSendMs = now_ms;
   if (usedMa() >= limitMa()) limited++;
+  heldValid = sends++ % CHECKED_SENDS == 0;
+  if (!heldValid) return;
   const uint32_t count = outputs();
   for (uint32_t i = 0; i < count; i++) held[i] = crcOfOutput(BusManager::getBus(i));
-  heldValid = true;
 }
 
 void OdrigProbe::feed(uint8_t byte, void (*pass)(uint8_t byte)) {

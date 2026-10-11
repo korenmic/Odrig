@@ -1,7 +1,8 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
 // memory, the time and the files of the installed show, carries bytes between the USB
-// serial port and the core, and keeps WLED from the LEDs. Every decision about files, time
-// and commands is the core's.
+// serial port and the core, sets WLED's outputs from the core's legs, keeps WLED from the
+// LEDs and sends the core's LED data to the outputs. Every decision about files, time,
+// the layout and commands is the core's.
 #include "wled.h"
 
 #include "odrig_core.h"
@@ -47,6 +48,33 @@ size_t feedByte(uint8_t byte, char *reply, size_t capacity) {
   return kept.length;
 }
 
+// The legs as the core lists them, for the outputs.
+uint32_t legCount() {
+  if (core == nullptr) return 0;
+  Locked held;
+  return odrig_core_leg_count(core);
+}
+
+bool legAt(uint32_t index, OdrigLeg *out) {
+  if (core == nullptr) return false;
+  odrig_leg leg;
+  {
+    Locked held;
+    if (!odrig_core_leg(core, index, &leg)) return false;
+  }
+  out->leg = leg.leg;
+  out->pin = leg.pin;
+  out->led_count = leg.led_count;
+  out->rgb = leg.rgb;
+  return true;
+}
+
+// Asks the core for a refresh. The timestamp is read after the lock is taken.
+bool refreshDue() {
+  Locked held;
+  return odrig_core_poll(core, OdrigFiles::nowMs()) == 1;
+}
+
 #ifdef ODRIG_PROBE
 const char *errorNow() {
   if (core == nullptr) return "no core";
@@ -70,8 +98,10 @@ class OdrigUsermod : public Usermod {
 #ifdef ODRIG_PROBE
     OdrigProbe::started(startMs, errorNow);
 #endif
+    const OdrigLegSource legs = {legCount, legAt};
+    OdrigLeds::source(legs);
     OdrigLeds::hold();
-    OdrigLeds::dark();
+    if (OdrigLeds::legs() == 0) OdrigLeds::dark();
   }
 
   void loop() override {
@@ -81,20 +111,33 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::hold();
     OdrigSerial::poll(feedByte);
     if (core == nullptr) return;
+    // The core is asked for the next refresh while the outputs may still be busy with
+    // the last one, and not again before that refresh is sent: so every refresh the core
+    // counts reaches the outputs, and decoding does not wait for the LEDs.
+    if (!refreshWaits) {
 #ifdef ODRIG_PROBE
-    const int64_t pollStart = esp_timer_get_time();
+      const int64_t pollStart = esp_timer_get_time();
+      refreshWaits = refreshDue();
+      OdrigProbe::polled(microsSince(pollStart));
+#else
+      refreshWaits = refreshDue();
 #endif
-    {
-      Locked held;
-      odrig_core_poll(core, OdrigFiles::nowMs());
     }
+    if (!refreshWaits || !BusManager::canAllShow()) return;
 #ifdef ODRIG_PROBE
-    OdrigProbe::polled(microsSince(pollStart));
+    OdrigProbe::beforeSend();
+    const int64_t sendStart = esp_timer_get_time();
+    OdrigLeds::send();
+    OdrigProbe::afterSend(OdrigFiles::nowMs(), microsSince(sendStart));
+#else
+    OdrigLeds::send();
 #endif
+    refreshWaits = false;
   }
 
  private:
   uint32_t startMs = 0;
+  bool refreshWaits = false;
 };
 
 static OdrigUsermod odrigUsermod;

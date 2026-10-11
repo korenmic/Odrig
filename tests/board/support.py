@@ -11,7 +11,9 @@ import sys
 import tempfile
 import time
 
-from odrig import pack
+from emulator import recfile
+from odrig import jsonframes, mapping as mapping_file, odrg, pack
+from odrig.generators import dense
 from odrigctl import cli as command_tool
 from odrigctl import client
 
@@ -57,6 +59,7 @@ SESSION = (
 )
 
 _running = None
+_installed = None
 
 
 def tool(*arguments):
@@ -136,17 +139,23 @@ def ensure(kind):
 
 def leave_the_board():
     """Puts on the board what the suite leaves there: the firmware and the dim example
-    show, playing."""
+    show, playing as after power-on."""
     ensure(LEFT_ON_THE_BOARD)
     with dim_show() as folder:
         ensure_installed(folder)
+    restart()
 
 
-def ensure_installed(folder):
-    """Makes the board hold a show folder, installing only when it holds something else."""
-    if installed() != files_of(folder):
-        done = install(folder)
-        if done.status != 0:
+def ensure_installed(folder, *extra):
+    """Makes the board hold a show folder, installing only when it holds something else.
+    What this run installed last is remembered, so that the board is not asked again."""
+    global _installed
+    wanted = files_of(folder)
+    if _installed is None:
+        _installed = installed()
+    if _installed != wanted:
+        done = install(folder, *extra)
+        if "error: " in done.err:
             raise AssertionError(f"installing {folder} failed: {done.out}{done.err}")
 
 
@@ -245,10 +254,15 @@ def brightness_of(folder):
 def install(folder, *extra):
     """Installs a show folder on the board. A show brighter than the wired strip allows is
     refused here, before the tool is started."""
+    global _installed
     brightness = brightness_of(folder)
     if brightness is not None and brightness > BRIGHTEST:
         raise AssertionError(f"{folder} has brightness {brightness}; nothing above {BRIGHTEST} is installed on the board")
-    return on_port("install-show", folder, *extra)
+    _installed = None
+    done = on_port("install-show", folder, *extra)
+    if "error: " not in done.err:
+        _installed = files_of(folder)
+    return done
 
 
 def storage_image():
@@ -300,3 +314,91 @@ def each_second(seconds, read=probe):
         time.sleep(max(0.0, start + number + 1 - time.monotonic()))
         reports.append(read())
     return reports
+
+
+def legs_mapping(width, legs=10, rows_per_leg=3, pins=None):
+    """The text of a mapping file: legs of some rows each, leg 1 at the top, every chain
+    starting on the right, on the pins given or on pins 1, 2, 3 and so on."""
+    pins = list(range(1, legs + 1)) if pins is None else list(pins)
+    height = legs * rows_per_leg
+    described = [
+        {"leg": number + 1, "pin": pins[number], "first_led": "right",
+         "rows": [height - number * rows_per_leg - row for row in range(rows_per_leg)]}
+        for number in range(legs)
+    ]
+    return json.dumps({"version": 1, "width": width, "legs": described})
+
+
+def own_colour(position):
+    """A colour for the pixel at a position that no other pixel of a canvas has. The values
+    are small, so that a whole canvas of them stays below what WLED's current limiter
+    allows two legs."""
+    return bytes([(position * 5) % 53, (position * 3) % 47, (position * 11) % 41])
+
+
+@contextlib.contextmanager
+def show_folder(mapping, animations, brightness=DIM, start=1):
+    """A temporary show folder: a mapping, given as a path or as text, and one animation
+    item for each `(name, animation bytes)`, the first one starting at power-on."""
+    with tempfile.TemporaryDirectory() as work:
+        folder = pathlib.Path(work, "show")
+        folder.mkdir()
+        text = pathlib.Path(mapping).read_text() if isinstance(mapping, pathlib.Path) else mapping
+        (folder / "mapping.json").write_text(text)
+        items = [{"id": number, "file": name} for number, (name, _) in enumerate(animations, 1)]
+        (folder / "show.json").write_text(json.dumps({"version": 1, "brightness": brightness, "items": items, "start": start}))
+        for name, content in animations:
+            (folder / name).write_bytes(content)
+        yield folder
+
+
+def canvas_of(mapping):
+    """The width and the height of the canvas of a mapping, given as a path or as text."""
+    data = mapping.read_bytes() if isinstance(mapping, pathlib.Path) else mapping.encode()
+    read = mapping_file.loads(data)
+    return read.width, read.height
+
+
+def one_frame(mapping):
+    """An animation of one frame in which every pixel has a colour of its own."""
+    width, height = canvas_of(mapping)
+    picture = b"".join(own_colour(position) for position in range(width * height))
+    return odrg.encode(jsonframes.Animation(width, height, ((1000, picture),)))
+
+
+def one_frame_show(mapping=TWO_LEGS, brightness=DIM):
+    """A show folder whose one item is the one-frame animation, playing from power-on."""
+    return show_folder(mapping, [("frame.odrg", one_frame(mapping))], brightness)
+
+
+def dense_clip(compressed, seconds=10):
+    """The dense 60 x 30 clip of some seconds: a smooth full-colour field, every LED lit."""
+    return odrg.encode(jsonframes.Animation(60, 30, tuple(dense.frames(60, 30, seconds))), compressed=compressed)
+
+
+def recorded(folder, seconds, script=""):
+    """The emulator's recording of a show folder: what the core gives every leg at every
+    tick, with the timed command lines of a script given to it."""
+    built = subprocess.run(["make", "-C", str(ROOT / "core"), "shared"], capture_output=True, text=True)
+    if built.returncode != 0:
+        raise AssertionError(f"`make -C core shared` failed:\n{built.stdout}{built.stderr}")
+    with tempfile.TemporaryDirectory() as work:
+        out, lines = pathlib.Path(work, "record.odrr"), pathlib.Path(work, "script.txt")
+        lines.write_text(script)
+        done = subprocess.run(
+            [sys.executable, "-m", "emulator", str(folder), "--record", str(out), "--seconds", str(seconds), "--script", str(lines)],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        if done.returncode != 0:
+            raise AssertionError(f"the emulator did not record {folder}: {done.stderr}")
+        return recfile.read(out)
+
+
+def leg_bytes(recording, ms):
+    """The LED bytes of each leg at the tick of a time, in the order of the legs."""
+    tick = next(tick for tick in recording.ticks if tick.ms == ms)
+    found, start = [], 0
+    for _, _, count in recording.legs:
+        found.append(tick.data[start:start + 3 * count])
+        start += 3 * count
+    return found

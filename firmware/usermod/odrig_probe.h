@@ -19,7 +19,7 @@ void pass(uint64_t now_ms);
 void polled(uint32_t poll_us);
 
 // Around one send: before it the outputs are compared with what they held after the
-// send before; after it what they hold is kept.
+// send before; after it what they hold is kept. This is done for one send in five.
 void beforeSend();
 void afterSend(uint64_t now_ms, uint32_t send_us);
 

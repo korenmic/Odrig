@@ -164,7 +164,7 @@ Rules for every task:
   - Requirements: 3.1, 3.2, 3.4, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 11.1, 11.4, 11.5, 14.1,
     14.7, 16.3, 16.4
 
-- [ ] 6. Outputs from mapping.json and playback
+- [x] 6. Outputs from mapping.json and playback
   - Make `apply()` and `matches()` use the core's legs, and add step 5 of the design's
     `loop()`: ask the core when the outputs can take data and send every refresh.
   - `tests/board/test_probe.py` in full, as the design lists it.
