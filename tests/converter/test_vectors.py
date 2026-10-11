@@ -1,13 +1,38 @@
 import collections
+import re
 import struct
+import types
 import unittest
 import zlib
 
-from odrig import jsonframes, odrg
+from odrig import errors, jsonframes, odrg
 
 from . import build_vectors, support
 
 VALID = support.ROOT / "tests" / "vectors" / "valid"
+INVALID = support.ROOT / "tests" / "vectors" / "invalid"
+
+# The reasons for which a reader rejects an ODRG file.
+READER_REASONS = (
+    "truncated",
+    "bad-magic",
+    "bad-version",
+    "reserved-bits",
+    "zero-size",
+    "bad-palette-size",
+    "canvas-too-large",
+    "no-frames",
+    "bad-deflate",
+    "zero-duration",
+    "bad-length",
+    "bad-stored-length",
+    "out-of-bits",
+    "run-past-end",
+    "bad-code",
+    "too-much-padding",
+    "bad-palette-index",
+    "trailing-bytes",
+)
 
 Parsed = collections.namedtuple("Parsed", "width height palette_size compressed n records first_block")
 Rice = collections.namedtuple("Rice", "value long_form")
@@ -79,6 +104,65 @@ def spelled(mode, data, n):
         for _ in range(n):
             rice()
     return codes
+
+
+def anatomy(data):
+    """How far a file can be followed from front to back, without judging what it holds.
+
+    `stream` says what became of a compressed body: "invalid", "cut", "whole", or
+    "followed" when bytes come after it. `ends` says where the body stops short: in the
+    "palette", in a "record start", in "record data", or at a "bad length". `records` holds
+    `(duration, L, mode, data)` for the records reached, and `extra` counts the bytes of the
+    body after the last one.
+    """
+    facts = types.SimpleNamespace(
+        header=len(data) >= 16, flags=0, palette_size=0, n=0, stream=None, ends=None, records=[], extra=0
+    )
+    if not facts.header:
+        return facts
+    _, _, facts.flags, width, height, facts.palette_size, count = struct.unpack_from("<4sBBHHHI", data)
+    facts.n = width * height * (1 if facts.palette_size else 3)
+    body = data[16:]
+    if facts.flags & 1:
+        inflater = zlib.decompressobj(wbits=-15)
+        try:
+            body = inflater.decompress(body)
+        except zlib.error:
+            facts.stream = "invalid"
+            return facts
+        if not inflater.eof:
+            facts.stream = "cut"
+            return facts
+        facts.stream = "followed" if inflater.unused_data else "whole"
+    at = 3 * facts.palette_size
+    if at > len(body):
+        facts.ends = "palette"
+        return facts
+    for _ in range(count):
+        if at + 5 > len(body):
+            facts.ends = "record start"
+            return facts
+        duration, length, mode = struct.unpack_from("<HHB", body, at)
+        chunk = body[at + 5:at + 4 + length]
+        facts.records.append((duration, length, mode, chunk))
+        if length < 2 or length > facts.n + 1:
+            facts.ends = "bad length"
+            return facts
+        if len(chunk) < length - 1:
+            facts.ends = "record data"
+            return facts
+        at += 4 + length
+    facts.extra = len(body) - at
+    return facts
+
+
+def reported(data):
+    """The reason the reference decoder rejects the file with, or `None`."""
+    try:
+        odrg.decode(data)
+    except errors.Rejection as rejection:
+        return rejection.reason
+    return None
 
 
 class ValidVectors(unittest.TestCase):
@@ -252,6 +336,184 @@ class ValidVectors(unittest.TestCase):
             if len(jsonframes.merged(jsonframes.read(VALID / f"{name}.json").frames)) < len(self.parsed[name].records)
         ]
         self.assertTrue(merged, "no vector has two records in a row with the same picture")
+
+
+class InvalidVectors(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.files = {path.name: path.read_bytes() for path in INVALID.iterdir()}
+        cls.facts = [(name.split(".")[0], anatomy(data)) for name, data in cls.files.items()]
+
+    def some(self, reason, holds, message):
+        self.assertTrue(any(holds(facts) for named, facts in self.facts if named == reason), message)
+
+    def test_every_file_is_named_for_a_reason_a_reader_rejects_with(self):
+        self.assertTrue(self.files)
+        for name in self.files:
+            self.assertRegex(name, r"\A[a-z0-9-]+(\.[a-z0-9-]+)?\.odrg\Z")
+            self.assertIn(name.split(".")[0], READER_REASONS, name)
+
+    def test_every_file_is_rejected_with_the_reason_in_its_name(self):
+        for name, data in self.files.items():
+            expected = name.split(".")[0]
+            got = reported(data)
+            self.assertEqual(got, expected, f"{name}: expected {expected}, reported {got}")
+
+    def test_every_reason_has_at_least_one_file(self):
+        named = {name.split(".")[0] for name in self.files}
+        for reason in READER_REASONS:
+            self.assertIn(reason, named, f"no invalid vector for {reason}")
+
+    def test_the_reasons_are_those_of_the_odrg_table_of_the_reasons_document(self):
+        text = (support.ROOT / "docs" / "reasons.md").read_text(encoding="utf-8")
+        section = text.split("## ODRG files")[1].split("\n## ")[0]
+        self.assertEqual(tuple(re.findall(r"(?m)^\| `([a-z0-9-]+)` \|", section)), READER_REASONS)
+
+    def test_no_file_is_above_4096_bytes(self):
+        for name, data in self.files.items():
+            self.assertLessEqual(len(data), 4096, name)
+
+    # The separate cases the set must hold, found by looking into the files.
+
+    def test_a_reserved_flag_bit(self):
+        self.some("reserved-bits", lambda facts: facts.flags & 0xFE, "no vector with a reserved flag bit")
+
+    def test_mode_bit_7(self):
+        self.some(
+            "reserved-bits",
+            lambda facts: any(mode & 0x80 for _, _, mode, _ in facts.records),
+            "no vector with bit 7 of a mode byte",
+        )
+
+    def test_a_stored_mode_byte_other_than_0x40(self):
+        self.some(
+            "reserved-bits",
+            lambda facts: any(mode & 0xC0 == 0x40 and mode != 0x40 for _, _, mode, _ in facts.records),
+            "no vector with a stored mode byte other than 0x40",
+        )
+
+    def test_a_file_cut_off_in_the_header(self):
+        self.some("truncated", lambda facts: not facts.header, "no vector cut off in the header")
+
+    def test_a_file_cut_off_in_the_palette(self):
+        self.some(
+            "truncated",
+            lambda facts: facts.stream is None and facts.ends == "palette",
+            "no vector cut off in the palette",
+        )
+
+    def test_a_file_cut_off_in_the_first_five_bytes_of_a_record(self):
+        self.some(
+            "truncated",
+            lambda facts: facts.stream is None and facts.ends == "record start",
+            "no vector cut off in the first five bytes of a record",
+        )
+
+    def test_a_file_cut_off_in_the_data_of_a_record(self):
+        self.some(
+            "truncated",
+            lambda facts: facts.stream is None and facts.ends == "record data",
+            "no vector cut off in the data of a record",
+        )
+
+    def test_a_deflate_stream_cut_off(self):
+        self.some("truncated", lambda facts: facts.stream == "cut", "no vector with a DEFLATE stream cut off")
+
+    def test_a_complete_deflate_stream_whose_output_ends_inside_a_record(self):
+        self.some(
+            "truncated",
+            lambda facts: facts.stream == "whole" and facts.ends in ("record start", "record data"),
+            "no vector with a complete DEFLATE stream whose output ends inside a record",
+        )
+
+    def test_a_length_below_2(self):
+        self.some(
+            "bad-length",
+            lambda facts: facts.ends == "bad length" and facts.records[-1][1] < 2,
+            "no vector with L below 2",
+        )
+
+    def test_a_length_above_n_plus_1(self):
+        self.some(
+            "bad-length",
+            lambda facts: facts.ends == "bad length" and facts.records[-1][1] > facts.n + 1,
+            "no vector with L above N + 1",
+        )
+
+    def largest(self, facts, run):
+        """The largest code that the records of one mode spell."""
+        return max(
+            (
+                code.value + (1 if run else 0)
+                for _, _, mode, data in facts.records
+                if mode & 0xC0 == 0 and bool(mode & 8) == run
+                for code in spelled(mode, data, facts.n)
+                if isinstance(code, Rice)
+            ),
+            default=0,
+        )
+
+    def test_a_code_above_255_in_plain_mode(self):
+        self.some("bad-code", lambda facts: self.largest(facts, False) > 255, "no vector with a code above 255 in plain mode")
+
+    def test_a_code_above_255_in_run_mode(self):
+        self.some("bad-code", lambda facts: self.largest(facts, True) > 255, "no vector with a code above 255 in run mode")
+
+    def stored_index_too_large(self, facts):
+        return any(mode == 0x40 and max(data) >= facts.palette_size for _, _, mode, data in facts.records)
+
+    def test_a_bad_palette_index_in_a_stored_frame(self):
+        self.some("bad-palette-index", self.stored_index_too_large, "no vector with a bad palette index in a stored frame")
+
+    def test_a_bad_palette_index_in_a_coded_frame(self):
+        self.some(
+            "bad-palette-index",
+            lambda facts: not self.stored_index_too_large(facts),
+            "no vector with a bad palette index in a coded frame",
+        )
+
+    def test_bytes_after_the_last_record_in_an_uncompressed_body(self):
+        self.some(
+            "trailing-bytes",
+            lambda facts: facts.stream is None and facts.extra > 0,
+            "no vector with bytes after the last record in an uncompressed body",
+        )
+
+    def test_bytes_after_the_last_record_in_a_compressed_body(self):
+        self.some(
+            "trailing-bytes",
+            lambda facts: facts.stream == "whole" and facts.extra > 0,
+            "no vector with bytes after the last record in a compressed body",
+        )
+
+    def test_bytes_in_the_file_after_the_deflate_stream(self):
+        self.some(
+            "trailing-bytes",
+            lambda facts: facts.stream == "followed" and facts.extra == 0,
+            "no vector with bytes after the DEFLATE stream",
+        )
+
+    # The set is the output of the builder, and every file has one defect.
+
+    def test_before_its_one_change_every_file_decodes_and_after_it_is_rejected(self):
+        for case in build_vectors.invalid_cases():
+            with self.subTest(name=case.name):
+                self.assertIsNone(reported(case.valid))
+                self.assertEqual(reported(case.odrg), case.reason)
+                self.assertEqual(case.reason, case.name.split(".")[0])
+                self.assertNotEqual(case.odrg, case.valid)
+
+    def test_the_folder_holds_exactly_the_names_the_builder_produces(self):
+        self.assertEqual(sorted(self.files), sorted(build_vectors.invalid_files()))
+
+    def test_every_file_made_without_zlib_is_byte_identical_to_the_builders_output(self):
+        compared = 0
+        for case in build_vectors.invalid_cases():
+            if not case.zlib:
+                with self.subTest(name=case.name):
+                    self.assertEqual(self.files[f"{case.name}.odrg"], case.odrg)
+                    compared += 1
+        self.assertGreater(compared, 0)
 
 
 if __name__ == "__main__":

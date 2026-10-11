@@ -731,3 +731,15 @@ alone proves the feature.
 
 **Resolution.** Seed 01 `design.md`, "jsonframes", "odrg" and "Test vectors";
 `docs/converter.md`, "Test vectors".
+
+## Seed 01: Line endings of tracked files
+
+**Question.** The suite compares tracked files with the output of the generators and of the
+vector builder byte for byte, and `pack` copies two JSON files as bytes. Git for Windows by
+default rewrites the line ends of text files when it checks them out, which would make
+those comparisons fail on a computer the tool is meant to run on.
+
+**Answer.** A `.gitattributes` file tells git to leave every `.json` file as it is and to
+treat `.odrg` files as binary.
+
+**Resolution.** `.gitattributes`.

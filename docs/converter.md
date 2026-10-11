@@ -188,6 +188,29 @@ those frames.
 | `deflate-stored`, `deflate-fixed`, `deflate-dynamic` | One body in a DEFLATE stream of one stored block, one fixed-code block and one dynamic-code block. |
 | `encoded.pal`, `encoded.rgb` | Short animations written by `encode`, compressed. |
 
+`tests/vectors/invalid/` holds files that a reader must reject. A file is named
+`REASON.odrg` or `REASON.CASE.odrg`: the part before the first dot is the reason, one of
+those under "ODRG files" in [reasons.md](reasons.md). Each file is a small valid file with
+exactly one defect, and a reader is right when it rejects it for that reason.
+
+| Reason | Cases |
+|---|---|
+| `truncated` | `header`, `palette`, `record-start` and `record-data`: the file is cut off there. `deflate`: the DEFLATE stream is cut off. `deflate-body`: the stream is complete and its output ends inside a record. |
+| `bad-magic`, `bad-version`, `bad-palette-size`, `no-frames` | One file each: that header field is wrong. |
+| `reserved-bits` | `flag`: flag bit 1 is set. `mode-bit-7`: bit 7 of a mode byte is set. `stored-mode`: a stored frame's mode byte is `0x41`. |
+| `zero-size` | `width`, `height`. |
+| `canvas-too-large` | `palette`: 65,535 x 1 with a palette. `rgb`: 21,845 x 1 without one. |
+| `bad-deflate` | `block-type`: the block type is 3. `stored-length`: a stored block's length and its complement disagree. |
+| `zero-duration`, `bad-stored-length`, `run-past-end`, `too-much-padding` | One file each. |
+| `bad-length` | `below-2`: L is 1. `above-n-plus-1`: L is N + 2. |
+| `out-of-bits` | `plain`: the data of a plain-mode record lacks its last byte. `gamma`: a Gamma code is cut off by the end of the data. |
+| `bad-code` | `plain`: the Rice value 256 with k = 6. `run`: the Rice value 255 in run mode. |
+| `bad-palette-index` | `coded`, `stored`: in a coded frame and in a stored frame. |
+| `trailing-bytes` | `body`: a byte after the last record of an uncompressed body. `deflate-body`: the same inside a compressed body. `after-deflate`: a byte in the file after the DEFLATE stream. |
+
+None of the invalid files is made with zlib; their compressed bodies are DEFLATE streams of
+one stored block.
+
 The vectors are the output of a tracked program, which makes them from fixed data:
 
 ```

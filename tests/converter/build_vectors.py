@@ -19,6 +19,7 @@ from odrig import jsonframes, odrg
 VECTORS = pathlib.Path(__file__).resolve().parents[1] / "vectors"
 
 Valid = collections.namedtuple("Valid", "name odrg json zlib")
+Invalid = collections.namedtuple("Invalid", "name reason odrg valid zlib")
 
 STORED_BLOCKS, FIXED_BLOCKS, DYNAMIC_BLOCKS = 0, 1, 2
 
@@ -426,6 +427,190 @@ def valid_cases():
     return cases
 
 
+def compose(width, height, palette, records, magic=b"ODRG", version=1, flags=0, colours=None,
+            frames=None, wrap=None):
+    """A file put together field by field, so that any one field can be made wrong."""
+    body = b"".join(palette) + b"".join(records)
+    if wrap is not None:
+        body = wrap(body)
+        flags |= 1
+    header = struct.pack(
+        "<4sBBHHHI",
+        magic,
+        version,
+        flags,
+        width,
+        height,
+        len(palette) if colours is None else colours,
+        len(records) if frames is None else frames,
+    )
+    return header + body
+
+
+def record(duration, mode, data, length=None):
+    """A frame record put together by hand. `length` overrides the right value of L."""
+    if length is None:
+        length = len(data) + 1
+    return struct.pack("<HHB", duration, length, mode) + data
+
+
+def changed(whole, duration=None, length=None, mode=None, data=None):
+    """A frame record with some of its parts replaced."""
+    old_duration, old_length, old_mode = struct.unpack_from("<HHB", whole)
+    return record(
+        old_duration if duration is None else duration,
+        old_mode if mode is None else mode,
+        whole[5:] if data is None else data,
+        (old_length if data is None else len(data) + 1) if length is None else length,
+    )
+
+
+def bits(text):
+    """Bytes from a string of 0 and 1; spaces are ignored and zero-bits fill the last byte."""
+    text = text.replace(" ", "")
+    text += "0" * (-len(text) % 8)
+    return bytes(int(text[at:at + 8], 2) for at in range(0, len(text), 8))
+
+
+def stored_block(body):
+    """A raw DEFLATE stream of one stored block, written without zlib."""
+    return b"\x01" + struct.pack("<HH", len(body), len(body) ^ 0xFFFF) + body
+
+
+def invalid_cases():
+    """Every invalid vector: a valid file with one defect, named for the reason of its rejection.
+
+    Each case carries the valid bytes it was changed from. None is made with zlib.
+    """
+    cases = []
+
+    def case(name, odrg_bytes, valid):
+        cases.append(Invalid(name, name.split(".")[0], odrg_bytes, valid, False))
+
+    # A 3 x 2 file with a palette of 4: a coded record, a stored record, a coded record.
+    palette = colours(4, 201)
+    film = Film(3, 2, palette)
+    dice = Dice(202)
+    film.coded(20, 3, False, 1, plain_choice(dice, 1))
+    film.stored(40, bytes([3, 0, 1, 2, 3, 0]))
+    film.coded(60, 0, True, 0, run_choice(dice, 0, end="zero"))
+    first, stored, last = film.records
+    n = len(film.buffer)
+    base = compose(3, 2, palette, film.records)
+    body = base[16:]
+    packed = compose(3, 2, palette, film.records, wrap=stored_block)
+    start_of_stored = 16 + 3 * len(palette) + len(first)
+
+    case("truncated.header", base[:10], base)
+    case("truncated.palette", base[:16 + 5], base)
+    case("truncated.record-start", base[:start_of_stored + 3], base)
+    case("truncated.record-data", base[:start_of_stored + 5 + 2], base)
+    case("truncated.deflate", packed[:-3], packed)
+    case("truncated.deflate-body", base[:5] + b"\x01" + base[6:16] + stored_block(body[:-2]), packed)
+
+    case("bad-magic", compose(3, 2, palette, film.records, magic=b"ODRH"), base)
+    case("bad-version", compose(3, 2, palette, film.records, version=2), base)
+    case("reserved-bits.flag", compose(3, 2, palette, film.records, flags=0x02), base)
+    case(
+        "reserved-bits.mode-bit-7",
+        compose(3, 2, palette, [changed(first, mode=first[4] | 0x80), stored, last]),
+        base,
+    )
+    case(
+        "reserved-bits.stored-mode",
+        compose(3, 2, palette, [first, changed(stored, mode=0x41), last]),
+        base,
+    )
+    case("zero-size.width", compose(0, 2, palette, film.records), base)
+    case("zero-size.height", compose(3, 0, palette, film.records), base)
+    case("bad-palette-size", compose(3, 2, palette, film.records, colours=257), base)
+    case("no-frames", compose(3, 2, palette, film.records, frames=0), base)
+
+    case("bad-deflate.block-type", packed[:16] + b"\x07" + packed[17:], packed)
+    case("bad-deflate.stored-length", packed[:19] + bytes([packed[19] ^ 0x01]) + packed[20:], packed)
+
+    case("zero-duration", compose(3, 2, palette, [first, changed(stored, duration=0), last]), base)
+    case("bad-length.below-2", compose(3, 2, palette, [first, stored, changed(last, length=1)]), base)
+    case("bad-length.above-n-plus-1", compose(3, 2, palette, [first, stored, changed(last, length=n + 2)]), base)
+    case("bad-stored-length", compose(3, 2, palette, [first, changed(stored, length=n), last]), base)
+
+    case("bad-palette-index.stored", compose(3, 2, palette, [first, changed(stored, data=bytes([3, 0, 1, 2, 4, 0])), last]), base)
+    case("trailing-bytes.body", base + b"\x00", base)
+    case("trailing-bytes.deflate-body", base[:5] + b"\x01" + base[6:16] + stored_block(body + b"\x00"), packed)
+    case("trailing-bytes.after-deflate", packed + b"\x00", packed)
+
+    # The largest canvases, and each of them one pixel wider.
+    all_zero = record(20, 0x08, bits("0" * 15 + "1" * 16))
+    one_colour = colours(1, 203)
+    case(
+        "canvas-too-large.palette",
+        compose(65535, 1, one_colour, [all_zero]),
+        compose(65534, 1, one_colour, [all_zero]),
+    )
+    all_zero = record(20, 0x08, bits("0" * 15 + "1111111111111101"))
+    case("canvas-too-large.rgb", compose(21845, 1, [], [all_zero]), compose(21844, 1, [], [all_zero]))
+
+    # A 2 x 1 file with a palette of 3. Predictor 3, plain mode, k = 0: the codes 4 and 0 are
+    # the indexes 2 and 0, and the code 6 would be the index 3.
+    three = colours(3, 204)
+    case(
+        "bad-palette-index.coded",
+        compose(2, 1, three, [record(20, 0x30, bits("1111110 0"))]),
+        compose(2, 1, three, [record(20, 0x30, bits("11110 0"))]),
+    )
+
+    # A 2 x 2 file without a palette: twelve codes.
+    film = Film(2, 2)
+    dice = Dice(205)
+    film.coded(20, 3, False, 2, plain_choice(dice, 2))
+    plain = film.records[0]
+    valid = compose(2, 2, [], [plain])
+    case("out-of-bits.plain", compose(2, 2, [], [changed(plain, data=plain[5:-1])]), valid)
+    if len(plain) - 5 >= 12:
+        raise RuntimeError("the record has no room for a byte of padding")
+    case("too-much-padding", compose(2, 2, [], [changed(plain, data=plain[5:] + b"\x00")]), valid)
+    # Predictor 0, run mode, k = 0. Gamma 13 = 0001101 is twelve zero codes; Gamma 14 is thirteen.
+    case(
+        "run-past-end",
+        compose(2, 2, [], [record(20, 0x08, bits("0001110"))]),
+        compose(2, 2, [], [record(20, 0x08, bits("0001101"))]),
+    )
+
+    # A 20 x 16 file with a palette of 2: 320 codes. Predictor 3, run mode, k = 0: Gamma 1 and
+    # Rice 1 = 10 make the first code 2, the index 1; Gamma 320 = 00000000 101000000 ends the
+    # buffer. Without its last byte the Gamma code is cut off.
+    two = colours(2, 206)
+    long_run = record(20, 0x38, bits("1 10 00000000 101000000"))
+    case(
+        "out-of-bits.gamma",
+        compose(20, 16, two, [changed(long_run, data=long_run[5:-1])]),
+        compose(20, 16, two, [long_run]),
+    )
+
+    # A 2 x 1 file without a palette: six codes. Predictor 3, plain mode, k = 6: 1110 111111 is
+    # the code 255 and 11110 000000 would be the code 256. Five codes 0 = 0 000000 follow.
+    zeros = " 0 000000" * 5
+    case(
+        "bad-code.plain",
+        compose(2, 1, [], [record(20, 0x36, bits("11110 000000" + zeros))]),
+        compose(2, 1, [], [record(20, 0x36, bits("1110 111111" + zeros))]),
+    )
+    # Predictor 3, run mode, k = 0: Gamma 1, then Rice 254 in the long form makes the code
+    # 255, and Rice 255 would make it 256. Gamma 6 = 00110 ends the buffer.
+    case(
+        "bad-code.run",
+        compose(2, 1, [], [record(20, 0x38, bits("1 11111111 11111111 00110"))]),
+        compose(2, 1, [], [record(20, 0x38, bits("1 11111111 11111110 00110"))]),
+    )
+
+    for made in cases:
+        if len(made.odrg) > 4096 or len(made.valid) > 4096:
+            raise RuntimeError(f"{made.name} is above 4,096 bytes")
+    if len({made.name for made in cases}) != len(cases):
+        raise RuntimeError("two invalid vectors have the same name")
+    return cases
+
+
 def write(folder, files):
     """Makes `folder` hold exactly `files`, a mapping from file name to bytes."""
     folder.mkdir(parents=True, exist_ok=True)
@@ -444,8 +629,13 @@ def valid_files():
     return files
 
 
+def invalid_files():
+    return {f"{case.name}.odrg": case.odrg for case in invalid_cases()}
+
+
 def main():
     write(VECTORS / "valid", valid_files())
+    write(VECTORS / "invalid", invalid_files())
 
 
 if __name__ == "__main__":

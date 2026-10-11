@@ -145,7 +145,7 @@ Rules for every task:
   - Describe the vector layout and the build command in `docs/converter.md`.
   - Requirements: 18.1, 18.2, 18.3, 18.4, 18.5
 
-- [ ] 10. Invalid test vectors
+- [x] 10. Invalid test vectors
   - Add the invalid set to `build_vectors.py`, run it, and track `tests/vectors/invalid/`.
   - Extend `test_vectors.py`: every file in the folder is rejected with the reason before
     the first dot of its name; every reason of Requirement 6 has at least one file; the
