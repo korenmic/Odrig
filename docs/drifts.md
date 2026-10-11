@@ -3215,3 +3215,141 @@ for the target file stopped in `read`, with `TypeError: undefined is not an obje
 (evaluating 'leg.rows.length')`. The commit message of the task gives the three texts.
 
 **Resolution.** The commit of task 5.
+
+## Seed 05: The mapping view of upright legs: its parts, its sizes and the size of the board
+
+**Question.** The design draws the two arrangements of the mapping view of a column-leg
+file and gives the sizes of the tracks. It does not name the parts of the fit, says "about
+770 pixels high" for an area of 1280 x 546, and does not say how the room beside the canvas
+is shared between the cells and the board, nor what `tracks` gives for a column-leg file.
+
+**Answer.** With a board, `fit` gives a column-leg file `view` "mapping", `arrangement`
+"wide" or "narrow", `feed`, the parts of its LEDs view with both number bands, and `level`,
+`upright`, `nearLabel` (the names of the legs at the left of the board), `board`, `farZone`
+and `reaches`. A reach says of a leg its `kind` ("near" for the left row of pads, "far" for
+the right row, "off" for a pin the board lacks), its `level` track counted from the canvas,
+its `upright` track counted from the board, and for the right row its `way`, "short" or
+"long". `tracks` gives the legs of a column-leg file their places from the left; the level
+track is that place in the narrow arrangement and the place from the other end in the wide
+one. A row-leg file keeps "beside" and "below" and everything else it had.
+
+The number bands are 30 pixels high, 40 where the cells are 13 pixels or more, so that the
+numbers stand 11 pixels from the canvas, clear of the turns of the chains, which are 6
+pixels outside it. For the target file this gives: in 1280 x 546 and in 1100 x 600 the wide
+arrangement, cells of 9, a drawing of 1075 x 810; in 1920 x 1000 the wide one, cells of 12,
+a drawing of 1255 x 990, whole in the area; in 756 x 546 the narrow one, cells of 9, a
+drawing of 696 x 1263; in 600 x 546 the narrow one, cells of 7, a drawing of 576 x 1143.
+The level channel is 150 deep and the upright channel 136 wide in all five. The wide
+arrangement is used from a width of 960 on.
+
+Beside the canvas the board keeps pads 16 pixels apart, or as many as the height allows,
+before the cells grow beyond 9 pixels, and it gives way down to 10 only so that cells of 9
+fit; what room is left then goes to the board, up to 20. Without this a file of 48 columns
+took the whole width for its cells and left a board whose names stood on each other. The
+canvas with its bands lies against the level channel and the board stands in the middle of
+the height beside it. In the narrow arrangement the board has pads 10 to 16 apart, as the
+board below the canvas of a row-leg file has.
+
+**Resolution.** `emulator/web/layout.js`, `placeWired`, `fitWired` and `tracks`;
+`tests/emulator/test_layout.py`, `UprightMapping`.
+
+## Seed 05: The short way round the board, where the board does not stand beside the canvas
+
+**Question.** The design says that a leg of the right row of pads takes the short way when
+its level track is in the half of the level channel farthest from the canvas, and that the
+rules keep two lines from crossing twice. In the narrow arrangement the far zone lies under
+the canvas. A leg whose first LED is to the left of the loops would, on the short way, come
+up to its level track and turn back along it, and two such lines cross twice: once where
+the loop of one passes the level track of the other, and once more where the last piece of
+the other passes the level track of the first. The design does not say which way the middle
+track of an odd number of legs takes, nor where several pads that the board lacks stand.
+
+**Answer.** In the narrow arrangement a leg takes the short way only when its level track
+is in the far half and its first LED is to the right of every loop; otherwise it takes the
+long way. In the wide arrangement the rule is the design's alone. For the target file
+nothing changes: legs 1 and 2 take the short way in the wide arrangement and legs 19 and 20
+in the narrow one. The middle track takes the short way, so one leg on a pad of the right
+row is not led round the whole board. Of several pads beyond the board, the one whose level
+track is farthest from the canvas stands nearest the level channel, so that their lines do
+not cross each other.
+
+Counted by the test from the lines themselves, the lines of the target file cross 88 times
+in each of the five areas, in both arrangements, no pair twice and none on another: 83
+pairs of the left row whose upper pad has the lower leg number, four pairs of a short-way
+and a long-way line in the far zone, and legs 19 and 20. With every leg of the right row
+on the short way the test failed with `116 != 88 : (1280, 546), wide: the lines of the
+target file cross 116 times`; the narrow arrangement then has 118 crossings, and the lines
+of legs 1 and 2 cross twice.
+
+**Resolution.** `emulator/web/layout.js`, `placeWired`; `tests/emulator/test_layout.py`,
+`UprightLines`.
+
+## Seed 05: The made-up column-leg files, and the arrangement each gets
+
+**Question.** Task 6 asks for the wide arrangement in areas of 1280 x 546, 1920 x 1000 and
+1100 x 600 and the narrow one in 756 x 546 and 600 x 546, "for the target file and the
+made-up column files". The made-up files of the suite have six columns at most. By the
+design's rule the board stands beside the canvas wherever cells of 9 pixels fit the width
+with it, and for those files that is every one of the five areas. None of them has a pin
+the board lacks beside pads of both rows, and none is fed from the top with more than one
+leg.
+
+**Answer.** The rule is kept. The small files get the wide arrangement in all five areas,
+and the tests say so. Five files are added in the test, each 48 columns wide or more, which
+get the wide arrangement in the first three areas and the narrow one in the last two, as
+the target file does: the target with leg 7 started at the top; the target with every leg
+started at the top; a file of twelve legs with two pins the board lacks, pads in both rows,
+columns that are not neighbours and two legs started at the top; the same with every start
+turned over, which is fed from the top and has two legs started at the bottom; and sixteen
+legs that are all on pads of the right row. They stay in the test: the made-up files of
+`tests/core/support.py` are the ones every suite plays on, and those are not changed.
+
+**Resolution.** `tests/emulator/test_layout.py`, `upright_mappings` and `UprightCase`.
+
+## Seed 05: A first LED at the far edge, and chains of columns that are apart
+
+**Question.** The design says that the number 1 of the first LED is a tag on the last piece
+of the line, and that a first LED at the far edge is reached through the gap at the left of
+the leg's first column, where the line turns into the LED from outside the canvas. That
+turn is half a cell wide and 6 pixels outside the canvas: there is no room for a tag on it.
+The design says that a chain turns outside the edge of the canvas into the next column, and
+nothing about two turns at the same edge that span the same columns.
+
+**Answer.** As in the drawing of rows: the tag of such a leg stands in the number band at
+the far edge, over the column of the first LED, just beyond the turn, where the number 1
+would stand; the line ends under it. Every other tag is on the last piece of its line. The
+turns of all chains are 6 pixels outside the canvas. Where the columns of a leg are not
+neighbours, a turn passes other columns, and two turns at one edge can lie on each other,
+as the turns of rows that are apart do in the drawing of a row-leg file. The target file
+has no such leg. Whether that needs more is for the check by eye.
+
+**Resolution.** `emulator/web/layout.js`, `wiresWired` and `chain`; `emulator/web/view.js`,
+`uprightLabels`; `tests/emulator/test_layout.py`, `UprightView`.
+
+## Seed 05: The view script run without a browser, and row-leg files compared before and after
+
+**Question.** Task 6 changes `emulator/web/view.js` and names tests of the layout script
+only. What the view script draws was so far checked by eye and by reading its text. Task 6
+also says that row-leg files are drawn exactly as before.
+
+**Answer.** A second script for the JavaScript shell, `tests/emulator/js/dump_view.js`,
+loads the page's scripts after a stand-in for the document that keeps every element they
+make, and prints the elements of the mapping view. The tests read from it, for every
+column-leg mapping in a wide and a narrow area: one pad, line, tag, chain and frame for
+every leg in the leg's colour; the tag on the last piece of the line; the numbers upright
+in the two bands, none over another and clear of the turns; `GPIO <pin>` beside a pad the
+board lacks; and that pointing at a leg marks every part of it and fades the others.
+
+That row-leg files are drawn as before was established by comparing, before and after the
+change, for the eight row-leg mappings of the suite: everything the layout script gives in
+fourteen areas with and without a board, and every element the view script makes for the
+mapping view in nine areas, 20,295 elements with all their attributes. Both are the same,
+byte for byte. The LEDs view of all eleven mappings of both kinds, 5,665 elements in nine
+areas, is the same too. In the browser, headless Chrome 154, the target file was looked at
+in windows of 1280 x 800 and 756 x 900, with the pointer on an LED, a label, a pad and a
+line, and files with legs started at the top and with pins the board lacks beside it.
+
+**Resolution.** `tests/emulator/js/dump_view.js`; `tests/emulator/test_layout.py`,
+`UprightView`. The tab `Mapping` on a column-leg file now shows this view, which replaces
+what the entry "The tab Mapping on a column-leg file, before its mapping view is written"
+describes.

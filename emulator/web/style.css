@@ -197,6 +197,7 @@ code, .value, .readout, .log td, .log th { font-family: var(--mono); }
 .drawing .chevron { fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
 .drawing .wire { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .drawing .reach-line { fill: none; stroke: transparent; stroke-width: 11; pointer-events: stroke; }
+.drawing .close .reach-line { stroke-width: 7; }
 .drawing .tag { fill: var(--stage); stroke-width: 1.2; }
 .drawing .veil { fill: #000000; opacity: 0; transition: opacity 0.12s; }
 .drawing .t-wire { pointer-events: auto; cursor: default; }

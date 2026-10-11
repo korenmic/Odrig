@@ -175,7 +175,7 @@ Rules for every task:
   - Requirements: 3.1, 3.2, 3.4, 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7,
     8.8, 10.1, 10.2, 10.3, 15.2
 
-- [ ] 6. The mapping view for upright legs and twenty lines
+- [x] 6. The mapping view for upright legs and twenty lines
   - `emulator/web/layout.js`: the wide and the narrow arrangement for column legs, the
     level and the upright channel, the track rules, the short and the long way round the
     board, the line to a first LED at the far edge, the mirrored arrangements for a feed

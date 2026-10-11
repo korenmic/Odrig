@@ -44,6 +44,22 @@ var OdrigLayout = (function () {
      through a band between canvas and board and down a second channel. */
   var BELOW = {gap: 10, legible: 9};
 
+  /* The mapping view of a column-leg file. Two channels carry the lines: the level
+     channel along the feed edge of the canvas, with a level track for each leg, and the
+     upright channel at the left of the board, with an upright track for each leg that
+     needs one. A track takes `track` pixels, and a channel has `channelPad` more at each
+     side. At the left of the board stand the names of the legs of its left row of pads.
+     At its right is the far zone: the loops of the lines for its right row, `track`
+     apart from `loopFirst` on, and the names of those legs. A pin the board lacks gets a
+     pad of its own, `offPad` from the next. A turn of a chain is `turn` outside the
+     canvas, and a line ends `tip` outside it. */
+  var WIRED = {track: 7, channelPad: 5, nearLabel: 42, farLabel: 40, loopFirst: 10, loopEnd: 6, offPad: 18, gap: 10,
+               turn: 6, tip: 2, legible: 9};
+  /* The parts around the canvas in that view: those of the LEDs view, with number bands
+     that hold the numbers clear of the turns. */
+  var WIRED_ROOMY = {gutter: 16, yLabel: 40, header: 20, legBand: 42, number: 40, margin: 10};
+  var WIRED_COMPACT = {gutter: 10, yLabel: 30, header: 16, legBand: 32, number: 30, margin: 6};
+
   /* The board in units of the distance between two pads. */
   var BOARD = {width: 11.5, height: 26.25, head: 2.75, inset: 0.5625, pad: 0.27};
   var PITCH = {least: 10, usual: 16, most: 20};
@@ -302,13 +318,16 @@ var OdrigLayout = (function () {
     return null;
   }
 
-  /* For each leg of a row-leg file its track in the channel between the canvas and the
-     board: the legs ordered by the y of their first row, highest first, get the tracks 0,
-     1, 2 and so on, track 0 nearest the canvas. */
+  /* For each leg its place among the legs along the feed edge, from 0. The legs of a
+     row-leg file are ordered by the y of their first row, highest first, and the place of
+     a leg is its track in the channel between the canvas and the board, track 0 nearest
+     the canvas. The legs of a column-leg file are ordered by the x of their first column,
+     from the left. */
   function tracks(m) {
+    var way = m.kind === "columns" ? -1 : 1;
     var order = m.legs.map(function (leg, i) { return i; });
     order.sort(function (a, b) {
-      return m.legs[b].strips[0] - m.legs[a].strips[0] || a - b;
+      return way * (m.legs[b].strips[0] - m.legs[a].strips[0]) || a - b;
     });
     var track = [];
     order.forEach(function (i, k) {
@@ -611,12 +630,242 @@ var OdrigLayout = (function () {
     };
   }
 
+  /* Where the line of leg i of a column-leg file comes to its first LED, for a feed edge
+     and a cell size: the column of that LED, whether the LED is at the feed edge, and how
+     far from the left edge of the canvas the last upright piece of the line runs. To a
+     first LED at the feed edge it runs in the middle of the column. To one at the far
+     edge it runs in the gap at the left of the column. */
+  function entryOf(m, feed, cell, i) {
+    var first = position(m, m.legs[i].pin, 1);
+    var atFeed = m.height === 1 || (first[1] === 1) === (feed === "bottom");
+    return {column: first[0], atFeed: atFeed, across: (atFeed ? first[0] - 0.5 : first[0] - 1) * cell};
+  }
+
+  /* The mapping view of a column-leg file for one cell size: the place of every part,
+     and for every leg how its line runs. `wide` puts the board beside the canvas, with
+     the level channel reaching on under the upright channel, the board and the far zone.
+     Otherwise the level channel lies between the canvas and the board, and the canvas
+     begins to the right of the upright channel. With the feed edge at the top both are
+     turned over from top to bottom, all but the board itself.
+
+     A reach says of a leg: `kind`, "near" for a pad in the left row of the board, "far"
+     for one in the right row and "off" for a pin the board lacks; `at`, the pad; `level`,
+     its level track, counted from the canvas; `upright`, its upright track, counted from
+     the board; and for a far pad `way`, "short" or "long", `loop`, its place among the
+     loops in the far zone, counted from the board, and on the long way `beyond`, its
+     place among the lines that pass beyond the end of the board, counted from the board.
+     An off pad has `index`, its place among the pads beyond the board, counted from the
+     board.
+
+     Beside the canvas the pads of the board are `wanted` apart or more, as far as the
+     height lets them be: a drawing that has no room for that is wider than the area. */
+  function placeWired(m, board, wide, parts, cell, wanted, width, height) {
+    var wired = WIRED;
+    var feed = side(m);
+    var down = feed === "bottom" ? 1 : -1;
+    /* The way from the board to the level channel: down or up the drawing. */
+    var toChannel = wide ? down : -down;
+    var legs = m.legs.length;
+    var canvasWidth = m.width * cell;
+    var canvasHeight = m.height * cell;
+    var canvasBlock = parts.header + parts.legBand + 2 * parts.number + canvasHeight;
+    var levelDepth = wired.track * legs + 2 * wired.channelPad;
+
+    /* The lines reach the level channel from the right where the board stands beside the
+       canvas, and from the left otherwise. The leg whose first LED is farthest from that
+       side takes the level track farthest from the canvas. */
+    var order = tracks(m);
+    var reached = m.legs.map(function (leg, i) {
+      var at = place(board, leg.pin);
+      return {leg: i, kind: at ? (at.row === "left" ? "near" : "far") : "off", at: at, level: wide ? legs - 1 - order[i] : order[i]};
+    });
+    function ofKind(kind) {
+      return reached.filter(function (reach) { return reach.kind === kind; });
+    }
+    var far = ofKind("far");
+    var off = ofKind("off");
+    var farZone = far.length ? wired.loopFirst + wired.track * (far.length - 1) + wired.loopEnd + wired.farLabel : parts.margin;
+
+    /* A board that does not stand beside the canvas is as wide as the canvas lets it be. */
+    var pitch = wide ? PITCH.least : clamp(Math.floor((canvasWidth - wired.nearLabel - farZone) / BOARD.width), PITCH.least, PITCH.usual);
+    /* How far to the right of the left edge of the canvas the outermost loop is then. */
+    var lastLoop = wired.nearLabel + Math.round(BOARD.width * pitch) + wired.loopFirst + wired.track * (far.length - 1);
+
+    /* A line from the right row of pads goes round the board. The short way is round the
+       end that faces the level channel, and reaches the level track from the far side of
+       the board. The long way is round the other end and then along the left side of the
+       board. A leg takes the short way when its level track is in the half of the level
+       channel farthest from the canvas. Where the board does not stand beside the canvas,
+       a leg whose first LED is not to the right of every loop takes the long way too: on
+       the short way its line would turn back along its level track. */
+    far.forEach(function (reach) {
+      var farHalf = 2 * reach.level + 1 >= legs;
+      var turnsOneWay = wide || entryOf(m, feed, cell, reach.leg).across >= lastLoop + wired.track;
+      reach.way = farHalf && turnsOneWay ? "short" : "long";
+    });
+
+    /* The nearer to the level channel of two pads first. A pad beyond the board is nearer
+       than every pad of the board, and of two such pads the one whose level track is
+       farther from the canvas is the nearer. */
+    function nearerFirst(a, b) {
+      if ((a.kind === "off") !== (b.kind === "off")) {
+        return a.kind === "off" ? -1 : 1;
+      }
+      if (a.kind === "off") {
+        return b.level - a.level;
+      }
+      return toChannel * (b.at.index - a.at.index) || a.leg - b.leg;
+    }
+    /* Of the pads whose lines leave the board at its left, the nearest to the level
+       channel takes the upright track nearest the board. */
+    var beside = reached.filter(function (reach) { return reach.kind !== "far"; }).sort(nearerFirst);
+    beside.forEach(function (reach, track) {
+      reach.upright = track;
+    });
+    off.sort(nearerFirst).reverse().forEach(function (reach, index) {
+      reach.index = index;
+    });
+    /* The loops of each way nest. On the short way the pad farthest from the level
+       channel takes the outer loop. On the long way the pad nearest the level channel
+       takes the outer loop, which passes farthest beyond the end of the board and takes
+       the upright track farthest from the board, beyond every other upright track. */
+    var shorts = far.filter(function (reach) { return reach.way === "short"; }).sort(nearerFirst);
+    shorts.forEach(function (reach, loop) {
+      reach.loop = loop;
+    });
+    var longs = far.filter(function (reach) { return reach.way === "long"; }).sort(nearerFirst).reverse();
+    longs.forEach(function (reach, loop) {
+      reach.loop = shorts.length + loop;
+      reach.beyond = loop;
+      reach.upright = beside.length + loop;
+    });
+
+    var uprightWidth = wired.track * (beside.length + longs.length) + 2 * wired.channelPad;
+    /* Beyond the end of the board that faces the level channel stand the pads the board
+       lacks, and beyond its other end pass the lines of the long way. */
+    var offZone = wired.offPad * off.length;
+    var longZone = longs.length ? wired.loopFirst + wired.track * (longs.length - 1) + wired.loopEnd : 0;
+
+    /* Beside the canvas the board takes the room that the canvas and the area leave. */
+    var fixed = 2 * parts.gutter + parts.yLabel + uprightWidth + wired.nearLabel + farZone;
+    if (wide) {
+      var room = Math.max(canvasBlock, height - 2 * parts.margin - levelDepth) - offZone - longZone;
+      pitch = Math.min(wanted, clamp(Math.floor(room / BOARD.height), PITCH.least, PITCH.most));
+      while (pitch < PITCH.most && fixed + canvasWidth + Math.round(BOARD.width * (pitch + 1)) <= width && Math.round(BOARD.height * (pitch + 1)) <= room) {
+        pitch += 1;
+      }
+    }
+    var boardWidth = Math.round(BOARD.width * pitch);
+    var boardHeight = Math.round(BOARD.height * pitch);
+    var boardBlock = offZone + boardHeight + longZone;
+    var block = Math.max(canvasBlock, boardBlock);
+    /* Where the board does not stand beside the canvas, the canvas begins to the right of
+       the upright channel, so that every first LED is to the right of every upright
+       track. The marks of the rows stand in that margin. */
+    var lead = wide ? parts.yLabel : Math.max(parts.yLabel, uprightWidth);
+    var contentWidth = wide ? fixed + canvasWidth + boardWidth : 2 * parts.gutter + lead + Math.max(canvasWidth, wired.nearLabel + boardWidth + farZone);
+    var contentHeight = 2 * parts.margin + levelDepth + (wide ? block : canvasBlock + wired.gap + boardBlock);
+    var left = Math.max(0, Math.floor((width - contentWidth) / 2));
+    var top = Math.max(0, Math.floor((height - contentHeight) / 2));
+    var inner = top + parts.margin;
+    var end = top + contentHeight - parts.margin;
+    var canvasX = left + parts.gutter + lead;
+
+    var canvasBlockY;
+    var levelY;
+    var boardBlockY;
+    var upright;
+    if (wide) {
+      /* The canvas with its bands lies against the level channel, and the board stands
+         in the middle of the height beside it. */
+      var blockY = down > 0 ? inner : inner + levelDepth;
+      levelY = down > 0 ? blockY + block : inner;
+      canvasBlockY = down > 0 ? levelY - canvasBlock : blockY;
+      boardBlockY = blockY + Math.floor((block - boardBlock) / 2);
+      upright = {x: canvasX + canvasWidth, y: blockY, width: uprightWidth, height: block};
+    } else {
+      canvasBlockY = down > 0 ? inner : end - canvasBlock;
+      levelY = down > 0 ? canvasBlockY + canvasBlock : canvasBlockY - levelDepth;
+      boardBlockY = down > 0 ? levelY + levelDepth + wired.gap : inner;
+      upright = {x: canvasX - uprightWidth, y: down > 0 ? levelY + levelDepth : inner, width: uprightWidth, height: wired.gap + boardBlock};
+    }
+    var nearX = wide ? upright.x + uprightWidth : canvasX;
+    var boardX = nearX + wired.nearLabel;
+    var boardY = boardBlockY + (toChannel > 0 ? longZone : offZone);
+    var levelX = wide ? canvasX : upright.x;
+    var placed = uprightParts(m, parts, cell, true, canvasX - parts.yLabel, canvasBlockY);
+    return {
+      view: "mapping",
+      arrangement: wide ? "wide" : "narrow",
+      feed: feed,
+      cell: cell,
+      roomy: parts === WIRED_ROOMY,
+      width: Math.max(width, contentWidth),
+      height: Math.max(height, contentHeight),
+      content: {x: left, y: top, width: contentWidth, height: contentHeight},
+      gutters: [
+        {x: left, y: top, width: parts.gutter, height: contentHeight},
+        {x: left + contentWidth - parts.gutter, y: top, width: parts.gutter, height: contentHeight}
+      ],
+      header: placed.header,
+      legBand: placed.legBand,
+      legWords: placed.legWords,
+      yLabel: placed.yLabel,
+      numberTop: placed.numberTop,
+      numberBottom: placed.numberBottom,
+      canvas: placed.canvas,
+      level: {x: levelX, y: levelY, width: left + contentWidth - parts.gutter - levelX, height: levelDepth},
+      upright: upright,
+      nearLabel: {x: nearX, y: boardY, width: wired.nearLabel, height: boardHeight},
+      board: {x: boardX, y: boardY, width: boardWidth, height: boardHeight, pitch: pitch},
+      farZone: {x: boardX + boardWidth, y: boardBlockY, width: farZone, height: boardBlock},
+      reaches: reached
+    };
+  }
+
+  /* The mapping view of a column-leg file for a drawing area. The board stands beside
+     the canvas where the area is wide enough for that with cells large enough to read.
+     The cell is the largest at which the drawing fits the area in both directions. Where
+     that is too small to read, it is the largest up to the readable size that fits the
+     width: the drawing is then higher than the area. A board beside the canvas keeps its
+     usual size before the cells grow, and gives way only to cells of the readable size. */
+  function fitWired(m, width, height, board) {
+    function placed(wide, parts, cell, wanted) {
+      return placeWired(m, board, wide, parts, cell, wanted, width, height);
+    }
+    var wide = placed(true, WIRED_COMPACT, WIRED.legible, PITCH.least).content.width <= width;
+    function largest(parts, wanted) {
+      var readable = null;
+      for (var cell = MAX_CELL; cell >= MIN_CELL; cell -= 1) {
+        var f = placed(wide, parts, cell, wanted);
+        if (f.content.width <= width) {
+          if (cell >= WIRED.legible && f.content.height <= height) {
+            return f;
+          }
+          if (cell <= WIRED.legible && !readable) {
+            readable = f;
+          }
+        }
+      }
+      return readable;
+    }
+    function best(parts) {
+      var usual = largest(parts, PITCH.usual);
+      if (usual && usual.cell >= WIRED.legible) {
+        return usual;
+      }
+      return largest(parts, PITCH.least) || usual || placed(wide, parts, MIN_CELL, PITCH.least);
+    }
+    var roomy = best(WIRED_ROOMY);
+    return roomy.cell >= ROOMY_FROM ? roomy : best(WIRED_COMPACT);
+  }
+
   /* The cell size in pixels and the place of every part, for a drawing area of a width
-     and a height. For a row-leg file: the LEDs view, or with a board the mapping view.
-     For a column-leg file: the drawing of its LEDs, with a board as without one. */
+     and a height: the LEDs view, or with a board the mapping view, each as the kind of
+     the file has it. */
   function fit(m, width, height, board) {
     if (m.kind === "columns") {
-      return fitUpright(m, width, height);
+      return board ? fitWired(m, width, height, board) : fitUpright(m, width, height);
     }
     return board ? fitMapping(m, width, height, board) : fitLeds(m, width, height);
   }
@@ -631,13 +880,74 @@ var OdrigLayout = (function () {
   }
 
   /* For each leg of a fitted mapping view: its pad, the label of the leg beside the pad,
-     and the corner points of the line from the pad to the first LED of the chain. The
-     drawing of a column-leg file has no board, and so no lines. */
+     and the corner points of the line from the pad to the first LED of the chain. */
   function wires(m, f, board) {
     if (m.kind === "columns") {
-      return [];
+      return wiresWired(m, f);
     }
     return f.arrangement === "below" ? wiresBelow(m, f) : wiresBeside(m, f);
+  }
+
+  /* The lines of a column-leg file. A line runs level from its pad to its upright track,
+     along that to its level track, along that to the x of its first LED, and upright to
+     that LED. A line from the right row of pads first runs level to its loop in the far
+     zone. On the short way the loop leads to the level track. On the long way it leads
+     beyond the other end of the board, and the line comes back across there to its
+     upright track. */
+  function wiresWired(m, f) {
+    var wired = WIRED;
+    var down = f.feed === "bottom" ? 1 : -1;
+    var toChannel = f.arrangement === "wide" ? down : -down;
+    var radius = BOARD.pad * f.board.pitch;
+    var feedEdge = down > 0 ? f.canvas.y + f.canvas.height : f.canvas.y;
+    var farEdge = down > 0 ? f.canvas.y : f.canvas.y + f.canvas.height;
+    var firstLevel = (down > 0 ? f.level.y : f.level.y + f.level.height) + down * (wired.channelPad + wired.track / 2);
+    var firstUpright = f.upright.x + f.upright.width - wired.channelPad - wired.track / 2;
+    var firstLoop = f.board.x + f.board.width + wired.loopFirst;
+    var facingEnd = toChannel > 0 ? f.board.y + f.board.height : f.board.y;
+    var otherEnd = toChannel > 0 ? f.board.y : f.board.y + f.board.height;
+
+    return f.reaches.map(function (reach) {
+      var levelY = firstLevel + down * wired.track * reach.level;
+      var trackX = firstUpright - wired.track * reach.upright;
+      var pad = reach.at
+        ? padAt(f, reach.at.row, reach.at.index)
+        : [padAt(f, "left", 0)[0], facingEnd + toChannel * wired.offPad * (reach.index + 0.6)];
+      var points = [pad];
+      var label;
+      if (reach.kind === "far") {
+        var loopX = firstLoop + wired.track * reach.loop;
+        label = {x: f.farZone.x + f.farZone.width - wired.farLabel, y: pad[1] + 3.5, anchor: "start"};
+        points.push([loopX, pad[1]]);
+        if (reach.way === "long") {
+          var beyondY = otherEnd - toChannel * (wired.loopFirst + wired.track * reach.beyond);
+          points.push([loopX, beyondY], [trackX, beyondY], [trackX, levelY]);
+        } else {
+          points.push([loopX, levelY]);
+        }
+      } else {
+        label = {x: pad[0] - radius - 5, y: pad[1] - 4, anchor: "end"};
+        points.push([trackX, pad[1]], [trackX, levelY]);
+      }
+      var entry = entryOf(m, f.feed, f.cell, reach.leg);
+      var columnX = f.canvas.x + (entry.column - 0.5) * f.cell;
+      if (entry.atFeed) {
+        points.push([columnX, levelY], [columnX, feedEdge + down * wired.tip]);
+      } else {
+        /* The first LED is at the far edge of the canvas: the line runs in the gap at
+           the left of the leg's first column to that edge and turns into the LED. */
+        var gapX = f.canvas.x + entry.across;
+        var turnY = farEdge - down * wired.turn;
+        points.push([gapX, levelY], [gapX, turnY], [columnX, turnY], [columnX, farEdge - down * wired.tip]);
+      }
+      return {
+        leg: reach.leg,
+        kind: reach.kind,
+        pad: {x: pad[0], y: pad[1], radius: radius, row: reach.at ? reach.at.row : null, index: reach.at ? reach.at.index : null},
+        label: label,
+        points: points
+      };
+    });
   }
 
   /* The last part of a line, from its track in the channel to the first LED. */
@@ -757,17 +1067,40 @@ var OdrigLayout = (function () {
     });
   }
 
-  /* The corner points, in the pixels of a fitted drawing, of the chain of leg i of a
-     row-leg file: along each row through the centres of its LEDs, and from the end of a
-     row to the start of the next by a short piece outside the edge of the canvas. `turns`
-     says, for every row but the first, where the chain comes back in and in which
-     direction. The drawing of a column-leg file has no chain: no point and no turn. */
+  /* The corner points, in the pixels of a fitted drawing, of the chain of leg i: along
+     each strip through the centres of its LEDs, and from the end of a strip to the start
+     of the next by a short piece outside the edge of the canvas. `turns` says, for every
+     strip but the first, where the chain comes back in and in which direction: for a row
+     along x, for a column down the drawing. */
   function chain(m, f, i) {
+    return m.kind === "columns" ? chainOfColumns(m, f, i) : chainOfRows(m, f, i);
+  }
+
+  function chainOfColumns(m, f, i) {
     var points = [];
     var turns = [];
-    if (m.kind === "columns") {
-      return {points: points, turns: turns};
-    }
+    var top = f.canvas.y;
+    var bottom = f.canvas.y + f.canvas.height;
+    var corners = path(m, i);
+    strips(m, i).forEach(function (strip, s) {
+      var start = centre(m, f, corners[2 * s][0], corners[2 * s][1]);
+      var end = centre(m, f, corners[2 * s + 1][0], corners[2 * s + 1][1]);
+      var fromTop = strip.start === "top";
+      if (s > 0) {
+        var outside = fromTop ? top - WIRED.turn : bottom + WIRED.turn;
+        points.push([points[points.length - 1][0], outside]);
+        points.push([start[0], outside]);
+        turns.push({x: start[0], y: fromTop ? top - 1 : bottom + 1, direction: fromTop ? 1 : -1});
+      }
+      points.push(start);
+      points.push(end);
+    });
+    return {points: points, turns: turns};
+  }
+
+  function chainOfRows(m, f, i) {
+    var points = [];
+    var turns = [];
     var corners = path(m, i);
     for (var r = 0; r < corners.length; r += 2) {
       var start = centre(m, f, corners[r][0], corners[r][1]);
