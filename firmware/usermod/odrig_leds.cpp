@@ -6,6 +6,9 @@ namespace {
 
 OdrigLegSource legSource = {nullptr, nullptr};
 
+char summaryText[160] = "0/0";
+bool summaryIsOld = true;
+
 bool legAt(uint32_t index, OdrigLeg *out) {
   return legSource.leg != nullptr && legSource.leg(index, out);
 }
@@ -49,9 +52,24 @@ void startOutputsAfterAFailedOne() {
   }
 }
 
+// Writes the outputs in words, for WLED's information.
+void summarize() {
+  const uint32_t count = OdrigLeds::legs();
+  size_t length = snprintf(summaryText, sizeof(summaryText), "%u/%u", (unsigned)OdrigLeds::working(), (unsigned)count);
+  for (uint32_t i = 0; i < count && length < sizeof(summaryText) - 1; i++) {
+    OdrigLeg leg;
+    Bus *bus = BusManager::getBus(i);
+    if ((bus && bus->isOk()) || !legAt(i, &leg)) continue;
+    length += snprintf(summaryText + length, sizeof(summaryText) - length, " leg %u pin %u", (unsigned)leg.leg, (unsigned)leg.pin);
+  }
+  summaryIsOld = false;
+}
+
 }  // namespace
 
 void OdrigLeds::source(const OdrigLegSource &legs) { legSource = legs; }
+
+const char *OdrigLeds::summary() { return summaryText; }
 
 uint32_t OdrigLeds::legs() { return legSource.count != nullptr ? legSource.count() : 0; }
 
@@ -103,8 +121,12 @@ void OdrigLeds::hold() {
     // WLED's LED settings were saved: WLED makes the outputs again in this pass of its
     // loop, from the list that is filled here.
     if (legs() != 0) describeOutputs();
+    summaryIsOld = true;
   } else if (!matches()) {
     apply();
+    summaryIsOld = true;
+  } else if (summaryIsOld) {
+    summarize();
   }
 }
 

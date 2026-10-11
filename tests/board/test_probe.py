@@ -163,6 +163,12 @@ class Port(unittest.TestCase):
         self.assertIsNone(support.probe()["error"])
         self.assertIsNone(support.command(PORT, "status")[1]["error"])
 
+    def test_wled_reports_its_access_point_as_up(self):
+        deadline = time.monotonic() + 20.0
+        while support.probe()["ap"] != 1 and time.monotonic() < deadline:
+            time.sleep(1.0)
+        self.assertEqual(support.probe()["ap"], 1)
+
     def test_the_port_is_silent_without_a_command(self):
         self.assertEqual(support.heard(b"", 5.0), [])
 

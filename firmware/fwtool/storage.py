@@ -20,6 +20,7 @@ SHOW_NAME = "show.json"
 MARK = b"littlefs"
 NO_SPACE = -28
 KEPT_IMAGES = 8
+PENDING = ".part"
 
 
 def geometry(image):
@@ -223,18 +224,31 @@ def from_board(on_port, region):
     return on_port.read(region.address, region.size, paths.STORAGE / f"{stamp()}-before.bin", [region])
 
 
-def keep(image, size):
-    """Writes a new storage image into the work folder and returns its path."""
+def pending(image):
+    """Writes a new storage image into the work folder under a name that is not yet one of
+    the kept images, and returns its path."""
     folder = paths.output(paths.STORAGE)
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f"{stamp()}-after.bin"
+    path = folder / f"{stamp()}-after.bin{PENDING}"
     number = 1
-    while path.exists():
+    while path.exists() or path.with_name(path.name[:-len(PENDING)]).exists():
         number += 1
-        path = folder / f"{stamp()}-after-{number}.bin"
+        path = folder / f"{stamp()}-after-{number}.bin{PENDING}"
     path.write_bytes(image)
-    prune(size)
     return path
+
+
+def keep(path, size):
+    """Makes a pending image, which the board now holds, the newest kept image."""
+    kept = path.with_name(path.name[:-len(PENDING)])
+    path.replace(kept)
+    prune(size)
+    return kept
+
+
+def discard(path):
+    """Removes a pending image that did not reach the board."""
+    path.unlink(missing_ok=True)
 
 
 def status_error(reply):

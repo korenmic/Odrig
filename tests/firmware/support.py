@@ -81,6 +81,13 @@ def partition_table(layout=LAYOUT, magic=b"\xaa\x50", checksum=True):
     return table.ljust(TABLE_SIZE, b"\xff")
 
 
+# esptool takes a file that begins with this byte for a program image. The stand-in knows
+# one program for the chip, and refuses any other file that begins with the byte, as
+# esptool does, unless it is told to leave that check out.
+PROGRAM_BYTE = b"\xe9"
+PROGRAM = PROGRAM_BYTE + b"a program for this chip"
+
+
 class RecordedEsptool:
     """Stands in for esptool: keeps the arguments of every call and serves what is read."""
 
@@ -100,9 +107,14 @@ class RecordedEsptool:
             with open(path, "wb") as file:
                 file.write(content[:size])
         if "write-flash" in arguments:
+            written = []
             for address, name in self.pairs(arguments[arguments.index("write-flash") + 1:]):
                 with open(name, "rb") as file:
-                    self.wrote.append((int(address, 16), file.read()))
+                    written.append((int(address, 16), name, file.read()))
+            for _, name, content in written:
+                if content[:1] == PROGRAM_BYTE and content[:len(PROGRAM)] != PROGRAM and "--force" not in arguments:
+                    return 2, f"A fatal error occurred: '{name}' is not an ESP32-S3 image. Use the force argument to flash anyway."
+            self.wrote += [(address, content) for address, _, content in written]
         if "verify-flash" in arguments and self.failing_verifies:
             self.failing_verifies -= 1
             return 2, "A fatal error occurred: Verification failed"

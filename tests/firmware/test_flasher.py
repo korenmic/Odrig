@@ -13,6 +13,13 @@ STOCK_NAMES = ["WLED_16.0.1_ESP32-S3_16MB_opi.bin", "bootloader_s3.bin", "partit
 FORBIDDEN_WORDS = ("erase-flash", "erase_flash", "--erase-all", "-e", "espefuse", "burn-efuse", "write-protect-efuse")
 
 
+def storage_module():
+    """The storage module, which needs the file system's library and is therefore loaded
+    where it is used."""
+    from fwtool import storage
+    return storage
+
+
 class Temporary(unittest.TestCase):
     def setUp(self):
         holder = tempfile.TemporaryDirectory()
@@ -21,7 +28,7 @@ class Temporary(unittest.TestCase):
 
     def image(self, name="odrig-firmware.bin", size=4096):
         path = self.folder / name
-        path.write_bytes(bytes(range(256)) * (size // 256))
+        path.write_bytes((support.PROGRAM + bytes(range(256)) * (size // 256))[:size])
         build.write_checksum(path)
         return path
 
@@ -155,6 +162,51 @@ class InstallShow(Temporary):
         words = self.install().words()
         for word in FORBIDDEN_WORDS:
             self.assertNotIn(word, words)
+
+    def test_a_block_that_begins_like_a_program_is_written_all_the_same(self):
+        region = flasher.Region("storage", 0x610000, 64 * 4096)
+        esptool = support.RecordedEsptool()
+        on_port = flasher.Flasher("/dev/cu.test", esptool)
+        piece = self.folder / "run-0"
+        piece.write_bytes(support.PROGRAM_BYTE + bytes(4095))
+        on_port.write([(0x610000, piece)], [region], restart=False, data=True)
+        self.assertEqual(esptool.wrote, [(0x610000, support.PROGRAM_BYTE + bytes(4095))])
+
+    def test_a_show_whose_changed_block_begins_like_a_program_is_installed(self):
+        storage = storage_module()
+        old = support.storage_image()
+        with support.example_show() as show:
+            files = support.files_of(show)
+            new = storage.with_show(old, files)
+            first = storage.runs(old, new, 4096)[0][0]
+            new = new[:first] + support.PROGRAM_BYTE + new[first + 1:]
+            esptool = support.RecordedEsptool(support.partition_table(support.small_layout()), {0x610000: old})
+            with mock.patch.object(storage, "with_show", lambda image, given: new):
+                with mock.patch.object(flasher.paths, "STORAGE", self.folder / "storage"), support.no_board(esptool, answer='{"ok":true,"error":null}'):
+                    result = support.run_main("install-show", show)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual((esptool.wrote[0][0], esptool.wrote[0][1][:1]), (0x610000 + first, support.PROGRAM_BYTE))
+
+    def test_the_program_check_is_left_out_for_storage_only(self):
+        install = next(call for call in self.install().calls if "write-flash" in call)
+        self.assertIn("--force", install)
+        with support.no_board() as esptool:
+            support.run_main("flash", "--image", self.image())
+        self.assertNotIn("--force", esptool.words())
+        on_port = flasher.Flasher("/dev/cu.test", support.RecordedEsptool())
+        for region in (flasher.APPLICATION, flasher.BOOTLOADER, flasher.TABLE):
+            action = lambda: on_port.write([(region.address, self.image(size=256))], [region], restart=False, data=True)
+            self.assertEqual(support.reason_of(self, action), "esptool-failed", region.name)
+
+    def test_a_program_that_is_not_for_this_chip_is_still_refused(self):
+        wrong = self.folder / "wrong.bin"
+        wrong.write_bytes(support.PROGRAM_BYTE + b"a program for another chip" + bytes(4096))
+        build.write_checksum(wrong)
+        with support.no_board() as esptool:
+            result = support.run_main("flash", "--image", wrong)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"^error: esptool-failed: .*is not an ESP32-S3 image")
+        self.assertEqual(esptool.wrote, [])
 
     def test_a_write_beside_the_storage_partition_is_refused(self):
         region = flasher.Region("storage", 0x610000, 64 * 4096)

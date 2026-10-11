@@ -2228,3 +2228,51 @@ way of opening it.
 
 **Resolution.** `tests/board/test_probe.py`, `tests/board/test_fps.py`,
 `tests/board/support.py`; `firmware/usermod/odrig_probe.cpp`.
+
+## Seed 04: What of the HTTP transport could be tried without the network
+
+**Question.** Task 7 adds `POST /odrig`, the report in WLED's information and the suite
+`tests/air/`, and says that `test-air` cannot be run by an agent. How sure is code that
+never ran?
+
+**Answer.** The firmware with the handler in it was built, flashed and run through the
+whole board suite, so the handler does not disturb what the port and the LEDs do. The
+handler itself did not serve a request. The tests of `tests/air/test_http.py` were run
+against the emulator, which answers `POST /odrig` by the rules the board must follow; they
+pass there, which shows that the tests themselves are sound, not that the board passes
+them. `tests/air/test_wled.py` asks WLED's own interface and has not run anywhere. The
+session over HTTP is compared with the same session through the port on the same board,
+each begun with `on`, `brightness 32` and `play 3` through the port, because restarting
+the board would take the network away from the Mac. A board whose core could not start
+answers `POST /odrig` with 503, as the design says.
+
+The text of the outputs for WLED's information is made on the loop's task and only read by
+the web server's task, so that no output is looked at while WLED makes the outputs again.
+
+**Resolution.** `firmware/usermod/odrig_http.cpp`; `firmware/usermod/odrig_leds.cpp`,
+`summary`; `tests/air/`; `docs/firmware.md`, "What the firmware does" and "test-air". The
+owner's checks of task 10 run `test-air`.
+
+## Seed 04: Storage blocks that esptool takes for a program
+
+**Question.** During task 7 every `install-show` began to fail with `esptool-failed`, after
+some thirty installs had worked: esptool refused to write, with "is not an ESP32-S3 image".
+esptool looks at every file it is given to write; one that begins with the byte `E9`, the
+first byte of a program image, it takes for a program and refuses when the rest is not a
+program for the chip. A block of storage can begin with any byte. The first block of the
+file system begins with a counter that goes up with every change, and it had reached 233,
+which is `E9`. A file of a show whose data block begins with that byte would do the same.
+
+**Answer.** When the tool writes storage it tells esptool to leave that check out, with
+esptool's `--force`. That option also leaves out esptool's warnings about a chip with
+secure boot or flash encryption, which this board does not use and which do not concern a
+write to storage; the tool's own check of every address against the storage partition
+stays. A program, written by `flash` and `restore-stock`, is never written that way, so a
+program for another chip is still refused. The tool also names a new storage image as one
+of its kept images only when the board holds it; until then the image has a name the tool
+does not take for the board's.
+
+**Resolution.** `firmware/fwtool/flasher.py`, `Flasher.write`;
+`firmware/fwtool/storage.py`, `pending` and `keep`; `firmware/fwtool/cli.py`,
+`_install_show`; `tests/firmware/test_flasher.py`, `tests/firmware/test_storage.py`. The
+board suite found it; the tests were run against the code without the change first.

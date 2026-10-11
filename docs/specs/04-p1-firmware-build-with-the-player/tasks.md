@@ -181,7 +181,7 @@ Rules for every task:
   - Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.5, 9.6, 9.7, 10.1, 10.2, 10.3,
     16.2, 16.5
 
-- [ ] 7. Commands over HTTP, the access point and the report in WLED's information
+- [x] 7. Commands over HTTP, the access point and the report in WLED's information
   - Create `firmware/usermod/odrig_http.h`, `.cpp`. Add to the usermod `addToJsonInfo`,
     `onUpdateBegin`, and the step of `loop()` that keeps WLED's captive portal answering.
   - Add the subcommand `test-air`, and `tests/air/__init__.py`, `test_http.py` and

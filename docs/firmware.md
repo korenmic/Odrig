@@ -94,6 +94,7 @@ python3 firmware/fw.py install-show DIR [--port P] [--no-check]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
+python3 firmware/fw.py test-air --http ADDRESS [--port P]
 ```
 
 `fw.py` itself uses only the Python standard library. It checks the command line, makes sure
@@ -265,9 +266,12 @@ reports a reason.
    and every file outside `/odrig` is as it was.
 6. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
    the chip compare the whole partition with the new image, and restarts the board.
+   esptool is told that these blocks are data: it would otherwise take a block that begins
+   with the first byte of a program image for a program and refuse it.
 
 A copy of storage from before the write and the new image stay in
-`build/firmware/storage/`, named by time; the newest eight images are kept. Every file of
+`build/firmware/storage/`, named by time; the newest eight images are kept. The new image
+is one of them only once the board holds it. Every file of
 storage outside `/odrig`, WLED's settings among them, keeps its content.
 
 Every show installed on the board while one 60-LED strip is fed from the board's 3.3 V pin
@@ -338,6 +342,54 @@ python -m odrigctl --port /dev/cu.usbmodem101 status
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
 serial, no answer to WLED's single-letter commands. The chip's own bootloader still prints
 a few lines at a reset; the command tool skips every line that is not a reply.
+
+**Commands over HTTP.** WLED's web server answers `POST /odrig` as
+[commands.md](commands.md) defines it and as the emulator does; the body goes to the same
+core the port reaches:
+
+```
+curl --data-binary 'play 2' -H 'Content-Type: application/octet-stream' http://4.3.2.1/odrig
+{"ok":true}
+python -m odrigctl --http 4.3.2.1 status
+```
+
+| Request | Answer |
+|---|---|
+| `POST /odrig` | Status 200, content type `application/json`, and the reply line as the core returned it, with its newline, also for a reply with `"ok":false`. |
+| Any other method on `/odrig` | Status 405 with `Allow: POST`. |
+| A longer path, such as `/odrig/x` | Status 404. |
+| `POST /odrig` on a board whose core could not start | Status 503. |
+
+Of a body longer than 128 bytes the first 128 are passed on, which the core answers with
+`line-too-long`. What follows a `?` is ignored. WLED adds `Access-Control-Allow-Origin: *`
+to every response.
+
+**The content type of a request matters on the board.** WLED's web server takes a body
+apart as form fields, before any handler sees it, when the content type is
+`application/x-www-form-urlencoded`, and when it is `text/plain` and the body looks like
+`name=value`. With any other content type the core gets the body byte for byte. With those
+two it gets it byte for byte as long as the body has none of the characters `&`, `=`, `+`
+and `%` and no zero byte, which holds for every valid command. `odrigctl` sends
+`application/octet-stream`. `curl --data` sends the form type; that works for every valid
+command, and `--data-binary` with the header above is exact for every body.
+
+**Wi-Fi is WLED's.** The usermod changes nothing of WLED's Wi-Fi behaviour or settings.
+With no network to join configured, WLED opens its access point about two seconds after
+start; the board's address on it is `4.3.2.1`. The name and the password of the access
+point are WLED's settings. The usermod keeps WLED's captive portal answering, which WLED
+itself does only outside its live mode. WLED's pages, its JSON interface and its updates
+through its own interface keep working; while WLED writes a new firmware, the usermod reads
+no file and sends nothing to the LEDs.
+
+**WLED's information** (`/json/info`, and the Info page of its interface) reports the
+access point as active in `wifi.ap`, the release name `odrig_ESP32-S3_16MB_opi`, and three
+entries of the usermod:
+
+| Entry | Value |
+|---|---|
+| `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
+| `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
+| `odrig start` | The milliseconds the core took to start. |
 
 **The outputs** are set from the mapping file. When the core has started with a valid
 mapping, the usermod replaces WLED's outputs with one output for each leg, in the order of
@@ -421,6 +473,21 @@ core; every other byte is passed on to the core, unchanged and in order.
 
 The probe build plays as the firmware does. Reading the outputs back takes time, so its
 own rate can be a refresh or two below the firmware's.
+
+### test-air
+
+```
+python3 firmware/fw.py test-air --http 4.3.2.1
+```
+
+Runs the suite in `tests/air/`, found by discovery. It needs the board on USB and this Mac
+joined to the board's Wi-Fi network; `ADDRESS` is the board's address on that network,
+`4.3.2.1` on the board's own access point. Joining the network is done by a person. The
+suite sends commands over HTTP and through the port and compares them, asks WLED's own
+interface for its information, and once saves WLED's LED settings, with the pin of the last
+output changed, to see the mapping's outputs come back; WLED then stores the mapping's
+outputs as its LED settings. Without a board, or when the address answers no command, it
+stops with `no-board` and runs nothing.
 
 ## The regions of the flash
 
@@ -531,6 +598,12 @@ LEDs; without it a send is about half as long. With the first form of the loop, 
 asked the core only once the outputs were free, the probe build sent 46 to 49 refreshes of
 the compressed dense clip a second; see "Seed 04: Asking the core while the LEDs are still
 being written" in [drifts.md](drifts.md).
+
+Commands over HTTP were written and not tried on the board: no program on this Mac may join
+the board's network. The tests of `tests/air/test_http.py` pass against the emulator, which
+answers `POST /odrig` by the same rules; `tests/air/test_wled.py` has not run anywhere. The
+probe build reports `ap` 1 within seconds of its start, which a board test checks: WLED's
+access point is up. A14 stays the owner's check.
 
 With `BusManager::setBrightness(255)` taken out of the usermod, the outputs were scaled by
 WLED's own brightness and the CRC tests failed for every output.

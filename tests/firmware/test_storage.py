@@ -211,7 +211,8 @@ class Commands(Temporary):
         verify = esptool.calls[-1]
         address, image = esptool.pairs(esptool.call("verify-flash"))[0]
         self.assertEqual(address, "0x610000")
-        self.assertEqual(pathlib.Path(image).read_bytes(), self.on_the_board(esptool))
+        self.assertEqual(storage.kept_images(len(self.old))[0].read_bytes(), self.on_the_board(esptool))
+        self.assertEqual(pathlib.Path(image).parent, self.folder / "storage")
         self.assertEqual(verify[verify.index("--after") + 1], "hard-reset")
         for call in esptool.calls[:-1]:
             self.assertEqual(call[call.index("--after") + 1], "no-reset")
@@ -282,7 +283,28 @@ class Commands(Temporary):
         (self.folder / "storage").mkdir()
         for number in range(12):
             (self.folder / "storage" / f"2026010{number:02d}-before.bin").write_bytes(bytes(8))
-        storage.keep(bytes(8), 8)
+        waiting = storage.pending(bytes(8))
+        self.assertNotIn(waiting, storage.kept_images(8))
+        storage.keep(waiting, 8)
         self.assertEqual(len(list((self.folder / "storage").iterdir())), storage.KEPT_IMAGES)
         self.assertEqual(len(storage.kept_images(8)), storage.KEPT_IMAGES)
         self.assertTrue(storage.kept_images(8)[0].name.endswith("-after.bin"))
+
+    def test_an_image_that_did_not_reach_the_board_is_not_kept_as_the_boards(self):
+        serving = self.esptool()
+
+        def refusing(arguments):
+            if "write-flash" in arguments:
+                return 2, "A fatal error occurred: the write failed"
+            return serving(arguments)
+
+        result = self.install(refusing)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"^error: esptool-failed: ")
+        kept = sorted(path.name.split("-", 1)[1] for path in (self.folder / "storage").iterdir())
+        self.assertEqual(kept, ["before.bin"])
+
+    def test_a_new_image_that_the_board_does_not_hold_after_the_write_is_not_kept(self):
+        self.install(self.esptool(failing_verifies=1))
+        kept = sorted(path.name.split("-", 1)[1] for path in (self.folder / "storage").iterdir())
+        self.assertEqual(kept, ["before.bin"])

@@ -1,12 +1,14 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
 // memory, the time and the files of the installed show, carries bytes between the USB
-// serial port and the core, sets WLED's outputs from the core's legs, keeps WLED from the
-// LEDs and sends the core's LED data to the outputs. Every decision about files, time,
-// the layout and commands is the core's.
+// serial port and the core and command lines between WLED's web server and the core, sets
+// WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED data
+// to the outputs, and reports its state in WLED's information. Every decision about files,
+// time, the layout and commands is the core's.
 #include "wled.h"
 
 #include "odrig_core.h"
 #include "odrig_files.h"
+#include "odrig_http.h"
 #include "odrig_leds.h"
 #include "odrig_serial.h"
 
@@ -46,6 +48,14 @@ size_t feedByte(uint8_t byte, char *reply, size_t capacity) {
   Locked held;
   odrig_core_feed(core, OdrigFiles::nowMs(), &byte, 1, keepReply, &kept);
   return kept.length;
+}
+
+// One command line of the web server for the core. It runs on the network task; the lock
+// is what lets it call the core.
+size_t commandLine(const char *line, size_t length, char *reply, size_t capacity) {
+  if (core == nullptr) return 0;
+  Locked held;
+  return odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity);
 }
 
 // The legs as the core lists them, for the outputs.
@@ -102,13 +112,18 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::source(legs);
     OdrigLeds::hold();
     if (OdrigLeds::legs() == 0) OdrigLeds::dark();
+    OdrigHttp::begin(commandLine);
   }
 
   void loop() override {
+    // While WLED writes a new firmware, no file is read and nothing is sent to the LEDs.
+    if (updating) return;
 #ifdef ODRIG_PROBE
     OdrigProbe::pass(OdrigFiles::nowMs());
 #endif
     OdrigLeds::hold();
+    // WLED answers the lookups of its captive portal only outside its live mode.
+    if (apActive) dnsServer.processNextRequest();
     OdrigSerial::poll(feedByte);
     if (core == nullptr) return;
     // The core is asked for the next refresh while the outputs may still be busy with
@@ -135,9 +150,32 @@ class OdrigUsermod : public Usermod {
     refreshWaits = false;
   }
 
+  // WLED's information page: whether the show is valid, how many outputs work, and how
+  // long the core took to start.
+  void addToJsonInfo(JsonObject &root) override {
+    JsonObject user = root["u"];
+    if (user.isNull()) user = root.createNestedObject("u");
+    String show = F("ok");
+    if (core == nullptr) {
+      show = F("no core");
+    } else {
+      Locked held;
+      const char *error = odrig_core_error(core);
+      if (error != nullptr) show = error;
+    }
+    user.createNestedArray(F("odrig show")).add(show);
+    user.createNestedArray(F("odrig outputs")).add(String(OdrigLeds::summary()));
+    JsonArray start = user.createNestedArray(F("odrig start"));
+    start.add(startMs);
+    start.add(F(" ms"));
+  }
+
+  void onUpdateBegin(bool begins) override { updating = begins; }
+
  private:
   uint32_t startMs = 0;
   bool refreshWaits = false;
+  bool updating = false;
 };
 
 static OdrigUsermod odrigUsermod;

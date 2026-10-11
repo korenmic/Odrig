@@ -45,4 +45,8 @@ void dark();
 uint32_t legs();
 uint32_t working();
 
+// The outputs in words: `<working>/<legs>`, and ` leg <n> pin <p>` for each output that
+// does not work. The text is renewed by hold().
+const char *summary();
+
 }  // namespace OdrigLeds

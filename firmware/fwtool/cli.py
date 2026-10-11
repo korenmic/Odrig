@@ -14,7 +14,10 @@ import sys
 
 from . import Failure, board, build, env, flasher, partitions, paths, stock, toolchain
 
-SUITES = {"test": "tests/firmware", "test-board": "tests/board"}
+SUITES = {"test": "tests/firmware", "test-board": "tests/board", "test-air": "tests/air"}
+
+# Where the suite that reaches the board over its network finds the board's address.
+ADDRESS_VARIABLE = "ODRIG_BOARD_HTTP"
 
 
 def parser():
@@ -44,6 +47,9 @@ def parser():
     commands.add_parser("test", help="run the tests that need no board")
     on_board = commands.add_parser("test-board", help="run the tests that need the board on USB")
     on_board.add_argument("--port", metavar="P", help="the board's USB serial port")
+    on_air = commands.add_parser("test-air", help="run the tests that need the board on USB and this Mac on the board's Wi-Fi network")
+    on_air.add_argument("--http", metavar="ADDRESS", required=True, help="the board's address on its network: host or host:port")
+    on_air.add_argument("--port", metavar="P", help="the board's USB serial port")
     return made
 
 
@@ -113,23 +119,27 @@ def _install_show(arguments):
     files = storage.folder_files(arguments.dir, check=not arguments.no_check)
     port = board.find(arguments.port)
     on_port, region, before_path = storage_of(port)
+    new_path = None
     try:
         before = before_path.read_bytes()
         after = storage.with_show(before, files)
-        after_path = storage.keep(after, region.size)
+        new_path = storage.pending(after)
         changed = storage.runs(before, after, storage.geometry(before)[1])
         pieces = []
         for number, (offset, content) in enumerate(changed):
-            piece = after_path.with_name(f"{after_path.stem}.run-{number}")
+            piece = new_path.with_name(f"{new_path.name}.run-{number}")
             piece.write_bytes(content)
             pieces.append((region.address + offset, piece))
         try:
-            on_port.write(pieces, [region], restart=False)
+            on_port.write(pieces, [region], restart=False, data=True)
         finally:
             for _, piece in pieces:
                 piece.unlink()
-        on_port.verify(region.address, after_path, [region], restart=True)
+        on_port.verify(region.address, new_path, [region], restart=True)
+        storage.keep(new_path, region.size)
     except Failure:
+        if new_path is not None:
+            storage.discard(new_path)
         on_port.restart()
         raise
     reply = board.EXPECTED["status"](port)
@@ -170,9 +180,14 @@ def _test_board(arguments):
     return run_suite(SUITES["test-board"], {board.PORT_VARIABLE: board.find(arguments.port)})
 
 
+def _test_air(arguments):
+    return run_suite(SUITES["test-air"], {board.PORT_VARIABLE: board.find(arguments.port), ADDRESS_VARIABLE: arguments.http})
+
+
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
-    "install-show": _install_show, "read-show": _read_show, "test": _test, "test-board": _test_board,
+    "install-show": _install_show, "read-show": _read_show,
+    "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
 
 

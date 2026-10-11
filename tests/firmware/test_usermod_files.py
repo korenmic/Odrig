@@ -53,7 +53,7 @@ class TheLibrary(unittest.TestCase):
 
     def test_it_has_the_sources_this_test_reads(self):
         names = {path.name for path in SOURCES}
-        for expected in ("odrig_usermod.cpp", "odrig_files.h", "odrig_files.cpp", "odrig_leds.h", "odrig_leds.cpp", "odrig_serial.h", "odrig_serial.cpp", "odrig_probe.h", "odrig_probe.cpp"):
+        for expected in ("odrig_usermod.cpp", "odrig_files.h", "odrig_files.cpp", "odrig_leds.h", "odrig_leds.cpp", "odrig_serial.h", "odrig_serial.cpp", "odrig_http.h", "odrig_http.cpp", "odrig_probe.h", "odrig_probe.cpp"):
             self.assertIn(expected, names)
         self.assertNotIn("odrig_pattern.cpp", names)
 
@@ -89,6 +89,35 @@ class Includes(unittest.TestCase):
     def test_the_usermod_names_no_function_of_wleds_serial_handling(self):
         for path in SOURCES:
             self.assertNotRegex(text_of(path), r"handleSerial|handleImprov|Adalight", path.name)
+
+
+class WebServer(unittest.TestCase):
+    def test_one_handler_is_registered_for_the_command_path(self):
+        registered = [(path.name, match) for path in SOURCES for match in re.findall(r"\bserver\.on\(([^,]+),", text_of(path))]
+        self.assertEqual(registered, [("odrig_http.cpp", "PATH")])
+        self.assertRegex(text_of(USERMOD / "odrig_http.cpp"), r'const char PATH\[\] = "/odrig";')
+
+    def test_the_handler_answers_as_the_commands_document_defines(self):
+        text = text_of(USERMOD / "odrig_http.cpp")
+        for expected in ("HTTP_POST", "405", 'F("Allow"), F("POST")', "404", 'F("application/json")', "BODY_BYTES = 128"):
+            self.assertIn(expected, text)
+
+    def test_the_usermod_names_no_wifi_function_of_wled(self):
+        for path in SOURCES:
+            self.assertNotRegex(text_of(path), r"\bWiFi\b|initAP|initConnection|apSSID|apPass|multiWiFi|forceReconnect|WLED_CONNECTED", path.name)
+
+    def test_the_captive_portal_is_kept_answering_and_an_update_stops_the_loop_first(self):
+        text = text_of(USERMOD / "odrig_usermod.cpp")
+        self.assertIn("if (apActive) dnsServer.processNextRequest();", text)
+        loop = text[text.index("void loop() override {"):]
+        first = [line.strip() for line in loop.splitlines()[1:] if line.strip() and not line.strip().startswith("//")][0]
+        self.assertEqual(first, "if (updating) return;")
+        self.assertIn("void onUpdateBegin(bool begins) override { updating = begins; }", text)
+
+    def test_the_information_has_the_three_entries(self):
+        text = text_of(USERMOD / "odrig_usermod.cpp")
+        for entry in ("odrig show", "odrig outputs", "odrig start"):
+            self.assertIn(f'F("{entry}")', text)
 
 
 class ProbeCode(unittest.TestCase):

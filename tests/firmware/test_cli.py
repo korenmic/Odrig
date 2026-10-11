@@ -184,6 +184,20 @@ class Commands(unittest.TestCase):
         self.assertEqual(run.call_args.args[0][1:], ["-m", "unittest", "discover", "-s", "tests/board", "-t", "."])
         self.assertEqual(run.call_args.kwargs["env"]["ODRIG_BOARD_PORT"], "/dev/cu.found")
 
+    def test_the_air_suite_is_chosen_by_its_folder_and_given_the_port_and_the_address(self):
+        with mock.patch.object(cli.subprocess, "run") as run, mock.patch.object(cli.board, "find", return_value="/dev/cu.found"):
+            run.return_value.returncode = 0
+            self.assertEqual(support.run_main("test-air", "--http", "4.3.2.1").status, 0)
+        self.assertEqual(run.call_args.args[0][1:], ["-m", "unittest", "discover", "-s", "tests/air", "-t", "."])
+        self.assertEqual(run.call_args.kwargs["env"]["ODRIG_BOARD_PORT"], "/dev/cu.found")
+        self.assertEqual(run.call_args.kwargs["env"]["ODRIG_BOARD_HTTP"], "4.3.2.1")
+
+    def test_the_air_suite_needs_an_address_and_a_board(self):
+        self.assertEqual(support.run_main("test-air").status, 2)
+        with mock.patch.object(cli.subprocess, "run", side_effect=AssertionError("ran the suite")), mock.patch.object(cli.board, "find", side_effect=Failure("no-board", "there is no /dev/cu.usbmodem*")):
+            result = support.run_main("test-air", "--http", "4.3.2.1")
+        self.assertEqual((result.status, result.err), (1, "error: no-board: there is no /dev/cu.usbmodem*\n"))
+
     def test_the_board_suite_runs_nothing_without_a_board(self):
         with mock.patch.object(cli.subprocess, "run", side_effect=AssertionError("ran the suite")), mock.patch.object(cli.board, "find", side_effect=Failure("no-board", "there is no /dev/cu.usbmodem*")):
             result = support.run_main("test-board")

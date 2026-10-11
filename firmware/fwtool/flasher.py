@@ -21,6 +21,7 @@ APPLICATION = Region("first application", partitions.APPLICATION_ADDRESS, 0x3000
 CHIP = "esp32s3"
 KEEP = ["--flash-mode", "keep", "--flash-freq", "keep", "--flash-size", "keep"]
 DETECT_SIZE = ["--flash-mode", "keep", "--flash-freq", "keep", "--flash-size", "detect"]
+NO_PROGRAM_CHECK = "--force"
 
 
 def storage_region(partition):
@@ -76,13 +77,18 @@ class Flasher:
             raise Failure("esptool-failed", f"the region {region.name} is not erased by this tool")
         self._esptool("no-reset", "erase-region", f"{region.address:#x}", f"{region.size:#x}")
 
-    def write(self, files, regions, restart):
+    def write(self, files, regions, restart, data=False):
         """Writes files, each at its address, in one esptool call. esptool compares a
         checksum of what it wrote. With `restart` the board is reset afterwards.
 
         A bootloader is written with the flash size esptool finds on the chip in its
         header, which is how the bootloader on the board was written; every other file
         goes to the flash as it is.
+
+        `data` says that the files are no programs. esptool takes every file that begins
+        with the first byte of a program image for one, and refuses it when the rest is
+        not a program for this chip; a block of storage can begin with any byte. For data
+        esptool is therefore told to leave that check out. A program is always checked.
         """
         arguments = []
         for address, path in files:
@@ -90,8 +96,11 @@ class Flasher:
             arguments += [f"{address:#x}", str(path)]
         if not arguments:
             return
+        if data and any(region in (BOOTLOADER, TABLE, APPLICATION) for region in regions):
+            raise Failure("esptool-failed", "a program is not written as data")
         settings = DETECT_SIZE if any(address == BOOTLOADER.address for address, _ in files) else KEEP
-        self._esptool("hard-reset" if restart else "no-reset", "write-flash", *settings, *arguments)
+        unchecked = [NO_PROGRAM_CHECK] if data else []
+        self._esptool("hard-reset" if restart else "no-reset", "write-flash", *unchecked, *settings, *arguments)
 
     def verify(self, address, path, regions, restart):
         """Compares a stretch of the flash with a file, as `write` would have written it."""
