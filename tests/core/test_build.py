@@ -96,8 +96,8 @@ class Library(unittest.TestCase):
 class Sources(unittest.TestCase):
     def test_there_are_sources_to_check(self):
         names = {path.name for path in core_sources()}
-        self.assertIn("reasons.cpp", names)
-        self.assertIn("reasons.h", names)
+        for name in ("reasons.cpp", "reasons.h", "inflate.cpp", "file_source.h", "odrig_core.h"):
+            self.assertIn(name, names)
 
     def test_they_include_only_three_system_headers_and_their_own(self):
         own = {path.name for path in core_sources()}
@@ -125,6 +125,94 @@ class Sources(unittest.TestCase):
         self.assertEqual(foreign_headers(text, own), ["vector", "other.h"])
         code = without_comments_and_strings('int a; // a double\nconst char *b = "float"; /* float */ double c;')
         self.assertEqual(FLOATING_POINT.findall(code), ["double"])
+
+
+# A host written against the interface, valid as C and as C++.
+USE_OF_THE_INTERFACE = """
+#include "odrig_core.h"
+#include "odrig_core.h"
+
+static void *give(void *ctx, size_t bytes) { (void)ctx; (void)bytes; return 0; }
+static int open_file(void *ctx, const char *name) { (void)ctx; (void)name; return 0; }
+static int32_t read_file(void *ctx, uint8_t *buffer, size_t capacity) { (void)ctx; (void)buffer; (void)capacity; return 0; }
+static void close_file(void *ctx) { (void)ctx; }
+static void log_line(void *ctx, const char *text) { (void)ctx; (void)text; }
+static void on_reply(void *ctx, const char *line, size_t line_length, const char *reply, size_t reply_length) {
+    (void)ctx; (void)line; (void)line_length; (void)reply; (void)reply_length;
+}
+
+int main(void) {
+    odrig_host host = {0, give, open_file, read_file, close_file, log_line};
+    odrig_leg leg;
+    char line[ODRIG_LINE_MAX + 1] = "status";
+    char reply[ODRIG_REPLY_MAX];
+    const uint8_t bytes[1] = {10};
+    odrig_reply_fn answered = on_reply;
+    odrig_core *core = odrig_core_begin(&host);
+    uint64_t now = 0;
+    uint32_t legs = odrig_core_leg_count(core);
+    int produced = odrig_core_poll(core, now);
+    int found = odrig_core_leg(core, 0, &leg);
+    size_t length = odrig_core_command(core, now, line, 6, reply, sizeof reply);
+    const char *error = odrig_core_error(core);
+    const uint8_t *rgb = leg.rgb;
+    uint16_t number = leg.leg, pin = leg.pin;
+    uint32_t count = leg.led_count;
+    odrig_core_feed(core, now, bytes, 1, answered, 0);
+    return (int)(legs + count + length) + produced + found + number + pin + (error != 0) + (rgb != 0)CHANGE;
+}
+"""
+
+
+class HostInterface(unittest.TestCase):
+    HEADER = INCLUDE / "odrig_core.h"
+
+    def compiles(self, compiler, language, standard, source):
+        done = subprocess.run(
+            [compiler, "-x", language, f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fsyntax-only", f"-I{INCLUDE}", "-"],
+            input=source,
+            capture_output=True,
+            text=True,
+        )
+        return done.returncode == 0, done.stderr
+
+    def test_it_is_the_only_header_a_host_includes(self):
+        self.assertEqual([path.name for path in INCLUDE.iterdir()], ["odrig_core.h"])
+
+    def test_it_compiles_as_c_and_as_cpp(self):
+        source = USE_OF_THE_INTERFACE.replace("CHANGE", "")
+        for compiler, language, standard in (("cc", "c", "c99"), ("cc", "c", "c17"), ("c++", "c++", "c++11"), ("c++", "c++", "c++17")):
+            with self.subTest(standard=standard):
+                compiled, complaint = self.compiles(compiler, language, standard, source)
+                self.assertTrue(compiled, complaint)
+
+    def test_the_compilation_refuses_a_wrong_use(self):
+        source = USE_OF_THE_INTERFACE.replace("CHANGE", " + odrig_core_poll(core)")
+        for compiler, language, standard in (("cc", "c", "c99"), ("c++", "c++", "c++11")):
+            with self.subTest(standard=standard):
+                compiled, complaint = self.compiles(compiler, language, standard, source)
+                self.assertFalse(compiled)
+                self.assertIn("odrig_core_poll", complaint)
+
+    def test_it_needs_only_stdint_and_stddef(self):
+        text = self.HEADER.read_text(encoding="utf-8")
+        self.assertEqual(sorted(INCLUDE_LINE.findall(text)), [("<", "stddef.h"), ("<", "stdint.h")])
+
+    def test_it_declares_the_seven_functions_of_the_core(self):
+        text = self.HEADER.read_text(encoding="utf-8")
+        declared = re.findall(r"\b(odrig_core_[a-z_]+)\(", without_comments_and_strings(text))
+        self.assertEqual(
+            sorted(declared),
+            [
+                "odrig_core_begin",
+                "odrig_core_command",
+                "odrig_core_error",
+                "odrig_core_feed",
+                "odrig_core_leg",
+                "odrig_core_leg_count",
+                "odrig_core_poll",
+            ],
+        )
 
 
 class ReasonNames(unittest.TestCase):

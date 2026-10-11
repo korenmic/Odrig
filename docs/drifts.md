@@ -1368,3 +1368,55 @@ to `odrig/errors.py`, since the tool never gives them.
 
 **Resolution.** `docs/reasons.md`, "The core"; `tests/converter/test_docs.py`;
 `tests/core/test_build.py`.
+
+## Seed 02: The header as the design prints it
+
+**Question.** Task 2 creates `core/include/odrig_core.h` "exactly as in the design". The
+printed text has no guard against being included twice, and a host that reaches it through
+two of its own headers would not compile as C. The design of seed 03 also speaks of the
+header's eight functions, and the printed header declares seven.
+
+**Answer.** The file is the printed text between the lines of an include guard,
+`ODRIG_CORE_H`. Nothing else differs, so the interface is the one the designs of seeds 03
+and 04 were written against. The functions are seven: `odrig_core_begin`,
+`odrig_core_poll`, `odrig_core_leg_count`, `odrig_core_leg`, `odrig_core_command`,
+`odrig_core_feed` and `odrig_core_error`. The "eight" in seed 03's design, "binding", is a
+miscount; its test compares the binding with the header itself, so it is not affected.
+
+**Resolution.** `core/include/odrig_core.h`; `tests/core/test_build.py`.
+
+## Seed 02: At which bit the DEFLATE decoder finds a defect
+
+**Question.** The design lists what the decoder rejects as `bad-deflate`, "exactly what
+zlib rejects". It does not say at which bit each defect is found. That matters for a
+stream that is both wrong and cut short: the reference decoder reports what zlib finds
+first, `bad-deflate` or `truncated`, and the core has to report the same.
+
+**Answer.** The decoder judges each part of a stream at the point where zlib does: the two
+counts of a dynamic block when its 14 bits are read; the code-length code when all of its
+lengths are read; a repeat when its extra bits are read; the two codes of the block when
+all their lengths are read, the missing end-of-block code first; a bit pattern that is no
+code once as many bits are read as the longest code of the set has, and after one bit when
+the set has no code; a length or distance symbol that does not exist when it is decoded; a
+distance when its extra bits are read. zlib reads a code-length code that has no code at
+all as lengths of zero that take one bit each, and the decoder does the same, so such a
+block is refused for its missing end-of-block code. The suite compares the outcome of
+every stream it has, whole, damaged or cut, with zlib's: the output and the number of
+bytes left after the stream, or `bad-deflate`, or `truncated`.
+
+**Resolution.** `core/src/inflate.cpp`; `tests/core/test_inflate.py`.
+
+## Seed 02: Many inputs in one run of the test host
+
+**Question.** The tasks ask for thousands of damaged streams and files. The test host is
+built with the sanitizers and takes about 45 ms to start, so one run for each input would
+take minutes. The design's `inflate` invocation also prints nothing that shows where the
+decoder stopped reading, which is what the check for bytes after a stream relies on.
+
+**Answer.** `inflate` takes the option `--batch`, and `decode` takes it when task 3 adds
+that invocation: standard input then holds any number of inputs, each after its length as four bytes, and the host prints
+the result of each in order. After `data <hex>`, `inflate` prints `left <n>`, the number of
+bytes of input after the last byte of the stream. The host hands out every file in pieces
+of changing sizes, none above 512 bytes, so every test runs the core against short reads.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`.

@@ -36,3 +36,32 @@ def host_lines(*arguments, stdin=b""):
     if result.status != 0 or result.err:
         raise AssertionError(f"odrig_host {' '.join(map(str, arguments))}: status {result.status}\n{result.err}")
     return result.out.splitlines()
+
+
+def batch(pieces):
+    """The input of a `--batch` invocation: each piece after its length as four bytes."""
+    return b"".join(len(piece).to_bytes(4, "little") + piece for piece in pieces)
+
+
+def inflate_each(streams):
+    """What the core's DEFLATE decoder makes of each stream.
+
+    One result for each stream: `("data", output, left)`, where `left` is the number of
+    bytes of input after the end of the stream, or `("rejected", reason)`.
+    """
+    lines = iter(host_lines("inflate", "--batch", stdin=batch(streams)))
+    results = []
+    for line in lines:
+        word, _, rest = line.partition(" ")
+        if word == "data":
+            left_word, _, left = next(lines).partition(" ")
+            if left_word != "left":
+                raise AssertionError(f"odrig_host inflate printed {left_word!r} after data")
+            results.append(("data", bytes.fromhex(rest), int(left)))
+        elif word == "rejected":
+            results.append(("rejected", rest))
+        else:
+            raise AssertionError(f"odrig_host inflate printed {line[:60]!r}")
+    if len(results) != len(streams):
+        raise AssertionError(f"odrig_host inflate gave {len(results)} results for {len(streams)} streams")
+    return results

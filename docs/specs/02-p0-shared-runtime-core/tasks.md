@@ -45,7 +45,7 @@ Rules for every task:
     allowed list. Remove both before committing.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 17.1, 17.7, 17.8
 
-- [ ] 2. Host interface, file source and DEFLATE decoder
+- [x] 2. Host interface, file source and DEFLATE decoder
   - Create `core/include/odrig_core.h` exactly as in the design.
   - Create `core/src/file_source.h`, `.cpp` and `core/src/inflate.h`, `.cpp` as the design
     describes, with the rejection rules listed there.
