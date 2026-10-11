@@ -209,10 +209,22 @@ less than C.
 
 ### What a reader rejects
 
-A wrong magic or version, non-zero reserved bits, C above 256, N above 65,534, a frame count
-of zero, a duration of zero, a length below 2 or above N + 1, a stored frame whose length is
-not N + 1, a coded frame that runs out of bits or has 8 or more padding bits, a run that
-passes N, a palette index of C or more, and any bytes after the last frame record.
+A file that ends before the header, the palette or a frame record is complete, a wrong magic
+or version, non-zero reserved bits, a width or height of zero, C above 256, N above 65,534, a
+frame count of zero, a compressed body that is not a valid DEFLATE stream or whose stream
+ends before its last block is complete, a duration of zero, a length below 2 or above N + 1,
+a mode byte with bit 6 set that is not `0x40`, a stored frame whose length is not N + 1, a
+coded frame that runs out of bits or has 8 or more padding bits, a run that passes N, a code
+above 255, a palette index of C or more, and any bytes after the last frame record: in the
+body, or in the file after the end of the DEFLATE stream.
+
+A reader does not examine the values of the padding bits.
+
+The bit codes can spell a code above 255. With k of 6 or 7, fewer than eight one-bits
+followed by the k low bits give a Rice value of up to 1,023, and in run mode the Rice value
+255 gives the code 256. A reader reads the whole Rice code and then rejects it.
+
+Every rejection has a fixed name. The names are listed in [reasons.md](reasons.md).
 
 ### Decoder memory
 

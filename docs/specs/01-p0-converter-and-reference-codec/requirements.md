@@ -144,6 +144,7 @@ reasons.
    | `bad-stored-length` | A stored frame's L is not N + 1. |
    | `out-of-bits` | A coded frame needs a bit after the last bit of its data. |
    | `run-past-end` | In run mode, a run of g - 1 zero codes would pass N. |
+   | `bad-code` | A code of a coded frame is above 255: a Rice value above 255 in plain mode, or above 254 in run mode. |
    | `too-much-padding` | After the N codes of a coded frame, 8 or more bits of its data are unread. |
    | `bad-palette-index` | In a palette file, a pixel of a decoded picture is C or more. |
    | `trailing-bytes` | Bytes follow the last frame record: in the body, or in the file after the end of the DEFLATE stream. |
@@ -151,8 +152,8 @@ reasons.
 2. The decoder SHALL check the header fields in the order of their offsets, and within a
    frame record SHALL check the duration, then L, then the mode byte, then the data, then
    the palette indexes of the resulting picture.
-3. WHEN a Gamma code is read THEN the decoder SHALL read the whole code before judging its
-   value, so that a code cut off by the end of the data is `out-of-bits`.
+3. WHEN a Gamma code or a Rice code is read THEN the decoder SHALL read the whole code
+   before judging its value, so that a code cut off by the end of the data is `out-of-bits`.
 
 ## Requirement 7: `encode` writes small, lossless ODRG files
 
@@ -473,9 +474,10 @@ a reader rejects, so that I can prove my reader refuses each of them for the rig
    separate files for each of these cases: a reserved flag bit, mode bit 7, and a stored
    mode byte other than `0x40`; a file cut off in the header, in the palette, in a record's
    first five bytes and in a record's data; a DEFLATE stream cut off, and a complete DEFLATE
-   stream whose output ends inside a record; L below 2 and L above N + 1; a bad palette index
-   in a coded frame and in a stored frame; bytes after the last record in an uncompressed
-   body, in a compressed body, and in the file after the DEFLATE stream.
+   stream whose output ends inside a record; L below 2 and L above N + 1; a code above 255
+   in plain mode and in run mode; a bad palette index in a coded frame and in a stored
+   frame; bytes after the last record in an uncompressed body, in a compressed body, and in
+   the file after the DEFLATE stream.
 3. Each file SHALL have exactly one defect: with that defect removed it would be valid.
 4. WHEN the reference decoder reads a file of the set THEN it SHALL reject it with the
    reason in the file's name.

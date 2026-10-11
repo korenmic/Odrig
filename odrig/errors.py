@@ -17,6 +17,23 @@ OUT_OF_RANGE = "out-of-range"
 NO_FRAMES = "no-frames"
 BAD_PIXEL_COUNT = "bad-pixel-count"
 
+TRUNCATED = "truncated"
+BAD_MAGIC = "bad-magic"
+RESERVED_BITS = "reserved-bits"
+ZERO_SIZE = "zero-size"
+BAD_PALETTE_SIZE = "bad-palette-size"
+CANVAS_TOO_LARGE = "canvas-too-large"
+BAD_DEFLATE = "bad-deflate"
+ZERO_DURATION = "zero-duration"
+BAD_LENGTH = "bad-length"
+BAD_STORED_LENGTH = "bad-stored-length"
+OUT_OF_BITS = "out-of-bits"
+RUN_PAST_END = "run-past-end"
+BAD_CODE = "bad-code"
+TOO_MUCH_PADDING = "too-much-padding"
+BAD_PALETTE_INDEX = "bad-palette-index"
+TRAILING_BYTES = "trailing-bytes"
+
 
 class Rejection(Exception):
     """An input that is refused. `reason` is a fixed name, `detail` is text for people."""

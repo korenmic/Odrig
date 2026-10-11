@@ -667,3 +667,21 @@ line, status 1 and nothing left behind.
 
 **Resolution.** Seed 01 `requirements.md`, Requirement 2 criterion 5; `docs/reasons.md`,
 "Any output".
+
+## Seed 01: Codes above 255
+
+**Question.** `docs/format.md` says a coded frame holds N codes, "each 0 to 255", but its bit
+codes can spell larger values: with k of 6 or 7 the short form of a Rice code reaches up to
+1,023, and in run mode the Rice value 255 makes the code 256. The reject list does not
+mention such a code and Requirement 6 has no reason for it. This is a gap in a governing
+document.
+
+**Answer.** A reader rejects it, with the new reason `bad-code`, judged when the Rice code
+has been read completely. Taking the value modulo 256 instead would give one residual two
+spellings and would make the result depend on how wide a reader's variables are. The core of
+seed 02 has to refuse the same files: it takes its reasons from Requirement 6 of seed 01, and
+the invalid test vectors carry both cases.
+
+**Resolution.** `docs/format.md`, "What a reader rejects"; seed 01 `requirements.md`,
+Requirement 6 and Requirement 19 criterion 2; `design.md`, "Reference decoder", step 6;
+`docs/reasons.md`, "ODRG files".

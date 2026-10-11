@@ -47,7 +47,7 @@ Rules for every task:
   - Add the JSON frames table to `docs/reasons.md`.
   - Requirements: 2.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4
 
-- [ ] 3. ODRG reference decoder and the `decode` subcommand
+- [x] 3. ODRG reference decoder and the `decode` subcommand
   - Add `Decoded` and `decode` to `odrig/odrg.py`, following the nine steps of the design.
     Standard library only.
   - Add the `decode` subcommand, with output through a `.part` file moved into place.

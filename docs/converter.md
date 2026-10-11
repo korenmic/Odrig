@@ -26,6 +26,24 @@ ignores it.
 | 1 | An input was rejected. One line `error: <reason>: <detail>` is written to standard error and no output is left behind. The reasons are listed in [reasons.md](reasons.md). |
 | 2 | The command line was not understood. A usage message is written to standard error and nothing else is written. |
 
+## decode
+
+```
+python -m odrig decode IN.odrg OUT.json
+```
+
+Reads an ODRG file with the reference decoder and writes its frames as a JSON frames file
+in the canonical layout. Frame records that follow each other with the same picture are
+written as one frame, so the JSON file shows the same picture at every millisecond as the
+ODRG file. An existing output file is replaced.
+
+```
+python -m odrig decode hello.odrg hello.json
+```
+
+A file that breaks the format is rejected with one of the reasons under "ODRG files" in
+[reasons.md](reasons.md), and no output is written.
+
 ## Tests
 
 ```

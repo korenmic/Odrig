@@ -1,4 +1,5 @@
 import re
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -174,6 +175,97 @@ class WritingAnOutput(unittest.TestCase):
         self.assertEqual(caught.exception.reason, "cannot-write")
         self.assertEqual(path.read_bytes(), b"old")
         self.assertEqual(self.names(), ["out.bin"])
+
+
+def odrg_file(*records, width=1, height=1):
+    """An uncompressed ODRG file without a palette, made of stored frame records."""
+    data = struct.pack("<4sBBHHHI", b"ODRG", 1, 0, width, height, 0, len(records))
+    for duration, picture in records:
+        data += struct.pack("<HHB", duration, len(picture) + 1, 0x40) + picture
+    return data
+
+
+class Decode(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+        self.source = self.folder / "clip.odrg"
+        self.output = self.folder / "clip.json"
+
+    def names(self):
+        return sorted(entry.name for entry in self.folder.iterdir())
+
+    def test_it_writes_the_frames_in_the_canonical_form(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03"), (40, b"\x00\x00\xff")))
+        result = support.run("decode", self.source, self.output)
+        self.assertEqual(result, support.Result(0, "", ""))
+        expected = (
+            b'{\n  "version": 1,\n  "width": 1,\n  "height": 1,\n  "frames": [\n'
+            b'    {"ms": 20, "pixels": [66051]},\n'
+            b'    {"ms": 40, "pixels": [255]}\n  ]\n}\n'
+        )
+        self.assertEqual(self.output.read_bytes(), expected)
+        self.assertEqual(self.names(), ["clip.json", "clip.odrg"])
+
+    def test_records_with_the_same_picture_become_one_frame(self):
+        same = b"\x01\x02\x03"
+        self.source.write_bytes(odrg_file((65535, same), (65535, same), (10, same), (20, b"\x00\x00\x00")))
+        self.assertEqual(support.run("decode", self.source, self.output).status, 0)
+        self.assertIn(b'{"ms": 131080, "pixels": [66051]},\n', self.output.read_bytes())
+        self.assertEqual(self.output.read_bytes().count(b'"ms"'), 2)
+
+    def test_it_runs_as_a_module(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03")))
+        result = support.run_module("decode", self.source, self.output)
+        self.assertEqual(result, support.Result(0, "", ""))
+        self.assertIn(b'"pixels": [66051]', self.output.read_bytes())
+
+    def test_an_existing_output_is_replaced(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03")))
+        self.output.write_bytes(b"something else, and longer than the new content " * 20)
+        self.assertEqual(support.run("decode", self.source, self.output).status, 0)
+        self.assertTrue(self.output.read_bytes().startswith(b'{\n  "version": 1,\n'))
+        self.assertTrue(self.output.read_bytes().endswith(b"]\n}\n"))
+        self.assertEqual(self.names(), ["clip.json", "clip.odrg"])
+
+    def test_a_rejected_input_leaves_no_output_and_no_part_file(self):
+        self.source.write_bytes(b"ODRX" + odrg_file((20, b"\x01\x02\x03"))[4:])
+        result = support.run("decode", self.source, self.output)
+        self.assertEqual(result.status, 1)
+        self.assertEqual(result.out, "")
+        self.assertTrue(result.err.startswith(f"error: bad-magic: {self.source}: "), result.err)
+        self.assertEqual(result.err.count("\n"), 1)
+        self.assertEqual(self.names(), ["clip.odrg"])
+
+    def test_a_rejected_input_leaves_an_existing_output_as_it_was(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03"))[:-1])
+        self.output.write_bytes(b"kept")
+        result = support.run("decode", self.source, self.output)
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith("error: truncated: "), result.err)
+        self.assertEqual(self.output.read_bytes(), b"kept")
+        self.assertEqual(self.names(), ["clip.json", "clip.odrg"])
+
+    def test_an_input_that_does_not_exist_is_not_found(self):
+        result = support.run("decode", self.source, self.output)
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith(f"error: not-found: {self.source}: "), result.err)
+        self.assertEqual(self.names(), [])
+
+    def test_an_output_folder_that_does_not_exist_is_cannot_write(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03")))
+        result = support.run("decode", self.source, self.folder / "absent" / "clip.json")
+        self.assertEqual(result.status, 1)
+        self.assertTrue(result.err.startswith("error: cannot-write: "), result.err)
+        self.assertEqual(self.names(), ["clip.odrg"])
+
+    def test_a_missing_argument_is_a_usage_error_and_writes_nothing(self):
+        self.source.write_bytes(odrg_file((20, b"\x01\x02\x03")))
+        result = support.run("decode", self.source)
+        self.assertEqual(result.status, 2)
+        self.assertIn("usage:", result.err)
+        self.assertEqual(self.names(), ["clip.odrg"])
 
 
 if __name__ == "__main__":

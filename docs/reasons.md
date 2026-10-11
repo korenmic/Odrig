@@ -39,6 +39,41 @@ The checks run in this order: the top level, `version`, the other top-level memb
 missing one before an unknown one), `width`, `height`, `frames`, then each frame in order:
 its members, `ms`, the number of pixels, and each pixel in order.
 
+## ODRG files
+
+Rules: [format.md](format.md), "ODRG".
+
+| Reason | Condition |
+|---|---|
+| `truncated` | The file ends before the 16-byte header, the palette or a frame record is complete, or a compressed body's DEFLATE stream ends before its last block is complete. |
+| `bad-magic` | Bytes 0 to 3 are not `4F 44 52 47`. |
+| `bad-version` | The version byte is not 1. |
+| `reserved-bits` | A flag bit from 1 to 7 is set; bit 7 of a mode byte is set; or a mode byte has bit 6 set and is not `0x40`. |
+| `zero-size` | Width or height is 0. |
+| `bad-palette-size` | C is above 256. |
+| `canvas-too-large` | N is above 65,534. |
+| `no-frames` | F is 0. |
+| `bad-deflate` | The compressed body is not a valid DEFLATE stream. |
+| `zero-duration` | A frame record's duration is 0. |
+| `bad-length` | L is below 2 or above N + 1. |
+| `bad-stored-length` | A stored frame's L is not N + 1. |
+| `out-of-bits` | A coded frame needs a bit after the last bit of its data. |
+| `run-past-end` | In run mode, a run of g - 1 zero codes would pass N. |
+| `bad-code` | A code of a coded frame is above 255: a Rice value above 255 in plain mode, or above 254 in run mode. |
+| `too-much-padding` | After the N codes of a coded frame, 8 or more bits of its data are unread. |
+| `bad-palette-index` | In a palette file, a pixel of a decoded picture is C or more. |
+| `trailing-bytes` | Bytes follow the last frame record: in the body, or in the file after the end of the DEFLATE stream. |
+
+The checks run in this order. A file shorter than 16 bytes is `truncated`. The header fields
+are checked in the order of their offsets: magic, version, flags, width and height, palette
+size, N, frame count. A compressed body is inflated whole, which gives `bad-deflate`,
+`truncated` or the `trailing-bytes` of bytes after the stream. Then come the palette and the
+frame records in order. Within a frame record: its first five bytes are present, the
+duration, L, the mode byte, the length of a stored frame, the data bytes are present, the
+bits of the data, and last the palette indexes of the picture. A Gamma code or a Rice code is
+read whole before its value is judged, so a code cut off by the end of the data is
+`out-of-bits`. Bytes after the last frame record are found last.
+
 ## Any output
 
 | Reason | Condition |

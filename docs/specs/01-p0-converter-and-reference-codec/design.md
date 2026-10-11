@@ -300,9 +300,10 @@ stream.
 5. Stored: the data becomes the buffer.
 6. Coded: read the N codes from the data with a bit reader that raises `out-of-bits` past
    the last bit. Plain mode reads N Rice codes. Run mode follows the three steps of the
-   document; a Gamma code is read completely, then `i + g - 1 > N` is `run-past-end`. After
-   the last code, `8 * (L - 1) - bits_read >= 8` is `too-much-padding`. Then the residuals
-   and the predictor.
+   document; a Gamma code is read completely, then `i + g - 1 > N` is `run-past-end`. A
+   Rice code is read completely, then a code above 255 is `bad-code`. After the last code,
+   `8 * (L - 1) - bits_read >= 8` is `too-much-padding`. Then the residuals and the
+   predictor.
 7. In a palette file, any buffer byte of C or more is `bad-palette-index`.
 8. Record the mode byte, the duration and the picture (through the palette when C is not 0).
 9. After the last record, any body byte left is `trailing-bytes`.
