@@ -5,6 +5,10 @@ import subprocess
 
 from . import Failure, env, paths
 
+TEMPLATE = paths.FIRMWARE / "platformio_override.ini.in"
+OVERRIDE_NAME = "platformio_override.ini"
+PLACEHOLDER = "@REPO@"
+
 URL = "https://github.com/wled/WLED.git"
 TAG = "v16.0.1"
 COMMIT = "29b389df1c1aaec6ff53aea742d17063b985906c"
@@ -56,3 +60,20 @@ def restore_and_patch(folder=paths.WLED, patches=paths.PATCHES, commit=COMMIT):
             raise Failure("patch-failed", f"{patch.name} does not apply: {done.stderr.strip()[-300:]}")
         applied.append(patch.name)
     return applied
+
+
+def override_text(root=paths.ROOT, template=TEMPLATE):
+    """The override file: the template with the repository's path in place of @REPO@."""
+    root = str(pathlib.Path(root).resolve())
+    if any(character.isspace() for character in root):
+        raise Failure("build-failed", f"the repository's path, {root!r}, has a space in it, which the library entries of the build cannot carry")
+    return pathlib.Path(template).read_text().replace(PLACEHOLDER, root)
+
+
+def write_override(folder=paths.WLED, root=paths.ROOT, template=TEMPLATE):
+    """Writes the override file into WLED's folder, unless it is there with this content."""
+    path = paths.output(pathlib.Path(folder) / OVERRIDE_NAME)
+    text = override_text(root, template)
+    if not path.is_file() or path.read_text() != text:
+        path.write_text(text)
+    return path

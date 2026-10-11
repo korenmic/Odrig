@@ -146,3 +146,48 @@ class Patches(TemporaryFolder):
     def test_the_folder_of_the_repository_holds_no_patch(self):
         self.assertEqual(wled.patch_files(), [])
         self.assertTrue((wled.paths.PATCHES / "README.md").is_file())
+
+
+class Override(TemporaryFolder):
+    def test_it_is_the_template_with_the_repository_path_in_place_of_the_marker(self):
+        template = wled.TEMPLATE.read_text()
+        self.assertEqual(wled.TEMPLATE, support.FIRMWARE / "platformio_override.ini.in")
+        self.assertIn("@REPO@", template)
+        text = wled.override_text()
+        self.assertEqual(text, template.replace("@REPO@", str(support.ROOT)))
+        self.assertNotIn("@REPO@", text)
+
+    def test_it_names_the_usermod_as_a_library_outside_wleds_folder(self):
+        text = wled.override_text()
+        self.assertIn(f"  odrig = symlink://{support.ROOT}/firmware/usermod\n", text)
+        self.assertRegex(text, r"(?m)^custom_usermods =\n  odrig = symlink://")
+
+    def test_it_switches_wleds_serial_handling_off_and_leaves_the_audio_usermod_out(self):
+        text = wled.override_text()
+        self.assertRegex(text, r"(?m)^  -D WLED_DISABLE_ADALIGHT$")
+        self.assertNotIn("audioreactive", text)
+
+    def test_it_has_the_two_environments_on_wleds_own(self):
+        text = wled.override_text()
+        self.assertRegex(text, r"(?m)^\[env:odrig\]\nextends = env:esp32s3dev_16MB_opi$")
+        self.assertRegex(text, r"(?m)^\[env:odrig_probe\]\nextends = env:odrig$")
+        self.assertRegex(text, r"(?m)^  -D ODRIG_PROBE$")
+        self.assertIn('-D WLED_RELEASE_NAME=\\"odrig_ESP32-S3_16MB_opi\\"', text)
+        for setting in ("board", "platform", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
+            self.assertNotRegex(text, rf"(?m)^{setting}\s*=", setting)
+
+    def test_a_repository_path_with_a_space_is_refused(self):
+        spaced = self.folder / "my odrig"
+        spaced.mkdir()
+        self.assertEqual(support.reason_of(self, lambda: wled.override_text(root=spaced)), "build-failed")
+
+    def test_the_file_is_written_into_wleds_folder_and_left_alone_when_it_is_right(self):
+        path = wled.write_override(self.folder)
+        self.assertEqual(path, self.folder / "platformio_override.ini")
+        self.assertEqual(path.read_text(), wled.override_text())
+        before = path.stat().st_mtime_ns
+        wled.write_override(self.folder)
+        self.assertEqual(path.stat().st_mtime_ns, before)
+        path.write_text("something else\n")
+        wled.write_override(self.folder)
+        self.assertEqual(path.read_text(), wled.override_text())

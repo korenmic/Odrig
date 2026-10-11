@@ -119,7 +119,7 @@ class Building(unittest.TestCase):
         def run(command, **named):
             ran.append((command, named))
             return mock.Mock(returncode=status)
-        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1232912):
+        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override"), mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1232912), mock.patch.object(build, "sha256", return_value="48e51d84"):
             result = support.run_main("build", *arguments)
         return result, ran, patched
 
@@ -134,6 +134,17 @@ class Building(unittest.TestCase):
         _, ran, _ = self.build("--stock")
         self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(build.paths.PIO_CORE))
         self.assertEqual(ran[0][1]["env"]["PLATFORMIO_BUILD_CACHE_DIR"], str(build.paths.PIO_CACHE))
+
+    def test_the_firmware_and_the_probe_build_have_environments_of_their_own_and_get_the_patches(self):
+        for arguments, environment, image in (([], "odrig", "odrig-firmware.bin"), (["--probe"], "odrig_probe", "odrig-probe.bin")):
+            result, ran, patched = self.build(*arguments)
+            self.assertEqual(result.status, 0, result.err)
+            self.assertEqual(ran[0][0][-2:], ["-e", environment])
+            self.assertEqual(patched.call_args.kwargs, {"patches": build.paths.PATCHES})
+            self.assertIn(f"{image}: ", result.out)
+
+    def test_stock_and_probe_do_not_go_together(self):
+        self.assertEqual(support.run_main("build", "--stock", "--probe").status, 2)
 
     def test_a_failed_build_is_build_failed(self):
         result, _, _ = self.build("--stock", status=1)

@@ -1,0 +1,22 @@
+; The build environments of the firmware. `python3 firmware/fw.py build` writes this file
+; into WLED's folder as platformio_override.ini, with the repository's path filled in.
+; Everything not named here is inherited from WLED's own environment esp32s3dev_16MB_opi:
+; the board, the platform, the partition table and the flash settings.
+
+[env:odrig]
+extends = env:esp32s3dev_16MB_opi
+custom_usermods =
+  odrig = symlink://@REPO@/firmware/usermod
+lib_deps = ${esp32s3.lib_deps}
+build_unflags = ${common.build_unflags}
+build_flags = ${common.build_flags} ${esp32s3.build_flags}
+  -D WLED_RELEASE_NAME=\"odrig_ESP32-S3_16MB_opi\"
+  -D WLED_WATCHDOG_TIMEOUT=0
+  -D ARDUINO_USB_CDC_ON_BOOT=1
+  -DBOARD_HAS_PSRAM
+  -D WLED_DISABLE_ADALIGHT
+
+[env:odrig_probe]
+extends = env:odrig
+build_flags = ${env:odrig.build_flags}
+  -D ODRIG_PROBE

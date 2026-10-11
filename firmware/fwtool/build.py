@@ -83,6 +83,7 @@ def build(kind, verbose=False):
     made = KINDS[kind]
     toolchain.python_environment()
     wled.restore_and_patch(patches=None if kind == "stock" else paths.PATCHES)
+    wled.write_override()
     done = subprocess.run(pio_command(made.environment, verbose), env=env.child(), stdout=sys.stderr)
     if done.returncode != 0:
         raise Failure("build-failed", f"PlatformIO ended with status {done.returncode} for the environment {made.environment}")

@@ -1983,3 +1983,78 @@ the test in task 5, as its task says.
 
 **Resolution.** `tests/board/test_flash_restore.py`; `docs/firmware.md`, "Verified on the
 board", A4 and A6.
+
+## Seed 04: The current limiter with ten legs, and what an output gives back
+
+**Question.** The design has the probe build report, for each output, the CRC-32 of the
+colours read back from it, and the tests compare that with the bytes that were sent. It
+also keeps WLED's current limiter active with the maximum of WLED's LED settings, which is
+850 mA on the board. WLED counts 1 mA for every LED at rest, so ten legs of 180 LEDs are
+estimated at 1,800 mA before any LED is lit, and the limiter then dims every refresh to
+its lowest level whatever the picture. An output that was dimmed does not give back what
+it was sent, and WLED's way of giving a colour back divides by the dimming.
+
+**Answer.** The limiter is left as the seed asks. Two things follow.
+
+For the owner: with ten legs wired, the LEDs stay at their lowest level until WLED's
+maximum current is raised to what the power supply gives, in WLED's LED settings. The
+firmware does not raise it. `docs/firmware.md` says so.
+
+For the tests: the probe build's report has one more member, `limited`, the sends in which
+the limiter dimmed. A test expects the exact bytes when `limited` is 0, and when it is not,
+exactly what the dimming makes of the bytes: at the lowest level a channel stays lit when
+it is above a quarter of the colour's largest channel, and WLED gives it back as 128. With
+the pattern of task 3 this holds for all ten outputs, which shows that each output gets its
+own leg's data in the right order. Exact bytes on ten outputs are checked in task 6 with a
+ten-leg mapping of few LEDs, which the limiter does not dim.
+
+The outputs are read back after the send and compared before the next one, so `overwritten`
+is counted the same way with and without dimming.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`; `tests/board/test_probe.py`;
+`docs/firmware.md`, "The probe build" and "Verified on the board".
+
+## Seed 04: The access point, reported over USB
+
+**Question.** The entry "Seed 04: How the board reports that its Wi-Fi network is up" left
+that report to a person with a device on the network, because the firmware's port carries
+only the commands of `docs/commands.md`. The probe build already answers one line of its
+own on the port.
+
+**Answer.** The probe build's report has the member `ap`: 1 while WLED's access point is up.
+A program can so establish over USB that the board reports its network as up, which is the
+first half of item 7 of the definition of done. Whether a device can join it and send
+commands stays the owner's check. The firmware itself still has no such report on the
+port, and `status` is unchanged.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`; `docs/firmware.md`, "The probe build".
+
+## Seed 04: Outputs after one that cannot be made, and details of the outputs
+
+**Question.** Requirement 8 wants the other outputs to work when one cannot be made. WLED
+starts its outputs in order and stops at the first that does not work, so the outputs after
+it would stay silent. WLED's settings can also hold a list of colour orders for ranges of
+LEDs, which would change the order of an output made by the usermod.
+
+**Answer.** After it has replaced the outputs, the usermod starts every working output
+that comes after one that failed. It empties WLED's list of colour orders for ranges, so
+every output has the one order, green, red, blue. An output's start and length are kept in
+16 bits, as WLED keeps them, so that the comparison with the legs cannot disagree for
+ever.
+
+**Resolution.** `firmware/usermod/odrig_leds.cpp`, `apply` and `matches`. Task 6 tests a
+mapping with a pin the chip keeps for itself.
+
+## Seed 04: What the board suite leaves on the board
+
+**Question.** Every task says what the board runs when it ends, and the tests of one run
+flash several images in an order that discovery chooses. Which test puts the last image
+on?
+
+**Answer.** The package `tests/board` loads every test file of its folder by discovery and
+adds one last step of its own, which makes the board run what the suite leaves there. In
+task 3 that is the probe build; from task 5 on it is the firmware with the dim example
+show. A test file added to the folder still runs without a change anywhere.
+
+**Resolution.** `tests/board/__init__.py`, `load_tests`; `tests/board/support.py`,
+`leave_the_board`.

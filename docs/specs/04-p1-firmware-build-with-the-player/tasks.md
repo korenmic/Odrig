@@ -86,7 +86,7 @@ Rules for every task:
   - Requirements: 1.5, 1.6, 1.7, 2.2, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4,
     6.2, 6.3, 6.4, 15.2, 16.6
 
-- [ ] 3. Spike: a usermod that owns the LEDs
+- [x] 3. Spike: a usermod that owns the LEDs
   - Create `firmware/platformio_override.ini.in` with the two environments, without the
     lines for the core, and add the override file and the subcommands `build` and
     `build --probe` to the tool.

@@ -6,9 +6,9 @@ tools the build needs, fetches WLED, builds, flashes, restores stock WLED and in
 show into the board's storage.
 
 This page covers [what the tool needs](#what-the-tool-needs), [the work folder](#the-work-folder),
-the [commands](#commands) of the tool, [the regions of the flash](#the-regions-of-the-flash)
-the tool writes, [rolling back](#rolling-back) and what was
-[verified on the board](#verified-on-the-board).
+the [commands](#commands) of the tool, [the probe build](#the-probe-build),
+[the regions of the flash](#the-regions-of-the-flash) the tool writes,
+[rolling back](#rolling-back) and what was [verified on the board](#verified-on-the-board).
 
 ## What the tool needs
 
@@ -86,7 +86,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build --stock [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py test
@@ -149,22 +149,35 @@ esptool: esptool v5.4.0
 ### build
 
 ```
+python3 firmware/fw.py build
+python3 firmware/fw.py build --probe
 python3 firmware/fw.py build --stock
 ```
 
 Builds an image with PlatformIO in `build/firmware/WLED` and keeps it in
-`build/firmware/out/` with its SHA-256 in a file beside it, `<image>.sha256`. With `--stock`
-it builds WLED's own environment `esp32s3dev_16MB_opi` from WLED's files as they are at the
-pinned commit, with no patch applied, into `stock-built.bin`. An image larger than the
-application partition, 3,145,728 bytes, is not kept: `image-too-large`.
+`build/firmware/out/` with its SHA-256 in a file beside it, `<image>.sha256`. An image
+larger than the application partition, 3,145,728 bytes, is not kept: `image-too-large`.
 
-Before building, the tool brings WLED's tracked files back to the pinned commit and applies
-every patch of `firmware/patches/`. A second build reuses what the work folder holds and
-fetches nothing. `--verbose` shows every command of the build. PlatformIO's output goes to
-standard error; the one line on standard output names the image:
+| Command | Environment | Image | What it is |
+|---|---|---|---|
+| `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
+| `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
+| `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
+
+Before building, the tool brings WLED's tracked files back to the pinned commit, applies
+every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder
+from `firmware/platformio_override.ini.in`, with the repository's path in place of
+`@REPO@`. That file adds the two environments and changes nothing of WLED's own; everything
+it does not name, the board, the platform, the partition table and the flash settings, is
+inherited from WLED's environment. The usermod is used where it is, as a library outside
+WLED's folder; nothing is copied. A repository path with a space in it is refused.
+
+A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
+every command of the build. PlatformIO's output goes to standard error; the one line on
+standard output names the image:
 
 ```
-/Users/you/odrig/build/firmware/out/stock-built.bin: 1232912 bytes, SHA-256 48e51d84...
+/Users/you/odrig/build/firmware/out/odrig-firmware.bin: 1194544 bytes, SHA-256 de6908aa...
 ```
 
 ### flash
@@ -232,6 +245,45 @@ Runs the suite in `tests/board/`, found by discovery in the same way. It needs t
 USB and writes to it: it flashes images and restores stock WLED. Without a board it stops
 with `no-board` and runs nothing.
 
+## The probe build
+
+The probe build exists so that a program can check what the LEDs are given without eyes on
+them. It answers the line `#probe` on the port with one JSON line, shown here on several:
+
+```json
+{"probe":1,"start_ms":0,"heap":227940,"realtime":1,"loops":1003,"sent":50,"gap_ms":21,
+ "poll_us":13,"send_us":7213,"overwritten":0,"limited":67,"limit_ma":730,"used_ma":1800,
+ "ap":1,"error":null,
+ "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"54135885"}]}
+```
+
+| Member | Meaning |
+|---|---|
+| `start_ms` | The milliseconds the player took to start. |
+| `heap` | The free internal memory of the chip, in bytes. |
+| `realtime` | 1 while WLED is held in its live mode with no override, else 0. |
+| `loops`, `sent` | The passes of the usermod's loop and the refreshes sent, in the last full second. |
+| `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. |
+| `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. |
+| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
+| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
+| `ap` | 1 while WLED's access point is up, else 0. |
+| `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt` or `parallel`, and `crc`, the CRC-32 of the colours it holds as WLED gives them back: red, green and blue for each LED. |
+
+While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
+dims, the output gives back the dimmed colours as WLED restores them, which at the
+limiter's lowest level is 128 for a channel that stayed lit and 0 for one that did not.
+
+In this state of the work the usermod has no player yet: it sends a fixed pattern of ten
+legs on pins 1 to 10 with 180 LEDs each, no value above 40, and the port answers `#probe`
+and nothing else.
+
+**What a person sees with this build.** One 60-LED strip is wired, on leg 1. WLED's maximum
+current is 850 mA, and 1,800 LEDs are estimated at 1,800 mA at rest alone, so the limiter
+holds every LED at its lowest level: the 60 LEDs show a steady, very faint glow of red and
+green that does not move and does not flicker, and nothing else. Nothing of WLED's own show,
+the text and the square it played before, appears.
+
 ## The regions of the flash
 
 The board has WLED's 16 MB layout. The tool reads the partition table before it writes and
@@ -274,6 +326,19 @@ letters are those of the design's table "Assumed, to be verified by an early tas
 | A5 | The C++ flag the build really uses. | `-std=gnu++11`, with `-fno-exceptions -fno-rtti -Os`, in the compiler command of every one of the 235 C++ files of the build, `wled00/wled.cpp` among them. C files are compiled with `-std=gnu99`. |
 | A6 | Writing only `app0` and erasing `otadata` leaves a board that starts the new image. | It does: `flash` and `restore-stock` each took 15 seconds and the board answered `v` after each. The storage partition, read whole before and after the pair, had the same 10,354,688 bytes. |
 | A7 | esptool 5.4.0 reads, writes, erases and verifies this board over its USB serial and JTAG unit, and resets it into and out of the bootloader. | It does. Reading the partition table takes half a second, reading storage 64 seconds. |
+
+| A8 | PlatformIO accepts the usermod as a `symlink://` library outside WLED's folder, and WLED's check of linked modules passes. | It does: the build lists `odrig` with the path `firmware/usermod`, compiles its five files from there, and WLED's check reports one library linked as a module and one usermod entry. The part of A8 about the core is task 5's. |
+| A9 | `strip.finalizeInit()` and `strip.makeAutoSegments()` called from a usermod replace the outputs, and ten outputs on pins 1 to 10 are all valid: four RMT and six parallel. | They do. The probe build reports ten working outputs on pins 1 to 10 with 180 LEDs each, the first four `rmt` and the other six `parallel`, in place of the two outputs of WLED's stored settings. |
+| A10 | In live mode nothing of WLED writes to the outputs between two refreshes, and the outputs hold exactly the colours written. | Nothing else writes: `overwritten` stayed 0 over 30 seconds, and `realtime` was 1. With ten legs of 180 LEDs the limiter dims every refresh to its lowest level, so the outputs do not hold the bytes written; each holds exactly what that dimming makes of its own leg's bytes, for all ten outputs. Exact bytes are shown in task 6, with fewer LEDs. |
+| A11 | With `WLED_DISABLE_ADALIGHT` the firmware writes nothing to the port by itself, and the usermod can read and write the port from its loop. | It does: nothing arrived in 5 seconds without a command, the byte `v` got no answer, and `#probe` was answered every time. |
+| A12 | A pass of WLED's loop and the push of 1,800 LEDs fit well inside 20 ms. | They do. Over 20 seconds the loop made 981 to 1,006 passes a second, a send of 1,800 LEDs took 7.2 ms at most with the limiter's dimming in it, the longest time between two sends was 25 ms, and 49 to 51 refreshes were sent in every second. 227,940 bytes of internal memory were free. |
+
+With the usermod's two calls that hold the LEDs taken out, WLED kept its own two outputs and
+played its own show: the report had `realtime` 0, two outputs, and `overwritten` rising by
+50 a second.
+
+The probe build reported `ap` 1 from the first second after its start: WLED's access point
+was up, with no network to join configured.
 
 The board's partition table, read with the tool, is the one WLED's source has for this
 environment and byte for byte the stock file `partitions_s3_16m.bin`:
