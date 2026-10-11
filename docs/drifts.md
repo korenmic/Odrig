@@ -3620,3 +3620,672 @@ two lines cross once, as the suite has it.
 
 **Resolution.** `docs/emulator.md`, "The LEDs view", "The mapping view", "The check list by
 eye" and "What has been checked"; `tests/emulator/test_docs.py`.
+
+## Seed 06: Where the JavaScript converter lives and how it is started
+
+**Question.** The seed asks for plain JavaScript modules in two parts and names no folder,
+no file and no command.
+
+**Answer.** The folder `converter/` at the repository root: the library in
+`converter/lib/`, the command line part in `converter/odrig.js` and `converter/cli/`, the
+tests in `converter/tests/`. The tool is started as
+`node converter/odrig.js <subcommand> ...`. `converter/package.json` marks every file
+under it as an ECMAScript module, which is also the form a web view loads, so nothing is
+built. The tests live inside `converter/` and not under `tests/`, because the one test
+command that Node.js 20 and later versions share starts in the folder it searches; see
+"Seed 06: One test command for Node.js 20 and for later versions".
+
+**Resolution.** `docs/specs/06-p1-javascript-converter/requirements.md`, Requirements 1
+and 2; `design.md`, "Repository layout" and "How it is run".
+
+## Seed 06: What "the same messages" covers
+
+**Question.** The seed asks for "the same results and messages as the Python tool". Part
+of what the Python tool writes is not its own wording: the position and message of
+Python's JSON module in a `bad-json` detail, zlib's message in `bad-deflate`, the
+operating system's message for a file that cannot be read or written, the message of
+Pillow or PyAV in `unreadable-media`, and the usage text of `argparse`. The JSON module's
+messages changed with Python 3.13.
+
+**Answer.** The reason is the same for every input. The detail is the same, character for
+character, wherever the Python tool words it itself, and what a successful run prints is
+the same byte for byte. Where the detail holds the text of a library, the JavaScript tool
+gives the same reason and its own words. For the common failures of the file system it
+writes the system's words as Python gives them on macOS and Linux, from a small table.
+The usage text is its own and names the tool as `node converter/odrig.js`. The tests
+compare whole error lines except for the reasons listed.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 3; `design.md`, "strictjson",
+"Files" and "Testing strategy".
+
+## Seed 06: Command lines the two tools read differently
+
+**Question.** The Python tool's command line is `argparse`, which accepts more than the
+documents show: an option shortened to an unambiguous beginning, and numbers of seconds in
+every spelling Python's `decimal` reads, with underscores or digits of other scripts.
+
+**Answer.** The JavaScript tool has a small parser of its own and accepts the documented
+forms: `--name value`, `--name=value`, options in any place, a value such as `-1` after an
+option, an option given twice with its last value, and seconds as a sign, digits, an
+optional fraction and an optional exponent. A shortened option and an exotic spelling of a
+number are usage errors in the JavaScript tool and work in the Python tool. Node's own
+argument parser was not used, because it takes `--start -1` for a missing value, where the
+Python tool reads the start and refuses it with `bad-range`.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 2 criteria 3, 6, 8 and 9;
+`design.md`, "Arguments".
+
+## Seed 06: A reader of JSON of our own, and texts nested very deeply
+
+**Question.** The files are read strictly: a member named twice, `1.0` where an integer is
+expected and a byte-order mark are refused, and an integer of thirty digits must keep its
+digits for a detail. JavaScript's `JSON.parse` reports none of the first three and loses
+digits. The Python tool also refuses a text that is nested too deeply for Python, at a
+depth that depends on the version of Python.
+
+**Answer.** The library has its own reader of JSON, over the bytes of the text, which
+keeps no state on the engine's stack. It refuses a text nested deeper than 512 levels as
+`bad-json`. No file of this project nests deeper than four. A text between 513 levels and
+Python's own limit is `bad-json` in the JavaScript tool and gets whatever reason its
+content has in the Python tool; no such file is of use to anyone.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 4; `design.md`, "strictjson".
+
+## Seed 06: The DEFLATE compressor, and what "within 5 percent" is measured against
+
+**Question.** The seed asks that compressed files decode to identical frames and are
+"within 5 percent of the Python tool's" in size. It does not say what compresses, or
+against which figure the 5 percent is taken. Node's `zlib` module does not exist in a web
+view. The compression streams of Node.js and of browsers take no level and give the bytes
+of the platform's own zlib, which differ between Node.js and Chrome.
+
+**Answer.** The library has a compressor of its own, written in plain JavaScript by the
+method of zlib at level 9, which is what the Python tool uses. A file encoded in the app
+is then the file encoded on the command line, on every computer, and the test in Chrome
+can ask for the same bytes. The measure is the size of the whole file the Python tool
+writes for the same source, with the zlib of the Python that runs the test; the JavaScript
+file may be at most 5 percent larger, and a smaller one is never a failure. A sketch of
+the method was run for the spec on six bodies: the largest difference from zlib 1.2.12 was
+0.1 percent, and one of the six streams had zlib's bytes. Identical bytes are not asked
+for.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 8; `design.md`, "The DEFLATE
+compressor".
+
+## Seed 06: The DEFLATE decoder
+
+**Question.** The reference tells three failures of a compressed body apart, as zlib
+reports them: `bad-deflate`, `truncated`, and `trailing-bytes` with the number of bytes
+after the stream. A decompression stream of a browser gives one error for all three and
+does not say where the stream ended.
+
+**Answer.** The library decodes DEFLATE itself, by the method of the core's decoder, which
+judges every part of a stream at the point where zlib does. The suite compares its verdict
+with zlib's for whole, damaged and cut streams, as the core's suite does. The detail of
+`bad-deflate` is the library's own; zlib's sentence is not copied.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 6; `design.md`, "inflate".
+
+## Seed 06: Numbers larger than JavaScript's
+
+**Question.** Python's integers have no size and its fractions are exact. The Python tool
+uses both: for a width of forty digits in a detail, for the sum of durations, for the
+times of video frames, and for the area mean, which it computes in 64-bit integers. A
+JavaScript number is exact only up to 2 to the power 53.
+
+**Answer.** A whole number from a file is a `Number` while it is exact and a `BigInt`
+otherwise, and sums and products of such values are computed so that no digit is lost.
+Times and the rectangle of a fit are fractions of two `BigInt`s. The area mean runs in
+`Number`s when its largest value, 511 times the area in the tool's units, is below 2 to
+the power 53, which holds for every real video, and in `BigInt`s between there and the
+Python tool's own limit of 2 to the power 63. Its division is written as
+`(a - a % b) / b`, which is exact. Floor division rounds toward minus infinity, as in
+Python. Seconds on the command line are read from their digits. The suite compares canvas
+pictures and ticks with the Python tool's for data from seeds.
+
+**Resolution.** Seed 06 `requirements.md`, Requirements 12 and 13; `design.md`, "Whole
+numbers and fractions" and "fit".
+
+## Seed 06: The package that decodes video, its licence and what its install leaves
+
+**Question.** The seed asks for "a package that brings its own decoder; no system-wide
+ffmpeg" and names none. Which package, under which licence, and does its install stay in
+the project folder?
+
+**Answer.** `ffmpeg-static` 5.3.0, licence GPL-3.0-or-later. Its install script fetches
+one ffmpeg 6.1.1 program for the platform from the package's GitHub releases into
+`converter/node_modules/`. The tool starts that program and reads its output; nothing of
+it is loaded into Node.js, is part of the library or is tracked. Three things the owner
+should know: the licence is the GPL; the script checks no checksum, so the repository
+tracks the checksum of the program for each platform it was verified on and the suite
+compares; and the script keeps a copy of the download in the user's cache folder,
+`~/Library/Caches/ffmpeg-static-nodejs` on macOS, outside the project folder, as npm keeps
+its own cache in `~/.npm`. Looked at and not chosen: `node-av`, whose API is closest to
+PyAV, needs Node.js 22.18 or later, and the seed asks for 20; `@ffmpeg-installer/ffmpeg`
+needs no download script but carries old builds nobody maintains, and is the fallback;
+`@ffmpeg/ffmpeg` no longer runs in Node.js; `libav.js` publishes no build with the H.264
+and HEVC decoders. Nothing was installed for this spec: the facts were read on npm's
+registry and in the package's files, and the first task that needs the package verifies
+them.
+
+**Resolution.** Seed 06 `requirements.md`, Requirements 14 and 17; `design.md`, "Video",
+facts V1 to V5 and assumptions A1 to A5; `tasks.md`, task 8.
+
+## Seed 06: How frames and their times come out of the decoder program
+
+**Question.** The Python tool gets each frame from PyAV with its presentation time as a
+whole number in the stream's time base. A program gives pictures on a pipe; where do the
+times come from, and what else must match?
+
+**Answer.** One run of ffmpeg writes the frames as raw red, green, blue and alpha to
+standard output, and its filter `showinfo` writes one log line for each frame with the
+presentation time, and one line with the time base. The reader pairs them in order and
+gives the library the time as an exact fraction. The form of those lines was read in the
+source of the version the package carries. The run is told not to turn the picture by a
+recorded rotation, which the Python tool does not apply, to keep every frame, and to use
+the scaler setting PyAV uses. The format of a file is not forced: like PyAV, ffmpeg tells
+it from the content. If the log does not serve, the times are taken from a second output
+in ffmpeg's `framecrc` form.
+
+**Resolution.** Seed 06 `design.md`, "Video", "The call" and assumption A2.
+
+## Seed 06: GIF files: the reader, and whose rules build the pictures
+
+**Question.** The Python tool reads a GIF with Pillow, which builds the picture of each
+frame from the frames before it by rules of its own. Read for this spec in Pillow 12.3.0:
+after a frame with disposal 2 that has no transparent index it paints the background
+colour, where browsers make the area transparent; it keeps the disposal of the frame
+before for a frame that names none; and it paints the background colour where the first
+frame does not cover the screen. The seed asks that the test GIF gives identical JSON, and
+seed 09 has the app's web view decode GIFs itself.
+
+**Answer.** On the command line a GIF is read with the package `omggif` 1.0.10, licence
+MIT, one file without a dependency, which gives each frame's rectangle, palette,
+transparent index, delay and disposal. The pictures are built in the command line part by
+the rules of the GIF format as browsers apply them, written out in the design, so that
+the command line and the app give the same pictures. For the GIFs of the suite, and for
+ordinary GIFs, these are Pillow's pictures. In the three corners named above the two
+tools differ; the documentation says so. The delays are the file's own, which the package
+gives unchanged. The decoder program can read GIFs too and is the fallback, with the GIF
+reader forced so that another kind of picture under the name is still refused.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 14 criteria 5, 6 and 10;
+`design.md`, "GIF" and assumption A6.
+
+## Seed 06: How a web view gives the library its frames
+
+**Question.** The library reads no file, and seed 09 has the phone's web view decode video
+and GIF. The seed says what the library holds and not how frames reach it.
+
+**Answer.** One function, `importFrames`, takes a source: its kind, video or GIF, and an
+iteration of frames, synchronous or asynchronous. A frame is its size, its pixels as red,
+green, blue and alpha, rows from the top, and for a video its presentation time, as a
+whole number of milliseconds or an exact fraction, for a GIF its delay. The rules that
+turn times and delays into frames on screen are in the library, so a web view gets the
+timeline of the command line. The command line uses the same function. Reading pixels
+out of the web view's frames is seed 09's.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 15; `design.md`, "How the library
+is given frames".
+
+## Seed 06: What of the Python tool is not ported
+
+**Question.** The seed lists `import`, `encode`, `decode`, `check` and `pack`. The Python
+package also has the generators of the tracked animations and of the dense clip, the
+builder of the test vectors, and after seed 05 the tool that writes `docs/mapping.md`.
+The firmware tool and the suites of the core and the emulator call the Python readers.
+
+**Answer.** None of these is ported, and none of their users changes. The generators
+compute with floating point and stay the one source of the tracked animations. The Python
+package keeps every file. `canvas-too-small`, a reason only the generators give, is still
+in the JavaScript list of reasons, so that the two lists are equal.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 18 criterion 8; `design.md`, "What
+this design relies on" and "Documents".
+
+## Seed 06: One test command for Node.js 20 and for later versions
+
+**Question.** The suite must run with one documented command, on Node's built-in test
+runner, selected by directory or discovery. Tried for this spec: `node --test <folder>`
+runs the folder's tests on Node.js 20.18 and fails on Node.js 26.5, which wants a pattern;
+a pattern works on 26.5 and not on 20.18.
+
+**Answer.** Without an argument both versions find the test files of the folder they are
+started in. The command is `npm test --prefix converter`: npm starts the script
+`node --test` in `converter/`, and the runner finds every file there whose name ends in
+`.test.js`. That is why the tests are in `converter/tests/`.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 18 criteria 1 and 2; `design.md`,
+"Testing strategy".
+
+## Seed 06: Chrome for the test
+
+**Question.** The definition of done has a test that loads the library in headless
+Chrome. No browser may be installed, and a package that drives a browser would be one more
+dependency.
+
+**Answer.** The test starts the Chrome that is installed, without a window and with a
+profile folder of its own in a temporary folder, on a page served from the loopback
+address; module scripts do not load from a file address. The page posts its results back
+to the test's own server, so nothing drives the browser from outside. Chrome is looked for
+at the path an environment variable names and then in the usual places. Where none is
+found the test is reported as skipped; on the Mac of this project it must run.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 16; `design.md`, "The page of the
+Chrome test".
+
+## Seed 06: The same installed file set, when compressed
+
+**Question.** The seed says `pack` "produces the same installed file set as the Python
+tool, byte-identical when uncompressed". Compressed files cannot have the Python tool's
+bytes.
+
+**Answer.** The same names in the folder; `mapping.json` and `show.json` with the same
+bytes in both cases; with `--uncompressed` every file with the same bytes; without it,
+every `.odrg` file decodes to the frame records of the Python tool's file and is at most
+5 percent larger.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 11 criteria 5 and 6.
+
+## Seed 06: A tool started without its packages
+
+**Question.** The Python tool needs its libraries only for `import`. What does the
+JavaScript tool do when `npm ci` was not run?
+
+**Answer.** `encode`, `decode`, `check` and `pack` run with Node.js alone; the two
+packages are loaded only when a file of their kind is imported. Without the package,
+`import` ends with status 1 and `error: decoder-missing: ...`, which names the command
+that installs it. `decoder-missing` is a failure of the setup and not a rejection of an
+input: it is listed in `docs/converter.md` and not in `docs/reasons.md`, as the emulator's
+failures to start are listed in its own page.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 14 criteria 8 and 9; `design.md`,
+"Video".
+
+## Seed 06: Which page presents which tool
+
+**Question.** The seed says the tool documentation presents the JavaScript tool as the
+converter and the Python tool as the reference used by tests. `docs/converter.md` is today
+the Python tool's page, and tests of three suites read commands in it and in the pages of
+the emulator and the firmware.
+
+**Answer.** `docs/converter.md` becomes the JavaScript tool's page. A new page,
+`docs/reference-converter.md`, takes what belongs to the Python tool: its setup, its
+command line, the generators, the test vectors and its use from Python. The pages of the
+emulator and the firmware pack their shows with the JavaScript tool; the generators stay
+Python commands. The tests that read those pages are changed in the same task.
+
+**Resolution.** Seed 06 `requirements.md`, Requirement 19; `design.md`, "Documents";
+`tasks.md`, task 10.
+
+## Seed 06: Show files while seed 07 changes them
+
+**Question.** This seed ports the reader of show files. Seed 07 changes `docs/show.md`: a
+show may then have no item. The two seeds can be implemented in either order.
+
+**Answer.** The JavaScript reader is ported from `odrig/show.py` as it is on the day.
+Whichever seed is implemented second brings both readers to the same rule; the comparison
+tests of this seed fail if they differ.
+
+**Resolution.** Seed 06 `design.md`, "show". Seed 07 `tasks.md`, task 3.
+
+## Seed 06: Recording the seed's progress
+
+**Question.** As for the other seeds: the seed convention has no state that means "spec
+written".
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress` and the last task sets `completed`. Every item of the definition of done is
+checked by a program, so no owner's check holds the seed open; it stays `in_progress` only
+if Chrome cannot be started by a program.
+
+**Resolution.** Seed 06 `tasks.md`, tasks 1, 9 and 10.
+
+## Seed 07: Error codes the seed does not name
+
+**Question.** The seed names eight codes for the new commands: `in-use`, `bad-argument`,
+`no-space`, `busy`, `bad-offset`, `incomplete`, `bad-checksum` and `bad-file`. It has none
+for `upload data`, `upload end` or `upload cancel` when no upload is open, which is what a
+client meets after the 60 seconds or after a restart of the board; and none for a storage
+that cannot be read or written. The owner approves every addition to the command list.
+This is a gap in the seed.
+
+**Answer.** Two codes are added, as working assumptions until the owner rules:
+`no-upload`, for the three commands with no upload open, and `storage-error`, for a
+failure of the host's storage, after which the show is as it was. The others are used as
+far as they reach: `unknown-id` for `remove` of an id no item has, as for `play`, and
+`show-invalid` for `list`, `remove` and every `upload` command while the show is invalid.
+The order when several apply is one list for all commands: `line-too-long`,
+`unknown-command`, `bad-argument`, `show-invalid`, `no-upload`, `incomplete`,
+`bad-checksum`, `busy`, `unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file`,
+`storage-error`.
+
+**Resolution.** `docs/specs/07-p1-content-commands/requirements.md`, Requirement 9;
+`design.md`, "The text of docs/commands.md" and "What goes beyond the seed".
+
+## Seed 07: `busy` for `upload end` and for `remove`
+
+**Question.** The seed gives `busy` to `upload begin` when an upload is already open. It
+does not say what `remove` does while an upload is open, or what `upload end` does when
+the file cannot be judged at once.
+
+**Answer.** `remove` is refused with `busy` while an upload is open: the upload may be
+about to replace that item, and both need the one buffer the core writes `show.json`
+from. `upload end` is answered with `busy` while the file is still being checked; the
+upload stays open and the client sends `upload end` again. See "Seed 07: Checking an
+uploaded file while the show plays". Both are uses of an approved code that the owner has
+not seen.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 4 criterion 3 and Requirement 7
+criterion 6; `design.md`, "The upload".
+
+## Seed 07: The form of the base64 and of the CRC-32
+
+**Question.** The seed writes `<base64>` and `<crc32>` and gives neither a form. Seed 04
+found that WLED's web server takes a request body apart as a form when a client sends it
+as a form or as plain text, and that a body is safe then only without `&`, `=`, `+` and
+`%`. The usual base64 has `+`, `/` and `=`.
+
+**Answer.** The base64 is the alphabet of RFC 4648, section 5: `A`-`Z`, `a`-`z`, `0`-`9`,
+`-` and `_`, without padding, with the unused bits of the last character zero, so that a
+piece has one spelling. Every valid command line is then still free of the four
+characters, whatever content type a client sends. The CRC-32 is the one of zlib and PNG,
+written as exactly eight hexadecimal digits in lower case; the documents give the check
+value for `123456789`.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 6 criterion 2 and Requirement 7
+criteria 1 and 2; `design.md`, "The upload".
+
+## Seed 07: The chunk size
+
+**Question.** The reply to `upload begin` names C, the most data bytes of one
+`upload data` line. The seed fixes the line at 2,048 characters and not C.
+
+**Answer.** C is 1,500. The longest line is then `upload data`, an offset of ten digits
+and 2,000 characters of base64: 2,023 characters. 1,518 bytes would fit exactly; 1,500
+leaves room and is a multiple of three, so every piece but the last is whole groups of
+base64. C is a constant of the core, the same on every host.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criterion 1; `design.md`, "The
+upload".
+
+## Seed 07: Checking an uploaded file while the show plays
+
+**Question.** `upload end` must refuse a file that is not valid ODRG for the canvas, with
+the format's reason. Finding that out means decoding the whole file. At startup that
+took 3.1 seconds on the board for a dense 60 x 30 clip of ten seconds, as seed 04
+measured. The seed also says playback continues during an upload, and the core is one
+thread that the host calls.
+
+**Answer.** The file is checked in steps of one frame record, one step after each refresh
+the core produces, by a second decoder with its own buffers that reads the file back from
+storage. The check begins when the last byte has arrived. `upload end` is answered with
+`busy` until it has ended. A step is skipped after a refresh that came late, so the check
+never pushes the rate down further. Two things follow that the owner should know: a file
+of F frames is checked in about F fiftieths of a second, however simple it is, so Hello
+world takes five seconds; and the second decoder costs 43,568 bytes of the core's memory.
+Checking the bytes as they arrive was not chosen: the decoder pulls its input and cannot
+stop inside a frame record, and a file read back is a file that was really stored.
+Checking inside `upload end` in one go was not chosen: the LEDs would stand still for
+seconds.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 7 criterion 6 and Requirement 10
+criterion 6; `design.md`, "The check".
+
+## Seed 07: One host function more than the seed lists
+
+**Question.** The seed says the host interface grows only by writing a file, renaming,
+deleting, and asking for free and total space. The check of an uploaded file needs to
+read that file while the player has another file open, and `open`, `read` and `close`
+hold one file, read front to back.
+
+**Answer.** One more function, `read_at`: up to 512 bytes of a named file from an offset.
+It carries no state in the core, and a host serves it with a second open file. It is a
+working assumption until the owner rules. Without it the check would have to stop
+playback, or the uploaded file would have to be trusted unchecked.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 14 criterion 1; `design.md`, "The
+host interface" and "The check".
+
+## Seed 07: Writing a file is three host functions
+
+**Question.** "Writing a file" could be one function that adds bytes to a named file. An
+upload arrives over hundreds of commands.
+
+**Answer.** Three functions: `write_open`, `write` and `write_close`. The host keeps the
+file open between the commands, and the file system commits once, at the end. A host must
+promise that a file is whole in storage after `write_close`, and that a file being
+written when the power goes is one the core removes at its start.
+
+**Resolution.** Seed 07 `design.md`, "The host interface".
+
+## Seed 07: How many items a running show can hold, and what `no-space` covers
+
+**Question.** The core takes its tables once, at startup, sized from `show.json`, and may
+not allocate afterwards. An upload adds an item. `docs/show.md` sets no limit on the
+number of items, and the seed names no code for a show that is full.
+
+**Answer.** The tables are taken with room for 32 items more than the show has at
+startup, and for at least 128. A new item beyond that is refused with `no-space`, which
+the seed gives to "the file would not fit"; replacing and removing still work, and a
+restart or a removal makes room. No limit is put on what a show file may hold. `no-space`
+for the file itself is judged with a reserve: the size, a 256th of it and 16,384 bytes
+must be free.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criteria 4 and 5 and
+Requirement 13; `design.md`, "Tables with room".
+
+## Seed 07: A show without items
+
+**Question.** `remove` can remove the last item, and `space` can report 0 animations.
+`docs/show.md` says `items` holds one or more items, so a show whose last item was removed
+would be invalid at the next start, and an invalid show takes no upload.
+
+**Answer.** `items` may be empty. A show without items is valid: nothing plays, `list`
+gives no items, and an upload adds the first. This changes `docs/show.md`,
+`docs/reasons.md`, the core and the Python reader of show files, and the JavaScript one
+when it exists. It is a change to a governing document that the owner has not seen.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 4 criterion 9 and Requirement 12
+criterion 5; `design.md`, "The text of docs/show.md"; `tasks.md`, task 4.
+
+## Seed 07: A power cut between two files
+
+**Question.** A change touches up to three files: the animation, `show.json`, and the
+animation that is no longer needed. A rename replaces one file at once, not three, and
+the host interface cannot list the folder to find a file that no item names.
+
+**Answer.** Every change has one rename of `show.json` at which the show changes; before
+it the old show is whole and after it the new one. A new animation is renamed into place
+before that point and an old one deleted after it. So that no file is left that the show
+does not name, the core first writes the names concerned into a small file,
+`pending.txt`; at its start it removes every file named there that no item names, and
+then that file. The temporary files `upload.part` and `show.part` are removed at every
+start. A folder with none of the three is started as before.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 11; `design.md`, "The four kinds of
+change" and "What the start does with leftovers".
+
+## Seed 07: What show.json looks like after the core wrote it
+
+**Question.** The core must write `show.json`. Nothing says in what layout, or which
+brightness it writes after `brightness` commands.
+
+**Answer.** One line without spaces and a line feed, with the members in the order of
+`docs/show.md`. The brightness written is the one the file had when the core started:
+what `brightness` changes is not kept across a restart, as before. A file written by hand
+keeps its layout until the first change.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 12; `design.md`, "The text of
+docs/show.md".
+
+## Seed 07: A file name that another item has
+
+**Question.** `upload begin` names a file. `docs/show.md` lets two items name one file. An
+upload under the name of another item's file would change that item's animation too.
+
+**Answer.** It is refused with `in-use`. An upload for an item may use that item's own
+file name or a name no item has. A show installed over USB with two items on one file
+keeps working, and the file is deleted with the last item that names it.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 5 criterion 4; `design.md`, "The
+upload".
+
+## Seed 07: `list` and `space` with an invalid show, and a cycle too long for a reply
+
+**Question.** The seed does not say what `list` gives when the show is invalid, or what
+is done with an item that does not fit into a reply of 1,024 bytes even alone, which a
+cycle of more than about 150 ids of five digits does not.
+
+**Answer.** With an invalid show `list` is refused with `show-invalid`, like `play`, and
+so are `remove` and the `upload` commands: a show that is invalid cannot be repaired by a
+command, only installed again. `space` still answers, with 0 animations. A cycle too long
+for a reply is listed with an empty `cycle`, which no valid show has, so that `list`
+always gets through the show.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 2 criterion 2, Requirement 3
+criteria 6 and 7 and Requirement 9 criterion 4.
+
+## Seed 07: What plays after a change
+
+**Question.** The seed says what happens when the playing item is removed. It does not
+say what happens when the file of the animation on the LEDs is replaced.
+
+**Answer.** When the item being played got a new file, or the cycle being played lists
+it, what is playing starts again from its first frame at the next refresh. Every other
+change leaves the LEDs exactly as they would have been. The player closes its file before
+a rename or a removal touches it.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 10 criteria 3 and 4; `design.md`,
+"Playback and a change".
+
+## Seed 07: What 60 seconds without data means
+
+**Question.** "An upload with no data for 60 seconds is discarded." After the last byte no
+data comes any more, the check can take longer than 60 seconds, and a client can go away
+before it sends `upload end`.
+
+**Answer.** The 60 seconds are counted from the last progress: `upload begin`, a piece
+that was taken, or a step of the check. A check that runs is never cut off; an upload
+whose check has ended and whose `upload end` does not come is discarded after 60 seconds.
+The time is that of the timestamps the host passes with its calls.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 8 criteria 2 and 3.
+
+## Seed 07: Memory close to the limit
+
+**Question.** The core's memory for the 60 x 60 canvas with 100 items must stay under
+128 KB. Seed 05 leaves it at 70,768 bytes.
+
+**Answer.** With this seed it is about 124,600 bytes, 95 percent of the limit: the second
+decoder's window and pixel buffer, 43,568 bytes, the longer line and reply, the chunk
+buffer, and tables with room. The limit holds and the suite measures it. A later feature
+has little left.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 13 criterion 4; `design.md`,
+"Memory".
+
+## Seed 07: The space the emulator reports
+
+**Question.** The emulator applies the commands to its folder. The disk of a Mac has
+hundreds of gigabytes free, so `no-space` could never be met and a client would show
+figures unlike the board's.
+
+**Answer.** The emulator reports the board's storage: 10,354,688 bytes in total, or the
+number given with `--storage`, and as free the total less the files of the folder, each
+rounded up to a block of 4,096 bytes. The files themselves are really written, renamed
+and deleted in the folder.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 16 criteria 2 and 3.
+
+## Seed 07: Long lines in the emulator's log
+
+**Question.** The page's log shows every command line. An upload is hundreds of lines of
+2,000 characters.
+
+**Answer.** A log entry carries the first 200 characters of a line and `length`, the
+number of characters it has, and the page shows both. `cut` keeps its meaning: the line
+was longer than the core's limit.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 16 criterion 5.
+
+## Seed 07: Writes on the board and the LEDs
+
+**Question.** The board must report 25 or more refreshes a second during an upload. A
+write to the flash stops the task that makes it, and the core's lock with it. Nothing
+about the times of WLED's file system on this board was measured for the spec.
+
+**Answer.** One `upload data` is one write of at most 1,500 bytes. The usermod times every
+storage call and gives the core no further command line until twice that time has passed,
+and at least 20 ms, without looking into a line: it holds the port's bytes and the web
+server's request back. Storage calls so take at most a third of the time. An early task
+measures this on the board with the probe build, before the core's upload is written. If
+25 cannot be held, the writes move to a task of their own, designed from what was
+measured.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 17; `design.md`, "Pacing" and
+assumptions B1 to B6; `tasks.md`, task 3.
+
+## Seed 07: A long line on the board's port
+
+**Question.** A line may have 2,048 characters. Read in the Arduino core: the USB serial
+port keeps received bytes in a queue of 256 bytes and drops what does not fit.
+
+**Answer.** The usermod makes the queue 4,096 bytes. Whether a line sent in one piece then
+always arrives whole is tried on the board in task 3; if not, the command tool sends a
+line in pieces.
+
+**Resolution.** Seed 07 `design.md`, fact S5 and assumption B4.
+
+## Seed 07: Which show the board is measured with
+
+**Question.** The definition of done asks for 25 or more refreshes a second during an
+upload and 49 or more afterwards. Whether the board holds 49 with twenty legs is an open
+question of seed 05.
+
+**Answer.** The measurement is made with the bench show on two legs, whose rate without
+an upload is 49 or more whatever seed 05 found, and with an upload of a dense bench clip
+of 60 seconds.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 17 criterion 4; `tasks.md`, task 7.
+
+## Seed 07: Details of the command tool
+
+**Question.** The seed gives the tool four commands, a percentage, a speed and a status
+that is not zero on a failure. It does not say where the progress goes, what name the
+file gets, or what the tool does about a reply that does not come.
+
+**Answer.** Progress goes to standard error, and standard output gets the reply that
+ended the command. The name sent is the last part of the file's path, as it is; the core
+judges it. A piece whose reply did not come is sent once more, and `bad-offset` for that
+second line means the first was taken. On any reply that is not ok the tool sends
+`upload cancel` and exits with 1. It waits on `busy` for up to 600 seconds. A file that
+cannot be read is status 2, with nothing sent. Over the port the tool keeps the port open
+for the whole upload.
+
+**Resolution.** Seed 07 `requirements.md`, Requirement 18; `design.md`, "The command
+tool".
+
+## Seed 07: No command gives the canvas size
+
+**Question.** The app of seed 09 converts a video on the phone for the installation's
+canvas and speaks to the board only through the commands. No command reports the canvas
+size.
+
+**Answer.** Nothing is added here: a command or a member of a reply is the owner's to
+approve. A file of the wrong size is refused by `upload end` with `bad-file` and the
+reason `size-mismatch`, after it was sent. Seed 09 has to settle where the app gets the
+size.
+
+**Resolution.** Seed 07 `design.md`, "Risks", item 8.
+
+## Seed 07: Recording the seed's progress
+
+**Question.** As for the other seeds, and as for seeds 04 and 08: the definition of done
+has an item only a person can check.
+
+**Answer.** The spec commit leaves `state.json` as it is. The first task sets
+`in_progress`. The last task is the owner's check over the board's network and sets
+`completed`; an agent leaves it open.
+
+**Resolution.** Seed 07 `tasks.md`, tasks 1 and 9.
