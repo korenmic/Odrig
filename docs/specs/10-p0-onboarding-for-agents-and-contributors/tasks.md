@@ -45,7 +45,7 @@ Rules for every task:
 - Answers to questions that come up are recorded in `docs/drifts.md`, at its end, not
   asked.
 
-- [ ] 1. The vocabulary, and the quick suite
+- [x] 1. The vocabulary, and the quick suite
   - Write `docs/vocabulary.md` as the design lists it: four groups, an entry for each word
     of Requirement 2 criteria 1 and 3, each definition one to four sentences that use only
     words defined above it, with a link to the governing document that specifies the thing.
