@@ -3,8 +3,9 @@
 How canvas coordinates correspond to physical LEDs: which data pin each LED hangs on, and
 where it sits along that pin's chain.
 
-The mapping itself lives in the files under [`mapping/`](../mapping/). The drawings and
-tables on this page are generated from those files.
+The mapping itself lives in the files under [`mapping/`](../mapping/). The player reads the
+installed mapping file when it starts, on the board and in the emulator alike, and nothing
+else defines the layout. The drawings and tables on this page are generated from those files.
 
 ## Coordinates
 

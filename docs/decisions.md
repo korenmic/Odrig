@@ -9,8 +9,10 @@ it stands now.
 - Hardware and power wiring are out of scope: operators handle them on site.
 - On-site control is over Wi-Fi, with an Android app for operators.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
-  queued, each task is one commit, and implementation goes through a pull request that a
-  human merges. Each seed keeps its own state file.
+  queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
+  with its own state file.
+- All work is committed directly on `master`, and every significant advance is committed.
+  There is no remote yet.
 - The repository will carry a vocabulary file and agent policies, limited to the policies
   that are relevant to this project.
 
@@ -24,18 +26,29 @@ it stands now.
 - Today: 2 legs, 6 rows, 360 LEDs, confirmed working.
 - Target: 10 legs, 30 rows, 1,800 LEDs.
 - The mapping is defined by the files in `mapping/` and described in
-  [mapping.md](mapping.md).
+  [mapping.md](mapping.md). The board and the emulator both read the installed mapping file
+  at runtime; it is the only definition of the layout.
 - Coordinates are 1-based, with (1,1) at the bottom-left LED. The proof-of-concept scripts in
   `animations/` and `tools/` still use the earlier convention (0-based, origin top-left).
 - Playback target: 50 frames per second.
+
+## Runtime architecture
+
+- One shared core, written in C++, does everything that must behave the same on the board
+  and in the emulator: decoding ODRG files, applying the mapping file, running the show,
+  keeping time, and handling commands.
+- The core is hosted twice: by the emulator on the Mac and by the firmware on the board. A
+  host only supplies time, file access and a way to move command lines and LED data.
+- Both hosts run the same installed file set: `mapping.json`, `show.json` and the `.odrg`
+  files. See [show.md](show.md).
 
 ## Firmware
 
 - Board: ESP32-S3-N16R8 (16 MB flash, 8 MB PSRAM), running the official WLED 16.0.1 build.
 - WLED stays the base firmware. Stock WLED plays only GIF files, so playing the custom
   runtime format needs a custom WLED build with our player added.
-- The decoder for the runtime format has one implementation, shared by the board and the
-  emulator.
+- In the custom build WLED is the platform: LED output, storage and Wi-Fi. Playback and
+  commands belong to the shared core, and the USB serial port carries the core's commands.
 
 ## Animation formats
 
@@ -77,25 +90,27 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 
 - The board and the emulator accept exactly the same commands, handled by the same
   front-end code. There are no emulator-only commands.
-- A command exists only if something really uses it. Today those are: play an animation by
-  its ID, switch on, switch off, set brightness, and report status.
+- A command exists only if something really uses it. Today those are: play an item by its
+  ID, switch on, switch off, set brightness, and report status.
+- Commands are plain text lines and every reply is one JSON line. See
+  [commands.md](commands.md).
 
 ## Emulator
 
 - The emulator is the first priority, so conversions and playback can be tested without the
   hardware.
 - It runs on macOS for now; cross-platform comes later.
-- It plays the runtime format through the shared decoder.
+- It is our own Mac program around the shared core, built natively. It does not depend on
+  any third-party emulator.
 - Commands reach it through a virtual serial port, so the serial tools that talk to the board
   work against it unchanged. A Wi-Fi channel is added when the Android app needs it.
 - It draws the physical LEDs in a web view: it takes what the player sends to each leg and
   places every LED using the tracked mapping file, so a wrong mapping is visible.
 - It has no size setting of its own. The canvas size comes from the mapping file, the same
   file the board uses.
-- If running the real firmware inside an emulator proves too hard, a PC build of our player
-  shown in the web view is an acceptable emulator.
-- Ready-made emulators are only considered if they need no paid subscription, run locally,
-  and do not cap the emulated chip below the real ESP32-S3's speed.
+- A ready-made emulator that runs the real firmware build may be added later as an extra. It
+  is only considered if it needs no paid subscription, runs locally, and does not cap the
+  emulated chip below the real ESP32-S3's speed.
 
 ## Open questions
 
@@ -104,7 +119,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
 - Decode speed of the custom format on the board at 50 frames per second for 1,800 LEDs.
 - Legs 3 to 10 on pins 3 to 10, and 10 outputs in the firmware, are untested on the
   hardware.
-- Which ready-made emulator, if any, to build on. Local trials are in progress.
+- Whether any ready-made emulator can run the real firmware build. Local trials are in
+  progress.
 
 ## Change log
 
@@ -120,3 +136,8 @@ field, every LED lit, 10 seconds). Nothing here was measured on the board.
   for ready-made emulators).
 - 2026-10-11: Format specification and mapping written. The runtime format is named ODRG.
   Leg N is on pin N, leg 1 is at the top of the canvas.
+- 2026-10-11: All work goes directly on `master`; no remote yet. The mapping file is read
+  at runtime by the board and the emulator. Runtime architecture fixed: one shared C++ core
+  hosted by the emulator and by the firmware, plain-text commands with JSON replies, and the
+  emulator as our own native Mac program. Show and command specifications written. Seeds
+  created for the converter, the shared core, the emulator and the firmware build.
