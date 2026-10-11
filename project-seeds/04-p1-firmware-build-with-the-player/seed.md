@@ -26,6 +26,10 @@ that works in the emulator then behaves the same on the board, from the same fol
 The board reads `mapping.json` when it starts. The firmware's LED outputs are set from that
 file, so the mapping file is the only place the layout is defined.
 
+Operators will control the installation over Wi-Fi. There is no other network at the event,
+so the board hosts its own Wi-Fi network and accepts the same commands over HTTP that it
+accepts over USB.
+
 ## Technical Constraints
 
 - Target: ESP32-S3-N16R8, 16 MB flash, 8 MB PSRAM, on the storage layout WLED's 16 MB build
@@ -54,10 +58,14 @@ file, so the mapping file is the only place the layout is defined.
 6. Only the core scales brightness. WLED's current limiter stays active.
 7. The USB serial port carries the core's commands and replies as in `docs/commands.md`.
    WLED's own serial commands are switched off in this build.
-8. WLED's Wi-Fi and web interface are left as they are. This seed adds no network commands.
-9. One command installs a packed show folder into the board's storage over USB, verifies what
-   was written, and restarts the board.
-10. `status` reports the real refresh rate measured on the board.
+8. The board's web server accepts commands over HTTP as `docs/commands.md` defines. They go
+   to the same command front-end as serial lines.
+9. When the board has no other network to join, it hosts its own Wi-Fi network from power-on,
+   using WLED's access point, so a phone or computer can join it and send commands. WLED's
+   Wi-Fi settings and web interface are otherwise left as they are.
+10. One command installs a packed show folder into the board's storage over USB, verifies
+    what was written, and restarts the board.
+11. `status` reports the real refresh rate measured on the board.
 
 ## Definition Of Done
 
@@ -74,7 +82,10 @@ All on the real board.
    49 or more refreshes per second, for the compressed file and for the uncompressed file.
    Only legs 1 and 2 need to be wired for this.
 6. Restoring stock WLED works and the board answers WLED's handshake afterwards.
-7. Building, flashing, installing a show and rolling back are documented.
+7. The board reports that its own Wi-Fi network is up after power-on. With a computer or
+   phone joined to that network, the command tool over HTTP gets the same replies as over
+   USB. Joining the network is done by a person; this check is not automated.
+8. Building, flashing, installing a show and rolling back are documented.
 
 ## Open Questions
 
