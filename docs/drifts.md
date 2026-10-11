@@ -1586,3 +1586,21 @@ of the suite then proves that the core never asks for more.
 
 **Resolution.** `tests/core/host/host.cpp`; `tests/core/test_failure.py`,
 `tests/core/test_memory.py`.
+
+## Seed 02: What is verified
+
+**Question.** The requirements ask for source files that compile unchanged for macOS and
+for the ESP32-S3 inside the WLED build, with a C++11 compiler or a later one. This seed
+builds and tests on the Mac only.
+
+**Answer.** The suite passes on macOS 26.5 on Apple Silicon with Apple clang 21, GNU Make
+3.81 and Python 3.14.6 with zlib 1.2.12, from a copy that holds the tracked files only. A
+test compiles the core's sources under C++11, 14, 17, 20 and 23 with every warning as an
+error. By hand they were also checked, without building, under `gnu++11` with exceptions
+switched on and `-Os`, as the Arduino core compiles, and for a 32-bit ARM target with
+conversion warnings; both gave no message. Nothing was compiled with GCC, for the
+ESP32-S3 or inside WLED, and no time was measured on the board: that is seed 04. The
+benchmark figures are those of the Mac.
+
+**Resolution.** `docs/core.md`; `tests/core/test_build.py`. Seed 04 `tasks.md`, tasks 5
+and 8, build the core for the board and measure there.

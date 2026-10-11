@@ -96,7 +96,9 @@ class Library(unittest.TestCase):
 class Sources(unittest.TestCase):
     def test_there_are_sources_to_check(self):
         names = {path.name for path in core_sources()}
-        for name in ("reasons.cpp", "reasons.h", "inflate.cpp", "file_source.h", "odrig_core.h"):
+        expected = ("core.cpp", "core_state.h", "reasons.cpp", "reasons.h", "arena.h", "file_source.cpp", "inflate.cpp", "odrg_decoder.cpp",
+                    "json_reader.cpp", "mapping.cpp", "show.cpp", "player.cpp", "commands.cpp", "odrig_core.h")
+        for name in expected:
             self.assertIn(name, names)
 
     def test_they_include_only_three_system_headers_and_their_own(self):
@@ -118,6 +120,17 @@ class Sources(unittest.TestCase):
             for line in code.splitlines():
                 if re.match(r"^\s+static\b", line):
                     self.fail(f"{path.name} has a static inside a block: {line.strip()}")
+
+    def test_they_are_valid_in_every_standard_from_cpp11_on(self):
+        sources = sorted(SOURCES.glob("*.cpp"))
+        self.assertGreaterEqual(len(sources), 10)
+        for standard in ("c++11", "c++14", "c++17", "c++20", "c++2b"):
+            done = subprocess.run(
+                ["c++", f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Werror", "-fno-exceptions", "-fno-rtti", f"-I{INCLUDE}", "-fsyntax-only", *map(str, sources)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual((done.returncode, done.stderr), (0, ""), standard)
 
     def test_the_checks_find_what_they_look_for(self):
         own = {"reasons.h"}

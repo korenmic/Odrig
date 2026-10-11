@@ -116,6 +116,9 @@ void core_fail(Core &core, Reason reason, const char *about, Reason detail) {
 }  // namespace odrig
 
 odrig_core *odrig_core_begin(const odrig_host *host) {
+    if (host == nullptr) {
+        return nullptr;
+    }
     odrig_core *core = static_cast<odrig_core *>(odrig::host_memory(*host, sizeof(odrig_core)));
     if (core == nullptr) {
         return nullptr;

@@ -37,3 +37,6 @@ work is in [project-seeds/](project-seeds/).
 
 The converter that turns media and JSON frames into the files the board plays, and how to
 set it up, use it and test it, is described in [docs/converter.md](docs/converter.md).
+
+The core, the C++ library that plays those files on the board and in the emulator, and how
+to build it, test it and host it, is described in [docs/core.md](docs/core.md).

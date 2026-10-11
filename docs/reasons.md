@@ -151,3 +151,36 @@ can meet:
 |---|---|
 | `read-error` | The host reports a failure while a file is read. |
 | `out-of-memory` | The host cannot supply the memory the core asks for when it starts. |
+
+The text is the reason name, followed for most reasons by what it is about:
+
+| Text | Condition |
+|---|---|
+| `mapping-missing` | `mapping.json` does not exist. |
+| `mapping-malformed` | `mapping.json` breaks a rule. |
+| `show-missing` | `show.json` does not exist. |
+| `show-malformed` | `show.json` breaks its format. |
+| `duplicate-id <id>` | Two items have that id. |
+| `undefined-id <id>` | A cycle, or `start`, names that id and no item has it. |
+| `nested-cycle <id>` | The cycle item with that id names an item that is a cycle. |
+| `file-missing <name>` | The named `.odrg` file does not exist. |
+| `file-malformed <name> <reason>` | The named file is rejected with that reason of "ODRG files". |
+| `size-mismatch <name>` | The named file's canvas size differs from the mapping's. |
+| `read-error <name>` | The host reports a failure while the named file is read. |
+| `out-of-memory` | The host cannot supply the memory the core asks for. |
+
+The checks of the first ten rows are made in the order of the table and the first one that
+fails decides; the files are taken in the order in which `show.json` first names them, and
+each by its header, then its size, then its body. The last two rows are reported at the
+point where they happen.
+
+`<id>` is a decimal number. For `undefined-id` it is the number as the file writes it, which
+need not be an id at all, such as `0`, `-5` or `70000`; a number beyond 32 bits is given as
+`4294967295`, with its sign. `<name>` is the file name as `show.json` has it, or
+`mapping.json` or `show.json` for `read-error`. `<reason>` is the reason the reference
+decoder of the converter gives for the same file. The whole text is made of lower-case
+letters, digits, `.`, `-`, `_` and spaces, so it stands in a JSON string as it is.
+
+A show can also become invalid while it plays, when a file is gone, cannot be read, or no
+longer follows the format. The text is then `file-missing <name>`, `read-error <name>`,
+`size-mismatch <name>` or `file-malformed <name> <reason>`.

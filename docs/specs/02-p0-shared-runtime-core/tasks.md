@@ -192,7 +192,7 @@ Rules for every task:
   - Add the benchmark command to `docs/core.md`.
   - Requirements: 18.1, 18.2
 
-- [ ] 11. Documentation and final check
+- [x] 11. Documentation and final check
   - Complete `docs/core.md`: the three commands and what each needs; every function of the
     host interface; the rules of use; the rules of time, the grid and refreshes; the LED
     data; the memory table with the figures measured in task 9; the invocations of the test
