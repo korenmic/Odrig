@@ -6,7 +6,9 @@ namespace {
 
 OdrigLegSource legSource = {nullptr, nullptr};
 
-char summaryText[160] = "0/0";
+// Room for `<working>/<legs>` and for ` leg <n> pin <p>` of each of the 32 outputs WLED
+// holds at most.
+char summaryText[8 + 32 * 16] = "0/0";
 bool summaryIsOld = true;
 
 bool legAt(uint32_t index, OdrigLeg *out) {
@@ -130,7 +132,7 @@ void OdrigLeds::hold() {
   }
 }
 
-void OdrigLeds::send() {
+void OdrigLeds::fill() {
   BusManager::setBrightness(255);
   Bus::setCCT(-1);
   const uint32_t count = legs();
@@ -144,8 +146,9 @@ void OdrigLeds::send() {
       bus->setPixelColor(n, RGBW32(rgb[0], rgb[1], rgb[2], 0));
     }
   }
-  BusManager::show();
 }
+
+void OdrigLeds::show() { BusManager::show(); }
 
 void OdrigLeds::dark() {
   strip.fill(BLACK);

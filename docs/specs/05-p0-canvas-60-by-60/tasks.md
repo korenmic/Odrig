@@ -46,7 +46,7 @@ Rules for every task:
   Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Spike: twenty outputs of 180 LEDs on the board
+- [x] 1. Spike: twenty outputs of 180 LEDs on the board
   - Set `"state": "in_progress"` in `project-seeds/05-p0-canvas-60-by-60/state.json`.
   - Create `firmware/patches/010-sixteen-parallel-outputs.patch` as the design's table "The
     patch" lists it, written against WLED's files at the pinned commit, with its first lines

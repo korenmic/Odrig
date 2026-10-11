@@ -143,8 +143,9 @@ class Patches(TemporaryFolder):
     def test_a_checkout_at_another_commit_is_not_patched(self):
         self.assertEqual(support.reason_of(self, lambda: wled.restore_and_patch(self.checkout, self.patches, wled.COMMIT)), "wled-mismatch")
 
-    def test_the_folder_of_the_repository_holds_no_patch(self):
-        self.assertEqual(wled.patch_files(), [])
+    def test_the_patch_files_of_the_repository_are_found_beside_their_readme(self):
+        self.assertEqual([path.suffix for path in wled.patch_files()], [".patch"] * len(wled.patch_files()))
+        self.assertEqual([path.name for path in wled.patch_files()], sorted(path.name for path in wled.patch_files()))
         self.assertTrue((wled.paths.PATCHES / "README.md").is_file())
 
 

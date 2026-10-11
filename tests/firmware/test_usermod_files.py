@@ -10,10 +10,16 @@ USERMOD = FIRMWARE / "usermod"
 SOURCES = sorted(path for path in USERMOD.iterdir() if path.suffix in (".cpp", ".h"))
 CORE = ROOT / "core"
 ALLOWED_HEADERS = {"wled.h", "odrig_core.h", "stddef.h", "stdint.h"}
-# The one header of the chip's own software that a source names: the USB unit behind the
-# port, which the port's driver does not let through.
-ALLOWED_IN = {"odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"}}
+# The headers of the chip's own software that a source names: the USB unit behind the
+# port, which the port's driver does not let through; and, in the probe build, the pulse
+# counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
+ALLOWED_IN = {
+    "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
+    "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
+}
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}
+# What the probe build measures of the signal itself: named nowhere else.
+SIGNAL_MEASURES = r"pcnt_|PCNT_|LCD_CAM|wire_us|\bpulses\b|esp_timer_create|esp_timer_start"
 
 def text_of(path):
     return path.read_text(encoding="utf-8")
@@ -133,6 +139,25 @@ class ProbeCode(unittest.TestCase):
                 continue
             self.assertNotRegex(outside_probe_blocks(text_of(path)), r"OdrigProbe|odrig_probe", path.name)
 
+    def test_the_pulse_counter_and_the_wire_time_are_in_the_probe_files_only(self):
+        probe = text_of(USERMOD / "odrig_probe.cpp")
+        for expected in ("pcnt_unit_config", "pcnt_get_counter_value", "PIN_INPUT_ENABLE", "esp_rom_gpio_connect_in_signal", "LCD_CAM.lcd_user.lcd_start", '\\"wire_us\\":', '\\"pulses\\":'):
+            self.assertIn(expected, probe)
+        for path in SOURCES:
+            if path.name not in PROBE_FILES:
+                self.assertNotRegex(text_of(path), SIGNAL_MEASURES, path.name)
+
+    def test_the_counter_leaves_what_the_pin_puts_out_alone(self):
+        probe = text_of(USERMOD / "odrig_probe.cpp")
+        self.assertIn("config.pulse_gpio_num = PCNT_PIN_NOT_USED;", probe)
+        self.assertNotRegex(probe, r"gpio_set_direction|pinMode|gpio_config\b|pcnt_set_pin")
+
+    def test_a_long_line_of_the_probe_build_is_written_without_waiting_for_the_port(self):
+        serial = text_of(USERMOD / "odrig_serial.cpp")
+        self.assertNotRegex(outside_probe_blocks(serial), r"writeLong|longLine")
+        self.assertIn("OdrigSerial::writeLong(line.c_str(), line.length());", text_of(USERMOD / "odrig_probe.cpp"))
+        self.assertIn("if (longLineWaits()) return;", serial)
+
     def test_the_reader_of_this_test_tells_the_two_builds_apart(self):
         text = "a\n#ifdef ODRIG_PROBE\nprobe\n#ifdef X\nx\n#endif\n#else\nplain\n#endif\nb"
         self.assertEqual(outside_probe_blocks(text), "a\nplain\nb")
@@ -197,13 +222,24 @@ class Host(unittest.TestCase):
         self.assertIn("(uint8_t)leg.pin, 255, 255, 255, 255", described)
 
     def test_a_refresh_goes_to_the_outputs_directly_at_full_brightness(self):
-        send = self.leds[self.leds.index("void OdrigLeds::send()"):self.leds.index("void OdrigLeds::dark()")]
-        for expected in ("BusManager::setBrightness(255);", "Bus::setCCT(-1);", "bus->setPixelColor(n, RGBW32(rgb[0], rgb[1], rgb[2], 0));", "BusManager::show();"):
-            self.assertIn(expected, send)
-        self.assertNotRegex(send, r"\bstrip\.")
+        fill = self.leds[self.leds.index("void OdrigLeds::fill()"):self.leds.index("void OdrigLeds::show()")]
+        show = self.leds[self.leds.index("void OdrigLeds::show()"):self.leds.index("void OdrigLeds::dark()")]
+        for expected in ("BusManager::setBrightness(255);", "Bus::setCCT(-1);", "bus->setPixelColor(n, RGBW32(rgb[0], rgb[1], rgb[2], 0));"):
+            self.assertIn(expected, fill)
+        self.assertNotIn("show()", fill.split("{", 1)[1])
+        self.assertIn("BusManager::show();", show)
+        self.assertNotRegex(fill + show, r"\bstrip\.")
+
+    def test_a_refresh_is_filled_at_once_and_shown_when_the_outputs_can_take_data(self):
+        usermod = text_of(USERMOD / "odrig_usermod.cpp")
+        loop = outside_probe_blocks(usermod[usermod.index("void loop() override {"):usermod.index("void addToJsonInfo")])
+        steps = [loop.index(step) for step in ("refreshWaits = refreshDue();", "OdrigLeds::fill();", "if (!BusManager::canAllShow()) return;", "OdrigLeds::show();", "refreshWaits = refreshFilled = false;")]
+        self.assertEqual(steps, sorted(steps))
+        self.assertEqual((loop.count("OdrigLeds::fill();"), loop.count("OdrigLeds::show();"), loop.count("refreshDue()")), (1, 1, 1))
+        self.assertIn("if (!refreshFilled) {", loop)
 
     def test_wled_is_held_in_its_live_mode_at_every_pass(self):
-        hold = self.leds[self.leds.index("void OdrigLeds::hold()"):self.leds.index("void OdrigLeds::send()")]
+        hold = self.leds[self.leds.index("void OdrigLeds::hold()"):self.leds.index("void OdrigLeds::fill()")]
         for expected in ("realtimeOverride = REALTIME_OVERRIDE_NONE;", "useMainSegmentOnly = false;", "realtimeLock(65000, REALTIME_MODE_GENERIC);", "if (doInitBusses)", "else if (!matches())"):
             self.assertIn(expected, hold)
         usermod = text_of(USERMOD / "odrig_usermod.cpp")

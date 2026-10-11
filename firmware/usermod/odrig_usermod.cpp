@@ -138,16 +138,30 @@ class OdrigUsermod : public Usermod {
       refreshWaits = refreshDue();
 #endif
     }
-    if (!refreshWaits || !BusManager::canAllShow()) return;
+    if (!refreshWaits) return;
+    // The refresh is copied into the outputs at once, also while the last one is still
+    // on the wire, and sent as soon as the outputs can take data.
+    if (!refreshFilled) {
 #ifdef ODRIG_PROBE
-    OdrigProbe::beforeSend();
-    const int64_t sendStart = esp_timer_get_time();
-    OdrigLeds::send();
-    OdrigProbe::afterSend(OdrigFiles::nowMs(), microsSince(sendStart));
+      OdrigProbe::beforeFill();
+      const int64_t fillStart = esp_timer_get_time();
+      OdrigLeds::fill();
+      fillUs = microsSince(fillStart);
 #else
-    OdrigLeds::send();
+      OdrigLeds::fill();
 #endif
-    refreshWaits = false;
+      refreshFilled = true;
+    }
+    if (!BusManager::canAllShow()) return;
+#ifdef ODRIG_PROBE
+    OdrigProbe::beforeShow();
+    const int64_t showStart = esp_timer_get_time();
+    OdrigLeds::show();
+    OdrigProbe::afterShow(OdrigFiles::nowMs(), fillUs + microsSince(showStart));
+#else
+    OdrigLeds::show();
+#endif
+    refreshWaits = refreshFilled = false;
   }
 
   // WLED's information page: whether the show is valid, how many outputs work, and how
@@ -175,7 +189,11 @@ class OdrigUsermod : public Usermod {
  private:
   uint32_t startMs = 0;
   bool refreshWaits = false;
+  bool refreshFilled = false;
   bool updating = false;
+#ifdef ODRIG_PROBE
+  uint32_t fillUs = 0;
+#endif
 };
 
 static OdrigUsermod odrigUsermod;

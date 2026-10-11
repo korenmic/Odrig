@@ -1,0 +1,159 @@
+Sixteen parallel LED outputs on the ESP32-S3, which with the four RMT outputs makes twenty.
+
+WLED 16.0.1 drives twelve digital outputs on the ESP32-S3: four through its RMT driver and
+eight through the parallel driver, the LCD unit of the chip, which it uses in the
+eight-lane form of the LED library NeoPixelBus. The LCD unit has sixteen data lines, and
+the library has the sixteen-lane form of the same method. This patch switches WLED to it:
+
+- wled00/const.h: for the ESP32-S3, WLED_MAX_I2S_CHANNELS is 16. WLED_MAX_DIGITAL_CHANNELS,
+  the sum with the four RMT channels, so becomes 20, and WLED_MAX_BUSSES 28.
+- wled00/bus_wrapper.h: for the ESP32-S3, the types of the parallel outputs are built on
+  the library's X16 methods: the nine X1...Method names and the twelve B_32_IP_* types.
+- wled00/FX_fcn.cpp: for the ESP32-S3, finalizeInit() counts the common buffer of the
+  parallel driver as sixteen lanes of two bytes, twice what it counted.
+
+Nothing changes for a chip other than the ESP32-S3.
+
+The usermod cannot do this from outside: the limits are constants compiled into WLED, and
+the type of the parallel outputs is chosen inside WLED's PolyBus. The chip has one LCD
+unit, so outputs of the usermod's own could not exist beside WLED's parallel outputs
+either.
+
+diff --git a/wled00/FX_fcn.cpp b/wled00/FX_fcn.cpp
+index 31c23f8..5e6cb3c 100644
+--- a/wled00/FX_fcn.cpp
++++ b/wled00/FX_fcn.cpp
+@@ -1257,7 +1257,11 @@ void WS2812FX::finalizeInit() {
+       constexpr unsigned stepFactor = 3; // 3 step cadence (3 bits per pixel bit)
+       #endif
+       unsigned i2sCommonMem = (stepFactor * bus.count * (3*Bus::hasRGB(bus.type)+Bus::hasWhite(bus.type)+Bus::hasCCT(bus.type)) * (Bus::is16bit(bus.type)+1));
++      #if defined(CONFIG_IDF_TARGET_ESP32S3)
++      if (useParallelI2S) i2sCommonMem *= 16; // parallel LCD uses 16 lanes of two bytes, requiring 16x the DMA buffer size (common buffer shared between all parallel busses)
++      #else
+       if (useParallelI2S) i2sCommonMem *= 8; // parallel I2S uses 8 channels, requiring 8x the DMA buffer size (common buffer shared between all parallel busses)
++      #endif
+       if (i2sCommonMem > I2SdmaMem) I2SdmaMem = i2sCommonMem;
+     }
+     #endif
+diff --git a/wled00/bus_wrapper.h b/wled00/bus_wrapper.h
+index 15b5b0a..954cb83 100644
+--- a/wled00/bus_wrapper.h
++++ b/wled00/bus_wrapper.h
+@@ -210,16 +210,16 @@
+ // https://github.com/Makuna/NeoPixelBus/blob/b32f719e95ef3c35c46da5c99538017ef925c026/src/internal/Esp32_i2s.h#L4
+ // https://github.com/Makuna/NeoPixelBus/blob/b32f719e95ef3c35c46da5c99538017ef925c026/src/internal/NeoEsp32RmtMethod.h#L857
+ #if defined(CONFIG_IDF_TARGET_ESP32S3)
+-  // S3 will always use LCD parallel output
+-  typedef X8Ws2812xMethod X1Ws2812xMethod;
+-  typedef X8Sk6812Method X1Sk6812Method;
+-  typedef X8400KbpsMethod X1400KbpsMethod;
+-  typedef X8800KbpsMethod X1800KbpsMethod;
+-  typedef X8Tm1814Method X1Tm1814Method;
+-  typedef X8Tm1829Method X1Tm1829Method;
+-  typedef X8Apa106Method X1Apa106Method;
+-  typedef X8Ws2805Method X1Ws2805Method;
+-  typedef X8Tm1914Method X1Tm1914Method;
++  // S3 will always use LCD parallel output, in its 16 lane form
++  typedef X16Ws2812xMethod X1Ws2812xMethod;
++  typedef X16Sk6812Method X1Sk6812Method;
++  typedef X16400KbpsMethod X1400KbpsMethod;
++  typedef X16800KbpsMethod X1800KbpsMethod;
++  typedef X16Tm1814Method X1Tm1814Method;
++  typedef X16Tm1829Method X1Tm1829Method;
++  typedef X16Apa106Method X1Apa106Method;
++  typedef X16Ws2805Method X1Ws2805Method;
++  typedef X16Tm1914Method X1Tm1914Method;
+ #elif defined(CONFIG_IDF_TARGET_ESP32S2)
+   // S2 will use I2S0
+   typedef NeoEsp32I2s0Ws2812xMethod X1Ws2812xMethod;
+@@ -244,6 +244,13 @@
+   typedef NeoEsp32I2s1Tm1914Method X1Tm1914Method;
+ #endif
+ 
++// parallel output: 16 lanes on the S3 (LCD), 8 lanes elsewhere (I2S)
++#if defined(CONFIG_IDF_TARGET_ESP32S3)
++#define NeoParallelMethod(x) X16 ## x ## Method
++#else
++#define NeoParallelMethod(x) X8 ## x ## Method
++#endif
++
+ // RMT driver selection
+ #if !defined(WLED_USE_SHARED_RMT)  && !defined(__riscv)
+ #include <NeoEsp32RmtHIMethod.h>
+@@ -256,51 +263,51 @@
+ #define B_32_RN_NEO_3 NeoPixelBus<NeoGrbFeature, NeoEsp32RmtMethod(Ws2812x)> // ESP32, S2, S3, C3
+ //#define B_32_IN_NEO_3 NeoPixelBus<NeoGrbFeature, NeoEsp32I2sNWs2812xMethod> // ESP32 (dynamic I2S selection)
+ #define B_32_I2_NEO_3 NeoPixelBus<NeoGrbFeature, X1Ws2812xMethod> // ESP32, S2, S3 (automatic I2S selection, see typedef above)
+-#define B_32_IP_NEO_3 NeoPixelBus<NeoGrbFeature, X8Ws2812xMethod> // parallel I2S (ESP32, S2, S3)
++#define B_32_IP_NEO_3 NeoPixelBus<NeoGrbFeature, NeoParallelMethod(Ws2812x)> // parallel I2S (ESP32, S2, S3)
+ //RGBW
+ #define B_32_RN_NEO_4 NeoPixelBus<NeoGrbwFeature, NeoEsp32RmtMethod(Sk6812)>
+ #define B_32_I2_NEO_4 NeoPixelBus<NeoGrbwFeature, X1Sk6812Method>
+-#define B_32_IP_NEO_4 NeoPixelBus<NeoGrbwFeature, X8Sk6812Method> // parallel I2S
++#define B_32_IP_NEO_4 NeoPixelBus<NeoGrbwFeature, NeoParallelMethod(Sk6812)> // parallel I2S
+ //400Kbps
+ #define B_32_RN_400_3 NeoPixelBus<NeoGrbFeature, NeoEsp32RmtMethod(400Kbps)>
+ #define B_32_I2_400_3 NeoPixelBus<NeoGrbFeature, X1400KbpsMethod>
+-#define B_32_IP_400_3 NeoPixelBus<NeoGrbFeature, X8400KbpsMethod> // parallel I2S
++#define B_32_IP_400_3 NeoPixelBus<NeoGrbFeature, NeoParallelMethod(400Kbps)> // parallel I2S
+ //TM1814 (RGBW)
+ #define B_32_RN_TM1_4 NeoPixelBus<NeoWrgbTm1814Feature, NeoEsp32RmtMethod(Tm1814)>
+ #define B_32_I2_TM1_4 NeoPixelBus<NeoWrgbTm1814Feature, X1Tm1814Method>
+-#define B_32_IP_TM1_4 NeoPixelBus<NeoWrgbTm1814Feature, X8Tm1814Method> // parallel I2S
++#define B_32_IP_TM1_4 NeoPixelBus<NeoWrgbTm1814Feature, NeoParallelMethod(Tm1814)> // parallel I2S
+ //TM1829 (RGB)
+ #define B_32_RN_TM2_3 NeoPixelBus<NeoBrgFeature, NeoEsp32RmtMethod(Tm1829)>
+ #define B_32_I2_TM2_3 NeoPixelBus<NeoBrgFeature, X1Tm1829Method>
+-#define B_32_IP_TM2_3 NeoPixelBus<NeoBrgFeature, X8Tm1829Method> // parallel I2S
++#define B_32_IP_TM2_3 NeoPixelBus<NeoBrgFeature, NeoParallelMethod(Tm1829)> // parallel I2S
+ //UCS8903
+ #define B_32_RN_UCS_3 NeoPixelBus<NeoRgbUcs8903Feature, NeoEsp32RmtMethod(Ws2812x)>
+ #define B_32_I2_UCS_3 NeoPixelBus<NeoRgbUcs8903Feature, X1800KbpsMethod>
+-#define B_32_IP_UCS_3 NeoPixelBus<NeoRgbUcs8903Feature, X8800KbpsMethod> // parallel I2S
++#define B_32_IP_UCS_3 NeoPixelBus<NeoRgbUcs8903Feature, NeoParallelMethod(800Kbps)> // parallel I2S
+ //UCS8904
+ #define B_32_RN_UCS_4 NeoPixelBus<NeoRgbwUcs8904Feature, NeoEsp32RmtMethod(Ws2812x)>
+ #define B_32_I2_UCS_4 NeoPixelBus<NeoRgbwUcs8904Feature, X1800KbpsMethod>
+-#define B_32_IP_UCS_4 NeoPixelBus<NeoRgbwUcs8904Feature, X8800KbpsMethod>// parallel I2S
++#define B_32_IP_UCS_4 NeoPixelBus<NeoRgbwUcs8904Feature, NeoParallelMethod(800Kbps)>// parallel I2S
+ //APA106
+ #define B_32_RN_APA106_3 NeoPixelBus<NeoGrbFeature, NeoEsp32RmtMethod(Apa106)>
+ #define B_32_I2_APA106_3 NeoPixelBus<NeoGrbFeature, X1Apa106Method>
+-#define B_32_IP_APA106_3 NeoPixelBus<NeoGrbFeature, X8Apa106Method> // parallel I2S
++#define B_32_IP_APA106_3 NeoPixelBus<NeoGrbFeature, NeoParallelMethod(Apa106)> // parallel I2S
+ //FW1906 GRBCCT 6 color channels
+ #define B_32_RN_FW6_5 NeoPixelBus<NeoGrbcwxFeature, NeoEsp32RmtMethod(Ws2812x)>
+ #define B_32_I2_FW6_5 NeoPixelBus<NeoGrbcwxFeature, X1800KbpsMethod>
+-#define B_32_IP_FW6_5 NeoPixelBus<NeoGrbcwxFeature, X8800KbpsMethod> // parallel I2S
++#define B_32_IP_FW6_5 NeoPixelBus<NeoGrbcwxFeature, NeoParallelMethod(800Kbps)> // parallel I2S
+ //WS2805 RGBCCT
+ #define B_32_RN_2805_5 NeoPixelBus<NeoGrbwwFeature, NeoEsp32RmtMethod(Ws2805)>
+ #define B_32_I2_2805_5 NeoPixelBus<NeoGrbwwFeature, X1Ws2805Method>
+-#define B_32_IP_2805_5 NeoPixelBus<NeoGrbwwFeature, X8Ws2805Method> // parallel I2S
++#define B_32_IP_2805_5 NeoPixelBus<NeoGrbwwFeature, NeoParallelMethod(Ws2805)> // parallel I2S
+ //TM1914 (RGB)
+ #define B_32_RN_TM1914_3 NeoPixelBus<NeoGrbTm1914Feature, NeoEsp32RmtMethod(Tm1914)>
+ #define B_32_I2_TM1914_3 NeoPixelBus<NeoGrbTm1914Feature, X1Tm1914Method>
+-#define B_32_IP_TM1914_3 NeoPixelBus<NeoGrbTm1914Feature, X8Tm1914Method> // parallel I2S
++#define B_32_IP_TM1914_3 NeoPixelBus<NeoGrbTm1914Feature, NeoParallelMethod(Tm1914)> // parallel I2S
+ //Sm16825 (RGBCCT)
+ #define B_32_RN_SM16825_5 NeoPixelBus<NeoRgbcwSm16825eFeature, NeoEsp32RmtMethod(Ws2812x)>
+ #define B_32_I2_SM16825_5 NeoPixelBus<NeoRgbcwSm16825eFeature, X1Ws2812xMethod>
+-#define B_32_IP_SM16825_5 NeoPixelBus<NeoRgbcwSm16825eFeature, X8Ws2812xMethod> // parallel I2S
++#define B_32_IP_SM16825_5 NeoPixelBus<NeoRgbcwSm16825eFeature, NeoParallelMethod(Ws2812x)> // parallel I2S
+ #endif
+ 
+ //APA102
+diff --git a/wled00/const.h b/wled00/const.h
+index 04ff8de..f0b8bce 100644
+--- a/wled00/const.h
++++ b/wled00/const.h
+@@ -86,7 +86,7 @@ constexpr size_t  WLED_MAX_USERMOD_PALETTES     = WLED_USERMOD_PALETTE_ID_BASE -
+     #define WLED_PLATFORM_ID 2       // used in UI to distinguish ESP type in UI
+   #elif defined(CONFIG_IDF_TARGET_ESP32S3)  // 4 RMT, 8 LEDC, has 2 I2S but NPB supports parallel x8 LCD on I2S1
+     #define WLED_MAX_RMT_CHANNELS 4         // ESP32-S3 has 4 RMT output channels
+-    #define WLED_MAX_I2S_CHANNELS 8         // uses LCD parallel output not I2S
++    #define WLED_MAX_I2S_CHANNELS 16        // uses LCD parallel output not I2S: all 16 data lines of the LCD unit
+     //#define WLED_MAX_ANALOG_CHANNELS 8
+     #define WLED_PLATFORM_ID 3       // used in UI to distinguish ESP type in UI, needs a proper fix!
+   #else

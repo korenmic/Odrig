@@ -18,4 +18,11 @@ void poll(Feed feed);
 // Writes bytes to the port.
 void write(const char *bytes, size_t length);
 
+#ifdef ODRIG_PROBE
+// Takes a long line for the port. poll() writes it in the pieces the port takes without
+// waiting, one piece in each call, and reads nothing from the port until all of it is
+// written, so that no reply lands inside it.
+void writeLong(const char *bytes, size_t length);
+#endif
+
 }  // namespace OdrigSerial

@@ -26,6 +26,9 @@ TWO_LEGS = ROOT / "mapping" / "legs-2.json"
 TEN_LEGS = ROOT / "mapping" / "legs-10.json"
 ANIMATIONS = ROOT / "animations"
 
+# The pins of the twenty legs of the target installation, in the order of the legs.
+TARGET_PINS = tuple(range(1, 19)) + (21, 47)
+
 # One 60-LED strip is wired, fed from the board's 3.3 V pin: no show that is installed
 # may be brighter than this, and the shows the suite packs are dimmer still.
 BRIGHTEST = 40
@@ -363,21 +366,23 @@ def canvas_of(mapping):
     return read.width, read.height
 
 
-def one_frame(mapping):
-    """An animation of one frame in which every pixel has a colour of its own."""
+def one_frame(mapping, ms=1000):
+    """An animation of one frame in which every pixel has a colour of its own. The frame
+    lasts some milliseconds, and the core opens the file again each time it has ended."""
     width, height = canvas_of(mapping)
     picture = b"".join(own_colour(position) for position in range(width * height))
-    return odrg.encode(jsonframes.Animation(width, height, ((1000, picture),)))
+    return odrg.encode(jsonframes.Animation(width, height, ((ms, picture),)))
 
 
-def one_frame_show(mapping=TWO_LEGS, brightness=DIM):
+def one_frame_show(mapping=TWO_LEGS, brightness=DIM, ms=1000):
     """A show folder whose one item is the one-frame animation, playing from power-on."""
-    return show_folder(mapping, [("frame.odrg", one_frame(mapping))], brightness)
+    return show_folder(mapping, [("frame.odrg", one_frame(mapping, ms))], brightness)
 
 
-def dense_clip(compressed, seconds=10):
-    """The dense 60 x 30 clip of some seconds: a smooth full-colour field, every LED lit."""
-    return odrg.encode(jsonframes.Animation(60, 30, tuple(dense.frames(60, 30, seconds))), compressed=compressed)
+def dense_clip(compressed, seconds=10, width=60, height=30):
+    """The dense clip of some seconds for a canvas: a smooth full-colour field, every LED
+    lit."""
+    return odrg.encode(jsonframes.Animation(width, height, tuple(dense.frames(width, height, seconds))), compressed=compressed)
 
 
 def recorded(folder, seconds, script=""):

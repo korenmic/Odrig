@@ -447,18 +447,22 @@ pass of WLED's loop. With an invalid mapping the usermod leaves WLED's outputs a
 and keeps them dark.
 
 On the ESP32-S3 the first four legs of the mapping file get WLED's four RMT outputs and the
-next eight its parallel driver, so the board can drive 12 legs. An output that cannot be
-made, for a thirteenth leg or a pin the board cannot use, does not work; the other outputs
-do, and the core runs unchanged.
+next sixteen its parallel driver, so the board can drive 20 legs. Stock WLED uses the
+parallel driver for eight outputs; the patch of [What the firmware changes in
+WLED](#what-the-firmware-changes-in-wled) switches it to the sixteen it can carry. An output
+that cannot be made, for a twenty-first leg or a pin the board cannot use, does not work;
+the other outputs do, and the core runs unchanged.
 
 **Playback.** The usermod asks the core for a refresh in every pass of its loop, until the
-core has produced one; that refresh is sent as soon as the outputs can take new data, and
-only then is the core asked again. Every refresh the core counts is so sent to the
-outputs, and `fps` in `status` is the board's real rate. A refresh goes to the outputs
-directly: each leg's bytes to that leg's output, LED number n of the leg to position n of
-the output. WLED's pixel buffer, LED map, matrix layout, gamma correction, white balance
-and segments take no part, and the outputs are set to WLED's full brightness before every
-refresh, so the only scaling of a colour value is the core's.
+core has produced one. That refresh is copied into the outputs at once, also while the
+refresh before it is still on the wire: an output keeps what it is sending apart from what
+it is given. It is sent as soon as the outputs can take new data, and only then is the core
+asked again. Every refresh the core counts is so sent to the outputs, and `fps` in `status`
+is the board's real rate. A refresh goes to the outputs directly: each leg's bytes to that
+leg's output, LED number n of the leg to position n of the output. WLED's pixel buffer, LED
+map, matrix layout, gamma correction, white balance and segments take no part, and the
+outputs are set to WLED's full brightness before every refresh, so the only scaling of a
+colour value is the core's.
 
 **WLED is kept from the LEDs.** The usermod holds WLED in its live mode, the one network
 pixel senders use, in which WLED runs no effect, no preset, no playlist and no transition,
@@ -494,7 +498,22 @@ start.
 | The audio usermod of the stock build is not included. | Buttons, relay and infrared settings. |
 | The web server also answers `POST /odrig`. | Every page and address WLED serves. |
 
-No file of WLED is changed for this: `firmware/patches/` holds no patch.
+One patch changes files of WLED, `firmware/patches/010-sixteen-parallel-outputs.patch`,
+which `build` and `build --probe` apply and `build --stock` does not. Stock WLED drives
+twelve LED outputs on the ESP32-S3: four through its RMT driver and eight through its
+parallel driver, the chip's LCD unit, used in the eight-lane form of the LED library
+NeoPixelBus. The LCD unit has sixteen data lines and the library has the sixteen-lane form
+of the same method. The patch changes three files, and nothing for another chip:
+
+| File of WLED | Change |
+|---|---|
+| `wled00/const.h` | For the ESP32-S3, `WLED_MAX_I2S_CHANNELS` is 16 in place of 8. WLED's limit of digital outputs, the sum with the four RMT channels, so becomes 20. |
+| `wled00/bus_wrapper.h` | For the ESP32-S3, the types of the parallel outputs are built on the library's sixteen-lane methods. |
+| `wled00/FX_fcn.cpp` | For the ESP32-S3, WLED's estimate of the memory of its outputs counts the common buffer of the parallel driver as sixteen lanes of two bytes. |
+
+The usermod cannot do this from outside: the limits are constants compiled into WLED, and
+the type of the parallel outputs is chosen inside WLED. WLED's LED settings page shows the
+new limits, which it gets from the firmware.
 
 ## The probe build
 
@@ -502,10 +521,11 @@ The probe build exists so that a program can check what the LEDs are given witho
 them. It answers the line `#probe` on the port with one JSON line, shown here on several:
 
 ```json
-{"probe":1,"start_ms":0,"heap":227940,"realtime":1,"loops":1003,"sent":50,"gap_ms":21,
- "poll_us":13,"send_us":7213,"overwritten":0,"limited":67,"limit_ma":730,"used_ma":1800,
+{"probe":1,"start_ms":95,"heap":135736,"realtime":1,"loops":235,"sent":50,"gap_ms":20,
+ "poll_us":578,"send_us":16525,"poll_total_us":28021,"send_total_us":816291,
+ "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
  "ap":1,"error":null,
- "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"54135885"}]}
+ "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"7b7d9750","pulses":4320}]}
 ```
 
 | Member | Meaning |
@@ -514,14 +534,22 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `heap` | The free internal memory of the chip, in bytes. |
 | `realtime` | 1 while WLED is held in its live mode with no override, else 0. |
 | `loops`, `sent` | The passes of the usermod's loop and the refreshes sent, in the last full second. |
-| `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. |
+| `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. A send is the copy into the outputs and WLED's show together; the wait for the outputs between the two is not in it. |
 | `poll_total_us`, `send_total_us` | The time all requests for a refresh and all sends took, in the last full second. |
-| `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. One send in five is checked. |
+| `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. Some outputs are read back after each send and again before the next, each in its turn: as many as have 200 LEDs together, and one at least. |
 | `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
 | `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
+| `wire_us` | The shortest and the longest time, since the last `#probe`, from the end of a send until the parallel driver had finished its transfer and could take data again, in microseconds; `null` when no output is on the parallel driver or none was sent. A timer looks at the driver every tenth of a millisecond. An output of 180 LEDs is 570 bytes on the wire with its reset, 5.7 ms. |
 | `ap` | 1 while WLED's access point is up, else 0. |
 | `error` | The reason the show is invalid, as `status` reports it, or `null`. |
-| `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt` or `parallel`, and `crc`, the CRC-32 of the colours it holds as WLED gives them back: red, green and blue for each LED. |
+| `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt`, `parallel` or `none`, and the two members below. |
+| `crc` | Of an output: the CRC-32 of the colours it held when it was last read back after a send, as WLED gives them back: red, green and blue for each LED. With twenty outputs of 180 LEDs every output is read back once in twenty sends, 0.4 seconds; an output that was not read back yet is read for the report. |
+| `pulses` | Of an output: the number of rising edges on its pin during one refresh, counted by the chip's pulse counter, or `null` before it was counted. A WS2812B bit is one pulse, so an output of 180 LEDs gives 4,320 whatever the colours. One output is counted at each send, each in its turn. The counter is put on the input of the pin's pad and leaves what the pin puts out alone. It counts to 32,767: 1,365 LEDs. |
+
+A `#probe` that arrives between the copy of a refresh into the outputs and its show is
+answered right after the show, so that a report never describes colours that were not
+sent. The report of twenty outputs is a line of 2,300 characters; the port writes it in the
+pieces it takes without waiting and reads no command until it is written.
 
 While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
 dims, the output gives back the dimmed colours as WLED restores them, which at the
@@ -736,6 +764,37 @@ played its own show: the report had `realtime` 0, two outputs, and `overwritten`
 
 The probe build reported `ap` 1 from the first second after its start: WLED's access point
 was up, with no network to join configured.
+
+**Twenty outputs.** What the design of seed 05 assumed, in its table "Assumed, to be
+verified by the spike", and what the first task of that seed found. It was tried with the
+probe build, the patch of [What the firmware changes in WLED](#what-the-firmware-changes-in-wled)
+applied, and a mapping of twenty row legs of three rows on pins 1 to 18, 21 and 47. One
+60-LED strip was wired, on pin 1; the other nineteen pins had nothing on them.
+
+| # | Assumption | What was found |
+|---|---|---|
+| A1 | The library's sixteen-lane method, at the commit WLED pins, sends correct data on all sixteen lanes. | As far as a program can see, it does. On each of the sixteen pins of the parallel driver the chip's pulse counter counted 24 pulses for every LED of a refresh: `pulses` 432 with legs of 18 LEDs and 4,320 with legs of 180. The driver was busy after a send for the time the bytes take on the wire: `wire_us` 812 to 1,019 with 18 LEDs, which are 84 bytes with the reset and 0.84 ms, and 5,677 to 5,952 with 180 LEDs, 570 bytes and 5.7 ms. That the pulses have the right widths, and that LEDs on a lane light, no program can see. |
+| A2 | With the patch WLED makes four RMT and sixteen parallel outputs on pins 1 to 18, 21 and 47, and all twenty work. | It does: twenty working outputs in the order of the legs, `rmt` for the first four and `parallel` for the next sixteen. With legs of 18 LEDs, which the limiter does not dim, every output held exactly the bytes the emulator records for its leg. With legs of 180 LEDs the limiter dims every refresh, `used_ma` 3,600 against `limit_ma` 730, and every output held exactly what its lowest level makes of its own leg's bytes. No pin had to be replaced. With the patch file moved out of `firmware/patches/` and the probe build built again, outputs 1 to 12 worked and outputs 13 to 20 did not. |
+| A3 | The pulse counter can count a pin an output drives without disturbing the output. | It can, on RMT pins and on pins of the parallel driver, when it is given no pin of its own and the input of the pin's pad is routed to it; the chip's driver would make a pin it is given an input. The counts were the same at every send, and the CRC of what the outputs hold did not change. |
+| A4 | Enough internal memory is left for WLED's web server and Wi-Fi; 100 KB free is taken as enough. | `heap` 135,736 with twenty outputs of 180 LEDs, the core and a show of one file; 203,164 with twenty outputs of 18 LEDs. The design expected about 190 KB. WLED's access point came up, `ap` 1. The core's blocks all came from internal memory. |
+| A5 | A send to twenty outputs happens 49 times a second or more with a picture that does not change. | Not with the loop of seed 04, which began a send when the outputs could take data: the probe build then sent 41 or 42 a second. A send takes 16.4 ms, 4.1 ms for the copy into the outputs and 12.3 ms for WLED's show with the limiter's dimming of 3,600 LEDs, and the LEDs are on the wire for 5.7 ms after it. With the copy made while the last refresh is still on the wire, as [What the firmware does](#what-the-firmware-does) has it now, 49 to 51 were sent in every one of ten seconds, 20 ms was the longest time between two sends, and `overwritten` stayed 0. |
+
+The dense 60 x 60 clip of 10 seconds on the same twenty legs, with the probe build of that
+task, in which the request for a refresh is still made in WLED's loop, over ten seconds
+each at brightness 32:
+
+| Clip | File | Start of the core | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Compressed | 1,383,766 bytes | 6,010 ms | 21 to 23 | 21 | 57 ms | 28.1 ms | 38.8 ms | 16.3 ms | 16.5 ms |
+| Uncompressed | 1,462,236 bytes | 4,182 ms | 31 or 32 | 32 | 47 ms | 13.7 ms | 28.7 ms | 16.3 ms | 16.5 ms |
+
+A request is longer than the work for one frame here, because the loop is slower than the
+clip: every request decodes all the frames since the one before, 2.3 of them on average
+for the compressed file and 1.6 for the uncompressed one. One frame is 12.3 ms of the
+core's work compressed and 8.6 ms uncompressed: reading it from storage, decoding it and
+placing 3,600 LEDs. With the 16.3 ms of a send that is more than the 20 ms there are, so
+the request has to run beside the send. See "Seed 05: What the spike found, and a refresh
+that is copied while the last one is on the wire" in [drifts.md](drifts.md).
 
 **From nothing.** With `build/firmware/` removed, `python3 firmware/fw.py build` set up the
 tools, fetched WLED and built the firmware in 2 minutes. The lists of the home folder from

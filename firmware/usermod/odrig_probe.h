@@ -18,10 +18,16 @@ void pass(uint64_t now_ms);
 // How long one request for a refresh took.
 void polled(uint32_t poll_us);
 
-// Around one send: before it the outputs are compared with what they held after the
-// send before; after it what they hold is kept. This is done for one send in five.
-void beforeSend();
-void afterSend(uint64_t now_ms, uint32_t send_us);
+// Around one send. After the show the time of the send is kept, the fill and the show
+// together, and the wire time begins: a timer looks every tenth of a millisecond whether
+// the parallel driver can take data again. Then some of the outputs are read back, each
+// in its turn, and before the next fill the same outputs are compared with what they
+// held: a difference means that something else wrote to them. Before the outputs are
+// shown, when they can all take data, the chip's pulse counter is put on the pin of one
+// output, each output in its turn.
+void beforeFill();
+void beforeShow();
+void afterShow(uint64_t now_ms, uint32_t send_us);
 
 // One byte from the port. Bytes at the start of a line are held back for as long as they
 // are a beginning of `#probe` and a newline; the complete line is answered here, and every

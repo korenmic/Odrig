@@ -35,8 +35,13 @@ bool matches();
 // Replaces WLED's outputs with one output for each leg. With no legs it leaves them.
 void apply();
 
-// Sends the legs' LED data to the outputs: LED n of leg i to position n of output i.
-void send();
+// A refresh goes to the outputs in two halves. fill() copies the legs' LED data into the
+// outputs: LED n of leg i to position n of output i. An output keeps what it is sending
+// apart from what it is given, so fill() may be called while the refresh before is still
+// on the wire. show() has the outputs send what they were given: WLED's current limiter
+// acts and the transfer starts. It is called only when every output can take data.
+void fill();
+void show();
 
 // Sends one dark picture through WLED's own path.
 void dark();

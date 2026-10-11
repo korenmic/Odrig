@@ -2832,3 +2832,99 @@ item only a person can check.
 open.
 
 **Resolution.** Seed 08 `tasks.md`, tasks 1 and 7.
+
+## Seed 05: What the spike found, and a refresh that is copied while the last one is on the wire
+
+**Question.** The design left five assumptions to the spike, A1 to A5, and gave the rate
+to the second task. Requirement 12 asks that its criteria 1 to 7 be established in the
+spike, and criterion 7 is the rate with a picture that does not change. What was found, and
+what had to change at once?
+
+**Answer.** A1 to A4 hold. With the patch the firmware makes twenty working outputs from
+twenty row legs on pins 1 to 18, 21 and 47: four RMT and sixteen on the parallel driver in
+its sixteen-lane form. The chip's pulse counter counts 24 pulses for every LED on each of
+the twenty pins, 432 for 18 LEDs and 4,320 for 180; the parallel driver is busy for 0.8 ms
+after a send of 18 LEDs and for 5.7 ms after one of 180, which is the 84 and the 570 bytes
+they are on the wire; on legs of 18 LEDs every output holds exactly its leg's bytes; and
+135,700 bytes of internal memory stay free with twenty outputs of 180 LEDs and the core.
+No pin had to be changed. With the patch file moved out, outputs 13 to 20 do not work.
+
+A5 does not hold with the loop of seed 04. With 3,600 LEDs and WLED's limiter dimming every
+LED, a send takes 16.4 ms: 4.1 ms to copy the colours into the outputs and 12.3 ms for
+WLED's show, in which the limiter reads and writes every LED again and the driver's buffer
+is filled. The loop began a send only when the outputs could take data, 5.7 ms after the
+last one: 22 ms for a refresh, and the probe build sent 41 or 42 of a still picture in a
+second.
+
+An output keeps what it is sending apart from what it is given: the RMT method has a
+buffer for each, and the parallel method fills its own buffer at the show. So the copy does
+not have to wait for the wire. Task 1 therefore splits the send in two: the refresh is
+copied into the outputs as soon as the core has produced it, and shown as soon as the
+outputs can take data. A refresh of a still picture then costs 16.4 ms, and 49 to 51 are
+sent in every second, with 20 ms as the longest time between two. This is the first half of
+step 2 of the design's "The time of one refresh", taken early because the spike is where
+criterion 7 is to be established; the design has the copy wait for the outputs, which it
+need not.
+
+The dense 60 x 60 clip still falls short, as the design expected: 21 to 23 refreshes a
+second for the compressed file and 31 or 32 for the uncompressed one, with the request in
+the loop. A request then takes 28 ms and 14 ms on average because it decodes every frame
+since the last one, 2.3 and 1.6 of them; one frame is 12.3 ms compressed and 8.6 ms
+uncompressed. Moving the request to a task of its own is task 2.
+
+**Resolution.** `firmware/patches/010-sixteen-parallel-outputs.patch`;
+`firmware/usermod/odrig_leds.cpp`, `fill` and `show`; `firmware/usermod/odrig_usermod.cpp`,
+`loop`; `tests/board/test_twenty.py`; `docs/firmware.md`, "What the firmware does" and
+"Verified on the board".
+
+## Seed 05: How the probe build measures with twenty outputs
+
+**Question.** The design takes the wire time in the usermod's loop and relies on a pass of
+the loop being under half a millisecond. It keeps seed 04's way of reading the outputs
+back: all of them, around one send in five, and once more for every report. With twenty
+outputs of 180 LEDs a pass that holds a send is 16 ms and one that opens a file 28 ms, so
+the wire time read in the loop came out anywhere from 5.7 to 36 ms. Reading 3,600 LEDs back
+takes 5.3 ms, and the report is a line of 2,300 characters that the port takes in pieces of
+a few hundred. Each of the three cost refreshes: the probe build sent 47 or 48 of a still
+picture a second where the loop has time for 50.
+
+**Answer.** The probe build measures so that its own work stays small whatever the number
+of outputs.
+
+- The wire time is taken by a timer that looks every tenth of a millisecond at the busy
+  flag of the chip's LCD unit, the one the library's own test of a finished write reads.
+  It runs only while a transfer is on the wire.
+- The outputs are read back in turn: after each send as many as have 200 LEDs together,
+  and one at least, and the same ones again before the next copy. `overwritten` counts as
+  before. The `crc` of an output in the report is that of its last reading, at most twenty
+  sends old with twenty outputs of 180 LEDs; an output that was not read yet is read for
+  the report.
+- A report asked for between the copy and the show of a refresh is written after the
+  show, so that it never describes colours that were not sent.
+- The report is handed to the port as one long line, which the port writes in the pieces
+  it takes without waiting, one in each pass, reading no command meanwhile.
+- The pulse counter is set up with no pin of its own, because the chip's driver would
+  make a pin it is given an input. The probe turns on the input of the pad and routes it
+  to the counter, which leaves the output as it is: A3 holds, on RMT pins and on pins of
+  the parallel driver.
+
+The probe build includes three more headers of the chip's own software for this, which the
+test of the usermod's files lists.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`; `firmware/usermod/odrig_serial.cpp`,
+`writeLong`; `tests/firmware/test_usermod_files.py`; `docs/firmware.md`, "The probe build".
+
+## Seed 05: A picture that does not change, in a test of the rate
+
+**Question.** The one-frame animation of the board tests lasts one second, and the core
+opens its file again each time the frame has ended. On the board an open takes 18 ms
+before the first byte is decoded, 28 ms with a picture of 60 x 60. With a send of 16 ms
+that is two refreshes of the second in which it happens: 48 are sent.
+
+**Answer.** The test of the rate with a still picture uses one frame that lasts a minute,
+so that the file is opened once in the time of the test; `one_frame` of the board tests
+takes the length of its frame. That an open costs refreshes is not new, seed 04 measured
+18.5 ms and one refresh; what it costs with 3,600 LEDs and the request in a task of its own
+is measured in task 2.
+
+**Resolution.** `tests/board/support.py`, `one_frame`; `tests/board/test_twenty.py`.

@@ -34,6 +34,26 @@ void keepSending() {
 
 OdrigSerial::Feed feedNow = nullptr;
 
+#ifdef ODRIG_PROBE
+String longLine;
+size_t longWritten = 0;
+
+// Writes the next piece of the long line. Returns whether some of it still waits.
+bool longLineWaits() {
+  if (longWritten >= longLine.length()) return false;
+  const int room = Serial.availableForWrite();
+  if (room > 0) {
+    const size_t piece = std::min((size_t)room, longLine.length() - longWritten);
+    OdrigSerial::write(longLine.c_str() + longWritten, piece);
+    longWritten += piece;
+  }
+  if (longWritten < longLine.length()) return true;
+  longLine = String();
+  longWritten = 0;
+  return false;
+}
+#endif
+
 // Hands one byte on and writes the reply it completed. The reply is written after the
 // player has returned.
 void pass(uint8_t byte) {
@@ -48,6 +68,9 @@ void OdrigSerial::poll(Feed feed) {
   feedNow = feed;
   if (emptyBuffer == 0) emptyBuffer = Serial.availableForWrite();
   keepSending();
+#ifdef ODRIG_PROBE
+  if (longLineWaits()) return;
+#endif
   for (int taken = 0; taken < BYTES_PER_PASS && Serial.available() > 0; taken++) {
     const int byte = Serial.read();
     if (byte < 0) break;
@@ -63,3 +86,9 @@ void OdrigSerial::write(const char *bytes, size_t length) {
   Serial.write((const uint8_t *)bytes, length);
   lastAsked = millis();
 }
+
+#ifdef ODRIG_PROBE
+void OdrigSerial::writeLong(const char *bytes, size_t length) {
+  longLine.concat(bytes, length);
+}
+#endif
