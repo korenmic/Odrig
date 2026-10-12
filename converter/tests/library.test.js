@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {spawnSync} from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -8,10 +9,11 @@ import * as index from "../lib/index.js";
 import {CONVERTER, ROOT} from "./support.js";
 
 const LIB = path.join(CONVERTER, "lib");
+const CLI = path.join(CONVERTER, "cli");
 
-function sources() {
-  const names = fs.readdirSync(LIB).sort();
-  return names.map((name) => ({name, text: fs.readFileSync(path.join(LIB, name), "utf8")}));
+function sources(folder = LIB) {
+  const names = fs.readdirSync(folder).sort();
+  return names.map((name) => ({name, text: fs.readFileSync(path.join(folder, name), "utf8")}));
 }
 
 // Every module a source text imports from: `import ... from`, `export ... from`, a bare
@@ -21,6 +23,24 @@ function specifiers(text) {
   const patterns = [
     /\bfrom\s*(["'])([^"']*)\1/g,
     /\bimport\s*(["'])([^"']*)\1/g,
+    /\bimport\s*\(\s*(["'`])([^"'`]*)\1/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      found.push(match[2]);
+    }
+  }
+  return found;
+}
+
+// The modules a source text of the command line part loads: its statements `import` and
+// `export ... from`, which begin a line, and `import("...")`. A word in a text of the
+// program, such as the name of the subcommand `import`, is no statement.
+function statements(text) {
+  const found = [];
+  const patterns = [
+    /^import\s+(?:[^"';]*?\sfrom\s*)?(["'])([^"']*)\1/gm,
+    /^export\s[^"';=]*?\sfrom\s*(["'])([^"']*)\1/gm,
     /\bimport\s*\(\s*(["'`])([^"'`]*)\1/g,
   ];
   for (const pattern of patterns) {
@@ -112,6 +132,80 @@ test("index.js offers every module of the library", async () => {
     assert.ok(Object.keys(module).length > 0, `${name} offers nothing`);
   }
   assert.equal(index.Rejection, index.errors.Rejection);
+});
+
+test("the tool is the library and a command line part that is built on it", async (t) => {
+  const files = sources(CLI);
+  const start = fs.readFileSync(path.join(CONVERTER, "odrig.js"), "utf8");
+  const manifest = JSON.parse(fs.readFileSync(path.join(CONVERTER, "package.json"), "utf8"));
+
+  await t.test("the folder holds the two parts and the tests, and nothing is built before it runs", () => {
+    for (const name of ["lib", "cli", "tests"]) {
+      assert.ok(fs.statSync(path.join(CONVERTER, name)).isDirectory(), name);
+    }
+    assert.ok(files.length >= 2);
+    for (const {name} of files) {
+      assert.match(name, /^[a-z]+\.js$/);
+    }
+    assert.equal(manifest.type, "module");
+    assert.equal(manifest.engines.node, ">=20");
+    assert.deepEqual(manifest.scripts, {test: "node --test"}, "one script, which names no test file and builds nothing");
+  });
+
+  await t.test("the command line part imports Node.js, the library by its index, and its own files", () => {
+    const names = new Set(files.map(({name}) => name));
+    const packages = new Map();
+    assert.ok(statements(files.find(({name}) => name === "main.js").text).includes("../lib/index.js"));
+    for (const {name, text} of files) {
+      for (const specifier of statements(text)) {
+        if (/^node:(child_process|fs|path|url)$/.test(specifier) || specifier === "../lib/index.js") {
+          continue;
+        }
+        if (/^\.\/[a-z]+\.js$/.test(specifier)) {
+          assert.ok(names.has(specifier.slice(2)), `cli/${name} imports ${specifier}, which is not there`);
+          continue;
+        }
+        packages.set(specifier, [...(packages.get(specifier) ?? []), name]);
+      }
+    }
+    assert.deepEqual([...packages], [["omggif", ["gif.js"]]], "the one package that is loaded, where a GIF is read");
+    assert.match(files.find(({name}) => name === "gif.js").text, /await import\("omggif"\)/);
+    assert.deepEqual(statements(start).sort(), ["./cli/main.js", "./cli/version.js"]);
+    assert.deepEqual(statements(files.find(({name}) => name === "version.js").text), []);
+    assert.deepEqual(statements('import a from "node:fs";\nimport {\n  b,\n} from "./b.js";\nexport {c} from "./c.js";\nconst names = ["import", "x"];\nexport const D = "d";\nawait import("e");'), [
+      "node:fs", "./b.js", "./c.js", "e",
+    ]);
+  });
+
+  await t.test("it decodes, encodes, checks and fits with the library and has no such code of its own", () => {
+    const text = (name) => files.find((file) => file.name === name).text;
+    for (const call of ["timeline.importFrames(", "jsonframes.loads(", "jsonframes.dumps(", "odrg.encode(", "odrg.decode(", "mapping.loads("]) {
+      assert.ok(text("main.js").includes(call), `cli/main.js calls ${call}`);
+    }
+    for (const call of ["packing.begin(", "packing.encodeSource("]) {
+      assert.ok(text("folder.js").includes(call), `cli/folder.js calls ${call}`);
+    }
+    for (const name of ["gif.js", "video.js", "files.js"]) {
+      assert.match(text(name), /^import \{errors\} from "\.\.\/lib\/index\.js";$/m, `cli/${name} takes the errors of the library and nothing else`);
+    }
+    for (const {name, text: source} of files) {
+      assert.equal(/\bzlib\b|\bCompressionStream\b|\bDecompressionStream\b/.test(source), false, `cli/${name} names a compression of the platform`);
+    }
+  });
+
+  await t.test("what is tracked of the tool is its sources: no media file, no generated source and no package", (inner) => {
+    const listed = spawnSync("git", ["ls-files", "-z"], {cwd: ROOT, encoding: "utf8"});
+    if (listed.status !== 0) {
+      inner.skip("git does not list the files of this folder");
+      return;
+    }
+    const tracked = listed.stdout.split("\0").filter((name) => name !== "");
+    const ours = tracked.filter((name) => name.startsWith("converter/"));
+    assert.ok(ours.includes("converter/package-lock.json"));
+    const known = /^converter\/(package\.json|package-lock\.json|ffmpeg\.sha256|odrig\.js|(cli|lib|tests)\/[a-z]+\.js|tests\/[a-z]+\.test\.js|tests\/reference\.py|tests\/page\/(index\.html|page\.js))$/;
+    assert.deepEqual(ours.filter((name) => !known.test(name)), []);
+    assert.deepEqual(tracked.filter((name) => /\.(mp4|mov|gif)$/i.test(name)), []);
+  });
 });
 
 test("the reasons are those of the Python tool", async (t) => {

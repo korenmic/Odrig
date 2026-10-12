@@ -4975,3 +4975,133 @@ equal what `node converter/odrig.js encode` writes.
 
 **Resolution.** `converter/tests/page/index.html`, `converter/tests/page/page.js`,
 `converter/tests/browser.test.js`.
+
+## Seed 06: The documents as written, and pages and tests the task does not list
+
+**Question.** The design's table "Documents" lists seven documents and two test files, and
+the task a third test file. Other pages pointed at sections of `docs/converter.md` that
+moved, another test of the Python suite read that page, and the emulator's suite ran the
+pack commands of its page with Python. What else changed, and what does a suite need now?
+
+**Answer.**
+
+- `docs/core.md`, `docs/format.md` and `docs/mapping.md` named `converter.md` for the
+  generators, for the Python that runs `odrig.mapdoc`, and for the readers the core's suite
+  compares with. They name `reference-converter.md` now, and the bench target of the core,
+  which starts the Python tool, is said to use the reference converter. Nothing else of
+  these pages changed.
+- `tests/converter/test_generators.py` read the sizes of the dense clip in
+  `docs/converter.md`. It reads them in `docs/reference-converter.md`, as Requirement 19
+  criterion 7 asks of every test of the Python suite that read the page.
+- The emulator's suite runs the commands of its page as they are written. Three of them
+  are now `node converter/odrig.js pack`, so that suite needs Node.js 20 or later as
+  `node`, and the page says so in its table of commands. Without it the test fails and
+  says what is missing. It is not skipped: a skipped test would leave the commands of the
+  page and its table of sizes unchecked. The sizes of that table are compared exactly now,
+  not within 2 percent, because the converter gives them on every computer.
+- `docs/firmware.md` says beside its pack command that it needs Node.js as `node`. The
+  firmware tool installs a Node.js 20 of its own into its work folder, for WLED's build;
+  that one is not on the path, and the tool is as it was.
+- Hello world and DVD bounce are called test content on both pages, as the owner sees
+  them: made to try the tools and the board, and not finished animations of the
+  installation.
+- `docs/converter.md` has what the design lists, and for the library also the calls with
+  what goes in and what comes out, because the app of seed 09 is written against them.
+  `docs/reference-converter.md` has, beside what the design lists, where the two tools are
+  known to differ, and the three known faults of the Python tool on damaged media, with a
+  pointer to the entry "Python crashing while it decodes a video for a comparison".
+- "Conversion" in `docs/decisions.md` says that the library has been run in Chrome and not
+  inside an app yet.
+
+**Resolution.** `docs/converter.md`, `docs/reference-converter.md`, `README.md`,
+`docs/emulator.md`, `docs/firmware.md`, `docs/reasons.md`, `docs/decisions.md`,
+`docs/core.md`, `docs/format.md`, `docs/mapping.md`; `converter/tests/docs.test.js`;
+`tests/converter/test_docs.py`, `tests/converter/test_generators.py`,
+`tests/emulator/test_docs.py`, `tests/firmware/test_docs.py`.
+
+## Seed 06: Which test checks which criterion, and the test that was missing
+
+**Question.** The last task asks to read every acceptance criterion of Requirements 1 to
+19 once more and to name, for each one a program can check, the test that checks it.
+
+**Answer.** The tests are those of `converter/tests/`, named here by their file without
+its ending and, where it helps, by the title of the test.
+
+| Requirement | Checked by |
+|---|---|
+| 1, the two parts | `library`: criteria 3, 4 and 5 by "the library is made of its own files only" and "index.js offers every module of the library"; criteria 1, 2, 6 and 7 by "the tool is the library and a command line part that is built on it", which was missing and is added; criterion 8 by `cli`, "an old version of Node.js is refused"; criterion 9 by `browser`. |
+| 2, the command line | `cli`: "the statuses", "the error line", "--help", "the parser", "the command line as a program", "reading and writing files"; criterion 8 also by `whole`, "fromDecimal reads a number from its digits", and `import`, "seconds on the command line are rounded ..."; criterion 11 by `encode` and `import`, "the same ... give the same ... on every run". |
+| 3, reasons and messages | `library`, "the reasons are those of the Python tool"; the comparisons of whole error lines in `strictjson`, `jsonframes`, `decode`, `mapping`, `pack`, `timeline` and `import`; criterion 5 by `cli`, "reading and writing files"; criterion 7 by `cli`, "--help" and "the parser". |
+| 4, strict JSON and JSON frames | `strictjson`, `jsonframes`; criterion 5 by "a file of 20 MB is read in under 10 seconds". |
+| 5, the ODRG decoder | `decode`. |
+| 6, a compressed body | `inflate`; criterion 4 by `decode`, with the vector `trailing-bytes.after-deflate`. |
+| 7, the encoder | `encode`. |
+| 8, compression | `deflate`; criterion 5 also by `browser`. |
+| 9, decode and check | `decode`, and `cli`, "check tells the format from the name, and --format overrides it". |
+| 10, mapping files | `mapping`, and `import`, "both command lines read a mapping file the same way, through import". |
+| 11, shows and pack | `pack`. |
+| 12, the timeline | `timeline`. |
+| 13, fitting | `fit`. |
+| 14, media on the command line | `import`; criterion 4 but for the rotation, see below. |
+| 15, frames from whoever has them | `timeline`, "importFrames takes frames from whoever has them"; criterion 6 by the added test of `library`. |
+| 16, the library in a page | `browser`. |
+| 17, dependencies | `import`, "the packages" and "a tool without its packages"; criterion 4 by `library`; criterion 6 by `docs`. |
+| 18, tests | criteria 2 and 5 by the added test of `library` and by `docs`; criterion 3 by the files named above; criterion 4 by `cli`, "the Python tool the suite compares with". |
+| 19, documentation | `docs`, and `tests/converter/test_docs.py`, `tests/emulator/test_docs.py` and `tests/firmware/test_docs.py`. |
+
+No program of the suite checks these:
+
+- Requirement 1 criterion 9 asks for the same result in a web view "for every function".
+  The page calls `jsonframes.loads` and `dumps`, `odrg.encode` and `decode`,
+  `timeline.importFrames` and `fit.place`, which pass through every file of the library
+  but not through every function by itself.
+- Requirement 14 criterion 4, that a rotation recorded for display is not applied: the
+  call has `-noautorotate`, and no test file with a rotation was made.
+- Requirement 16 criterion 5, the test reported as skipped where there is no Chrome: on
+  this Mac there is one, so the skipping was read and not seen.
+- Requirement 18 criterion 6, no network connection: nothing of the suite opens one but
+  the Chrome test, to `127.0.0.1`; no program proves it.
+- Requirement 18 criteria 7 and 8 are checked by running the other suites and by
+  `git diff` against the commit this seed started from, which shows no file of `odrig/`,
+  `core/`, `emulator/`, `odrigctl/` or `firmware/`.
+- Requirement 19 criterion 6: `docs` checks that the versions are named, not that they
+  are the ones that were used.
+
+**Resolution.** `converter/tests/library.test.js`, "the tool is the library and a command
+line part that is built on it".
+
+## Seed 06: The last check: what was run, and the suite of the firmware tool that was not
+
+**Question.** Requirement 18 criterion 7 names four suites that need no board, among them
+`python3 firmware/fw.py test`, and the last task runs them. The run that did the tasks of
+this seed was told not to start the firmware tool, because another run was working with
+the board through it.
+
+**Answer.** Run after the last change, all passing:
+
+| Command | Tests |
+|---|---:|
+| `npm test --prefix converter`, Node.js 26.5.0 | 1,286 |
+| The same suite with Node.js 20.18.0, started as `node --test` in `converter/` | 1,286 |
+| `.venv/bin/python -m unittest discover -s tests/converter -t .` | 616 |
+| `make -C core test` | 246 |
+| `python3 -m unittest discover -s tests/emulator -t .` | 328 |
+| `python3 -m unittest tests.firmware.test_docs` | 12 |
+
+The Node.js 20 is the one the firmware tool keeps in its work folder,
+`build/firmware/venv/bin/node` of the main checkout, started by itself. Of the firmware
+tool's suite only the last line was run: the one file of tests that reads
+`docs/firmware.md`, by itself and without the tool. The rest of that suite was not run. No
+file of `firmware/` changed in this seed, and no other test of that suite reads a file
+this seed changed, so nothing of it should differ. The state of the seed is set to
+completed with that one run open: whoever merges this seed runs
+`python3 firmware/fw.py test` when the board is free.
+
+The versions: macOS 26.5 (25F71) on Apple Silicon, npm 12.0.2, Chrome 154.0.8037.98,
+Python 3.14.6 with zlib 1.2.12, PyAV 17.1.0 and Pillow 12.3.0, and ffmpeg 6.0 as the
+decoder program. The suites ran in a second checkout of the repository, a git worktree,
+with the environment variable `ODRIG_PYTHON` naming the Python of the main checkout's
+`.venv`.
+
+**Resolution.** `docs/converter.md`, "What is verified";
+`project-seeds/06-p1-javascript-converter/state.json`.

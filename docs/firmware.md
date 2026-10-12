@@ -243,7 +243,7 @@ Storage is not written, so WLED's settings and the show it played before are sti
 ### install-show
 
 ```
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python3 firmware/fw.py install-show build/example-show
 ```
@@ -341,14 +341,15 @@ With the board on USB, from the repository root:
 ```
 python3 firmware/fw.py build
 python3 firmware/fw.py flash
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python3 firmware/fw.py install-show build/example-show
 python -m odrigctl --port /dev/cu.usbmodem101 status
 ```
 
 The first command also sets up the tools and fetches WLED, which needs the network once.
-`pack` is the converter's command of [converter.md](converter.md); `shows/example/show.json`
+`pack` is the converter's command of [converter.md](converter.md), which needs Node.js 20
+or later as `node` and nothing else; `shows/example/show.json`
 has brightness 128, so for a strip fed from the board's 3.3 V pin pack a copy of it with a
 brightness of 40 or less. The example show is for today's build of two legs. The show for
 the target build of twenty legs, 60 x 60, is the demo show: [emulator.md](emulator.md),
@@ -736,7 +737,7 @@ and the board tests with the target file have not run. See
    mkdir -p build/lane/sources
    python -m odrig.generators.hello_world build/lane/sources/hello.json --mapping build/lane/mapping.json
    printf '{"version": 1, "brightness": 32, "items": [{"id": 1, "file": "hello.odrg"}], "start": 1}\n' > build/lane/show.json
-   python -m odrig pack --show build/lane/show.json --mapping build/lane/mapping.json \
+   node converter/odrig.js pack --show build/lane/show.json --mapping build/lane/mapping.json \
        --sources build/lane/sources --out build/lane/show
    python3 firmware/fw.py install-show build/lane/show
    ```

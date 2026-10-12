@@ -20,7 +20,7 @@ Run from the repository root.
 | Command | What it does | What it needs |
 |---|---|---|
 | `make -C core shared` | Builds `core/build/libodrig_core.dylib`, the library the emulator loads, from every `core/src/*.cpp` with the flags of `make -C core`. | Apple's command-line developer tools: `make` and `c++`. |
-| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and the JavaScript shell that is part of macOS. |
+| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, the JavaScript shell that is part of macOS, and Node.js 20 or later as `node`, for the test that runs the pack commands of this page. |
 
 The emulator never builds the library itself. The suite is every `test_*.py` file in
 `tests/emulator/`, found by discovery; importing the test package runs `make -C core shared`
@@ -31,17 +31,18 @@ JavaScript shell of macOS,
 
 ## Two shows to run
 
-The emulator runs a packed show: the folder that `python -m odrig pack` writes, described in
-[converter.md](converter.md). Two shows are tracked. `python` on this page is any Python
-3.10 or later, `python3` on a Mac; nothing here needs the libraries of the converter's
-virtual environment. `pack` refuses an output folder that is not empty, so remove the
-folder before packing again.
+The emulator runs a packed show: the folder that `node converter/odrig.js pack` writes,
+described in [converter.md](converter.md). `pack` needs Node.js 20 or later and nothing
+else. Two shows are tracked. `python` on this page is any Python 3.10 or later, `python3`
+on a Mac; nothing here needs the libraries of the virtual environment of
+[reference-converter.md](reference-converter.md). `pack` refuses an output folder that is
+not empty, so remove the folder before packing again.
 
 **The example show**, for today's build of two legs, 60 x 6: Hello world and the bouncing
 square, alternating every 15 seconds. Its sources are tracked in `animations/`.
 
 ```
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python -m emulator build/example-show
 ```
@@ -55,7 +56,7 @@ by the generators into `build/`, which git ignores:
 mkdir -p build/demo-20/sources
 python -m odrig.generators.hello_world build/demo-20/sources/hello.json --mapping mapping/legs-20.json
 python -m odrig.generators.dvd_bounce  build/demo-20/sources/dvd.json   --mapping mapping/legs-20.json
-python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
     --sources build/demo-20/sources --out build/demo-20/show
 python -m emulator build/demo-20/show
 ```
@@ -70,7 +71,8 @@ from the top-left corner to the bottom-right one, and so passes over every leg.
 | `hello.odrg`, 5.1 s | 255 | 1,210 |
 | `dvd.odrg`, 20.9 s | 116 | 1,052 |
 
-The sizes are those the converter gives with zlib 1.2.12.
+The sizes are those the converter gives, on every computer. The generators are programs
+of the Python package of [reference-converter.md](reference-converter.md).
 
 ## Starting
 
@@ -710,7 +712,7 @@ make -C core shared
 mkdir -p build/dense/sources
 python -m odrig.generators.dense build/dense/sources/dense.json --mapping mapping/legs-20.json --seconds 10
 printf '{"version": 1, "brightness": 255, "items": [{"id": 1, "file": "dense.odrg"}], "start": 1}\n' > build/dense/show.json
-python -m odrig pack --show build/dense/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show build/dense/show.json --mapping mapping/legs-20.json \
     --sources build/dense/sources --out build/dense/show
 ```
 

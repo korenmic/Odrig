@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -242,19 +243,27 @@ class EmulatorDocument(unittest.TestCase):
 
 class DocumentedShows(unittest.TestCase):
     """The commands the document gives for the two shows and for the dense clip, run as
-    they are written, in a folder that has the repository's tracked folders linked in."""
+    they are written, in a folder that has the repository's tracked folders linked in.
+    The shows are packed by the converter, a program for Node.js, and their sources are
+    written by the generators of the Python package."""
+
+    PACK = "node converter/odrig.js pack "
 
     def test_the_commands_for_the_shows_pack_three_folders_the_emulator_runs(self):
         text = DOCUMENT.read_text(encoding="utf-8")
         lines = blocks(section(text, "Two shows to run")) + blocks(section(text, "The check list by eye"))
-        commands = [line for line in lines if line.split(" ")[0] in ("mkdir", "printf") or line.startswith("python -m odrig")]
-        self.assertEqual(sum(line.startswith("python -m odrig pack ") for line in commands), 3)
+        commands = [line for line in lines if line.split(" ")[0] in ("mkdir", "printf") or line.startswith(("python -m odrig", "node converter/"))]
+        self.assertEqual(sum(line.startswith(self.PACK) for line in commands), 3)
+        self.assertEqual(sum(line.startswith("node ") for line in commands), 3)
         self.assertEqual(sum(line.startswith("python -m odrig.generators.") for line in commands), 3)
+        self.assertEqual(sum(line.startswith("python ") for line in commands), 3)
         for line in commands:
             self.assertNotRegex(line, r"\b(60|30)\b", line)
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "the pack commands of the document need Node.js 20 or later as `node`: see docs/converter.md, \"Setup\"")
         with tempfile.TemporaryDirectory() as folder:
             work = pathlib.Path(folder)
-            for name in ("odrig", "mapping", "shows", "animations"):
+            for name in ("odrig", "converter", "mapping", "shows", "animations"):
                 os.symlink(support.ROOT / name, work / name)
             for line in commands:
                 words = shlex.split(line)
@@ -264,6 +273,8 @@ class DocumentedShows(unittest.TestCase):
                     continue
                 if words[0] == "python":
                     words[0] = sys.executable
+                if words[0] == "node":
+                    words[0] = node
                 done = subprocess.run(words, cwd=work, capture_output=True, text=True)
                 self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""), line)
             for show, legs in (("build/example-show", 2), ("build/demo-20/show", 20), ("build/dense/show", 20)):
@@ -274,16 +285,15 @@ class DocumentedShows(unittest.TestCase):
                 self.assertEqual(recording.led_bytes, 540 * legs, show)
                 self.assertTrue(all(tick.produced and any(tick.data) for tick in recording.ticks), show)
             packed = {path.name: path.read_bytes() for path in sorted((work / "build/demo-20/show").glob("*.odrg"))}
-        # The table of the demo show's two files: the frames, and the sizes within 2 percent,
-        # because a compressed size depends on the version of zlib.
+        # The table of the demo show's two files: the frames, and the sizes, which the
+        # converter gives on every computer.
         rows = re.findall(r"(?m)^\| `([a-z]+\.odrg)`, ([0-9.]+) s \| ([0-9]+) \| ([0-9,]+) \|$", section(text, "Two shows to run"))
         self.assertEqual([name for name, _, _, _ in rows], ["hello.odrg", "dvd.odrg"])
         for name, seconds, frames, size in rows:
             records = odrg.decode(packed[name]).records
             self.assertEqual(len(records), int(frames), name)
             self.assertEqual(f"{sum(ms for ms, _ in records) / 1000:.1f}", seconds, name)
-            documented = int(size.replace(",", ""))
-            self.assertLessEqual(abs(len(packed[name]) - documented) * 100, 2 * documented, (name, len(packed[name])))
+            self.assertEqual(len(packed[name]), int(size.replace(",", "")), name)
 
 
 class Readme(unittest.TestCase):

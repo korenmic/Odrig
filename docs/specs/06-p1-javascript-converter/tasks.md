@@ -184,7 +184,7 @@ Rules for every task:
     was tried, leave this task open and say so in the hand-over.
   - Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 1.9
 
-- [ ] 10. The documents and the last check
+- [x] 10. The documents and the last check
   - Rewrite `docs/converter.md` and create `docs/reference-converter.md` as the design's
     table "Documents" lists them. Change `README.md`, `docs/emulator.md`,
     `docs/firmware.md`, `docs/reasons.md` and `docs/decisions.md` as it lists them.
