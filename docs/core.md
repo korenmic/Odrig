@@ -7,8 +7,9 @@ the firmware run the same source files, so the two cannot behave differently.
 
 The core is written in C++11 without exceptions, run-time type information, threads or
 floating point. It includes no header of a platform and refers to nothing outside itself
-but the C library's routines that copy, fill and compare memory. It keeps everything it
-knows in one object, takes its memory once at startup, and never calls itself.
+but the C library's routines that copy, fill and compare memory and the one that finds the
+end of a text, which GCC puts in the place of a loop. It keeps everything it knows in one
+object, takes its memory once at startup, and never calls itself.
 
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),

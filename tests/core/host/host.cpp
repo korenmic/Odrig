@@ -3,6 +3,11 @@
 
 #include <sys/stat.h>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -20,6 +25,10 @@
 #include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
+#endif
 
 namespace {
 
@@ -420,6 +429,16 @@ void decode_one(Host &host, const char *name) {
     }
 }
 
+// Where the name of a file begins in a path: after its last separator. On Windows a
+// backslash separates as a slash does.
+size_t last_separator(const std::string &path) {
+#ifdef _WIN32
+    return path.find_last_of("/\\");
+#else
+    return path.rfind('/');
+#endif
+}
+
 int decode(const std::string &argument) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
@@ -428,7 +447,7 @@ int decode(const std::string &argument) {
         }
         return 0;
     }
-    size_t slash = argument.rfind('/');
+    size_t slash = last_separator(argument);
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
@@ -696,6 +715,11 @@ bool whole_number(const std::string &text, long *value) {
 }  // namespace
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    // The input and the output are bytes: no line ending is to be changed on the way.
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
     std::vector<std::string> arguments(argv + 1, argv + argc);
     if (arguments.empty()) {
         return usage();

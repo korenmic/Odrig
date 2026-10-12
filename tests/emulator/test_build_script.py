@@ -273,6 +273,89 @@ class OnlyWhatChanged(unittest.TestCase):
             self.assertEqual(json.loads((folder / "toolchain.json").read_text(encoding="utf-8"))["cxx"], "clang++")
 
 
+def makefile_variable(name):
+    """A variable of the makefile, with the variables it names put in."""
+    variables = dict(re.findall(r"(?m)^([A-Z_]+) = (.+)$", MAKEFILE.read_text(encoding="utf-8")))
+    return re.sub(r"\$\(([A-Z_]+)\)", lambda match: variables[match.group(1)], variables[name]).split()
+
+
+class TheTestHost(unittest.TestCase):
+    GNU = build.Toolchain("gnu", "g++", "gcc", "ar", "nm", None)
+    MICROSOFT = build.Toolchain("msvc", "cl", "cl", "lib", "link", None)
+    FIRST = build.GNU_CHECKS[0][1]
+
+    def test_with_the_first_checks_the_flags_are_those_of_the_makefile(self):
+        self.assertEqual([*self.FIRST, *build.GNU_DEBUG], makefile_variable("SANITIZERS"))
+        command, made = build.checked_command(self.GNU, "core.cpp", self.FIRST)
+        self.assertEqual(command, ["g++", *makefile_variable("CORE_FLAGS"), *makefile_variable("SANITIZERS"), "-c", "src/core.cpp", "-o", "build/checked/core.o"])
+        self.assertEqual(made, "build/checked/core.o")
+        command, made = build.host_command(self.GNU, "host.cpp", self.FIRST)
+        self.assertEqual(command, ["g++", *makefile_variable("HOST_FLAGS"), "-c", "../tests/core/host/host.cpp", "-o", "build/host/host.o"])
+        self.assertEqual(made, "build/host/host.o")
+
+    def test_the_host_is_linked_with_the_checks_and_on_windows_carries_the_run_time(self):
+        objects = ["build/checked/core.o", "build/host/host.o"]
+        self.assertEqual(build.host_link(self.GNU, objects, self.FIRST, "darwin"), (["g++", *makefile_variable("SANITIZERS"), "-o", "build/odrig_host", *objects], "build/odrig_host"))
+        command, made = build.host_link(self.GNU, objects, (), "win32")
+        self.assertEqual((command, made), (["g++", "-O1", "-g", "-static", "-o", "build/odrig_host.exe", *objects], "build/odrig_host.exe"))
+        self.assertEqual([build.host_name(platform) for platform in ("darwin", "win32", "linux")], ["odrig_host", "odrig_host.exe", "odrig_host"])
+
+    def test_the_sources_of_the_host_are_those_of_its_folder(self):
+        self.assertEqual((ROOT / "core" / build.HOST_SOURCES).resolve(), ROOT / "tests" / "core" / "host")
+        self.assertGreaterEqual(len(list((ROOT / "core" / build.HOST_SOURCES).glob("*.cpp"))), 2)
+
+    def checks_with(self, works):
+        """The checks the script takes when only the sets for which `works` is true can be
+        built and run."""
+        made = tempfile.TemporaryDirectory()
+        self.addCleanup(made.cleanup)
+        tried = []
+
+        def quiet(command, env=None):
+            flags = tuple(word for word in command[1:] if str(word).startswith(("-f", "-D")))
+            if len(command) > 1:
+                tried.append(flags)
+            return len(command) == 1 or works(flags)
+
+        with mock.patch.object(build, "BUILD", pathlib.Path(made.name)), mock.patch.object(build, "CORE", pathlib.Path(made.name)), mock.patch.object(build, "quiet", quiet):
+            return build.checks(self.GNU), tried
+
+    def test_the_first_checks_a_small_program_builds_and_runs_with_are_taken(self):
+        first, second, none = build.GNU_CHECKS
+        self.assertEqual(self.checks_with(lambda flags: True), (first, [first[1]]))
+        self.assertEqual(self.checks_with(lambda flags: "-fsanitize=address,undefined" not in flags), (second, [first[1], second[1]]))
+        self.assertEqual(self.checks_with(lambda flags: not flags), (none, [first[1], second[1], ()]))
+        self.assertEqual(self.checks_with(lambda flags: False)[0], none)
+        self.assertEqual(none, ("none", ()))
+
+    def test_the_checks_are_the_address_check_where_there_is_one_and_traps_where_not(self):
+        first, second, _ = build.GNU_CHECKS
+        self.assertIn("-fsanitize=address,undefined", first[1])
+        self.assertIn("-fsanitize-trap=undefined", second[1])
+        self.assertNotIn("address", " ".join(second[1]))
+
+    def test_microsofts_compiler_gets_its_own_run_time_checks(self):
+        self.assertEqual(build.checks(self.MICROSOFT), build.MICROSOFT_CHECKS)
+        command, made = build.checked_command(self.MICROSOFT, "core.cpp", build.MICROSOFT_CHECKS[1])
+        for flag in ("/W4", "/WX", "/EHs-c-", "/GR-", "/RTC1", "/Od"):
+            self.assertIn(flag, command)
+        self.assertNotIn("/O2", command)
+        self.assertEqual(made, "build/checked/core.obj")
+        command, made = build.host_command(self.MICROSOFT, "host.cpp", build.MICROSOFT_CHECKS[1])
+        self.assertEqual((command[0], command[-3:], made), ("cl", ["/c", "../tests/core/host/host.cpp", "/Fobuild/host/host.obj"], "build/host/host.obj"))
+        self.assertEqual(build.host_link(self.MICROSOFT, ["a.obj"], (), "win32"), (["link", "/nologo", "/OUT:build/odrig_host.exe", "a.obj"], "build/odrig_host.exe"))
+
+    def test_the_test_command_builds_the_library_and_the_host_and_gives_the_status_of_the_suite(self):
+        done = []
+        with mock.patch.object(build, "find", return_value=self.GNU), mock.patch.object(build, "build_static", lambda toolchain: done.append("library")), \
+                mock.patch.object(build, "build_host", lambda toolchain: done.append("host")), mock.patch.object(build.subprocess, "run") as run:
+            run.return_value.returncode = 1
+            status, out, _ = run_main("test")
+        self.assertEqual((status, done), (1, ["library", "host"]))
+        self.assertEqual(run.call_args.args[0], [sys.executable, "-m", "unittest", "discover", "-s", "tests/core", "-t", "."])
+        self.assertEqual(run.call_args.kwargs["cwd"], ROOT)
+        self.assertIn("python -m unittest discover -s tests/core -t .", out)
+
 class TheCommandLine(unittest.TestCase):
     def run_main(self, *argv):
         return run_main(*argv)

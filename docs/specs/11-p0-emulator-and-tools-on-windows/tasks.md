@@ -77,7 +77,7 @@ Rules for every task:
   - Run `python -m unittest discover -s tests/emulator -t .`; it passes on Windows.
   - Requirements 5.3, 5.5 and 5.6, and 2.4.
 
-- [ ] 5. The core suite on Windows
+- [x] 5. The core suite on Windows
   - `core/build.py` gets `test`: the test host with the checks the toolchain has.
   - `tests/core/host/` gets the calls of Windows for aligned memory and for unchanged
     input and output. `tests/core/support.py` reads `toolchain.json`; the tests that read

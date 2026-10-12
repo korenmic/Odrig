@@ -2,6 +2,7 @@
 
     python core/build.py           builds the static library in build/
     python core/build.py shared    builds the shared library the emulator loads
+    python core/build.py test      builds the static library and the test host, then runs the suite
     python core/build.py clean     removes build/
 
 It works with GCC or Clang, started as g++ or clang++, and with Microsoft's compiler cl.
@@ -47,6 +48,21 @@ MICROSOFT_TOOLS = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
 WARNINGS = ("-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Werror")
 GNU_FLAGS = ("-std=c++11", "-O2", *WARNINGS, "-Wframe-larger-than=512", "-fno-exceptions", "-fno-rtti", "-Iinclude")
 MICROSOFT_FLAGS = ("/nologo", "/std:c++14", "/O2", "/W4", "/WX", "/EHs-c-", "/GR-", "/MT", "/Iinclude")
+
+# The test host is built with the checks for faults at run time that the toolchain has. The
+# first set a small program can be built and run with is taken. GCC for Windows has no
+# address check.
+GNU_CHECKS = (
+    ("address and undefined behaviour", ("-fsanitize=address,undefined", "-fno-sanitize-recover=undefined")),
+    ("undefined behaviour as traps, the stack protector and the assertions of the standard library", ("-fsanitize=undefined", "-fsanitize-trap=undefined", "-fstack-protector-strong", "-D_GLIBCXX_ASSERTIONS")),
+    ("none", ()),
+)
+GNU_DEBUG = ("-O1", "-g")
+MICROSOFT_CHECKS = ("the run-time checks of the compiler", ("/RTC1", "/GS", "/sdl"))
+MICROSOFT_CHECKED_FLAGS = ("/nologo", "/std:c++14", "/Od", "/W4", "/WX", "/EHs-c-", "/GR-", "/MT", "/Iinclude")
+MICROSOFT_HOST_FLAGS = ("/nologo", "/std:c++17", "/Od", "/W4", "/WX", "/EHsc", "/MT", "/D_CRT_SECURE_NO_WARNINGS", "/Iinclude", "/Isrc")
+HOST_SOURCES = "../tests/core/host"
+PROBE = "int main() { return 0; }\n"
 
 INSTALL = (
     "no C++ compiler was found; unpack a GCC for Windows, such as the WinLibs build of MinGW-w64, "
@@ -346,11 +362,102 @@ def writable(made):
         pass
 
 
+def host_name(platform=sys.platform):
+    """The file name of the test host on a system."""
+    return "odrig_host.exe" if platform == "win32" else "odrig_host"
+
+
+def quiet(command, env=None):
+    """Runs one step without showing it, and says whether it ended well."""
+    try:
+        return subprocess.run([str(word) for word in command], cwd=CORE, env=env, capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+def checks(toolchain, platform=sys.platform):
+    """`(what they check, flags)`: the checks for faults at run time the test host is built
+    with. For a GNU-style compiler it is the first set of `GNU_CHECKS` with which a small
+    program can be built and run."""
+    if toolchain.kind == "msvc":
+        return MICROSOFT_CHECKS
+    folder = BUILD / "probe"
+    folder.mkdir(parents=True, exist_ok=True)
+    written(folder / "probe.cpp", PROBE)
+    program = f"build/probe/{'probe.exe' if platform == 'win32' else 'probe'}"
+    for what, flags in GNU_CHECKS:
+        (CORE / program).unlink(missing_ok=True)
+        if quiet([toolchain.cxx, *flags, *GNU_DEBUG, "build/probe/probe.cpp", "-o", program], toolchain.env) and quiet([CORE / program], toolchain.env):
+            return what, flags
+    return GNU_CHECKS[-1]
+
+
+def checked_command(toolchain, source, flags):
+    """`(command, object)` for the second compilation of a source of the core, the one the
+    test host links, with the checks."""
+    name = source[: -len(".cpp")]
+    if toolchain.kind == "msvc":
+        made = f"build/checked/{name}.obj"
+        return [toolchain.cxx, *MICROSOFT_CHECKED_FLAGS, *flags, "/c", f"src/{source}", f"/Fo{made}"], made
+    made = f"build/checked/{name}.o"
+    return [toolchain.cxx, *GNU_FLAGS, *flags, *GNU_DEBUG, "-c", f"src/{source}", "-o", made], made
+
+
+def host_command(toolchain, source, flags):
+    """`(command, object)` for one source of the test host."""
+    name = source[: -len(".cpp")]
+    if toolchain.kind == "msvc":
+        made = f"build/host/{name}.obj"
+        return [toolchain.cxx, *MICROSOFT_HOST_FLAGS, *flags, "/c", f"{HOST_SOURCES}/{source}", f"/Fo{made}"], made
+    made = f"build/host/{name}.o"
+    return [toolchain.cxx, "-std=c++17", *WARNINGS, *flags, *GNU_DEBUG, "-Iinclude", "-Isrc", "-c", f"{HOST_SOURCES}/{source}", "-o", made], made
+
+
+def host_link(toolchain, objects, flags, platform=sys.platform):
+    """`(command, program)` for the test host."""
+    made = f"build/{host_name(platform)}"
+    if toolchain.kind == "msvc":
+        return [toolchain.nm, "/nologo", f"/OUT:{made}", *objects], made
+    carried = ("-static",) if platform == "win32" else ()
+    return [toolchain.cxx, *flags, *GNU_DEBUG, *carried, "-o", made, *objects], made
+
+
+def build_host(toolchain):
+    """Builds the test host: the sources of `tests/core/host/` and a second compilation of
+    the core's sources, both with the checks."""
+    for folder in ("checked", "host"):
+        (BUILD / folder).mkdir(parents=True, exist_ok=True)
+    record(toolchain)
+    what, flags = checks(toolchain)
+    print(f"checks: {what}", flush=True)
+    written(BUILD / "checks.txt", " ".join(flags) + "\n")
+    host_sources = sorted(path.name for path in (CORE / HOST_SOURCES).glob("*.cpp"))
+    host_headers = sorted(f"{HOST_SOURCES}/{path.name}" for path in (CORE / HOST_SOURCES).glob("*.h"))
+    steps = [(needed_by(source), *checked_command(toolchain, source, flags)) for source in sources()]
+    steps += [([f"{HOST_SOURCES}/{source}", *host_headers, *needed_by(source)[1:]], *host_command(toolchain, source, flags)) for source in host_sources]
+    all_started([command for needed, command, made in steps if stale(made, [*needed, "build/checks.txt"])], toolchain.env)
+    objects = [made for _, _, made in steps]
+    command, made = host_link(toolchain, objects, flags)
+    if stale(made, objects):
+        started(command, toolchain.env)
+    return made
+
+
+def test(toolchain):
+    """Builds the static library and the test host, and runs the suite of `tests/core/`
+    with the Python that runs this script. Returns the status of the suite."""
+    build_static(toolchain)
+    build_host(toolchain)
+    command = [sys.executable, "-m", "unittest", "discover", "-s", "tests/core", "-t", "."]
+    print(" ".join(["python", *command[1:]]), flush=True)
+    return subprocess.run(command, cwd=ROOT).returncode
+
+
 def clean():
     shutil.rmtree(BUILD, ignore_errors=True)
 
 
-TARGETS = {"shared": build_shared}
+TARGETS = {"shared": build_shared, "test": test}
 
 
 def parser():
@@ -358,7 +465,7 @@ def parser():
         prog="python core/build.py",
         description="Builds the core without GNU Make: the static library, or what the word names.",
     )
-    made.add_argument("target", metavar="TARGET", nargs="?", choices=sorted([*TARGETS, "clean"]), help="shared: the shared library the emulator loads; clean: removes core/build/")
+    made.add_argument("target", metavar="TARGET", nargs="?", choices=sorted([*TARGETS, "clean"]), help="shared: the shared library the emulator loads; test: the test host, and the suite of tests/core; clean: removes core/build/")
     made.add_argument("--cxx", metavar="PROGRAM", help="the C++ compiler: g++, clang++ or cl, by name or by path")
     return made
 
@@ -370,11 +477,11 @@ def main(argv=None):
             clean()
             return 0
         toolchain = find(arguments.cxx)
-        TARGETS.get(arguments.target, build_static)(toolchain)
+        status = TARGETS.get(arguments.target, build_static)(toolchain)
     except Failure as failed:
         print(failed.line(), file=sys.stderr)
         return 1
-    return 0
+    return status if isinstance(status, int) else 0
 
 
 if __name__ == "__main__":

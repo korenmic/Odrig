@@ -11,7 +11,9 @@ import random
 import re
 import struct
 import subprocess
+import sys
 import tempfile
+import unittest
 
 from odrig import errors, jsonframes, mapping, odrg, pack, show
 from odrig.generators import dense, dvd_bounce, hello_world
@@ -19,16 +21,42 @@ from odrig.generators import dense, dvd_bounce, hello_world
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
 BUILD = CORE / "build"
-LIBRARY = BUILD / "libodrig_core.a"
-HOST = BUILD / "odrig_host"
+
+# macOS builds the core with `make`, every other system with the build script, which
+# writes down the toolchain it used.
+BY_MAKE = sys.platform == "darwin"
+TEST_COMMAND = "make -C core test" if BY_MAKE else "python core/build.py test"
+TOOLCHAIN = BUILD / "toolchain.json"
+
+
+def toolchain():
+    """The toolchain the core is built with: its kind, `gnu` or `msvc`, and its programs
+    `cxx`, `cc`, `ar` and `nm`. Where `make` builds, they are the ones the makefile takes
+    from the path."""
+    if not BY_MAKE and TOOLCHAIN.is_file():
+        return json.loads(TOOLCHAIN.read_text(encoding="utf-8"))
+    return {"kind": "gnu", "cxx": "c++", "cc": "cc", "ar": "ar", "nm": "nm"}
+
+
+def gnu(program):
+    """One program of a GNU-style toolchain, by its role. A test that needs one is skipped
+    where the core is built with Microsoft's compiler, which has no such program."""
+    used = toolchain()
+    if used["kind"] != "gnu":
+        raise unittest.SkipTest(f"the core is built with Microsoft's compiler, which has no program that takes the options of {program}")
+    return used[program]
+
+
+LIBRARY = BUILD / ("odrig_core.lib" if toolchain()["kind"] == "msvc" else "libodrig_core.a")
+HOST = BUILD / ("odrig_host.exe" if sys.platform == "win32" else "odrig_host")
 
 Result = collections.namedtuple("Result", "status out err")
 
 
 def built(path):
-    """The path of a file that `make -C core test` builds, or a failure that says so."""
+    """The path of a file that the test command builds, or a failure that says so."""
     if not path.exists():
-        raise AssertionError(f"{path} is not built; run the suite with `make -C core test`")
+        raise AssertionError(f"{path} is not built; run the suite with `{TEST_COMMAND}`")
     return path
 
 

@@ -256,8 +256,7 @@ class Emulator:
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
+                self.kill()
             for reader in self._readers:
                 reader.join(timeout=5)
             self.process.stdout.close()
@@ -266,6 +265,15 @@ class Emulator:
             if self._temporary is not None:
                 self._temporary.cleanup()
         return self._result
+
+    def kill(self):
+        """Ends the process at once. On Windows the interpreter of a virtual environment is
+        the child of the program that was started, so the whole tree is ended."""
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.process.pid)], capture_output=True)
+        else:
+            self.process.kill()
+        self.process.wait()
 
     def __enter__(self):
         return self
@@ -434,31 +442,16 @@ def js_shell():
     return [node, str(NODE_SHELL)]
 
 
-TOOLCHAIN = ROOT / "core" / "build" / "toolchain.json"
-
-
-def toolchain():
-    """What the build script wrote down about the toolchain it built the library with, or
-    `None` where `make` built it."""
-    return json.loads(TOOLCHAIN.read_text(encoding="utf-8")) if sys.platform != "darwin" and TOOLCHAIN.is_file() else None
-
-
 def c_compiler():
     """The C compiler that goes with the compiler the library was built with. A test that
     needs one is skipped where that is Microsoft's, which does not take the options of
     `cc`."""
-    used = toolchain()
-    if used is None:
-        return "cc"
-    if used["kind"] != "gnu":
-        raise unittest.SkipTest("the library was built with Microsoft's compiler, which does not take the options of cc")
-    return used["cc"]
+    return core_support.gnu("cc")
 
 
 def object_suffix():
     """How the name of an object file ends with the toolchain the library was built with."""
-    used = toolchain()
-    return ".obj" if used is not None and used["kind"] == "msvc" else ".o"
+    return ".obj" if core_support.toolchain()["kind"] == "msvc" else ".o"
 
 
 def dll_tables(path):

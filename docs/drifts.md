@@ -5346,3 +5346,42 @@ On the Windows computer the suite runs 443 tests, of which 15 are skipped.
 
 **Resolution.** `tests/emulator/support.py`; `tests/emulator/js/shell.js`; the test modules
 of `tests/emulator/` that the commit of seed 11 task 4 changes.
+
+## Seed 11: The core suite with the compilers of Windows
+
+**Question.** `make -C core test` builds the test host with the address and
+undefined-behaviour sanitizers and the suite reads the library with `nm -m` of macOS. What
+does `python core/build.py test` build on Windows, and what does the suite read?
+
+**Answer.**
+
+- GCC for Windows has no run-time library for either sanitizer. The build script takes the
+  first set of checks with which a small program can be built and run: the two sanitizers
+  where they are; then the undefined-behaviour checks as traps, which need no library,
+  with the stack protector and the assertions of the standard library; then none. It
+  prints the line `checks: <what it took>`. On the Windows computer, with GCC 16.1 of
+  WinLibs, that is the second set. A fault of memory that only the address check finds is
+  therefore found on macOS, not on Windows.
+- With Microsoft's compiler the test host is built with `/RTC1 /GS /sdl`. Its address
+  check is not used: the program then needs a DLL of the compiler, which is found only
+  inside the compiler's own environment.
+- The test host needs three calls of Windows: memory with a wider alignment from
+  `_aligned_malloc`, standard input and output as bytes, and a backslash taken as a
+  separator of a path.
+- The compiled core refers to `strlen` when GCC builds it, though no source calls it: GCC
+  puts it in the place of a loop that looks for the end of a text. `strlen` joins the list
+  of names the core may refer to. It takes no memory, does no input or output and reads no
+  clock. `docs/core.md` said the core refers only to routines that copy, fill and compare
+  memory: that sentence now names this one too. This is a change to a document that
+  defines the project, and it holds until the owner rules otherwise.
+- Where `nm` gives a letter for the kind of a name, the suite reads that form and puts an
+  underscore in front of every name, so that the list of allowed names is one list. With
+  Microsoft's compiler the ten tests that need a GNU-style `nm`, `ar`, `cc` or `c++` are
+  skipped.
+
+On the Windows computer `python core/build.py test` runs 246 tests, all of which pass with
+GCC; with `--cxx cl`, 246 with 10 skipped.
+
+**Resolution.** `core/build.py`: `checks`, `build_host` and `test`. `tests/core/host/`.
+`tests/core/support.py`, `tests/core/test_build.py`, `tests/core/allowed_symbols.txt`.
+`docs/core.md`, the second paragraph.
