@@ -1,0 +1,10 @@
+{
+  "number": 11,
+  "slug": "11-p0-emulator-and-tools-on-windows",
+  "state": "remaining",
+  "title": "Emulator and tools on Windows",
+  "priority": "P0",
+  "addedAt": "2026-10-12T03:12:17+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Make the converter, the emulator and the command tool work on Windows from a fresh clone: build the core there, a local TCP port in place of the virtual serial port, serial access by COM name; implemented and verified on the Windows computer."
+}
