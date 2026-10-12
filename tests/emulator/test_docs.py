@@ -101,15 +101,15 @@ class EmulatorDocument(unittest.TestCase):
         text = section(self.text, "The command tool")
         given = [line for line in blocks(text) if line.startswith("python -m odrigctl ") and "(" not in line]
         made = cli.parser()
-        sent = {"--port": set(), "--http": set()}
+        sent = {"--port": set(), "--tcp": set(), "--http": set()}
         for line in given:
             arguments = made.parse_args(shlex.split(line)[3:])
-            transport = "--port" if arguments.port is not None else "--http"
+            transport = "--port" if arguments.port is not None else "--tcp" if arguments.tcp is not None else "--http"
             sent[transport].add(cli.command_line(made, arguments).decode("ascii").split()[0])
-        self.assertEqual(sent["--port"], set(cli.COMMANDS))
-        self.assertEqual(sent["--http"], set(cli.COMMANDS))
+        for transport in sent:
+            self.assertEqual(sent[transport], set(cli.COMMANDS), transport)
         for command, takes in cli.COMMANDS.items():
-            synopsis = f"python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] {command}" + (f" {takes}" if takes else "")
+            synopsis = f"python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] {command}" + (f" {takes}" if takes else "")
             self.assertIn(synopsis, text)
         for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (3, "error: unreachable: <detail>")):
             self.assertRegex(text, rf"(?m)^\| {status} \| .*{re.escape(meaning)}")

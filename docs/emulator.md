@@ -548,16 +548,16 @@ send for 15 seconds is sent the comment line `: keep-alive`.
 ## The command tool
 
 `odrigctl` sends the commands of [commands.md](commands.md) to the emulator or to the
-board, through a serial port or over HTTP. It is a second small Python package at the
-repository root, uses only the Python standard library, and treats the two targets alike:
-only the port name or the address says which one is meant.
+board, through a serial port, over TCP or over HTTP. It is a second small Python package
+at the repository root, uses only the Python standard library, and treats the two targets
+alike: only the port name or the address says which one is meant.
 
 ```
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] play ID
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] on
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] off
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] brightness N
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] play ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] on
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -569,6 +569,17 @@ python -m odrigctl --port build/emulator/serial on
 python -m odrigctl --port build/emulator/serial off
 python -m odrigctl --port build/emulator/serial brightness 40
 python -m odrigctl --port build/emulator/serial status
+```
+
+Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
+lines on Windows:
+
+```
+python -m odrigctl --tcp 127.0.0.1:8601 play 2
+python -m odrigctl --tcp 127.0.0.1:8601 on
+python -m odrigctl --tcp 127.0.0.1:8601 off
+python -m odrigctl --tcp 127.0.0.1:8601 brightness 40
+python -m odrigctl --tcp 127.0.0.1:8601 status
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -605,16 +616,24 @@ The tool prints the reply line to standard output:
   line that is a JSON object with a member `ok`; every other line, such as a boot message,
   is ignored. A port without modem lines, which the emulator's is, refuses the two requests,
   and the tool goes on.
+- `--port NAME` on Windows: the name is that of a real serial port, such as `COM3`. The
+  tool opens it through the system's own library, lowers RTS before it lowers DTR, and
+  then sets 115200 baud, 8 data bits, no parity and one stop bit, with DTR and RTS left
+  low, so that opening the port again raises neither. Windows has no virtual serial port:
+  the emulator is reached there with `--tcp` or `--http`.
+- `--tcp ADDRESS`: `host:port`; the port has to be given. The tool connects, sends the
+  line and takes the first received line that is a reply, as through a serial port.
 - `--http ADDRESS`: `host` or `host:port`, with or without `http://` in front and a `/` at
   the end; without a port it is 80. The tool sends `POST http://ADDRESS/odrig` with the line
   as the body and the content type `application/octet-stream`, and takes the body of a
   response with status 200 as the reply. Any other status counts as not reached.
 - The options may stand before or after the command.
 
-Another program can use the two exchanges directly: `odrigctl.client.serial_exchange(port,
-data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` return the reply
-or raise `Unreachable`. `serial_exchange` takes a fourth argument, a function that says
-which received line is the answer, for a target whose answer is not a reply of
+Another program can use the three exchanges directly: `odrigctl.client.serial_exchange(port,
+data, timeout)`, `odrigctl.client.tcp_exchange(address, data, timeout)` and
+`odrigctl.client.http_exchange(address, line, timeout)` return the reply or raise
+`Unreachable`. `serial_exchange` and `tcp_exchange` take a fourth argument, a function that
+says which received line is the answer, for a target whose answer is not a reply of
 [commands.md](commands.md).
 
 ## Record mode

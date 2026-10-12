@@ -271,7 +271,7 @@ class Usage(unittest.TestCase):
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--http", "--timeout"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout"})
 
 
 class StandIn:

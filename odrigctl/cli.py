@@ -26,14 +26,23 @@ def _seconds(text):
     return seconds
 
 
+def _lines_address(text):
+    try:
+        client.tcp_address(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not host:port") from None
+    return text
+
+
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m odrigctl",
-        description="Sends one command to a target, over its serial port or over HTTP, and prints the reply.",
+        description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply.",
         epilog="Commands: play ID, on, off, brightness N, status. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
+    target.add_argument("--tcp", metavar="ADDRESS", type=_lines_address, help="the address of a target that takes lines over TCP: host:port")
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for the reply (default: 2)")
     made.add_argument("command", metavar="COMMAND", choices=sorted(COMMANDS), help="play, on, off, brightness or status")
@@ -61,6 +70,8 @@ def main(argv=None):
     try:
         if arguments.port is not None:
             reply = client.serial_exchange(arguments.port, line, arguments.timeout)
+        elif arguments.tcp is not None:
+            reply = client.tcp_exchange(arguments.tcp, line, arguments.timeout)
         else:
             reply = client.http_exchange(arguments.http, line, arguments.timeout)
             if not client.is_reply(reply):

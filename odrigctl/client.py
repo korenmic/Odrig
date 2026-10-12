@@ -1,13 +1,21 @@
-"""One exchange with a target: a line out and its reply back, over serial or over HTTP."""
+"""One exchange with a target: a line out and its reply back, over serial, over TCP or
+over HTTP."""
 
-import fcntl
 import http.client
 import json
 import os
 import select
+import socket
 import struct
-import termios
 import time
+
+from . import winserial
+
+try:
+    import fcntl
+    import termios
+except ImportError:
+    fcntl = termios = None
 
 SETTLE_SECONDS = 0.2
 DISCARD_SECONDS = 0.1
@@ -85,41 +93,118 @@ def _write(descriptor, data, seconds):
             select.select([], [descriptor], [], left)
 
 
+class _Posix:
+    """A serial port of a system that has `termios`, as an exchange uses it."""
+
+    def __init__(self, port):
+        self._descriptor = _open(port)
+
+    def received(self, seconds):
+        return _received(self._descriptor, seconds)
+
+    def write(self, data, seconds):
+        _write(self._descriptor, data, seconds)
+
+    def close(self):
+        os.close(self._descriptor)
+
+
+def _serial(port):
+    """Opens a serial port in the way of this system."""
+    not_serial = () if termios is None else (termios.error,)
+    try:
+        return winserial.Port(port) if termios is None else _Posix(port)
+    except OSError as error:
+        raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
+    except not_serial:
+        raise Unreachable(f"{port}: this is not a serial port") from None
+
+
+def _first(pieces, accept):
+    """The first line among received pieces that `accept` takes, without its line end, or
+    `None` when the pieces end before one came."""
+    waiting = b""
+    for piece in pieces:
+        waiting += piece
+        while b"\n" in waiting:
+            line, waiting = waiting.split(b"\n", 1)
+            line = line.rstrip(b"\r")
+            if accept(line):
+                return line
+    return None
+
+
 def serial_exchange(port, data, timeout, accept=is_reply):
     """Sends bytes to a serial port and returns the first received line that `accept`
     takes, without its line end. Every other line is dropped.
 
     What was waiting in the port when it was opened is discarded first.
     """
-    try:
-        descriptor = _open(port)
-    except OSError as error:
-        raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-    except termios.error:
-        raise Unreachable(f"{port}: this is not a serial port") from None
+    opened = _serial(port)
     try:
         try:
             time.sleep(SETTLE_SECONDS)
-            for _ in _received(descriptor, DISCARD_SECONDS):
+            for _ in opened.received(DISCARD_SECONDS):
                 pass
-            _write(descriptor, data, timeout)
+            opened.write(data, timeout)
+            line = _first(opened.received(timeout), accept)
         except OSError as error:
             raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-        waiting = b""
-        try:
-            for piece in _received(descriptor, timeout):
-                waiting += piece
-                while b"\n" in waiting:
-                    line, waiting = waiting.split(b"\n", 1)
-                    line = line.rstrip(b"\r")
-                    if accept(line):
-                        return line
-        except OSError as error:
-            raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-        raise Unreachable(f"{port}: no reply within {timeout:g} seconds")
+        if line is None:
+            raise Unreachable(f"{port}: no reply within {timeout:g} seconds")
+        return line
     finally:
-        os.close(descriptor)
+        opened.close()
 
+
+def tcp_address(address):
+    """`(host, port)` of an address written as `host:port`, or `ValueError`."""
+    host, colon, port = address.rpartition(":")
+    host = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    if not colon or not host or not (port.isascii() and port.isdigit()) or not 0 < int(port) < 65536:
+        raise ValueError(f"{address!r} is not host:port")
+    return host, int(port)
+
+
+def _from(connection, seconds):
+    """What a connection sends within a length of time, in pieces as they come. It ends
+    early when the other end closes."""
+    deadline = time.monotonic() + seconds
+    while True:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        connection.settimeout(left)
+        try:
+            piece = connection.recv(65536)
+        except TimeoutError:
+            return
+        if not piece:
+            return
+        yield piece
+
+
+def tcp_exchange(address, data, timeout, accept=is_reply):
+    """Sends bytes to a target that takes lines over TCP, at `host:port`, and returns the
+    first received line that `accept` takes, without its line end. Every other line is
+    dropped."""
+    try:
+        connection = socket.create_connection(tcp_address(address), timeout=timeout)
+    except ValueError as error:
+        raise Unreachable(str(error)) from None
+    except OSError as error:
+        raise Unreachable(f"{address}: {error.strerror or type(error).__name__}") from None
+    try:
+        try:
+            connection.sendall(data)
+            line = _first(_from(connection, timeout), accept)
+        except OSError as error:
+            raise Unreachable(f"{address}: {error.strerror or type(error).__name__}") from None
+        if line is None:
+            raise Unreachable(f"{address}: no reply within {timeout:g} seconds")
+        return line
+    finally:
+        connection.close()
 
 def http_exchange(address, line, timeout):
     """Sends one line as the body of `POST http://ADDRESS/odrig` and returns the reply,

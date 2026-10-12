@@ -56,7 +56,7 @@ Rules for every task:
     Windows.
   - Requirements 2.1, 2.3 and 3.
 
-- [ ] 3. The command tool: TCP, and a real serial port on Windows
+- [x] 3. The command tool: TCP, and a real serial port on Windows
   - `odrigctl/client.py` gets `tcp_exchange` and picks the serial port of the system.
     `odrigctl/cli.py` gets `--tcp`. Create `odrigctl/winserial.py`.
   - `tests/emulator/test_tool_tcp.py`: every command over TCP against the emulator, the
