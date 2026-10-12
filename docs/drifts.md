@@ -7102,3 +7102,18 @@ new image all the same.
 **Resolution.** `docs/firmware.md`, "Verified on the board", S4;
 `firmware/usermod/wled/odrig_platform.h`; `tests/firmware/test_usermod_files.py`,
 `test_the_shared_sources_reach_their_platform_through_the_platform_header`.
+
+## Seed 12: The channel, a hidden name, and which member counts
+
+**Question.** The design gave the network channel 1 where the stored settings name none,
+and did not say what a hidden name or a member named twice does.
+
+**Answer.** The reader follows WLED, so that one set of stored settings gives one
+network whichever firmware runs. The channel is `ap.chan` when it is a whole number from
+1 to 13 and 6 otherwise: 6 is what WLED takes, not 1. The network hides its name when
+`ap.hide` is a whole number above 0, as WLED's does. Of a member that is named twice the
+first counts. A file that is not one JSON object counts as absent as a whole: the reader
+walks all of it before it takes anything.
+
+**Resolution.** `firmware/standalone/src/settings.h` and `settings.cpp`;
+`tests/firmware/test_standalone_settings.py`.

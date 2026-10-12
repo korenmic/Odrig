@@ -87,7 +87,7 @@ Rules for every task:
     it passes as before.
   - Requirements: 1.4, 1.6, 10.5
 
-- [ ] 3. The stored settings
+- [x] 3. The stored settings
   - `firmware/standalone/src/settings.h` and `settings.cpp`, without Arduino.
   - The host program for the tests, and its build in `tests/firmware/`.
   - Tests: the cases the design's "Tests without the board" lists under "Settings".
