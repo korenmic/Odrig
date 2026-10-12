@@ -48,7 +48,7 @@ Rules for every task:
   that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The settings file and its checks
+- [x] 1. The settings file and its checks
   - Create `firmware/wifi.json` as the design gives it, with the name `odrig` and the
     owner's password from the hand-over. Without a password in the hand-over the task is
     blocked: record that and stop. Do not make one up.

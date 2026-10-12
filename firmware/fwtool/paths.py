@@ -20,6 +20,7 @@ STORAGE = WORK / "storage"
 
 PATCHES = FIRMWARE / "patches"
 REQUIREMENTS = FIRMWARE / "requirements.txt"
+WIFI_SETTINGS = FIRMWARE / "wifi.json"
 
 # The factory backup of the board. Nothing is ever written, moved or deleted in it.
 PROTECTED = ROOT / "esp32-backup"
