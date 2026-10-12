@@ -2,9 +2,9 @@
   "number": 9,
   "slug": "09-p1-operators-app-for-android",
   "state": "remaining",
-  "title": "Operators' app for Android",
+  "title": "Operators' app for Android: command and control",
   "priority": "P1",
   "addedAt": "2026-10-11T14:58:22+03:00",
   "addedCommit": "pending-local",
-  "summary": "Android app built with Capacitor: status, play, on and off, brightness, list, remove, and on-phone conversion with chunked upload and progress."
+  "summary": "The first part of the operators' app, built with Capacitor: it shows what plays, lists the installed animations by id and file name, plays one, goes back to the playlist, switches the LEDs and sets the brightness."
 }

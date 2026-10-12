@@ -7117,3 +7117,23 @@ walks all of it before it takes anything.
 
 **Resolution.** `firmware/standalone/src/settings.h` and `settings.cpp`;
 `tests/firmware/test_standalone_settings.py`.
+
+## Seed 09 after the owner split the app
+
+**Question.** Seed 09 was the whole operators' app, and its spec, thirteen tasks, was
+written for all of it. On 2026-10-12 the owner split the app: command and control first,
+converting and uploading second. No task of seed 09 had been done. What becomes of the
+seed and of its spec?
+
+**Answer.** Seed 09 keeps its number and becomes the first part, with a new text; its
+scope may change because none of its tasks was done. The second part is a new seed, 17.
+The reply to `status` with the canvas size goes with the second part: only converting
+needs it. The spec of seed 09 stays in its folder until the seed is taken through its
+spec again, and its three pages say at their top that they describe the whole app and
+are not to be implemented from. A beginning of the old first task, the canvas size in
+`status`, was set aside and is not in the repository.
+
+**Resolution.** `project-seeds/09-p1-operators-app-for-android/seed.md`;
+`project-seeds/17-p2-operators-app-converting-and-uploading/`;
+`docs/specs/09-p1-operators-app-for-android/`, the note at the top of each page;
+`AGENTS.md`, "What is coming".

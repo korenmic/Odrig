@@ -1,5 +1,10 @@
 # Requirements: Operators' app for Android (seed 09)
 
+> This spec was written on 2026-10-12 for the whole app, before the owner split the app
+> into two parts. Seed 09 is now the first part, command and control, and seed 17 the
+> second, converting and uploading. The spec is written again for the first part before
+> any of its tasks is done. Do not implement from it as it stands.
+
 Source seed: `project-seeds/09-p1-operators-app-for-android/seed.md`. It depends on seed 06,
 for the converter library the app runs on the phone, on seed 07, for the commands that
 list, remove and upload, and on seed 08, for the network the phone joins. None of the three
