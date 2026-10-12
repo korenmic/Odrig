@@ -9,6 +9,7 @@ exact fractions of milliseconds.
 """
 
 import os
+import struct
 from fractions import Fraction
 
 from . import errors, jsonframes
@@ -188,7 +189,7 @@ def _gif_frames(path):
                 end = start + Fraction(delay)
                 yield start, end, _over_black(numpy.asarray(image.convert("RGBA")))
                 start = end
-    except (OSError, EOFError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
+    except (OSError, EOFError, ValueError, SyntaxError, IndexError, struct.error, Image.DecompressionBombError) as error:
         raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the GIF cannot be decoded: {error}") from None
 
 

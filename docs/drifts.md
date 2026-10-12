@@ -6160,3 +6160,20 @@ a worktree does not have, and anything on Windows or Linux.
 folder; `tests/walkthrough/test_fresh_copy.py`, `tests/walkthrough/support.py`;
 `tests/converter/test_docs.py`, "the document of the reference has the generators for both
 kinds and for the target".
+
+## Seed 13: The bytes of whole files, compared once and not pinned
+
+**Question.** The design asks for a test that a whole video and a whole GIF give the same
+JSON frames bytes as "a copy of the expected output kept from before the change". The exact
+pixel values of a decoded video depend on the build of the decoder, so bytes kept in the
+repository would fail on another computer for a reason that has nothing to do with this
+seed.
+
+**Answer.** The comparison was made once, by running the tool of the commit before the seed
+and the tool after task 3 on the same whole video and the same whole GIF: the two JSON
+frames files are byte-identical for each. No bytes are pinned in a test. The existing import
+tests, which recognise each frame by the nearest of the fixed colours, keep covering whole
+files.
+
+**Resolution.** Seed 13 `tasks.md`, task 3; the commit message of task 3 records the
+comparison.

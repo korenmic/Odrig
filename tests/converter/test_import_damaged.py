@@ -62,3 +62,33 @@ class Damaged(unittest.TestCase):
         damaged = self.folder / "bad-title.mp4"
         damaged.write_bytes(data)
         self.assertIn("the video cannot be decoded", self.refused(damaged))
+
+    def cut_gif(self, length):
+        whole = self.folder / "whole.gif"
+        if not whole.exists():
+            media_fixtures.write_gif(whole, C[:4], [100, 100, 100, 100])
+        cut = self.folder / f"cut-{length}.gif"
+        cut.write_bytes(whole.read_bytes()[:length])
+        return cut, len(whole.read_bytes())
+
+    def test_a_gif_cut_where_pillow_runs_out_of_a_list_is_refused(self):
+        self.assertIn("the GIF cannot be decoded", self.refused(self.cut_gif(78)[0]))
+
+    def test_a_gif_cut_where_pillow_runs_out_of_bytes_to_unpack_is_refused(self):
+        self.assertIn("the GIF cannot be decoded", self.refused(self.cut_gif(86)[0]))
+
+    def test_a_gif_cut_after_any_number_of_bytes_is_read_or_refused(self):
+        length = self.cut_gif(1)[1]
+        self.assertEqual(length, 213)
+        output = self.folder / "swept.json"
+        read = 0
+        for size in range(1, length):
+            with self.subTest(size=size):
+                result = support.run("import", self.cut_gif(size)[0], output, "--mapping", LEGS_2)
+                if result.status == 0:
+                    self.assertEqual(support.run("check", output).status, 0)
+                    read += 1
+                else:
+                    self.assertEqual((result.status, result.out), (1, ""))
+                    self.assertTrue(result.err.startswith(REFUSED), result.err)
+        self.assertGreater(read, 0)

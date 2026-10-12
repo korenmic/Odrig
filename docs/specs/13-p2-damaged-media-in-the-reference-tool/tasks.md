@@ -18,7 +18,7 @@ with `.venv/bin/python -m unittest discover -s tests/converter -t .`.
   - `odrig/media.py`: catch `UnicodeDecodeError` in `_video_frames`.
   - Requirement 2.
 
-- [ ] 3. A GIF cut short is refused
+- [x] 3. A GIF cut short is refused
   - Add the tests of the GIF cut after 78 and after 86 bytes, and the sweep over every
     length. Against the unchanged tool: `IndexError` and `struct.error`.
   - `odrig/media.py`: catch `IndexError` and `struct.error` in `_gif_frames`.
