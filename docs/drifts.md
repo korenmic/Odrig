@@ -5245,3 +5245,14 @@ under `docs/`, names no remote, and several points of the new work it does not s
 **Resolution.** `agent/README.md` and the four pages beside it; `AGENTS.md`; `README.md`;
 `docs/decisions.md`, "Scope and process" and the change log; `.gitattributes`;
 `tests/onboarding/` and `tests/walkthrough/`; seed 10 `tasks.md`, task 6.
+
+## Seed 02: The core's test command with another Python, settled
+
+**Question.** `docs/core.md` gave `make -C core test PYTHON=.venv/bin/python`, which fails
+because `make` runs inside `core/` and looks for the interpreter there. Should the makefile
+or the document change?
+
+**Answer.** The document. The interpreter is named by its full path. Run from the top of the
+repository, `make -C core test PYTHON="$PWD/.venv/bin/python"` passes all 246 tests.
+
+**Resolution.** `docs/core.md`, the test command.

@@ -26,10 +26,11 @@ Run from the repository root.
 | `make -C core bench` | Builds `core/build/odrig_bench`, has the converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
 | `make -C core clean` | Removes `core/build/`. | |
 
-The test command uses `python3`. Another Python is named on the command line:
+The test command uses `python3`. Another Python is named on the command line, by its full
+path, because `make` runs inside `core/`:
 
 ```
-make -C core test PYTHON=.venv/bin/python
+make -C core test PYTHON="$PWD/.venv/bin/python"
 ```
 
 The suite is every `test_*.py` file in `tests/core/`, found by discovery. It drives the
