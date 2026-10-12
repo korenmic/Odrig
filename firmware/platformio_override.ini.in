@@ -17,6 +17,7 @@ build_flags = ${common.build_flags} ${esp32s3.build_flags}
   -DBOARD_HAS_PSRAM
   -D WLED_DISABLE_ADALIGHT
   -I@REPO@/core/include
+  -I@REPO@/firmware/usermod/wled
 
 [env:odrig_probe]
 extends = env:odrig

@@ -1,6 +1,6 @@
 #include "odrig_files.h"
 
-#include "wled.h"
+#include "odrig_platform.h"
 
 namespace {
 
@@ -82,8 +82,8 @@ void blocksFreed(size_t bytes) { usedBlocks -= std::min(usedBlocks, blocksOf(byt
 
 // The size of the file at a path, or 0 when there is none.
 size_t sizeAt(const char *path) {
-  if (!WLED_FS.exists(path)) return 0;
-  File file = WLED_FS.open(path, "r");
+  if (!ODRIG_FS.exists(path)) return 0;
+  File file = ODRIG_FS.open(path, "r");
   if (!file) return 0;
   const size_t size = file.isDirectory() ? 0 : file.size();
   file.close();
@@ -93,8 +93,8 @@ size_t sizeAt(const char *path) {
 // Asks the file system for its size and for the blocks in use.
 void askSpace() {
   const int64_t startUs = esp_timer_get_time();
-  spaceTotal = (uint32_t)WLED_FS.totalBytes();
-  usedBlocks = (uint32_t)(WLED_FS.usedBytes() / BLOCK_BYTES);
+  spaceTotal = (uint32_t)ODRIG_FS.totalBytes();
+  usedBlocks = (uint32_t)(ODRIG_FS.usedBytes() / BLOCK_BYTES);
   spaceAskedUs = (uint32_t)(esp_timer_get_time() - startUs);
   spaceKnown = true;
 }
@@ -136,10 +136,10 @@ int openNamed(void *, const char *name) {
   strcpy(path, FOLDER);
   strcat(path, name);
   if (openFile) openFile.close();
-  openFile = WLED_FS.open(path, "r");
+  openFile = ODRIG_FS.open(path, "r");
   if (openFile && !openFile.isDirectory()) return 1;
   if (openFile) openFile.close();
-  return WLED_FS.exists(path) ? -1 : 0;
+  return ODRIG_FS.exists(path) ? -1 : 0;
 }
 
 int32_t readSome(void *, uint8_t *buffer, size_t capacity) {
@@ -182,13 +182,13 @@ int beginFile(void *, const char *name) {
     if (writtenFile) writtenFile.close();
     writtenName[0] = 0;
     const size_t left = sizeAt(given);
-    if (WLED_FS.remove(given)) blocksFreed(left);
+    if (ODRIG_FS.remove(given)) blocksFreed(left);
   }
   if (!pathOf(name, path)) return -1;
   dropSecond(name);
   // A file that has the name is emptied.
   const size_t before = sizeAt(path);
-  writtenFile = WLED_FS.open(path, "w");
+  writtenFile = ODRIG_FS.open(path, "w");
   if (!writtenFile) return -1;
   blocksFreed(before);
   strcpy(writtenName, name);
@@ -213,7 +213,7 @@ int endFile(void *) {
   writtenFile.close();
   writtenName[0] = 0;
   // The file is whole when storage holds as many bytes as were given.
-  File whole = WLED_FS.open(path, "r");
+  File whole = ODRIG_FS.open(path, "r");
   if (!whole) return -1;
   const size_t size = whole.size();
   whole.close();
@@ -230,7 +230,7 @@ int renameFile(void *, const char *from, const char *to) {
   giveUpWritten(to);
   // The file that had the new name leaves storage.
   const size_t replaced = sizeAt(pathTo);
-  if (!WLED_FS.rename(pathFrom, pathTo)) return -1;
+  if (!ODRIG_FS.rename(pathFrom, pathTo)) return -1;
   blocksFreed(replaced);
   return 1;
 }
@@ -241,9 +241,9 @@ int removeFile(void *, const char *name) {
   if (!pathOf(name, path)) return -1;
   dropSecond(name);
   giveUpWritten(name);
-  if (!WLED_FS.exists(path)) return 0;
+  if (!ODRIG_FS.exists(path)) return 0;
   const size_t removed = sizeAt(path);
-  if (!WLED_FS.remove(path)) return -1;
+  if (!ODRIG_FS.remove(path)) return -1;
   blocksFreed(removed);
   return 1;
 }
@@ -266,7 +266,7 @@ int32_t readAt(void *, const char *name, uint32_t offset, uint8_t *buffer, size_
   if (!secondFile || strcmp(secondName, name) != 0) {
     if (secondFile) secondFile.close();
     secondName[0] = 0;
-    secondFile = WLED_FS.open(path, "r");
+    secondFile = ODRIG_FS.open(path, "r");
     if (!secondFile || secondFile.isDirectory()) {
       if (secondFile) secondFile.close();
       return -1;

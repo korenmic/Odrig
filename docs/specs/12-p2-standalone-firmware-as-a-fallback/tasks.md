@@ -72,7 +72,7 @@ Rules for every task:
     changed, fails and names the pin.
   - Requirements: 1.1, 1.3, 1.4, 1.5, 1.6, 5.1, 8.4
 
-- [ ] 2. The platform header: three files of the usermod compile for either firmware
+- [x] 2. The platform header: three files of the usermod compile for either firmware
   - `firmware/usermod/wled/odrig_platform.h`, `firmware/standalone/platform/odrig_platform.h`.
   - `odrig_files.cpp`, `odrig_serial.cpp` and `odrig_http.cpp` include `odrig_platform.h`
     and name the file system `ODRIG_FS`. `firmware/platformio_override.ini.in` gains the

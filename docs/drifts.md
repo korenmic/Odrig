@@ -7085,3 +7085,20 @@ up; and the libraries of the standalone project are kept in that project's own f
 under `build/firmware/standalone/`.
 
 **Resolution.** `firmware/fwtool/cli.py`, `parsed`; `tests/firmware/test_standalone.py`.
+
+## Seed 12: The WLED-based firmware after the platform header
+
+**Question.** Three sources of the usermod now include `odrig_platform.h` in place of
+`wled.h`. The design said the compiled code of the WLED-based firmware does not change.
+Its image has another SHA-256.
+
+**Answer.** The code did not change. The image before and the image after, built in the
+same work folder, differ in 65 bytes of 1,221,568: 32 bytes at `0xB0`, where the build
+keeps a hash of its own program file, and the checksum and the hash at the end of the
+image. The program file holds the names of the source files for a debugger, and one more
+header is named now. Every other byte is the same. The whole board suite was run on the
+new image all the same.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board", S4;
+`firmware/usermod/wled/odrig_platform.h`; `tests/firmware/test_usermod_files.py`,
+`test_the_shared_sources_reach_their_platform_through_the_platform_header`.

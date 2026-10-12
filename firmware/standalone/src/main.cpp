@@ -2,15 +2,19 @@
 // mounted and not formatted, twenty LED outputs of 180 LEDs, four on the RMT driver and
 // sixteen on the parallel driver, sent 50 times a second, and the USB serial port. It
 // answers the line `#probe` with what it found, as one line of JSON.
-#include <Arduino.h>
-#include <LittleFS.h>
 #include <NeoPixelBus.h>
+
+#include "odrig_platform.h"
 
 #include "driver/pcnt.h"
 #include "esp_heap_caps.h"
 #include "esp_rom_gpio.h"
 #include "esp_timer.h"
 #include "soc/pcnt_periph.h"
+
+// The web server that the shared HTTP transport registers its handler on. The trial does
+// not start it.
+AsyncWebServer server(80);
 
 namespace {
 

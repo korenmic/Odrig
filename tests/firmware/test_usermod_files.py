@@ -9,7 +9,12 @@ from . import FIRMWARE, ROOT
 USERMOD = FIRMWARE / "usermod"
 SOURCES = sorted(path for path in USERMOD.iterdir() if path.suffix in (".cpp", ".h"))
 CORE = ROOT / "core"
-ALLOWED_HEADERS = {"wled.h", "odrig_core.h", "stddef.h", "stdint.h"}
+ALLOWED_HEADERS = {"wled.h", "odrig_platform.h", "odrig_core.h", "stddef.h", "stdint.h"}
+# The sources that are compiled into the standalone firmware too. They reach their
+# platform through a header of which each firmware has its own.
+SHARED = ("odrig_files.cpp", "odrig_serial.cpp", "odrig_http.cpp")
+PLATFORM_HEADER = "odrig_platform.h"
+STANDALONE = FIRMWARE / "standalone"
 # The headers of the chip's own software that a source names: the USB unit behind the
 # port, which the port's driver does not let through; and, in the probe build, the pulse
 # counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
@@ -75,6 +80,38 @@ class Includes(unittest.TestCase):
         for path in SOURCES:
             for header in included(path):
                 self.assertIn(header, ALLOWED_HEADERS | own | ALLOWED_IN.get(path.name, set()), f"{path.name} includes {header}")
+
+    def test_the_shared_sources_reach_their_platform_through_the_platform_header(self):
+        for name in SHARED:
+            with self.subTest(source=name):
+                headers = included(USERMOD / name)
+                self.assertIn(PLATFORM_HEADER, headers)
+                self.assertNotIn("wled.h", headers)
+                self.assertNotRegex(text_of(USERMOD / name), r"\bWLED_FS\b|\bwled\.h\b")
+        for path in SOURCES:
+            if path.name not in SHARED:
+                self.assertNotIn(PLATFORM_HEADER, included(path), path.name)
+
+    def test_each_firmware_has_a_platform_header_of_its_own_and_none_lies_beside_the_sources(self):
+        self.assertFalse((USERMOD / PLATFORM_HEADER).exists())
+        wleds = (USERMOD / "wled" / PLATFORM_HEADER).read_text(encoding="utf-8")
+        self.assertIn('#include "wled.h"', wleds)
+        self.assertIn("#define ODRIG_FS WLED_FS", wleds)
+        own = (STANDALONE / "platform" / PLATFORM_HEADER).read_text(encoding="utf-8")
+        for expected in ("#include <Arduino.h>", "#include <LittleFS.h>", "#include <ESPAsyncWebServer.h>", "#define ODRIG_FS LittleFS", "extern AsyncWebServer server;"):
+            self.assertIn(expected, own)
+        self.assertNotIn("wled", own.lower())
+        override = (FIRMWARE / "platformio_override.ini.in").read_text(encoding="utf-8")
+        self.assertIn("-I@REPO@/firmware/usermod/wled", override)
+        project = (STANDALONE / "platformio.ini.in").read_text(encoding="utf-8")
+        self.assertLess(project.index("-I@REPO@/firmware/standalone/platform"), project.index("-I@REPO@/firmware/usermod"))
+        self.assertNotIn("firmware/usermod/wled", project)
+
+    def test_the_standalone_firmware_compiles_the_shared_sources_through_files_of_one_line(self):
+        for name in SHARED:
+            with self.subTest(source=name):
+                wrapper = STANDALONE / "src" / name.replace("odrig_", "shared_")
+                self.assertEqual(wrapper.read_text(encoding="utf-8").strip().splitlines()[-1], f'#include "../../usermod/{name}"')
 
     def test_the_port_is_named_only_where_it_is_handled(self):
         naming = {path.name for path in SOURCES if re.search(r"\bSerial\b", text_of(path))}
@@ -271,22 +308,22 @@ class Host(unittest.TestCase):
 
     def test_files_are_read_from_the_shows_folder_in_the_pieces_the_core_asks_for(self):
         self.assertIn('const char FOLDER[] = "/odrig/";', self.files)
-        self.assertIn('WLED_FS.open(path, "r")', self.files)
+        self.assertIn('ODRIG_FS.open(path, "r")', self.files)
         self.assertIn("openFile.read(buffer, capacity)", self.files)
 
     def test_files_are_written_renamed_and_removed_in_one_source_only(self):
-        changing = r'WLED_FS\.(remove|rename)\b|\.open\([^)]*"(w|a|r\+)[^"]*"\)'
+        changing = r'ODRIG_FS\.(remove|rename)\b|\.open\([^)]*"(w|a|r\+)[^"]*"\)'
         users = {path.name for path in SOURCES if re.search(changing, text_of(path))}
         self.assertEqual(users, {"odrig_files.cpp"})
-        users = {path.name for path in SOURCES if re.search(r"\bWLED_FS\b", text_of(path))}
+        users = {path.name for path in SOURCES if re.search(r"\bODRIG_FS\b", text_of(path))}
         self.assertEqual(users, {"odrig_files.cpp"})
         for path in SOURCES:
             text = text_of(path)
-            self.assertNotRegex(text, r"WLED_FS\.(mkdir|rmdir|format)\b", path.name)
+            self.assertNotRegex(text, r"ODRIG_FS\.(mkdir|rmdir|format)\b", path.name)
             self.assertNotRegex(text, r"serializeConfig|writeObjectToFile|doSerializeConfig|configNeedsWrite", path.name)
 
     def test_every_path_given_to_the_file_system_is_in_the_shows_folder(self):
-        calls = re.findall(r"WLED_FS\.(open|exists|remove|rename)\(([^)]*)\)", self.files)
+        calls = re.findall(r"ODRIG_FS\.(open|exists|remove|rename)\(([^)]*)\)", self.files)
         self.assertGreaterEqual(len(calls), 8)
         paths = set()
         for _, arguments in calls:
@@ -325,7 +362,7 @@ class Host(unittest.TestCase):
     def test_a_file_is_whole_when_storage_holds_the_bytes_that_were_given(self):
         body = self.files[self.files.index("int endFile(void *) {"):]
         body = body[:body.index("\n}\n")]
-        steps = [body.index(step) for step in ("writtenFile.close();", 'File whole = WLED_FS.open(path, "r");', "whole.size();", "return size == writtenBytes ? 1 : -1;")]
+        steps = [body.index(step) for step in ("writtenFile.close();", 'File whole = ODRIG_FS.open(path, "r");', "whole.size();", "return size == writtenBytes ? 1 : -1;")]
         self.assertEqual(steps, sorted(steps))
 
     def test_a_rename_and_a_removal_first_close_the_second_reader_and_the_writer(self):
@@ -333,29 +370,29 @@ class Host(unittest.TestCase):
             body = self.files[self.files.index(f"int {function}(void *"):]
             body = body[:body.index("\n}\n")]
             for name in names:
-                self.assertLess(body.index(f"dropSecond({name});"), body.index("WLED_FS."), function)
-                self.assertLess(body.index(f"giveUpWritten({name});"), body.index("WLED_FS."), function)
+                self.assertLess(body.index(f"dropSecond({name});"), body.index("ODRIG_FS."), function)
+                self.assertLess(body.index(f"giveUpWritten({name});"), body.index("ODRIG_FS."), function)
         removal = self.files[self.files.index("int removeFile(void *"):]
-        self.assertIn("if (!WLED_FS.exists(path)) return 0;", removal[:removal.index("\n}\n")])
+        self.assertIn("if (!ODRIG_FS.exists(path)) return 0;", removal[:removal.index("\n}\n")])
 
     def test_the_space_is_asked_of_the_file_system_once_and_kept_up_from_the_storage_calls(self):
-        self.assertEqual((self.files.count("WLED_FS.totalBytes()"), self.files.count("WLED_FS.usedBytes()")), (1, 1))
+        self.assertEqual((self.files.count("ODRIG_FS.totalBytes()"), self.files.count("ODRIG_FS.usedBytes()")), (1, 1))
         asked = self.files[self.files.index("void askSpace() {"):]
         asked = asked[:asked.index("\n}\n")]
-        for expected in ("WLED_FS.totalBytes()", "WLED_FS.usedBytes() / BLOCK_BYTES", "spaceKnown = true;"):
+        for expected in ("ODRIG_FS.totalBytes()", "ODRIG_FS.usedBytes() / BLOCK_BYTES", "spaceKnown = true;"):
             self.assertIn(expected, asked)
         self.assertEqual(self.files.count("askSpace();"), 1)
         self.assertIn("odrig_host OdrigFiles::host() {\n  if (!spaceKnown) askSpace();", self.files)
         told = self.files[self.files.index("int tellSpace(void *"):]
         told = told[:told.index("\n}\n")]
-        self.assertNotIn("WLED_FS", told)
+        self.assertNotIn("ODRIG_FS", told)
         self.assertNotIn("Timed", told)
         self.assertIn("(uint64_t)usedBlocks * BLOCK_BYTES", told)
         self.assertIn("const size_t BLOCK_BYTES = 4096;", self.files)
         self.assertIn("const size_t INLINE_BYTES = 512;", self.files)
         # What comes to storage and what leaves it, in each storage call.
         kept_up = {
-            "beginFile": ("if (WLED_FS.remove(given)) blocksFreed(left);", "blocksFreed(before);"),
+            "beginFile": ("if (ODRIG_FS.remove(given)) blocksFreed(left);", "blocksFreed(before);"),
             "addBytes": ("blocksFreed(writtenBytes);", "blocksTaken(writtenBytes);"),
             "renameFile": ("const size_t replaced = sizeAt(pathTo);", "blocksFreed(replaced);"),
             "removeFile": ("const size_t removed = sizeAt(path);", "blocksFreed(removed);"),

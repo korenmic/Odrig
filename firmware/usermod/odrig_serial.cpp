@@ -1,6 +1,6 @@
 #include "odrig_serial.h"
 
-#include "wled.h"
+#include "odrig_platform.h"
 
 #include "hal/usb_serial_jtag_ll.h"
 
