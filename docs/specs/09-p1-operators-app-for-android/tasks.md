@@ -1,5 +1,10 @@
 # Tasks: Operators' app for Android (seed 09)
 
+> This spec was written on 2026-10-12 for the whole app, before the owner split the app
+> into two parts. Seed 09 is now the first part, command and control, and seed 17 the
+> second, converting and uploading. The spec is written again for the first part before
+> any of its tasks is done. Do not implement from it as it stands.
+
 Seeds 06, 07 and 08 are implemented before these tasks start: the tasks use the library in
 `converter/lib/`, the content commands in the core, the emulator and the firmware, and the
 board's network `odrig`. Where the real code differs from what this spec's design relies

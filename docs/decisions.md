@@ -346,6 +346,16 @@ are in [format.md](format.md), "Measured sizes".
   prints what a board holds. With 0 the limiter is off, which the probe build showed on
   the board. The limit stays 850 while a strip is fed from the board's 3.3 V pin. The
   value for the installation is the owner's to set.
+- 2026-10-12: The owner ruled on what plays. All installed animations play as a playlist
+  by default. An animation repeats until at least 30 seconds have passed and then
+  finishes the loop it is in; a show can give it a repeat count and a maximum duration.
+  `on` stays a plain switch, and one new command, `play all`, goes back to the playlist.
+  After `play <id>` the playlist goes on with the animation after it. An animation is
+  called by its file name. This is seed 16 and is not built yet.
+- 2026-10-12: The owner split the operators' app into two parts. The first, seed 09, is
+  command and control: what plays, the list of animations, play, on and off. The second,
+  seed 17, is converting a video on the phone and uploading it, which is not the first
+  priority. Neither is built yet.
 - 2026-10-12: The converter, the core's build, the emulator and the command tool work on
   Windows 10 and 11, and their suites pass there (seed 11). The core is built there by a
   script in Python, `core/build.py`, with GCC, Clang or Microsoft's compiler; macOS keeps

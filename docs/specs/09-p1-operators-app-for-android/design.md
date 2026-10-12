@@ -1,5 +1,10 @@
 # Design: Operators' app for Android (seed 09)
 
+> This spec was written on 2026-10-12 for the whole app, before the owner split the app
+> into two parts. Seed 09 is now the first part, command and control, and seed 17 the
+> second, converting and uploading. The spec is written again for the first part before
+> any of its tasks is done. Do not implement from it as it stands.
+
 ## Overview
 
 The app is a folder of plain web code, `app/www/`, packaged by Capacitor into an Android

@@ -1,0 +1,10 @@
+{
+  "number": 17,
+  "slug": "17-p2-operators-app-converting-and-uploading",
+  "state": "remaining",
+  "title": "Operators' app for Android: converting and uploading",
+  "priority": "P2",
+  "addedAt": "2026-10-12T18:49:46+03:00",
+  "addedCommit": "pending-local",
+  "summary": "The second part of the operators' app: convert a video or GIF on the phone with the project's converter, preview it, upload it with progress, see sizes and free storage, and remove an animation."
+}
