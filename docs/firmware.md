@@ -649,12 +649,17 @@ chip, and 55 mA for one LED at full white. It counts 1 mA for every LED at rest.
 estimate is above the maximum it dims the refresh; `status` still reports the core's
 brightness.
 
+The maximum is the limit of `firmware/limit.json`, which `set-limit` and
+`install-firmware` put into WLED's stored settings; `read-limit` prints what a board
+holds. The firmware itself never sets it. A limit of 0 switches the limiter off: WLED
+then estimates nothing and dims nothing.
+
 > With the twenty legs of the target, 3,600 LEDs, the estimate at rest alone is 3,600 mA.
 > With WLED's maximum of 850 mA the limiter then holds every LED at its lowest level,
 > whatever plays: as WLED's source has it, every channel of a colour that is lit is then
 > sent as 1 of 255. The same holds for every mapping of 730 LEDs or more. Before twenty
-> legs are lit, the maximum current must be raised to what the power supply gives, in
-> WLED's LED settings, "Maximum PSU Current". The firmware does not change it. With two
+> legs are lit, the limit must be raised to what the power supply gives, or switched off:
+> edit `firmware/limit.json` and run `set-limit`. With two
 > legs, 360 LEDs, the limiter also dims a bright picture such as Hello world, at any
 > brightness at which the estimate passes 730 mA.
 
@@ -722,8 +727,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. A send is the copy into the outputs and WLED's show together; the wait for the outputs between the two is not in it. |
 | `poll_total_us`, `send_total_us` | The time all requests for a refresh and all sends took, in the last full second. |
 | `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. Some outputs are read back after each send and again before the next, each in its turn: as many as have 200 LEDs together, and one at least. |
-| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
-| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
+| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. With the limiter off it stays 0. |
+| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. Both are 0 while the limiter is off, which is a maximum of 0. |
 | `wire_us` | The shortest and the longest time, since the last `#probe`, from the end of a send until the parallel driver had finished its transfer and could take data again, in microseconds; `null` when no output is on the parallel driver or none was sent. A timer looks at the driver every tenth of a millisecond. An output of 180 LEDs is 570 bytes on the wire with its reset, 5.7 ms. |
 | `space_us` | The time the file system took to tell its size and its used bytes, when the usermod asked before the core started, in microseconds. |
 | `store` | The storage calls since the last `#probe`, reads aside: their number in `calls`, the longest in `longest_us` and their sum in `total_us`, in microseconds. And the requests for a refresh in which the core read a second file, which is how it checks an uploaded file: their number in `check_steps`, the longest in `check_longest_us` and their sum in `check_total_us`. |
@@ -1397,3 +1402,16 @@ before the first run and after the second, every file other than `/cfg.json` and
 `install-firmware`, on a board whose storage held another name and password, took 50.2
 seconds. Afterwards the firmware answered `status` with the show playing, and storage
 read back held the name and the password of the settings file and the same show.
+
+**The limit on LED current.** What the design of seed 15 assumed and the probe build then
+showed on the board, with Hello world for the target file at brightness 40.
+
+| Assumption | What was found |
+|---|---|
+| WLED takes `hw.led.maxpwr` of the `/cfg.json` the tool edited at its start. | It does. After `set-limit` with a limit of 850 the report had `limit_ma` 730 and `used_ma` 3,600, and after `set-limit` with 0 both were 0. |
+| With a limit of 0 nothing is dimmed. | Nothing was: over five seconds every report had `limited` 0, and 50 sends in the second. With 850 every send was dimmed: `limited` 49 to 51 from one report to the next, a second apart. |
+| The probe build's count is right with the limiter off. | It was not: it counted every send as dimmed, 49 to 67 in a report, because it compared an estimate of 0 with a limit of 0. It now counts only while WLED's maximum is above 0. The firmware has none of that code: built before and after, its image has the same SHA-256. |
+
+`set-limit` took 36 seconds. Storage read back held 0 and then 850, and between the two
+only `hw.led.maxpwr` of `/cfg.json` differed. `read-limit` printed `limit: off` and then
+`limit: 850 mA`.

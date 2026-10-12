@@ -66,7 +66,7 @@ Rules for every task:
     the test of its one storage write fails: storage does not hold the limit. Undo it.
   - Requirements: 1.5, 2.1, 2.2, 2.3, 2.4, 2.6, 3.1, 3.2, 4.1, 4.2, 7.1
 
-- [ ] 4. The limiter on the board
+- [x] 4. The limiter on the board
   - `firmware/usermod/odrig_probe.cpp`: `limited` counts only with a maximum above 0.
     `tests/firmware/test_usermod_files.py` for it. Build the firmware before and after
     and record that its SHA-256 is the same.

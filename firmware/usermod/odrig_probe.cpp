@@ -225,6 +225,9 @@ void readTheCountedOutput() {
   countedOutput = NO_OUTPUT;
 }
 
+// With a maximum of 0 WLED's limiter is off: it dims nothing and estimates nothing.
+bool limiterOn() { return BusManager::ablMilliampsMax() > 0; }
+
 // The current the limiter allows the LEDs, and the current it estimated for the last send.
 uint32_t limitMa() {
   const uint32_t all = BusManager::ablMilliampsMax();
@@ -615,7 +618,7 @@ void OdrigProbe::afterShow(uint64_t now_ms, uint32_t send_us) {
   if (sentBefore && now_ms - lastSendMs > longestGapMs) longestGapMs = (uint32_t)(now_ms - lastSendMs);
   sentBefore = true;
   lastSendMs = now_ms;
-  if (usedMa() >= limitMa()) limited++;
+  if (limiterOn() && usedMa() >= limitMa()) limited++;
   readBackTheNextOutputs();
   filledNotShown = false;
   if (reportWaits) {

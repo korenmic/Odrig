@@ -417,6 +417,11 @@ class Host(unittest.TestCase):
         usermod = text_of(USERMOD / "odrig_usermod.cpp")
         self.assertEqual(usermod.count("OdrigLeds::hold();"), 2)
 
+    def test_the_probe_build_counts_a_dimmed_send_only_while_the_limiter_is_on(self):
+        probe = text_of(USERMOD / "odrig_probe.cpp")
+        self.assertIn("bool limiterOn() { return BusManager::ablMilliampsMax() > 0; }", probe)
+        self.assertEqual(re.findall(r"[^\n]*limited\+\+[^\n]*", probe), ["  if (limiterOn() && usedMa() >= limitMa()) limited++;"])
+
     def test_the_limiters_maximum_is_never_set_by_the_usermod(self):
         for path in SOURCES:
             self.assertNotRegex(text_of(path), r"setMilliampsMax|_gMilliAmpsMax\s*=", path.name)

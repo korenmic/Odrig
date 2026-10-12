@@ -6997,3 +6997,61 @@ owner sets the seed to `completed`.
 **Resolution.** `docs/specs/08-p1-wifi-name-and-password/tasks.md`, task 7;
 `docs/wifi.md`, "The owner's check";
 `project-seeds/08-p1-wifi-name-and-password/state.json` is not changed.
+
+## Seed 15: Where the limit lives, and how a board is asked for it
+
+**Question.** The seed says that the limit lives in one tracked settings file and that the
+firmware tool reports the limit stored on the board. Which file, and which command?
+
+**Answer.** A file of its own, `firmware/limit.json`, with the one member `milliamps`. The
+settings file of seed 08 holds exactly a name and a password, and its reader refuses a
+third member; a limit is no Wi-Fi setting either. Reporting is a command of its own,
+`read-limit`, which reads storage and writes nothing, as `read-show` does. On a board
+whose `/cfg.json` holds no `hw.led.maxpwr` it says so and names WLED's own 850 mA.
+
+**Resolution.** `firmware/limit.json`; `firmware/fwtool/limit.py`;
+`docs/specs/15-p1-led-current-limit-as-a-setting/design.md`, "The commands".
+
+## Seed 15: `install-firmware` prints four lines
+
+**Question.** Seed 08 required `install-firmware` to print the three lines `set-wifi`
+prints. Seed 15 has it apply the limit too.
+
+**Answer.** It prints four: the name, `password: set`, the line of the limit, and the
+reply to `status`. It makes one storage image with both settings and writes once. Both
+files are read and checked before the board is touched, the settings file first.
+`--limit FILE` reads another limit file, as `--settings FILE` reads another settings
+file. The tests of seed 08 that held three lines hold four.
+
+**Resolution.** `firmware/fwtool/cli.py`, `store_settings` and `_install_firmware`;
+`tests/firmware/test_wifi_commands.py`; `tests/board/test_wifi.py`, `FromScratch`.
+
+## Seed 15: The probe build counted every send as dimmed with the limiter off
+
+**Question.** The seed's check on the board is that the probe report shows no dimmed
+send with a limit of 0. The report showed 49 to 67 in every second.
+
+**Answer.** The count was wrong, not the limiter. With a maximum of 0, WLED's limiter is
+not in use: it estimates nothing and dims nothing, as its source says and as `used_ma` 0
+showed. The probe build counted a send as dimmed when the estimate was at or above the
+limit, and 0 is at or above 0. It now counts only while WLED's maximum is above 0. The
+firmware has none of that code and its image is unchanged.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`, `limiterOn`;
+`tests/firmware/test_usermod_files.py`,
+`test_the_probe_build_counts_a_dimmed_send_only_while_the_limiter_is_on`;
+`tests/board/test_limit.py`.
+
+## Seed 15: A limit of 0 on the bench, for a minute
+
+**Question.** The bench strip is fed from the board's 3.3 V pin, and the limiter is what
+protects that pin from a high brightness. The board test switches the limiter off.
+
+**Answer.** For about a minute, with a show of brightness 40 installed and no command
+sent that changes the brightness, and it sets 850 again before it ends. At brightness 40
+the 60 LEDs of the strip cannot ask for more than they do in every other board test. A
+run that is stopped in between leaves 0 on the board: the suite's last step puts the
+limit of the limit file back, and so does `python3 firmware/fw.py set-limit`.
+
+**Resolution.** `tests/board/test_limit.py`; `tests/board/support.py`, `ensure_settings`;
+`tests/board/__init__.py`, the last step.
