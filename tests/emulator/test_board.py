@@ -4,14 +4,14 @@ import subprocess
 import unittest
 
 from . import support
-from .test_layout import JSC, WEB
+from .test_layout import WEB
 
 
 def board_of_the_page():
     """The board as `board.js` defines it, read through the JavaScript shell."""
-    done = subprocess.run([str(JSC), str(WEB / "board.js"), "-e", "print(JSON.stringify(OdrigBoard))"], capture_output=True, text=True)
+    done = subprocess.run([*support.js_shell(), str(WEB / "board.js"), "-e", "print(JSON.stringify(OdrigBoard))"], capture_output=True, text=True)
     if done.returncode != 0 or done.stderr:
-        raise AssertionError(f"jsc ended with status {done.returncode}: {done.stderr[-400:]}")
+        raise AssertionError(f"the JavaScript shell ended with status {done.returncode}: {done.stderr[-400:]}")
     return json.loads(done.stdout)
 
 

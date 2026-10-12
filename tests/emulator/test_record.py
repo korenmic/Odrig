@@ -6,7 +6,7 @@ import tempfile
 import time
 import unittest
 
-from emulator import recfile, record
+from emulator import binding, recfile, record
 from tests.core import support as core_support
 
 from . import support
@@ -360,7 +360,7 @@ class Recording(unittest.TestCase):
         result = support.run(self.example(), "--record", self.out, "--seconds", 1, "--core", self.work / "libodrig_core.dylib")
         self.assertEqual(result.status, 1)
         self.assertRegex(result.err, r"\Aerror: core-not-built: .+\n\Z")
-        self.assertIn("make -C core shared", result.err)
+        self.assertIn(f"`{binding.BUILD_COMMAND}`", result.err)
         self.assert_nothing_left()
 
     def test_a_record_file_that_cannot_be_written_is_cannot_write(self):

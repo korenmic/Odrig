@@ -69,7 +69,7 @@ Rules for every task:
     and `socket`.
   - Requirement 4.
 
-- [ ] 4. The emulator suite on Windows
+- [x] 4. The emulator suite on Windows
   - Create `tests/emulator/js/shell.js`; the tests choose the JavaScript shell by system.
   - The helper `Emulator` reads the ports the emulator has and stops it with the signal of
     the system. Tests that need a pseudo-terminal are skipped where there is none, with the

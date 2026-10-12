@@ -58,7 +58,7 @@ class Declarations(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             program = pathlib.Path(folder, "layout")
             subprocess.run(
-                ["cc", "-x", "c", "-std=c99", f"-I{support.HEADER.parent}", "-o", str(program), "-"],
+                [support.c_compiler(), "-x", "c", "-std=c99", f"-I{support.HEADER.parent}", "-o", str(program), "-"],
                 input=LAYOUT_PROGRAM, text=True, check=True, capture_output=True,
             )
             printed = subprocess.run([str(program)], capture_output=True, text=True, check=True).stdout.split("\n")
@@ -70,21 +70,19 @@ class Declarations(unittest.TestCase):
         self.assertEqual([line for line in printed if line], expected)
 
     def test_the_library_offers_the_seven_functions_and_holds_every_source_of_the_core(self):
-        listed = subprocess.run(["nm", "-gU", str(support.LIBRARY)], capture_output=True, text=True, check=True).stdout
-        functions = sorted(re.findall(r"(?m) T _(odrig_core_[a-z_]+)$", listed))
-        self.assertEqual(functions, sorted(binding.FUNCTIONS))
+        self.assertEqual(sorted(support.exported(support.LIBRARY)), sorted(binding.FUNCTIONS))
         sources = sorted(path.stem for path in (support.ROOT / "core" / "src").glob("*.cpp"))
         self.assertGreaterEqual(len(sources), 10)
-        objects = sorted(path.stem for path in (support.ROOT / "core" / "build" / "core").glob("*.o"))
-        self.assertEqual(objects, sources)
-        for path in (support.ROOT / "core" / "build" / "core").glob("*.o"):
+        made = sorted((support.ROOT / "core" / "build" / "core").glob(f"*{support.object_suffix()}"))
+        self.assertEqual(sorted(path.stem for path in made), sources)
+        for path in made:
             self.assertLessEqual(path.stat().st_mtime, support.LIBRARY.stat().st_mtime + 1, path.name)
 
     def test_a_library_that_is_not_there_is_core_not_built_and_names_the_command(self):
         with self.assertRaises(failure.Failure) as caught:
-            binding.load(support.ROOT / "core" / "build" / "no-such-library.dylib")
+            binding.load(support.ROOT / "core" / "build" / f"no-such-{binding.LIBRARY_NAME}")
         self.assertEqual(caught.exception.reason, "core-not-built")
-        self.assertIn("make -C core shared", caught.exception.detail)
+        self.assertIn(f"`{binding.BUILD_COMMAND}`", caught.exception.detail)
 
     def test_a_file_that_is_no_library_is_core_not_built(self):
         with self.assertRaises(failure.Failure) as caught:

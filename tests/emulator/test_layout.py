@@ -11,7 +11,6 @@ from tests.core import support as core_support
 
 from . import support
 
-JSC = pathlib.Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc")
 WEB = support.ROOT / "emulator" / "web"
 SCRIPTS = (WEB / "board.js", WEB / "layout.js", support.ROOT / "tests" / "emulator" / "js" / "dump_layout.js")
 VIEW_SCRIPTS = (support.ROOT / "tests" / "emulator" / "js" / "dump_view.js", "--", WEB / "board.js", WEB / "layout.js", WEB / "view.js")
@@ -22,30 +21,26 @@ COLOURS = "#ff6b6b #ffa94d #ffd43b #a9e34b #51cf66 #38d9a9 #3bc9db #4dabf7 #748f
 
 def dump(text, **questions):
     """What the page's layout script computes for a mapping file, run in the JavaScript
-    shell of macOS without a browser."""
-    if not JSC.exists():
-        raise AssertionError(f"the JavaScript shell of macOS is not at {JSC}")
+    shell without a browser."""
     with tempfile.TemporaryDirectory() as folder:
         path = pathlib.Path(folder, "mapping.json")
         path.write_text(text, encoding="utf-8")
-        done = subprocess.run([str(JSC), *map(str, SCRIPTS), "--", str(path), json.dumps(questions)], capture_output=True, text=True)
+        done = subprocess.run([*support.js_shell(), *map(str, SCRIPTS), "--", str(path), json.dumps(questions)], capture_output=True, text=True)
     if done.returncode != 0 or done.stderr:
-        raise AssertionError(f"jsc ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
+        raise AssertionError(f"the JavaScript shell ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
     return json.loads(done.stdout)
 
 
 def drawn(text, areas, pointed=0):
     """What the page's view script draws for a mapping file in its mapping view, for each
-    drawing area, run in the JavaScript shell of macOS with a stand-in for the document.
+    drawing area, run in the JavaScript shell with a stand-in for the document.
     `pointed` is the index of the leg that is pointed at once the drawing is made."""
-    if not JSC.exists():
-        raise AssertionError(f"the JavaScript shell of macOS is not at {JSC}")
     with tempfile.TemporaryDirectory() as folder:
         path = pathlib.Path(folder, "mapping.json")
         path.write_text(text, encoding="utf-8")
-        done = subprocess.run([str(JSC), *map(str, VIEW_SCRIPTS), str(path), json.dumps(areas), str(pointed)], capture_output=True, text=True)
+        done = subprocess.run([*support.js_shell(), *map(str, VIEW_SCRIPTS), str(path), json.dumps(areas), str(pointed)], capture_output=True, text=True)
     if done.returncode != 0 or done.stderr:
-        raise AssertionError(f"jsc ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
+        raise AssertionError(f"the JavaScript shell ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
     return json.loads(done.stdout)
 
 
@@ -1895,7 +1890,7 @@ class UprightView(UprightCase):
 
 class WithoutABrowser(unittest.TestCase):
     def test_the_layout_script_runs_in_the_javascript_shell(self):
-        done = subprocess.run([str(JSC), str(WEB / "layout.js"), "-e", "print(typeof OdrigLayout.position, typeof window, typeof document)"], capture_output=True, text=True)
+        done = subprocess.run([*support.js_shell(), str(WEB / "layout.js"), "-e", "print(typeof OdrigLayout.position, typeof window, typeof document)"], capture_output=True, text=True)
         self.assertEqual((done.returncode, done.stdout.strip(), done.stderr), (0, "function undefined undefined", ""))
 
     def test_the_position_rule_is_written_in_the_layout_script_only(self):

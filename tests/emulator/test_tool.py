@@ -1,22 +1,25 @@
-import fcntl
 import json
 import os
 import pathlib
 import socket
 import struct
 import tempfile
-import termios
 import threading
 import time
 import unittest
 from unittest import mock
 
-from emulator import serialport
 from odrig import mapping
 from odrigctl import cli, client
 from tests.core.support import ReferencePlayer
 
 from . import support
+
+if support.HAS_SERIAL:
+    import fcntl
+    import termios
+
+    from emulator import serialport
 
 OK = '{"ok":true}\n'
 
@@ -52,7 +55,7 @@ class AgainstTheEmulator(unittest.TestCase):
     def setUp(self):
         self.folder = support.entered(self, support.example_show())
         self.emulator = support.entered(self, support.Emulator(self.folder))
-        self.targets = {"serial": ("--port", self.emulator.serial), "http": ("--http", f"127.0.0.1:{self.emulator.port}")}
+        self.targets = {support.LINES: support.line_target(self.emulator), "http": ("--http", f"127.0.0.1:{self.emulator.port}")}
 
     def test_each_command_prints_the_reply_and_exits_with_0_by_each_transport(self):
         for transport, target in self.targets.items():
@@ -80,11 +83,11 @@ class AgainstTheEmulator(unittest.TestCase):
             typed = ["abc", "007", "+5", "5 ", "0x10", "1e2", "é"]
             for argument in typed:
                 support.run_tool(*self.targets["http"], "play", argument)
-                support.run_tool(*self.targets["serial"], "brightness", argument)
+                support.run_tool(*self.targets[support.LINES], "brightness", argument)
             logged = support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2 * len(typed), 10), "log")
         expected = [line for argument in typed for line in (f"play {argument}", f"brightness {argument}")]
         self.assertEqual([entry["line"] for entry in logged], [line.replace("é", "\\xC3\\xA9") for line in expected])
-        self.assertEqual([entry["transport"] for entry in logged], ["http", "serial"] * len(typed))
+        self.assertEqual([entry["transport"] for entry in logged], ["http", support.LINES] * len(typed))
         self.assertEqual({entry["reply"] for entry in logged if "007" not in entry["line"]}, {'{"ok":false,"error":"bad-argument"}'})
 
     def test_the_options_may_follow_the_command_and_the_address_may_be_written_as_a_url(self):
@@ -94,8 +97,8 @@ class AgainstTheEmulator(unittest.TestCase):
             ["--http", f"http://127.0.0.1:{port}", "status"],
             ["--http", f"http://127.0.0.1:{port}/", "status"],
             ["--http", f"localhost:{port}", "status", "--timeout", "5"],
-            ["brightness", "128", "--port", self.emulator.serial],
-            ["--timeout", "0.5", "--port", self.emulator.serial, "on"],
+            ["brightness", "128", *support.line_target(self.emulator)],
+            ["--timeout", "0.5", *support.line_target(self.emulator), "on"],
         ):
             self.assertEqual(support.run_tool(*argv).status, 0, argv)
 
@@ -105,12 +108,12 @@ class AgainstTheEmulator(unittest.TestCase):
             self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
             result = support.run_module(*target, "play", "4", module="odrigctl")
             self.assertEqual((result.status, result.out, result.err), (1, '{"ok":false,"error":"unknown-id"}\n', ""))
-        self.assertEqual(support.run_module("--port", self.emulator.serial, module="odrigctl").status, 2)
+        self.assertEqual(support.run_module(*support.line_target(self.emulator), module="odrigctl").status, 2)
 
     def test_the_tool_leaves_nothing_behind_in_the_port(self):
         for _ in range(3):
-            self.assertEqual(support.run_tool(*self.targets["serial"], "on").status, 0)
-        with support.Serial(self.emulator.serial) as port:
+            self.assertEqual(support.run_tool(*self.targets[support.LINES], "on").status, 0)
+        with support.lines(self.emulator) as port:
             self.assertEqual(port.read_for(0.3), b"")
             self.assertEqual(port.ask("on"), b'{"ok":true}\n')
 
@@ -120,7 +123,7 @@ class Session(unittest.TestCase):
         """Sends the whole session to a fresh emulator that runs a show. Returns the files
         of the show, what the tool did for each command, and the log entries of the page."""
         with show() as folder, support.Emulator(folder) as emulator:
-            target = ("--port", emulator.serial) if transport == "serial" else ("--http", f"127.0.0.1:{emulator.port}")
+            target = support.line_target(emulator) if transport == support.LINES else ("--http", f"127.0.0.1:{emulator.port}")
             results = [support.run_tool(*target, *words) for words in SESSION]
             with support.EventStream(emulator.port) as stream:
                 logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")
@@ -134,7 +137,7 @@ class Session(unittest.TestCase):
 
     def check_session(self, show, legs):
         replies = {}
-        for transport in ("serial", "http"):
+        for transport in (support.LINES, "http"):
             with self.subTest(transport=transport):
                 files, results, logged = self.session(show, transport)
                 self.assertEqual(len(mapping.loads(files["mapping.json"]).legs), legs)
@@ -152,7 +155,7 @@ class Session(unittest.TestCase):
                 self.assertEqual([entry["line"] for entry in logged], [" ".join(words)[:64] for words in SESSION])
                 self.assertEqual([entry["cut"] for entry in logged], [len(" ".join(words)) > 64 for words in SESSION])
                 self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
-        self.assertEqual(replies["serial"], replies["http"])
+        self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
         self.assertEqual(codes[-5:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long"])
         self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS))
@@ -188,6 +191,7 @@ class Unreachable(unittest.TestCase):
         for address in ("127.0.0.1:port", "http://", "", "https://127.0.0.1:1"):
             self.assert_unreachable(support.run_tool("--http", address, "status"))
 
+    @support.needs_serial
     def test_a_port_that_stays_silent_exits_with_3_after_the_time_limit(self):
         silent = serialport.Port(self.work / "serial", lambda data: b"")
         self.addCleanup(silent.close)
@@ -277,9 +281,8 @@ class Usage(unittest.TestCase):
 class StandIn:
     """Stands in for `fcntl.ioctl`: writes down the modem-line requests and lets them fail."""
 
-    NAMES = {termios.TIOCM_RTS: "RTS", termios.TIOCM_DTR: "DTR"}
-
     def __init__(self, fails=False):
+        self.names = {termios.TIOCM_RTS: "RTS", termios.TIOCM_DTR: "DTR"}
         self.requests = []
         self.fails = fails
 
@@ -287,7 +290,7 @@ class StandIn:
         if request in (termios.TIOCMBIC, termios.TIOCMBIS, termios.TIOCMSET):
             (lines,) = struct.unpack("I", argument)
             action = {termios.TIOCMBIC: "lower", termios.TIOCMBIS: "raise", termios.TIOCMSET: "set"}[request]
-            self.requests.append(f"{action} {self.NAMES.get(lines, lines)}")
+            self.requests.append(f"{action} {self.names.get(lines, lines)}")
             if self.fails:
                 raise OSError(25, "Inappropriate ioctl for device")
             return 0
@@ -310,6 +313,7 @@ class SerialExchange(unittest.TestCase):
         port.start()
         return port.link
 
+    @support.needs_serial
     def test_it_asks_for_rts_to_be_lowered_before_dtr(self):
         link = self.port(b'{"ok":true}\n')
         stand_in = StandIn()
@@ -318,6 +322,7 @@ class SerialExchange(unittest.TestCase):
         self.assertEqual(stand_in.requests, ["lower RTS", "lower DTR"], "the modem lines are not lowered RTS first, DTR second")
         self.assertEqual(reply, b'{"ok":true}')
 
+    @support.needs_serial
     def test_it_goes_on_when_both_requests_fail(self):
         link = self.port(b'{"ok":true}\n')
         stand_in = StandIn(fails=True)
@@ -327,6 +332,7 @@ class SerialExchange(unittest.TestCase):
         self.assertEqual(reply, b'{"ok":true}')
         self.assertEqual(b"".join(self.received), b"status\n")
 
+    @support.needs_serial
     def test_it_sets_the_port_raw_at_115200_without_modem_control(self):
         link = self.port(b'{"ok":true}\n')
         client.serial_exchange(link, b"status\n", 2)
@@ -337,10 +343,12 @@ class SerialExchange(unittest.TestCase):
         self.assertEqual((ispeed, ospeed), (termios.B115200, termios.B115200))
         self.assertEqual((characters[termios.VMIN], characters[termios.VTIME]), (0, 0))
 
+    @support.needs_serial
     def test_a_line_that_is_not_a_reply_is_skipped(self):
         link = self.port(b'boot: ready\n[1,2,3]\n{"state":{"on":true}}\n"ok"\n\n{"ok":false,"error":"unknown-id"}\r\n{"ok":true}\n')
         self.assertEqual(client.serial_exchange(link, b"play 9\n", 2), b'{"ok":false,"error":"unknown-id"}')
 
+    @support.needs_serial
     def test_what_was_waiting_in_the_port_is_discarded(self):
         answers = iter([b'{"ok":true,"stale":1}\n', b'{"ok":true,"fresh":1}\n'])
         port = serialport.Port(self.work / "serial", lambda data: next(answers))
@@ -351,10 +359,12 @@ class SerialExchange(unittest.TestCase):
             time.sleep(0.2)
         self.assertEqual(client.serial_exchange(port.link, b"second\n", 2), b'{"ok":true,"fresh":1}')
 
+    @support.needs_serial
     def test_another_judge_of_a_reply_may_be_given(self):
         link = self.port(b'{"ok":true}\nWLED 16.0.1\n')
         self.assertEqual(client.serial_exchange(link, b"v\n", 2, accept=lambda line: line.startswith(b"WLED")), b"WLED 16.0.1")
 
+    @support.needs_serial
     def test_a_reply_that_arrives_in_pieces_is_put_together(self):
         def feed(data):
             def late():

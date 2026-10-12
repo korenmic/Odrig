@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 
-from emulator import app
+from emulator import app, binding
 from tests.core import support as core_support
 
 from . import support
@@ -39,14 +39,16 @@ class Start(unittest.TestCase):
     def test_exactly_the_two_lines_are_printed_in_order(self):
         link = self.work / "serial"
         emulator = self.started(self.example(), serial_link=link)
-        self.assertEqual(emulator.serial, str(link))
+        self.assertEqual(emulator.serial, str(link) if support.HAS_SERIAL else None)
+        named = f"serial: {link}" if support.HAS_SERIAL else f"tcp: {emulator.tcp}"
         self.assertEqual(emulator.status()["ok"], True)
-        with support.Serial(link) as port:
+        with support.lines(emulator) as port:
             self.assertEqual(port.ask("on"), b'{"ok":true}\n')
         result = emulator.stop()
-        self.assertEqual(result.out, f"page: http://127.0.0.1:{emulator.port}/\nserial: {link}\n")
+        self.assertEqual(result.out, f"page: http://127.0.0.1:{emulator.port}/\n{named}\n")
         self.assertEqual((result.status, result.err), (0, ""))
 
+    @unittest.skipUnless(support.HAS_SERIAL, support.NO_SERIAL)
     def test_the_link_is_a_symbolic_link_to_a_terminal_device_and_is_gone_after_the_end(self):
         link = self.work / "serial"
         for number in (signal.SIGTERM, signal.SIGINT):
@@ -59,6 +61,7 @@ class Start(unittest.TestCase):
                 self.assertFalse(os.path.lexists(link))
         self.assertEqual(list(self.work.iterdir()), [])
 
+    @unittest.skipUnless(support.HAS_SERIAL, support.NO_SERIAL)
     def test_a_link_left_by_an_earlier_run_is_replaced(self):
         link = self.work / "serial"
         os.symlink("/dev/ttys999", link)
@@ -69,6 +72,7 @@ class Start(unittest.TestCase):
         emulator.stop()
         self.assertFalse(os.path.lexists(link))
 
+    @unittest.skipUnless(support.HAS_SERIAL, support.NO_SERIAL)
     def test_a_regular_file_at_the_link_path_is_serial_unavailable_and_stays_untouched(self):
         link = self.work / "serial"
         link.write_bytes(b"something of the user's")
@@ -79,6 +83,7 @@ class Start(unittest.TestCase):
         self.assertEqual(link.read_bytes(), b"something of the user's")
         self.assertTrue(support.refused(port))
 
+    @unittest.skipUnless(support.HAS_SERIAL, support.NO_SERIAL)
     def test_without_the_option_the_link_is_in_the_build_folder_of_the_repository_whatever_the_working_folder(self):
         expected = support.ROOT / "build" / "emulator" / "serial"
         process = subprocess.Popen(
@@ -105,9 +110,10 @@ class Start(unittest.TestCase):
         self.assertEqual(emulator.lines[0], f"page: http://127.0.0.1:{port}/")
         self.assertEqual(emulator.status()["ok"], True)
 
-    def test_sigterm_and_sigint_end_it_with_status_0(self):
+    def test_each_signal_that_ends_it_ends_it_with_status_0(self):
         folder = self.example()
-        for number in (signal.SIGTERM, signal.SIGINT):
+        self.assertIn(support.STOPS, ((signal.SIGTERM, signal.SIGINT), (getattr(signal, "CTRL_BREAK_EVENT", None),)))
+        for number in support.STOPS:
             with self.subTest(signal=number.name):
                 emulator = support.Emulator(folder)
                 self.assertEqual(emulator.status()["ok"], True)
@@ -121,7 +127,7 @@ class Start(unittest.TestCase):
             holder.listen(1)
             port = holder.getsockname()[1]
             link = self.work / "serial"
-            result = support.run_module(self.example(), "--port", port, "--serial-link", link)
+            result = support.run_module(self.example(), "--port", port, *support.port_options(link))
             self.assert_refused(result, "address-in-use")
             self.assertIn(f"127.0.0.1:{port}", result.err)
             self.assertFalse(os.path.lexists(link))
@@ -131,13 +137,13 @@ class Start(unittest.TestCase):
         a_file = self.work / "file"
         a_file.write_bytes(b"")
         for path in (self.work / "none", a_file):
-            self.assert_refused(support.run_module(path, "--port", 0, "--serial-link", self.work / "serial"), "not-a-folder")
+            self.assert_refused(support.run_module(path, "--port", 0, *support.port_options(self.work / "serial")), "not-a-folder")
         self.assertEqual([entry.name for entry in self.work.iterdir()], ["file"])
 
     def test_a_wrong_core_is_core_not_built_and_names_the_command(self):
-        result = support.run_module(self.example(), "--port", 0, "--serial-link", self.work / "serial", "--core", self.work / "libodrig_core.dylib")
+        result = support.run_module(self.example(), "--port", 0, *support.port_options(self.work / "serial"), "--core", self.work / binding.LIBRARY_NAME)
         self.assert_refused(result, "core-not-built")
-        self.assertIn("make -C core shared", result.err)
+        self.assertIn(f"`{binding.BUILD_COMMAND}`", result.err)
         self.assertEqual(list(self.work.iterdir()), [])
 
     def test_a_folder_without_a_show_starts_and_reports_mapping_missing(self):

@@ -5309,3 +5309,40 @@ library is loaded, the script ends with `build-failed` and says to stop the emul
 
 **Resolution.** `core/build.py`: `stale`, `needed_by`, `record` and `writable`.
 `tests/emulator/test_build_script.py`, the class `OnlyWhatChanged`.
+
+## Seed 11: The emulator suite where there is no pseudo-terminal
+
+**Question.** Many tests of the emulator suite send their lines through the serial port,
+end the emulator with SIGTERM, ask `lsof` and `nm`, compile with `cc`, link folders and run
+the page's scripts in `jsc`. None of that exists on Windows. Which tests are skipped there,
+and which run another way?
+
+**Answer.** A test is skipped only when what it checks is the pseudo-terminal itself or
+something Windows cannot do. Everything else runs through what the system has.
+
+- A test that used the serial port as "the other transport beside HTTP" now takes the
+  transport that carries bytes on its system: the serial port where there is one, the line
+  port elsewhere. The helpers are `support.lines`, `support.line_target` and
+  `support.LINES`, which is `serial` or `tcp`. On macOS these tests do what they did.
+- Skipped where there is no pseudo-terminal, with that reason: the module of the serial
+  port, the tests of the link, and the tests of the POSIX serial exchange. The Windows
+  exchange has its own tests, with a stand-in for `kernel32`, which run everywhere.
+- The emulator is ended with the break of the console on Windows, the one signal a parent
+  can send a child there, and with SIGTERM and SIGINT elsewhere. Ctrl-C itself cannot be
+  sent to a child on Windows by a test; the emulator handles it with the same handler.
+- The test that stops the emulator's process for 300 ms is skipped where there is no
+  SIGSTOP.
+- The JavaScript shell is `jsc` where macOS has it and Node.js elsewhere, with
+  `tests/emulator/js/shell.js`, which takes the command line of `jsc` and has its `print`,
+  `read`, `load` and `checkSyntax`. The syntax check of the page's scripts is then made by
+  the engine of Chrome and Edge, not by that of Safari: the test is named for the shell.
+- What a library exports is read from the DLL's own table; the C compiler is the one beside
+  the compiler that built the library, and with Microsoft's compiler the one test that
+  compiles a C program is skipped; the listening addresses come from the system's list
+  where there is no `lsof`; folders are copied where a program may not make links; and
+  `mkdir` is done by the test where the system has no such program.
+
+On the Windows computer the suite runs 443 tests, of which 15 are skipped.
+
+**Resolution.** `tests/emulator/support.py`; `tests/emulator/js/shell.js`; the test modules
+of `tests/emulator/` that the commit of seed 11 task 4 changes.

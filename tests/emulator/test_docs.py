@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -255,12 +256,15 @@ class DocumentedShows(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             work = pathlib.Path(folder)
             for name in ("odrig", "mapping", "shows", "animations"):
-                os.symlink(support.ROOT / name, work / name)
+                support.linked(support.ROOT / name, work / name)
             for line in commands:
                 words = shlex.split(line)
                 if words[0] == "printf":
                     target = words[words.index(">") + 1]
-                    (work / target).write_text(words[1].replace("\\n", "\n"), encoding="utf-8")
+                    (work / target).write_text(words[1].replace("\\n", "\n"), encoding="utf-8", newline="\n")
+                    continue
+                if words[0] == "mkdir" and shutil.which("mkdir") is None:
+                    (work / words[-1]).mkdir(parents=True, exist_ok="-p" in words)
                     continue
                 if words[0] == "python":
                     words[0] = sys.executable

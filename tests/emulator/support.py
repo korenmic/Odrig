@@ -8,14 +8,18 @@ import io
 import json
 import os
 import pathlib
+import re
 import select
+import shutil
 import signal
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import unittest
 
 from emulator import app
 from odrig import pack
@@ -35,8 +39,12 @@ DEMO_SHOW = ROOT / "shows" / "demo-20" / "show.json"
 # the console, which reaches a child in a process group of its own.
 HAS_SERIAL = app.HAS_SERIAL
 NO_SERIAL = "this system has no pseudo-terminal"
+needs_serial = unittest.skipUnless(HAS_SERIAL, NO_SERIAL)
 STOP = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
+STOPS = (signal.CTRL_BREAK_EVENT,) if hasattr(signal, "CTRL_BREAK_EVENT") else (signal.SIGTERM, signal.SIGINT)
 OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+# The transport that carries bytes to the emulator of this system, as the log names it.
+LINES = "serial" if HAS_SERIAL else "tcp"
 
 
 @contextlib.contextmanager
@@ -410,6 +418,136 @@ class Lines:
 
     def __exit__(self, *_):
         self.close()
+
+JSC = pathlib.Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc")
+NODE_SHELL = ROOT / "tests" / "emulator" / "js" / "shell.js"
+
+
+def js_shell():
+    """The words that start the JavaScript shell: the shell of macOS where it is, and
+    elsewhere Node.js with the program that takes the same command line."""
+    if JSC.exists():
+        return [str(JSC)]
+    node = shutil.which("node")
+    if node is None:
+        raise AssertionError(f"there is no JavaScript shell: {JSC} is not there and Node.js is not on the path")
+    return [node, str(NODE_SHELL)]
+
+
+TOOLCHAIN = ROOT / "core" / "build" / "toolchain.json"
+
+
+def toolchain():
+    """What the build script wrote down about the toolchain it built the library with, or
+    `None` where `make` built it."""
+    return json.loads(TOOLCHAIN.read_text(encoding="utf-8")) if sys.platform != "darwin" and TOOLCHAIN.is_file() else None
+
+
+def c_compiler():
+    """The C compiler that goes with the compiler the library was built with. A test that
+    needs one is skipped where that is Microsoft's, which does not take the options of
+    `cc`."""
+    used = toolchain()
+    if used is None:
+        return "cc"
+    if used["kind"] != "gnu":
+        raise unittest.SkipTest("the library was built with Microsoft's compiler, which does not take the options of cc")
+    return used["cc"]
+
+
+def object_suffix():
+    """How the name of an object file ends with the toolchain the library was built with."""
+    used = toolchain()
+    return ".obj" if used is not None and used["kind"] == "msvc" else ".o"
+
+
+def dll_tables(path):
+    """`(imported libraries, exported names)` of a DLL of Windows, read from its file."""
+    data = pathlib.Path(path).read_bytes()
+    header = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[header:header + 4] != b"PE\0\0":
+        raise AssertionError(f"{path} is no DLL")
+    count, optional_size = struct.unpack_from("<H", data, header + 6)[0], struct.unpack_from("<H", data, header + 20)[0]
+    optional = header + 24
+    directories = optional + (112 if struct.unpack_from("<H", data, optional)[0] == 0x20B else 96)
+    sections = [struct.unpack_from("<8sIIII", data, optional + optional_size + 40 * index) for index in range(count)]
+
+    def place(address):
+        for _, size, start, raw_size, raw in sections:
+            if start <= address < start + max(size, raw_size):
+                return raw + address - start
+        raise AssertionError(f"{path}: nothing holds the address {address:#x}")
+
+    def text(address):
+        start = place(address)
+        return data[start:data.index(b"\0", start)].decode("ascii")
+
+    export_table, _, import_table, _ = struct.unpack_from("<IIII", data, directories)
+    exported_names = []
+    if export_table:
+        names, name_table = struct.unpack_from("<I", data, place(export_table) + 24)[0], struct.unpack_from("<I", data, place(export_table) + 32)[0]
+        exported_names = [text(struct.unpack_from("<I", data, place(name_table) + 4 * index)[0]) for index in range(names)]
+    imported = []
+    entry = place(import_table) if import_table else None
+    while entry is not None:
+        name = struct.unpack_from("<I", data, entry + 12)[0]
+        if not name:
+            break
+        imported.append(text(name))
+        entry += 20
+    return imported, exported_names
+
+
+def exported(library):
+    """The names a shared library offers to a program that loads it."""
+    if sys.platform == "win32":
+        return dll_tables(library)[1]
+    options, mark = ("-gU", " T _") if sys.platform == "darwin" else ("-gD", " T ")
+    listed = subprocess.run(["nm", options, str(library)], capture_output=True, text=True, check=True).stdout
+    return [line.split(mark, 1)[1] for line in listed.splitlines() if mark in line]
+
+
+def listening(emulator):
+    """Every address the process of an emulator listens on, as `address:port`, in order.
+
+    Where there is no `lsof` the system's own list is read, in which the process is the one
+    that listens on the page address: on Windows the interpreter of a virtual environment
+    is the child of the program that was started."""
+    if shutil.which("lsof"):
+        listed = subprocess.run(["lsof", "-nP", "-a", "-p", str(emulator.process.pid), "-iTCP", "-sTCP:LISTEN"], capture_output=True, text=True).stdout
+        return sorted(re.findall(r"TCP (\S+) \(LISTEN\)", listed))
+    script = "Get-NetTCPConnection -State Listen | ForEach-Object { '{0} {1} {2}' -f $_.LocalAddress, $_.LocalPort, $_.OwningProcess }"
+    listed = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, check=True).stdout
+    rows = [line.split() for line in listed.splitlines() if len(line.split()) == 3]
+    owners = {owner for address, port, owner in rows if (address, port) == ("127.0.0.1", str(emulator.port))}
+    return sorted(f"[{address}]:{port}" if ":" in address else f"{address}:{port}" for address, port, owner in rows if owner in owners)
+
+
+def linked(source, target):
+    """Makes a folder appear at a second place: as a symbolic link, or as a copy where the
+    system does not let this program make links."""
+    try:
+        os.symlink(source, target, target_is_directory=True)
+    except OSError:
+        shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
+
+
+def lines(emulator):
+    """A program's end of the transport that carries bytes to an emulator of this system:
+    its serial port where it has one, its line port elsewhere."""
+    return Serial(emulator.serial) if HAS_SERIAL else Lines(emulator.tcp)
+
+
+def line_target(emulator):
+    """The option of the command tool, and its value, that names that transport."""
+    return ("--port", emulator.serial) if HAS_SERIAL else ("--tcp", emulator.tcp)
+
+
+def port_options(link):
+    """The options that keep an emulator started by its command line off what another
+    emulator may hold: the link of its serial port, or a free port for its line port."""
+    return ("--serial-link", link) if HAS_SERIAL else ("--tcp-port", 0)
+
 
 Event = collections.namedtuple("Event", "kind data")
 

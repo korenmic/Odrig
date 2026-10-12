@@ -82,6 +82,7 @@ class SpeedOfThisMac(unittest.TestCase):
                 times = [ms for ms, _ in frames]
                 self.assertEqual(times, sorted(set(times)))
 
+    @unittest.skipUnless(hasattr(signal, "SIGSTOP"), "this system has no signal that stops a process and none that lets it go on")
     def test_after_a_stop_of_300_ms_no_missed_refresh_is_made_up_for(self):
         with support.example_show() as folder, support.Emulator(folder) as emulator:
             wait_for_the_second_full_second(emulator)

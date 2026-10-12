@@ -6,7 +6,6 @@ import json
 import os
 import pathlib
 import re
-import struct
 import subprocess
 import sys
 import tempfile
@@ -15,7 +14,7 @@ from unittest import mock
 
 from emulator import binding
 
-from . import BUILD_SCRIPT, LIBRARY, ROOT
+from . import BUILD_SCRIPT, LIBRARY, ROOT, support
 
 MAKEFILE = ROOT / "core" / "Makefile"
 SEVEN = ["odrig_core_begin", "odrig_core_poll", "odrig_core_leg_count", "odrig_core_leg", "odrig_core_command", "odrig_core_feed", "odrig_core_error"]
@@ -49,44 +48,6 @@ def makefile_flags():
     text = MAKEFILE.read_text(encoding="utf-8")
     variables = dict(re.findall(r"(?m)^([A-Z_]+) = (.+)$", text))
     return re.sub(r"\$\(([A-Z_]+)\)", lambda match: variables[match.group(1)], variables["CORE_FLAGS"]).split()
-
-
-def tables(path):
-    """`(imported libraries, exported names)` of a DLL, read from its file."""
-    data = pathlib.Path(path).read_bytes()
-    header = struct.unpack_from("<I", data, 0x3C)[0]
-    if data[header:header + 4] != b"PE\0\0":
-        raise AssertionError(f"{path} is no DLL")
-    count, optional_size = struct.unpack_from("<H", data, header + 6)[0], struct.unpack_from("<H", data, header + 20)[0]
-    optional = header + 24
-    magic = struct.unpack_from("<H", data, optional)[0]
-    directories = optional + (112 if magic == 0x20B else 96)
-    sections = [struct.unpack_from("<8sIIII", data, optional + optional_size + 40 * index) for index in range(count)]
-
-    def place(address):
-        for _, size, start, raw_size, raw in sections:
-            if start <= address < start + max(size, raw_size):
-                return raw + address - start
-        raise AssertionError(f"{path}: nothing holds the address {address:#x}")
-
-    def text(address):
-        start = place(address)
-        return data[start:data.index(b"\0", start)].decode("ascii")
-
-    export_table, _, import_table, _ = struct.unpack_from("<IIII", data, directories)
-    exported = []
-    if export_table:
-        names, name_table = struct.unpack_from("<I", data, place(export_table) + 24)[0], struct.unpack_from("<I", data, place(export_table) + 32)[0]
-        exported = [text(struct.unpack_from("<I", data, place(name_table) + 4 * index)[0]) for index in range(names)]
-    imported = []
-    entry = place(import_table) if import_table else None
-    while entry is not None:
-        name = struct.unpack_from("<I", data, entry + 12)[0]
-        if not name:
-            break
-        imported.append(text(name))
-        entry += 20
-    return imported, exported
 
 
 class FindingTheCompiler(unittest.TestCase):
@@ -378,7 +339,7 @@ class TheLibraryOfTheSystem(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "win32", "the shared library is a DLL on Windows only")
     def test_the_dll_exports_the_seven_functions_and_needs_only_libraries_of_windows(self):
-        imported, exported = tables(LIBRARY)
+        imported, exported = support.dll_tables(LIBRARY)
         self.assertEqual(sorted(exported), sorted(SEVEN))
         self.assertTrue(imported)
         for name in imported:
