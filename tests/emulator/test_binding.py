@@ -256,6 +256,25 @@ class Folder(unittest.TestCase):
             self.assertEqual(self.host.open(name), -1, name)
             self.assertIsNone(self.host.read(16), name)
 
+    def test_the_storage_methods_refuse_every_name_that_is_not_a_file_name_of_the_folder(self):
+        for name in ("../outside.json", "inner/b.odrg", "/etc/hosts", str(self.folder / "a.odrg"), "inner\\b.odrg", "", "..", "A.odrg", "a" * 33):
+            self.assertEqual(self.host.write_open(name), -1, name)
+            self.assertEqual(self.host.remove(name), -1, name)
+            self.assertEqual(self.host.rename("a.odrg", name), -1, name)
+            self.assertEqual(self.host.rename(name, "new.odrg"), -1, name)
+            self.assertIsNone(self.host.read_at(name, 0, 16), name)
+        self.assertEqual((self.folder.parent / "outside.json").read_bytes(), b"{}")
+        self.assertEqual(sorted(path.name for path in self.folder.parent.iterdir()), ["outside.json", "show"])
+        self.assertEqual(sorted(path.name for path in self.folder.iterdir()), ["a.odrg", "inner"])
+        self.assertEqual((self.folder / "a.odrg").read_bytes(), bytes(range(200)) * 5)
+        self.assertEqual((self.folder / "inner" / "b.odrg").read_bytes(), b"b")
+        # A name of the folder is taken by each of them.
+        self.assertEqual((self.host.write_open("n-1_x.odrg"), self.host.write(b"abc"), self.host.write_close()), (1, 1, 1))
+        self.assertEqual(self.host.read_at("n-1_x.odrg", 1, 16), b"bc")
+        self.assertEqual(self.host.rename("n-1_x.odrg", "a.odrg"), 1)
+        self.assertEqual((self.folder / "a.odrg").read_bytes(), b"abc")
+        self.assertEqual((self.host.remove("a.odrg"), self.host.remove("a.odrg")), (1, 0))
+
     def test_a_file_that_is_not_there_is_0_and_a_folder_is_minus_1(self):
         self.assertEqual(self.host.open("missing.odrg"), 0)
         self.assertEqual(self.host.open("inner"), -1)

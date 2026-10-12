@@ -63,7 +63,11 @@ class Scope(unittest.TestCase):
         for path, tree in modules(EMULATOR):
             self.assertNotIn("zlib", imported(tree), path.name)
             for text in texts(tree):
-                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off"), f"{path.name} writes out {text!r}")
+                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt"), f"{path.name} writes out {text!r}")
+                # The binding names the members of the host record, and two of them are
+                # spelled as commands are.
+                if path.name != "binding.py":
+                    self.assertNotIn(text, ("space", "remove"), f"{path.name} writes out {text!r}")
         users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
         self.assertEqual(users, ["hub.py"])
 

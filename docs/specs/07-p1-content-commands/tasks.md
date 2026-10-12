@@ -213,7 +213,7 @@ Rules for every task:
   - The board is left with the firmware and the dim example show.
   - Requirements: 15.2, 17.4, 17.8, 17.9, 19.6, 19.7, 19.8, 20.5, 21.1, 21.2, 21.3, 21.4
 
-- [ ] 8. The documents and the last check
+- [x] 8. The documents and the last check
   - Compare `docs/commands.md` and `docs/show.md` with the texts of the design, word for
     word, and settle every difference: in the document when the code is as the design
     says, in `docs/drifts.md` when a task found the design wrong.

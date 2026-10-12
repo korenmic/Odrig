@@ -177,6 +177,30 @@ class Firmware(unittest.TestCase):
             self.assertIn(line, lines)
         self.assertIn("`build/lane/mapping.json`", body)
 
+    def test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured(self):
+        does = " ".join(section(self.text, "What the firmware does").split())
+        for expected in ("**Storage.**", "Every path is `/odrig/<name>`", "The firmware writes, renames and deletes a file only there", "`upload.part`", "`show.part`", "`pending.txt`",
+                         "**Storage calls are paced.**", "the longer of 20 ms and twice d", "The port's queue for what arrives has 4,096 bytes",
+                         "Of a body longer than 4,096 bytes the first 4,096 are passed on"):
+            self.assertIn(expected, does)
+        for function in ("write_open", "write", "write_close", "rename", "remove", "space", "read_at"):
+            self.assertIn(f"| `{function}` | ", section(self.text, "What the firmware does"))
+        probe = " ".join(section(self.text, "The probe build").split())
+        for expected in ("`space_us`", "`store`", "`calls`", "`longest_us`", "`total_us`", "`check_steps`", "`check_longest_us`", "`check_total_us`", "`#store <bytes>`"):
+            self.assertIn(expected, probe)
+        measured = " ".join(section(self.text, "Measurements on the board").split())
+        self.assertIn("**An upload over USB.**", measured)
+        self.assertIn("`build/firmware/out/upload.json`", measured)
+        self.assertRegex(measured, r"\*\*The speed\*\* was [\d,]+ bytes a second")
+        self.assertRegex(measured, r"\*\*While the data arrived\*\* `status` reported \d+ to \d+ refreshes a second")
+        self.assertRegex(measured, r"\*\*After `upload end`\*\* `status` reported \d+")
+        self.assertRegex(measured, r"\*\*The storage calls\*\* .* the longest took \d+ ms")
+        rates = [int(rate) for rate in re.search(r"`status` reported (\d+) to (\d+) refreshes a second", measured).groups()]
+        self.assertTrue(all(20 <= rate <= 51 for rate in rates), rates)
+        verified = " ".join(section(self.text, "Verified on the board").split())
+        for letter in ("B1", "B2", "B3", "B4", "B5", "B6"):
+            self.assertIn(f"| {letter} | ", verified)
+
     def test_it_gives_the_measurements_made_on_the_board(self):
         measured = section(self.text, "Measurements on the board")
         for expected in ("Start of the core", "Refreshes a second", "9 MB", "install-show"):

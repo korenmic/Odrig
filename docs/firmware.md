@@ -660,11 +660,11 @@ WLED's maximum current was 850 mA, so on the target file the limiter dimmed ever
 
 | Show | Working outputs | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest | Free internal memory |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 171 ms | 2,293 to 2,365 | 50 | 50 | 43 ms | 0.98 ms | 23.3 ms | 1.03 ms | 1.22 ms | 202,760 bytes |
-| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 174 ms | 367 to 420 | 50 | 50 | 42 ms | 1.79 ms | 23.7 ms | 15.7 ms | 16.1 ms | 126,520 bytes |
-| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,011 ms | 507 to 851 | 28 to 37 | 33 | 42 ms | 25.9 ms | 48.1 ms | 20.0 ms | 31.8 ms | 126,624 bytes |
-| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 59 s | 4,183 ms | 140 to 152 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.6 ms | 19.8 ms | 33.1 ms | 126,592 bytes |
-| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 165 s | 38,747 ms | 555 to 982 | 25 to 35 | 32 | 60 ms | 26.6 ms | 68.5 ms | 20.0 ms | 33.3 ms | 126,212 bytes |
+| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 213 ms | 2,082 to 2,131 | 50 | 50 | 44 ms | 0.97 ms | 24.3 ms | 1.03 ms | 1.24 ms | 150,972 bytes |
+| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 215 ms | 325 to 369 | 50 | 50 | 43 ms | 1.83 ms | 24.0 ms | 15.6 ms | 16.1 ms | 65,020 bytes |
+| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,107 ms | 504 to 748 | 29 to 36 | 34 | 42 ms | 25.7 ms | 47.9 ms | 20.0 ms | 31.7 ms | 65,004 bytes |
+| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 58 s | 4,278 ms | 130 to 154 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.9 ms | 19.7 ms | 33.5 ms | 65,032 bytes |
+| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 180 s | 39,172 ms | 525 to 803 | 28 to 35 | 31 | 42 ms | 26.0 ms | 50.8 ms | 20.0 ms | 32.6 ms | 64,988 bytes |
 
 The files of a row are the whole show folder. The mean request is the time the core worked
 in a second over the refreshes sent in it; at a rate below 50 one request decodes every
@@ -676,19 +676,19 @@ What the figures say:
   to 18, 21 and 47.
 - **Every rate is inside the 20 to 50 a second the owner accepts.** A show that is not
   dense plays at 50 on twenty legs as on two. The dense clip, in which every LED changes
-  at every frame, plays at 44 or 45 uncompressed and at 28 to 37 compressed in the probe
+  at every frame, plays at 44 or 45 uncompressed and at 29 to 36 compressed in the probe
   build; the firmware itself reports 45 to 47 and 36 to 42, see
   [Verified on the board](#verified-on-the-board). A dense file plays faster uncompressed.
-- **A send to twenty outputs** takes 15.7 ms with the limiter's dimming of every LED in
+- **A send to twenty outputs** takes 15.6 ms with the limiter's dimming of every LED in
   it, and 20 ms while the core decodes a dense clip on the chip's other processor core.
   The LEDs need 5.7 ms on the wire after that.
 - **The long requests** are those in which the core opens a file, at the start of every
-  loop of an animation and at every turn of a cycle: 23 ms for a small file, and up to
-  69 ms with dense clips, when the frames that came due meanwhile are decoded in the same
+  loop of an animation and at every turn of a cycle: 24 ms for a small file, and up to
+  51 ms with dense clips, when the frames that came due meanwhile are decoded in the same
   request.
 - **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 174 ms for the demo show, 6.0 s for one dense 60 x 60 clip of 10 seconds
-  compressed and 4.2 s uncompressed, and 39 s for a storage filled with 9 MB of such
+  by decoding it: 215 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
+  compressed and 4.3 s uncompressed, and 39 s for a storage filled with 9 MB of such
   clips. For that time the LEDs are dark and the board answers nothing, on the port or on
   the network; WLED opens its access point only afterwards. `install-show` and `flash`
   wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
@@ -696,8 +696,13 @@ What the figures say:
 - **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. One dense
   clip takes a minute and 9 MB take three.
-- **Memory.** 126,000 bytes of the chip's internal memory are free with twenty outputs of
-  180 LEDs and the core, 203,000 with two.
+- **Memory.** 65,000 bytes of the chip's internal memory are free with twenty outputs of
+  180 LEDs and the core, 151,000 with two. Before the content commands these were 126,000
+  and 203,000: the core now takes at its start what the check of an uploaded file needs,
+  a second window of 32,768 bytes and a second picture of the canvas, and tables with
+  room for 128 items. It takes them from the internal memory first and from the external
+  memory only when the internal memory has none. WLED's pages and its interface over
+  Wi-Fi have not been tried with the memory that is left.
 
 **An upload over USB.** Taken by `tests/board/test_upload.py` on 2026-10-12 with the probe
 build, with the example show at brightness 32 playing on the bench file; the test writes
@@ -705,16 +710,16 @@ the figures to `build/firmware/out/upload.json`. The file was the dense bench cl
 seconds: 60 x 6, 3,000 frames, 868,712 bytes. The command tool's upload sent it through
 the port and asked for `status` once a second through the same session.
 
-- **The speed** was 12,583 bytes a second: 69 seconds for the file. It is the speed of
+- **The speed** was 12,674 bytes a second: 69 seconds for the file. It is the speed of
   storage with its pacing, not of the port.
-- **While the data arrived** `status` reported 37 to 45 refreshes a second.
-- **The check** took 60.4 seconds: one frame of the file for each refresh, so as long as
-  the animation lasts. `status` reported 50 throughout. The core read the file back in
-  1,698 of its requests for a refresh, and the longest of those requests took 24 ms.
+- **While the data arrived** `status` reported 36 to 44 refreshes a second.
+- **The check** took 60.2 seconds: one frame of the file for each refresh, so as long as
+  the animation lasts. `status` reported 47 to 50 meanwhile. The core read the file back
+  in 1,698 of its requests for a refresh, and the longest of those requests took 27 ms.
 - **After `upload end`** `status` reported 50 in each of the ten seconds but the first,
-  which had 40: it is the second in which the file is put in place, with its storage
-  calls in a row. The longest time between two sends was 248 ms, there.
-- **The storage calls** of the whole upload were 591, 18.6 seconds together, and the
+  which had 41: it is the second in which the file is put in place, with its storage
+  calls in a row. The longest time between two sends was 216 ms, there.
+- **The storage calls** of the whole upload were 591, 18.4 seconds together, and the
   longest took 156 ms.
 - **The space.** `space` reported 872,448 bytes fewer free with the file in place, 213
   blocks for 868,712 bytes, and the 10,211,328 of before once the item was removed.
@@ -1232,7 +1237,7 @@ bench file, two outputs of 180 LEDs. The letters are those of that design's tabl
 | B3 | A write of 1,500 bytes takes a few milliseconds, and one in three some tens. With the pacing, `status` reports 25 or more with the bench show playing. | The writes are slower than assumed: 0.13 ms at the shortest, 31 ms in the mean and 152 ms at the longest; about one in three takes 87 ms, when the file system erases a block. With the pacing the board sent 34 to 46 refreshes in every second of the megabyte's 72 seconds, and 50 in each of the ten seconds after it; the longest time between two sends in a second was 90 to 161 ms. With the pacing taken out, the same trial ran at 44,148 bytes a second and the board sent 10 or 11 refreshes a second. The owner accepts 20 to 50, so the pacing stays as designed, and the writes need no task of their own. |
 | B4 | A line of 2,048 characters written to the port in one piece arrives whole with a queue of 4,096 bytes. | It does, twenty times out of twenty, and a line of 2,049 characters was answered with `line-too-long` twenty times. Two lines of 2,048 characters in one write, 4,098 bytes, do not fit the queue: the end of the second is lost. The command tool sends a line after the reply to the one before, so it never does that. |
 | B5 | `usedBytes` takes under 100 ms with storage nearly full. | It does not: 30 ms with the example show, 79 ms with one dense clip of 1.4 MB, and 377 ms with 9 MB of clips. So the usermod asks once, before the core starts, and keeps the number up itself, as [What the firmware does](#what-the-firmware-does) describes under "Storage"; `space` then makes no call to the file system. After a megabyte was written, renamed and removed, the number kept and the number the file system told after a restart were within 16,384 bytes of each other, which is what the test allows. |
-| B6 | An upload over USB carries 10,000 bytes a second or more. | It does: the command tool's upload of a file of 868,712 bytes ran at 12,583 bytes a second, see [Measurements on the board](#measurements-on-the-board). The storage side alone carries 13,985 bytes a second with the pacing: a megabyte in 72 seconds. |
+| B6 | An upload over USB carries 10,000 bytes a second or more. | It does: the command tool's upload of a file of 868,712 bytes ran at 12,674 bytes a second, see [Measurements on the board](#measurements-on-the-board). The storage side alone carries 13,985 bytes a second with the pacing: a megabyte in 72 seconds. |
 
 The other calls of the trial: opening a file for writing 14 ms, closing it 14 ms, removing
 the megabyte 38 ms, and writing the small file of 16 bytes, its open and its close with

@@ -5513,3 +5513,49 @@ owner's check can show.
 
 **Resolution.** `tests/air/test_upload.py`; `docs/firmware.md`, "test-air" and step 7 of
 "The owner's checks".
+
+## Seed 07: The last check: what the documents were compared with, and the tests added
+
+**Question.** Task 8 compares `docs/commands.md` and `docs/show.md` with the design word
+for word, reads every acceptance criterion once more, and adds a test where a program can
+check a criterion and none did.
+
+**Answer.** `docs/commands.md` is the design's text, byte for byte. `docs/show.md` has
+the design's four texts word for word, apart from the example of a written `show.json`,
+which the design gives with a cycle that lists an id no item has; the page has a valid
+show there, as recorded with task 4. No other difference was found, so nothing else was
+settled.
+
+Six criteria had no test and got one:
+
+- 13.5, no array above 256 bytes in a function of the core: a scan of the sources,
+  beside the compiler's limit of 512 bytes for a frame and the assertion that holds the
+  core object to 4,096 bytes.
+- 15.1, no host looks into a line: the emulator's sources also hold none of the words
+  `list` and `upload` and none of the core's three file names; `space` and `remove` are
+  allowed in the binding alone, where they are members of the host record.
+- 16.4, the emulator's host refuses a name that is no file name of the folder: now also
+  for the five storage methods that take a name.
+- 20.5 and 21.2, `docs/firmware.md` has the storage functions, the pacing, the probe's
+  members and the measured upload.
+- 20.6, `docs/reasons.md` no longer lists a show without items as malformed.
+- 20.7, `docs/decisions.md` lists the commands and the two limits.
+
+What no program checks: 14.4 as far as it is the file system's own promise for a power
+cut during a rename, which no task tries on the board; 14.6, which holds because no host
+function calls the core, and is seen in the traces of the storage calls; and 21.5 and
+21.6, the owner's check.
+
+The first table of "Measurements on the board" was taken again with the firmware as it
+is now: the core asks for more memory at its start, so less of the chip's internal
+memory is free, and every start takes a little longer.
+
+**Resolution.** `tests/core/test_build.py`,
+`test_no_function_has_an_array_above_256_bytes`; `tests/emulator/test_scope.py`;
+`tests/emulator/test_binding.py`,
+`test_the_storage_methods_refuse_every_name_that_is_not_a_file_name_of_the_folder`;
+`tests/firmware/test_docs.py`,
+`test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured`;
+`tests/core/test_docs.py`, `Decisions` and
+`test_a_show_without_items_is_not_listed_as_malformed`; `docs/decisions.md`, "Commands"
+and the change log; `docs/firmware.md`, "Measurements on the board".

@@ -197,12 +197,31 @@ class ReasonsDocument(unittest.TestCase):
             ],
         )
 
+    def test_a_show_without_items_is_not_listed_as_malformed(self):
+        text = (DOCS / "reasons.md").read_text(encoding="utf-8")
+        rows = [line for line in text.splitlines() if line.startswith("| `show-malformed` | The show file breaks its format")]
+        self.assertEqual(len(rows), 1)
+        self.assertNotIn("no item", rows[0])
+        self.assertIn("a `cycle` is empty", rows[0])
+        self.assertNotIn("there is no item", text)
+
     def test_every_text_begins_with_a_name_the_core_can_report(self):
         names = set(support.host_lines("reasons"))
         texts = re.findall(r"(?m)^\| `([a-z-]+)(?: <[a-z]+>)*` \|", self.section)
         self.assertGreaterEqual(len(texts), 14)
         for text in texts:
             self.assertIn(text, names)
+
+
+class Decisions(unittest.TestCase):
+    def test_the_commands_section_lists_what_the_front_end_reads(self):
+        text = (support.ROOT / "docs" / "decisions.md").read_text(encoding="utf-8")
+        commands = " ".join(text.split("\n## Commands\n")[1].split("\n## ")[0].split())
+        for expected in ("play an item by its ID", "switch on", "switch off", "set brightness", "report status", "report the free storage", "list what is installed",
+                         "remove an item", "upload an animation", "2,048 characters", "1,024 bytes", "the owner approves every addition"):
+            self.assertIn(expected, commands)
+        log = text.split("\n## Change log\n")[1]
+        self.assertIn("`space`, `list`, `remove` and `upload`", " ".join(log.strip().split("\n- ")[-1].split()))
 
 
 class Readme(unittest.TestCase):
