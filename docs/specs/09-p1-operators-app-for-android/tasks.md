@@ -59,7 +59,7 @@ Rules for every task:
     emulator as it is, fails: the option is a usage error.
   - Requirements: 12.1, 12.2, 12.3, 12.4
 
-- [ ] 2. The tool's `serve`, the suite's harness, the address, the client and the target screen
+- [x] 2. The tool's `serve`, the suite's harness, the address, the client and the target screen
   - `app/app.py` and `app/apptool/`: the command `serve`, the exit statuses and the error
     line. The other commands come with task 6.
   - `tests/app/support.py` and `tests/app/page/`: the emulator, the stand-in target, the

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>odrig</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+<section id="show" hidden>
+<h1>Show</h1>
+</section>
+<section id="target">
+<h1>Target</h1>
+<label for="address">Address of the installation</label>
+<input id="address" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
+<div class="pair">
+<button id="use" type="button">Use</button>
+<button id="board" type="button">Board</button>
+</div>
+<p id="link" class="state">Checking</p>
+<p id="link-failure" hidden></p>
+<p id="invalid" hidden></p>
+<p id="route"></p>
+<p>Join the Wi-Fi network odrig in the phone's Wi-Fi settings.</p>
+<p id="about" class="small"></p>
+</section>
+</main>
+<div id="message" hidden>
+<p id="message-text"></p>
+<button id="message-close" type="button">OK</button>
+</div>
+<nav>
+<button id="to-show" type="button">Show</button>
+<button id="to-target" type="button">Target</button>
+</nav>
+<script type="module" src="main.js"></script>
+</body>
+</html>

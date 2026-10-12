@@ -7510,3 +7510,36 @@ spec will say when it is written.
 **Resolution.** `docs/firmware.md`, "Measurements on the board" and "Verified on the
 board", the paragraph on the playlist; `tests/board/test_playlist.py`;
 `tests/air/test_upload.py`.
+
+## Seed 09: What Chrome showed for the app's suite
+
+**Question.** The design of the app assumed three things about Chrome without a window,
+C1 to C3, for the suite that drives the web code. Do they hold, and what else did the
+first run of the suite show?
+
+**Answer.**
+
+- C1 holds. A page from `127.0.0.1:A` posts a text to `127.0.0.1:B/odrig` with `fetch`
+  and reads the emulator's reply, with no request before it: the emulator's log has the
+  one line `status` for each request, as `http`.
+- C2 does not hold. With `--window-size=360,740` the driver's page was laid out 500 by
+  653 pixels: Chrome has a smallest window. The fallback of the design applies: the
+  driver gives the frame that holds the app its size, and the app in it is 360 by 740.
+- C3 holds. The app's page in a frame of the driver's page, both from the suite's
+  server, is worked by the driver, and an address the driver keeps before the frame
+  loads is the one the app starts with.
+- The board's address, `4.3.2.1`, is somebody else's computer on every network but the
+  board's own, and the app asks it when no address was set. So the suite's server is
+  also Chrome's proxy: what is not for this computer arrives there, is answered with
+  502 and goes no further. The suite reads from it what the pages asked other computers
+  for, which is how the test of the first address sees the line `status` on its way to
+  `4.3.2.1`. Chrome asks for things of its own, such as the time; they end there too
+  and are not counted, because they name no page.
+- `messages.js` is there from this task, with the texts of the four failures of the way
+  to the target, because the target screen shows them; the order of work had it later.
+- An address is kept in small letters and a port without zeros in front. While a request
+  to the address before is under way, a new address waits for its end, at most the five
+  seconds of the time limit: one request is under way at a time.
+
+**Resolution.** `tests/app/support.py`, `run` and `_Pages`; `tests/app/page/driver.js`;
+`app/www/target.js`, `parse`; `app/www/client.js`, `begin`.

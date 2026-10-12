@@ -28,6 +28,7 @@ SUITES = {
     "emulator": (".venv/bin/python -m unittest discover -s tests/emulator -t .", True),
     "onboarding": (".venv/bin/python -m unittest discover -s tests/onboarding -t .", True),
     "firmware": ("python3 firmware/fw.py test", False),
+    "app": ("python3 -m unittest discover -s tests/app -t .", False),
     "walkthrough": (".venv/bin/python -m unittest discover -s tests/walkthrough -t .", False),
     "board": ("python3 firmware/fw.py test-board", False),
     "air": ("python3 firmware/fw.py test-air", False),

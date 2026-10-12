@@ -97,17 +97,17 @@ the network.
 
 ```sh
 python3 firmware/fw.py test
+python3 -m unittest discover -s tests/app -t .
 .venv/bin/python -m unittest discover -s tests/walkthrough -t .
 ```
 
-The first is the suite of the firmware tool, `tests/firmware`, and needs no board. The
-first time that tool runs, it fetches WLED's source and its build tools into
-`build/firmware/`: about 260 MB, over the network. Run it when you work on the firmware.
-
-The second, `tests/walkthrough`, follows this page and the animation guide in a fresh copy:
-it sets up a clone in a temporary folder as this page says, which needs the network, runs
-the five suites above, packs and checks the demo show, and makes an animation as the guide
-says. It takes about four minutes. Run it when you have changed either page.
+The first is the suite of the firmware tool, `tests/firmware`, and needs no board. The first
+time that tool runs, it fetches WLED's source and its build tools into `build/firmware/`:
+about 260 MB, over the network. The second, `tests/app`, runs the web code of the operators'
+app, `app/www/`, in Chrome without a window against the emulator. The third,
+`tests/walkthrough`, follows this page and the animation guide in a fresh copy, which needs
+the network: it sets up a clone, runs the five suites above, packs the demo show and makes
+an animation, in seven minutes. Run it when you have changed either page.
 
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
