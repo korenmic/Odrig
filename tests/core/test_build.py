@@ -47,10 +47,10 @@ def foreign_headers(text, own):
 
 
 # The object files of macOS are listed with their sections, by `nm -m`, and every name of
-# C has an underscore in front. For the object files of Windows `nm` gives one letter for
-# the kind of a name, and the name as it is in C: there the underscore is put in front
-# here, so that a name reads the same on both systems.
-MACH_O = sys.platform != "win32"
+# C has an underscore in front. Elsewhere `nm` gives one letter for the kind of a name,
+# and the name as it is in C: there the underscore is put in front here, so that a name
+# reads the same on every system.
+MACH_O = sys.platform == "darwin"
 def number(text, constants):
     """The value of a number of elements: digits, constants of the same source, and the
     signs of a sum or a product."""

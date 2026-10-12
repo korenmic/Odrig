@@ -24,9 +24,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CORE = ROOT / "core"
 BUILD = CORE / "build"
 
-# Windows builds the core with the build script, which writes down the toolchain it used.
-# Elsewhere `make` builds it.
-BY_MAKE = sys.platform != "win32"
+# macOS builds the core with `make`, every other system with the build script, which
+# writes down the toolchain it used.
+BY_MAKE = sys.platform == "darwin"
 TEST_COMMAND = "make -C core test" if BY_MAKE else "python core/build.py test"
 TOOLCHAIN = BUILD / "toolchain.json"
 
@@ -60,6 +60,16 @@ def built(path):
     if not path.exists():
         raise AssertionError(f"{path} is not built; run the suite with `{TEST_COMMAND}`")
     return path
+
+
+def raw_deflate(level):
+    """A function that compresses bytes into a raw DEFLATE stream at a level, in a way
+    every Python from 3.10 on has."""
+    def deflate(body):
+        deflater = zlib.compressobj(level, zlib.DEFLATED, -15)
+        return deflater.compress(body) + deflater.flush()
+
+    return deflate
 
 
 def host(*arguments, stdin=b""):

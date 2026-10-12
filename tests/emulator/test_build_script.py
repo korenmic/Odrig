@@ -200,8 +200,8 @@ class Commands(unittest.TestCase):
         self.assertEqual(sorted(build.exports()), sorted(binding.FUNCTIONS))
 
     def test_the_shared_library_has_the_name_of_the_system(self):
-        self.assertEqual([build.shared_name(platform) for platform in ("darwin", "win32")], ["libodrig_core.dylib", "odrig_core.dll"])
-        for platform in ("darwin", "win32"):
+        self.assertEqual([build.shared_name(platform) for platform in ("darwin", "win32", "linux")], ["libodrig_core.dylib", "odrig_core.dll", "libodrig_core.so"])
+        for platform in ("darwin", "win32", "linux"):
             self.assertEqual(build.shared_name(platform), binding.library_of(platform)[0])
         self.assertRegex(MAKEFILE.read_text(encoding="utf-8"), r"(?m)^SHARED = \$\(BUILD\)/libodrig_core\.dylib$")
 
@@ -215,6 +215,13 @@ class Commands(unittest.TestCase):
         command, made, definitions = build.shared_command(self.GNU, ["build/core/a.o"], "darwin")
         self.assertEqual((command, made, definitions), (["g++", "-dynamiclib", "-o", "build/libodrig_core.dylib", "build/core/a.o"], "build/libodrig_core.dylib", None))
         self.assertIn("$(CXX) -dynamiclib -o $@ $(OBJECTS)", MAKEFILE.read_text(encoding="utf-8"))
+
+    def test_elsewhere_the_code_is_made_position_independent(self):
+        self.assertEqual(build.position_independent(self.GNU, "linux"), ("-fPIC",))
+        for platform in ("win32", "darwin"):
+            self.assertEqual(build.position_independent(self.GNU, platform), ())
+        self.assertEqual(build.position_independent(self.MICROSOFT, "win32"), ())
+        self.assertEqual(build.shared_command(self.GNU, ["a.o"], "linux")[0], ["g++", "-shared", "-o", "build/libodrig_core.so", "a.o"])
 
     def test_microsofts_link_names_every_export(self):
         command, made, definitions = build.shared_command(self.MICROSOFT, ["build/core/a.obj"], "win32")
@@ -259,11 +266,11 @@ class OnlyWhatChanged(unittest.TestCase):
             self.assertIn(name, needed)
         self.assertNotIn("src/player.cpp", needed)
 
-    @unittest.skipUnless(sys.platform == "win32", "the build script builds the library on Windows only")
+    @unittest.skipIf(sys.platform == "darwin", "make builds the library on macOS")
     def test_building_again_with_nothing_changed_runs_no_step(self):
         self.assertEqual(run_main("shared"), (0, "", ""))
 
-    @unittest.skipUnless(sys.platform == "win32", "the build script builds the library on Windows only")
+    @unittest.skipIf(sys.platform == "darwin", "make builds the library on macOS")
     def test_a_library_that_a_program_has_loaded_is_no_obstacle_when_nothing_changed(self):
         binding.load(LIBRARY)
         self.assertEqual(run_main("shared")[0], 0)
@@ -325,7 +332,7 @@ class TheTestHost(unittest.TestCase):
         self.assertEqual(build.host_link(self.GNU, objects, self.FIRST, "darwin"), (["g++", *makefile_variable("SANITIZERS"), "-o", "build/odrig_host", *objects], "build/odrig_host"))
         command, made = build.host_link(self.GNU, objects, (), "win32")
         self.assertEqual((command, made), (["g++", "-O1", "-g", "-static", "-o", "build/odrig_host.exe", *objects], "build/odrig_host.exe"))
-        self.assertEqual([build.host_name(platform) for platform in ("darwin", "win32")], ["odrig_host", "odrig_host.exe"])
+        self.assertEqual([build.host_name(platform) for platform in ("darwin", "win32", "linux")], ["odrig_host", "odrig_host.exe", "odrig_host"])
 
     def test_the_sources_of_the_host_are_those_of_its_folder(self):
         self.assertEqual((ROOT / "core" / build.HOST_SOURCES).resolve(), ROOT / "tests" / "core" / "host")
@@ -437,6 +444,7 @@ class TheLibraryOfTheSystem(unittest.TestCase):
     def test_each_system_has_its_library_and_its_build_command(self):
         self.assertEqual(binding.library_of("darwin"), ("libodrig_core.dylib", "make -C core shared"))
         self.assertEqual(binding.library_of("win32"), ("odrig_core.dll", "python core/build.py shared"))
+        self.assertEqual(binding.library_of("linux"), ("libodrig_core.so", "python core/build.py shared"))
 
     def test_a_missing_library_names_the_build_command_of_the_system(self):
         from emulator import failure
@@ -457,7 +465,7 @@ class TheLibraryOfTheSystem(unittest.TestCase):
         for name in SEVEN:
             self.assertTrue(hasattr(library, name), name)
 
-    @unittest.skipUnless(sys.platform == "win32", "the build script builds the library on Windows only")
+    @unittest.skipIf(sys.platform == "darwin", "make builds the library on macOS and writes no such file")
     def test_the_build_script_writes_down_the_toolchain_it_used(self):
         written = json.loads((ROOT / "core" / "build" / "toolchain.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(written), ["ar", "cc", "cxx", "kind", "nm"])
