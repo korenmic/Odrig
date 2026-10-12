@@ -6,6 +6,7 @@
 import {errors, jsonframes, odrg, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
+import * as folder from "./folder.js";
 
 function encode(values) {
   const source = files.read(values.input);
@@ -69,6 +70,7 @@ export const SUBCOMMANDS = new Map([
   ["encode", encode],
   ["decode", decode],
   ["check", check],
+  ["pack", folder.pack],
 ]);
 
 // White space as Python's `str.split` knows it.

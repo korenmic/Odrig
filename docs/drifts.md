@@ -4574,3 +4574,83 @@ generators of the Python tool write their sources into a temporary folder.
 
 **Resolution.** `converter/lib/odrg.js`; `converter/tests/reference.py`, `forms` and
 `decode`; `converter/tests/support.js`, `animationFrom` and `generated`.
+
+## Seed 06: The order of the first checks of pack, and what the library says of a source it was not given
+
+**Question.** The design has `pack` on the command line read the mapping file, read the
+show file, and then call `pack.begin`, which checks the mapping and then the show. The
+Python tool reads and checks the mapping file before it reads the show file: a mapping
+file that breaks a rule and a show file that is not there is `mapping-malformed` in the
+Python tool and would be `show-missing` in that order. The library also packs from bytes
+held in memory, where a source that is missing has no words of the operating system.
+
+**Answer.** `cli/folder.js` reads the mapping file, checks it with the library's reader,
+and only then reads the show file and calls `pack.begin`. The mapping is read twice; it is
+a few hundred bytes. `pack.pack` of the library gives `file-missing` for a source that is
+not among the bytes it was given, with the detail `X.json: the show names X.odrg and its
+source is not there`; on the command line the detail is the operating system's, as in the
+Python tool. An item of a show is `{id, file, cycle, seconds}` with null for what its kind
+does not have, as the Python reader has it. A folder and a name are joined as Python's
+`os.path.join` joins them, so an empty sources folder gives the name alone. The folders
+above the output folder are made one by one, the topmost first, as Python's `os.makedirs`
+makes them, so that a failure names the same path in both tools.
+
+**Resolution.** `converter/cli/folder.js`; `converter/lib/pack.js`, `converter/lib/show.js`;
+`converter/tests/pack.test.js`, "a mapping file that breaks a rule and a show file that is
+not there" and "the output folder".
+
+## Seed 06: How mapping files and shows are compared before import is there, and tables of command lines
+
+**Question.** The design reads every mapping file "by both tools through `import`", and
+`import` is added two tasks after the reader of mapping files. Its tables of shows and of
+mapping files have some hundred entries, each a command line for both tools.
+
+**Answer.** `mapping.test.js` compares the two readers themselves: `reference.py` gives
+what `odrig.mapping.loads` returns or rejects, for the tracked files, for the made-up
+files of `tests/core/support.py` and for 73 files of each kind that break a rule, and the
+library must give the same kind, canvas, legs and counts of LEDs, or the same reason and
+detail. It compares the two command lines through `pack`, the one subcommand that reads a
+mapping file at this point: a file that breaks a rule gives the same error line, and a
+file that is as the format says gives `size-mismatch` for a source of another canvas, whose
+detail names the canvas of the mapping. The task that adds `import` reads mapping files
+through `import` as well. `pack.test.js` compares the readers of show files in the same
+way.
+
+Where a table has many command lines, the Python side runs them in one Python, through
+the request `run` of `reference.py`, which calls the command line of the Python tool once
+for each, and the JavaScript side calls `main` of `cli/main.js` in the test's own program.
+A few entries of every table are run once more as programs of their own, and the three
+shows of Requirement 11, the output folder with paths from the folder the tool is started
+in, and the usage errors always are. A new Python for each of 300 command lines would take
+most of a minute.
+
+`reference.py` has the requests `mappings`, `read_mappings`, `read_shows` and `run` for
+this.
+
+**Resolution.** `converter/tests/mapping.test.js`, `converter/tests/pack.test.js`;
+`converter/tests/support.js`, `runPythonMany` and `runJsHere`.
+
+## Seed 06: A request to reference.py that never came back, and how the tests now ask
+
+**Question.** The design gives the Python side its input on standard input. In one run of
+the whole suite, the twelfth or so, a request of `inflate.test.js` with 6,000 streams did
+not come back: the Python program waited to read its standard input, and the test's
+Node.js 26.5 waited, inside the call that starts a program and waits for it, for the
+program to end. Neither moved for ten minutes; the suite has no time limit of its own. The
+Python program was ended by its process number, and the test then failed.
+
+**Answer.** The cause was not found: both sides were waiting on a pipe whose other end was
+open, which points at Node.js or the system and not at the tests. The requests no longer
+use a pipe for their data. `reference` of `support.js` writes the input into a file of a
+temporary folder and names it, and a second file for the answer, on the command line of
+`reference.py`, which reads the one and writes the other; the folder is removed after the
+call. Every program the tests start, both tools and `reference.py`, is started without a
+standard input and with a limit of ten minutes, after which it is ended and the test fails
+with a message, so a program that stalls can no longer hold the suite. The whole suite ran
+three times in a row after the change, 1,016 tests each time, in 22 seconds.
+
+This was seen once and is recorded so that a second sighting is recognised: if a test
+fails after ten minutes with "did not come to an end", it is this.
+
+**Resolution.** `converter/tests/support.js`, `reference`, `runJs` and `runPython`;
+`converter/tests/reference.py`, `main`.

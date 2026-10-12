@@ -120,7 +120,7 @@ Rules for every task:
     the first byte that differs into the commit message. Undo it.
   - Requirements: 1.9, 2.11, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.2, 8.3, 9.5
 
-- [ ] 6. Mapping files, show files and `pack`
+- [x] 6. Mapping files, show files and `pack`
   - Create `lib/mapping.js`, `lib/show.js`, `lib/pack.js` and `cli/folder.js`, from the
     Python files as they are in the repository. Add `pack` to the table of subcommands.
   - `tests/mapping.test.js` and `tests/pack.test.js` as the design lists them. The demo

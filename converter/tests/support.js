@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 
-import {errorLine, summary} from "../cli/main.js";
+import {errorLine, main, summary} from "../cli/main.js";
 import {errors} from "../lib/index.js";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -62,6 +62,8 @@ function environment(more) {
 }
 
 const LARGEST_OUTPUT = 1 << 30;
+// How long a program the tests start may run before it is ended and the test fails.
+const LONGEST_RUN_MS = 600000;
 
 // Runs `node converter/odrig.js` with the arguments. The result is `{status, out, err}`,
 // the two streams as text. `options.cwd` is the folder it is started in, the repository
@@ -72,6 +74,8 @@ export function runJs(argv, options = {}) {
     encoding: "utf8",
     env: environment(options.env),
     maxBuffer: LARGEST_OUTPUT,
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: LONGEST_RUN_MS,
   });
   return finished(done, "node");
 }
@@ -83,6 +87,8 @@ export function runPython(argv, options = {}) {
     encoding: "utf8",
     env: environment(options.env),
     maxBuffer: LARGEST_OUTPUT,
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: LONGEST_RUN_MS,
   });
   return finished(done, "python");
 }
@@ -92,29 +98,34 @@ export function runBoth(argv, options = {}) {
   return {js: runJs(argv, options), python: runPython(argv, options)};
 }
 
-// Asks `tests/reference.py` for something only Python has. `input` goes to its standard
-// input, as bytes or as a value written as JSON; the result is its standard output as
-// bytes.
-export function referenceBytes(request, argv = [], input = null) {
-  const given = input === null || input instanceof Uint8Array ? input : Buffer.from(JSON.stringify(input));
-  const done = spawnSync(python(), [REFERENCE, request, ...argv.map(String)], {
-    cwd: ROOT,
-    env: environment(),
-    input: given ?? undefined,
-    maxBuffer: LARGEST_OUTPUT,
-  });
-  if (done.error) {
-    throw new Error(`python could not be started: ${done.error.message}`);
-  }
-  if (done.status !== 0) {
-    throw new Error(`reference.py ${request} ended with status ${done.status}: ${done.stderr.toString("utf8")}`);
-  }
-  return done.stdout;
-}
-
-// As `referenceBytes`, with the standard output read as JSON.
+// Asks `tests/reference.py` for something only Python has. The input is a value that is
+// written as JSON, and the result is the value its answer spells. Both travel in files of
+// a temporary folder: a pipe to a program that is started and waited for in one call has
+// been seen to stall on a large input.
 export function reference(request, argv = [], input = null) {
-  return JSON.parse(referenceBytes(request, argv, input).toString("utf8"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-"));
+  try {
+    const asked = path.join(folder, "asked.json");
+    const answered = path.join(folder, "answered.json");
+    fs.writeFileSync(asked, JSON.stringify(input));
+    const done = spawnSync(python(), [REFERENCE, request, asked, answered, ...argv.map(String)], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: environment(),
+      maxBuffer: LARGEST_OUTPUT,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: LONGEST_RUN_MS,
+    });
+    if (done.error) {
+      throw new Error(`reference.py ${request} did not come to an end: ${done.error.message}`);
+    }
+    if (done.status !== 0) {
+      throw new Error(`reference.py ${request} ended with status ${done.status}: ${done.stderr}`);
+    }
+    return JSON.parse(fs.readFileSync(answered, "utf8"));
+  } finally {
+    fs.rmSync(folder, {recursive: true, force: true});
+  }
 }
 
 // A new temporary folder that is removed when the test `t` is over.
@@ -328,4 +339,24 @@ export function animationFrom(seed, {largestWidth = 40, largestHeight = 30} = {}
     frames.push({ms, picture});
   }
   return {width, height, frames};
+}
+
+// Runs command lines of the Python tool one after the other in one Python, in the folder
+// `cwd`: for each `{status, out, err}`. It is the command line of `python -m odrig` without
+// a new program for each line.
+export function runPythonMany(commands, cwd = ROOT) {
+  const results = reference("run", [], {cwd, commands: commands.map((argv) => argv.map(String))});
+  return results.map(([status, out, err]) => ({status, out, err}));
+}
+
+// Runs one command line of the JavaScript tool in this program: `{status, out, err}`. Paths
+// are taken from the folder this program runs in.
+export async function runJsHere(argv) {
+  const written = {out: "", err: ""};
+  const streams = {
+    out: {write: (text) => void (written.out += text)},
+    err: {write: (text) => void (written.err += text)},
+  };
+  const status = await main(argv.map(String), streams);
+  return {status, ...written};
 }

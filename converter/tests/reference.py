@@ -1,8 +1,9 @@
 """The Python side of the tests of the JavaScript converter: what only the Python tool has.
 
-Started as `python converter/tests/reference.py REQUEST [ARGUMENT ...]`. A request reads
-its input from standard input as JSON and writes its result to standard output as JSON.
-Bytes travel as hexadecimal text, and whole numbers of any size as decimal text.
+Started as `python converter/tests/reference.py REQUEST ASKED ANSWERED [ARGUMENT ...]`. A
+request reads its input from the file ASKED as JSON and writes its result into the file
+ANSWERED as JSON. Bytes travel as hexadecimal text, and whole numbers of any size as
+decimal text.
 """
 
 import contextlib
@@ -19,7 +20,7 @@ import zlib
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
-from odrig import cli, errors, jsonframes, mapping, odrg  # noqa: E402
+from odrig import cli, errors, jsonframes, mapping, odrg, show  # noqa: E402
 
 
 def _run(argv):
@@ -190,8 +191,85 @@ def decode(arguments, files):
     return results
 
 
+def mappings(arguments, given):
+    """The mapping files the suites of the core play on, by name: the tracked files and the
+    made-up ones of both kinds, each as its text."""
+    from tests.core import support
+
+    return support.mapping_texts()
+
+
+def read_mappings(arguments, files):
+    """What `odrig.mapping.loads` gives for each file, or its rejection."""
+    results = []
+    for data in files:
+        try:
+            canvas = mapping.loads(bytes.fromhex(data))
+        except errors.Rejection as rejection:
+            results.append({"reason": rejection.reason, "detail": rejection.detail})
+            continue
+        results.append(
+            {
+                "kind": canvas.kind,
+                "width": canvas.width,
+                "height": canvas.height,
+                "strip_length": canvas.strip_length,
+                "legs": [
+                    {
+                        "leg": leg.leg,
+                        "pin": leg.pin,
+                        "first_led": leg.first_led,
+                        "strips": list(leg.strips),
+                        "led_count": canvas.led_count(leg),
+                    }
+                    for leg in canvas.legs
+                ],
+            }
+        )
+    return results
+
+
+def read_shows(arguments, files):
+    """What `odrig.show.loads` gives for each file, with the file names of `show.files`, or
+    its rejection."""
+    results = []
+    for data in files:
+        try:
+            listed = show.loads(bytes.fromhex(data))
+        except errors.Rejection as rejection:
+            results.append({"reason": rejection.reason, "detail": rejection.detail})
+            continue
+        results.append(
+            {
+                "brightness": listed.brightness,
+                "start": listed.start,
+                "items": [
+                    {"id": item.id, "file": item.file, "cycle": None if item.cycle is None else list(item.cycle), "seconds": item.seconds}
+                    for item in listed.items
+                ],
+                "files": show.files(listed),
+            }
+        )
+    return results
+
+
+def run(arguments, given):
+    """What `python -m odrig` gives for each of the command lines of `given["commands"]`,
+    run one after the other in this interpreter, in the folder `given["cwd"]`: for each its
+    status, its standard output and its standard error."""
+    before = os.getcwd()
+    os.chdir(given["cwd"])
+    try:
+        return [_run(list(argv)) for argv in given["commands"]]
+    finally:
+        os.chdir(before)
+
+
 REQUESTS = {
     "check": check,
+    "mappings": mappings,
+    "read_mappings": read_mappings,
+    "read_shows": read_shows,
     "encode": encode,
     "forms": forms,
     "decode": decode,
@@ -200,13 +278,17 @@ REQUESTS = {
     "milliseconds": milliseconds,
     "inflate": inflate,
     "deflate": deflate,
+    "run": run,
 }
 
 
 def main(argv):
-    request, arguments = argv[0], argv[1:]
-    given = json.load(sys.stdin)
-    json.dump(REQUESTS[request](arguments, given), sys.stdout)
+    request, asked, answered, arguments = argv[0], argv[1], argv[2], argv[3:]
+    with open(asked, encoding="utf-8") as file:
+        given = json.load(file)
+    result = REQUESTS[request](arguments, given)
+    with open(answered, "w", encoding="utf-8") as file:
+        json.dump(result, file)
     return 0
 
 
