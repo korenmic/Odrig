@@ -116,7 +116,7 @@ class EncodedFiles(unittest.TestCase):
                         records.append(odrg.coded_record(old, new, width, bpp, 20, predictor, run, k))
                         written.add((bpp, predictor, run, k))
                         old = new
-            for deflate in (None, support.raw_deflate(9)):
+            for deflate in (None, lambda body: zlib.compress(body, 9, wbits=-15)):
                 files.append(odrg.container(width, height, palette, records, deflate))
         every = {(bpp, predictor, run, k) for bpp in (1, 3) for predictor in range(4) for run in (False, True) for k in range(8)}
         self.assertEqual(written, every)

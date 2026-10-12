@@ -1,7 +1,7 @@
 """The suite of the emulator and the command tool.
 
 Importing the package builds the core's shared library, so the one test command builds
-what it tests: with `make` on macOS and with the build script elsewhere. When the build
+what it tests: with the build script on Windows and with `make` elsewhere. When the build
 fails, no test runs and the output of the build is the failure.
 """
 
@@ -14,7 +14,7 @@ from emulator import binding
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIBRARY = ROOT / "core" / "build" / binding.LIBRARY_NAME
 BUILD_SCRIPT = ROOT / "core" / "build.py"
-BUILD_COMMAND = ["make", "-C", str(ROOT / "core"), "shared"] if sys.platform == "darwin" else [sys.executable, str(BUILD_SCRIPT), "shared"]
+BUILD_COMMAND = [sys.executable, str(BUILD_SCRIPT), "shared"] if sys.platform == "win32" else ["make", "-C", str(ROOT / "core"), "shared"]
 
 
 def build_the_library():

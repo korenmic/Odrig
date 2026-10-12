@@ -112,11 +112,7 @@ def kind_of(program):
 
 def shared_name(platform=sys.platform):
     """The file name of the shared library on a system."""
-    if platform == "win32":
-        return "odrig_core.dll"
-    if platform == "darwin":
-        return "libodrig_core.dylib"
-    return "libodrig_core.so"
+    return "odrig_core.dll" if platform == "win32" else "libodrig_core.dylib"
 
 
 def exports(header=HEADER):
@@ -271,12 +267,6 @@ def compile_command(toolchain, source, flags=()):
     return [toolchain.cxx, *GNU_FLAGS, *flags, "-c", f"src/{source}", "-o", made], made
 
 
-def position_independent(toolchain, platform=sys.platform):
-    """The flag a GNU-style compiler needs for code that goes into a shared library, where
-    the system does not make all code so."""
-    return () if toolchain.kind == "msvc" or platform in ("win32", "darwin") else ("-fPIC",)
-
-
 def stale(made, needed):
     """Whether a file has to be made again: it is not there, or it is older than one of the
     files it is made from. The paths are as seen from `core/`."""
@@ -312,7 +302,7 @@ def compiled(toolchain):
     objects."""
     (BUILD / "core").mkdir(parents=True, exist_ok=True)
     record(toolchain)
-    steps = [(source, *compile_command(toolchain, source, position_independent(toolchain))) for source in sources()]
+    steps = [(source, *compile_command(toolchain, source)) for source in sources()]
     all_started([command for source, command, made in steps if stale(made, needed_by(source))], toolchain.env)
     return [made for _, _, made in steps]
 
@@ -334,9 +324,7 @@ def shared_command(toolchain, objects, platform=sys.platform):
     if platform == "win32":
         definitions = "EXPORTS\n" + "".join(f"    {name}\n" for name in exports())
         return [toolchain.cxx, "-shared", "-static", "-o", made, *objects, "build/core/odrig_core.def"], made, definitions
-    if platform == "darwin":
-        return [toolchain.cxx, "-dynamiclib", "-o", made, *objects], made, None
-    return [toolchain.cxx, "-shared", "-o", made, *objects], made, None
+    return [toolchain.cxx, "-dynamiclib", "-o", made, *objects], made, None
 
 
 def build_static(toolchain):

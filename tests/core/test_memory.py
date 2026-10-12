@@ -98,7 +98,7 @@ def stored_clip(frames, compressed):
     palette = [rng.randbytes(3) for _ in range(9)]
     pictures = [bytes(rng.randrange(9) for _ in range(3600)) for _ in range(8)]
     records = [odrg.stored_record(pictures[number % 8], 20) for number in range(frames)]
-    deflate = support.raw_deflate(6) if compressed else None
+    deflate = (lambda body: zlib.compress(body, 6, wbits=-15)) if compressed else None
     return odrg.container(60, 60, palette, records, deflate)
 
 

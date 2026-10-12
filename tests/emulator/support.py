@@ -501,9 +501,8 @@ def exported(library):
     """The names a shared library offers to a program that loads it."""
     if sys.platform == "win32":
         return dll_tables(library)[1]
-    options, mark = ("-gU", " T _") if sys.platform == "darwin" else ("-gD", " T ")
-    listed = subprocess.run(["nm", options, str(library)], capture_output=True, text=True, check=True).stdout
-    return [line.split(mark, 1)[1] for line in listed.splitlines() if mark in line]
+    listed = subprocess.run(["nm", "-gU", str(library)], capture_output=True, text=True, check=True).stdout
+    return [line.split(" T _", 1)[1] for line in listed.splitlines() if " T _" in line]
 
 
 def listening(emulator):

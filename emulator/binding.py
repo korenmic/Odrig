@@ -17,11 +17,9 @@ REPLY_MAX = 1024
 
 def library_of(platform):
     """`(file name, build command)` of the core's shared library on a system."""
-    if platform == "darwin":
-        return "libodrig_core.dylib", "make -C core shared"
     if platform == "win32":
         return "odrig_core.dll", "python core/build.py shared"
-    return "libodrig_core.so", "python core/build.py shared"
+    return "libodrig_core.dylib", "make -C core shared"
 
 
 LIBRARY_NAME, BUILD_COMMAND = library_of(sys.platform)
