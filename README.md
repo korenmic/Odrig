@@ -5,6 +5,21 @@ addressable LED strips. The target is a canvas of 60 x 60 LEDs on twenty legs, e
 pin of the board with three upright strips of 60 LEDs; the build on the bench today has two
 legs of three flat strips, 60 x 6.
 
+## Start here
+
+Read these four pages first, in this order:
+
+1. [docs/getting-started.md](docs/getting-started.md) takes you from a fresh clone to the
+   demo show playing in the emulator on your own computer. It needs no board.
+2. [docs/vocabulary.md](docs/vocabulary.md) says what the project's words mean.
+3. [docs/animation-guide.md](docs/animation-guide.md) shows how to make an animation and
+   try it without the board.
+4. [docs/working-rules.md](docs/working-rules.md) has the rules that bind every change.
+   Read it before you change anything.
+
+The rest of this page names the reference documents. Coding agents start at
+[AGENTS.md](AGENTS.md).
+
 ## Workstreams
 
 - **Firmware** — the program flashed onto the ESP32 that drives the LEDs and plays stored

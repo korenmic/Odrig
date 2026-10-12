@@ -97,7 +97,7 @@ Rules for every task:
     which no canvas has, `test_guide.py` fails where it runs the generator. Undo it.
   - Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
 
-- [ ] 5. The entry file, `CLAUDE.md` and the README
+- [x] 5. The entry file, `CLAUDE.md` and the README
   - Write `AGENTS.md` with the headings of the design, at most 150 lines, and `CLAUDE.md`.
   - Add the section `Start here` to `README.md`. The phrases and the links that the suites
     of seeds 01 to 05 check in it stay.
