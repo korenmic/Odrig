@@ -3,6 +3,7 @@
 import collections
 import contextlib
 import functools
+import importlib.util
 import io
 import json
 import pathlib
@@ -27,6 +28,8 @@ PAGE_LINES = 200
 
 # What a page may name although no clone holds it: what is made on the computer.
 MADE_ON_THE_COMPUTER = ("build/", "core/build/", ".venv/", ".codex/", "converter/node_modules/")
+# Where what is fetched or tried on a computer goes. Git ignores both.
+FETCHED_OR_TRIED = ("tools/", "scratch/")
 # Folders that exist untracked on the first computer only, and that nobody changes.
 FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 # The files of an installed file set that no tracked file is named after.
@@ -39,6 +42,10 @@ SEEDS_ON_MASTER = ("project-seeds/11-p0-emulator-and-tools-on-windows/",)
 REMOTE_BRANCHES = "origin/"
 
 PYTHONS = (".venv/bin/python", "python", "python3")
+# The Python of the environment as Windows writes it. A command that starts it is checked
+# as one that starts Python.
+WINDOWS_PYTHON = ".venv\\Scripts\\python"
+BUILD_SCRIPT = "core/build.py"
 # The program that runs the converter and the file it is given, and the program that
 # installs the converter's packages and runs its suite, with the two ways it is run.
 NODE = "node"
@@ -138,7 +145,7 @@ def is_path(word):
 
 def looked_for(word):
     """Whether a path must exist in a clone: not one that is made on the computer."""
-    apart = MADE_ON_THE_COMPUTER + FIRST_COMPUTER_ONLY + (REMOTE_BRANCHES,)
+    apart = MADE_ON_THE_COMPUTER + FETCHED_OR_TRIED + FIRST_COMPUTER_ONLY + (REMOTE_BRANCHES,)
     return not word.startswith(apart) and word not in INSTALLED_NAMES + TO_BE_MADE + SEEDS_ON_MASTER
 
 
@@ -179,8 +186,18 @@ def understood(parse, arguments):
     return None
 
 
+@functools.lru_cache(maxsize=None)
+def build_script():
+    """The build script of the core as a module."""
+    spec = importlib.util.spec_from_file_location("odrig_core_build", ROOT / BUILD_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _python(words):
-    """What is wrong with a command that starts Python: a module, or the firmware tool."""
+    """What is wrong with a command that starts Python: a module, the firmware tool, or
+    the build script of the core."""
     from emulator import app
     from fwtool import cli as firmware
     from odrig import cli as converter
@@ -190,6 +207,8 @@ def _python(words):
         return None
     if words[:1] == ["firmware/fw.py"]:
         return understood(firmware.parser().parse_args, words[1:])
+    if words[:1] == [BUILD_SCRIPT]:
+        return understood(build_script().parser().parse_args, words[1:])
     if words[:1] != ["-m"] or len(words) < 2:
         return "it starts neither a module nor the firmware tool"
     module, rest = words[1], words[2:]
@@ -285,7 +304,7 @@ def _make(words):
 
 def refusal(command):
     """What is wrong with a command a page gives, or nothing: the tool it names is asked."""
-    words = shlex.split(command.split(" > ")[0])
+    words = shlex.split(command.replace(WINDOWS_PYTHON, "python").split(" > ")[0])
     program, rest = words[0], words[1:]
     if program in PYTHONS:
         return _python(rest)
@@ -305,4 +324,4 @@ def refusal(command):
 def is_command(span):
     """Whether a code span of the prose is a command: it starts one of the checked programs."""
     words = span.split()
-    return len(words) > 1 and words[0] in PYTHONS + (NODE, NPM, "make", "git")
+    return len(words) > 1 and words[0] in PYTHONS + (WINDOWS_PYTHON, NODE, NPM, "make", "git")

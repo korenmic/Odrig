@@ -7,8 +7,9 @@ the firmware run the same source files, so the two cannot behave differently.
 
 The core is written in C++11 without exceptions, run-time type information, threads or
 floating point. It includes no header of a platform and refers to nothing outside itself
-but the C library's routines that copy, fill and compare memory. It keeps everything it
-knows in one object, takes its memory once at startup, and never calls itself.
+but the C library's routines that copy, fill and compare memory and the one that finds the
+end of a text, which GCC puts in the place of a loop. It keeps everything it knows in one
+object, takes its memory once at startup, and never calls itself.
 
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
@@ -25,6 +26,9 @@ Run from the repository root.
 | `make -C core test` | Builds the library and the test host `core/build/odrig_host`, then runs the suite of `tests/core/`. | The same, and Python 3.10 or later with no added package. |
 | `make -C core bench` | Builds `core/build/odrig_bench`, has the reference converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
 | `make -C core clean` | Removes `core/build/`. | |
+| `python core/build.py` | Builds the library without GNU Make, which is how Windows builds: `core/build/libodrig_core.a`, or `odrig_core.lib` with Microsoft's compiler. It builds again only what changed. | A C++ compiler: `g++` or `clang++`, on the path or unpacked under the folder `tools/`, or Microsoft's C++ build tools. Python 3.10 or later. |
+| `python core/build.py test` | Builds the library and the test host, then runs the suite of `tests/core/` with the Python that runs the script. | The same. |
+| `python core/build.py clean` | Removes `core/build/`. | |
 
 The test command uses `python3`. Another Python is named on the command line, by its full
 path, because `make` runs inside `core/`:
@@ -40,6 +44,15 @@ the readers of the reference converter,
 written in Python, `ReferencePlayer` in `tests/core/support.py`. The test host is built with
 the address and undefined-behaviour sanitizers. The suite needs no hardware and no network
 connection.
+
+The build script finds the compiler itself: the one named with `--cxx`, the one the
+variable `CXX` names, one unpacked under `tools/`, one on the path, and then Microsoft's.
+It builds the test host with the checks for faults at run time that the toolchain has,
+and prints which: the two sanitizers where they are; with GCC for Windows, which has no
+library for them, the undefined-behaviour checks as traps, the stack protector and the
+assertions of the standard library; with Microsoft's compiler its own run-time checks. A
+fault that only the address sanitizer finds is therefore found on macOS. With Microsoft's
+compiler the tests that need a GNU-style `nm`, `ar`, `cc` or `c++` are skipped.
 
 Git ignores `core/build/`.
 

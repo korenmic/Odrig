@@ -1,6 +1,6 @@
 # The emulator
 
-The emulator is a Mac program that runs the core of [core.md](core.md) on an installed show,
+The emulator is a program for macOS and Windows that runs the core of [core.md](core.md) on an installed show,
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
 repository root and uses only the Python standard library. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
@@ -11,7 +11,8 @@ This page covers the [commands](#commands) that build and test it, the
 [serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
 [command tool](#the-command-tool), [the page](#the-page) with its two views, the
 [event stream](#the-event-stream), [record mode](#record-mode), the
-[exit statuses](#exit-statuses) and the [check list by eye](#the-check-list-by-eye).
+[exit statuses](#exit-statuses), what is [open after the work on Windows](#on-windows) and
+the [check list by eye](#the-check-list-by-eye).
 
 ## Commands
 
@@ -22,12 +23,28 @@ Run from the repository root.
 | `make -C core shared` | Builds `core/build/libodrig_core.dylib`, the library the emulator loads, from every `core/src/*.cpp` with the flags of `make -C core`. | Apple's command-line developer tools: `make` and `c++`. |
 | `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, the JavaScript shell that is part of macOS, and Node.js 20 or later as `node`, for the test that runs the pack commands of this page. |
 
+On Windows the two commands are these. `python` there is the Python of the virtual
+environment, `.venv\Scripts\python`.
+
+| Command | What it does | What it needs |
+|---|---|---|
+| `python core/build.py shared` | Builds `core/build/odrig_core.dll`, the same library for Windows, from every `core/src/*.cpp`. It builds again only what changed. | A C++ compiler: `g++` or `clang++`, on the path or unpacked under the folder `tools/`, or Microsoft's C++ build tools. No GNU Make. |
+| `python -m unittest discover -s tests/emulator -t .` | Builds the shared library with the build script and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and Node.js as the JavaScript shell. |
+
+Windows does not let a library be written while a running emulator has it loaded. A build
+with nothing to do leaves the library alone, so the suite runs beside an open emulator.
+When a source of the core has changed, stop the emulator first: the build script says so.
+
 The emulator never builds the library itself. The suite is every `test_*.py` file in
 `tests/emulator/`, found by discovery; importing the test package runs `make -C core shared`
 first, and when that fails no test runs and make's output is the failure. The suite needs
 no hardware, no network connection and no browser. The page's geometry is run in the
 JavaScript shell of macOS,
 `/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`.
+Where that shell is not there, the suite builds with the build script and takes Node.js
+with `tests/emulator/js/shell.js`, a small program that takes the command line of `jsc`.
+A test that needs the pseudo-terminal is skipped on Windows, and a test that only sends
+lines beside HTTP sends them through the [line port](#the-line-port) there.
 
 ## Two shows to run
 
@@ -77,7 +94,7 @@ of the Python package of [reference-converter.md](reference-converter.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose] [--storage BYTES]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -92,14 +109,15 @@ serial: /Users/you/odrig/build/emulator/serial
 It then asks the core for a refresh at every grid time, 20 ms apart, with a timestamp in
 whole milliseconds from a clock that does not go backwards. When a request is late it
 carries the current time; the grid times that were missed are not asked for again. The
-emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, and then
-removes the link to its port and exits with status 0.
+emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, on Windows
+Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with status 0.
 
 | Option | Meaning | Without it |
 |---|---|---|
 | `--port N` | The port of the address on 127.0.0.1; 0 takes any free port. | 8600 |
 | `--serial-link PATH` | Where the link to the serial port is made. | `build/emulator/serial` under the repository root, whatever folder the command is run from |
-| `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root |
+| `--tcp-port N` | The port of the [line port](#the-line-port) on 127.0.0.1; 0 takes any free port. | On a Mac there is no line port; on Windows it is 8601 |
+| `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
 | `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
 
@@ -153,6 +171,40 @@ python -m odrigctl --port build/emulator/serial status
 A link left at the path by an earlier run is replaced. If the path holds anything that is
 not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
 at once need two link paths and two page ports.
+
+## The line port
+
+Windows has no pseudo-terminal. There the emulator offers the line protocol of the serial
+port on a TCP port of 127.0.0.1 instead, the line port, and prints its address in place of
+the serial port's:
+
+```
+page: http://127.0.0.1:8600/
+tcp: 127.0.0.1:8601
+```
+
+On a Mac the serial port stays, and `--tcp-port N` opens the line port beside it; the
+emulator then prints `tcp:` as a third line. On Windows `--serial-link` ends the emulator
+with the reason `serial-unavailable`.
+
+```
+python -m odrigctl --tcp 127.0.0.1:8601 status
+```
+
+- A program connects, writes command lines and reads the replies. Every byte it writes
+  reaches the core's entry for bytes, unchanged and in order, and every reply to a line
+  those bytes finish is written back to the same connection. A line may arrive in pieces,
+  and several lines may arrive at once.
+- The port does not echo, and it adds, removes and changes no newline and no carriage
+  return.
+- A program may connect and leave any number of times, and several may be connected at
+  once. As with the serial port, one emulator reads one stream of lines: a line begun on
+  one connection and not ended is ended by the next bytes that arrive, on whichever
+  connection. A program sends whole lines.
+- A command that arrived this way has `tcp` as its transport in the log.
+- Stopping the emulator closes every connection.
+
+Two emulators at once need two line ports and two page ports.
 
 ## Commands over HTTP
 
@@ -505,7 +557,7 @@ event:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
@@ -519,8 +571,8 @@ data: 123460 <base64 of the refresh>
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
-| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `hello` | First on every connection. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 
@@ -536,20 +588,20 @@ send for 15 seconds is sent the comment line `: keep-alive`.
 ## The command tool
 
 `odrigctl` sends the commands of [commands.md](commands.md) to the emulator or to the
-board, through a serial port or over HTTP. It is a second small Python package at the
-repository root, uses only the Python standard library, and treats the two targets alike:
-only the port name or the address says which one is meant.
+board, through a serial port, over TCP or over HTTP. It is a second small Python package
+at the repository root, uses only the Python standard library, and treats the two targets
+alike: only the port name or the address says which one is meant.
 
 ```
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] play ID
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] on
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] off
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] brightness N
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] status
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] space
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] list
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] remove ID
-python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] play ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] on
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -565,6 +617,21 @@ python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial remove 9
+```
+
+Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
+lines on Windows:
+
+```
+python -m odrigctl --tcp 127.0.0.1:8601 play 2
+python -m odrigctl --tcp 127.0.0.1:8601 on
+python -m odrigctl --tcp 127.0.0.1:8601 off
+python -m odrigctl --tcp 127.0.0.1:8601 brightness 40
+python -m odrigctl --tcp 127.0.0.1:8601 status
+python -m odrigctl --tcp 127.0.0.1:8601 space
+python -m odrigctl --tcp 127.0.0.1:8601 list
+python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
+python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -609,6 +676,13 @@ The tool prints the reply line to standard output:
   line that is a JSON object with a member `ok`; every other line, such as a boot message,
   is ignored. A port without modem lines, which the emulator's is, refuses the two requests,
   and the tool goes on.
+- `--port NAME` on Windows: the name is that of a real serial port, such as `COM3`. The
+  tool opens it through the system's own library, lowers RTS before it lowers DTR, and
+  then sets 115200 baud, 8 data bits, no parity and one stop bit, with DTR and RTS left
+  low, so that opening the port again raises neither. Windows has no virtual serial port:
+  the emulator is reached there with `--tcp` or `--http`.
+- `--tcp ADDRESS`: `host:port`; the port has to be given. The tool connects, sends the
+  line and takes the first received line that is a reply, as through a serial port.
 - `--http ADDRESS`: `host` or `host:port`, with or without `http://` in front and a `/` at
   the end; without a port it is 80. The tool sends `POST http://ADDRESS/odrig` with the line
   as the body and the content type `application/octet-stream`, and takes the body of a
@@ -660,9 +734,12 @@ data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` are 
 exchange each: they return the reply or raise `Unreachable`. `serial_exchange` takes a
 fourth argument, a function that says which received line is the answer, for a target
 whose answer is not a reply of [commands.md](commands.md).
+`odrigctl.client.tcp_exchange(address, data, timeout)` is the same exchange over TCP, with
+the address as `host:port`.
 `odrigctl.client.Session(port=..., http=..., timeout=...)` is several exchanges with one
 target: `exchange(line)` returns the reply to a line, and `close()` ends the session. Over
-the port it opens the port once, as `serial_exchange` does, and keeps it open; a line that
+the port it opens the port once, as `serial_exchange` does, and keeps it open, and with
+`tcp=...` in the place of `port=...` it does the same with a connection; a line that
 arrived whole before a line is sent is no answer to it and is dropped. Over HTTP every
 exchange is one request. `odrigctl.content.list_all(session, show)` and
 `odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
@@ -698,8 +775,8 @@ bytes. A script may hold the content commands of [commands.md](commands.md): the
 the folder as in real time, so the folder is changed afterwards, and "the same folder"
 means a folder with the same files as before the first recording. The emulator gives the
 core nothing of its own in this mode: only the requests for a refresh and the commands of
-the script. The options `--port`, `--serial-link` and `--verbose` belong to real time and
-do not go with `--record`.
+the script. The options `--port`, `--serial-link`, `--tcp-port` and `--verbose` belong to
+real time and do not go with `--record`.
 
 ### The script
 
@@ -782,6 +859,40 @@ the ticks to a Python program.
 Whether the folder holds a valid show is not the emulator's judgement but the core's: any
 folder is recorded, and with an invalid show the LED data is dark and `status` gives the
 reason.
+
+## On Windows
+
+The emulator, the command tool and the suite of both work on Windows 10 and 11. What is
+different there is said where it belongs on this page: the [build](#commands), the
+[line port](#the-line-port) in place of the serial port, and `--tcp` and a `COM` name in
+the [command tool](#the-command-tool). Two lists are open after that work.
+
+**Open for the first computer.** The work was done on a Windows computer, and nothing of
+it could be run on macOS. To be seen there:
+
+- The suites pass as before: `make -C core test`, the emulator suite, the converter
+  suite and the onboarding suite. The tests that used the serial port as the transport
+  beside HTTP now take it through a helper, and the tests of the JavaScript shell start
+  `jsc` through one.
+- The emulator opens its serial port and prints its two lines as before, and with
+  `--tcp-port 0` prints `tcp:` as a third line and answers on that port.
+- The command tool reaches the emulator and the board through `--port` as before:
+  `odrigctl/client.py` kept its functions for the serial port of macOS and gained a
+  choice between them and the port of Windows.
+- The core suite passes with the name `_strlen` in `tests/core/allowed_symbols.txt`,
+  which Apple's compiler does not use.
+- `python3 core/build.py shared` is not how macOS builds, and has not been run there.
+
+**Open for whoever has a board on a Windows computer.** No board was connected to the
+Windows computer. To be seen with one:
+
+- `python -m odrigctl --port COM<n> status` prints the board's status.
+- The board does not restart when the port is opened, the first time after it is plugged
+  in and the times after. Windows raises DTR and RTS when a port is opened that has not
+  been set otherwise, before a program can say anything; the tool lowers RTS, then DTR,
+  and leaves the port set so that the next opening raises neither. Whether the first
+  opening restarts the board is not known.
+- The firmware tool, `firmware/fw.py`, has not been run on Windows at all.
 
 ## The check list by eye
 
@@ -947,3 +1058,60 @@ What is left for a person:
 - The page in a light appearance of the system, and a file whose legs start at the top or
   whose pins the board lacks: the list has no step for them. The suite covers the
   geometry of such files, and nobody looked at them in this pass.
+
+### What has been checked on Windows
+
+The work on Windows was checked on one computer: Windows 11, with Python 3.14.2 and, in a
+fresh clone, Python 3.12.10; GCC 16.1 of WinLibs and Microsoft's compiler 14.50; and
+Node.js 24.13. The page was read in Chrome 154 and in Edge 151, both without a window, by a
+program that drives the browser through its remote-debugging port, as on the Mac. The
+program and its screenshots are in `scratch/`, which git ignores.
+
+- **The suites.** With Python 3.14: the converter suite, 622 tests; the core suite, 246,
+  and with Microsoft's compiler 246 of which 10 are skipped; the suite of the emulator and
+  the command tool, 450 of which 15 are skipped; the onboarding suite, 75. In a fresh
+  clone, made with git set to convert line endings and set up with Python 3.12 as the
+  getting-started page says, no file had a carriage return and the same four suites
+  passed, after one test of a time limit was made to allow for the clock of that Python,
+  which counts in steps of 1/64 of a second.
+- **The demo show.** Packed with the commands of Windows, `dvd.odrg` has 1,052 bytes and
+  `hello.odrg` 1,213, three more than in the table above, which was made with another
+  zlib. Record mode prints the reply the getting-started page shows. The emulator prints
+  its `page:` and its `tcp:` line. `status`, `play 2`, `brightness 40`, `play 3` and
+  `play 99` gave the replies of [commands.md](commands.md) over HTTP and over the line
+  port, with the exit statuses 0 and 1, and each stood in the log of the page as `http` or
+  `tcp`.
+- **The page.** In both browsers the LEDs view shows HELLO WORLD upright in the rows 28 to
+  33 and the twenty legs in their colours, and the mapping view the board beside the
+  canvas with a line from every pin. `core` was 50 and `page` 49 to 51 in every second
+  read: eight seconds in the LEDs view and six in the mapping view, in a window of
+  1280 x 800 in both browsers and of 756 x 900 in Chrome. Neither browser reported an
+  error of the page. The header shows `tcp 127.0.0.1:8601` in the place of the serial port.
+- **An import.** A GIF of 40 x 40 with 36 pictures and a video of three seconds, H.264 at
+  25 pictures a second, were imported for the target, checked, packed with the bouncing
+  square and played, as the animation guide describes. `core` and `page` stayed at 50.
+- **A show of 113 animations**, made from GIFs with the converter on another computer,
+  was read by the core without a complaint and played, in a cycle and one by one.
+- **A serial port.** The computer has a port `COM1` with nothing connected. The command
+  tool opened it; afterwards the system reported 115200 baud, 8 data bits, DTR off and RTS
+  off for it, where it had reported 1200, 7, on and on; and the tool ended with status 3,
+  `no reply within 1 seconds`. The port was set back.
+
+What is left on Windows:
+
+- The 22 steps of the list above were not gone through one by one there. What is said
+  above was seen; the pointing of step 18 and the invalid show of step 22 were not looked
+  at on Windows, and the suite covers both.
+- A person at a screen has not gone through the list on Windows either, and Python 3.10
+  and 3.11 were not installed on that computer.
+- The two lists under [On Windows](#on-windows): what only the first computer can see, and
+  what needs a board on a Windows computer.
+
+After `master` brought the content commands and the converter in JavaScript, on the merged
+branch and with Python 3.14: the reference converter's suite, 638 tests; the core suite,
+364, and with Microsoft's compiler 364 of which 10 are skipped; the suite of the emulator
+and the command tool, 523 of which 17 are skipped; the onboarding suite, 81. `space`,
+`list`, `remove` and `upload` are part of those suites and run over the line port. The
+converter's own suite, `npm test --prefix converter`, does not pass on Windows: of 499
+tests 288 pass and 208 fail, 73 of them with one error, where the suite starts a helper in
+Python that is written for macOS; the others were not looked into. That is not mended here.

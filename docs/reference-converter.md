@@ -50,8 +50,8 @@ mkdir build
 ```
 
 The tool opens no serial port and no network connection, and has no code for one operating
-system only. It is verified on macOS with Python 3.14. Windows, Linux and the Python
-versions from 3.10 to 3.13 are supported by construction and not yet verified.
+system only. It is verified on macOS and on Windows 11, each with Python 3.14. Linux and the
+Python versions from 3.10 to 3.13 are supported by construction and not yet verified.
 
 ## Command line
 

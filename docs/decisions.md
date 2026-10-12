@@ -38,7 +38,7 @@ it stands now.
   [working-rules.md](../agent/working-rules.md), which hold the agent policies that are
   relevant to this project.
 - A second contributor works on a Windows computer. Making the emulator and the tools run
-  there is seed 11.
+  there is seed 11, which is implemented.
 
 ## Canvas and coordinates
 
@@ -73,7 +73,7 @@ it stands now.
 - One shared core, written in C++, does everything that must behave the same on the board
   and in the emulator: decoding ODRG files, applying the mapping file, running the show,
   keeping time, and handling commands.
-- The core is hosted twice: by the emulator on the Mac and by the firmware on the board. A
+- The core is hosted twice: by the emulator on a computer and by the firmware on the board. A
   host only supplies time, file access and a way to move command lines and LED data.
 - Both hosts run the same installed file set: `mapping.json`, `show.json` and the `.odrg`
   files. See [show.md](show.md).
@@ -186,11 +186,12 @@ are in [format.md](format.md), "Measured sizes".
 
 - The emulator is the first priority, so conversions and playback can be tested without the
   hardware.
-- It runs on macOS for now; cross-platform comes later.
-- It is our own Mac program around the shared core, built natively. It does not depend on
+- It runs on macOS and on Windows.
+- It is our own program around the shared core, built natively. It does not depend on
   any third-party emulator.
 - Commands reach it through a virtual serial port, so the serial tools that talk to the board
-  work against it unchanged, and over HTTP, which stands in for the board's Wi-Fi.
+  work against it unchanged, and over HTTP, which stands in for the board's Wi-Fi. Windows
+  has no virtual serial port: there the same lines travel over a TCP port of 127.0.0.1.
 - Its page shows each command as it arrives, and a mapping view: the board and its pins, the
   line from each pin to its leg, and each leg's snake through its three strips, rows or
   columns.
@@ -355,3 +356,10 @@ are in [format.md](format.md), "Measured sizes".
   command and control: what plays, the list of animations, play, on and off. The second,
   seed 17, is converting a video on the phone and uploading it, which is not the first
   priority. Neither is built yet.
+- 2026-10-12: The converter, the core's build, the emulator and the command tool work on
+  Windows 10 and 11, and their suites pass there (seed 11). The core is built there by a
+  script in Python, `core/build.py`, with GCC, Clang or Microsoft's compiler; macOS keeps
+  `make`. Windows has no pseudo-terminal, so the emulator offers the line protocol of its
+  virtual serial port on a TCP port of 127.0.0.1, and the command tool has `--tcp` beside
+  `--port` and `--http`. This adds no command. The command tool opens a real serial port
+  of Windows by its `COM` name; that has not been tried with a board.

@@ -65,7 +65,7 @@ generators of the tracked animations and builds the test vectors, and is describ
 The core, the C++ library that plays those files on the board and in the emulator, and how
 to build it, test it and host it, is described in [docs/core.md](docs/core.md).
 
-The emulator, the Mac program that runs the core on a packed show and draws the LEDs in a
+The emulator, the program for macOS and Windows that runs the core on a packed show and draws the LEDs in a
 web page, the demo show for the target build, and the command tool that talks to the
 emulator and to the board, are described in [docs/emulator.md](docs/emulator.md).
 

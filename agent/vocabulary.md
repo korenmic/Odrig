@@ -85,7 +85,7 @@ the entry links to it.
 - **host**: A program around the core. It supplies the time, the files and a way to carry
   commands in and LED colours out, and decides nothing else. See
   [core.md](../docs/core.md#the-host-interface).
-- **emulator**: The host that runs on a Mac. It plays an installed file set and draws
+- **emulator**: The host that runs on a Mac or a Windows computer. It plays an installed file set and draws
   every LED in a web page, each placed by the mapping, so a show can be tried without the
   board. It takes the same commands as the board. See [emulator.md](../docs/emulator.md).
 - **firmware**: The program on the board: WLED, a widely used open program for LED

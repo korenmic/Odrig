@@ -8,7 +8,6 @@ from html.parser import HTMLParser
 from emulator import httpd
 
 from . import support
-from .test_layout import JSC
 
 WEB = support.ROOT / "emulator" / "web"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json"}
@@ -127,12 +126,13 @@ class Files(unittest.TestCase):
         self.assertNotIn("<input", index)
 
     def syntax(self, path):
-        """What the JavaScript shell of macOS, which has the engine of Safari, makes of the
-        syntax of a script: its exit status and what it prints."""
-        done = subprocess.run([str(JSC), "-e", "checkSyntax(arguments[0])", "--", str(path)], capture_output=True, text=True)
+        """What the JavaScript shell makes of the syntax of a script: its exit status and
+        what it prints. The shell of macOS has the engine of Safari, and Node.js that of
+        Chrome and Edge."""
+        done = subprocess.run([*support.js_shell(), "-e", "checkSyntax(arguments[0])", "--", str(path)], capture_output=True, text=True)
         return done.returncode, done.stdout + done.stderr
 
-    def test_every_script_is_valid_for_the_javascript_engine_of_safari(self):
+    def test_every_script_is_valid_for_the_javascript_engine_of_the_shell(self):
         scripts = [path for path in page_files() if path.suffix == ".js"]
         self.assertEqual(len(scripts), 4)
         for path in scripts:

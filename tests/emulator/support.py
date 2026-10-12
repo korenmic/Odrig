@@ -8,14 +8,18 @@ import io
 import json
 import os
 import pathlib
+import re
 import select
+import shutil
 import signal
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import unittest
 
 from emulator import app
 from odrig import pack
@@ -29,6 +33,21 @@ EXAMPLE_SHOW = ROOT / "shows" / "example" / "show.json"
 TWO_LEGS = ROOT / "mapping" / "legs-2.json"
 TARGET = ROOT / "mapping" / "legs-20.json"
 DEMO_SHOW = ROOT / "shows" / "demo-20" / "show.json"
+
+# Whether the emulator has its virtual serial port on this system, and the signal a test
+# ends an emulator with: where a child cannot be sent a termination signal, the break of
+# the console, which reaches a child in a process group of its own.
+HAS_SERIAL = app.HAS_SERIAL
+NO_SERIAL = "this system has no pseudo-terminal"
+needs_serial = unittest.skipUnless(HAS_SERIAL, NO_SERIAL)
+STOP = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
+STOPS = (signal.CTRL_BREAK_EVENT,) if hasattr(signal, "CTRL_BREAK_EVENT") else (signal.SIGTERM, signal.SIGINT)
+OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+# The clock a test measures a length of time with counts in steps on some systems: 1/64 of
+# a second with Python 3.12 and earlier on Windows. A wait may measure one step short.
+CLOCK_STEP = time.get_clock_info("monotonic").resolution
+# The transport that carries bytes to the emulator of this system, as the log names it.
+LINES = "serial" if HAS_SERIAL else "tcp"
 
 
 @contextlib.contextmanager
@@ -143,20 +162,28 @@ class Emulator:
     """The emulator in real time, as a child process on a free port.
 
     `lines` holds what it has printed to standard output so far, `port` the port of the
-    page address it named, and `serial` the path of its serial port. Without `serial_link`
-    the link to the port is made in a temporary folder.
+    page address it named, `serial` the path of its serial port and `tcp` the address of
+    its line port, each `None` when it has none. Without `serial_link` the link to the
+    serial port is made in a temporary folder. Where there is no serial port the line port
+    is opened on a free port; elsewhere `tcp_port` asks for it.
     """
 
     START_SECONDS = 15
 
-    def __init__(self, folder, *options, port=0, serial_link=None):
+    def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None):
         self._temporary = None
-        if serial_link is None:
-            self._temporary = tempfile.TemporaryDirectory()
-            serial_link = pathlib.Path(self._temporary.name, "serial")
+        command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port)]
+        if HAS_SERIAL:
+            if serial_link is None:
+                self._temporary = tempfile.TemporaryDirectory()
+                serial_link = pathlib.Path(self._temporary.name, "serial")
+            command += ["--serial-link", str(serial_link)]
+        elif tcp_port is None:
+            tcp_port = 0
+        if tcp_port is not None:
+            command += ["--tcp-port", str(tcp_port)]
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--serial-link", str(serial_link), *(str(option) for option in options)],
-            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            [*command, *(str(option) for option in options)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=OWN_GROUP,
         )
         self.lines = []
         self._errors = []
@@ -171,7 +198,8 @@ class Emulator:
         try:
             self.url = self._printed_line("page: ")
             self.port = int(self.url.rstrip("/").rsplit(":", 1)[1])
-            self.serial = self._printed_line("serial: ")
+            self.serial = self._printed_line("serial: ") if HAS_SERIAL else None
+            self.tcp = self._printed_line("tcp: ") if tcp_port is not None else None
         except BaseException:
             self.stop()
             raise
@@ -179,7 +207,7 @@ class Emulator:
     def _read(self, pipe, lines):
         for line in iter(pipe.readline, b""):
             with self._printed:
-                lines.append(line.decode("utf-8", "replace").rstrip("\n"))
+                lines.append(line.decode("utf-8", "replace").rstrip("\r\n"))
                 self._printed.notify_all()
         with self._printed:
             self._printed.notify_all()
@@ -223,16 +251,18 @@ class Emulator:
     def send_signal(self, number):
         self.process.send_signal(number)
 
-    def stop(self, number=signal.SIGTERM):
+    def stop(self, number=STOP):
         """Ends the emulator with a signal and gives its exit status and what it printed."""
         if self._result is None:
             if self.process.poll() is None:
-                self.process.send_signal(number)
+                try:
+                    self.process.send_signal(number)
+                except OSError:
+                    self.kill()
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
+                self.kill()
             for reader in self._readers:
                 reader.join(timeout=5)
             self.process.stdout.close()
@@ -241,6 +271,15 @@ class Emulator:
             if self._temporary is not None:
                 self._temporary.cleanup()
         return self._result
+
+    def kill(self):
+        """Ends the process at once. On Windows the interpreter of a virtual environment is
+        the child of the program that was started, so the whole tree is ended."""
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.process.pid)], capture_output=True)
+        else:
+            self.process.kill()
+        self.process.wait()
 
     def __enter__(self):
         return self
@@ -338,6 +377,207 @@ class Serial:
 
     def __exit__(self, *_):
         self.close()
+
+
+class Lines:
+    """A program's end of a connection to a port that takes lines over TCP, named as
+    `host:port`."""
+
+    def __init__(self, address, seconds=5):
+        host, _, port = address.rpartition(":")
+        self.socket = socket.create_connection((host, int(port)), timeout=seconds)
+
+    def write(self, data):
+        self.socket.sendall(data)
+
+    def read_lines(self, count=1, seconds=5):
+        """What arrives until it holds `count` newlines, or until the time is over or the
+        other end closes."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while received.count(b"\n") < count:
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([self.socket], [], [], left)[0]:
+                break
+            piece = self.socket.recv(4096)
+            if not piece:
+                break
+            received += piece
+        return received
+
+    def read_for(self, seconds):
+        """Everything that arrives within a length of time."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return received
+            if select.select([self.socket], [], [], left)[0]:
+                piece = self.socket.recv(4096)
+                if not piece:
+                    return received
+                received += piece
+
+    def ask(self, line, seconds=5):
+        """Sends one command line and gives its reply."""
+        self.write(line if isinstance(line, bytes) else line.encode("utf-8") + b"\n")
+        return self.read_lines(1, seconds)
+
+    def close(self):
+        self.socket.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+JSC = pathlib.Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc")
+NODE_SHELL = ROOT / "tests" / "emulator" / "js" / "shell.js"
+
+
+def js_shell():
+    """The words that start the JavaScript shell: the shell of macOS where it is, and
+    elsewhere Node.js with the program that takes the same command line."""
+    if JSC.exists():
+        return [str(JSC)]
+    node = shutil.which("node")
+    if node is None:
+        raise AssertionError(f"there is no JavaScript shell: {JSC} is not there and Node.js is not on the path")
+    return [node, str(NODE_SHELL)]
+
+
+def c_compiler():
+    """The C compiler that goes with the compiler the library was built with. A test that
+    needs one is skipped where that is Microsoft's, which does not take the options of
+    `cc`."""
+    return core_support.gnu("cc")
+
+
+def object_suffix():
+    """How the name of an object file ends with the toolchain the library was built with."""
+    return ".obj" if core_support.toolchain()["kind"] == "msvc" else ".o"
+
+
+def dll_tables(path):
+    """`(imported libraries, exported names)` of a DLL of Windows, read from its file."""
+    data = pathlib.Path(path).read_bytes()
+    header = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[header:header + 4] != b"PE\0\0":
+        raise AssertionError(f"{path} is no DLL")
+    count, optional_size = struct.unpack_from("<H", data, header + 6)[0], struct.unpack_from("<H", data, header + 20)[0]
+    optional = header + 24
+    directories = optional + (112 if struct.unpack_from("<H", data, optional)[0] == 0x20B else 96)
+    sections = [struct.unpack_from("<8sIIII", data, optional + optional_size + 40 * index) for index in range(count)]
+
+    def place(address):
+        for _, size, start, raw_size, raw in sections:
+            if start <= address < start + max(size, raw_size):
+                return raw + address - start
+        raise AssertionError(f"{path}: nothing holds the address {address:#x}")
+
+    def text(address):
+        start = place(address)
+        return data[start:data.index(b"\0", start)].decode("ascii")
+
+    export_table, _, import_table, _ = struct.unpack_from("<IIII", data, directories)
+    exported_names = []
+    if export_table:
+        names, name_table = struct.unpack_from("<I", data, place(export_table) + 24)[0], struct.unpack_from("<I", data, place(export_table) + 32)[0]
+        exported_names = [text(struct.unpack_from("<I", data, place(name_table) + 4 * index)[0]) for index in range(names)]
+    imported = []
+    entry = place(import_table) if import_table else None
+    while entry is not None:
+        name = struct.unpack_from("<I", data, entry + 12)[0]
+        if not name:
+            break
+        imported.append(text(name))
+        entry += 20
+    return imported, exported_names
+
+
+def exported(library):
+    """The names a shared library offers to a program that loads it."""
+    if sys.platform == "win32":
+        return dll_tables(library)[1]
+    listed = subprocess.run(["nm", "-gU", str(library)], capture_output=True, text=True, check=True).stdout
+    return [line.split(" T _", 1)[1] for line in listed.splitlines() if " T _" in line]
+
+
+def listening(emulator):
+    """Every address the process of an emulator listens on, as `address:port`, in order.
+
+    Where there is no `lsof` the system's own list is read, in which the process is the one
+    that listens on the page address: on Windows the interpreter of a virtual environment
+    is the child of the program that was started."""
+    if shutil.which("lsof"):
+        listed = subprocess.run(["lsof", "-nP", "-a", "-p", str(emulator.process.pid), "-iTCP", "-sTCP:LISTEN"], capture_output=True, text=True).stdout
+        return sorted(re.findall(r"TCP (\S+) \(LISTEN\)", listed))
+    script = "Get-NetTCPConnection -State Listen | ForEach-Object { '{0} {1} {2}' -f $_.LocalAddress, $_.LocalPort, $_.OwningProcess }"
+    listed = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, check=True).stdout
+    rows = [line.split() for line in listed.splitlines() if len(line.split()) == 3]
+    owners = {owner for address, port, owner in rows if (address, port) == ("127.0.0.1", str(emulator.port))}
+    return sorted(f"[{address}]:{port}" if ":" in address else f"{address}:{port}" for address, port, owner in rows if owner in owners)
+
+
+def linked(source, target):
+    """Makes a folder appear at a second place: as a symbolic link, or where the system does
+    not let this program make one, as a junction on Windows and as a copy elsewhere."""
+    try:
+        os.symlink(source, target, target_is_directory=True)
+    except OSError:
+        if sys.platform == "win32":
+            import _winapi
+
+            _winapi.CreateJunction(str(source), str(target))
+        else:
+            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
+
+
+def lines(emulator):
+    """A program's end of the transport that carries bytes to an emulator of this system:
+    its serial port where it has one, its line port elsewhere."""
+    return Serial(emulator.serial) if HAS_SERIAL else Lines(emulator.tcp)
+
+
+def line_target(emulator):
+    """The option of the command tool, and its value, that names that transport."""
+    return ("--port", emulator.serial) if HAS_SERIAL else ("--tcp", emulator.tcp)
+
+
+def session_target(emulator):
+    """How a session of the command tool is told of that transport."""
+    return {"port": emulator.serial} if HAS_SERIAL else {"tcp": emulator.tcp}
+
+
+class BytePort:
+    """A port a test puts between the command tool and something of its own: every byte
+    the tool sends goes to `feed`, and what `feed` returns goes back. It is a virtual
+    serial port where the system has one and a line port elsewhere. `target` is the
+    option of the tool, and its value, that names it."""
+
+    def __init__(self, folder, feed):
+        if HAS_SERIAL:
+            from emulator import serialport
+
+            self.port = serialport.Port(pathlib.Path(folder, "serial"), feed)
+            self.target = ("--port", self.port.link)
+        else:
+            from emulator import lineport
+
+            self.port = lineport.Port(0, feed)
+            self.target = ("--tcp", self.port.address)
+        self.port.start()
+
+    def close(self):
+        self.port.close()
+
+
+def port_options(link):
+    """The options that keep an emulator started by its command line off what another
+    emulator may hold: the link of its serial port, or a free port for its line port."""
+    return ("--serial-link", link) if HAS_SERIAL else ("--tcp-port", 0)
 
 
 Event = collections.namedtuple("Event", "kind data")

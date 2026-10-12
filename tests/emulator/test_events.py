@@ -37,7 +37,7 @@ class Stream(unittest.TestCase):
         self.assertEqual(events[0].kind, "hello")
         self.assertEqual([event.kind for event in events].count("hello"), 1)
         hello = json.loads(events[0].data)
-        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0"])
+        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
         self.assertEqual(hello["legs"], [[1, 1, 180], [2, 2, 180]])
         self.assertIsNone(hello["error"])
         self.assertEqual(hello["page"], self.emulator.url)
@@ -84,9 +84,9 @@ class Stream(unittest.TestCase):
     def test_a_command_by_each_transport_gives_one_log_event_and_a_later_status_event(self):
         stream = self.stream()
         stream.read_until(has("frame"))
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             sent = []
-            for transport, line in (("http", "brightness 33"), ("serial", "off"), ("http", "play 99"), ("serial", "play 2"), ("serial", "dance"), ("http", "on")):
+            for transport, line in (("http", "brightness 33"), (support.LINES, "off"), ("http", "play 99"), (support.LINES, "play 2"), (support.LINES, "dance"), ("http", "on")):
                 if transport == "http":
                     reply = self.emulator.command(line)
                 else:
@@ -134,12 +134,12 @@ class Stream(unittest.TestCase):
 
     def test_a_late_connection_receives_the_entries_kept_so_far(self):
         self.emulator.command("brightness 50")
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             port.ask("off")
         self.emulator.command("on\r\n")
         events = self.stream().read_until(has("frame"))
         self.assertEqual([event.kind for event in events[:5]], ["hello", "log", "log", "log", "status"])
-        self.assertEqual([(entry["transport"], entry["line"]) for entry in support.of_kind(events, "log")], [("http", "brightness 50"), ("serial", "off"), ("http", "on")])
+        self.assertEqual([(entry["transport"], entry["line"]) for entry in support.of_kind(events, "log")], [("http", "brightness 50"), (support.LINES, "off"), ("http", "on")])
         self.assertEqual(support.of_kind(events, "status")[0]["brightness"], 50)
 
     def test_the_last_500_entries_are_kept(self):
@@ -157,7 +157,7 @@ class Stream(unittest.TestCase):
         long_line = "play " + "8" * 2055
         self.assertEqual(len(long_line), 2060)
         self.emulator.command(long_line)
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             port.ask(long_line)
         self.emulator.command("x" * 64)
         logged = support.of_kind(self.stream().read_until(has("frame")), "log")
@@ -170,14 +170,14 @@ class Stream(unittest.TestCase):
     def test_a_line_of_1000_characters_is_logged_with_200_and_its_length(self):
         line = "play " + "8" * 995
         self.emulator.command(line)
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             port.ask(line)
         logged = support.of_kind(self.stream().read_until(has("frame")), "log")
         self.assertEqual([(entry["line"], entry["length"], entry["cut"]) for entry in logged], [(line[:200], 1000, False)] * 2)
         self.assertEqual({entry["reply"] for entry in logged}, {'{"ok":false,"error":"bad-argument"}'})
 
     def test_bytes_outside_printable_ascii_are_logged_as_escapes(self):
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             port.ask(b"pl\x00y \xff\t\n")
         self.emulator.command(b"caf\xc3\xa9")
         logged = support.of_kind(self.stream().read_until(has("frame")), "log")

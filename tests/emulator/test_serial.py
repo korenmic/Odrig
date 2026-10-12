@@ -1,17 +1,22 @@
-import fcntl
 import os
 import pathlib
 import stat
 import tempfile
-import termios
 import time
 import unittest
 
-from emulator import failure, serialport
 from tests.core.support import ReferencePlayer
 
 from . import support
 from .test_http import REFUSED, SESSION
+
+if not support.HAS_SERIAL:
+    raise unittest.SkipTest(support.NO_SERIAL)
+
+import fcntl
+import termios
+
+from emulator import failure, serialport
 
 OK = b'{"ok":true}\n'
 TOO_LONG = b'{"ok":false,"error":"line-too-long"}\n'

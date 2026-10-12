@@ -10,7 +10,7 @@ import sys
 import tempfile
 import unittest
 
-from emulator import app, failure, hub, recfile
+from emulator import app, binding, failure, hub, recfile
 from odrig import odrg
 from odrigctl import cli, content
 
@@ -59,18 +59,24 @@ class EmulatorDocument(unittest.TestCase):
 
     def test_it_has_a_section_for_everything_the_requirements_list(self):
         headings = re.findall(r"(?m)^##+ (.+)$", self.text)
-        for heading in ("Commands", "Two shows to run", "Starting", "The serial port", "Commands over HTTP", "The page", "The LEDs view", "The mapping view",
-                        "The event stream", "The command tool", "Record mode", "The script", "The record file", "Exit statuses", "The check list by eye"):
+        for heading in ("Commands", "Two shows to run", "Starting", "The serial port", "The line port", "Commands over HTTP", "The page", "The LEDs view", "The mapping view",
+                        "The event stream", "The command tool", "Record mode", "The script", "The record file", "Exit statuses", "On Windows", "The check list by eye"):
             self.assertIn(heading, headings)
         for target in re.findall(r"\]\(#([a-z-]+)\)", self.text):
             self.assertIn(target, [heading.lower().replace(" ", "-") for heading in headings], target)
 
     def test_it_gives_the_command_that_builds_the_library_and_the_test_command_and_what_each_needs(self):
         rows = dict(re.findall(r"(?m)^\| `([^`]+)` \| .+ \| (.+) \|$", section(self.text, "Commands")))
-        self.assertEqual(sorted(rows), ["make -C core shared", "python3 -m unittest discover -s tests/emulator -t ."])
+        self.assertEqual(sorted(rows), ["make -C core shared", "python -m unittest discover -s tests/emulator -t .", "python core/build.py shared", "python3 -m unittest discover -s tests/emulator -t ."])
         self.assertIn("command-line developer tools", rows["make -C core shared"])
         self.assertIn("Python 3.10", rows["python3 -m unittest discover -s tests/emulator -t ."])
         self.assertIn("JavaScript shell", rows["python3 -m unittest discover -s tests/emulator -t ."])
+        for needed in ("`g++` or `clang++`", "`tools/`", "Microsoft's C++ build tools", "No GNU Make"):
+            self.assertIn(needed, rows["python core/build.py shared"])
+        for needed in ("Python 3.10", "Node.js as the JavaScript shell"):
+            self.assertIn(needed, rows["python -m unittest discover -s tests/emulator -t ."])
+        self.assertIn(f"core/build/{binding.library_of('win32')[0]}", self.text)
+        self.assertEqual(binding.library_of("win32")[1], "python core/build.py shared")
         makefile = (support.ROOT / "core" / "Makefile").read_text(encoding="utf-8")
         self.assertRegex(makefile, r"(?m)^shared: \$\(SHARED\)$")
         self.assertRegex(makefile, r"(?m)^\$\(SHARED\): \$\(OBJECTS\)\n\t\$\(CXX\) -dynamiclib -o \$@ \$\(OBJECTS\)$")
@@ -79,10 +85,10 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose] [--storage BYTES]", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]", self.text)
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--core", "--verbose", "--storage", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--record", "--seconds", "--script"})
         self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
@@ -104,15 +110,15 @@ class EmulatorDocument(unittest.TestCase):
         text = section(self.text, "The command tool")
         given = [line for line in blocks(text) if line.startswith("python -m odrigctl ") and "(" not in line]
         made = cli.parser()
-        sent = {"--port": set(), "--http": set()}
+        sent = {"--port": set(), "--tcp": set(), "--http": set()}
         for line in given:
             arguments = made.parse_args(shlex.split(line)[3:])
-            transport = "--port" if arguments.port is not None else "--http"
+            transport = "--port" if arguments.port is not None else "--tcp" if arguments.tcp is not None else "--http"
             sent[transport].add(cli.checked(made, arguments)[0])
-        self.assertEqual(sent["--port"], set(cli.COMMANDS))
-        self.assertEqual(sent["--http"], set(cli.COMMANDS))
+        for transport in sent:
+            self.assertEqual(sent[transport], set(cli.COMMANDS), transport)
         for command, takes in cli.COMMANDS.items():
-            synopsis = " ".join(["python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS]", command, *takes])
+            synopsis = " ".join(["python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS]", command, *takes])
             self.assertIn(synopsis + "\n", text)
         for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (2, "error: not-found: <detail>"), (3, "error: unreachable: <detail>")):
             self.assertRegex(text, rf"(?m)^\| {status} \| .*{re.escape(meaning)}")
@@ -164,7 +170,7 @@ class EmulatorDocument(unittest.TestCase):
         text = section(self.text, "The event stream")
         events = dict(re.findall(r"event: ([a-z]+)\ndata: (.+)", text))
         self.assertEqual(sorted(events), ["frame", "hello", "log", "status"])
-        self.assertEqual(sorted(json.loads(events["hello"])), ["error", "legs", "page", "serial", "show", "t0"])
+        self.assertEqual(sorted(json.loads(events["hello"])), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
         self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "ok", "on", "playing"])
@@ -283,12 +289,15 @@ class DocumentedShows(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             work = pathlib.Path(folder)
             for name in ("odrig", "converter", "mapping", "shows", "animations"):
-                os.symlink(support.ROOT / name, work / name)
+                support.linked(support.ROOT / name, work / name)
             for line in commands:
                 words = shlex.split(line)
                 if words[0] == "printf":
                     target = words[words.index(">") + 1]
-                    (work / target).write_text(words[1].replace("\\n", "\n"), encoding="utf-8")
+                    (work / target).write_text(words[1].replace("\\n", "\n"), encoding="utf-8", newline="\n")
+                    continue
+                if words[0] == "mkdir" and shutil.which("mkdir") is None:
+                    (work / words[-1]).mkdir(parents=True, exist_ok="-p" in words)
                     continue
                 if words[0] == "python":
                     words[0] = sys.executable

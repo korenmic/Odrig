@@ -95,26 +95,27 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 
 ## If you work on Windows
 
-Only a part of the project works on Windows today:
+The reference converter, the core's build, the emulator and the command tool work on
+Windows 10 and 11, and their suites pass there. That was seed 11,
+`project-seeds/11-p0-emulator-and-tools-on-windows/`.
 
-- The converter is written to run there, and so is its suite. Both have been run on macOS
-  only. The same is true of the Python reference and the generators.
-- The emulator and the command tool run on macOS only.
+- The core is built there by `python core/build.py shared`, not by `make`.
+- Windows has no virtual serial port. The emulator takes command lines on a TCP port, and
+  the command tool reaches it with `--tcp` or `--http`.
+- The converter's own suite, `npm test --prefix converter`, does not pass on Windows yet:
+  208 of its 499 tests fail there. Mending that is not part of seed 11.
 - The firmware tool and the board stay with the first computer.
+- Nothing is installed in the system. A compiler or another program that is fetched is
+  unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.
 
-Making the emulator and the tools run on Windows is seed 11,
-`project-seeds/11-p0-emulator-and-tools-on-windows/`. It is the first job of the
-contributor on Windows: take it through its spec, its tasks and their implementation, on
-the Windows computer. Running the converter's suite there is part of it.
-[agent/getting-started.md](agent/getting-started.md#on-windows) has what can be tried on
-Windows today, and the setup as far as it is known.
+[agent/getting-started.md](agent/getting-started.md#on-windows) has the setup and the
+commands of Windows.
 
 ## What is coming
 
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **The emulator and the tools on Windows**, seed 11, as the section above says.
 - **A playlist of everything by default**, seed 16: all installed animations play in
   turn, each for at least 30 seconds or for a repeat count of its own, and `play all`
   goes back to the playlist. Today a show plays only what it names as its start.

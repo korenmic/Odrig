@@ -39,9 +39,9 @@ def texts(tree):
 class Scope(unittest.TestCase):
     def test_the_packages_have_the_modules_this_test_reads(self):
         names = {path.name for path, _ in modules(EMULATOR)}
-        for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "recfile.py", "record.py", "serialport.py"):
+        for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "lineport.py", "recfile.py", "record.py", "serialport.py"):
             self.assertIn(expected, names)
-        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py", "content.py"])
+        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py", "content.py", "winserial.py"])
 
     def test_every_module_imports_only_the_standard_library_and_its_own_package(self):
         for package in PACKAGES:
@@ -55,9 +55,9 @@ class Scope(unittest.TestCase):
             for path, tree in modules(package):
                 self.assertEqual(imported(tree) & others, set(), f"{package.name}/{path.name}")
 
-    def test_only_the_binding_imports_ctypes(self):
+    def test_only_the_binding_and_the_serial_port_of_windows_import_ctypes(self):
         users = [f"{package.name}/{path.name}" for package in PACKAGES for path, tree in modules(package) if "ctypes" in imported(tree)]
-        self.assertEqual(users, ["emulator/binding.py"])
+        self.assertEqual(users, ["emulator/binding.py", "odrigctl/winserial.py"])
 
     def test_the_emulator_holds_no_decoder_no_show_reader_and_no_command_names(self):
         for path, tree in modules(EMULATOR):
@@ -81,8 +81,10 @@ class Scope(unittest.TestCase):
         self.assertEqual(addresses, [("emulator/httpd.py", "127.0.0.1")])
         server = (EMULATOR / "httpd.py").read_text(encoding="utf-8")
         self.assertIn("super().__init__((ADDRESS, port), Handler)", server)
+        line_port = (EMULATOR / "lineport.py").read_text(encoding="utf-8")
+        self.assertIn("super().__init__((httpd.ADDRESS, port), Connection)", line_port)
         for path, tree in modules(EMULATOR):
-            if path.name != "httpd.py":
+            if path.name not in ("httpd.py", "lineport.py"):
                 self.assertEqual(imported(tree) & {"socket", "socketserver", "http", "asyncio"}, set(), path.name)
 
     def test_the_tool_has_no_word_for_the_emulator_or_the_board(self):
@@ -96,7 +98,7 @@ class Scope(unittest.TestCase):
             self.assertNotIn(f"tools/{name}", listed)
         tracked = subprocess.run(["git", "ls-files", "odrigctl"], cwd=support.ROOT, capture_output=True, text=True, check=True).stdout.split()
         if tracked:
-            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py", "odrigctl/content.py"])
+            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py", "odrigctl/content.py", "odrigctl/winserial.py"])
 
     def test_no_commit_of_this_seed_changes_a_source_or_the_header_of_the_core(self):
         changed = subprocess.run(

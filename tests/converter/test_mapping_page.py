@@ -98,7 +98,7 @@ class Copies(unittest.TestCase):
         """Puts `new` in the place of `old`, which the file holds exactly once."""
         text = path.read_text(encoding="utf-8")
         self.assertEqual(text.count(old), 1, old)
-        path.write_text(text.replace(old, new), encoding="utf-8")
+        path.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
 
     def holds(self):
         """Every file of the copy with its bytes."""
@@ -441,20 +441,20 @@ class Refused(Copies):
     def test_a_marker_without_an_end_before_the_next_marker(self):
         text = self.page.read_text(encoding="utf-8")
         cut = text.index(END)
-        self.page.write_text(text[:cut] + text[cut + len(END) + 1:], encoding="utf-8")
+        self.page.write_text(text[:cut] + text[cut + len(END) + 1:], encoding="utf-8", newline="\n")
         number = text.split("\n").index(marker("board legs-20")) + 1
         self.refused("page-malformed", "mapping.md", f"line {number}: the marker of a generated part has no end")
 
     def test_a_marker_without_an_end_before_the_end_of_the_page(self):
         text = self.page.read_text(encoding="utf-8")
         cut = text.rindex(END)
-        self.page.write_text(text[:cut] + text[cut + len(END) + 1:], encoding="utf-8")
+        self.page.write_text(text[:cut] + text[cut + len(END) + 1:], encoding="utf-8", newline="\n")
         number = text.split("\n").index(marker("table legs-20")) + 1
         self.refused("page-malformed", f"line {number}: the marker of a generated part has no end")
 
     def test_an_end_without_a_marker(self):
         text = self.page.read_text(encoding="utf-8")
-        self.page.write_text(text.replace(marker("drawing legs-2") + "\n", ""), encoding="utf-8")
+        self.page.write_text(text.replace(marker("drawing legs-2") + "\n", ""), encoding="utf-8", newline="\n")
         self.refused("page-malformed", "the end of a generated part has no marker")
 
     def test_a_name_it_does_not_know(self):
@@ -474,7 +474,7 @@ class Refused(Copies):
             OPENING.rstrip(),
         ):
             with self.subTest(written=written):
-                self.page.write_text(text.replace(marker("board legs-20"), written), encoding="utf-8")
+                self.page.write_text(text.replace(marker("board legs-20"), written), encoding="utf-8", newline="\n")
                 self.refused("page-malformed", "does not name a board, a drawing or a table of a mapping file", " ".join(written.split()))
 
     def test_a_page_that_is_not_there(self):

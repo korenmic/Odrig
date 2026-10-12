@@ -1,7 +1,5 @@
 import http.client
 import json
-import re
-import subprocess
 import tempfile
 import threading
 import unittest
@@ -132,7 +130,7 @@ class Commands(unittest.TestCase):
         self.assertEqual(replies, {b'{"ok":true}\n'})
 
     def test_what_one_transport_changes_status_over_the_other_reports(self):
-        with support.Serial(self.emulator.serial) as port:
+        with support.lines(self.emulator) as port:
             self.assertEqual(self.emulator.command("brightness 7"), b'{"ok":true}\n')
             through_the_port = json.loads(port.ask("status"))
             self.assertEqual((through_the_port["brightness"], through_the_port["on"]), (7, True))
@@ -167,11 +165,8 @@ class Commands(unittest.TestCase):
         self.assertEqual(self.emulator.url, f"http://127.0.0.1:{self.emulator.port}/")
         self.assertFalse(support.refused(self.emulator.port))
         self.assertTrue(support.refused(self.emulator.port, "::1"))
-        listed = subprocess.run(
-            ["lsof", "-nP", "-a", "-p", str(self.emulator.process.pid), "-iTCP", "-sTCP:LISTEN"], capture_output=True, text=True
-        ).stdout
-        listening = re.findall(r"TCP (\S+) \(LISTEN\)", listed)
-        self.assertEqual(listening, [f"127.0.0.1:{self.emulator.port}"])
+        expected = sorted(address for address in (f"127.0.0.1:{self.emulator.port}", self.emulator.tcp) if address is not None)
+        self.assertEqual(support.listening(self.emulator), expected)
 
 
 class Engine:
@@ -243,7 +238,7 @@ class InvalidShow(unittest.TestCase):
                     self.assertEqual(support.without_fps(answer.body), support.without_fps(player.command(50, line.encode("ascii"))), line)
                 self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"show-invalid"}\n')
                 self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
-                with support.Serial(emulator.serial) as port:
+                with support.lines(emulator) as port:
                     for line in ("status", "play 2", "brightness 200", "off", "on", "status", "dance"):
                         self.assertEqual(support.without_fps(port.ask(line)), support.without_fps(player.command(60, line.encode("ascii"))), line)
 

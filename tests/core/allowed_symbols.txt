@@ -9,6 +9,10 @@ _memset
 _bzero
 _memcmp
 
+# The C library's routine that finds the end of a text. The sources do not call it: GCC
+# puts it in the place of a loop that looks for the terminating zero.
+_strlen
+
 # The compiler's own support: the check it adds to a function that holds a local array.
 ___stack_chk_fail
 ___stack_chk_guard

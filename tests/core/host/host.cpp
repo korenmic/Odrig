@@ -1,9 +1,17 @@
 // The test host: a program around the core that the suite of tests/core drives as a child
 // process. It has no clock; whatever it prints depends on its arguments and its input only.
 
-#include <dirent.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+
+#include <filesystem>
+#else
+#include <dirent.h>
 #include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <cerrno>
@@ -23,6 +31,16 @@
 #include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
+
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
+#endif
+
+#ifdef _WIN32
+// The call of Windows that renames a file over one that is there, as `rename` does on
+// other systems. Its last argument, 1, says to take the place of what is there.
+extern "C" __declspec(dllimport) int __stdcall MoveFileExA(const char *from, const char *to, unsigned long flags);
+#endif
 
 namespace {
 
@@ -512,7 +530,11 @@ private:
             files_[to] = content;
             return true;
         }
+#ifdef _WIN32
+        return MoveFileExA(path_of(from).c_str(), path_of(to).c_str(), 1) != 0;
+#else
         return ::rename(path_of(from).c_str(), path_of(to).c_str()) == 0;
+#endif
     }
 
     // 1 when a file was removed, 0 when there was none, -1 otherwise.
@@ -520,9 +542,15 @@ private:
         if (from_ == kFromFiles) {
             return files_.erase(name) != 0 ? 1 : 0;
         }
+#ifdef _WIN32
+        if (std::remove(path_of(name).c_str()) == 0) {
+            return 1;
+        }
+#else
         if (::unlink(path_of(name).c_str()) == 0) {
             return 1;
         }
+#endif
         return errno == ENOENT ? 0 : -1;
     }
 
@@ -551,6 +579,15 @@ private:
             }
             return used;
         }
+#ifdef _WIN32
+        std::error_code failed;
+        for (const auto &entry : std::filesystem::directory_iterator(folder_, failed)) {
+            if (entry.is_regular_file(failed)) {
+                used += (static_cast<uint64_t>(entry.file_size(failed)) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            }
+        }
+        return used;
+#else
         DIR *folder = opendir(folder_.c_str());
         if (folder == nullptr) {
             return 0;
@@ -563,6 +600,7 @@ private:
         }
         closedir(folder);
         return used;
+#endif
     }
 
     // Loads a file of the folder: 1 when loaded, 0 when there is no such file, -1 otherwise.
@@ -731,6 +769,16 @@ void decode_one(Host &host, const char *name) {
     }
 }
 
+// Where the name of a file begins in a path: after its last separator. On Windows a
+// backslash separates as a slash does.
+size_t last_separator(const std::string &path) {
+#ifdef _WIN32
+    return path.find_last_of("/\\");
+#else
+    return path.rfind('/');
+#endif
+}
+
 int decode(const std::string &argument) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
@@ -739,7 +787,7 @@ int decode(const std::string &argument) {
         }
         return 0;
     }
-    size_t slash = argument.rfind('/');
+    size_t slash = last_separator(argument);
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
@@ -1079,6 +1127,12 @@ bool storage_bytes(const std::string &text, uint64_t *value) {
 }  // namespace
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+    // The input and the output are bytes: no line ending is to be changed on the way.
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
     std::vector<std::string> arguments(argv + 1, argv + argc);
     if (arguments.empty()) {
         return usage();

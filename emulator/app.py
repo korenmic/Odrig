@@ -13,12 +13,19 @@ import signal
 import sys
 import threading
 
-from . import binding, engine, failure, host, httpd, hub, record, serialport
+from . import binding, engine, failure, host, httpd, hub, lineport, record
+
+# The virtual serial port is a pseudo-terminal. A system without one has the line port.
+HAS_SERIAL = hasattr(os, "openpty")
+if HAS_SERIAL:
+    from . import serialport
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-LIBRARY = ROOT / "core" / "build" / "libodrig_core.dylib"
+LIBRARY = ROOT / "core" / "build" / binding.LIBRARY_NAME
 SERIAL_LINK = ROOT / "build" / "emulator" / "serial"
 PORT = 8600
+TCP_PORT = 8601
+WAIT_SECONDS = 0.2
 
 
 def _milliseconds(text):
@@ -48,12 +55,13 @@ def parser():
     made = argparse.ArgumentParser(
         prog="python -m emulator",
         description="Runs the core on the installed show of a folder: in real time, with commands through a "
-        "virtual serial port and over HTTP, or in record mode on a virtual clock.",
+        "virtual serial port or a TCP port and over HTTP, or in record mode on a virtual clock.",
     )
     made.add_argument("show_dir", metavar="SHOW_DIR", help="the folder that holds the installed show")
     made.add_argument("--port", metavar="N", type=_port, help=f"the port of the page on 127.0.0.1; 0 takes any free port (default: {PORT})")
     made.add_argument("--serial-link", metavar="PATH", help="where the link to the virtual serial port is made (default: build/emulator/serial)")
-    made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help="the core's shared library (default: core/build/libodrig_core.dylib)")
+    made.add_argument("--tcp-port", metavar="N", type=_port, help=f"the port on 127.0.0.1 that takes command lines over TCP; 0 takes any free port (default: {TCP_PORT} on a system without a virtual serial port, none elsewhere)")
+    made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help=f"the core's shared library (default: core/build/{binding.LIBRARY_NAME})")
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
     made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
                       help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
@@ -72,41 +80,72 @@ def parse(argv):
     else:
         if arguments.seconds is None:
             made.error("record mode needs its length: --seconds S")
-        if arguments.port is not None or arguments.serial_link is not None or arguments.verbose:
-            made.error("record mode opens no page and no port: --port, --serial-link and --verbose do not go with --record")
+        if arguments.port is not None or arguments.serial_link is not None or arguments.tcp_port is not None or arguments.verbose:
+            made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port and --verbose do not go with --record")
     return arguments
 
 
+def ports(arguments, has_serial=HAS_SERIAL):
+    """Which ports a run in real time opens: `(link of the serial port, TCP port)`, each
+    `None` when the run does not have it."""
+    if has_serial:
+        return SERIAL_LINK if arguments.serial_link is None else arguments.serial_link, arguments.tcp_port
+    if arguments.serial_link is not None:
+        raise failure.Failure(failure.SERIAL_UNAVAILABLE, f"{arguments.serial_link}: this system has no pseudo-terminal; command lines are taken on the TCP port")
+    return None, TCP_PORT if arguments.tcp_port is None else arguments.tcp_port
+
+
 def serve(arguments, out):
-    """Real time: starts the core, opens the port and the page address, and runs until a
+    """Real time: starts the core, opens the ports and the page address, and runs until a
     signal. A step that fails undoes the ones before it."""
+    link, tcp_port = ports(arguments)
     files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage)
     port = None
+    line_port = None
     server = None
     try:
         core = binding.Core(arguments.core, files)
         running = engine.Engine(core, hub.Hub())
         running.tick()
         running.refresh_status()
-        port = serialport.Port(SERIAL_LINK if arguments.serial_link is None else arguments.serial_link, lambda data: running.feed(data, "serial"))
-        described = {"show": os.path.abspath(arguments.show_dir), "serial": port.link, "legs": [list(leg) for leg in core.legs], "t0": running.t0}
+        if link is not None:
+            port = serialport.Port(link, lambda data: running.feed(data, "serial"))
+        if tcp_port is not None:
+            line_port = lineport.Port(tcp_port, lambda data: running.feed(data, "tcp"))
+        described = {
+            "show": os.path.abspath(arguments.show_dir),
+            "serial": None if port is None else port.link,
+            "tcp": None if line_port is None else line_port.address,
+            "legs": [list(leg) for leg in core.legs],
+            "t0": running.t0,
+        }
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
-            lambda: {"show": described["show"], "page": server.url, "serial": described["serial"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
+            lambda: {"show": described["show"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
         )
 
         stopped = threading.Event()
-        for number in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(number, lambda *_: stopped.set())
+        for name in ("SIGINT", "SIGTERM", "SIGBREAK"):
+            if hasattr(signal, name):
+                signal.signal(getattr(signal, name), lambda *_: stopped.set())
 
         print(f"page: {server.url}", file=out)
-        print(f"serial: {port.link}", file=out, flush=True)
+        if port is not None:
+            print(f"serial: {port.link}", file=out)
+        if line_port is not None:
+            print(f"tcp: {line_port.address}", file=out)
+        out.flush()
 
-        port.start()
+        if port is not None:
+            port.start()
+        if line_port is not None:
+            line_port.start()
         loop = engine.RealTime(running)
         loop.start()
         server.start()
-        stopped.wait()
+        # A wait without a limit is not interrupted by a signal on every system.
+        while not stopped.wait(WAIT_SECONDS):
+            pass
         server.stop()
         server = None
         loop.stop()
@@ -115,6 +154,8 @@ def serve(arguments, out):
     finally:
         if server is not None:
             server.server_close()
+        if line_port is not None:
+            line_port.close()
         if port is not None:
             port.close()
         files.release()

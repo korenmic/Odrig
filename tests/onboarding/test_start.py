@@ -19,7 +19,6 @@ HEADINGS = (
 )
 
 CLONE = "git clone https://github.com/korenmic/Odrig.git"
-SEED_FOR_WINDOWS = "project-seeds/11-p0-emulator-and-tools-on-windows/"
 
 # For every folder of tests/ that holds a suite: the command that runs it, and whether the
 # page gives it among the suites to run right after the setup.
@@ -62,40 +61,79 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_has_to_be_on_the_computer(self):
         needed = flat(self.part("What you need"))
-        for phrase in ("A Mac", "run on macOS only at present", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`",
+        for phrase in ("A Mac, or a Windows computer", "The firmware tool runs on macOS only at present", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`",
                        "Node.js 20 or later, as `node`", "the `npm` that comes with it", "`node --version` has to say v20 or more"):
             self.assertIn(phrase, needed)
         package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(package["engines"], {"node": ">=20"})
         self.assertIn("On a Windows computer read [On Windows](#on-windows) first.", flat(self.text.split("\n## ")[0]))
 
-    def test_it_says_what_works_on_windows_today_and_whose_job_the_rest_is(self):
+    def test_it_says_what_works_on_windows_what_stays_with_the_first_computer_and_what_to_install(self):
         windows = flat(self.part("On Windows"))
-        for phrase in ("| The converter and its suite | Written to run there. They have been run on macOS only. |",
-                       "| The reference converter, the generators and their suite | The same: written to run there, run on macOS only. |",
-                       "| The core's build, the emulator, the command tool | macOS only. |",
-                       "| The firmware tool and the board | They stay with the first computer. |",
-                       "is seed 11", f"`{SEED_FOR_WINDOWS}`", "the first job of the contributor on Windows",
-                       "its spec, its tasks and their implementation on the Windows computer", "Python 3.10 or later", "Node.js 20 or later",
-                       "the converter and the generators can be tried on Windows", "which also runs the converter's suite on Windows",
-                       "from `make -C core shared` on, is what seed 11 provides"):
+        for phrase in ("The reference converter, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
+                       f"The converter's own suite, `{CONVERTER_SUITE[1]}`, does not pass there yet.",
+                       "The firmware tool, the board and the walk-through suite stay with the first computer.",
+                       "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
+                       "`g++` or `clang++` on the path, and Microsoft's C++ build tools", "the WinLibs build of MinGW-w64",
+                       "into the folder `tools/` of the repository: nothing is installed"):
             self.assertIn(phrase, windows)
-        self.assertIn("Windows and Linux are supported by construction and not verified: nothing has been run there.", flat(support.read("docs/converter.md")))
-        self.assertIn("It is verified on macOS with Python 3.14.", flat(support.read("docs/reference-converter.md")))
+        self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/reference-converter.md")))
+        self.assertEqual(support.subprocess.run(["git", "check-ignore", "-q", "tools/x"], cwd=support.ROOT).returncode, 0)
 
-    def test_the_setup_on_windows_is_the_part_that_is_known_and_is_not_given_as_run(self):
-        self.assertEqual(self.commands("On Windows"), [])
+    def test_the_setup_on_windows_and_its_four_suites_are_commands_their_tools_understand(self):
+        self.assertEqual(self.commands("On Windows"), [], "the walk-through runs on macOS and is not to run these")
         shown = [block.body.splitlines() for block in support.blocks(self.text) if block.heading == "On Windows"]
+        python = support.WINDOWS_PYTHON
         self.assertEqual(shown, [[
             CLONE,
             "cd Odrig",
             "python -m venv .venv",
-            ".venv\\Scripts\\python -m pip install -r requirements.txt",
+            f"{python} -m pip install -r requirements.txt",
             "npm ci --prefix converter",
-            CONVERTER_SUITE[1],
-            ".venv\\Scripts\\python -m unittest discover -s tests/converter -t .",
+            f"{python} core/build.py shared",
+            f"{python} -m unittest discover -s tests/converter -t .",
+            f"{python} core/build.py test",
+            f"{python} -m unittest discover -s tests/emulator -t .",
+            f"{python} -m unittest discover -s tests/onboarding -t .",
         ]])
-        self.assertIn("none of it has been tried there", flat(self.part("On Windows")))
+        for command in shown[0]:
+            self.assertIsNone(support.refusal(command), command)
+        self.assertEqual(python, ".venv\\Scripts\\python")
+
+    def test_the_four_suites_of_windows_are_the_four_the_page_runs_after_the_setup(self):
+        on_windows = [line for block in support.blocks(self.text) if block.heading == "On Windows" for line in block.body.splitlines() if "tests/" in line or line.endswith(" test")]
+        after_setup = [command for command in self.commands("Run the tests") if command != CONVERTER_SUITE[1]]
+        self.assertEqual(len(on_windows), len(after_setup))
+        written = {".venv/bin/python": support.WINDOWS_PYTHON, "make -C core test": f"{support.WINDOWS_PYTHON} core/build.py test"}
+        for here, there in zip(after_setup, on_windows):
+            for old, new in written.items():
+                here = here.replace(old, new)
+            self.assertEqual(here, there)
+
+    def test_the_differences_on_windows_are_one_table(self):
+        rows = re.findall(r"(?m)^\| (.+?) \| (.+?) \|$", self.part("On Windows"))
+        self.assertEqual(rows[0][1], "On Windows")
+        differences = dict(rows[1:])
+        self.assertEqual(differences["`.venv/bin/python`"], f"`{support.WINDOWS_PYTHON}`")
+        self.assertEqual(differences["`mkdir -p build/demo-20/sources`"], "`mkdir build\\demo-20\\sources`")
+        self.assertEqual(differences["`printf '1000 status\\n' > FILE`"], '`Set-Content FILE "1000 status"`')
+        built = [(here, there) for here, there in differences.items() if here.startswith("`make -C core shared`")]
+        self.assertEqual(len(built), 1)
+        for word in ("`core/build/libodrig_core.dylib`",):
+            self.assertIn(word, built[0][0])
+        for word in ("`core/build.py shared`", "`core/build/odrig_core.dll`"):
+            self.assertIn(word, built[0][1])
+        ports = [(here, there) for here, there in differences.items() if "`serial:`" in here]
+        self.assertEqual(len(ports), 1)
+        self.assertIn("`--port build/emulator/serial`", ports[0][0])
+        for word in ("`tcp: 127.0.0.1:8601`", "`--tcp 127.0.0.1:8601`"):
+            self.assertIn(word, ports[0][1])
+        from emulator import app, binding
+
+        self.assertEqual((app.TCP_PORT, binding.library_of("win32")[0], binding.library_of("darwin")[0]), (8601, "odrig_core.dll", "libodrig_core.dylib"))
+        used = flat(self.text.split("\n## Set up\n")[1])
+        for here in ("mkdir -p build/demo-20/sources", "printf '1000 status\\n' > ", "--port build/emulator/serial", "make -C core shared", ".venv/bin/python"):
+            self.assertIn(here, used, "the page no longer uses what the table translates")
 
     def test_the_setup_is_the_clone_the_environment_the_libraries_the_packages_and_the_shared_library(self):
         self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "npm ci --prefix converter", "make -C core shared"])

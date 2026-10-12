@@ -1,5 +1,6 @@
 import re
 import subprocess
+import sys
 import unittest
 
 from . import support
@@ -45,6 +46,11 @@ def foreign_headers(text, own):
     return found
 
 
+# The object files of macOS are listed with their sections, by `nm -m`, and every name of
+# C has an underscore in front. For the object files of Windows `nm` gives one letter for
+# the kind of a name, and the name as it is in C: there the underscore is put in front
+# here, so that a name reads the same on both systems.
+MACH_O = sys.platform != "win32"
 def number(text, constants):
     """The value of a number of elements: digits, constants of the same source, and the
     signs of a sum or a product."""
@@ -78,15 +84,24 @@ def arrays_in_blocks(code, known=()):
 
 def nm(*options):
     done = subprocess.run(
-        ["nm", *options, str(support.built(support.LIBRARY))], capture_output=True, text=True, check=True
+        [support.gnu("nm"), *options, str(support.built(support.LIBRARY))], capture_output=True, text=True, check=True
     )
     return done.stdout
+
+
+def lettered():
+    """`(letter, name)` for every name `nm` lists with a letter for its kind."""
+    return [(match.group(1), "_" + match.group(2)) for match in re.finditer(r"(?m)^[0-9a-f]*\s+([A-Za-z]) (\S+)$", nm())]
 
 
 def symbols():
     """`(undefined, defined)`: the names the library refers to and the names it defines."""
     undefined = set()
     defined = set()
+    if not MACH_O:
+        for letter, name in lettered():
+            (undefined if letter == "U" else defined).add(name)
+        return undefined, defined
     for line in nm("-m").splitlines():
         match = re.match(r"^\s*[0-9a-f]*\s*\((.+?)\)\s+(?:\[.*?\]\s+)?(?:non-)?(?:weak )?(?:private )?external\s+(\S+)", line)
         if not match:
@@ -94,6 +109,22 @@ def symbols():
         section, name = match.groups()
         (undefined if section == "undefined" else defined).add(name)
     return undefined, defined
+
+
+def writable():
+    """The names the library keeps in a section a program can write to. A name that begins
+    with a dot is that of a section, which every object file has, also when it is empty."""
+    if not MACH_O:
+        return sorted(name[1:] for letter, name in lettered() if letter in "DdBbCcGgSs" and not name.startswith("_."))
+    found = []
+    for line in nm("-m").splitlines():
+        section = re.search(r"\((__[A-Z_]+,__[a-z_0-9]+|common)\)", line)
+        if not section:
+            continue
+        name = section.group(1)
+        if name == "common" or (name.startswith("__DATA,") and name != "__DATA,__const"):
+            found.append(line.strip())
+    return found
 
 
 def allowed_symbols():
@@ -112,22 +143,15 @@ class Library(unittest.TestCase):
         allowed = allowed_symbols()
         self.assertTrue(allowed)
         for name in allowed:
-            self.assertRegex(name, r"^_(mem(cpy|move|set|cmp)|bzero|__stack_chk_(fail|guard))$")
+            self.assertRegex(name, r"^_(mem(cpy|move|set|cmp)|strlen|bzero|__stack_chk_(fail|guard))$")
 
     def test_it_has_no_symbol_in_a_writable_data_section(self):
-        listing = nm("-m")
-        self.assertIn("(__TEXT,__text)", listing)
-        for line in listing.splitlines():
-            section = re.search(r"\((__[A-Z_]+,__[a-z_0-9]+|common)\)", line)
-            if not section:
-                continue
-            name = section.group(1)
-            writable = name == "common" or (name.startswith("__DATA,") and name != "__DATA,__const")
-            self.assertFalse(writable, line.strip())
+        self.assertIn("(__TEXT,__text)" if MACH_O else " T ", nm("-m") if MACH_O else nm())
+        self.assertEqual(writable(), [])
 
     def test_the_library_holds_every_source(self):
         members = subprocess.run(
-            ["ar", "t", str(support.built(support.LIBRARY))], capture_output=True, text=True, check=True
+            [support.gnu("ar"), "t", str(support.built(support.LIBRARY))], capture_output=True, text=True, check=True
         ).stdout.split()
         objects = sorted(name for name in members if name.endswith(".o"))
         self.assertEqual(objects, sorted(path.stem + ".o" for path in SOURCES.glob("*.cpp")))
@@ -188,7 +212,7 @@ class Sources(unittest.TestCase):
         self.assertGreaterEqual(len(sources), 10)
         for standard in ("c++11", "c++14", "c++17", "c++20", "c++2b"):
             done = subprocess.run(
-                ["c++", f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Werror", "-fno-exceptions", "-fno-rtti", f"-I{INCLUDE}", "-fsyntax-only", *map(str, sources)],
+                [support.gnu("cxx"), f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Werror", "-fno-exceptions", "-fno-rtti", f"-I{INCLUDE}", "-fsyntax-only", *map(str, sources)],
                 capture_output=True,
                 text=True,
             )
@@ -260,7 +284,7 @@ class HostInterface(unittest.TestCase):
 
     def compiles(self, compiler, language, standard, source):
         done = subprocess.run(
-            [compiler, "-x", language, f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fsyntax-only", f"-I{INCLUDE}", "-"],
+            [support.gnu({"cc": "cc", "c++": "cxx"}[compiler]), "-x", language, f"-std={standard}", "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-fsyntax-only", f"-I{INCLUDE}", "-"],
             input=source,
             capture_output=True,
             text=True,

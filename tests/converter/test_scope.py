@@ -48,7 +48,7 @@ def is_or_is_inside(name, module):
 
 class Scope(unittest.TestCase):
     def test_the_package_has_the_modules_this_test_reads(self):
-        names = {str(path.relative_to(PACKAGE)) for path, _ in modules()}
+        names = {path.relative_to(PACKAGE).as_posix() for path, _ in modules()}
         for expected in ("cli.py", "odrg.py", "media.py", "pack.py", "generators/dense.py"):
             self.assertIn(expected, names)
 

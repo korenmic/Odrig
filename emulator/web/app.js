@@ -89,8 +89,15 @@
   }
 
   function shortPath(path) {
-    var parts = path.split("/");
+    var parts = path.split(/[\\/]/);
     return parts.length > 3 ? "\u2026/" + parts.slice(-2).join("/") : path;
+  }
+
+  function port(id, value, shown) {
+    var given = typeof value === "string";
+    byId(id).textContent = given ? shown(value) : "-";
+    byId(id).title = given ? value : "";
+    byId(id).parentNode.hidden = !given;
   }
 
   function onHello(event) {
@@ -102,9 +109,9 @@
     byId("empty").hidden = false;
     byId("show").textContent = shortPath(hello.show);
     byId("show").title = hello.show;
-    byId("serial").textContent = shortPath(hello.serial);
-    byId("serial").title = hello.serial;
-    document.title = "odrig emulator \u2013 " + hello.show.split("/").pop();
+    port("serial", hello.serial, shortPath);
+    port("tcp", hello.tcp, String);
+    document.title = "odrig emulator \u2013 " + hello.show.split(/[\\/]/).pop();
     showReason();
     if (!hello.legs.length) {
       mapping = {width: 0, height: 0, legs: []};

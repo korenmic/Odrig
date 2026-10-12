@@ -10,7 +10,7 @@ from odrig import mapping
 from tests.core import support as core_support
 
 from . import support
-from .test_layout import JSC, WEB, dump, numbers_of, rule
+from .test_layout import WEB, dump, numbers_of, rule
 
 SCRIPT = support.ROOT / "tests" / "emulator" / "js" / "dump_painted.js"
 
@@ -22,18 +22,16 @@ OF_THE_MAPPING_VIEW = ("board", "wires", "wires close", "wire", "reach-line", "c
 def painted(text, areas, refreshes=(), board=False):
     """What the page's view script draws for a mapping file, and what it paints on its
     canvas when the drawing is made and for each refresh, for each drawing area: run in the
-    JavaScript shell of macOS with a stand-in for the document. With `board` the drawing
+    JavaScript shell with a stand-in for the document. With `board` the drawing
     is the mapping view, without it the LEDs view."""
-    if not JSC.exists():
-        raise AssertionError(f"the JavaScript shell of macOS is not at {JSC}")
     with tempfile.TemporaryDirectory() as folder:
         path = pathlib.Path(folder, "mapping.json")
         path.write_text(text, encoding="utf-8")
         asked = pathlib.Path(folder, "questions.json")
         asked.write_text(json.dumps({"areas": areas, "board": board, "refreshes": [list(refresh) for refresh in refreshes]}), encoding="utf-8")
-        done = subprocess.run([str(JSC), str(SCRIPT), "--", str(WEB / "board.js"), str(WEB / "layout.js"), str(WEB / "view.js"), str(path), str(asked)], capture_output=True, text=True)
+        done = subprocess.run([*support.js_shell(), str(SCRIPT), "--", str(WEB / "board.js"), str(WEB / "layout.js"), str(WEB / "view.js"), str(path), str(asked)], capture_output=True, text=True)
     if done.returncode != 0 or done.stderr:
-        raise AssertionError(f"jsc ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
+        raise AssertionError(f"the JavaScript shell ended with status {done.returncode}:\n{done.stdout[-600:]}\n{done.stderr[-600:]}")
     return json.loads(done.stdout)
 
 

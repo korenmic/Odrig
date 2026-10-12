@@ -11,7 +11,7 @@ from . import support
 
 
 def over_serial(emulator, line):
-    with support.Serial(emulator.serial) as port:
+    with support.lines(emulator) as port:
         return port.ask(line)
 
 
@@ -19,7 +19,7 @@ def over_http(emulator, line):
     return emulator.command(line)
 
 
-ROUTES = {"serial": over_serial, "http": over_http}
+ROUTES = {support.LINES: over_serial, "http": over_http}
 
 
 class Space(unittest.TestCase):
@@ -103,7 +103,7 @@ class ListAndRemove(unittest.TestCase):
         )
 
     def test_remove_changes_the_show_and_the_folder_as_the_reference_has_them_by_each_route(self):
-        for first, second in (("serial", "http"), ("http", "serial")):
+        for first, second in ((support.LINES, "http"), ("http", support.LINES)):
             with self.subTest(first=first):
                 support.installed(self.folder, core_support.example_show())
                 player = self.reference()
@@ -194,7 +194,7 @@ class Uploads(unittest.TestCase):
 
     def test_an_upload_over_each_route_and_over_the_two_mixed_installs_the_file_and_its_item(self):
         self.assertGreater(len(self.clip), 9000)
-        for number, routes in enumerate((("serial",), ("http",), ("serial", "http"), ("http", "serial")), start=10):
+        for number, routes in enumerate(((support.LINES,), ("http",), (support.LINES, "http"), ("http", support.LINES)), start=10):
             with self.subTest(routes=routes):
                 support.installed(self.folder, core_support.example_show())
                 for stale in set(support.files_of(self.folder)) - set(core_support.example_show()):
@@ -236,7 +236,7 @@ class Uploads(unittest.TestCase):
         self.assertEqual(over_http(again, "play 9"), DONE)
         self.assertEqual(again.status()["animation"], 9)
         smaller = core_support.clip(5, 60, 6)
-        self.assertEqual(upload(again, ("serial",), 9, "smaller.odrg", smaller)[1], DONE)
+        self.assertEqual(upload(again, (support.LINES,), 9, "smaller.odrg", smaller)[1], DONE)
         self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller)})
         self.assertEqual(again.status()["playing"], 9)
         self.assertEqual(over_http(again, "remove 9"), DONE)
@@ -247,7 +247,7 @@ class Uploads(unittest.TestCase):
     def test_a_file_of_another_canvas_is_refused_with_bad_file_and_its_reason(self):
         emulator = self.started()
         wrong = core_support.clip(5, 60, 60)
-        given, ended = upload(emulator, ("http", "serial"), 9, "wrong.odrg", wrong)
+        given, ended = upload(emulator, ("http", support.LINES), 9, "wrong.odrg", wrong)
         self.assertEqual(ended, b'{"ok":false,"error":"bad-file","reason":"size-mismatch"}\n')
         self.assertEqual(over_http(emulator, "upload cancel"), b'{"ok":false,"error":"no-upload"}\n')
         self.assertEqual(sorted(support.files_of(self.folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])

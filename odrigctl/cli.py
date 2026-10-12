@@ -39,15 +39,24 @@ def _seconds(text):
     return seconds
 
 
+def _lines_address(text):
+    try:
+        client.tcp_address(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not host:port") from None
+    return text
+
+
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m odrigctl",
-        description="Sends one command to a target, over its serial port or over HTTP, and prints the reply. "
+        description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it.",
         epilog="Commands: play ID, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
+    target.add_argument("--tcp", metavar="ADDRESS", type=_lines_address, help="the address of a target that takes lines over TCP: host:port")
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("command", metavar="COMMAND", choices=list(COMMANDS), help=", ".join(COMMANDS))
@@ -128,7 +137,7 @@ def main(argv=None):
             print(f"error: not-found: {words[2]}: {error.strerror or type(error).__name__}", file=sys.stderr)
             return 2
     try:
-        with client.Session(port=arguments.port, http=arguments.http, timeout=arguments.timeout) as session:
+        with client.Session(port=arguments.port, tcp=arguments.tcp, http=arguments.http, timeout=arguments.timeout) as session:
             if arguments.command == "list":
                 return 0 if content.list_all(session, _print) else 1
             if arguments.command == "upload":

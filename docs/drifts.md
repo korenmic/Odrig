@@ -5257,6 +5257,228 @@ repository, `make -C core test PYTHON="$PWD/.venv/bin/python"` passes all 246 te
 
 **Resolution.** `docs/core.md`, the test command.
 
+## Seed 11: What the seed leaves to its spec
+
+**Question.** The seed asks for a tracked script that builds the core on Windows, for the
+line protocol on a local TCP port, and for the command tool to reach it. It names no file,
+no option, no port number and no printed line. What are they?
+
+**Answer.**
+
+- The build script is `core/build.py`, written in Python with the standard library alone:
+  Python is the one program every contributor already has. It finds the compiler itself and
+  looks in the folder `tools/` of the repository before the path, so that a compiler can be
+  unpacked there without being installed. `tools/` is ignored by git. `core/Makefile` stays
+  as it is and stays the way macOS builds.
+- The shared library is `core/build/odrig_core.dll` on Windows, whichever compiler built it.
+- The emulator's option is `--tcp-port N`, the port without the option is 8601, one above
+  the page's, and the printed line is `tcp: 127.0.0.1:<port>`. On macOS the option opens the
+  line port beside the serial port and does not take its place, so that nothing a Mac prints
+  or opens changes unless the option is given.
+- On Windows `--serial-link` is refused with the reason `serial-unavailable`, which the
+  emulator already has, and not with a new reason.
+- The command tool's option is `--tcp ADDRESS`, where the address must have its port: the
+  board has no such port, so no port number is the usual one.
+- A command that arrived by the line port has the transport `tcp` in the log. This adds no
+  command: the line protocol and the list of commands are those of `docs/commands.md`.
+- A real serial port on Windows is opened through `kernel32` with `ctypes`, which is part
+  of Python. The rule of seed 03 that only the emulator's binding uses `ctypes` gives way
+  for this one module of the command tool.
+- The JavaScript shell of the emulator suite on Windows is Node.js, which a developer there
+  usually has. macOS keeps `jsc`.
+- The core suite needs the object listing and the syntax checks of a GNU-style toolchain.
+  With Microsoft's toolchain the build script builds the libraries and the test host, and
+  the tests that question a GNU-style compiler are skipped with that reason.
+
+**Resolution.** `docs/specs/11-p0-emulator-and-tools-on-windows/`: `requirements.md`,
+`design.md` and `tasks.md`.
+
+## Seed 11: A library that a running emulator has loaded
+
+**Question.** The build script compiled and linked everything at every run. On Windows a
+DLL that a running program has loaded cannot be written, so the emulator suite, which
+builds the library when it starts, could not run while an emulator was open. What does the
+build script do?
+
+**Answer.** What `make` does: a file is made again only when it is missing or older than
+what it is made from. An object is made from its source, every header of the core, the
+build script and the toolchain written down in `core/build/toolchain.json`, which is
+rewritten only when another toolchain is used. So a build with nothing to do touches
+nothing, and the suite runs beside an open emulator. When a source did change and the
+library is loaded, the script ends with `build-failed` and says to stop the emulator.
+
+**Resolution.** `core/build.py`: `stale`, `needed_by`, `record` and `writable`.
+`tests/emulator/test_build_script.py`, the class `OnlyWhatChanged`.
+
+## Seed 11: The emulator suite where there is no pseudo-terminal
+
+**Question.** Many tests of the emulator suite send their lines through the serial port,
+end the emulator with SIGTERM, ask `lsof` and `nm`, compile with `cc`, link folders and run
+the page's scripts in `jsc`. None of that exists on Windows. Which tests are skipped there,
+and which run another way?
+
+**Answer.** A test is skipped only when what it checks is the pseudo-terminal itself or
+something Windows cannot do. Everything else runs through what the system has.
+
+- A test that used the serial port as "the other transport beside HTTP" now takes the
+  transport that carries bytes on its system: the serial port where there is one, the line
+  port elsewhere. The helpers are `support.lines`, `support.line_target` and
+  `support.LINES`, which is `serial` or `tcp`. On macOS these tests do what they did.
+- Skipped where there is no pseudo-terminal, with that reason: the module of the serial
+  port, the tests of the link, and the tests of the POSIX serial exchange. The Windows
+  exchange has its own tests, with a stand-in for `kernel32`, which run everywhere.
+- The emulator is ended with the break of the console on Windows, the one signal a parent
+  can send a child there, and with SIGTERM and SIGINT elsewhere. Ctrl-C itself cannot be
+  sent to a child on Windows by a test; the emulator handles it with the same handler.
+- The test that stops the emulator's process for 300 ms is skipped where there is no
+  SIGSTOP.
+- The JavaScript shell is `jsc` where macOS has it and Node.js elsewhere, with
+  `tests/emulator/js/shell.js`, which takes the command line of `jsc` and has its `print`,
+  `read`, `load` and `checkSyntax`. The syntax check of the page's scripts is then made by
+  the engine of Chrome and Edge, not by that of Safari: the test is named for the shell.
+- What a library exports is read from the DLL's own table; the C compiler is the one beside
+  the compiler that built the library, and with Microsoft's compiler the one test that
+  compiles a C program is skipped; the listening addresses come from the system's list
+  where there is no `lsof`; folders are copied where a program may not make links; and
+  `mkdir` is done by the test where the system has no such program.
+
+On the Windows computer the suite runs 443 tests, of which 15 are skipped.
+
+**Resolution.** `tests/emulator/support.py`; `tests/emulator/js/shell.js`; the test modules
+of `tests/emulator/` that the commit of seed 11 task 4 changes.
+
+## Seed 11: The core suite with the compilers of Windows
+
+**Question.** `make -C core test` builds the test host with the address and
+undefined-behaviour sanitizers and the suite reads the library with `nm -m` of macOS. What
+does `python core/build.py test` build on Windows, and what does the suite read?
+
+**Answer.**
+
+- GCC for Windows has no run-time library for either sanitizer. The build script takes the
+  first set of checks with which a small program can be built and run: the two sanitizers
+  where they are; then the undefined-behaviour checks as traps, which need no library,
+  with the stack protector and the assertions of the standard library; then none. It
+  prints the line `checks: <what it took>`. On the Windows computer, with GCC 16.1 of
+  WinLibs, that is the second set. A fault of memory that only the address check finds is
+  therefore found on macOS, not on Windows.
+- With Microsoft's compiler the test host is built with `/RTC1 /GS /sdl`. Its address
+  check is not used: the program then needs a DLL of the compiler, which is found only
+  inside the compiler's own environment.
+- The test host needs three calls of Windows: memory with a wider alignment from
+  `_aligned_malloc`, standard input and output as bytes, and a backslash taken as a
+  separator of a path.
+- The compiled core refers to `strlen` when GCC builds it, though no source calls it: GCC
+  puts it in the place of a loop that looks for the end of a text. `strlen` joins the list
+  of names the core may refer to. It takes no memory, does no input or output and reads no
+  clock. `docs/core.md` said the core refers only to routines that copy, fill and compare
+  memory: that sentence now names this one too. This is a change to a document that
+  defines the project, and it holds until the owner rules otherwise.
+- Where `nm` gives a letter for the kind of a name, the suite reads that form and puts an
+  underscore in front of every name, so that the list of allowed names is one list. With
+  Microsoft's compiler the ten tests that need a GNU-style `nm`, `ar`, `cc` or `c++` are
+  skipped.
+
+On the Windows computer `python core/build.py test` runs 246 tests, all of which pass with
+GCC; with `--cxx cl`, 246 with 10 skipped.
+
+**Resolution.** `core/build.py`: `checks`, `build_host` and `test`. `tests/core/host/`.
+`tests/core/support.py`, `tests/core/test_build.py`, `tests/core/allowed_symbols.txt`.
+`docs/core.md`, the second paragraph.
+
+## Seed 11: The converter suite on Windows
+
+**Question.** On Windows 33 of the 618 tests of the converter suite failed. Is anything
+wrong in the converter?
+
+**Answer.** No: the converter writes every file as bytes and makes the same files on
+Windows. The three causes were in the tests.
+
+- Five places wrote a page as text, and Python then writes the line ending of the system:
+  `\r\n` on Windows. The tool reads bytes and found no marker that ended in `\n`. The tests
+  now write `\n`.
+- One test compared a path inside the package with `generators/dense.py`; on Windows the
+  path came with a backslash. It is compared in the form the documents write.
+- The builder of the test vectors has zlib make the body of `deflate-fixed.odrg` with the
+  strategy `Z_FIXED`. The Python 3.14 of Windows has zlib-ng, 1.3.1.zlib-ng here, which
+  answers that request with a stored block, so the builder gave up. The builder now keeps
+  what zlib made when that is one last block of the fixed codes, as with the zlib of macOS
+  and of Python 3.12, and otherwise writes such a block itself, every byte as a literal.
+  The tracked vector does not change. The file was never compared byte for byte with what
+  the builder makes, because the output of zlib depends on its version.
+
+The sizes the documents give for compressed files were measured with zlib 1.2.12 and are
+compared within 2 percent; with zlib-ng they still are within that.
+
+**Resolution.** `tests/converter/test_mapping_page.py`, `tests/converter/test_scope.py`,
+`tests/converter/build_vectors.py`: `fixed_block` and `fixed_codes`, and
+`tests/converter/test_vectors.py`, the class `TheBuilder`.
+
+## Seed 11: The pages after the work on Windows
+
+**Question.** The getting-started page and the animation guide are each 200 lines long,
+the most the quick suite lets a page be, and the walk-through runs their commands on the
+first computer. How do they give the commands of Windows? And the decisions said the
+emulator runs on macOS for now: who changes that?
+
+**Answer.**
+
+- The pages keep their commands, which are those of macOS and which the walk-through runs.
+  The section "On Windows" of the getting-started page has what a Windows computer needs,
+  one block with the setup and the four suites, and one table that says how everything
+  else on the two pages is written on Windows: the Python of the environment, the build
+  script in place of `make`, `mkdir`, the file a script is written to, and the line port in
+  place of the serial port. The block is not marked as a shell block, so the walk-through
+  does not run it; the quick suite asks each tool whether it understands its commands, and
+  compares the four suites with the four the page runs after the setup.
+- The quick suite knows `.venv\Scripts\python` as a Python and `core/build.py` as a
+  program, and takes `tools/` and `scratch/` as folders no clone has to hold.
+- The owner said during this work where a Windows contributor puts what is fetched: nothing
+  is installed in the system; a program that is needed is unpacked into `tools/`, and a
+  trial goes into `scratch/`. Both are ignored by git. `AGENTS.md` has it as a rule under
+  "If you work on Windows", and the build script looks into `tools/` for a compiler.
+- `docs/decisions.md` now says that the emulator runs on macOS and on Windows, that it is
+  our own program, no longer "Mac program", and that on Windows the lines of the serial
+  port travel over a TCP port. The seed, which the owner wrote, asked for exactly this, so
+  the sentences follow the seed and no decision is made here. The change log has an entry.
+- `AGENTS.md` no longer lists seed 11 under "What is coming".
+- The walk-through suite and the firmware tool were not ported: the seed leaves the
+  firmware and the board with the first computer, and the walk-through follows the
+  commands of macOS.
+
+**Resolution.** `agent/getting-started.md`, "On Windows"; `agent/animation-guide.md`, its
+first paragraph; `AGENTS.md`, "If you work on Windows"; `docs/emulator.md`, "Commands" and
+"On Windows"; `docs/core.md`, "Commands"; `docs/commands.md`, "Transports";
+`docs/decisions.md`; `tests/onboarding/`.
+
+## Seed 11: The final check on Windows
+
+**Question.** What was seen working on the Windows computer, with what, and what did the
+check itself turn up?
+
+**Answer.** What was seen is in `docs/emulator.md` under "What has been checked on
+Windows". Three things came up on the way and were settled.
+
+- The fresh clone was set up with Python 3.12 where the rest of the work used 3.14, to
+  have a second Python and a zlib that is not zlib-ng. There one test of the command tool
+  failed: it sets a time limit of 0.4 seconds and measured 0.391. The clock a program reads
+  with Python 3.12 and earlier on Windows counts in steps of 1/64 of a second, so a wait of
+  0.4 seconds can measure one step short. The limit was kept; the two tests that measure
+  it allow one step of the clock, which on macOS is next to nothing.
+- The fresh clone was made with git set to convert line endings, `core.autocrlf` true,
+  which is what the installer of git for Windows proposes. No file was converted: the
+  first line of `.gitattributes` holds.
+- A video for the import was made with PyAV, which the converter's environment has: the
+  folder of leads the owner gave holds GIFs only.
+
+The check list by eye was not gone through step by step on Windows. A program read the
+header and took screenshots in Chrome and in Edge without a window, and the screenshots of
+the LEDs view and of the mapping view were looked at. A person at a screen, Python 3.10
+and 3.11, a Mac and a board on a `COM` port are what is left, and each is listed in
+`docs/emulator.md`.
+
+**Resolution.** `docs/emulator.md`, "What has been checked on Windows" and "On Windows".
+`tests/emulator/support.py`, `CLOCK_STEP`, and `tests/emulator/test_tool.py`.
 ## Seed 03: The check list by eye, closed without a person
 
 **Question.** The last task of seed 03 is a check list to be gone through by a person in
@@ -5271,6 +5493,58 @@ is about real LEDs on the board.
 
 **Resolution.** Seed 03 `tasks.md`, task 11, ticked; the seed's `state.json` set to
 `completed`.
+
+## Seed 11: What the review of the pull request found
+
+**Question.** The work of seed 11 went into a pull request and was read by a reviewer who had
+not written it. What did the review find, and what was done about it?
+
+**Answer.** The product code of macOS was found unchanged in what it does. Three tests of the
+suite would have failed on the first computer, and six smaller points were named.
+
+- Three tests held only on Windows. One compared every name a shared library offers with the
+  seven functions, where only a DLL offers no other name: it now takes the names that begin
+  with `odrig_core_`, as the test did before. One expected the settings structure of a serial
+  port of Windows to be 28 bytes, which it was only on Windows, because the number type it
+  was built from is wider elsewhere: the structures are now built from types of a fixed size.
+  One expected a compiler named `C:\x\bin\cl.exe` to be known as Microsoft's on every system:
+  the name of a program now ends its folder at a slash or a backslash wherever the script
+  runs.
+- The command tool on Windows lowered RTS and then DTR by asking for each directly, and went
+  on when a request was refused. Windows refuses the request for RTS when the port was left
+  to drive RTS by itself, and DTR would then have gone low with RTS still high, which is the
+  combination that resets the chip. The tool now lowers the lines through the port's
+  settings, written twice: first RTS, with DTR as it was, then DTR. Seen on the `COM1` of
+  the Windows computer, with nothing connected, also with RTS set to handshake beforehand:
+  both were reported off afterwards. A board has still not been tried.
+- The build script read what the command prompt writes in the wrong code page, so a user
+  name that is not ASCII would have broken the search for Microsoft's compiler; it used a
+  compiler named by a relative path from the wrong folder; both are mended.
+- The line port could take a connection, or hand on a line, in the moment it was closing;
+  it now takes none and hands on nothing from then on. A library named without a folder is
+  loaded from the working folder on Windows too. The helper that ends an emulator in the
+  tests ends it also when the signal cannot be sent.
+- Not changed: a source that is removed stays in a library that is already built, until the
+  build folder is cleaned. The makefile behaves the same way.
+- Two tests of the core suite and one of the converter suite called zlib in a way Python
+  3.10 does not know. They now use a call every Python has. The two of the core suite were
+  there before this seed; this was seen failing with Python 3.10 and has not been run with
+  it again.
+
+Before the owner ruled that Linux is no requirement and that the Linux subsystem of the
+Windows computer is not to be used for tests, the suites were run there once, with Python
+3.10, as the nearest thing to a Mac at hand. The three tests above failed there, which is how
+they were seen failing. Everything of the serial port, the serial exchange of the command
+tool and the two signals passed. What else failed there concerns Linux only, the names of its
+terminal devices and the size of a buffer, and is left as it is. This is not a run on macOS:
+the list in `docs/emulator.md` stands.
+
+On the Windows computer, after the mends: converter 622 tests, core 246, emulator 460 with 15
+skipped, onboarding 75.
+
+**Resolution.** `odrigctl/winserial.py`; `core/build.py`: `stem`, `absolute` and
+`microsoft_environment`; `emulator/lineport.py`; `emulator/binding.py`: `load`;
+`tests/emulator/`, `tests/core/support.py`: `raw_deflate`.
 ## Seed 06: Where the check of the Node.js version lives
 
 **Question.** The design has `converter/odrig.js` check the version of Node.js and then
@@ -7137,3 +7411,45 @@ are not to be implemented from. A beginning of the old first task, the canvas si
 `project-seeds/17-p2-operators-app-converting-and-uploading/`;
 `docs/specs/09-p1-operators-app-for-android/`, the note at the top of each page;
 `AGENTS.md`, "What is coming".
+## Seed 11: Master moved under the pull request
+
+**Question.** While the pull request of seed 11 waited, `master` got the content commands
+(seed 07), the converter in JavaScript (seed 06) and three more seeds. What had to be done
+to the work on Windows, what does the converter's suite do on Windows, which the seed asks
+to be run there once the converter is in the repository, and what in the pull request was
+not about Windows?
+
+**Answer.**
+
+- The command tool had become a `Session`: several exchanges through one opening of a
+  port. The serial port of Windows and the connection over TCP are put into it. An open
+  port is the descriptor of `_open` where the system has `termios`, and an object elsewhere;
+  four small functions do with either what the tool did with a descriptor. A session takes
+  `tcp=` beside `port=` and `http=`, so `list` and `upload` work over TCP.
+- The new tests of the emulator suite and of the core suite took the same turn as the
+  earlier ones: the transport of the system in place of the serial port, and in the core's
+  test host the calls of Windows for renaming over a file, removing and listing a folder.
+- **The converter's own suite on Windows**, `npm test --prefix converter`, with Node.js
+  24.13 and Python 3.14: 499 tests, 288 pass, 208 fail, 3 are skipped. 73 of the failures
+  show the same error: the suite starts a helper in Python,
+  `converter/tests/reference.py`, which loads the C library of the system with
+  `ctypes.CDLL(None)`, and Windows has no such thing to load. The other failures were not
+  looked into. The commands of the converter that `docs/emulator.md` gives run on Windows:
+  the emulator suite runs them. Mending the converter's suite is not part of this seed and
+  was not begun: `docs/converter.md` still says that nothing has been run on Windows.
+- The system's error 10055, seen once before and left unexplained, came again while two
+  suites ran at the same time, as the reason an emulator could not take a port. It is the
+  system running short of ports or buffers under that load, not a fault of the emulator.
+- The owner ruled that the pull request holds the support of Windows only and that Linux
+  is not worked on. What the branch did for a system that is neither macOS nor Windows,
+  and a mend of two older tests for Python 3.10, were taken out and are kept on the branch
+  `beyond-windows`. The spec of this seed still names `libodrig_core.so` for other
+  systems: the code no longer does.
+
+On the Windows computer, on the merged branch: the reference converter's suite 638 tests,
+the core suite 364, with Microsoft's compiler 364 of which 10 are skipped, the emulator
+suite 523 of which 17 are skipped, the onboarding suite 81.
+
+**Resolution.** `odrigctl/client.py`: `Session`, `_ready`, `_take`, `_give`, `_had` and
+`_shut`; `tests/core/host/host.cpp`; `tests/emulator/support.py`: `BytePort`,
+`session_target`; `agent/getting-started.md` and `AGENTS.md`, the sections about Windows.

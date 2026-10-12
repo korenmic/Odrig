@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import unittest
 
 from . import support
@@ -122,22 +123,22 @@ class EntryFile(unittest.TestCase):
         for phrase in ("Every addition to the command list", "changes a decision in `docs/decisions.md`", "hardware or power"):
             self.assertIn(phrase, needed)
 
-    def test_it_says_what_works_on_windows_today_and_whose_job_the_rest_is(self):
-        windows = self.part("If you work on Windows")
-        for phrase in ("The converter is written to run there, and so is its suite. Both have been run on macOS only.",
-                       "The emulator and the command tool run on macOS only.", "The firmware tool and the board stay with the first computer.",
-                       "The same is true of the Python reference and the generators.",
-                       "is seed 11", f"`{SEED_FOR_WINDOWS}`", "the first job of the contributor on Windows",
-                       "its spec, its tasks and their implementation", "Running the converter's suite there is part of it.",
+    def test_it_says_what_works_on_windows_and_what_is_different_there(self):
+        windows = " ".join(self.part("If you work on Windows").split())
+        for phrase in ("The reference converter, the core's build, the emulator and the command tool work on Windows 10 and 11, and their suites pass there.",
+                       "The converter's own suite, `npm test --prefix converter`, does not pass on Windows yet", "Mending that is not part of seed 11.",
+                       "That was seed 11", f"`{SEED_FOR_WINDOWS}`", "built there by `python core/build.py shared`, not by `make`",
+                       "Windows has no virtual serial port", "with `--tcp` or `--http`", "The firmware tool and the board stay with the first computer.",
+                       "Nothing is installed in the system", "unpacked into `tools/`", "a trial goes into `scratch/`", "Git ignores both",
                        "[agent/getting-started.md](agent/getting-started.md#on-windows)"):
             self.assertIn(phrase, windows)
-        seed = flat((support.ROOT / SEED_FOR_WINDOWS / "seed.md").read_text(encoding="utf-8"))
-        self.assertIn("When the JavaScript converter is present in the repository, its suite is run on Windows too", seed)
+        for folder in ("tools/x", "scratch/x"):
+            self.assertEqual(subprocess.run(["git", "check-ignore", "-q", folder], cwd=support.ROOT).returncode, 0, folder)
 
     def test_what_is_coming_names_every_seed_that_is_not_begun_and_no_seed_that_is_completed(self):
         coming = self.part("What is coming")
         named = {int(number) for number in re.findall(r"\bseed ([0-9]{2})\b", coming)}
-        self.assertLessEqual({9, 11, 12}, named)
+        self.assertLessEqual({9, 12}, named)
         self.assertGreaterEqual(len(seeds()), 10)
         for number, state in seeds():
             with self.subTest(seed=number, state=state):

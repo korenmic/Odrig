@@ -276,7 +276,7 @@ code, .value, .readout, .log td, .log th { font-family: var(--mono); }
   font-weight: 600;
   color: var(--panel);
 }
-.chip[data-via="serial"] { background: var(--over-serial); }
+.chip[data-via="serial"], .chip[data-via="tcp"] { background: var(--over-serial); }
 .chip[data-via="http"] { background: var(--over-web); }
 
 .log tr.new td { animation: arrive 1.2s ease-out; }

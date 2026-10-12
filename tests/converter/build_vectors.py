@@ -192,6 +192,28 @@ def deflate_with(level, strategy=zlib.Z_DEFAULT_STRATEGY):
     return deflate
 
 
+def fixed_block(body):
+    """A raw DEFLATE stream of one block with the fixed codes, every byte as a literal,
+    written without zlib."""
+    bits = [1, 1, 0]
+    for value in body:
+        code, length = (0x30 + value, 8) if value < 144 else (0x190 + value - 144, 9)
+        bits += [(code >> (length - 1 - place)) & 1 for place in range(length)]
+    bits += [0] * 7
+    bits += [0] * (-len(bits) % 8)
+    return bytes(sum(bit << place for place, bit in enumerate(bits[at:at + 8])) for at in range(0, len(bits), 8))
+
+
+def fixed_codes(deflate):
+    """A deflate whose output is one block of the fixed codes: what zlib makes when it is
+    told to use them, and where a zlib does not do as told, the block written here."""
+    def made(body):
+        data = deflate(body)
+        return data if data[0] & 7 == 0b011 else fixed_block(body)
+
+    return made
+
+
 def first_block(data):
     """`(is the last block, block type)` of the first DEFLATE block of a compressed file."""
     first = data[16]
@@ -413,7 +435,7 @@ def valid_cases():
     body = deflate_film()
     for name, deflate, kind in (
         ("deflate-stored", deflate_with(0), STORED_BLOCKS),
-        ("deflate-fixed", deflate_with(9, zlib.Z_FIXED), FIXED_BLOCKS),
+        ("deflate-fixed", fixed_codes(deflate_with(9, zlib.Z_FIXED)), FIXED_BLOCKS),
         ("deflate-dynamic", deflate_with(9), DYNAMIC_BLOCKS),
     ):
         case = body.valid(name, deflate)

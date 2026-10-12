@@ -47,7 +47,7 @@ def broken_links(page, text):
         name, _, part = target.partition("#")
         path = (folder / name).resolve() if name else support.ROOT / page
         inside = path == support.ROOT or support.ROOT in path.parents
-        if not inside or not support.exists(str(path.relative_to(support.ROOT))):
+        if not inside or not support.exists(path.relative_to(support.ROOT).as_posix()):
             broken.append(target)
         elif part and part not in [support.anchor(heading) for heading in support.headings(path.read_text(encoding="utf-8"))]:
             broken.append(target)

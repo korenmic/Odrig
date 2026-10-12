@@ -6,6 +6,7 @@ This is the only module that knows the core is a C library. Everything else uses
 import collections
 import ctypes
 import os
+import sys
 from ctypes import CFUNCTYPE, POINTER, Structure, c_char, c_char_p, c_int, c_int32, c_size_t, c_uint8, c_uint16, c_uint32, c_uint64, c_void_p
 
 from . import failure
@@ -13,7 +14,15 @@ from . import failure
 LINE_MAX = 2048
 REPLY_MAX = 1024
 
-BUILD_COMMAND = "make -C core shared"
+
+def library_of(platform):
+    """`(file name, build command)` of the core's shared library on a system."""
+    if platform == "win32":
+        return "odrig_core.dll", "python core/build.py shared"
+    return "libodrig_core.dylib", "make -C core shared"
+
+
+LIBRARY_NAME, BUILD_COMMAND = library_of(sys.platform)
 
 ALLOC = CFUNCTYPE(c_void_p, c_void_p, c_size_t)
 OPEN = CFUNCTYPE(c_int, c_void_p, c_char_p)
@@ -67,7 +76,9 @@ def load(library_path):
     """The library with every function of the header declared, or `core-not-built`."""
     path = os.fspath(library_path)
     try:
-        library = ctypes.CDLL(path)
+        # By its whole path: a library named without a folder is the one in the working
+        # folder, which not every system looks into for a bare name.
+        library = ctypes.CDLL(os.path.abspath(path))
         for name, (result, arguments) in FUNCTIONS.items():
             function = getattr(library, name)
             function.restype = result
