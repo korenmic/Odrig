@@ -57,9 +57,16 @@ def parser():
     network.add_argument("--port", metavar="P", help="the board's USB serial port")
     network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
     network.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
-    scratch = commands.add_parser("install-firmware", help="write the built firmware to the board and then the network's name and password into its storage")
+    limiter = commands.add_parser("set-limit", help="put the limit on LED current from the limit file into the board's storage")
+    limiter.add_argument("--port", metavar="P", help="the board's USB serial port")
+    limiter.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a limit file other than firmware/limit.json")
+    limiter.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    limit_read = commands.add_parser("read-limit", help="print the limit on LED current that the board's storage holds")
+    limit_read.add_argument("--port", metavar="P", help="the board's USB serial port")
+    scratch = commands.add_parser("install-firmware", help="write the built firmware to the board and then the network's name and password and the limit on LED current into its storage")
     scratch.add_argument("--port", metavar="P", help="the board's USB serial port")
     scratch.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
+    scratch.add_argument("--limit", metavar="FILE", type=pathlib.Path, help="a limit file other than firmware/limit.json")
     scratch.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after each restart (default: 20)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
@@ -179,33 +186,68 @@ def _install_show(arguments):
     return 0 if storage.status_error(reply) is None else 1
 
 
-def store_settings(port, settings, wait):
-    """Puts a name and a password into WLED's stored settings on the board, restarts it,
+def store_settings(port, wait, network=None, milliamps=None):
+    """Puts settings into WLED's stored settings on the board in one write: the name and
+    the password of the network, the limit on LED current, or both. Restarts the board
     and prints what was set and the board's reply to `status`."""
-    from . import wifi
+    from . import limit, wifi
+
+    def make(image):
+        if network is not None:
+            image = wifi.apply(image, network)
+        if milliamps is not None:
+            image = limit.apply(image, milliamps)
+        return image
+
     on_port, region, before_path = storage_of(port)
-    write_storage(on_port, region, before_path.read_bytes(), lambda before: wifi.apply(before, settings))
+    write_storage(on_port, region, before_path.read_bytes(), make)
     reply = board.EXPECTED["status"](port, wait)
-    print(f"name: {settings.name}")
-    print("password: set")
+    if network is not None:
+        print(f"name: {network.name}")
+        print("password: set")
+    if milliamps is not None:
+        print(limit.line(milliamps))
     print(reply)
     return 0
 
 
-def _set_wifi(arguments):
+def _network(arguments):
     from . import wifi
-    settings = wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
-    return store_settings(board.find(arguments.port), settings, arguments.wait)
+    return wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
+
+
+def _set_wifi(arguments):
+    network = _network(arguments)
+    return store_settings(board.find(arguments.port), arguments.wait, network=network)
+
+
+def _set_limit(arguments):
+    from . import limit
+    milliamps = limit.read(arguments.settings if arguments.settings is not None else paths.LIMIT_SETTINGS)
+    return store_settings(board.find(arguments.port), arguments.wait, milliamps=milliamps)
+
+
+def _read_limit(arguments):
+    from . import limit
+    port = board.find(arguments.port)
+    on_port, _, image_path = storage_of(port)
+    try:
+        found = limit.stored(image_path.read_bytes())
+    finally:
+        on_port.restart()
+    print(limit.NOT_STORED if found is None else limit.line(found))
+    return 0
 
 
 def _install_firmware(arguments):
-    from . import wifi
-    settings = wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
+    from . import limit
+    network = _network(arguments)
+    milliamps = limit.read(arguments.limit if arguments.limit is not None else paths.LIMIT_SETTINGS)
     image = build.checked_image(build.image_path("firmware"))
     build.check_size(image)
     port = board.find(arguments.port)
     write_application(port, image, expect="status", wait=arguments.wait)
-    return store_settings(port, settings, arguments.wait)
+    return store_settings(port, arguments.wait, network=network, milliamps=milliamps)
 
 
 def _read_show(arguments):
@@ -247,7 +289,8 @@ def _test_air(arguments):
 
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
-    "install-show": _install_show, "set-wifi": _set_wifi, "install-firmware": _install_firmware, "read-show": _read_show,
+    "install-show": _install_show, "set-wifi": _set_wifi, "set-limit": _set_limit, "read-limit": _read_limit,
+    "install-firmware": _install_firmware, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
 

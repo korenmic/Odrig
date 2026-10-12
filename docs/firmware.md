@@ -95,7 +95,9 @@ python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|pro
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
-python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--wait SECONDS]
+python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
+python3 firmware/fw.py read-limit [--port P]
+python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--limit FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
@@ -134,7 +136,10 @@ with that environment's Python.
 | `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
 | `wifi-name-invalid` | The name does not have 1 to 32 characters of printable ASCII. |
 | `wifi-password-invalid` | The password does not have 8 to 63 characters of printable ASCII. |
-| `wled-settings-malformed` | `/cfg.json` or `/wsec.json` in the board's storage is not a JSON object, or its `ap` is not an object. Nothing was written to the board. |
+| `wled-settings-malformed` | `/cfg.json` or `/wsec.json` in the board's storage is not a JSON object, or its `ap`, its `hw` or its `hw.led` is not an object. Nothing was written to the board. |
+| `limit-settings-missing` | The limit file to read is not there or is not a file. |
+| `limit-settings-malformed` | The limit file is not a JSON object with exactly the whole number `milliamps`. |
+| `limit-invalid` | The limit is not from 0 to 65,535. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
@@ -337,6 +342,39 @@ stored and checked.
 `flash`, `restore-stock` and `install-show` leave the name and the password as storage
 has them.
 
+### set-limit
+
+```
+python3 firmware/fw.py set-limit
+```
+
+Puts the limit on LED current into the board's storage, checks what was written, restarts
+the board, and prints two lines: `limit: <N> mA`, or `limit: off` for a limit of 0, and
+the board's reply to `status`.
+
+The limit comes from the limit file, `firmware/limit.json`, a JSON object with exactly
+the whole number `milliamps`, from 0 to 65,535. It is the maximum for all LEDs together
+that WLED's limiter works with, and 0 switches the limiter off; see
+[The current limiter stays active](#what-the-firmware-does). `--settings FILE` reads
+another limit file. A file that is refused stops the command before the board is touched.
+
+WLED keeps the number as `hw.led.maxpwr` of `/cfg.json`. The command edits that file the
+way `set-wifi` does: every other member keeps its value and its place, a `hw` or a
+`hw.led` object that is missing is made, the new image is checked, the blocks that
+changed are written, and the chip compares the whole partition. On a board that holds
+the limit already nothing is written. The tool waits 20 seconds for the reply to
+`status`, or as long as `--wait SECONDS` says.
+
+### read-limit
+
+```
+python3 firmware/fw.py read-limit
+```
+
+Reads the board's storage, restarts the board, and prints the limit it holds in one line:
+`limit: <N> mA`, `limit: off`, or `limit: not stored; WLED uses 850 mA` when `/cfg.json`
+holds no `hw.led.maxpwr`. It writes nothing.
+
 ### install-firmware
 
 ```
@@ -346,13 +384,15 @@ python3 firmware/fw.py install-firmware
 The command for a board from scratch: one that runs stock WLED or an earlier build, or
 whose storage does not hold the network's name and password yet. It writes the built
 firmware to the board as `flash` does, waits for the firmware's reply to `status`, and
-then does what `set-wifi` does: it puts the name and the password of the settings file
-into storage, restarts the board again, and prints `name: <name>`, `password: set` and
-the reply to `status`.
+then does what `set-wifi` and `set-limit` do, in one write: it puts the name and the
+password of the settings file and the limit of the limit file into storage, restarts the
+board again, and prints `name: <name>`, `password: set`, the line of the limit and the
+reply to `status`.
 
-The settings file is read and checked first, and then the image
-`build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When either is
+The settings file and the limit file are read and checked first, and then the image
+`build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
 refused, the board has not been touched. `--settings FILE` reads another settings file,
+`--limit FILE` another limit file,
 and `--wait SECONDS` is the time the command waits for the board's reply after each of
 its two restarts, 20 seconds without it. The command takes 50 seconds on the bench board.
 
@@ -854,7 +894,7 @@ touches these regions only:
 | Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
 | Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash`, `install-firmware` and `restore-stock` |
 | First application (`app0`) | `0x10000` | `0x300000` | `flash`, `install-firmware`, `restore-stock` |
-| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi` and `install-firmware`, changed blocks only |
+| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
 partition at `0xFF0000` are never written. The whole flash is never erased, and no tool

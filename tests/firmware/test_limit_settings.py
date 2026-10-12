@@ -2,10 +2,11 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
-from fwtool import Failure, limit, paths
+from fwtool import Failure, build, limit, paths
 
-from . import ROOT
+from . import ROOT, support
 
 LIMIT_FILE = ROOT / "firmware" / "limit.json"
 
@@ -78,6 +79,48 @@ class Reading(unittest.TestCase):
         self.assertEqual(limit.line(850), "limit: 850 mA")
         self.assertEqual(limit.line(65535), "limit: 65535 mA")
         self.assertEqual(limit.line(0), "limit: off")
+
+
+# What a refused limit file is refused with, through each command that reads one.
+REFUSED = {
+    "limit-settings-malformed": ('{"milliamps": 1.5}', '{"milliamps": "850"}', "[850]", ""),
+    "limit-invalid": ('{"milliamps": -1}', '{"milliamps": 65536}'),
+}
+COMMANDS = (("set-limit", "--settings"), ("install-firmware", "--limit"))
+
+
+class ThroughTheCommands(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = pathlib.Path(folder.name)
+
+    def built(self):
+        image = self.folder / "odrig-firmware.bin"
+        image.write_bytes(support.PROGRAM)
+        build.write_checksum(image)
+        return image
+
+    def test_a_limit_file_that_is_refused_stops_the_command_before_the_board_is_touched(self):
+        for command, option in COMMANDS:
+            for reason, contents in REFUSED.items():
+                for number, content in enumerate(contents):
+                    with self.subTest(command=command, reason=reason, number=number):
+                        path = self.folder / "limit.json"
+                        path.write_text(content)
+                        with support.untouched_board(), mock.patch.object(build, "checked_image", side_effect=lambda image: self.built()):
+                            result = support.run_main(command, option, path)
+                        self.assertEqual(result.status, 1)
+                        self.assertEqual(result.out, "")
+                        self.assertRegex(result.err, rf"\Aerror: {reason}: [^\n]+\n\Z")
+
+    def test_a_limit_file_that_is_not_there_stops_the_command_before_the_board_is_touched(self):
+        for command, option in COMMANDS:
+            with self.subTest(command=command):
+                with support.untouched_board():
+                    result = support.run_main(command, option, self.folder / "nothing.json")
+                self.assertEqual(result.status, 1)
+                self.assertRegex(result.err, r"\Aerror: limit-settings-missing: [^\n]+\n\Z")
 
 
 class TheLimitFile(unittest.TestCase):

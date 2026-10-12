@@ -5,7 +5,7 @@ import tempfile
 import time
 import unittest
 
-from fwtool import storage, wifi
+from fwtool import limit, storage, wifi
 
 from . import PORT, support
 
@@ -170,9 +170,9 @@ class FromScratch(unittest.TestCase):
     def test_it_ends_with_status_0_and_prints_what_set_wifi_prints(self):
         self.assertEqual(self.done.status, 0, self.done.err)
         lines = self.done.out.splitlines()
-        self.assertEqual(lines[:2], ["name: odrig", "password: set"])
-        self.assertEqual(len(lines), 3)
-        self.assertTrue(json.loads(lines[2])["ok"])
+        self.assertEqual(lines[:3], ["name: odrig", "password: set", limit.line(limit.read())])
+        self.assertEqual(len(lines), 4)
+        self.assertTrue(json.loads(lines[3])["ok"])
         self.assertFalse(wifi.read().password in self.done.out + self.done.err)
 
     def test_the_firmware_answers_status_and_plays_the_show(self):

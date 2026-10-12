@@ -242,7 +242,7 @@ class InstallFirmware(OnASmallLayout):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"name: {NAME}\npassword: set\n{REPLY}\n")
+        self.assertEqual(result.out, f"name: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\n")
         self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
         self.checked.assert_called_once_with(build.image_path("firmware"))
         program, data = [call for call in esptool.calls if "write-flash" in call]
@@ -305,7 +305,7 @@ class InstallFirmware(OnASmallLayout):
         self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash"])
 
     def test_it_has_no_option_that_carries_a_name_or_a_password(self):
-        self.assertEqual(options_of("install-firmware"), {"-h", "--help", "--port", "--settings", "--wait"})
+        self.assertEqual(options_of("install-firmware"), {"-h", "--help", "--port", "--settings", "--limit", "--wait"})
 
     def test_nothing_of_these_runs_shows_the_password(self):
         first = self.esptool()

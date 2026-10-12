@@ -53,7 +53,7 @@ Rules for every task:
     member of `hw.led`. Undo it.
   - Requirements: 2.5, 2.7
 
-- [ ] 3. `set-limit`, `read-limit`, and the limit in `install-firmware`
+- [x] 3. `set-limit`, `read-limit`, and the limit in `install-firmware`
   - `firmware/fwtool/cli.py`: the two commands; `install-firmware` reads both files
     first, makes one storage image with both, and prints four lines; `--limit FILE`.
   - `tests/firmware/test_limit_commands.py`; the refusals through the commands in

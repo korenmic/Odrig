@@ -26,6 +26,10 @@ def read(path=paths.LIMIT_SETTINGS):
     return milliamps
 
 
+# WLED's maximum when its stored settings hold none.
+NOT_STORED = "limit: not stored; WLED uses 850 mA"
+
+
 def line(milliamps):
     """The limit in the words the tool prints."""
     return "limit: off" if milliamps == 0 else f"limit: {milliamps} mA"
