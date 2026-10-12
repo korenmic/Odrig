@@ -117,6 +117,40 @@ class FindingTheCompiler(unittest.TestCase):
             self.find("cl", programs=())
         self.assertEqual(caught.exception.reason, "no-compiler")
 
+    def test_a_compiler_named_by_a_path_is_found_from_the_folder_the_steps_run_in(self):
+        found = self.find("tools/bin/g++", programs=())
+        self.assertEqual(found.cxx, os.path.abspath("tools/bin/g++"))
+        self.assertTrue(os.path.isabs(found.cc))
+        self.assertEqual(self.find(environ={"CXX": os.path.join("gcc", "bin", "g++")}, programs=()).cxx, os.path.abspath(os.path.join("gcc", "bin", "g++")))
+        self.assertEqual(self.find("g++-13").cxx, "g++-13")
+        self.assertEqual(build.absolute("clang++"), "clang++")
+
+    def test_the_name_of_a_program_ends_its_folder_at_a_slash_or_a_backslash_on_every_system(self):
+        for program, name in ((r"C:\x\bin\cl.exe", "cl"), ("/opt/llvm/bin/clang++", "clang++"), (r"tools\gcc/bin\G++.EXE", "g++"), ("cl", "cl")):
+            self.assertEqual(build.stem(program), name)
+        text = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertNotIn("PurePath(str(program))", text)
+
+    def test_what_the_command_prompt_writes_is_read_in_its_own_code_page(self):
+        folder = pathlib.Path(self.folder())
+        (folder / "Microsoft Visual Studio" / "Installer").mkdir(parents=True)
+        (folder / "Microsoft Visual Studio" / "Installer" / "vswhere.exe").write_bytes(b"")
+        (folder / "vs" / "VC" / "Auxiliary" / "Build").mkdir(parents=True)
+        (folder / "vs" / "VC" / "Auxiliary" / "Build" / "vcvars64.bat").write_bytes(b"")
+        answers = [str(folder / "vs").encode("utf-8") + b"\r\n", b"TEMP=C:\\Users\\Jos\x82\\Temp\r\nPATH=C:\\cl\r\n=C:=C:\\\r\n"]
+        asked = []
+
+        def run(command, **settings):
+            asked.append((command, settings))
+            return mock.Mock(returncode=0, stdout=answers[len(asked) - 1])
+
+        with mock.patch.object(build, "PROMPT_ENCODING", "cp437"), mock.patch.object(build.shutil, "which", lambda name, path=None: "C:\\cl\\cl.exe"):
+            made = build.microsoft_environment({"ProgramFiles(x86)": str(folder)}, run)
+        self.assertEqual(made, {"TEMP": "C:\\Users\\Jos\u00e9\\Temp", "PATH": "C:\\cl"})
+        self.assertIn("-utf8", asked[0][0])
+        for _, settings in asked:
+            self.assertNotIn("text", settings)
+
     def test_a_compiler_named_cl_is_microsofts_and_every_other_is_gnu_style(self):
         for program, kind in (("cl", "msvc"), ("CL.EXE", "msvc"), (r"C:\x\bin\cl.exe", "msvc"), ("clang-cl", "msvc"), ("g++", "gnu"), ("clang++", "gnu"), ("c++", "gnu"), ("x86_64-w64-mingw32-g++.exe", "gnu"), ("/opt/llvm/bin/clang++", "gnu")):
             self.assertEqual(build.kind_of(program), kind, program)

@@ -44,6 +44,9 @@ ARCHIVERS = ("ar", "llvm-ar")
 LISTERS = ("nm", "llvm-nm")
 MICROSOFT = ("cl", "clang-cl")
 MICROSOFT_TOOLS = "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+# The command prompt of Windows writes in a code page of its own, which is not the one
+# Python reads text in.
+PROMPT_ENCODING = "oem" if sys.platform == "win32" else "utf-8"
 
 WARNINGS = ("-Wall", "-Wextra", "-Wpedantic", "-Wshadow", "-Werror")
 GNU_FLAGS = ("-std=c++11", "-O2", *WARNINGS, "-Wframe-larger-than=512", "-fno-exceptions", "-fno-rtti", "-Iinclude")
@@ -90,9 +93,17 @@ class Failure(Exception):
 
 
 def stem(program):
-    """The name of a program without its folder and without `.exe`, in lower case."""
-    name = pathlib.PurePath(str(program)).name.lower()
+    """The name of a program without its folder and without `.exe`, in lower case. The
+    folder ends at a slash or at a backslash, whichever system this runs on."""
+    name = re.split(r"[\\/]", str(program))[-1].lower()
     return name[:-4] if name.endswith(".exe") else name
+
+
+def absolute(program):
+    """A program that is named by a path, as a path that holds from any folder: the steps
+    of a build run in the folder of the core. A bare name is left to the search of the
+    path."""
+    return os.path.abspath(program) if re.search(r"[\\/]", program) else program
 
 
 def kind_of(program):
@@ -168,17 +179,18 @@ def microsoft_environment(environ=os.environ, run=subprocess.run):
     finder = pathlib.Path(base, "Microsoft Visual Studio", "Installer", "vswhere.exe")
     if not finder.is_file():
         return None
-    found = run([str(finder), "-latest", "-products", "*", "-requires", MICROSOFT_TOOLS, "-property", "installationPath"], capture_output=True, text=True)
-    places = found.stdout.split("\n") if found.returncode == 0 else []
+    found = run([str(finder), "-latest", "-products", "*", "-requires", MICROSOFT_TOOLS, "-property", "installationPath", "-utf8"], capture_output=True)
+    places = found.stdout.decode("utf-8", "replace").split("\n") if found.returncode == 0 else []
     if not places or not places[0].strip():
         return None
     script = pathlib.Path(places[0].strip(), "VC", "Auxiliary", "Build", "vcvars64.bat")
     if not script.is_file():
         return None
-    shown = run(f'"{script}" >nul 2>&1 && set', shell=True, capture_output=True, text=True)
+    shown = run(f'"{script}" >nul 2>&1 && set', shell=True, capture_output=True)
     if shown.returncode != 0:
         return None
-    made = dict(line.split("=", 1) for line in shown.stdout.splitlines() if "=" in line and not line.startswith("="))
+    lines = shown.stdout.decode(PROMPT_ENCODING, "replace").splitlines()
+    made = dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith("="))
     return made if shutil.which(MICROSOFT[0], path=made.get("PATH", made.get("Path", ""))) else None
 
 
@@ -207,6 +219,7 @@ def find(named=None, environ=os.environ, which=shutil.which, tools=TOOLS, enviro
     names, one unpacked under `tools/`, one on the path, and then Microsoft's."""
     named = named or environ.get("CXX")
     if named:
+        named = absolute(named)
         if kind_of(named) == "gnu":
             return gnu(named, which)
         made = microsoft(named, environ, which, environment)
