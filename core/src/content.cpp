@@ -174,6 +174,9 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
 }
 
 uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
+    if (core.upload.state != kUploadNone) {
+        return refuse(reply, "busy");
+    }
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) {
         ++position;
@@ -219,7 +222,7 @@ bool content_write_show(Core &core, const ShowChange &change) {
         out.number(item.id);
         if (!item.is_cycle) {
             out.text(",\"file\":\"");
-            out.text(core.files[item.first].name);
+            out.text(position == change.renamed ? change.name : core.files[item.first].name);
             out.text("\"}");
         } else {
             out.text(",\"cycle\":[");
@@ -234,6 +237,16 @@ bool content_write_show(Core &core, const ShowChange &change) {
             out.byte('}');
         }
     }
+    if (change.added_id != 0) {
+        if (!first) {
+            out.byte(',');
+        }
+        out.text("{\"id\":");
+        out.number(change.added_id);
+        out.text(",\"file\":\"");
+        out.text(change.added_name);
+        out.text("\"}");
+    }
     out.byte(']');
     if (core.has_start && core.start_item != change.without) {
         out.text(",\"start\":");
@@ -242,6 +255,43 @@ bool content_write_show(Core &core, const ShowChange &change) {
     out.text("}\n");
     out.flush();
     return !out.failed && host.write_close(host.ctx) == 1;
+}
+
+namespace {
+
+void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms) {
+    uint32_t length = 0;
+    for (; name[length] != '\0'; ++length) {
+        file.name[length] = name[length];
+    }
+    file.name[length] = '\0';
+    file.bytes = bytes;
+    file.total_ms = total_ms;
+}
+
+}  // namespace
+
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms) {
+    ItemInfo &item = core.items[core.item_count++];
+    item.id = static_cast<uint16_t>(id);
+    item.seconds = 0;
+    item.is_cycle = 0;
+    item.first = core.file_count++;
+    item.count = 0;
+    set_file(core.files[item.first], name, bytes, total_ms);
+}
+
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms) {
+    ItemInfo &item = core.items[position];
+    for (uint32_t other = 0; other < core.item_count; ++other) {
+        if (other != position && !core.items[other].is_cycle && core.items[other].first == item.first) {
+            // The old file stays another item's. There are fewer files than items here,
+            // so the file table has room.
+            item.first = core.file_count++;
+            break;
+        }
+    }
+    set_file(core.files[item.first], name, bytes, total_ms);
 }
 
 void content_take_out(Core &core, uint32_t position) {

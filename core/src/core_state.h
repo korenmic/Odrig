@@ -45,6 +45,43 @@ struct FileInfo {
 // Stands for no item.
 const uint32_t kNothing = 0xFFFFFFFFu;
 
+// What checks an uploaded file beside playback: a second source, which reads the file
+// back from storage, and second decoders.
+struct Checker {
+    FileSource file;
+    Inflate inflate;
+    OdrgDecoder decoder;
+};
+
+// The states of an upload: none is open; its bytes are being received; all have arrived
+// and the file is being checked; the check has ended and its outcome waits to be asked for.
+const uint8_t kUploadNone = 0;
+const uint8_t kUploadReceiving = 1;
+const uint8_t kUploadChecking = 2;
+const uint8_t kUploadChecked = 3;
+
+// The outcomes of a check: the file can be played; it is not a valid file for the canvas;
+// storage could not be read, or did not give back the bytes that were received.
+const uint8_t kCheckPassed = 0;
+const uint8_t kCheckBadFile = 1;
+const uint8_t kCheckStorageFailed = 2;
+
+// The one upload that can be open.
+struct Upload {
+    uint8_t state;
+    uint8_t outcome;        // of a check that has ended
+    uint8_t reason;         // why the file is not valid, a Reason
+    uint8_t header_read;    // the first step of the check has been taken
+    uint16_t id;            // the id the item gets, or has
+    char name[33];          // the name the file gets
+    uint32_t size;          // the size `upload begin` named
+    uint32_t received;
+    uint32_t crc;           // the running CRC-32 of the bytes received
+    uint32_t records_left;  // the frame records the check has still to decode
+    uint64_t total_ms;      // the sum of the durations of the records decoded
+    uint64_t progress;      // the time something last moved
+};
+
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
 struct Core {
@@ -83,9 +120,17 @@ struct Core {
     uint8_t has_start;
     uint32_t start_item;
 
-    // A block of kChunkSize bytes for a host whose storage can be changed: the text of a
-    // file the core writes, on its way to the host, and `pending.txt` as it is read.
+    // A block of kChunkSize bytes for a host whose storage can be changed: a piece of an
+    // upload or the text of a file the core writes, on its way to the host, and
+    // `pending.txt` as it is read.
     uint8_t *chunk;
+
+    // The upload, and what its check needs, three blocks for a host whose storage can be
+    // changed: the second source and decoders, a pixel buffer and a window of their own.
+    Upload upload;
+    Checker *checker;
+    uint8_t *check_pixels;
+    uint8_t *check_window;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -95,6 +140,8 @@ struct Core {
     uint64_t t0;            // the power-on moment: the first timestamp
     uint64_t latest;        // the latest timestamp
     uint64_t next_due;      // the first grid time that is neither used nor skipped
+    uint8_t had_refresh;    // a refresh has been produced
+    uint64_t last_grid;     // the grid time of the latest refresh
 
     // The refreshes produced in the running second, counted from the power-on moment, and
     // in the second before it that had any.

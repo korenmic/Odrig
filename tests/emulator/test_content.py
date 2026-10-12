@@ -1,6 +1,7 @@
 import json
 import pathlib
 import tempfile
+import time
 import unittest
 
 from tests.core import support as core_support
@@ -162,6 +163,116 @@ class ListAndRemove(unittest.TestCase):
         emulator = self.started()
         self.assertEqual(emulator.status()["error"], None)
         self.assertEqual(sorted(path.name for path in self.folder.iterdir()), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+
+
+BUSY = b'{"ok":false,"error":"busy"}\n'
+DONE = b'{"ok":true}\n'
+
+
+def upload(emulator, routes, number, name, data, piece=1500, seconds=30):
+    """Sends an upload to an emulator, each command by the next of some routes in turn, and
+    sends `upload end` again for as long as the file is being checked. Returns the replies
+    to the lines before `upload end`, and the last reply to `upload end`."""
+    lines = core_support.upload_lines(number, name, data, piece)
+    given = [ROUTES[routes[position % len(routes)]](emulator, line) for position, line in enumerate(lines)]
+    deadline = time.monotonic() + seconds
+    while True:
+        ended = ROUTES[routes[-1]](emulator, core_support.upload_end(data))
+        if ended != BUSY or time.monotonic() > deadline:
+            return given, ended
+        time.sleep(0.05)
+
+
+class Uploads(unittest.TestCase):
+    def setUp(self):
+        self.work = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
+        self.folder = support.installed(self.work / "show", core_support.example_show())
+        self.clip = core_support.dense_clip(60, 6, 1)
+
+    def started(self, *options):
+        return support.entered(self, support.Emulator(self.folder, *options))
+
+    def test_an_upload_over_each_route_and_over_the_two_mixed_installs_the_file_and_its_item(self):
+        self.assertGreater(len(self.clip), 9000)
+        for number, routes in enumerate((("serial",), ("http",), ("serial", "http"), ("http", "serial")), start=10):
+            with self.subTest(routes=routes):
+                support.installed(self.folder, core_support.example_show())
+                for stale in set(support.files_of(self.folder)) - set(core_support.example_show()):
+                    (self.folder / stale).unlink()
+                emulator = support.Emulator(self.folder)
+                try:
+                    given, ended = upload(emulator, routes, number, "clip.odrg", self.clip)
+                    self.assertEqual(given[0], b'{"ok":true,"chunk":1500}\n')
+                    self.assertEqual([json.loads(reply)["received"] for reply in given[1:]], [min(len(self.clip), 1500 * count) for count in range(1, len(given))])
+                    self.assertEqual(ended, DONE)
+                    listed = json.loads(over_http(emulator, "list"))["items"]
+                    self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(self.clip)})
+                    self.assertEqual(over_serial(emulator, f"play {number}"), DONE)
+                    state = emulator.status()
+                    self.assertEqual((state["playing"], state["animation"], state["error"]), (number, number, None))
+                    self.assertEqual(json.loads(over_serial(emulator, "space"))["animations"], 3)
+                finally:
+                    emulator.stop()
+                files = support.files_of(self.folder)
+                self.assertEqual(sorted(files), ["clip.odrg", "dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+                self.assertEqual(files["clip.odrg"], self.clip)
+                self.assertEqual(json.loads(files["show.json"])["items"][-1], {"id": number, "file": "clip.odrg"})
+                player = ReferencePlayer(core_support.example_show())
+                for line in core_support.upload_lines(number, "clip.odrg", self.clip):
+                    player.command(0, line.encode())
+                for tick in range(0, 20 * 60, 20):
+                    player.poll(tick)
+                self.assertEqual(player.command(2000, core_support.upload_end(self.clip).encode()), DONE)
+                self.assertEqual(files, player.files)
+
+    def test_an_uploaded_animation_is_there_after_the_emulator_was_started_again_and_can_be_replaced_and_removed(self):
+        emulator = support.Emulator(self.folder)
+        try:
+            self.assertEqual(upload(emulator, ("http",), 9, "clip.odrg", self.clip)[1], DONE)
+        finally:
+            emulator.stop()
+        again = self.started()
+        self.assertEqual(json.loads(over_serial(again, "list"))["items"][-1], {"id": 9, "file": "clip.odrg", "bytes": len(self.clip)})
+        self.assertEqual(over_http(again, "play 9"), DONE)
+        self.assertEqual(again.status()["animation"], 9)
+        smaller = core_support.clip(5, 60, 6)
+        self.assertEqual(upload(again, ("serial",), 9, "smaller.odrg", smaller)[1], DONE)
+        self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller)})
+        self.assertEqual(again.status()["playing"], 9)
+        self.assertEqual(over_http(again, "remove 9"), DONE)
+        again.stop()
+        self.assertEqual(support.files_of(self.folder), {name: content if isinstance(content, bytes) else content.encode() for name, content in core_support.example_show().items()} | {"show.json": support.files_of(self.folder)["show.json"]})
+        self.assertEqual([item["id"] for item in json.loads(support.files_of(self.folder)["show.json"])["items"]], [1, 2, 3])
+
+    def test_a_file_of_another_canvas_is_refused_with_bad_file_and_its_reason(self):
+        emulator = self.started()
+        wrong = core_support.clip(5, 60, 60)
+        given, ended = upload(emulator, ("http", "serial"), 9, "wrong.odrg", wrong)
+        self.assertEqual(ended, b'{"ok":false,"error":"bad-file","reason":"size-mismatch"}\n')
+        self.assertEqual(over_http(emulator, "upload cancel"), b'{"ok":false,"error":"no-upload"}\n')
+        self.assertEqual(sorted(support.files_of(self.folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+
+    def test_a_file_that_does_not_fit_the_storage_given_is_no_space(self):
+        emulator = self.started("--storage", 4 * STORAGE_BLOCK + 16384 + 1000)
+        self.assertEqual(over_http(emulator, "upload begin 9 clip.odrg 1000"), b'{"ok":false,"error":"no-space"}\n')
+        self.assertEqual(over_serial(emulator, "upload begin 9 clip.odrg 996"), b'{"ok":true,"chunk":1500}\n')
+        self.assertEqual(over_http(emulator, "upload begin 8 other.odrg 5"), b'{"ok":false,"error":"busy"}\n')
+        self.assertEqual(over_http(emulator, "upload cancel"), DONE)
+        self.assertEqual(sorted(support.files_of(self.folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+
+    def test_an_upload_that_was_not_ended_leaves_nothing_after_the_next_start(self):
+        emulator = support.Emulator(self.folder)
+        try:
+            lines = core_support.upload_lines(9, "clip.odrg", self.clip)
+            for line in lines[:3]:
+                over_http(emulator, line)
+            self.assertEqual(support.files_of(self.folder)["upload.part"], self.clip[:3000])
+        finally:
+            emulator.stop()
+        self.assertIn("upload.part", support.files_of(self.folder))
+        again = self.started()
+        self.assertEqual(over_http(again, "upload cancel"), b'{"ok":false,"error":"no-upload"}\n')
+        self.assertEqual(sorted(support.files_of(self.folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
 
 
 if __name__ == "__main__":

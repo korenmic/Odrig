@@ -5312,3 +5312,68 @@ the document has that the tool does not send yet.
 
 **Resolution.** `odrig/show.py`; `tests/converter/test_show_pack.py`;
 `tests/emulator/test_tool.py`, `test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The check stands still while the player is late
+
+**Question.** The design gives the check of an uploaded file one step after a refresh
+that came in step: on the grid slot right after the one before. That keeps the check
+from taking time the player needs. It does not say what follows when no refresh is in
+step for a long time, which is the case when content plays at 25 refreshes a second or
+fewer: every refresh is then a slot late.
+
+**Answer.** It is built as designed, and what follows is this. A step of the check is
+what counts as progress of an upload in the checking state. With no step for 60 seconds
+the upload is discarded like any other on which nothing moved, and the next `upload end`
+is answered with `no-upload`. A client sees `busy` for up to a minute and then
+`no-upload`. At rates between 25 and 50 the check runs, slower the more refreshes are
+late: a step for every refresh that follows another without a gap.
+
+On the board this matters for a show whose content is dense enough to play below 50: the
+dense 60 x 60 clip plays at 28 to 37 compressed. An upload while such content plays is
+checked slowly, and at 25 or fewer not at all. `off`, or playing an item that keeps the
+rate at 50, lets the check run at full speed: one frame of the file for each refresh.
+The owner should see this before the event; a change, such as a step for every refresh
+when the last step is more than a second old, would change the design and is not made
+here.
+
+**Resolution.** `core/src/player.cpp`, `in_step`; `core/src/upload.cpp`, `upload_step`
+and `upload_touch`; `docs/core.md`, "Uploads and the check"; `tests/core/test_upload.py`,
+`TheCheck`.
+
+## Seed 07: The codes of a file that storage gave back wrong
+
+**Question.** The check reads the uploaded file back from storage. The design answers a
+file that is not valid with `bad-file` and storage that failed with `storage-error`. It
+does not say which of the two a file gets whose bytes, read back, are not the bytes that
+were received.
+
+**Answer.** The check decodes what it reads back and, at the end, compares the number of
+bytes and their CRC-32 with what was received. A read that fails is `storage-error`.
+Bytes that differ and still decode are `storage-error`, found at the end. Bytes that
+differ and do not decode are `bad-file` with the decoder's reason, because the decoder
+meets them first; `bad-file` is also the earlier of the two in the order of the codes.
+The upload is discarded in all three cases. The test host gets two options for these
+cases beyond the design's list: `--read-back-fails OFFSET`, from which on `read_at`
+answers -1, and `--read-back-differs OFFSET`, the place of one byte that `read_at` gives
+back with one bit changed.
+
+**Resolution.** `core/src/upload.cpp`, `upload_step` and `upload_end`;
+`tests/core/host/host.cpp`; `docs/core.md`, "The test host"; `tests/core/test_upload.py`.
+
+## Seed 07: What the reference player and the emulator needed for the upload
+
+**Question.** The reference player counts the check in refreshes, so it has to know
+after how many steps the core's decoder refuses a damaged file; the converter's decoder,
+which the reference player uses, refuses a file as a whole. The emulator tells the core
+the space of its folder from the sizes of the files, while Python keeps written bytes in
+a buffer of its own.
+
+**Answer.** For a file whose body is refused, a test tells the reference player how many
+frame records decode before the refused one, by the CRC-32 of the file; without that it
+takes the number the header names. The check then ends two steps later, as for a sound
+file: one step for the header and one for the end. The emulator's host opens the file it
+writes without a buffer, so that every piece is in the folder when the core has given
+it, and `space` during an upload counts it.
+
+**Resolution.** `tests/core/support.py`, `ReferencePlayer.sound_records`;
+`emulator/host.py`, `write_open`; `tests/emulator/test_content.py`, `Uploads`.

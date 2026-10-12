@@ -37,6 +37,12 @@ void storage_clear_parts(Core &core);
 // file is asked for it and nothing else.
 void storage_settle_pending(Core &core);
 
+// Puts the upload whose check has passed in place: its file under its name, and its item
+// into the show in storage and then into the tables, as a new last item or in place of
+// the animation the item with its id had. What plays starts again when its file was
+// replaced. False when storage could not be written; the show is then as it was.
+bool storage_install_upload(Core &core);
+
 // Takes the item at a position out of the show in storage, and then out of the tables:
 // the names concerned into `pending.txt`, the show without the item into `show.part`,
 // that file renamed onto `show.json`, and then the item's file removed when no other item

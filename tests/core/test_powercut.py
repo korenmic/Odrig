@@ -34,6 +34,14 @@ def changed(files, lines):
     return reference.files, replies
 
 
+def changed_by(files, script):
+    """The files of the folder after a session, as the reference player has them, and the
+    lines it prints for the replies."""
+    reference = support.ReferencePlayer(files)
+    printed = reference.run(script)
+    return reference.files, [line for line in printed if line.startswith("reply")]
+
+
 def storage_calls(files, script):
     """The storage calls of a session, the two of the start among them, as the test host
     traces them."""
@@ -140,6 +148,105 @@ class Removal(PowerCut):
             again = support.session(folder, [], ["--trace-store"])
             self.assertEqual(again.stored, ("remove upload.part 0", "remove show.part 0", "remove one.odrg 1", "remove pending.txt 1"))
             self.assertEqual(sorted(support.folder_files(folder)), ["four.odrg", "mapping.json", "show.json", "two.odrg"])
+
+
+class Upload(PowerCut):
+    """A power cut, and a storage call that fails, at each storage call of each kind of
+    upload: while the bytes arrive, and while the file is put in place."""
+
+    CLIP = support.clip(71, 60, 6, (20, 40))
+
+    # Each kind of upload: the items of the show, its `start`, the id and the file name.
+    KINDS = {
+        "a new item": (ITEMS, 6, 9, "new.odrg"),
+        "a new item in a show without items": ([], None, 1, "first.odrg"),
+        "the file of an item under the same name": (ITEMS, 1, 1, "one.odrg"),
+        "the file of the item that plays under another name": (ITEMS, 4, 4, "other.odrg"),
+        "the file of an item of the playing cycle under another name": (ITEMS, 3, 1, "other.odrg"),
+        "an item whose old file another item names": (ITEMS, 6, 5, "five.odrg"),
+    }
+
+    def script(self, number, name, more=()):
+        made = [f"poll {T0}", f"poll {T0 + 20}"]
+        made += [support.line(T0 + 20, line) for line in support.upload_lines(number, name, self.CLIP, 150)]
+        made += [f"poll {T0 + 40 + 20 * step}" for step in range(4)]
+        made += [support.line(T0 + 120, support.upload_end(self.CLIP))]
+        return made + list(more)
+
+    def arrow(self, calls, number, name, items):
+        """The number of the storage call at which the show changes."""
+        same_name = any(item.get("file") == name and item["id"] == number for item in items)
+        return calls.index(f"rename upload.part {name} 1" if same_name else "rename show.part show.json 1") + 1
+
+    def test_a_power_cut_at_each_storage_call_leaves_the_old_show_or_the_new_one(self):
+        for kind, (items, start, number, name) in self.KINDS.items():
+            files = small_show(items, start=start)
+            old = as_bytes(files)
+            script = self.script(number, name)
+            new, replies = changed_by(files, script)
+            self.assertEqual(replies[-1], OK, kind)
+            self.assertEqual(new[name], self.CLIP, kind)
+            calls = storage_calls(files, script)
+            arrow = self.arrow(calls, number, name, items)
+            self.assertGreaterEqual(len([call for call in calls if call.startswith("write ")]), 2, kind)
+            for at, keeps in self.cuts_of(calls):
+                what = f"{kind}: cut at storage call {at}, `{calls[at - 1]}`, with {keeps} of its bytes written"
+                as_left, again, after = self.cut(files, script, at, keeps)
+                self.assert_a_whole_show(again, after, old if at <= arrow else new, what)
+                self.assertIn(as_left["show.json"], (old["show.json"], new["show.json"]), what)
+
+    def test_a_storage_call_that_fails_gives_storage_error_and_the_old_show_or_the_new_show_whole(self):
+        asked = [support.line(T0 + 120, "upload cancel"), support.line(T0 + 120, "list"), f"poll {T0 + 120}", f"poll {T0 + 140}", support.line(T0 + 140, "status")]
+        for kind, (items, start, number, name) in self.KINDS.items():
+            files = small_show(items, start=start)
+            old = as_bytes(files)
+            script = self.script(number, name, asked)
+            new, _ = changed_by(files, script)
+            calls = storage_calls(files, script)
+            arrow = self.arrow(calls, number, name, items)
+            listed_old = support.ReferencePlayer(files).run([support.line(T0, "list")])[0]
+            for at in range(1, len(calls) + 1):
+                what = f"{kind}: storage call {at}, `{calls[at - 1]}`, fails"
+                run, left = support.start_and_keep(files, script, ["--store-fails-at", str(at)])
+                self.assertIsNone(run.error, what)
+                given = [line for line in run.lines if line.startswith("reply")]
+                if 2 < at <= arrow:
+                    # Before the show changed: one reply says `storage-error`, the upload
+                    # is gone, nothing is left of it, and the core has the show it had.
+                    self.assertEqual(given.count(STORAGE_ERROR), 1, what)
+                    self.assertNotIn(OK, given[:-3], what)
+                    self.assertEqual(given[-3:-1], ['reply {"ok":false,"error":"no-upload"}', listed_old], what)
+                    self.assertEqual(left, old, what)
+                else:
+                    # The start's own removals, which find nothing, or a call after the
+                    # show changed: the change stands, and the next start clears up.
+                    self.assertEqual(run.lines, support.ReferencePlayer(files).run(script), what)
+                    self.assertEqual({name_: content for name_, content in left.items() if name_ in new}, new, what)
+                    with support.installed(left) as folder:
+                        again = support.session(folder, [support.line(T0, "list")])
+                        self.assertIsNone(again.error, what)
+                        self.assertEqual(support.folder_files(folder), new, what)
+
+    def test_a_restart_in_each_state_of_an_upload_leaves_the_old_show_and_nothing_of_the_upload(self):
+        files = small_show(ITEMS, start=6)
+        old = as_bytes(files)
+        lines = support.upload_lines(9, "new.odrg", self.CLIP, 150)
+        states = {
+            "begun": [support.line(T0, lines[0])],
+            "some bytes": [support.line(T0, line) for line in lines[:3]],
+            "all bytes": [support.line(T0, line) for line in lines],
+            "the check half done": [f"poll {T0}"] + [support.line(T0, line) for line in lines] + [f"poll {T0 + 20}", f"poll {T0 + 40}"],
+            "the check done": [f"poll {T0}"] + [support.line(T0, line) for line in lines] + [f"poll {T0 + 20 * step}" for step in range(1, 6)],
+        }
+        for state, script in states.items():
+            with self.subTest(state=state), support.installed(files) as folder:
+                first = support.session(folder, script)
+                self.assertIsNone(first.error)
+                self.assertIn("upload.part", support.folder_files(folder))
+                again = support.session(folder, [support.line(T0, "list"), support.line(T0, "upload cancel"), support.line(T0, "upload end 00000000")], ["--trace-store"])
+                self.assertEqual(again.stored, ("remove upload.part 1", "remove show.part 0"))
+                self.assertEqual(again.lines[1:], ['reply {"ok":false,"error":"no-upload"}'] * 2)
+                self.assertEqual(support.folder_files(folder), old)
 
 
 if __name__ == "__main__":

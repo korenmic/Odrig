@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "odrig_core.h"
+#include "upload.h"
 
 namespace odrig {
 
@@ -146,6 +147,26 @@ void player_play(Core &core, uint32_t item) {
     core.shown = played.is_cycle ? core.entries[played.first] : item;
 }
 
+void player_releases_file(Core &core, uint32_t item) {
+    if (core.stream_open && core.stream_item == item) {
+        close_stream(core);
+    }
+}
+
+void player_file_replaced(Core &core, uint32_t item) {
+    if (core.playing == kNothing) {
+        return;
+    }
+    const ItemInfo &played = core.items[core.playing];
+    bool plays = core.playing == item;
+    for (uint32_t entry = 0; played.is_cycle && entry < played.count; ++entry) {
+        plays = plays || core.entries[played.first + entry] == item;
+    }
+    if (plays) {
+        player_play(core, core.playing);
+    }
+}
+
 void player_item_leaves(Core &core, uint32_t item) {
     if (core.playing == item) {
         close_stream(core);
@@ -166,12 +187,17 @@ void player_item_leaves(Core &core, uint32_t item) {
 
 int player_poll(Core &core, uint64_t now_ms) {
     const uint64_t now = clock_touch(core, now_ms);
+    upload_touch(core, now);
     if (core.leg_count == 0 || now < core.next_due) {
         return 0;
     }
     // The latest grid time at or before now is used; every earlier one is skipped.
     const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
     core.next_due = grid + kGridStep;
+    // Whether this refresh follows the one before it without a grid time skipped.
+    const bool in_step = core.had_refresh && grid == core.last_grid + kGridStep;
+    core.had_refresh = 1;
+    core.last_grid = grid;
 
     const uint64_t second = (now - core.t0) / 1000;
     if (second != core.second_running) {
@@ -194,6 +220,11 @@ int player_poll(Core &core, uint64_t now_ms) {
         fill_leds(core);
     } else {
         memset(core.led_data, 0, 3u * core.led_total);
+    }
+    // The LED data is complete. The check of an uploaded file takes one step now, and
+    // none when the host was late for this refresh.
+    if (in_step) {
+        upload_step(core, now);
     }
     return 1;
 }

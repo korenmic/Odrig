@@ -43,7 +43,7 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
     def test_without_any_later_block_the_show_is_invalid_with_out_of_memory(self):
         plain = support.start(two_leg_show(), ["error"])
         blocks = plain.memory[1]
-        self.assertEqual(blocks, 13)
+        self.assertEqual(blocks, 16)
         for number in range(2, blocks + 1):
             with self.subTest(block=number):
                 run = support.start(two_leg_show(), ["error"], ["--alloc-fails-at", str(number)])
@@ -65,7 +65,7 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
             self.assertEqual((run.error, run.legs), ("out-of-memory", ()))
 
     def test_memory_that_fails_after_the_mapping_is_set_up_leaves_the_legs(self):
-        for number in (8, 9, 10, 11, 12, 13):
+        for number in (8, 9, 10, 11, 12, 13, 14, 15, 16):
             run = support.start(two_leg_show(), options=["--alloc-fails-at", str(number)])
             self.assertEqual((run.error, run.legs), ("out-of-memory", ((1, 1, 180), (2, 2, 180))))
 
@@ -114,17 +114,31 @@ class FixedMemory(unittest.TestCase):
         self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1)))
         asked, blocks = run.memory
         self.assertLess(asked, 131072)
-        self.assertEqual(blocks, 13)
-        # Every block but the core object has a size that is fixed or follows from the
-        # mapping and the show: the line and the reply of the byte entry, legs, the pixel
-        # of each LED, LED data, strip check, pixel buffer, window, the chunk buffer, and
-        # the tables of items, cycle entries and files, the first and the last with room
-        # for 32 items more than the 100 of the show.
-        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 132 * 16 + 200 * 2 + 132 * 48
-        self.assertEqual(tables, 75237)
-        core_object = asked - tables
-        self.assertGreater(core_object, 2000)
-        self.assertLessEqual(core_object, 4096)
+        self.assertEqual(blocks, 16)
+        # Every block but the core object and the decoders of the check has a size that is
+        # fixed or follows from the mapping and the show: the line and the reply of the
+        # byte entry, legs, the pixel of each LED, LED data, strip check, pixel buffer,
+        # window, the chunk buffer, the pixel buffer and the window of the check, and the
+        # tables of items, cycle entries and files, the first and the last with room for
+        # 32 items more than the 100 of the show.
+        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 10800 + 32768 + 132 * 16 + 200 * 2 + 132 * 48
+        self.assertEqual(tables, 118805)
+        # What the compiler settles: the core object, at most 4,096 bytes, and the second
+        # source and decoders, about 2,500.
+        settled = asked - tables
+        self.assertGreater(settled, 4000)
+        self.assertLessEqual(settled, 4096 + 2600)
+
+    def test_a_host_without_storage_is_asked_for_four_blocks_fewer(self):
+        files = hundred_items()
+        with_storage = support.start(files).memory
+        for option in ("--no-storage", "--only-space"):
+            without = support.start(files, options=[option]).memory
+            self.assertEqual(without[1], 12)
+            self.assertEqual(with_storage[1] - without[1], 4)
+            saved = with_storage[0] - without[0]
+            self.assertGreater(saved, 1500 + 10800 + 32768 + 2000)
+            self.assertLess(saved, 1500 + 10800 + 32768 + 3000)
 
     def test_a_session_of_content_commands_asks_for_no_memory(self):
         # The test host stops a run in which the core asks for memory after its start,

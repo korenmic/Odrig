@@ -3,6 +3,8 @@
 #include "content.h"
 #include "odrig_core.h"
 #include "player.h"
+#include "show.h"
+#include "upload.h"
 
 namespace odrig {
 
@@ -68,13 +70,15 @@ struct Words {
     uint32_t count;
 };
 
-// The value of an argument made of decimal digits only. False for an empty argument and for
-// any other character. A value above `most` is given as `most` + 1.
-bool decimal(const char *text, uint32_t length, uint32_t most, uint32_t *value) {
+// The value of a word that must be a number from `least` to `most`, written in decimal
+// digits only. False for an empty word, for any other character and for any other value.
+bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
+    const char *text = words.text[word];
+    const uint32_t length = words.size[word];
     if (length == 0) {
         return false;
     }
-    uint32_t result = 0;
+    uint64_t result = 0;
     for (uint32_t at = 0; at < length; ++at) {
         if (text[at] < '0' || text[at] > '9') {
             return false;
@@ -83,19 +87,91 @@ bool decimal(const char *text, uint32_t length, uint32_t most, uint32_t *value) 
             result = result * 10 + static_cast<uint32_t>(text[at] - '0');
         }
     }
-    *value = result > most ? most + 1 : result;
+    if (result < least || result > most) {
+        return false;
+    }
+    *value = static_cast<uint32_t>(result);
     return true;
 }
 
-// The value of a word that must be a number from `least` to `most`. False for anything else.
-bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
-    return decimal(words.text[word], words.size[word], most, value) && *value >= least && *value <= most;
+// The value of a word that must be exactly eight hexadecimal digits, 0-9 and a-f.
+bool crc_word(const Words &words, uint32_t word, uint32_t *value) {
+    if (words.size[word] != 8) {
+        return false;
+    }
+    uint32_t result = 0;
+    for (uint32_t at = 0; at < 8; ++at) {
+        const char digit = words.text[word][at];
+        if (digit >= '0' && digit <= '9') {
+            result = result << 4 | static_cast<uint32_t>(digit - '0');
+        } else if (digit >= 'a' && digit <= 'f') {
+            result = result << 4 | static_cast<uint32_t>(digit - 'a' + 10);
+        } else {
+            return false;
+        }
+    }
+    *value = result;
+    return true;
+}
+
+// The four `upload` commands. The words are read first, then the show is asked for.
+uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
+    if (words.count >= 2 && words.is(1, "begin")) {
+        uint32_t id;
+        uint32_t bytes;
+        char name[33];
+        if (words.count != 5 || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
+            !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes)) {
+            return refuse(reply, "bad-argument");
+        }
+        for (uint32_t at = 0; at < words.size[3]; ++at) {
+            name[at] = words.text[3][at];
+        }
+        name[words.size[3]] = '\0';
+        if (!is_file_name(name)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_begin(core, now, id, name, bytes, reply);
+    }
+    if (words.count >= 2 && words.is(1, "data")) {
+        uint32_t offset;
+        uint32_t count = 0;
+        if (words.count != 4 || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset) ||
+            (count = base64_size(words.text[3], words.size[3])) == 0) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_data(core, now, offset, words.text[3], words.size[3], count, reply);
+    }
+    if (words.count >= 2 && words.is(1, "end")) {
+        uint32_t crc;
+        if (words.count != 3 || !crc_word(words, 2, &crc)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_end(core, crc, reply);
+    }
+    if (words.count == 2 && words.is(1, "cancel")) {
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_cancel(core, reply);
+    }
+    return refuse(reply, "bad-argument");
 }
 
 }  // namespace
 
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
+    upload_touch(core, now);
     Reply reply;
     reply.bytes = bytes;
     reply.length = 0;
@@ -179,6 +255,9 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return content_remove(core, id, reply);
     }
+    if (words.is(0, "upload")) {
+        return upload(core, now, words, reply);
+    }
     return refuse(reply, "unknown-command");
 }
 
@@ -200,7 +279,7 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
         return;
     }
     odrig::Core &state = core->state;
-    odrig::clock_touch(state, now_ms);
+    odrig::upload_touch(state, odrig::clock_touch(state, now_ms));
     if (state.line == nullptr || state.feed_reply == nullptr) {
         return;
     }

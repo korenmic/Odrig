@@ -90,9 +90,12 @@ The last seven members are the storage functions: three that write a file, `rena
   then answered with `storage-error`. With `write_open` set, all seven are set.
 - The core calls them only inside `odrig_core_begin`, `odrig_core_command`,
   `odrig_core_feed` and `odrig_core_poll`, never from inside another host function.
-- With `write_open` `NULL`, `remove` is answered with `storage-error`, the start removes
-  nothing, and the block that only a change of the show needs is not asked for.
-- `read_at` is not called yet: no command reads a second file.
+- With `write_open` `NULL`, `remove` and `upload begin` are answered with `storage-error`,
+  the start removes nothing, and the four blocks that only a change of the show needs are
+  not asked for.
+- `read_at` reads the file of an upload back from storage while it is checked: one more
+  function than writing, renaming and removing, because `open`, `read` and `close` hold
+  the one file that plays.
 
 ### What the core offers
 
@@ -203,9 +206,12 @@ of 2,049 and of 1,024 bytes. When the host could supply neither or only one of t
 show is invalid with `out-of-memory`, `odrig_core_feed` takes no bytes and calls nothing,
 and `odrig_core_command` works as ever.
 
-A line that is no valid command changes nothing and is answered with the first code that
-applies of `line-too-long`, `unknown-command`, `bad-argument`, `show-invalid`,
-`unknown-id`, `in-use` and `storage-error`.
+A line that is no valid command is answered with the first code that applies, in the
+order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
+`bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
+`unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
+upload they are about.
 
 ## Startup
 
@@ -251,18 +257,20 @@ order, byte for byte.
 
 ## The files the core writes
 
-`remove` changes the show while the core runs: in storage first, then in its tables. The
-core keeps three names in the folder for itself:
+`remove` and `upload` change the show while the core runs: in storage first, then in its
+tables. The core keeps three names in the folder for itself:
 
 | Name | What it is |
 |---|---|
-| `upload.part` | The bytes of an upload. No command writes it yet; the start removes it. |
+| `upload.part` | The bytes of the open upload. |
 | `show.part` | The next `show.json`, until it is renamed. |
-| `pending.txt` | The names of `.odrg` files that a change is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+| `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
 
-A removal is these calls to the host, in this order. F is the removed item's file; lines
-1, 4 and 5 are left out when the item is a cycle or another item names F. "write X" is
+There are four kinds of change. Each line is one call to the host; "write X" is
 `write_open`, one or more `write` of at most 1,500 bytes, and `write_close`.
+
+**A removal.** F is the removed item's file; lines 1, 4 and 5 are left out when the item is
+a cycle or another item names F.
 
 ```
 1  write pending.txt: "F"
@@ -272,35 +280,105 @@ A removal is these calls to the host, in this order. F is the removed item's fil
 5  remove pending.txt
 ```
 
+**An upload for a new item**, with the file name G:
+
+```
+1  write pending.txt: "G"
+2  rename upload.part -> G
+3  write show.part: the show with the item at its end
+4  rename show.part -> show.json                 <-
+5  remove pending.txt
+```
+
+**An upload that replaces an item's file by one of the same name G:**
+
+```
+1  rename upload.part -> G                       <-
+```
+
+`show.json` does not change.
+
+**An upload that replaces an item's file F by one of another name G.** F is left out of
+lines 1 and 5 when another item names it.
+
+```
+1  write pending.txt: "G", "F"
+2  rename upload.part -> G
+3  write show.part: the show with the item naming G
+4  rename show.part -> show.json                 <-
+5  remove F
+6  remove pending.txt
+```
+
 The show changes at the arrow: a power cut before it leaves the old show, one after it
 the new show, and the next start removes whatever else is in the folder. `show.json` is
 never written in place. The text of `show.json` is the one of [show.md](show.md),
 "show.json after a change", with the brightness the file had at startup.
 
 - **When a call fails before the arrow**, the reply is `storage-error`, the core removes
-  `show.part` and `pending.txt` again, and the tables are as they were.
+  `show.part`, a G it had just renamed into place, and `pending.txt` again, and the
+  tables are as they were. An upload it happened to is discarded with its bytes.
 - **When a call fails after the arrow**, the change stands and the reply is
   `{"ok":true}`: a file that could not be removed is named by `pending.txt` and is
   removed at the next start.
-- **The tables** change after the arrow: the items after the removed one move up, the
-  entries of a removed cycle leave the entry table, and a file that no item names any
-  more leaves the file table. Every position the core holds follows, so what plays goes
-  on undisturbed. When the removed item is the one that plays, playback stops, the file
-  that is open is closed, and the next refresh is dark.
+- **The tables** change after the arrow. In a removal the items after the removed one
+  move up, the entries of a removed cycle leave the entry table, and a file that no item
+  names any more leaves the file table; every position the core holds follows, so what
+  plays goes on undisturbed. A new item is written at the end of the item table and of
+  the file table. A replaced item's entry of the file table gets the new name, size and
+  duration; when another item named the old file too, the item gets an entry of its own.
+- **What plays.** When the removed item is the one that plays, playback stops, the file
+  that is open is closed, and the next refresh is dark. When the file of the animation
+  that plays is replaced, or of an animation the playing cycle lists, what plays starts
+  again from its first frame at the next refresh. Before a file is renamed onto a name
+  or removed, the player closes it when it has it open. Every other change leaves the LED
+  data as it would have been.
 - The item table and the file table have room for 32 items more than `show.json` lists at
-  startup, and for at least 128.
+  startup, and for at least 128. A new item beyond that is refused with `no-space`.
+
+## Uploads and the check
+
+One upload can be open. It belongs to the core and not to an entry: its commands may
+come through `odrig_core_command` and `odrig_core_feed` in any mixture.
+
+- **`upload begin`** asks the host for its space and refuses a file for which
+  `bytes + bytes / 256 + 16,384` is more than the free bytes; then it begins the file
+  `upload.part`.
+- **`upload data`** checks the base64 whole, decodes it into the chunk buffer and gives
+  the bytes to the host in one `write`. With the last byte the file is closed.
+- **The check.** A file must be decoded whole before it joins the show. That is done
+  beside playback, with a second source, second decoders, a pixel buffer and a window of
+  their own, which read `upload.part` back with `read_at`, 512 bytes at a time. It runs
+  in steps inside `odrig_core_poll`, one step after the LED data of a refresh is
+  complete, and none after a refresh before which a grid time was skipped: when the host
+  is late, the check waits. The first step reads the header and compares the canvas with
+  the mapping's; each further step decodes one frame record, which is what playback does
+  for a refresh; the step after the last record asks for the end of the file and
+  compares the size and the CRC-32 of what was read back with what was received. A file
+  of F frame records is checked in F + 2 refreshes.
+- **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
+  file in place by the sequence of its kind, or reports what the check found:
+  `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
+  `size-mismatch`; `storage-error` when storage could not be read or gave back other
+  bytes.
+- **Discarding.** `upload cancel`, a wrong checksum, a failed check, a failed storage
+  call, and a show that becomes invalid discard the upload: `upload.part` is removed. So
+  does every call that carries a timestamp 60,000 ms or more after the last progress:
+  `upload begin`, an `upload data` that was taken, or a step of the check. The core
+  reads no clock for it.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to thirteen
-blocks, in the order of the table: two of a fixed size for the byte entry, one for a host
-whose storage can be changed, and the others sized from the mapping and the show. The figures are for the target file,
+The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
+blocks, in the order of the table: two of a fixed size for the byte entry, four for a host
+whose storage can be changed, and the others sized from the mapping and the show. No
+command, no upload and no check asks for memory. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
 with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,136 |
+| The core object | fixed | 3,256 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -310,14 +388,18 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
 | Chunk buffer, with storage that can be changed | 1,500 | 1,500 |
+| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,440 |
+| The check: pixel buffer | as the player's | 10,800 |
+| The check: window | 32,768 | 32,768 |
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **78,373** |
+| **Total** | | **124,501** |
 
-That is 60 percent of the 131,072 bytes the core may use for this canvas. The example show
-on the two-leg mapping asks for 51,578 bytes. A host without storage that can be changed
-is not asked for the chunk buffer. The size and the number of frames of an
+That is 95 percent of the 131,072 bytes the core may use for this canvas: the check of an
+uploaded file takes 46,008 of them. The example show on the two-leg mapping asks for
+87,986 bytes. A host without storage that can be changed is not asked for the chunk
+buffer and the three blocks of the check: 76,993 bytes for the target file. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 
@@ -393,6 +475,8 @@ leg; and `ready`.
 | `--cut-at N` | The N-th storage call is not made; the program prints `power cut` and ends with status 75. |
 | `--cut-at N --cut-keeps K` | The same, but when that call is a `write`, its first K bytes are written first. |
 | `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
+| `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes at or after that offset. |
+| `--read-back-differs OFFSET` | `read_at` gives the byte at that offset with one bit changed. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
 `space` and `read_at` are not counted and not traced. The storage functions work on the

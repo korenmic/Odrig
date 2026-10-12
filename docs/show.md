@@ -20,8 +20,8 @@ the player removes what is left of them when it starts. No show names them: a na
 
 The same folder is what the emulator runs and what is uploaded to the board. The player reads
 these files when it starts. Nothing else defines the layout or the show.
-While it runs, the command `remove` of [commands.md](commands.md) changes the show; see
-"Changing a show while it runs".
+While it runs, the commands `remove` and `upload` of [commands.md](commands.md) change the
+show; see "Changing a show while it runs".
 
 ## show.json
 
@@ -70,16 +70,25 @@ power-on.
 
 ## Changing a show while it runs
 
-`remove <id>` takes an item out of the show. It takes effect at once and is kept: the
-player writes `show.json`, and a restart finds the show as it was left.
+`remove <id>` takes an item out of the show. `upload` adds an animation item, or gives an
+animation item another animation. Both take effect at once and are kept: the player
+writes `show.json` and the `.odrg` file, and a restart finds the show as it was left.
 
+- A new item is added at the end of `items`. Its `id` is the one the upload named: any
+  id from 1 to 65,535 that no item has. Ids need not follow each other, and the id of a
+  removed item can be used again.
+- An upload to the id of an animation item replaces its animation. The item keeps its id
+  and its position, and gets the file name the upload named.
 - A cycle cannot be made or changed by a command. A cycle can be removed, and an
   animation can be removed once no cycle lists it.
-- A show installed with two items that name one file keeps working, and the file is
-  deleted when the last item that names it is removed.
+- Two items do not get the same file by an upload: a file name that another item has is
+  refused. A show installed with two items that name one file keeps working, and the
+  file is deleted when the last item that names it is removed.
 - An `.odrg` file that no item names any more is deleted.
-- The show may end up without items. It is valid: nothing plays.
-- `brightness` of `show.json` is not changed. Removing the `start` item removes `start`.
+- The show may end up without items. It is valid: nothing plays until an animation is
+  uploaded.
+- `brightness` and `start` of `show.json` are not changed by an upload. Removing the
+  `start` item removes `start`.
 - `mapping.json` is never changed.
 
 A change is made so that a power cut at any moment leaves a whole show in the folder: the
@@ -87,7 +96,8 @@ one from before the command, or the one after it. New content is written to a fi
 own and gets its name by renaming.
 
 How many items a player has room for is fixed when it starts: 32 more than the show has
-then, and at least 128.
+then, and at least 128. A new item beyond that is refused until the player has restarted
+or an item was removed.
 
 ## show.json after a change
 

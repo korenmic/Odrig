@@ -89,13 +89,13 @@ class CoreDocument(unittest.TestCase):
     def test_its_memory_table_adds_up_to_what_the_suite_measures(self):
         table = self.text.split("\n## Memory\n")[1].split("\n## ")[0]
         rows = re.findall(r"(?m)^\| ([^|*]+) \| [^|]+ \| ([0-9,]+) \|$", table)
-        self.assertEqual(len(rows), 13)
+        self.assertEqual(len(rows), 16)
         total = int(re.search(r"\*\*Total\*\* \| \| \*\*([0-9,]+)\*\*", table).group(1).replace(",", ""))
         self.assertEqual(sum(int(number.replace(",", "")) for _, number in rows), total)
         from .test_memory import hundred_items
 
         asked, blocks = support.start(hundred_items()).memory
-        self.assertEqual((asked, blocks), (total, 13))
+        self.assertEqual((asked, blocks), (total, 16))
         example, _ = support.start(support.example_show()).memory
         self.assertIn(f"{example:,} bytes", table)
 
@@ -114,6 +114,61 @@ class CoreDocument(unittest.TestCase):
         for status in re.findall(r"const int k[A-Za-z]+ = ([0-9]+);", source):
             self.assertRegex(self.text, rf"(?m)^\| {status} \|", status)
         self.assertRegex(self.text, r"(?m)^\| 70 \| `allocation after startup` \|")
+
+
+class CommandsDocument(unittest.TestCase):
+    """docs/commands.md against the core's command front-end."""
+
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "in-use", "no-space", "bad-offset",
+             "bad-file", "storage-error"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = (DOCS / "commands.md").read_text(encoding="utf-8")
+        cls.sources = "\n".join(path.read_text(encoding="utf-8") for path in sorted((support.CORE / "src").glob("*")))
+        cls.header = HEADER.read_text(encoding="utf-8")
+
+    def test_its_error_codes_are_the_ones_the_core_gives_in_the_order_they_are_judged(self):
+        table = self.text.split("\n## Error codes\n")[1].split("\n## ")[0]
+        self.assertEqual(re.findall(r"(?m)^\| `([a-z-]+)` \|", table), self.ORDER)
+        self.assertIn("When more than one code applies, the reply has the first in the order of this table.", table)
+        given = set(re.findall(r'refuse\(\w+, "([a-z-]+)"\)', self.sources)) | set(re.findall(r'\\"error\\":\\"([a-z-]+)\\"', self.sources))
+        self.assertEqual(given, set(self.ORDER))
+        core = (DOCS / "core.md").read_text(encoding="utf-8")
+        listed = core.split("in the\norder of the table of [commands.md](commands.md): ")[1].split(". It\nchanges nothing")[0]
+        self.assertEqual(re.findall(r"`([a-z-]+)`", listed), self.ORDER)
+
+    def test_its_commands_are_the_ones_the_front_end_reads(self):
+        table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
+        documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
+        self.assertEqual(documented, ["play <id>", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "upload begin <id> <file> <bytes>",
+                                      "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"begin", "data", "end", "cancel"})
+
+    def test_its_limits_are_the_cores(self):
+        limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
+        self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
+        for phrase in ("A line is at most 2,048 characters.", "a JSON object on one line of at most 1,024 bytes.", "| `line-too-long` | The line is longer than 2,048 characters. |",
+                       '{"ok":true,"chunk":1500}', "`<id>` is 1 to 65,535.", "`<bytes>` is the size of the file, 1 to 4,294,967,295.", "`<from>` is 0 to 65,535.",
+                       "An upload on which nothing has moved for 60\nseconds is discarded too"):
+            self.assertIn(phrase, self.text)
+        self.assertIn("const uint32_t kChunkSize = 1500;", self.sources)
+        self.assertIn("const uint64_t kUploadQuietMs = 60000;", self.sources)
+        self.assertIn("const uint32_t kUploadReserve = 16384;", self.sources)
+
+    def test_its_examples_are_sound(self):
+        import base64
+        import zlib
+
+        self.assertIn("for the\nnine bytes `123456789` is `cbf43926`", self.text)
+        self.assertEqual(f"{zlib.crc32(b'123456789'):08x}", "cbf43926")
+        # The piece of the example begins as every ODRG file does.
+        self.assertIn("upload data 0 T0RSRwEB...", self.text)
+        self.assertEqual(base64.urlsafe_b64decode("T0RSRwEB"), b"ODRG\x01\x01")
+        for example in re.findall(r"(?m)^(\{\"ok\".*\})$", self.text):
+            self.assertLessEqual(len(example) + 1, 1024)
+            self.assertNotIn(" ", example)
 
 
 class ReasonsDocument(unittest.TestCase):

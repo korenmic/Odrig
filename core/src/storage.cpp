@@ -97,6 +97,81 @@ void storage_settle_pending(Core &core) {
     }
 }
 
+bool storage_install_upload(Core &core) {
+    const odrig_host &host = core.host;
+    const Upload &upload = core.upload;
+    uint32_t position = 0;
+    while (position < core.item_count && core.items[position].id != upload.id) {
+        ++position;
+    }
+
+    if (position < core.item_count && same_text(core.files[core.items[position].first].name, upload.name)) {
+        // The item's file is replaced under its own name: the show file stays as it is,
+        // and the one rename is where the show changes.
+        player_releases_file(core, position);
+        if (host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+            return false;
+        }
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms);
+        player_file_replaced(core, position);
+        return true;
+    }
+
+    // A new item, or an item that gets a file of another name. The old file goes when no
+    // other item names it.
+    const bool is_new = position == core.item_count;
+    char old_file[33];
+    old_file[0] = '\0';
+    if (!is_new) {
+        const ItemInfo &item = core.items[position];
+        bool shared = false;
+        for (uint32_t other = 0; other < core.item_count; ++other) {
+            shared = shared || (other != position && !core.items[other].is_cycle && core.items[other].first == item.first);
+        }
+        if (!shared) {
+            const char *name = core.files[item.first].name;
+            uint32_t length = 0;
+            for (; name[length] != '\0'; ++length) {
+                old_file[length] = name[length];
+            }
+            old_file[length] = '\0';
+        }
+    }
+    const bool with_old_file = old_file[0] != '\0';
+
+    if (!write_pending(core, upload.name, with_old_file ? old_file : nullptr) ||
+        host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+        host.remove(host.ctx, kPending);
+        return false;
+    }
+    ShowChange change;
+    if (is_new) {
+        change.added_id = upload.id;
+        change.added_name = upload.name;
+    } else {
+        change.renamed = position;
+        change.name = upload.name;
+    }
+    if (!content_write_show(core, change) || host.rename(host.ctx, kShowPart, kShowFile) != 1) {
+        host.remove(host.ctx, kShowPart);
+        host.remove(host.ctx, upload.name);
+        host.remove(host.ctx, kPending);
+        return false;
+    }
+
+    // The show in storage is the new one from here on.
+    if (is_new) {
+        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms);
+    } else {
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms);
+        player_file_replaced(core, position);
+    }
+    if (!with_old_file || host.remove(host.ctx, old_file) != -1) {
+        host.remove(host.ctx, kPending);
+    }
+    return true;
+}
+
 bool storage_remove_item(Core &core, uint32_t position) {
     const odrig_host &host = core.host;
     const ItemInfo &item = core.items[position];

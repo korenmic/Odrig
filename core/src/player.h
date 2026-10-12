@@ -21,6 +21,15 @@ void player_start(Core &core);
 // Plays the item at this position of the item table from its first frame.
 void player_play(Core &core, uint32_t item);
 
+// The file of the animation item at this position is about to be replaced under its
+// name: the player closes it when it has it open. It opens again at the next refresh.
+void player_releases_file(Core &core, uint32_t item);
+
+// The animation item at this position has another animation now. When it is the item
+// being played, or an animation of the cycle being played, what is played starts again
+// from its first frame at the next refresh.
+void player_file_replaced(Core &core, uint32_t item);
+
 // The item at this position is about to leave the item table, and every item after it
 // moves up by one. When it is the item being played, playback stops and the file that is
 // open is closed. Otherwise the positions the player holds follow the items, and what

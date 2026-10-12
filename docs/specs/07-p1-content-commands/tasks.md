@@ -146,7 +146,7 @@ Rules for every task:
     4.6, 4.7, 4.8, 4.9, 4.10, 9.4, 9.5, 10.1, 10.4, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6,
     11.7, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 13.1, 13.2, 13.5, 16.1, 16.7
 
-- [ ] 5. The upload
+- [x] 5. The upload
   - `core/src/upload.cpp`: `upload begin`, `data`, `end` and `cancel`; base64; the
     CRC-32; the 60 seconds; the check with its second source, decoders, pixel buffer and
     window, taken at startup when the host has storage. `core/src/file_source.cpp`: a

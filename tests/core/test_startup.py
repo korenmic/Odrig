@@ -232,8 +232,8 @@ class EachReason(unittest.TestCase):
 
     def test_out_of_memory(self):
         blocks = support.start(example()).memory[1]
-        self.assertEqual(blocks, 13)
-        for number in (10, 11, 12, 13):
+        self.assertEqual(blocks, 16)
+        for number in (10, 11, 12, 13, 14, 15, 16):
             self.check(example(), "out-of-memory", ["--alloc-fails-at", str(number)])
 
 
@@ -469,7 +469,7 @@ class TablesWithRoom(unittest.TestCase):
         items = [animation(number, "hello.odrg") for number in range(1, count + 1)]
         run = support.start(example(show_json=support.show_text(items)))
         self.assertIsNone(run.error)
-        self.assertEqual(run.memory[1], 13)
+        self.assertEqual(run.memory[1], 16)
         return run.memory[0]
 
     def test_the_tables_have_room_for_32_items_more_than_the_show_and_for_128_at_least(self):

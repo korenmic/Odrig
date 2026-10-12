@@ -48,7 +48,8 @@ int usage() {
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
         "       --remove-after FILE N  --swap-after FILE N OTHER\n"
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
-        "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n",
+        "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
+        "       --read-back-fails OFFSET  --read-back-differs OFFSET\n",
         stderr);
     return kUsage;
 }
@@ -124,6 +125,8 @@ struct Options {
     long cut_at = 0;                // the number of the storage call at which the power is cut
     long cut_keeps = 0;             // the bytes of that call that are written first, for a `write`
     bool trace_store = false;       // print `store <call> <arguments> <result>` for every storage call
+    long read_back_fails = -1;      // the offset from which `read_at` returns -1; none below 0
+    long read_back_differs = -1;    // the offset of the byte `read_at` gives with one bit changed
     bool check_names = false;       // stop when the core names a file outside its names
 };
 
@@ -411,6 +414,17 @@ private:
         size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
+        const long fails = host.options_.read_back_fails;
+        if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
+            if (offset >= static_cast<size_t>(fails)) {
+                return -1;
+            }
+            count = static_cast<size_t>(fails) - offset;
+        }
+        const long differs = host.options_.read_back_differs;
+        if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
+            content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
+        }
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
         host.read_at_name_ = name;
         host.read_at_end_ = offset + static_cast<uint32_t>(count);
@@ -1145,6 +1159,12 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--trace-store") {
                 options.trace_store = true;
                 at += 1;
+            } else if (arguments[at] == "--read-back-fails" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.read_back_fails)) {
+                at += 2;
+            } else if (arguments[at] == "--read-back-differs" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.read_back_differs)) {
+                at += 2;
             } else {
                 return usage();
             }

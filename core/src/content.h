@@ -25,12 +25,24 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply);
 // difference the show is written as it is.
 struct ShowChange {
     uint32_t without = kNothing;    // the position of an item that is left out
+    uint32_t renamed = kNothing;    // the position of an animation item that names another file,
+    const char *name = nullptr;     // which is this one
+    uint32_t added_id = 0;          // the id of an animation item that is added at the end, or 0,
+    const char *added_name = nullptr;   // and its file
 };
 
 // Writes the show, with a change, as the file `show.part`: one line without spaces and a
 // line feed, as docs/show.md has it. The text goes through the chunk buffer. False when
 // the host could not take it; the file may then be there in part, and being written.
 bool content_write_show(Core &core, const ShowChange &change);
+
+// Adds an animation item with a file of its own at the end of the tables. There is room.
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms);
+
+// Gives the animation item at a position another file: its name, its size and its total
+// duration. When another item names the item's old file too, the item gets an entry of
+// its own at the end of the file table.
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms);
 
 // Takes the item at a position out of the tables: the items after it move up, its
 // entries leave the entry table when it is a cycle, and its file leaves the file table

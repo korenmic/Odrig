@@ -10,8 +10,8 @@ ignored. Words are separated by single spaces. A line is at most 2,048 character
 
 Every command gets exactly one reply: a JSON object on one line of at most 1,024 bytes.
 
-- Success: `{"ok":true}`, with more members for `status`, `space` and `list`.
-- Failure: `{"ok":false,"error":"<code>"}`.
+- Success: `{"ok":true}`, with more members for `status`, `space`, `list` and `upload`.
+- Failure: `{"ok":false,"error":"<code>"}`, with one more member for `bad-file`.
 
 ## Commands
 
@@ -25,10 +25,14 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show. |
 | `remove <id>` | Removes an item from the show. |
+| `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
+| `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
+| `upload end <crc32>` | Closes the upload and installs the animation. |
+| `upload cancel` | Discards the open upload. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the `start` item
 is playing if there is one. What `play`, `on`, `off` and `brightness` change is not kept
-across a restart. What `remove` changes is: it changes the installed show.
+across a restart. What `remove` and `upload` change is: they change the installed show.
 
 Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
 
@@ -89,18 +93,90 @@ The item leaves the show, and the items after it move up.
 - If the item is playing, playback stops and the LEDs go dark. Anything else that plays
   goes on undisturbed.
 - The animation's file is deleted when no remaining item names it.
+- While an upload is open, `remove` is refused with `busy`.
+
+## Uploading an animation
+
+An animation is sent as an ODRG file, in pieces, each acknowledged:
+
+```
+upload begin 4 clip.odrg 3200
+{"ok":true,"chunk":1500}
+upload data 0 T0RSRwEB...
+{"ok":true,"received":1500}
+upload data 1500 ...
+{"ok":true,"received":3000}
+upload data 3000 ...
+{"ok":true,"received":3200}
+upload end 1c291ca3
+{"ok":true}
+```
+
+**`upload begin <id> <file> <bytes>`** opens an upload. One upload can be open at a time,
+whichever route its commands arrive by.
+
+- `<id>` is 1 to 65,535. An id that no item has makes a new item, which becomes the last
+  of the show. The id of an animation item replaces that item's animation; the item keeps
+  its id and its position. A client that wants a new item chooses any id that `list` does
+  not show.
+- `<file>` is the name the file gets, under the naming rule of [show.md](show.md).
+- `<bytes>` is the size of the file, 1 to 4,294,967,295.
+- The reply's `chunk` is the most bytes one `upload data` line may carry.
+- It is refused with `busy` when an upload is open; with `in-use` when the id belongs to
+  a cycle, or another item already names `<file>`; and with `no-space` when the file
+  would not fit into the free storage, or the show has no room for another item.
+
+**`upload data <offset> <base64>`** adds bytes. `<offset>` is the number of bytes sent
+before these, and must equal the number received so far; otherwise the reply is
+`bad-offset` and the bytes are not taken. `<base64>` is 1 to `chunk` bytes in base64 with
+the alphabet `A`-`Z`, `a`-`z`, `0`-`9`, `-` and `_` (RFC 4648, section 5), without `=` at
+the end. The reply's `received` is the number of bytes received so far. Bytes beyond the
+size given to `upload begin` are refused with `bad-offset`.
+
+**`upload end <crc32>`** closes the upload. `<crc32>` is the CRC-32 of the whole file as
+eight hexadecimal digits, `0`-`9` and `a`-`f`: the CRC-32 of zlib and PNG, which for the
+nine bytes `123456789` is `cbf43926`.
+
+- `incomplete`: fewer bytes arrived than `upload begin` named. The upload stays open.
+- `bad-checksum`: the bytes received have another CRC-32. The upload is discarded.
+- `busy`: the file is still being checked. The upload stays open; send `upload end`
+  again. The check decodes the whole file while the show goes on playing, one frame of
+  the file for each LED refresh, so it takes about as long as a fiftieth of a second for
+  each frame of the animation.
+- `bad-file`: the file is not a valid ODRG file for the canvas. The reply has one more
+  member, `{"ok":false,"error":"bad-file","reason":"<reason>"}`: a reason of "ODRG files"
+  in [reasons.md](reasons.md), or `size-mismatch` when the file is for another canvas
+  size. The upload is discarded.
+- On success the file is in place and the item is in the show. It can be played at once.
+  If the item that is playing got a new animation, or a cycle that is playing lists it,
+  what is playing starts again from its first frame.
+
+**`upload cancel`** discards the open upload. An upload on which nothing has moved for 60
+seconds is discarded too: no data arrived, and no check is running.
+
+Playback goes on during an upload. Nothing of the show changes before `upload end`
+succeeds.
 
 ## Error codes
 
 | Code | When |
 |---|---|
-| `unknown-command` | The first word is not a command. |
-| `bad-argument` | An argument is missing, extra, not a number, or out of range. |
-| `unknown-id` | `play` or `remove` names an id that is not in `show.json`. |
-| `show-invalid` | `play`, `list` or `remove` was sent while the show is invalid. |
 | `line-too-long` | The line is longer than 2,048 characters. |
-| `in-use` | `remove` names an animation that a cycle lists. |
-| `storage-error` | The storage could not be read or written. The show is as it was. |
+| `unknown-command` | The first word is not a command. |
+| `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
+| `show-invalid` | `play`, `list`, `remove` or an `upload` command was sent while the show is invalid. |
+| `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
+| `incomplete` | `upload end` came before all bytes. |
+| `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
+| `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
+| `unknown-id` | `play` or `remove` names an id that is not in `show.json`. |
+| `in-use` | `remove` names an animation that a cycle lists; `upload begin` names the id of a cycle, or a file name another item has. |
+| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
+| `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
+| `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
+| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. |
+
+When more than one code applies, the reply has the first in the order of this table.
 
 ## Transports
 

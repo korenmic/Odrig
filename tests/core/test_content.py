@@ -34,7 +34,9 @@ class Content(unittest.TestCase):
         run, left = support.start_and_keep(files, script, options)
         self.reference = support.ReferencePlayer(files, storage=storage, changeable=changeable)
         expected = self.reference.run(script)
-        printed = run.lines
+        # With the option --trace-store the test host prints the storage calls as well.
+        printed = [line for line in run.lines if not line.startswith("store ")]
+        self.stored = [line[len("store "):] for line in run.lines if line.startswith("store ")]
         self.assertEqual(len(printed), len(expected))
         for number, (line, wanted) in enumerate(zip(printed, expected)):
             if line != wanted:
@@ -42,6 +44,7 @@ class Content(unittest.TestCase):
         self.assertEqual(sorted(left), sorted(self.reference.files))
         self.assertEqual(left, self.reference.files)
         self.left = left
+        self.printed = printed
         return printed
 
     def space(self, files, options=(), storage=BOARD):
@@ -346,9 +349,9 @@ class List(Content):
                 asked.append(support.line(T0 + 20 * number + 3, f"list {number % 4}"))
         asked.append(support.line(T0 + 2400, "status"))
         with_list = self.run_both(files, asked, ["--trace-store"])
+        self.assertEqual(self.stored, [])
         without = self.run_both(files, plain)
         self.assertEqual([line for line in with_list if '"items"' not in line], without)
-        self.assertFalse(any(line.startswith("store ") for line in with_list))
         self.assertEqual(self.left, {name: content if isinstance(content, bytes) else content.encode() for name, content in files.items()})
 
 
@@ -503,7 +506,7 @@ class Remove(Content):
             self.assertEqual(replies(printed)[:4], [refused("storage-error")] * 2 + [refused("unknown-id"), refused("in-use")])
             self.assertEqual(json.loads(replies(printed)[4])["items"], self.reference_items(files))
             self.assertEqual(json.loads(replies(printed)[5])["playing"], 6)
-            self.assertFalse(any(line.startswith("store ") for line in printed))
+            self.assertEqual(self.stored, [])
 
     def test_the_storage_calls_of_a_removal_are_those_of_the_design_in_their_order(self):
         files = small_show(self.ITEMS, start=6)
@@ -580,9 +583,13 @@ class HostWithoutStorage(Content):
         for option in ("--no-storage", "--only-space"):
             without = support.start(files, script, [option, "--trace-store", "--trace-files"])
             self.assertEqual([line for line in without.lines if not line.startswith("open ")], with_storage.lines, option)
-            # It is not asked for the block that only a host with storage needs, it is
-            # asked to remove nothing, and it is not asked for the file of leftovers.
-            self.assertEqual(without.memory, (with_storage.memory[0] - 1500, with_storage.memory[1] - 1), option)
+            # It is not asked for the four blocks that only a host with storage needs: the
+            # chunk buffer, and the decoders, the pixel buffer and the window of the check.
+            # It is asked to remove nothing, and not for the file of leftovers.
+            self.assertEqual(without.memory[1], with_storage.memory[1] - 4, option)
+            saved = with_storage.memory[0] - without.memory[0]
+            self.assertGreater(saved, 1500 + 1080 + 32768 + 2000, option)
+            self.assertLess(saved, 1500 + 1080 + 32768 + 3000, option)
             self.assertEqual(without.stored, (), option)
             self.assertNotIn("pending.txt", [name for name, _ in without.opened], option)
             self.assertIsNone(without.error)

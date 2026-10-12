@@ -112,7 +112,9 @@ class FolderHost:
             return -1
         self._drop_second(name)
         try:
-            self._written = open(path, "wb")
+            # Without a buffer of its own: every piece is in the folder when it was taken,
+            # so the space the folder takes is the bytes written so far.
+            self._written = open(path, "wb", buffering=0)
         except OSError:
             return -1
         self._written_name = name

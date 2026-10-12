@@ -110,9 +110,15 @@ that is not made of the characters the core uses for a file name, is refused. Fo
 `space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
 bytes, or the number given with `--storage`, and as the free space the total less the
 sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
-`remove` changes the folder as it changes the board's storage: `show.json` is written
-again and a file no item names any more is deleted. To keep a show, run a copy of its
-folder.
+`remove` and `upload` change the folder as they change the board's storage: an upload is
+written into `upload.part` of the folder piece by piece and takes its name when
+`upload end` succeeds, `show.json` is written again through `show.part`, and a file no
+item names any more is deleted. To keep a show, run a copy of its folder. A folder the
+emulator was stopped on during an upload holds `upload.part` until the emulator is
+started on it again; `install-show` of the firmware tool refuses such a folder, as it
+refuses any file the show does not name. The emulator paces nothing: its file operations
+take microseconds, and the check of an uploaded file takes one frame of it for each
+refresh, as on the board.
 
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
@@ -622,7 +628,9 @@ python -m emulator build/example-show --record build/example.odrr --seconds 60
 | `--storage BYTES` | The size of the storage the core is told of, as in real time. |
 
 Recording the same folder with the same length and the same script twice gives the same
-bytes. The emulator gives the core nothing of its own in this mode: only the requests for
+bytes. A script may hold the content commands of [commands.md](commands.md): they act on
+the folder as in real time, so the folder is changed afterwards, and "the same folder"
+means a folder with the same files as before the first recording. The emulator gives the core nothing of its own in this mode: only the requests for
 a refresh and the commands of the script. The options `--port`, `--serial-link` and
 `--verbose` belong to real time and do not go with `--record`.
 

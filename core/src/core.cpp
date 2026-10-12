@@ -8,6 +8,7 @@
 #include "reasons.h"
 #include "show.h"
 #include "storage.h"
+#include "upload.h"
 
 namespace odrig {
 
@@ -89,8 +90,13 @@ void start(Core &core) {
         return;
     }
     if (storage_changes(core)) {
+        // What only a change of the show needs: the chunk buffer, and for the check of an
+        // uploaded file a second set of decoders with a pixel buffer and a window.
         core.chunk = static_cast<uint8_t *>(arena_take(core, kChunkSize));
-        if (core.chunk == nullptr) {
+        core.checker = static_cast<Checker *>(arena_take(core, sizeof(Checker)));
+        core.check_pixels = static_cast<uint8_t *>(arena_take(core, rgb_picture < kLargestPicture ? rgb_picture : kLargestPicture));
+        core.check_window = static_cast<uint8_t *>(arena_take(core, kWindowSize));
+        if (core.chunk == nullptr || core.checker == nullptr || core.check_pixels == nullptr || core.check_window == nullptr) {
             core_fail(core, kOutOfMemory, nullptr, kNone);
             return;
         }
@@ -131,6 +137,8 @@ void core_fail(Core &core, Reason reason, const char *about, Reason detail) {
     if (core.host.log != nullptr) {
         core.host.log(core.host.ctx, core.error_text);
     }
+    // An invalid show takes no upload.
+    upload_discard(core);
 }
 
 }  // namespace odrig
