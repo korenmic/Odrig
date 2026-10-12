@@ -17,9 +17,9 @@ LEDs on and off, change brightness, and see what the board is doing.
 
 ## What the app needs that does not exist yet
 
-- **A list of what can be played.** Today a client must already know the ids in `show.json`.
-  The app needs to fetch the items and show them by name. That means names for items in
-  `show.json` and a way to read the list, neither of which exists.
+- **Names for what can be played.** The command `list` gives every item with its id and its
+  file name; see [commands.md](commands.md). A name to show an operator does not exist:
+  `show.json` has none.
 - **The emulator reachable from a phone.** It listens only on the Mac itself. Testing the app
   on a real phone needs an option to listen on the local network.
 
