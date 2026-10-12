@@ -6982,3 +6982,18 @@ Not in the spec, because the pages for newcomers did not exist when it was writt
 
 **Resolution.** `tests/firmware/test_wifi_commands.py`; `tests/firmware/test_wifi_docs.py`;
 `tests/air/test_wifi.py`; `AGENTS.md`, "What is coming"; `tests/onboarding/test_entry.py`.
+
+## Seed 08: The owner's check is open
+
+**Question.** Task 7 needs a phone or a computer joined to the board's network. No agent
+joins that network.
+
+**Answer.** The task stays open, its checkbox unticked, and the seed stays `in_progress`.
+Under the task, `tasks.md` has what a program established over USB: the board hosts
+`odrig` with WPA2, and its storage holds the name and the password of the settings file.
+What remains is "The owner's check" of `docs/wifi.md`, four steps. When they pass, the
+owner sets the seed to `completed`.
+
+**Resolution.** `docs/specs/08-p1-wifi-name-and-password/tasks.md`, task 7;
+`docs/wifi.md`, "The owner's check";
+`project-seeds/08-p1-wifi-name-and-password/state.json` is not changed.

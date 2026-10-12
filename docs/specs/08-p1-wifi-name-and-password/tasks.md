@@ -199,3 +199,18 @@ Rules for every task:
   - Set `"state": "completed"` and `completedAt` in
     `project-seeds/08-p1-wifi-name-and-password/state.json`.
   - Requirements: 7.1, 8.3, 10.3, 10.4
+  - Open. No agent joins the board's network, so this is left for the owner. What a
+    program established over USB on 2026-10-12, with the probe build:
+    - after `python3 firmware/fw.py set-wifi` the report had `ap` 1, `ap_name` `odrig` and
+      `ap_auth` 3, which is WPA2 with a password;
+    - storage read back from the board held the name and the password of
+      `firmware/wifi.json`, and was the image the tool wrote, byte for byte, also after
+      WLED had started on it;
+    - the show played as before, and `status` reported no error;
+    - `python3 firmware/fw.py install-firmware` put the same settings on a board whose
+      storage held another name and password;
+    - the board suite passes with these tests in it, 47 tests, three times in a row.
+  - What remains: steps 1 to 4 of "The owner's check" in `docs/wifi.md`, among them
+    `python3 firmware/fw.py test-air --http 4.3.2.1` with this Mac joined to `odrig`,
+    which also runs `tests/air/test_wifi.py` for the first time. Only that shows that a
+    device joins with the password. The seed stays `in_progress` until then.
