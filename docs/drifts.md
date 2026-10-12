@@ -5493,3 +5493,55 @@ is about real LEDs on the board.
 
 **Resolution.** Seed 03 `tasks.md`, task 11, ticked; the seed's `state.json` set to
 `completed`.
+
+## Seed 11: What the review of the pull request found
+
+**Question.** The work of seed 11 went into a pull request and was read by a reviewer who had
+not written it. What did the review find, and what was done about it?
+
+**Answer.** The product code of macOS was found unchanged in what it does. Three tests of the
+suite would have failed on the first computer, and six smaller points were named.
+
+- Three tests held only on Windows. One compared every name a shared library offers with the
+  seven functions, where only a DLL offers no other name: it now takes the names that begin
+  with `odrig_core_`, as the test did before. One expected the settings structure of a serial
+  port of Windows to be 28 bytes, which it was only on Windows, because the number type it
+  was built from is wider elsewhere: the structures are now built from types of a fixed size.
+  One expected a compiler named `C:\x\bin\cl.exe` to be known as Microsoft's on every system:
+  the name of a program now ends its folder at a slash or a backslash wherever the script
+  runs.
+- The command tool on Windows lowered RTS and then DTR by asking for each directly, and went
+  on when a request was refused. Windows refuses the request for RTS when the port was left
+  to drive RTS by itself, and DTR would then have gone low with RTS still high, which is the
+  combination that resets the chip. The tool now lowers the lines through the port's
+  settings, written twice: first RTS, with DTR as it was, then DTR. Seen on the `COM1` of
+  the Windows computer, with nothing connected, also with RTS set to handshake beforehand:
+  both were reported off afterwards. A board has still not been tried.
+- The build script read what the command prompt writes in the wrong code page, so a user
+  name that is not ASCII would have broken the search for Microsoft's compiler; it used a
+  compiler named by a relative path from the wrong folder; both are mended.
+- The line port could take a connection, or hand on a line, in the moment it was closing;
+  it now takes none and hands on nothing from then on. A library named without a folder is
+  loaded from the working folder on Windows too. The helper that ends an emulator in the
+  tests ends it also when the signal cannot be sent.
+- Not changed: a source that is removed stays in a library that is already built, until the
+  build folder is cleaned. The makefile behaves the same way.
+- Two tests of the core suite and one of the converter suite called zlib in a way Python
+  3.10 does not know. They now use a call every Python has. The two of the core suite were
+  there before this seed; this was seen failing with Python 3.10 and has not been run with
+  it again.
+
+Before the owner ruled that Linux is no requirement and that the Linux subsystem of the
+Windows computer is not to be used for tests, the suites were run there once, with Python
+3.10, as the nearest thing to a Mac at hand. The three tests above failed there, which is how
+they were seen failing. Everything of the serial port, the serial exchange of the command
+tool and the two signals passed. What else failed there concerns Linux only, the names of its
+terminal devices and the size of a buffer, and is left as it is. This is not a run on macOS:
+the list in `docs/emulator.md` stands.
+
+On the Windows computer, after the mends: converter 622 tests, core 246, emulator 460 with 15
+skipped, onboarding 75.
+
+**Resolution.** `odrigctl/winserial.py`; `core/build.py`: `stem`, `absolute` and
+`microsoft_environment`; `emulator/lineport.py`; `emulator/binding.py`: `load`;
+`tests/emulator/`, `tests/core/support.py`: `raw_deflate`.

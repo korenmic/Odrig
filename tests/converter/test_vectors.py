@@ -539,7 +539,7 @@ class TheBuilder(unittest.TestCase):
         body = bytes(range(256)) * 4
         own = build_vectors.fixed_block(body)
         self.assertEqual(build_vectors.fixed_codes(lambda given: own)(body), own)
-        for other in (zlib.compress(body, 0, -15), b"\x05" + own[1:]):
+        for other in (build_vectors.deflate_with(0)(body), b"\x05" + own[1:]):
             self.assertNotEqual(other[0] & 7, 0b011)
             self.assertEqual(build_vectors.fixed_codes(lambda given: other)(body), own)
 

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 
 from odrig import errors, jsonframes, mapping, odrg, pack, show
 from odrig.generators import dense, dvd_bounce, hello_world
@@ -58,6 +59,16 @@ def built(path):
     if not path.exists():
         raise AssertionError(f"{path} is not built; run the suite with `{TEST_COMMAND}`")
     return path
+
+
+def raw_deflate(level):
+    """A function that compresses bytes into a raw DEFLATE stream at a level, in a way
+    every Python from 3.10 on has."""
+    def deflate(body):
+        deflater = zlib.compressobj(level, zlib.DEFLATED, -15)
+        return deflater.compress(body) + deflater.flush()
+
+    return deflate
 
 
 def host(*arguments, stdin=b""):

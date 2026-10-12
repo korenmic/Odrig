@@ -255,7 +255,10 @@ class Emulator:
         """Ends the emulator with a signal and gives its exit status and what it printed."""
         if self._result is None:
             if self.process.poll() is None:
-                self.process.send_signal(number)
+                try:
+                    self.process.send_signal(number)
+                except OSError:
+                    self.kill()
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:

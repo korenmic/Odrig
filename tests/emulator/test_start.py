@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from emulator import app, binding
 from tests.core import support as core_support
@@ -103,6 +104,14 @@ class Start(unittest.TestCase):
         self.assertEqual((process.returncode, out, err), (0, "", ""))
         self.assertFalse(os.path.lexists(expected))
         self.assertEqual(list(self.work.iterdir()), [])
+
+    def test_an_emulator_that_cannot_be_sent_its_signal_is_ended_all_the_same(self):
+        emulator = support.Emulator(self.example())
+        page = emulator.port
+        with mock.patch.object(emulator.process, "send_signal", side_effect=OSError(6, "The handle is invalid")):
+            emulator.stop()
+        self.assertIsNotNone(emulator.process.poll())
+        self.assertTrue(support.refused(page))
 
     def test_the_port_option_names_the_port(self):
         port = support.free_port()
