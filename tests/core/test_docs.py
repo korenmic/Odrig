@@ -57,7 +57,7 @@ class CoreDocument(unittest.TestCase):
         types = set(re.findall(r"\b(odrig_[a-z_]+)\b", self.header)) - set(re.findall(r"\b(odrig_core_[a-z_]+)\(", self.header))
         self.assertEqual(types, {"odrig_core", "odrig_host", "odrig_leg", "odrig_reply_fn"})
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
-        self.assertEqual(limits, {"ODRIG_LINE_MAX": "64", "ODRIG_REPLY_MAX": "192"})
+        self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for name in sorted(types | set(limits)):
             self.assertTrue(name in self.named, name)
         for name, value in limits.items():
@@ -89,13 +89,13 @@ class CoreDocument(unittest.TestCase):
     def test_its_memory_table_adds_up_to_what_the_suite_measures(self):
         table = self.text.split("\n## Memory\n")[1].split("\n## ")[0]
         rows = re.findall(r"(?m)^\| ([^|*]+) \| [^|]+ \| ([0-9,]+) \|$", table)
-        self.assertEqual(len(rows), 10)
+        self.assertEqual(len(rows), 12)
         total = int(re.search(r"\*\*Total\*\* \| \| \*\*([0-9,]+)\*\*", table).group(1).replace(",", ""))
         self.assertEqual(sum(int(number.replace(",", "")) for _, number in rows), total)
         from .test_memory import hundred_items
 
         asked, blocks = support.start(hundred_items()).memory
-        self.assertEqual((asked, blocks), (total, 10))
+        self.assertEqual((asked, blocks), (total, 12))
         example, _ = support.start(support.example_show()).memory
         self.assertIn(f"{example:,} bytes", table)
 

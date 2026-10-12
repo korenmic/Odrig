@@ -154,8 +154,10 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
 | Any other path | Status 404. |
 
-- The body is the command line, with or without a final newline. Of a body longer than 128
-  bytes the first 128 are passed on, which the core answers with `line-too-long`.
+- The body is the command line, with or without a final newline. A body of up to 4,096
+  bytes reaches the core as it is; a line of more than 2,048 characters is answered by the
+  core with `line-too-long`. Of a body longer than 4,096 bytes the first 4,096 are passed
+  on, which the core answers in the same way.
 - The content type of the request is not looked at.
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
@@ -183,10 +185,12 @@ From top to bottom the page has:
   below, with a readout at its top right that names what the pointer is on:
   `leg 2, pin 2, LED 61 (1,2)`.
 - **The command log.** One line for each command that arrived, by the serial port or over
-  HTTP: the time it arrived, how it came, the line, and the reply. A line of more than 64
-  characters is shown with its first 64 and the mark `…`. A byte outside printable ASCII is
-  shown as `\xNN`. The log keeps the newest line in sight, and a page opened later shows
-  the last 500 entries the emulator kept.
+  HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
+  200 characters is shown with its first 200, the mark `…` and the number of characters it
+  has; for a line of more than 2,048 characters, which the core cuts, the mark says
+  `more than 2048 characters`. A byte outside printable ASCII is shown as `\xNN`. The log
+  keeps the newest line in sight, and a page opened later shows the last 500 entries the
+  emulator kept.
 
 In a light appearance of the system the header and the log are light. The drawing always
 stands on a dark stage, so the LEDs and the leg colours look the same either way.
@@ -485,7 +489,7 @@ event: hello
 data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
-data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","cut":false,"reply":"{\"ok\":true}"}
+data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
 data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
@@ -497,7 +501,7 @@ data: 123460 <base64 of the refresh>
 | Event | What it carries |
 |---|---|
 | `hello` | First on every connection. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
-| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the line as the core read it, and `reply` the reply without its newline. A line of more than 64 characters is given with its first 64 and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 

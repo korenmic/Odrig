@@ -186,8 +186,8 @@ class StateAfterStartup(Playback):
             (with_show(support.show_text(items, 99, 3)) | {"dvd.odrg": support.clip(1, 2, 2)}, (), "size-mismatch dvd.odrg", 99),
             (with_show(support.show_text(items, 99, 3)), ("--read-fails", "dvd.odrg", "20"), "read-error dvd.odrg", 99),
             (with_show(support.show_text(items, 99, 3)), ("--read-fails", "show.json", "20"), "read-error show.json", 0),
-            (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "6"), "out-of-memory", 0),
-            (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "10"), "out-of-memory", 0),
+            (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "8"), "out-of-memory", 0),
+            (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "12"), "out-of-memory", 0),
         )
         for files, options, error, brightness in cases:
             with self.subTest(error=error):

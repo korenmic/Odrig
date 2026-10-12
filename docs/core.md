@@ -94,7 +94,7 @@ no clock.
 `ctx` is the `reply_ctx` of the call. The line and the reply are valid during the call only,
 and neither ends in a zero.
 
-`ODRIG_LINE_MAX` is 64, the longest command line in characters. `ODRIG_REPLY_MAX` is 192,
+`ODRIG_LINE_MAX` is 2048, the longest command line in characters. `ODRIG_REPLY_MAX` is 1024,
 the longest reply in bytes with its newline.
 
 ### Rules of use
@@ -158,16 +158,24 @@ board. The host sends them to the leg's pin as they are.
 The commands and their replies are those of [commands.md](commands.md). The core is the
 only place where a command is read; a transport only carries lines.
 
-`odrig_core_command` takes one line. It drops one newline at the end of the line and then
-one carriage return at its end, so the body of an HTTP request can be passed as it is. The
-line is split into words at every single space. Every line gets exactly one reply, an empty
-line too: one JSON object on one line, ended by a newline, without a zero after it.
+`odrig_core_command` takes one line of at most 2,048 characters. It drops one newline at
+the end of the line and then one carriage return at its end, so the body of an HTTP request
+can be passed as it is. The line is split into words at every single space; a command has
+five words at most, and a line with more is no valid command. Every line gets exactly one
+reply, an empty line too: one JSON object on one line of at most 1,024 bytes, ended by a
+newline, without a zero after it. The reply is written into the room the caller gives.
 
 `odrig_core_feed` is for a transport that delivers bytes, such as a serial port. Every
-newline ends a line. The core keeps an unfinished line from one call to the next, and of a
-line without end it keeps no more than it needs to tell that the line is too long. For each
-line it calls `on_reply` with the line as the command entry read it, without its line end
-and cut to 64 characters when it is longer, and with the reply.
+newline ends a line. The core keeps an unfinished line of up to 2,048 characters, and a
+carriage return after them, from one call to the next, and of a line without end it keeps
+no more than it needs to tell that the line is too long. For each line it calls `on_reply`
+with the line as the command entry read it, without its line end and cut to 2,048
+characters when it is longer, and with the reply.
+
+The unfinished line and the reply of this entry are two blocks the core takes at startup,
+of 2,049 and of 1,024 bytes. When the host could supply neither or only one of them, the
+show is invalid with `out-of-memory`, `odrig_core_feed` takes no bytes and calls nothing,
+and `odrig_core_command` works as ever.
 
 A line that is no valid command changes nothing and is answered with the first code that
 applies of `line-too-long`, `unknown-command`, `bad-argument`, `show-invalid` and
@@ -199,14 +207,17 @@ byte.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to ten blocks sized
-from the mapping and the show. The figures are for the target file, `mapping/legs-20.json`,
-60 x 60 on twenty legs, with a show of 100 items: 80 animations with a file each and 20
-cycles of 10 entries. They are measured by the suite.
+The core asks the host for memory only inside `odrig_core_begin`, in up to twelve blocks,
+in the order of the table: two of a fixed size for the byte entry, and the others sized
+from the mapping and the show. The figures are for the target file,
+`mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
+with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,112 |
+| The core object | fixed | 3,064 |
+| Line of the byte entry | 2,049 | 2,049 |
+| Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
 | The pixel of each LED | 2 for each LED | 7,200 |
 | LED data | 3 for each LED | 10,800 |
@@ -216,10 +227,10 @@ cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each item | 1,600 |
 | Cycle entries | 2 for each entry of a cycle | 400 |
 | Files | 48 for each animation item | 3,840 |
-| **Total** | | **70,768** |
+| **Total** | | **73,793** |
 
-That is 54 percent of the 131,072 bytes the core may use for this canvas. The example show
-on the two-leg mapping asks for 38,933 bytes. The size and the number of frames of an
+That is 56 percent of the 131,072 bytes the core may use for this canvas. The example show
+on the two-leg mapping asks for 41,958 bytes. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 
@@ -297,4 +308,4 @@ the core as it goes and ends the program at once when a check fails:
 | 64 | a usage message, `bad line` or `bad batch` | The command line or the input was not understood. |
 | 70 | `allocation after startup` | The core asked the host for memory, or the program allocated with `new`, during a call after startup. |
 | 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. |
-| 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 192 bytes. |
+| 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |

@@ -43,7 +43,7 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
     def test_without_any_later_block_the_show_is_invalid_with_out_of_memory(self):
         plain = support.start(two_leg_show(), ["error"])
         blocks = plain.memory[1]
-        self.assertEqual(blocks, 10)
+        self.assertEqual(blocks, 12)
         for number in range(2, blocks + 1):
             with self.subTest(block=number):
                 run = support.start(two_leg_show(), ["error"], ["--alloc-fails-at", str(number)])
@@ -59,15 +59,26 @@ class MemoryTheHostCannotSupply(unittest.TestCase):
         run = support.start(two_leg_show(), ["error"], ["--alloc-fails-at", str(plain.memory[1] + 1)])
         self.assertEqual(run, plain)
 
-    def test_memory_that_fails_while_the_mapping_is_set_up_leaves_no_legs(self):
-        for number in (2, 3, 4, 5):
+    def test_memory_that_fails_before_the_mapping_is_set_up_leaves_no_legs(self):
+        for number in (2, 3, 4, 5, 6, 7):
             run = support.start(two_leg_show(), options=["--alloc-fails-at", str(number)])
             self.assertEqual((run.error, run.legs), ("out-of-memory", ()))
 
     def test_memory_that_fails_after_the_mapping_is_set_up_leaves_the_legs(self):
-        for number in (6, 7, 8, 9, 10):
+        for number in (8, 9, 10, 11, 12):
             run = support.start(two_leg_show(), options=["--alloc-fails-at", str(number)])
             self.assertEqual((run.error, run.legs), ("out-of-memory", ((1, 1, 180), (2, 2, 180))))
+
+    def test_without_the_blocks_of_the_byte_entry_bytes_get_no_reply_and_a_line_gets_one(self):
+        script = [support.fed(5, b"status\n"), support.fed(6, b"x" * 3000 + b"\non\n"), support.line(7, "status"), support.line(8, "play 1"), support.fed(9, b"off\n"), support.line(10, "status")]
+        for number in (2, 3):
+            run = support.start(two_leg_show(), script, ["--alloc-fails-at", str(number)])
+            self.assertEqual(run.error, "out-of-memory")
+            self.assertEqual(len(run.lines), 3)
+            first, play, last = (json.loads(line[len("reply "):]) for line in run.lines)
+            self.assertEqual((first["error"], first["on"], first["playing"]), ("out-of-memory", True, None))
+            self.assertEqual(play, {"ok": False, "error": "show-invalid"})
+            self.assertEqual(last, first)
 
 
 def hundred_items():
@@ -103,12 +114,13 @@ class FixedMemory(unittest.TestCase):
         self.assertEqual(run.legs, tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1)))
         asked, blocks = run.memory
         self.assertLess(asked, 131072)
-        self.assertEqual(blocks, 10)
-        # Every block but the core object has a size that follows from the mapping and
-        # the show: legs, the pixel of each LED, LED data, strip check, pixel buffer,
-        # window, items, cycle entries, files.
-        tables = 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 100 * 16 + 200 * 2 + 80 * 48
-        self.assertEqual(tables, 67656)
+        self.assertEqual(blocks, 12)
+        # Every block but the core object has a size that is fixed or follows from the
+        # mapping and the show: the line and the reply of the byte entry, legs, the pixel
+        # of each LED, LED data, strip check, pixel buffer, window, items, cycle entries,
+        # files.
+        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 100 * 16 + 200 * 2 + 80 * 48
+        self.assertEqual(tables, 70729)
         core_object = asked - tables
         self.assertGreater(core_object, 2000)
         self.assertLessEqual(core_object, 4096)

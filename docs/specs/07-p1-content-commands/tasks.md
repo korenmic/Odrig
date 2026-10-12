@@ -50,7 +50,7 @@ Rules for every task:
   Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Lines of 2,048 characters and replies of 1,024 bytes
+- [x] 1. Lines of 2,048 characters and replies of 1,024 bytes
   - Set `"state": "in_progress"` in `project-seeds/07-p1-content-commands/state.json`.
   - `core/include/odrig_core.h`: the two limits. `core/src`: the line and the reply of the
     byte entry as two blocks taken at startup; the words of a line, up to five; `fits` in

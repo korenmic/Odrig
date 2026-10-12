@@ -37,7 +37,7 @@ SESSION = (
     ("play", "99"),
     ("play", "abc"),
     ("brightness", "256"),
-    ("play", "1" * 70),
+    ("play", "1" * 2050),
     ("status",),
 )
 
@@ -69,7 +69,7 @@ class AgainstTheEmulator(unittest.TestCase):
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for transport, target in self.targets.items():
             for words, code in ((("play", "99"), "unknown-id"), (("play", "abc"), "bad-argument"), (("brightness", "256"), "bad-argument"), (("brightness", "-5"), "bad-argument"),
-                                (("play", ""), "bad-argument"), (("play", "1 2"), "bad-argument"), (("play", "1" * 70), "line-too-long")):
+                                (("play", ""), "bad-argument"), (("play", "1 2"), "bad-argument"), (("play", "1" * 70), "bad-argument"), (("play", "1" * 2050), "line-too-long")):
                 with self.subTest(transport=transport, command=words):
                     result = support.run_tool(*target, *words)
                     self.assertEqual((result.status, result.out, result.err), (1, '{"ok":false,"error":"%s"}\n' % code, ""))
@@ -149,8 +149,9 @@ class Session(unittest.TestCase):
                 replies[transport] = [json.dumps(support.without_fps(result.out)) for result in results]
                 self.assertEqual(len(logged), len(SESSION))
                 self.assertEqual({entry["transport"] for entry in logged}, {transport})
-                self.assertEqual([entry["line"] for entry in logged], [" ".join(words)[:64] for words in SESSION])
-                self.assertEqual([entry["cut"] for entry in logged], [len(" ".join(words)) > 64 for words in SESSION])
+                self.assertEqual([entry["line"] for entry in logged], [" ".join(words)[:200] for words in SESSION])
+                self.assertEqual([entry["length"] for entry in logged], [min(len(" ".join(words)), 2048) for words in SESSION])
+                self.assertEqual([entry["cut"] for entry in logged], [len(" ".join(words)) > 2048 for words in SESSION])
                 self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
         self.assertEqual(replies["serial"], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]

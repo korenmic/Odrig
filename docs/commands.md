@@ -6,9 +6,9 @@ exists only if something really uses it.
 ## Lines
 
 A command is one line of text ending in a newline; a carriage return before the newline is
-ignored. Words are separated by single spaces. A line is at most 64 characters.
+ignored. Words are separated by single spaces. A line is at most 2,048 characters.
 
-Every command gets exactly one reply: a JSON object on one line.
+Every command gets exactly one reply: a JSON object on one line of at most 1,024 bytes.
 
 - Success: `{"ok":true}`, with more members for `status`.
 - Failure: `{"ok":false,"error":"<code>"}`.
@@ -51,7 +51,7 @@ Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounde
 | `bad-argument` | An argument is missing, extra, not a number, or out of range. |
 | `unknown-id` | `play` names an id that is not in `show.json`. |
 | `show-invalid` | `play` was sent while the show is invalid. |
-| `line-too-long` | The line is longer than 64 characters. |
+| `line-too-long` | The line is longer than 2,048 characters. |
 
 ## Transports
 

@@ -126,7 +126,7 @@ class EmulatorDocument(unittest.TestCase):
     def test_it_describes_the_http_address_with_a_curl_example(self):
         text = section(self.text, "Commands over HTTP")
         self.assertIn("curl --data-binary 'play 2' http://127.0.0.1:8600/odrig", text)
-        for phrase in ("`POST /odrig`", "Status 200", "`application/json`", "Status 405 with `Allow: POST`", "Status 411", "Status 404", "128", "`Access-Control-Allow-Origin: *`"):
+        for phrase in ("`POST /odrig`", "Status 200", "`application/json`", "Status 405 with `Allow: POST`", "Status 411", "Status 404", "4,096", "2,048", "`Access-Control-Allow-Origin: *`"):
             self.assertIn(phrase, text)
 
     def test_it_describes_the_port(self):

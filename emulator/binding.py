@@ -10,8 +10,8 @@ from ctypes import CFUNCTYPE, POINTER, Structure, c_char, c_char_p, c_int, c_int
 
 from . import failure
 
-LINE_MAX = 64
-REPLY_MAX = 192
+LINE_MAX = 2048
+REPLY_MAX = 1024
 
 BUILD_COMMAND = "make -C core shared"
 
@@ -137,8 +137,8 @@ class Core:
 
     def feed(self, now_ms, data):
         """Bytes of a transport. Returns `(line, reply, cut)` for every line they finish:
-        the line as the core read it, its reply, and whether the line was cut to its first
-        64 characters."""
+        the line as the core read it, its reply, and whether the line was longer than the
+        core's limit and was cut to it."""
         self._answered = []
         self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []

@@ -152,10 +152,20 @@ class ExampleShow(unittest.TestCase):
         self.assertEqual(json.loads(answered[0][1])["brightness"], 9)
 
     def test_feed_marks_a_line_that_was_cut(self):
-        long_line = b"play " + b"1" * 70
-        self.assertEqual(self.core.feed(0, long_line + b"\n"), [(long_line[:64], b'{"ok":false,"error":"line-too-long"}\n', True)])
-        exact = b"x" * 64
+        long_line = b"play " + b"1" * 2050
+        self.assertEqual(self.core.feed(0, long_line + b"\n"), [(long_line[:2048], b'{"ok":false,"error":"line-too-long"}\n', True)])
+        exact = b"x" * 2048
         self.assertEqual(self.core.feed(0, exact + b"\n"), [(exact, b'{"ok":false,"error":"unknown-command"}\n', False)])
+
+    def test_a_line_of_2048_characters_and_a_reply_fit_the_binding(self):
+        self.assertEqual((binding.LINE_MAX, binding.REPLY_MAX), (2048, 1024))
+        longest = b"brightness " + b"0" * 2035 + b"41"
+        self.assertEqual(len(longest), 2048)
+        self.assertEqual(self.core.command(0, longest), b'{"ok":true}\n')
+        self.assertEqual(self.core.command(0, longest + b"\r\n"), b'{"ok":true}\n')
+        self.assertEqual(self.core.command(0, longest + b"0"), b'{"ok":false,"error":"line-too-long"}\n')
+        self.assertEqual(self.core.feed(0, longest + b"\n"), [(longest, b'{"ok":true}\n', False)])
+        self.assertEqual(json.loads(self.core.command(0, b"status"))["brightness"], 41)
 
     def test_two_cores_in_one_program_do_not_share_their_state(self):
         other = self.started()

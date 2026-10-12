@@ -232,8 +232,8 @@ class EachReason(unittest.TestCase):
 
     def test_out_of_memory(self):
         blocks = support.start(example()).memory[1]
-        self.assertEqual(blocks, 10)
-        for number in (8, 9, 10):
+        self.assertEqual(blocks, 12)
+        for number in (10, 11, 12):
             self.check(example(), "out-of-memory", ["--alloc-fails-at", str(number)])
 
 

@@ -59,7 +59,7 @@ SESSION = (
     "play 99",
     "play abc",
     "brightness 256",
-    "play " + "7" * 70,
+    "play " + "7" * 2050,
     "brightness 0", "status",
     "brightness 40", "status",
     "play 3", "status",

@@ -153,16 +153,28 @@ class Stream(unittest.TestCase):
         self.assertEqual((logged[0]["seq"], logged[-1]["seq"]), (4, 503))
         self.assertEqual((logged[0]["line"], logged[-1]["line"]), ("brightness 3", "brightness 246"))
 
-    def test_a_line_of_80_characters_is_logged_with_64_and_marked_as_cut(self):
-        long_line = "play " + "8" * 75
-        self.assertEqual(len(long_line), 80)
+    def test_a_line_of_2060_characters_is_logged_with_200_its_length_as_read_and_marked_as_cut(self):
+        long_line = "play " + "8" * 2055
+        self.assertEqual(len(long_line), 2060)
         self.emulator.command(long_line)
         with support.Serial(self.emulator.serial) as port:
             port.ask(long_line)
         self.emulator.command("x" * 64)
         logged = support.of_kind(self.stream().read_until(has("frame")), "log")
-        self.assertEqual([(entry["line"], entry["cut"]) for entry in logged], [(long_line[:64], True), (long_line[:64], True), ("x" * 64, False)])
+        self.assertEqual(
+            [(entry["line"], entry["length"], entry["cut"]) for entry in logged],
+            [(long_line[:200], 2048, True), (long_line[:200], 2048, True), ("x" * 64, 64, False)],
+        )
         self.assertEqual({entry["reply"] for entry in logged[:2]}, {'{"ok":false,"error":"line-too-long"}'})
+
+    def test_a_line_of_1000_characters_is_logged_with_200_and_its_length(self):
+        line = "play " + "8" * 995
+        self.emulator.command(line)
+        with support.Serial(self.emulator.serial) as port:
+            port.ask(line)
+        logged = support.of_kind(self.stream().read_until(has("frame")), "log")
+        self.assertEqual([(entry["line"], entry["length"], entry["cut"]) for entry in logged], [(line[:200], 1000, False)] * 2)
+        self.assertEqual({entry["reply"] for entry in logged}, {'{"ok":false,"error":"bad-argument"}'})
 
     def test_bytes_outside_printable_ascii_are_logged_as_escapes(self):
         with support.Serial(self.emulator.serial) as port:

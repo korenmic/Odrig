@@ -5001,3 +5001,93 @@ can check, with a phone.
 agent leaves it open.
 
 **Resolution.** Seed 09 `tasks.md`, tasks 1 and 13.
+
+## Seed 07: What seed 05 left, where this spec expected something else
+
+**Question.** The spec of seed 07 was written while seed 05 was being implemented, from
+the design of seed 05. Its tasks say: where the code differs, follow the code and record
+the difference. What differs?
+
+**Answer.** The code was read before the first task. The core, the emulator and the
+command tool are as the design's table "What this design relies on" has them. Four things
+differ, all on the board:
+
+- The request for a refresh has a task of its own, `odrig`, on the chip's other processor
+  core, and the core's lock is held for a whole request, 9 to 17 ms with a dense clip. The
+  design names this as its risk 6. So a step of the check will run on that task, and the
+  storage calls of a command on WLED's loop, for the port, and on the network task, for
+  HTTP. The spike of task 3 measures the pacing in that arrangement.
+- The port no longer feeds the core one byte at a time. It collects the bytes of a pass,
+  at most 272, and hands them on at the end of a line or when the buffer is full, each
+  hand-over under one hold of the lock. A line of 2,048 characters so reaches the core in
+  eight or more pieces, which the core's byte entry joins.
+- The owner has ruled, in seed 05, that any rate from 20 to 50 refreshes a second is fine
+  on the board for any content. The session that coordinates this run passed the ruling on
+  for this seed: where the seed and this spec ask for 25 or more during an upload and 49
+  or more afterwards, the board tests assert 20 or more in both places, and the measured
+  figures are written down as they are. Requirement 17 criteria 4 and 7 and Requirement 21
+  criterion 3 are read that way from here on.
+- This run works in a checkout of its own, beside the first one. The stock WLED files and
+  the factory backup exist in the first checkout only. The tool of this checkout builds in
+  its own `build/firmware/`; where a board test restores stock WLED, the stock files are
+  read from the first checkout through a link that is removed afterwards, and nothing of
+  that folder is copied or changed.
+
+The session of the board suite, `tests/board/support.py`, has one line that must be too
+long. It had 75 characters and gets 2,055 in the first task, with the limit, although the
+board suite runs again only in task 3, when the firmware with the longer line is on the
+board.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, tasks 3 and 7;
+`tests/board/support.py`, `SESSION`.
+
+## Seed 07: The byte entry without its two blocks, and where the blocks are taken
+
+**Question.** The line and the reply of the byte entry leave the core object and become
+two blocks taken at startup. The design does not say when, or what `odrig_core_feed` does
+when the host could not supply them. A reply of 1,024 bytes cannot stand on the stack of
+a function of the core, so without the blocks the entry has nowhere to put a line or a
+reply.
+
+**Answer.** The two blocks are the first the core asks for after its own object, before
+the mapping is read: commands arrive whatever the show is, also when there is none. When
+either is missing the show is invalid with `out-of-memory`, as for every later block,
+`odrig_core_feed` takes no bytes and calls nothing, and `odrig_core_command`, which writes
+into the caller's room, works as ever. So a host that could not give 3 KB answers over
+HTTP and not over its serial port, and `status` says why. The numbers of the blocks in
+the tests of a failing `alloc` move up by two.
+
+A line is split into up to five words; a line with more is `bad-argument` for every
+command, and `unknown-command` when its first word is no command, which comes first in
+the order of the codes.
+
+**Resolution.** `core/src/core.cpp`, `start`; `core/src/commands.cpp`, `Words` and
+`odrig_core_feed`; `docs/core.md`, "Command lines" and "Memory";
+`tests/core/test_memory.py`.
+
+## Seed 07: The length in a log entry of a line that was cut
+
+**Question.** A log entry of the emulator gets `length`, "the number of characters of the
+line as the core read it". Of a line of more than 2,048 characters the core hands back
+its first 2,048, and of a body of more than 4,096 bytes the emulator keeps 4,096.
+
+**Answer.** `length` is the length of the line the core read: 2,048 for every line that
+was cut, with `cut` true. The page shows such a line with its first 200 characters and
+`more than 2048 characters`, and a shorter long line with its first 200 and its real
+length.
+
+**Resolution.** `emulator/hub.py`, `Hub.log`; `emulator/web/app.js`; `docs/emulator.md`,
+"The page" and "The event stream".
+
+## Seed 07: Queue and session files in a checkout of its own
+
+**Question.** The run works in a checkout of its own. Where do the queue and the session
+state go, and how are the records numbered?
+
+**Answer.** Into `.codex/` of that checkout, which git ignores: the queue records Q-401
+to Q-409, one for each task of this spec, without task ids, because the script that makes
+them does not run on this Mac, and the session state in `.codex/tactic/session.json`. No
+branch is pushed: there is no remote.
+
+**Resolution.** `.codex/local-task-queue.md` and `.codex/tactic/session.json` of the
+checkout, untracked.

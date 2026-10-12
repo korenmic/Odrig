@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-#define ODRIG_LINE_MAX   64     /* longest command line, in characters */
-#define ODRIG_REPLY_MAX 192     /* longest reply, in bytes, with its newline */
+#define ODRIG_LINE_MAX  2048    /* longest command line, in characters */
+#define ODRIG_REPLY_MAX 1024    /* longest reply, in bytes, with its newline */
 
 typedef struct odrig_core odrig_core;
 

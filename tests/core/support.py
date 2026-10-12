@@ -532,6 +532,7 @@ class ReferencePlayer:
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
+    LINE_MAX = 2048
     COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255)}
 
@@ -552,7 +553,7 @@ class ReferencePlayer:
     def _obey(self, line):
         """Carries out a command line. Returns the error code of a line that is no valid
         command, the first that applies, and changes nothing then."""
-        if len(line) > 64:
+        if len(line) > self.LINE_MAX:
             return "line-too-long"
         name, *arguments = line.split(b" ")
         if name not in self.COMMANDS:
@@ -605,7 +606,7 @@ class ReferencePlayer:
             reply = self.command(now, line)
             if line.endswith(b"\r"):
                 line = line[:-1]
-            answered.append((line[:64], reply))
+            answered.append((line[:self.LINE_MAX], reply))
         return answered
 
     def answer(self, line):

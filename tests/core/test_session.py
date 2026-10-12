@@ -4,7 +4,7 @@ import unittest
 from . import support
 from .test_playback import T0, Playback, refreshes
 
-LONG_LINE = "brightness " + "1" * 54
+LONG_LINE = "brightness " + "1" * 2038
 
 # What happens besides the polls, by milliseconds after power-on. The cycle of the example
 # show, item 3, is played at 7,000 ms and changes turns at 22,000 and at 37,000 ms.
@@ -19,7 +19,7 @@ EVENTS = {
     5010: ["status"],
     7000: ["play 3", "status"],
     8000: ["bogus", "play", "play 99", LONG_LINE, "brightness 256", "", "play 0", "PLAY 1", "status"],
-    9000: [b"sta", b"tus\r\nbright", b"ness 200\n", b"z" * 300, b"\non\n"],
+    9000: [b"sta", b"tus\r\nbright", b"ness 200\n", b"z" * 3000, b"\non\n"],
     12000: ["status", "brightness 128"],
     21000: ["off", "status"],
     22010: ["status"],
@@ -60,7 +60,7 @@ class ScriptedSession(Playback):
         for brightness in (0, 1, 128, 255):
             self.assertIn(f"brightness {brightness}", lines)
         self.assertEqual(lines.count("play 3"), 2)
-        self.assertEqual(len(LONG_LINE), 65)
+        self.assertEqual(len(LONG_LINE), 2049)
 
     def test_on_the_example_show_every_reply_and_every_refresh_is_the_reference_players(self):
         script = scripted_session()

@@ -87,18 +87,20 @@ class Commands(unittest.TestCase):
                 self.assertTrue(received.endswith(b"\r\n\r\n"), received)
                 self.assertEqual(support.without_fps(self.emulator.command("status")), before)
 
-    def test_an_empty_body_a_body_of_65_characters_and_one_of_10000_bytes(self):
+    def test_an_empty_body_a_body_of_2049_characters_and_one_of_10000_bytes(self):
         too_long = b'{"ok":false,"error":"line-too-long"}\n'
         unknown = b'{"ok":false,"error":"unknown-command"}\n'
         self.assertEqual(self.emulator.request(body=b"").body, unknown)
         self.assertEqual(self.emulator.request(body=b"\n").body, unknown)
-        self.assertEqual(self.emulator.request(body=b"x" * 64).body, unknown)
-        self.assertEqual(self.emulator.request(body=b"x" * 64 + b"\r\n").body, unknown)
-        self.assertEqual(self.emulator.request(body=b"x" * 65).body, too_long)
-        self.assertEqual(self.emulator.request(body=b"play " + b"1" * 60).body, too_long)
+        self.assertEqual(self.emulator.request(body=b"x" * 2048).body, unknown)
+        self.assertEqual(self.emulator.request(body=b"x" * 2048 + b"\r\n").body, unknown)
+        self.assertEqual(self.emulator.request(body=b"x" * 2049).body, too_long)
+        self.assertEqual(self.emulator.request(body=b"play " + b"1" * 2044).body, too_long)
+        self.assertEqual(self.emulator.request(body=b"x" * 4096).body, too_long)
+        self.assertEqual(self.emulator.request(body=b"x" * 4097).body, too_long)
         answer = self.emulator.request(body=b"status\n" * 1428 + b"sta\n")
         self.assertEqual((answer.status, answer.body), (200, too_long))
-        self.assertEqual(self.emulator.request(body=bytes(range(256)) * 4).body, too_long)
+        self.assertEqual(self.emulator.request(body=bytes(range(256)) * 9).body, too_long)
 
     def test_a_connection_is_kept_and_a_long_body_is_read_to_its_end(self):
         connection = http.client.HTTPConnection("127.0.0.1", self.emulator.port, timeout=10)
@@ -200,16 +202,16 @@ class WhatTheServerPassesOn(unittest.TestCase):
         return answer.status, answer.read()
 
     def test_the_body_is_passed_on_as_it_arrived_with_or_without_its_newline(self):
-        bodies = [b"status", b"status\n", b"play 2\r\n", b"", b"\x00\xff caf\xc3\xa9", b"x" * 128]
+        bodies = [b"status", b"status\n", b"play 2\r\n", b"", b"\x00\xff caf\xc3\xa9", b"x" * 128, bytes(range(256)) * 16]
         for body in bodies:
             self.assertEqual(self.request("POST", "/odrig", body), (200, b'{"ok":true}\n'))
         self.assertEqual(self.engine.lines, [(body, "http") for body in bodies])
 
-    def test_of_a_body_longer_than_128_bytes_the_first_128_are_passed_on(self):
+    def test_of_a_body_longer_than_4096_bytes_the_first_4096_are_passed_on(self):
         long_body = bytes(range(256)) * 40
-        for body in (long_body[:129], long_body[:300], long_body):
+        for body in (long_body[:4097], long_body[:5000], long_body):
             self.assertEqual(self.request("POST", "/odrig", body)[0], 200)
-        self.assertEqual(self.engine.lines, [(long_body[:128], "http")] * 3)
+        self.assertEqual(self.engine.lines, [(long_body[:4096], "http")] * 3)
 
     def test_the_front_end_is_not_called_for_another_method_a_missing_length_or_another_path(self):
         for method in ("GET", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"):

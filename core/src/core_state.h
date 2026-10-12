@@ -92,10 +92,14 @@ struct Core {
     uint32_t count_running;
     uint32_t count_before;
 
-    // The unfinished line of odrig_core_feed: its first bytes, 64 characters and a carriage
-    // return at most, and whether more than those have arrived.
-    char line[ODRIG_LINE_MAX + 1];
-    uint8_t line_length;
+    // The byte entry, odrig_core_feed. `line` is a block of ODRIG_LINE_MAX + 1 bytes that
+    // holds the first bytes of the unfinished line, a whole line and a carriage return at
+    // most; `line_over` says that more than those have arrived. `feed_reply` is a block of
+    // ODRIG_REPLY_MAX bytes for the reply to a line. Without the two blocks the entry
+    // takes no bytes.
+    char *line;
+    char *feed_reply;
+    uint16_t line_length;
     uint8_t line_over;
 
     // Playback.

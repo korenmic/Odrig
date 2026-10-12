@@ -63,6 +63,13 @@ void check_file(Core &core, FileInfo &info) {
 }
 
 void start(Core &core) {
+    core.line = static_cast<char *>(arena_take(core, ODRIG_LINE_MAX + 1));
+    core.feed_reply = static_cast<char *>(arena_take(core, ODRIG_REPLY_MAX));
+    if (core.line == nullptr || core.feed_reply == nullptr) {
+        core_fail(core, kOutOfMemory, nullptr, kNone);
+        return;
+    }
+
     Reason reason = read_mapping(core);
     if (reason != kNone) {
         core_fail(core, reason, reason == kReadError ? "mapping.json" : nullptr, kNone);

@@ -7,8 +7,13 @@ namespace odrig {
 
 namespace {
 
-// A reply while it is written.
+// A reply while it is written, into room for ODRIG_REPLY_MAX bytes.
 struct Reply {
+    // Whether this many bytes more can be written.
+    bool fits(uint32_t more) const {
+        return more <= ODRIG_REPLY_MAX - length;
+    }
+
     void text(const char *more) {
         while (*more != '\0') {
             bytes[length++] = *more++;
@@ -75,14 +80,42 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     return reply.length;
 }
 
-// Whether the first `length` bytes of the line are this word, byte for byte.
-bool is_word(const char *line, uint32_t length, const char *word) {
-    uint32_t at = 0;
-    while (at < length && word[at] != '\0' && line[at] == word[at]) {
-        ++at;
+// The most words a command has. A line with more is no valid command.
+const uint32_t kMostWords = 5;
+
+// The words of a line. The line is split at every space, so it has one word more than it
+// has spaces, and a word may be empty. The first kMostWords of them are kept.
+struct Words {
+    void split(const char *line, uint32_t length) {
+        count = 0;
+        uint32_t begin = 0;
+        for (uint32_t at = 0; at <= length; ++at) {
+            if (at < length && line[at] != ' ') {
+                continue;
+            }
+            if (count < kMostWords) {
+                text[count] = line + begin;
+                size[count] = at - begin;
+            }
+            ++count;
+            begin = at + 1;
+        }
     }
-    return at == length && word[at] == '\0';
-}
+
+    // Whether a word is this text, byte for byte.
+    bool is(uint32_t word, const char *wanted) const {
+        const char *given = text[word];
+        uint32_t at = 0;
+        while (at < size[word] && wanted[at] != '\0' && given[at] == wanted[at]) {
+            ++at;
+        }
+        return at == size[word] && wanted[at] == '\0';
+    }
+
+    const char *text[kMostWords];
+    uint32_t size[kMostWords];
+    uint32_t count;
+};
 
 // The value of an argument made of decimal digits only. False for an empty argument and for
 // any other character. A value above `most` is given as `most` + 1.
@@ -103,6 +136,11 @@ bool decimal(const char *text, uint32_t length, uint32_t most, uint32_t *value) 
     return true;
 }
 
+// The value of a word that must be a number from `least` to `most`. False for anything else.
+bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
+    return decimal(words.text[word], words.size[word], most, value) && *value >= least && *value <= most;
+}
+
 }  // namespace
 
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
@@ -121,46 +159,34 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return refuse(reply, "line-too-long");
     }
 
-    // The line is split at every space, so it has one word more than it has spaces.
-    uint32_t first = 0;
-    while (first < length && line[first] != ' ') {
-        ++first;
-    }
-    uint32_t more_words = 0;
-    for (uint32_t at = 0; at < length; ++at) {
-        if (line[at] == ' ') {
-            ++more_words;
-        }
-    }
-    // With two words, the second one is the argument.
-    const char *argument = more_words == 1 ? line + first + 1 : line;
-    const uint32_t argument_length = more_words == 1 ? length - first - 1 : 0;
+    Words words;
+    words.split(line, length);
 
-    if (is_word(line, first, "status")) {
-        if (more_words != 0) {
+    if (words.is(0, "status")) {
+        if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
         return status(core, now, reply);
     }
-    const bool switch_on = is_word(line, first, "on");
-    if (switch_on || is_word(line, first, "off")) {
-        if (more_words != 0) {
+    const bool switch_on = words.is(0, "on");
+    if (switch_on || words.is(0, "off")) {
+        if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
         core.on = switch_on ? 1 : 0;
         return succeed(reply);
     }
-    if (is_word(line, first, "brightness")) {
+    if (words.is(0, "brightness")) {
         uint32_t value;
-        if (more_words != 1 || !decimal(argument, argument_length, 255, &value) || value > 255) {
+        if (words.count != 2 || !number_word(words, 1, 0, 255, &value)) {
             return refuse(reply, "bad-argument");
         }
         player_set_brightness(core, static_cast<uint8_t>(value));
         return succeed(reply);
     }
-    if (is_word(line, first, "play")) {
+    if (words.is(0, "play")) {
         uint32_t id;
-        if (more_words != 1 || !decimal(argument, argument_length, 65535, &id) || id < 1 || id > 65535) {
+        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
@@ -198,11 +224,14 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
     }
     odrig::Core &state = core->state;
     odrig::clock_touch(state, now_ms);
-    char reply[ODRIG_REPLY_MAX];
+    if (state.line == nullptr || state.feed_reply == nullptr) {
+        return;
+    }
+    char *reply = state.feed_reply;
     for (size_t at = 0; at < length; ++at) {
         const char byte = static_cast<char>(bytes[at]);
         if (byte != '\n') {
-            // Room for 64 characters and the carriage return of a line that ends in one.
+            // Room for a whole line and the carriage return of a line that ends in one.
             if (state.line_length < ODRIG_LINE_MAX + 1) {
                 state.line[state.line_length++] = byte;
             } else {
@@ -210,9 +239,9 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
             }
             continue;
         }
-        // A line that outgrew the room is longer than 64 characters whatever it ends in.
-        // The host is handed the line as the command entry reads it: without one carriage
-        // return at its end, and its first 64 characters when it is longer.
+        // A line that outgrew the room is too long whatever it ends in. The host is handed
+        // the line as the command entry reads it: without one carriage return at its end,
+        // and its first ODRIG_LINE_MAX characters when it is longer.
         uint32_t kept = state.line_length;
         uint32_t reply_length;
         if (state.line_over) {
