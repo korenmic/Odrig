@@ -39,7 +39,7 @@ class CoreDocument(unittest.TestCase):
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
-        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log"])
+        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at"])
         self.assertEqual(members["odrig_leg"], ["leg", "pin", "led_count", "rgb"])
         for struct, names in members.items():
             self.assertTrue(struct in self.named, struct)
@@ -103,7 +103,7 @@ class CoreDocument(unittest.TestCase):
         source = HOST.read_text(encoding="utf-8")
         usage = source.split("int usage() {")[1].split("return kUsage;")[0]
         options = set(re.findall(r"--[a-z-]+", usage))
-        self.assertGreaterEqual(len(options), 8)
+        self.assertGreaterEqual(len(options), 16)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`[^`\n]*{option}\b", option)
         for invocation in ("reasons", "inflate", "decode", "session", "guard"):

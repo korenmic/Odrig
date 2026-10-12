@@ -56,6 +56,13 @@ odrig_host OdrigFiles::host() {
   made.read = readSome;
   made.close = closeOpen;
   made.log = keepLine;
+  made.write_open = nullptr;
+  made.write = nullptr;
+  made.write_close = nullptr;
+  made.rename = nullptr;
+  made.remove = nullptr;
+  made.space = nullptr;
+  made.read_at = nullptr;
   return made;
 }
 

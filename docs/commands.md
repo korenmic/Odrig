@@ -10,7 +10,7 @@ ignored. Words are separated by single spaces. A line is at most 2,048 character
 
 Every command gets exactly one reply: a JSON object on one line of at most 1,024 bytes.
 
-- Success: `{"ok":true}`, with more members for `status`.
+- Success: `{"ok":true}`, with more members for `status` and `space`.
 - Failure: `{"ok":false,"error":"<code>"}`.
 
 ## Commands
@@ -22,6 +22,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
 | `status` | Reports the current state. |
+| `space` | Reports the free and the total storage and the number of animations. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the `start` item is
 playing if there is one. Changes made by commands are not kept across a restart.
@@ -43,6 +44,16 @@ Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounde
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 
+## Storage and the installed items
+
+```
+space
+{"ok":true,"free":8372224,"total":10354688,"animations":2}
+```
+
+`free` and `total` are bytes of the storage the show is in. `animations` is the number of
+animation items of the show, and 0 while the show is invalid.
+
 ## Error codes
 
 | Code | When |
@@ -52,6 +63,7 @@ Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounde
 | `unknown-id` | `play` names an id that is not in `show.json`. |
 | `show-invalid` | `play` was sent while the show is invalid. |
 | `line-too-long` | The line is longer than 2,048 characters. |
+| `storage-error` | The storage could not be read: `space` on a board that cannot tell its space. |
 
 ## Transports
 

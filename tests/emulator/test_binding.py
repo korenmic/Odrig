@@ -26,6 +26,8 @@ int main(void) {
     printf("odrig_host %zu\\n", sizeof(odrig_host));
     MEMBER(odrig_host, ctx); MEMBER(odrig_host, alloc); MEMBER(odrig_host, open);
     MEMBER(odrig_host, read); MEMBER(odrig_host, close); MEMBER(odrig_host, log);
+    MEMBER(odrig_host, write_open); MEMBER(odrig_host, write); MEMBER(odrig_host, write_close);
+    MEMBER(odrig_host, rename); MEMBER(odrig_host, remove); MEMBER(odrig_host, space); MEMBER(odrig_host, read_at);
     printf("odrig_leg %zu\\n", sizeof(odrig_leg));
     MEMBER(odrig_leg, leg); MEMBER(odrig_leg, pin); MEMBER(odrig_leg, led_count); MEMBER(odrig_leg, rgb);
     return 0;
@@ -49,6 +51,18 @@ class Declarations(unittest.TestCase):
         for name, (_, arguments) in binding.FUNCTIONS.items():
             listed = re.search(rf"\b{name}\(([^)]*)\)", code).group(1)
             self.assertEqual(len(arguments), len(listed.split(",")), name)
+
+    def test_its_host_record_has_the_members_of_the_header_in_their_order(self):
+        body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)
+        members = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
+        self.assertEqual([name for name, _ in binding.HostRecord._fields_], members)
+        self.assertEqual(members[6:], ["write_open", "write", "write_close", "rename", "remove", "space", "read_at"])
+
+    def test_every_storage_function_has_as_many_arguments_as_the_header_gives_it(self):
+        body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)
+        for name, kind in binding.HostRecord._fields_[1:]:
+            listed = re.search(rf"\(\*{name}\)\(([^;]*)\);", body).group(1)
+            self.assertEqual(len(kind._argtypes_), len(listed.split(",")), name)
 
     def test_its_two_limits_are_those_of_the_header(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", header_code()))
@@ -166,6 +180,34 @@ class ExampleShow(unittest.TestCase):
         self.assertEqual(self.core.command(0, longest + b"0"), b'{"ok":false,"error":"line-too-long"}\n')
         self.assertEqual(self.core.feed(0, longest + b"\n"), [(longest, b'{"ok":true}\n', False)])
         self.assertEqual(json.loads(self.core.command(0, b"status"))["brightness"], 41)
+
+    def test_a_host_with_the_storage_methods_tells_its_space(self):
+        self.assertEqual(self.core.command(0, b"space"), self.reference.command(0, b"space"))
+        self.assertEqual(json.loads(self.core.command(0, b"space"))["total"], host.STORAGE_BYTES)
+
+    def test_a_host_without_the_storage_methods_is_a_host_without_storage(self):
+        class ReadOnly:
+            def __init__(self, files):
+                self.files = files
+
+            def open(self, name):
+                return self.files.open(name)
+
+            def read(self, capacity):
+                return self.files.read(capacity)
+
+            def close(self):
+                self.files.close()
+
+            def log(self, text):
+                self.files.log(text)
+
+        files = host.FolderHost(self.folder)
+        self.addCleanup(files.release)
+        core = binding.Core(support.LIBRARY, ReadOnly(files))
+        self.assertIsNone(core.error())
+        self.assertEqual(core.command(0, b"space"), b'{"ok":false,"error":"storage-error"}\n')
+        self.assertEqual(json.loads(core.command(0, b"status"))["playing"], 3)
 
     def test_two_cores_in_one_program_do_not_share_their_state(self):
         other = self.started()

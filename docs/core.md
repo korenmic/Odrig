@@ -62,11 +62,35 @@ Every function receives `ctx` as its first argument.
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
 | `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. Today the core logs one thing: the reason text when the show becomes invalid. |
+| `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
+| `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
+| `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
+| `rename` | `int rename(void *ctx, const char *from, const char *to)`: gives the file `from` the name `to`, in place of a file that has it. After a power cut during the call, `to` is its old file or the new one, whole. Returns 1, or -1. |
+| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
+| `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
+| `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
 `show.json` twice each at startup. It never writes, creates or deletes a file, and it reads
 no clock.
+
+The last seven members are the storage functions: three that write a file, `rename`,
+`remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
+
+- A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
+  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the three
+  names the core keeps for itself, `upload.part`, `show.part` and `pending.txt`.
+- The core has at most one file being written, gives `write` at most 1,500 bytes in one
+  call, and reads a file with `read_at` from offset 0 on, each call where the last ended.
+  It renames and removes no file that `open` holds or that is being written.
+- A host without storage that can be changed sets `write_open` to `NULL`. The core then
+  calls none of the seven but `space`. `space` may be `NULL` too; the command `space` is
+  then answered with `storage-error`. With `write_open` set, all seven are set.
+- The core calls them only inside `odrig_core_begin`, `odrig_core_command`,
+  `odrig_core_feed` and `odrig_core_poll`, never from inside another host function.
+- Of the seven the core calls `space`, for the command of that name. No command writes a
+  file, so the other six are not called.
 
 ### What the core offers
 
@@ -215,7 +239,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,064 |
+| The core object | fixed | 3,120 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -227,10 +251,10 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each item | 1,600 |
 | Cycle entries | 2 for each entry of a cycle | 400 |
 | Files | 48 for each animation item | 3,840 |
-| **Total** | | **73,793** |
+| **Total** | | **73,849** |
 
 That is 56 percent of the 131,072 bytes the core may use for this canvas. The example show
-on the two-leg mapping asks for 41,958 bytes. The size and the number of frames of an
+on the two-leg mapping asks for 42,014 bytes. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 
@@ -270,6 +294,7 @@ repeated exactly.
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
 | `odrig_host reasons` | Prints every reason name the core can report, one on a line. |
 | `odrig_host guard alloc`, `guard new`, `guard read` | Does what the host must stop: asks the host for memory, or the program, as the core would after startup; or asks for 513 bytes of a file. |
+| `odrig_host guard write`, `guard write-none`, `guard close-none`, `guard two-files`, `guard name`, `guard rename-open`, `guard remove-open`, `guard read-at`, `guard read-at-offset` | Uses the storage functions as the core never may: gives `write` 1,501 bytes; calls `write`, or `write_close`, with no file being written; begins a second file while one is being written; names a file that is none of the core's; renames onto, or removes, the file `open` holds; asks `read_at` for 513 bytes, or for an offset that is not where its last call ended. |
 
 A batch on standard input is a row of pieces, each after its length as four bytes, least
 significant first. For `session --batch` a session is the number of its files as text, a
@@ -297,9 +322,23 @@ leg; and `ready`.
 | `--remove-after FILE N` | The file is gone once it has been opened N times. |
 | `--swap-after FILE N OTHER` | After N openings the name opens the content of the file `OTHER`. |
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
+| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 10,354,688, the size of the board's storage. |
+| `--no-storage` | The seven storage functions are `NULL`. |
+| `--only-space` | Of the seven only `space` is there: a host whose storage cannot be changed. |
+| `--space-unknown` | `space` returns -1. |
+| `--store-fails-at N` | The N-th storage call fails: it does nothing and returns -1. |
+| `--cut-at N` | The N-th storage call is not made; the program prints `power cut` and ends with status 75. |
+| `--cut-at N --cut-keeps K` | The same, but when that call is a `write`, its first K bytes are written first. |
+| `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
 
-The host hands out every file in pieces of changing sizes, none above 512 bytes. It checks
-the core as it goes and ends the program at once when a check fails:
+A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
+`space` and `read_at` are not counted and not traced. The storage functions work on the
+folder of a session, and for `session --batch` on the files held in memory. A file that
+was being written when the program ends stays with the bytes written so far.
+
+The host hands out every file in pieces of changing sizes, none above 512 bytes, through
+`read` and through `read_at`. It checks the core as it goes and ends the program at once
+when a check fails:
 
 | Status | Line printed | When |
 |---:|---|---|
@@ -307,5 +346,6 @@ the core as it goes and ends the program at once when a check fails:
 | 1 | a line that says what | An answer of the core contradicts another one: the legs and their count, a decoder that changes its answer after the end, a reply written into too little room. Also `guard` when nothing stopped it. |
 | 64 | a usage message, `bad line` or `bad batch` | The command line or the input was not understood. |
 | 70 | `allocation after startup` | The core asked the host for memory, or the program allocated with `new`, during a call after startup. |
-| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. |
+| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or for an offset that is neither 0 nor where its last call for that file ended. |
 | 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |
+| 75 | `power cut` | The storage call that `--cut-at` names was reached. |

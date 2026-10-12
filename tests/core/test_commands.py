@@ -232,7 +232,7 @@ class BytesOfATransport(Commands):
         self.assertEqual(answered, [(b"z" * 2048, refused("line-too-long")), (b"on", OK)])
         answered = self.fed([b"q" * 4000] + [b"q" * 3000, b"q" * 3000 + b"\n", b"off\r\n"])
         self.assertEqual(answered, [(b"q" * 2048, refused("line-too-long")), (b"off", OK)])
-        answered = self.fed([b"w" * 1000000, b"\r\n", b"status\n"])
+        answered = self.fed([b"w" * 70000, b"\r\n", b"status\n"])
         self.assertEqual(answered[0], (b"w" * 2048, refused("line-too-long")))
         self.assertEqual(answered[1][0], b"status")
 

@@ -5091,3 +5091,64 @@ branch is pushed: there is no remote.
 
 **Resolution.** `.codex/local-task-queue.md` and `.codex/tactic/session.json` of the
 checkout, untracked.
+
+## Seed 07: What the test host has beyond the design's list, and what it takes for misuse
+
+**Question.** The design lists six options for the test host and the misuses it stops. It
+asks for `space` to be tested "with a host that cannot tell", and for a host whose
+`write_open` is `NULL` while `space` answers, and has no option for either. It says each
+new check is "shown to stop the test host", and the core never does what the checks
+stop, so no session can show it. The header lets a host give up a file that is being
+written when `write_open` is called again, while Requirement 19 has the test host stop
+when the core "has two files being written".
+
+**Answer.** Two options more: `--space-unknown`, with which `space` returns -1, and
+`--only-space`, with which only `space` of the seven is there. `--no-storage` makes all
+seven `NULL`, as the design says. Nine invocations more, `odrig_host guard write`,
+`write-none`, `close-none`, `two-files`, `name`, `rename-open`, `remove-open`, `read-at`
+and `read-at-offset`, each of which uses the storage functions as the core never may and
+is stopped with `file misuse`. A second `write_open` while a file is being written is
+misuse for the test host: the core removes or closes a file before it begins another, and
+a host only has to cope with the other case. `read_at` may always start again at
+offset 0, which is how the core begins the check of every upload. The name check covers
+`open` too, in sessions.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host";
+`tests/core/test_content.py`, `StorageGuards`.
+
+## Seed 07: Where `space` and the reply live in the core, and what `storage-error` says for now
+
+**Question.** The design puts `space` into `content.cpp`, which its task list creates
+only in task 4, and leaves the `Reply` in `commands.cpp`, where `content.cpp` cannot
+reach it. `docs/commands.md` is to list only what exists, and the design's sentence for
+`storage-error` speaks of a show and of an upload.
+
+**Answer.** `content.cpp` begins in task 2 with `space`. The `Reply`, with `succeed` and
+`refuse`, moves to `commands.h`, so that `content.cpp` and later `upload.cpp` write
+replies with the same code. `storage.h` holds the three names the core keeps for itself
+and the question whether the host's storage can be changed. Until the commands that
+write exist, `docs/commands.md` gives `storage-error` as what `space` is answered with on
+a board that cannot tell its space, and the test of the command tool that compares the
+tool's commands with the document says that `space` is in the document and not yet in
+the tool.
+
+**Resolution.** `core/src/content.cpp`, `commands.h`, `storage.h`; `docs/commands.md`,
+"Error codes"; `tests/emulator/test_tool.py`,
+`test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The emulator's host: which names it takes, and a host object without storage
+
+**Question.** The emulator "refuses a name with a path separator" and uses a name "only
+when it is one the core may use". A test of seed 03 forbids the emulator to write out the
+name `show.json`, so it cannot list the core's names. The binding is also used with host
+objects that only read.
+
+**Answer.** `FolderHost` takes a name of 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
+and `.` that is not made of dots alone, and refuses every other: such a name has no
+separator and cannot leave the folder. The binding gives the core the seven storage
+functions when the host object has `write_open`, and seven null pointers otherwise.
+`FolderHost.close` stays what the core calls to close the open file; `release` closes
+every file the host holds, at the end of the program.
+
+**Resolution.** `emulator/host.py`; `emulator/binding.py`, `Core.__init__`;
+`docs/emulator.md`, "Starting".

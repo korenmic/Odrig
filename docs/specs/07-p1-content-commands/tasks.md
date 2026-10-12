@@ -70,7 +70,7 @@ Rules for every task:
     is, fails with `line-too-long` in the reply.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 9.6, 13.5, 16.5
 
-- [ ] 2. The host interface for storage, and `space`
+- [x] 2. The host interface for storage, and `space`
   - `core/include/odrig_core.h`: the seven members after `log`, as the design prints them.
     `core/src/storage.h`: the core's names. The command `space`.
   - `tests/core/host/host.cpp`: the seven functions on a folder and on the files of a

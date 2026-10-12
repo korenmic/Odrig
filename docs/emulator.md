@@ -75,7 +75,7 @@ The sizes are those the converter gives with zlib 1.2.12.
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose] [--storage BYTES]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -99,9 +99,17 @@ removes the link to its port and exits with status 0.
 | `--serial-link PATH` | Where the link to the serial port is made. | `build/emulator/serial` under the repository root, whatever folder the command is run from |
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
+| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
 
-There is no option for a size and none for an address: the canvas is the one of
-`mapping.json` in the folder, and the address is always 127.0.0.1.
+There is no option for the size of the canvas and none for an address: the canvas is the
+one of `mapping.json` in the folder, and the address is always 127.0.0.1.
+
+**Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
+the folder it was started on, and on nothing else: a name with a path separator, or one
+that is not made of the characters the core uses for a file name, is refused. For
+`space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
+bytes, or the number given with `--storage`, and as the free space the total less the
+sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
 
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
@@ -589,7 +597,7 @@ which received line is the answer, for a target whose answer is not a reply of
 ## Record mode
 
 ```
-python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH]
+python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]
 ```
 
 Record mode runs the core on a virtual clock, without waiting for real time, and writes
@@ -608,6 +616,7 @@ python -m emulator build/example-show --record build/example.odrr --seconds 60
 | `--seconds S` | The length of the recording. It must be above 0. |
 | `--script FILE` | Timed command lines to give the core. Without it no command is given. |
 | `--core PATH` | Another shared library than `core/build/libodrig_core.dylib`. |
+| `--storage BYTES` | The size of the storage the core is told of, as in real time. |
 
 Recording the same folder with the same length and the same script twice gives the same
 bytes. The emulator gives the core nothing of its own in this mode: only the requests for

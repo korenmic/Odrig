@@ -97,7 +97,7 @@ class Sources(unittest.TestCase):
     def test_there_are_sources_to_check(self):
         names = {path.name for path in core_sources()}
         expected = ("core.cpp", "core_state.h", "reasons.cpp", "reasons.h", "arena.h", "file_source.cpp", "inflate.cpp", "odrg_decoder.cpp",
-                    "json_reader.cpp", "mapping.cpp", "show.cpp", "player.cpp", "commands.cpp", "odrig_core.h")
+                    "json_reader.cpp", "mapping.cpp", "show.cpp", "player.cpp", "commands.cpp", "content.cpp", "content.h", "storage.h", "odrig_core.h")
         for name in expected:
             self.assertIn(name, names)
 
@@ -150,18 +150,29 @@ static int open_file(void *ctx, const char *name) { (void)ctx; (void)name; retur
 static int32_t read_file(void *ctx, uint8_t *buffer, size_t capacity) { (void)ctx; (void)buffer; (void)capacity; return 0; }
 static void close_file(void *ctx) { (void)ctx; }
 static void log_line(void *ctx, const char *text) { (void)ctx; (void)text; }
+static int begin_file(void *ctx, const char *name) { (void)ctx; (void)name; return -1; }
+static int add_bytes(void *ctx, const uint8_t *bytes, size_t length) { (void)ctx; (void)bytes; (void)length; return -1; }
+static int end_file(void *ctx) { (void)ctx; return -1; }
+static int rename_file(void *ctx, const char *from, const char *to) { (void)ctx; (void)from; (void)to; return -1; }
+static int remove_file(void *ctx, const char *name) { (void)ctx; (void)name; return -1; }
+static int tell_space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes) { (void)ctx; *free_bytes = 1; *total_bytes = 2; return 1; }
+static int32_t read_part(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity) {
+    (void)ctx; (void)name; (void)offset; (void)buffer; (void)capacity; return -1;
+}
 static void on_reply(void *ctx, const char *line, size_t line_length, const char *reply, size_t reply_length) {
     (void)ctx; (void)line; (void)line_length; (void)reply; (void)reply_length;
 }
 
 int main(void) {
-    odrig_host host = {0, give, open_file, read_file, close_file, log_line};
+    odrig_host host = {0, give, open_file, read_file, close_file, log_line,
+                       begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];
     const uint8_t bytes[1] = {10};
     odrig_reply_fn answered = on_reply;
-    odrig_core *core = odrig_core_begin(&host);
+    odrig_core *core = odrig_core_begin(plain.write_open == 0 ? &host : &plain);
     uint64_t now = 0;
     uint32_t legs = odrig_core_leg_count(core);
     int produced = odrig_core_poll(core, now);

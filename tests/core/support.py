@@ -200,7 +200,7 @@ def installed(files):
         yield folder
 
 
-Run = collections.namedtuple("Run", "status core memory error legs logs opened lines")
+Run = collections.namedtuple("Run", "status core memory error legs logs opened stored lines")
 Run.__doc__ = """One run of `odrig_host session`.
 
 `core` is "ok" or "null". `memory` is `(bytes, blocks)`: what the core asked the host for
@@ -208,8 +208,22 @@ while it started. `error` is the reason the show is invalid after startup, or `N
 `legs` holds `(leg, pin, LED count)` for each leg. `logs` are the diagnostic texts the core
 gave the host while it started. `opened` holds `(name, result)` for each file the core asked
 the host to open while it started, when the session has the option `--trace-files`.
-`lines` is everything printed after startup.
+`stored` holds the storage calls the core made while it started, each as the text after
+`store `, when the session has the option `--trace-store`. `lines` is everything printed
+after startup.
 """
+
+# The storage of the board and the block of its file system, which the test host and the
+# emulator report space by.
+BOARD_STORAGE = 10354688
+STORAGE_BLOCK = 4096
+
+
+def free_space(files, total=BOARD_STORAGE):
+    """The free bytes a host reports for these files: the total less the size of each file
+    rounded up to a whole block, and not below 0."""
+    used = sum(-(-len(content if isinstance(content, bytes) else content.encode("utf-8")) // STORAGE_BLOCK) * STORAGE_BLOCK for content in files.values())
+    return max(0, total - used)
 
 
 def _script_bytes(script):
@@ -232,6 +246,7 @@ def _run(status, printed):
     legs = []
     logs = []
     opened = []
+    stored = []
     position = 0
     for position, line in enumerate(printed):
         word, _, rest = line.partition(" ")
@@ -240,6 +255,8 @@ def _run(status, printed):
         elif word == "open" and core is None:
             name, _, answer = rest.rpartition(" ")
             opened.append((name, int(answer)))
+        elif word == "store" and core is None:
+            stored.append(rest)
         elif word == "core":
             core = rest
         elif word == "memory":
@@ -253,7 +270,7 @@ def _run(status, printed):
     else:
         position = len(printed)
     lines = printed[position + 1:] if position < len(printed) and printed[position] == "ready" else printed[position:]
-    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), lines)
+    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), tuple(stored), lines)
 
 
 def start(files, script=(), options=(), status=0):
@@ -422,8 +439,10 @@ class ReferencePlayer:
 
     GRID = 20
 
-    def __init__(self, files):
-        """`files` maps the name of each installed file to its content."""
+    def __init__(self, files, storage=BOARD_STORAGE):
+        """`files` maps the name of each installed file to its content. `storage` is the
+        total space the host reports, or None for a host that cannot tell its space."""
+        self.storage = storage
         self.error = None       # the reason the show is invalid, or None
         self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
         self.items = {}         # the items of the show by id
@@ -439,6 +458,7 @@ class ReferencePlayer:
         self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
         self.unfinished = b""   # the bytes of a transport since the last newline
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
+        self.files = content    # the files of the folder by name
         try:
             start = self._check(content)
         except _Invalid as invalid:
@@ -533,7 +553,7 @@ class ReferencePlayer:
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
     LINE_MAX = 2048
-    COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0}
+    COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0, b"space": 0}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255)}
 
     def command(self, now, line):
@@ -548,6 +568,8 @@ class ReferencePlayer:
             return b'{"ok":false,"error":"' + code.encode("ascii") + b'"}\n'
         if line == b"status":
             return self._status(now)
+        if line == b"space":
+            return self._space()
         return b'{"ok":true}\n'
 
     def _obey(self, line):
@@ -576,9 +598,17 @@ class ReferencePlayer:
             self._play(value)
         elif name == b"brightness":
             self.brightness = value
+        elif name == b"space":
+            if self.storage is None:
+                return "storage-error"
         elif name != b"status":
             self.on = name == b"on"
         return None
+
+    def _space(self):
+        animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)
+        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations}
+        return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def _status(self, now):
         second = (now - self.t0) // 1000
