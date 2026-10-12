@@ -12,7 +12,7 @@ from . import ROOT
 
 SOURCES = ROOT / "firmware" / "standalone" / "src"
 PROGRAM = ROOT / "tests" / "firmware" / "host" / "host.cpp"
-PARTS = ("settings.cpp",)
+PARTS = ("settings.cpp", "limit.cpp")
 FLAGS = ("-std=c++11", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-g")
 
 _folder = tempfile.TemporaryDirectory()
@@ -51,3 +51,13 @@ def settings(config, secrets):
     found["password"] = bytes.fromhex(found["password"])
     return found
 
+
+def limit(maximum, outputs):
+    """What the limiter does to the outputs of one refresh, each given as its bytes,
+    three for an LED. The outputs come back as bytes."""
+    given = f"maximum {maximum}\noutputs {len(outputs)}\n".encode()
+    for output in outputs:
+        given += f"{len(output) // 3}\n".encode() + output
+    found = run("limit", given)
+    found["outputs"] = [bytes.fromhex(output) for output in found["outputs"]]
+    return found

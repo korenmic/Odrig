@@ -95,7 +95,7 @@ Rules for every task:
     length, gives a network.
   - Requirements: 4.1, 4.3, 4.4, 6.1
 
-- [ ] 4. The limiter
+- [x] 4. The limiter
   - `firmware/standalone/src/limit.h` and `limit.cpp`, without Arduino; the host program
     gains it.
   - Tests: the reference in Python from R6 and R7 of the design, and the cases the design
