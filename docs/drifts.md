@@ -3872,3 +3872,52 @@ needs no library, and `python3` of 3.10 or later is what the page asks for anywa
 reported to the owner with this seed's hand-over.
 
 **Resolution.** `docs/getting-started.md`, "Run the tests".
+
+## Seed 10: Where the onboarding files live, and the Windows contributor
+
+**Question.** While task 5 was being done the owner added four things, which reached this
+run through the session that coordinates it. The onboarding files are a workstream of
+their own and live in a folder `agent/` at the top of the repository, with
+`agent/README.md` as the page a newcomer begins with; `AGENTS.md` and `CLAUDE.md` stay at
+the top, short, and point into the folder. A second contributor works on a Windows
+computer; making the emulator and the tools run there is seed 11 and that contributor's
+first job. The repository has a remote, `https://github.com/korenmic/Odrig`, and the rule
+for several contributors is to be made concrete for it. Hello world and DVD bounce are
+proof-of-concept animations and are presented as test content only. The spec has the pages
+under `docs/`, names no remote, and several points of the new work it does not settle.
+
+**Answer.**
+
+- The four pages moved with `git mv` to `agent/`, and `agent/README.md` is new: what the
+  project is, the reading order, and what each file of the folder is for. `AGENTS.md`
+  keeps the table from tasks to documents and the rules, because an agent that reads only
+  that file has to know both; it gives up the commands of the setup, which the
+  getting-started page has. Where this spec's requirements and design name a page under
+  `docs/`, read `agent/`. Those two files are not edited; `tasks.md` has the work as
+  task 6, and the final check is task 7.
+- The address of the remote stands in the pages, in `docs/decisions.md` and in the tests,
+  because the owner gave it to be written there. Requirement 7 criterion 5, which keeps
+  persons and paths of somebody's computer out of the pages, is read as not concerning
+  the address of the repository.
+- Seeds 11 and 12 are on `master` and not on this branch, and the session's permissions
+  did not allow this branch to be brought up to date with `master`. The pages name the
+  folder of seed 11 as the owner said. The quick suite takes that one path as present when
+  `master`, here or on the remote, holds it, and `AGENTS.md` names seeds 11 and 12 under
+  "What is coming", so that its test holds once the branches meet. The suites have not run
+  on the two branches together: whoever merges runs them on the result.
+- `.gitattributes` on `master` has git keep the additions of both sides in this file. The
+  same line is added on this branch, so that what the working rules say of it is so here
+  and a test can check it. Two identical additions merge without a conflict.
+- The setup on Windows is given as a block that the walk-through does not run, and the
+  page says that none of it has been tried there. How Python is started on Windows is
+  left to seed 11.
+- `docs/decisions.md` said that there is no remote. It now names the remote, the folder
+  and the contributor on Windows, and has one more entry at the end of its change log;
+  the entry that task 2 of this seed added is left as it was.
+- The commands that reach the remote, the clone, `git fetch` and `git push`, were not run
+  from this worktree, whose session does not touch the remote. The quick suite checks only
+  that they are commands of git that it knows.
+
+**Resolution.** `agent/README.md` and the four pages beside it; `AGENTS.md`; `README.md`;
+`docs/decisions.md`, "Scope and process" and the change log; `.gitattributes`;
+`tests/onboarding/` and `tests/walkthrough/`; seed 10 `tasks.md`, task 6.

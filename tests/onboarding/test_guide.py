@@ -8,7 +8,7 @@ from odrig.generators import dense, dvd_bounce, hello_world
 
 from . import support
 
-PAGE = "docs/animation-guide.md"
+PAGE = "agent/animation-guide.md"
 
 HEADINGS = (
     "Two ways to make an animation",
@@ -62,6 +62,8 @@ class Guide(unittest.TestCase):
         examples = [block for block in support.blocks(self.text) if block.mark == "python"]
         self.assertEqual([block.heading for block in examples], ["A generator"])
         self.assertIn(f"`{EXAMPLE}`", self.part("A generator"))
+        self.assertIn("write proof-of-concept animations: test content, not examples of finished work", flat(self.part("A generator")))
+        self.assertIn("are test content", flat(self.part("Where things go")))
         self.assertFalse((support.ROOT / EXAMPLE).exists())
         module = {"__name__": "odrig.generators.dot", "__package__": "odrig.generators"}
         exec(compile(examples[0].body, EXAMPLE, "exec"), module)
@@ -118,7 +120,7 @@ class Guide(unittest.TestCase):
 
     def test_it_gives_the_limit_of_a_hosting_service_and_the_question_that_is_open(self):
         sizes = flat(self.part("How large sources get"))
-        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "[open question](decisions.md#open-questions)", "1,210 bytes"):
+        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "[open question](../docs/decisions.md#open-questions)", "1,210 bytes"):
             self.assertIn(phrase, sizes)
         self.assertIn("Whether large video-derived JSON sources are tracked as they are", flat(support.read("docs/decisions.md")))
         self.assertIn("| 1,210 |", support.read("docs/emulator.md"))

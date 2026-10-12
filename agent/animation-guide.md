@@ -48,10 +48,11 @@ if __name__ == "__main__":
 
 `picture` makes a black picture and sets the places it is given: a place is (x, y), and a
 colour is three bytes, red, green and blue. `run` reads the mapping file, calls `frames`
-and writes the source. `odrig/generators/dvd_bounce.py` is the shortest generator to read
-as a model, and the tests of a new one go into `tests/converter/test_generators.py`. Saved
-as `odrig/generators/dot.py`, the module above is started like the generators that are
-there. This writes the bouncing square for the target:
+and writes the source. Saved as `odrig/generators/dot.py`, the module is started like the
+generators that are there, and its tests go into `tests/converter/test_generators.py`. The
+generators that are there write proof-of-concept animations: test content, not examples of
+finished work. `odrig/generators/dvd_bounce.py` is the shortest to read for how one is
+built. This writes its bouncing square for the target:
 
 ```sh
 mkdir -p build/try/sources
@@ -73,7 +74,7 @@ shape of the canvas: `fill`, the default, covers the canvas and cuts off what ov
 distorts it. `--start` and `--duration` take a part of the file: with
 `--start 12.5 --duration 4`, four seconds from 12.5 seconds on. Sound is ignored, and a
 video that was filmed upright on a phone has to be turned before it is imported.
-[converter.md](converter.md#import) has the rest.
+[converter.md](../docs/converter.md#import) has the rest.
 
 ## Check a source
 
@@ -109,7 +110,7 @@ printf '{"version": 1, "brightness": 128, "items": [{"id": 1, "file": "clip.odrg
 
 `build/try/show` is then an installed file set. `pack` refuses a source made for another
 canvas, and a folder that is not empty: remove `build/try/show` before you pack again.
-[show.md](show.md) describes show files, with more items and with cycles.
+[show.md](../docs/show.md) describes show files, with more items and with cycles.
 
 ## Look at it in the emulator
 
@@ -154,8 +155,8 @@ It prints one line that begins with `reply 1000`, as in getting started. In it,
 
 `pack` makes `NAME.odrg` from `NAME.json`, so name a source in lower-case letters, digits,
 `-` and `_`, at most 27 characters. The two tracked sources, `animations/hello.json` and
-`animations/dvd.json`, are what two generators write for the bench build. Commit on your
-own branch and by named paths, as [working-rules.md](working-rules.md) says.
+`animations/dvd.json`, are test content: what two generators write for the bench build.
+Commit on your own branch and by named paths, as [working-rules.md](working-rules.md) says.
 
 ## How large sources get
 
@@ -181,7 +182,7 @@ demo show is 1,210 bytes, and the dense clip 1.4 MB.
 The large hosting services for git refuse a single file above 100 MB and warn above 50 MB.
 Keep every source at 50 MB or less, which is a minute of video at 25 pictures a second,
 and cut a longer piece into several animations with `--start` and `--duration`. Whether
-sources of such sizes are tracked at all is an [open question](decisions.md#open-questions)
+sources of such sizes are tracked at all is an [open question](../docs/decisions.md#open-questions)
 for the owner.
 
 ## Dense animations on the board
@@ -196,4 +197,4 @@ To pack a show that way, give `pack` the option `--uncompressed`: it then writes
 animation of the show without compression. Animations that are not dense, such as those of
 the demo show, play at 50 refreshes a second in either form and are far smaller compressed,
 which is what `pack` does without the option. The figures are in
-[firmware.md](firmware.md#verified-on-the-board) and [format.md](format.md#measured-sizes).
+[firmware.md](../docs/firmware.md#verified-on-the-board) and [format.md](../docs/format.md#measured-sizes).

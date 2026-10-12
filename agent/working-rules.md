@@ -22,7 +22,7 @@ are explained in [vocabulary.md](vocabulary.md).
   seed's state to `in_progress` and the last sets it to `completed`.
 - **A question met on the way is answered, not asked.** When a seed, a spec or a document
   leaves a point open, or two of them disagree, decide it yourself and add an entry at the
-  end of [drifts.md](drifts.md): the heading `## Seed <number>: <subject>`, then
+  end of [drifts.md](../docs/drifts.md): the heading `## Seed <number>: <subject>`, then
   **Question.**, **Answer.** and **Resolution.**, which names the file that now carries
   the answer. If the question shows a gap in a document that defines the project, say so in
   the entry; your answer then holds until the owner rules. What the section
@@ -35,7 +35,7 @@ are explained in [vocabulary.md](vocabulary.md).
   message or a comment. Say it in the hand-over at the end of your work, and keep saying
   it until the owner turns it down or it has become a seed.
 
-What has been decided is in [decisions.md](decisions.md), each decision as it stands now.
+What has been decided is in [decisions.md](../docs/decisions.md), each decision as it stands now.
 
 ## How commits are made
 
@@ -68,15 +68,15 @@ words and wait for the answer.
 
 - **Every addition to the command list.** There is one list of commands for every way a
   command can travel, and a command is added to all of them or to none.
-- **Anything that changes a decision** in [decisions.md](decisions.md).
+- **Anything that changes a decision** in [decisions.md](../docs/decisions.md).
 - **Anything about hardware or power**: wiring, the power supply, the limit that WLED puts
   on the current, which LEDs are connected. Wiring and power are handled on site by the
   operators and are not this project's work.
 
 Some checks need a person, because only a person sees what the LEDs do or holds a phone
 that has joined the board's network. The documents list them as the owner's checks, in
-[firmware.md](firmware.md#the-owners-checks), and as the check list by eye, in
-[emulator.md](emulator.md#the-check-list-by-eye). An agent leaves such a check open and
+[firmware.md](../docs/firmware.md#the-owners-checks), and as the check list by eye, in
+[emulator.md](../docs/emulator.md#the-check-list-by-eye). An agent leaves such a check open and
 says so.
 
 ## If you have a board
@@ -98,12 +98,12 @@ one. For anyone who has:
    `brightness` of 40 or less in its `show.json`. The tracked shows have 128: pack a copy
    with a lower value. The tool does not check this.
 5. **The flash is written only by `firmware/fw.py`**, which touches only the regions that
-   [firmware.md](firmware.md#the-regions-of-the-flash) lists. The whole flash is never
+   [firmware.md](../docs/firmware.md#the-regions-of-the-flash) lists. The whole flash is never
    erased, and no fuse of the chip is ever written.
 6. **The firmware is built only as `python3 firmware/fw.py build` builds it.** A build of
    the whole firmware with other compiler settings once left the board silent on USB.
 7. **A board that stops answering needs a person**: the cable is pulled and put back by
-   hand, and no program can do that. [firmware.md](firmware.md#verified-on-the-board) has
+   hand, and no program can do that. [firmware.md](../docs/firmware.md#verified-on-the-board) has
    the steps that follow.
 8. **A person joins a computer to the board's Wi-Fi network**, not an agent, and an agent
    does not change WLED's settings.
@@ -119,23 +119,38 @@ What was measured on the board, with the firmware making twenty outputs: the dem
 refreshed 50 times a second, and a clip of 60 x 60 in which every LED changes at every
 frame 36 to 42 times when its file is compressed and 45 to 47 times when it is not. The
 emulator refreshes 50 times a second whatever plays, so it says nothing about the rate on
-the board. The figures are in [firmware.md](firmware.md#verified-on-the-board).
+the board. The figures are in [firmware.md](../docs/firmware.md#verified-on-the-board).
 
 ## Several contributors at once
 
-- **Each contributor has a checkout and a branch of their own.** Two contributors never
-  work in one checkout: it has one checked-out branch, and when one of them switches it,
-  the other's next commit lands on the wrong branch. Before you commit, see that
-  `git branch --show-current` names your branch.
-- **Nothing is committed directly on `master`.** It only receives merges.
-- **A branch is brought up to date with `master` before it is merged**, by merging
-  `master` into it or by rebasing it.
-- **A branch is merged only with every suite that needs no board passing** on the
-  up-to-date branch.
-- **Two files are added to at the end only**: [drifts.md](drifts.md), and the change log
-  that ends [decisions.md](decisions.md). An entry that is there is not edited or moved; a
-  later finding is a new entry that names the earlier one. When your branch and `master`
-  have both added at the end, keep both additions, those of `master` first.
+The repository has a remote, `https://github.com/korenmic/Odrig`, which is private. Each
+contributor works in a clone of their own, and the work meets on `master` of the remote.
+
+1. **Clone, and make a branch of your own**:
+   `git clone https://github.com/korenmic/Odrig.git`, then `git switch -c <your-branch>`.
+   Two contributors never work in one checkout: it has one checked-out branch, and when
+   one of them switches it, the other's next commit lands on the wrong branch.
+2. **Commit on your branch.** Nothing is committed directly on `master`. Before a commit,
+   see that `git branch --show-current` names your branch.
+3. **Before you merge, bring your branch up to date**: `git fetch origin`, then
+   `git merge origin/master` on your branch.
+4. **Run every suite that works on your computer** on the up-to-date branch. A branch is
+   merged only when all of them pass. Without a board that is every suite that needs no
+   board; on Windows it is the suites that run there.
+5. **Then merge into `master` and push**: `git switch master`,
+   `git merge --ff-only origin/master`, `git merge <your-branch>` and
+   `git push origin master`. If the push is refused because `master` has moved on, go
+   back to step 3.
+6. **Never rewrite history that has been pushed**: no forced push, and no rebase or
+   amendment of a commit that is on the remote.
+7. **Two files are added to at the end only**: [drifts.md](../docs/drifts.md), and the
+   change log that ends [decisions.md](../docs/decisions.md). An entry that is there is
+   not edited or moved; a later finding is a new entry that names the earlier one. For
+   the drift log, `.gitattributes` has git keep the additions of both sides of a merge by
+   itself. In the change log, keep both by hand, those of `master` first.
+8. **A seed's number is chosen after fetching.** A seed is still one folder and one
+   commit. Run `git fetch origin` and look at `project-seeds/` as `origin/master` has it
+   before you take the next free number, so that two contributors do not take the same.
 
 ## The owner's workflow skills
 

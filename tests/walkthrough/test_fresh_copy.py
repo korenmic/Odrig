@@ -15,7 +15,7 @@ Followed = collections.namedtuple("Followed", "page followed left_out")
 # headings whose commands are run, in the order of the page, and the headings whose
 # commands are not run, each with the reason.
 START = Followed(
-    "docs/getting-started.md",
+    "agent/getting-started.md",
     ("Set up", "Run the tests", "Pack the demo show", "Check it without a screen"),
     {
         "Suites that need more": "the firmware tool's suite fetches its build tools, one suite is this one, and two need the board",
@@ -23,7 +23,7 @@ START = Followed(
     },
 )
 GUIDE = Followed(
-    "docs/animation-guide.md",
+    "agent/animation-guide.md",
     ("A generator", "An import", "Check a source", "Pack it into a show", "Check it without a screen"),
     {
         "Look at it in the emulator": "it needs somebody to look at the page",

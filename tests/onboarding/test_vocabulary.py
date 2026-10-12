@@ -3,7 +3,7 @@ import unittest
 
 from . import support
 
-PAGE = "docs/vocabulary.md"
+PAGE = "agent/vocabulary.md"
 
 GROUPS = ("The installation", "What is played", "The programs", "How the work is organised")
 

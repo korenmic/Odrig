@@ -9,16 +9,16 @@ legs of three flat strips, 60 x 6.
 
 Read these four pages first, in this order:
 
-1. [docs/getting-started.md](docs/getting-started.md) takes you from a fresh clone to the
+1. [agent/getting-started.md](agent/getting-started.md) takes you from a fresh clone to the
    demo show playing in the emulator on your own computer. It needs no board.
-2. [docs/vocabulary.md](docs/vocabulary.md) says what the project's words mean.
-3. [docs/animation-guide.md](docs/animation-guide.md) shows how to make an animation and
+2. [agent/vocabulary.md](agent/vocabulary.md) says what the project's words mean.
+3. [agent/animation-guide.md](agent/animation-guide.md) shows how to make an animation and
    try it without the board.
-4. [docs/working-rules.md](docs/working-rules.md) has the rules that bind every change.
+4. [agent/working-rules.md](agent/working-rules.md) has the rules that bind every change.
    Read it before you change anything.
 
-The rest of this page names the reference documents. Coding agents start at
-[AGENTS.md](AGENTS.md).
+[agent/README.md](agent/README.md) introduces these pages. The rest of this page names
+the reference documents. Coding agents start at [AGENTS.md](AGENTS.md).
 
 ## Workstreams
 
@@ -40,8 +40,9 @@ The rest of this page names the reference documents. Coding agents start at
   Android app for operators.
 - **Tests** — automated checks for the mapping, the formats, the converters and playback.
 - **Git repo** — this repository: its structure, history and workflow.
-- **Agent files** — documents, policies and skills that tell coding agents what this project
-  is and how to work in it.
+- **Agent files** — the pages in the folder [agent/](agent/) that tell coding agents and new
+  contributors what this project is and how to work in it, with `AGENTS.md` and `CLAUDE.md`
+  at the top of the repository as the way in.
 
 Hardware and power wiring are not a workstream: they are handled on site by the operators.
 

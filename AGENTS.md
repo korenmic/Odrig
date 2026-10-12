@@ -5,36 +5,25 @@ you do anything else.
 
 ## What this is
 
-odrig is the LED animation system of an art installation. A small board, an ESP32-S3,
-drives a canvas of 60 x 60 LEDs and plays animations that are stored on it. This repository
-holds everything between a video or an idea and what the LEDs show:
-
-- the **converter**, `odrig/`: Python. It turns a video or a GIF into a source that git
-  tracks, a source into the file that is played, and a list of animations into a show;
-- the **core**, `core/`: C++. It is the player, the one piece of code that runs both on the
-  board and on a computer;
-- the **emulator**, `emulator/`: Python, on macOS. It runs the core on a computer and
-  draws every LED in a web page, so a show can be tried without the board;
-- the **command tool**, `odrigctl/`: Python. It sends commands, such as play or
-  brightness, to the emulator or to the board;
-- the **firmware tool**, `firmware/`: Python. It builds the program for the board, puts
-  it there and installs a show.
-
-Only the firmware tool needs the board. Most work, and all work on animations, needs none.
+odrig is the LED animation system of an art installation: a small board drives a canvas of
+60 x 60 LEDs and plays animations that are stored on it. This repository holds the tools
+that make the animations, the player, an emulator that shows them without the board, and
+the program for the board. The pages for newcomers are in the folder `agent/`.
 
 ## Read first
 
-1. [docs/vocabulary.md](docs/vocabulary.md): what the project's words mean. The other
+1. [agent/README.md](agent/README.md): what the project is and what its parts are.
+2. [agent/vocabulary.md](agent/vocabulary.md): what the project's words mean. The other
    documents use them without explaining them.
-2. [docs/working-rules.md](docs/working-rules.md): the rules below, in full.
-3. [docs/getting-started.md](docs/getting-started.md), when this clone is not set up yet:
-   what the computer needs, the setup, the tests, and the demo show in the emulator.
+3. [agent/working-rules.md](agent/working-rules.md): the rules below, in full.
+4. [agent/getting-started.md](agent/getting-started.md), when this clone is not set up
+   yet: what the computer needs, the setup, the tests, and the demo show in the emulator.
 
 ## Then read, by task
 
 | Your task | Read |
 |---|---|
-| Make or change an animation or a show | [docs/animation-guide.md](docs/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
+| Make or change an animation or a show | [agent/animation-guide.md](agent/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
 | Change the converter | [docs/converter.md](docs/converter.md), [docs/format.md](docs/format.md), [docs/reasons.md](docs/reasons.md) |
 | Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
@@ -45,13 +34,13 @@ Only the firmware tool needs the board. Most work, and all work on animations, n
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
 for your subject; do not read it through. Planned work is in `project-seeds/`, one folder
 for each seed, and the specs made from the seeds are in `docs/specs/`. The tests are in
-`tests/`, one folder for each suite.
+`tests/`, one folder for each suite; the getting-started page has the command of each.
 
 ## Rules you may not break
 
-1. **Your own branch, your own checkout.** Never commit on `master`, and never work in a
-   checkout that another contributor uses. Before a commit, `git branch --show-current`
-   names your branch.
+1. **Your own branch, your own clone.** Never commit on `master` directly, and never work
+   in a checkout that another contributor uses. Before a commit,
+   `git branch --show-current` names your branch.
 2. **One task, one commit.** The commit also ticks the task's checkbox in its `tasks.md`.
 3. **Stage named paths only.** Never `git add -A`, `git add .`, `git add -u` or
    `git commit -a`. After a commit, read `git show --stat`.
@@ -68,10 +57,12 @@ for each seed, and the specs made from the seeds are in `docs/specs/`. The tests
 9. **What you leave open, you tell the owner in words.** A note in a file does not count.
 10. **`docs/drifts.md` and the change log of `docs/decisions.md` are added to at the end
     only.**
-11. **Any refresh rate from 20 to 50 a second on the board is acceptable.** Do no work to
+11. **Before you merge, bring your branch up to date with `origin/master`** and run every
+    suite that works on your computer. Never rewrite history that has been pushed.
+12. **Any refresh rate from 20 to 50 a second on the board is acceptable.** Do no work to
     raise a rate inside that range.
 
-[docs/working-rules.md](docs/working-rules.md) has each of these with its reason.
+[agent/working-rules.md](agent/working-rules.md) has each of these with its reason.
 
 ## Never touch
 
@@ -95,28 +86,27 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 - Anything about hardware or power.
 - A check that only a person can make: what the LEDs show, or what a phone gets.
 
-## Commands you will use
+## If you work on Windows
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-make -C core shared
-.venv/bin/python -m unittest discover -s tests/converter -t .
-make -C core test
-.venv/bin/python -m unittest discover -s tests/emulator -t .
-.venv/bin/python -m unittest discover -s tests/onboarding -t .
-```
+Only a part of the project works on Windows today:
 
-The first three set up a clone, once, on a Mac. The other four are the suites that need no
-board. All are run from the repository root. You cannot look at the emulator's page: check
-a show in the emulator's record mode, as "Check it without a screen" in
-[docs/getting-started.md](docs/getting-started.md) shows.
+- The converter is written to run there, and so is its suite. Both have been run on macOS
+  only.
+- The emulator and the command tool run on macOS only.
+- The firmware tool and the board stay with the first computer.
+
+Making the emulator and the tools run on Windows is seed 11,
+`project-seeds/11-p0-emulator-and-tools-on-windows/`. It is the first job of the
+contributor on Windows: take it through its spec, its tasks and their implementation, on
+the Windows computer. [agent/getting-started.md](agent/getting-started.md#on-windows) has
+the setup on Windows as far as it is known.
 
 ## What is coming
 
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
+- **The emulator and the tools on Windows**, seed 11, as the section above says.
 - **A converter in JavaScript**, seed 06. It is to become the converter people use, from
   the command line and inside the apps. The Python tool stays as the reference that tests
   compare it with. Today the Python tool is the converter.
@@ -126,9 +116,9 @@ present, and do not build on them.
   Today the board's network has the defaults of WLED; see [docs/wifi.md](docs/wifi.md).
 - **An app for the operators, for Android**, seed 09. The first notes are in
   [docs/android-app.md](docs/android-app.md).
+- **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 
-Seeds 03, 04 and 05 are built and still `in_progress`: they wait for checks on the board
-or by a person.
+The state of every seed is in the `state.json` of its folder.
 
 ## The owner's workflow
 

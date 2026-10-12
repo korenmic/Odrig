@@ -4,7 +4,8 @@ import unittest
 
 from . import support
 
-PAGE = "docs/working-rules.md"
+PAGE = "agent/working-rules.md"
+REMOTE = "https://github.com/korenmic/Odrig"
 DECISIONS = "docs/decisions.md"
 CHANGE_LOG = "\n## Change log\n"
 
@@ -88,9 +89,18 @@ class WorkingRules(unittest.TestCase):
 
     def test_it_says_how_several_contributors_work_at_once(self):
         several = self.part("Several contributors at once")
-        for phrase in ("a checkout and a branch of their own", "Nothing is committed directly on `master`", "brought up to date with `master` before it is merged",
-                       "merged only with every suite that needs no board passing", "added to at the end only", "keep both additions"):
+        self.assertEqual(re.findall(r"(?m)^([0-9]+)\. \*\*", support.section(self.text, "Several contributors at once")), [str(number) for number in range(1, 9)])
+        for phrase in (f"`{REMOTE}`", f"`git clone {REMOTE}.git`", "`git switch -c <your-branch>`", "Two contributors never work in one checkout",
+                       "Nothing is committed directly on `master`", "`git fetch origin`", "`git merge origin/master`", "Run every suite that works on your computer",
+                       "merged only when all of them pass", "`git merge <your-branch>`", "`git push origin master`", "Never rewrite history that has been pushed",
+                       "added to at the end only", "keep both by hand, those of `master` first", "A seed's number is chosen after fetching",
+                       "one folder and one commit"):
             self.assertIn(phrase, several)
+
+    def test_the_drift_log_keeps_the_additions_of_both_sides_of_a_merge(self):
+        self.assertIn("`.gitattributes` has git keep the additions of both sides of a merge", self.part("Several contributors at once"))
+        attributes = (support.ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+        self.assertIn("docs/drifts.md merge=union", attributes)
 
     def test_it_says_what_the_workflow_skills_are_and_that_they_are_not_needed(self):
         skills = self.part("The owner's workflow skills")
@@ -108,18 +118,22 @@ class Decisions(unittest.TestCase):
     def test_the_rule_for_several_contributors_stands_in_place_of_the_rule_of_one(self):
         process = flat(self.sections.split("\n## Scope and process\n")[1].split("\n## ")[0])
         self.assertNotIn("All work is committed directly on `master`", process)
+        self.assertNotIn("There is no remote yet", process)
         for phrase in ("Several contributors work at once", "Each works on a branch of their own", "nothing is committed directly on `master`",
                        "brought up to date with `master` before it is merged", "only with every test suite that needs no board passing",
-                       "only ever added to at the end", "[working-rules.md](working-rules.md)"):
+                       "only ever added to at the end", f"The remote is `{REMOTE}`, a private repository", "is never rewritten",
+                       "[working-rules.md](../agent/working-rules.md)"):
             self.assertIn(phrase, process)
 
     def test_the_decisions_say_that_the_repository_carries_the_vocabulary_and_the_rules(self):
         process = flat(self.sections.split("\n## Scope and process\n")[1].split("\n## ")[0])
         self.assertNotIn("will carry", process)
-        self.assertIn("carries a vocabulary, [vocabulary.md](vocabulary.md), and the working rules", process)
+        for phrase in ("in the folder `agent/`", "a vocabulary, [vocabulary.md](../agent/vocabulary.md), and the working rules",
+                       "A second contributor works on a Windows computer", "is seed 11"):
+            self.assertIn(phrase, process)
 
     def test_the_change_log_has_the_new_rule_after_the_rule_of_one_and_only_grows_at_its_end(self):
-        self.assertGreaterEqual(len(self.entries), 14)
+        self.assertGreaterEqual(len(self.entries), 15)
         dates = [date for date, _ in self.entries]
         self.assertEqual(dates, sorted(dates))
         entries = [flat(entry) for _, entry in self.entries]
@@ -130,6 +144,11 @@ class Decisions(unittest.TestCase):
         self.assertLess(of_one[0], of_several[0])
         for phrase in ("a branch for each contributor", "added to at the end only"):
             self.assertIn(phrase, entries[of_several[0]])
+        of_the_remote = [position for position, entry in enumerate(entries) if entry.startswith("The repository has a remote")]
+        self.assertEqual(len(of_the_remote), 1)
+        self.assertLess(of_several[0], of_the_remote[0])
+        for phrase in (f"`{REMOTE}`", "the folder `agent/`", "a Windows computer", "seed 11"):
+            self.assertIn(phrase, entries[of_the_remote[0]])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 # Getting started
 
 From a fresh clone to the demo show playing in the emulator. Nothing on this page needs the
-board. The project's words are explained in [vocabulary.md](vocabulary.md).
+board. The project's words are explained in [vocabulary.md](vocabulary.md). On a Windows
+computer read [On Windows](#on-windows) first.
 
 ## What you need
 
@@ -14,21 +15,41 @@ board. The project's words are explained in [vocabulary.md](vocabulary.md).
 - **A network connection** for the setup, once.
 - **Safari or Chrome**, to look at the emulator's page.
 
-On Windows and Linux only the converter is meant to work: it is written to run there, and
-so is its suite, but it has been run on macOS only. There you can do the first two commands
-of the setup, run the converter's suite, and make, check and pack animations. You cannot
-build the core or run the emulator.
+## On Windows
+
+Only a part of the project works on Windows today, and none of it has been tried there:
+
+| What | On Windows today |
+|---|---|
+| The converter and its suite | Written to run there. They have been run on macOS only. |
+| The core's build, the emulator, the command tool | macOS only. |
+| The firmware tool and the board | They stay with the first computer. |
+
+Making the emulator and the tools run on Windows is seed 11,
+`project-seeds/11-p0-emulator-and-tools-on-windows/`. It is the first job of the
+contributor on Windows, who takes it through its spec, its tasks and their implementation
+on the Windows computer. Until then this is the setup as far as it is known. It needs git
+and Python 3.10 or later, and `python` stands for however that Python is started:
+
+```text
+git clone https://github.com/korenmic/Odrig.git
+cd Odrig
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m unittest discover -s tests/converter -t .
+```
+
+With that, the commands of the converter on this page and in the animation guide are the
+same, with `.venv\Scripts\python` in place of `.venv/bin/python`: the generators, `import`,
+`check` and `pack`. Everything else, from `make -C core shared` on, is what seed 11
+provides: the core's build, the other suites, the emulator, its record mode and the
+command tool. Linux is in the same position, and nobody has tried it.
 
 ## Set up
 
-Clone the repository from the address the owner gave you, and go into its folder:
-
-```text
-git clone <address of the repository> odrig
-cd odrig
-```
-
-Every command of this repository is run from that folder, the repository root.
+Clone the repository, which is private, with
+`git clone https://github.com/korenmic/Odrig.git`, and go into its folder, `Odrig`. Every
+command of this repository is run from that folder, the repository root.
 
 ```sh
 python3 -m venv .venv
@@ -40,9 +61,8 @@ The first command makes a Python environment in the folder `.venv`. The second p
 libraries into it, numpy, Pillow and PyAV, which the converter needs to read videos and
 GIFs. The third builds the core as the library the emulator loads,
 `core/build/libodrig_core.dylib`. Git ignores both folders, `.venv/` and `core/build/`.
-
 `.venv/bin/python` is the Python for every command of this repository. The other documents
-write it as `python`. On Windows it is `.venv\Scripts\python`.
+write it as `python`.
 
 ## Run the tests
 
@@ -70,9 +90,9 @@ The firmware tool has a suite that needs no board:
 python3 firmware/fw.py test
 ```
 
-It runs the tests in `tests/firmware`. The first time any command of that tool runs, the
-tool fetches WLED's source and installs its build tools into `build/firmware/`: about
-260 MB, over the network. Run it when you work on the firmware or on its tool.
+It runs the tests in `tests/firmware`. The first time any command of that tool runs, it
+fetches WLED's source and its build tools into `build/firmware/`: about 260 MB, over the
+network. Run it when you work on the firmware or on its tool.
 
 One suite, `tests/walkthrough`, follows this page and the animation guide in a fresh copy
 of the repository, to see that their commands still work:
@@ -81,22 +101,22 @@ of the repository, to see that their commands still work:
 .venv/bin/python -m unittest discover -s tests/walkthrough -t .
 ```
 
-It clones the repository into a temporary folder, sets it up there as this page says, which
-needs the network, runs the four suites above, packs the demo show and checks it, and then
-makes, imports and packs an animation as the guide says. It takes about four minutes. Run
-it when you have changed one of the two pages or a command they give.
+It sets up a clone in a temporary folder as this page says, which needs the network, runs
+the four suites above, packs and checks the demo show, and makes an animation as the guide
+says. It takes about four minutes. Run it when you have changed either page.
 
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
 `tests/air`. Before either, read "If you have a board" in
-[working-rules.md](working-rules.md#if-you-have-a-board) and [firmware.md](firmware.md).
+[working-rules.md](working-rules.md#if-you-have-a-board) and [firmware.md](../docs/firmware.md).
 
 ## Pack the demo show
 
-The demo show, `shows/demo-20/show.json`, is made for the target: Hello world, a square
-that bounces, and a cycle that plays the two in turn, 15 seconds each, from power-on. Its
-two sources are not tracked. Two generators write them, and `pack` turns them and the show
-file into an installed file set:
+The demo show, `shows/demo-20/show.json`, is test content for the target and not finished
+work: two proof-of-concept animations, the words HELLO WORLD and a square that bounces, and
+a cycle that plays the two in turn, 15 seconds each, from power-on. Its two sources are not
+tracked. Two generators write them, and `pack` turns them and the show file into an
+installed file set:
 
 ```sh
 mkdir -p build/demo-20/sources
@@ -146,8 +166,8 @@ Each prints the reply. The first one's is:
 ```
 
 The page shows every command in its log as it arrives. Stop the emulator with Ctrl-C in
-its terminal. [commands.md](commands.md) has the five commands and
-[emulator.md](emulator.md) everything about the emulator and its page.
+its terminal. [commands.md](../docs/commands.md) has the five commands and
+[emulator.md](../docs/emulator.md) everything about the emulator and its page.
 
 ## Check it without a screen
 
@@ -167,14 +187,14 @@ reply 1000 {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps"
 
 `"error":null` says the show is valid, `"playing":3` that item 3, the cycle, is playing,
 and `"animation":1` that Hello world is on the LEDs. With a show that is not valid, `error`
-holds the reason, such as `file-missing dvd.odrg`; [reasons.md](reasons.md) lists them.
+holds the reason, such as `file-missing dvd.odrg`; [reasons.md](../docs/reasons.md) lists them.
 The record file holds the colour of every LED at every refresh;
-[emulator.md](emulator.md#record-mode) describes it.
+[emulator.md](../docs/emulator.md#record-mode) describes it.
 
 ## What to read next
 
 - [animation-guide.md](animation-guide.md), to make an animation and try it here.
 - [working-rules.md](working-rules.md), before you change anything.
-- [converter.md](converter.md), [format.md](format.md) and [show.md](show.md) for the
-  tools and files used above, and [mapping.md](mapping.md) for how the canvas is wired.
-- [decisions.md](decisions.md) for what has been decided and what is still open.
+- [converter.md](../docs/converter.md), [format.md](../docs/format.md) and [show.md](../docs/show.md) for the
+  tools and files used above, and [mapping.md](../docs/mapping.md) for how the canvas is wired.
+- [decisions.md](../docs/decisions.md) for what has been decided and what is still open.

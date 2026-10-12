@@ -1,2 +1,3 @@
 *.json -text
 *.odrg binary
+docs/drifts.md merge=union

@@ -131,18 +131,24 @@ class TheChecks(unittest.TestCase):
             self.assertTrue(support.is_path(word) and not support.exists(word), word)
         for word in ("status", ".odrg", "(x, y)", "127.0.0.1:8600", "--mapping", "/odrig", "<id>"):
             self.assertFalse(support.is_path(word), word)
-        for word in ("build/demo-20/show", ".venv/bin/python", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json"):
+        for word in ("build/demo-20/show", ".venv/bin/python", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json", "origin/master"):
             self.assertFalse(support.looked_for(word), word)
+
+    def test_a_seed_that_is_named_ahead_of_this_branch_is_on_master(self):
+        for folder in support.SEEDS_ON_MASTER:
+            self.assertFalse(support.looked_for(folder))
+            self.assertTrue(support.exists(folder) or support.on_master(folder), folder)
+        self.assertFalse(support.on_master("project-seeds/00-nothing/"))
 
     def test_the_two_folders_of_the_first_computer_are_not_tracked(self):
         self.assertEqual(support.tracked(*support.FIRST_COMPUTER_ONLY), [])
 
     def test_a_link_is_followed_to_its_file_and_its_heading(self):
-        page = "docs/vocabulary.md"
-        good = "[a](format.md) [b](format.md#json-frames) [c](../mapping/legs-2.json) [d](https://example.org/x) [e](#the-programs)"
+        page = "agent/vocabulary.md"
+        good = "[a](../docs/format.md) [b](../docs/format.md#json-frames) [c](../mapping/legs-2.json) [d](https://example.org/x) [e](#the-programs) [f](working-rules.md)"
         self.assertEqual(broken_links(page, good), [])
-        bad = "[a](nothing.md) [b](format.md#no-such-heading) [c](../../elsewhere.md) [d](#no-such-heading)"
-        self.assertEqual(broken_links(page, bad), ["nothing.md", "format.md#no-such-heading", "../../elsewhere.md", "#no-such-heading"])
+        bad = "[a](format.md) [b](../docs/format.md#no-such-heading) [c](../../elsewhere.md) [d](#no-such-heading)"
+        self.assertEqual(broken_links(page, bad), ["format.md", "../docs/format.md#no-such-heading", "../../elsewhere.md", "#no-such-heading"])
         self.assertEqual(support.anchor("The owner's checks"), "the-owners-checks")
 
     def test_a_command_is_given_to_its_tool(self):
@@ -158,6 +164,10 @@ class TheChecks(unittest.TestCase):
             "make -C core test",
             "make -C core shared",
             "git add <path> ...",
+            "git clone https://github.com/korenmic/Odrig.git",
+            "git fetch origin",
+            "git merge --ff-only origin/master",
+            "git push origin master",
             "printf '1000 status\\n' > build/ask.txt",
             "python -m odrig",
         ):

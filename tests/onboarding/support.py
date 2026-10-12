@@ -17,7 +17,7 @@ if str(FIRMWARE) not in sys.path:
     sys.path.insert(0, str(FIRMWARE))
 
 # The pages a newcomer reads first, by their paths in the repository.
-PAGES = ("AGENTS.md", "CLAUDE.md", "docs/vocabulary.md", "docs/working-rules.md", "docs/getting-started.md", "docs/animation-guide.md")
+PAGES = ("AGENTS.md", "CLAUDE.md", "agent/README.md", "agent/vocabulary.md", "agent/working-rules.md", "agent/getting-started.md", "agent/animation-guide.md")
 
 ENTRY = "AGENTS.md"
 ENTRY_LINES = 150
@@ -31,11 +31,15 @@ FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 INSTALLED_NAMES = ("mapping.json",)
 # What a page gives as something for the reader to make.
 TO_BE_MADE = ("odrig/generators/dot.py",)
+# A seed that the pages name and that a branch holds once it is up to date with `master`.
+SEEDS_ON_MASTER = ("project-seeds/11-p0-emulator-and-tools-on-windows/",)
+# How a page names a branch of the remote.
+REMOTE_BRANCHES = "origin/"
 
 PYTHONS = (".venv/bin/python", "python", "python3")
 # Programs of the system a page may use in a command, which have nothing to check.
 PLAIN_PROGRAMS = ("mkdir", "printf", "rm", "cd", "curl")
-GIT_SUBCOMMANDS = ("clone", "add", "commit", "show", "status", "branch", "switch", "merge", "log", "diff", "worktree")
+GIT_SUBCOMMANDS = ("clone", "add", "commit", "show", "status", "branch", "switch", "merge", "fetch", "push", "log", "diff", "worktree")
 
 Block = collections.namedtuple("Block", "heading mark body")
 
@@ -126,7 +130,17 @@ def is_path(word):
 
 def looked_for(word):
     """Whether a path must exist in a clone: not one that is made on the computer."""
-    return not word.startswith(MADE_ON_THE_COMPUTER + FIRST_COMPUTER_ONLY) and word not in INSTALLED_NAMES + TO_BE_MADE
+    apart = MADE_ON_THE_COMPUTER + FIRST_COMPUTER_ONLY + (REMOTE_BRANCHES,)
+    return not word.startswith(apart) and word not in INSTALLED_NAMES + TO_BE_MADE + SEEDS_ON_MASTER
+
+
+def on_master(word):
+    """Whether `master`, here or on the remote, holds a folder."""
+    for branch in ("master", "origin/master"):
+        listed = subprocess.run(["git", "ls-tree", "-d", "--name-only", branch, "--", word.rstrip("/")], cwd=ROOT, capture_output=True)
+        if listed.returncode == 0 and listed.stdout.strip():
+            return True
+    return False
 
 
 def exists(word):

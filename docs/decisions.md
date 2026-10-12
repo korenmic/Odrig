@@ -29,11 +29,16 @@ it stands now.
   with `master` before it is merged, and it is merged only with every test suite that
   needs no board passing. [drifts.md](drifts.md) and the change log of this file are only
   ever added to at the end, so that two contributors' additions can both be kept. Every
-  significant advance is committed. There is no remote yet. See
-  [working-rules.md](working-rules.md), "Several contributors at once".
-- The repository carries a vocabulary, [vocabulary.md](vocabulary.md), and the working
-  rules, [working-rules.md](working-rules.md), which hold the agent policies that are
+  significant advance is committed. The remote is `https://github.com/korenmic/Odrig`, a
+  private repository, and history that has been pushed to it is never rewritten. See
+  [working-rules.md](../agent/working-rules.md), "Several contributors at once".
+- The pages for newcomers are a workstream of their own and are in the folder `agent/`,
+  with `AGENTS.md` and `CLAUDE.md` at the top of the repository. Among them are a
+  vocabulary, [vocabulary.md](../agent/vocabulary.md), and the working rules,
+  [working-rules.md](../agent/working-rules.md), which hold the agent policies that are
   relevant to this project.
+- A second contributor works on a Windows computer. Making the emulator and the tools run
+  there is seed 11.
 
 ## Canvas and coordinates
 
@@ -275,3 +280,7 @@ are in [format.md](format.md), "Measured sizes".
   up to date with `master` and merged only with every suite that needs no board passing.
   `drifts.md` and this change log are added to at the end only. The repository carries the
   vocabulary and the working rules.
+- 2026-10-12: The repository has a remote, `https://github.com/korenmic/Odrig`, private.
+  The pages for newcomers are a workstream of their own in the folder `agent/`. A second
+  contributor works on a Windows computer; making the emulator and the tools run there is
+  seed 11.

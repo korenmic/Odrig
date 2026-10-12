@@ -5,7 +5,7 @@ tasks describe their tools and documents and change none of them. Where the repo
 differs from what this spec's design relies on, follow the repository and record the
 difference in `docs/drifts.md`.
 
-No task needs the board. Tasks 3, 4 and 6 need a network connection, for the three
+No task needs the board. Tasks 3, 4, 6 and 7 need a network connection, for the three
 libraries the walk-through installs in its temporary folder.
 
 Rules for every task:
@@ -20,7 +20,8 @@ Rules for every task:
   `.venv/bin/python -m unittest discover -s tests/converter -t .`, which reads every
   tracked document; both pass. Tasks 5 and 6, which change or check `README.md`, also run
   `make -C core test`, `python3 -m unittest discover -s tests/emulator -t .` and
-  `python3 firmware/fw.py test`; all pass. Tasks 3, 4 and 6 also run the walk-through,
+  `python3 firmware/fw.py test`; all pass. So does task 7. Tasks 3, 4, 6 and 7 also run
+  the walk-through,
   `python3 -m unittest discover -s tests/walkthrough -t .`, with the new files of the task
   staged; it passes.
 - Where a task says "Prove it fails first", run the test against the state described, watch
@@ -107,7 +108,38 @@ Rules for every task:
     test of the reading order fails naming that file. Undo both.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 6.1, 6.2, 7.7
 
-- [ ] 6. The final check, and the seed's state
+- [x] 6. The folder `agent/`, the Windows contributor and the remote
+  - The owner added this task while task 5 was being done; `docs/drifts.md` has it under
+    "Seed 10: Where the onboarding files live, and the Windows contributor". Where this
+    spec's requirements and design name a page under `docs/`, read `agent/`.
+  - Move the four pages for newcomers with `git mv` into a folder `agent/` at the top of
+    the repository: the vocabulary, the working rules, getting started and the animation
+    guide. Write `agent/README.md` as the page a newcomer begins with: what the project
+    is, the reading order, and what each file of the folder is for. `AGENTS.md` and
+    `CLAUDE.md` stay at the top, short, and point into `agent/`. The governing documents
+    stay in `docs/`. Mend every link and every path in the tests, and name the folder in
+    the line of the README about the agent files.
+  - Say in the getting-started page and in the entry file what works on Windows today and
+    what does not; that making the emulator and the tools run there is seed 11,
+    `project-seeds/11-p0-emulator-and-tools-on-windows/`, and the first job of the
+    contributor on Windows; and give the setup on Windows as far as it is known, marked as
+    not yet run there.
+  - Give the remote and its clone command, and make the rule for several contributors
+    concrete in the working rules: clone, a branch of one's own, fetch and bring the branch
+    up to date with `origin/master`, every suite that works on the platform, merge into
+    `master` and push, no rewriting of pushed history, the two files that are added to at
+    the end only, and a seed's number chosen after fetching. `docs/decisions.md` names the
+    remote and gets one more entry at the end of its change log.
+  - Present Hello world and DVD bounce as proof-of-concept animations that serve as test
+    content, not as examples of finished work.
+  - Extend the quick suite for all of this, and point the walk-through at the moved pages.
+  - Prove it fails first: with the pages moved and the tests not yet changed, the quick
+    suite fails naming the pages it no longer finds under `docs/`.
+  - This task runs every suite and the walk-through, as tasks 5 and 6 of the rules above
+    do.
+  - Requirements: 1.3, 1.5, 1.6, 3.7, 4.1, 6.1, 6.3, 6.4, 7.1, 7.2
+
+- [ ] 7. The final check, and the seed's state
   - Read the acceptance criteria of Requirements 1 to 8 once more and name, for each one a
     program can check, the test that checks it; add a test where one is missing.
   - Read the six pages once more, in the order a newcomer reads them: `AGENTS.md`, the
