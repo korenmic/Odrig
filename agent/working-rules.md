@@ -53,13 +53,14 @@ What has been decided is in [decisions.md](../docs/decisions.md), each decision 
   message, the seed and the spec.
 - **A suite is selected by discovery.** Each folder of `tests/` that holds tests is one
   suite, run by one command such as
-  `python -m unittest discover -s tests/converter -t .`. No command, script or document
-  lists test files, so a new test file needs no change anywhere else.
+  `python -m unittest discover -s tests/emulator -t .`. The converter's own suite is the
+  folder `converter/tests/`, run by `npm test --prefix converter`. No command, script or
+  document lists test files, so a new test file needs no change anywhere else.
 - **The suites pass before a commit.** The `tasks.md` of a spec says which suites a task
   runs, and [getting-started.md](getting-started.md#run-the-tests) has the command of each.
-- **Leave alone what is not yours.** Nothing under `build/` or `.venv/` is committed, and
-  nothing that was fetched or built. An untracked file that you did not make is not moved,
-  edited, deleted or staged.
+- **Leave alone what is not yours.** Nothing under `build/`, `.venv/` or
+  `converter/node_modules/` is committed, and nothing else that was fetched or built. An
+  untracked file that you did not make is not moved, edited, deleted or staged.
 
 ## What needs the owner
 

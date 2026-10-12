@@ -4,9 +4,11 @@ import collections
 import contextlib
 import functools
 import io
+import json
 import pathlib
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -24,7 +26,7 @@ ENTRY_LINES = 150
 PAGE_LINES = 200
 
 # What a page may name although no clone holds it: what is made on the computer.
-MADE_ON_THE_COMPUTER = ("build/", "core/build/", ".venv/", ".codex/")
+MADE_ON_THE_COMPUTER = ("build/", "core/build/", ".venv/", ".codex/", "converter/node_modules/")
 # Folders that exist untracked on the first computer only, and that nobody changes.
 FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 # The files of an installed file set that no tracked file is named after.
@@ -37,6 +39,12 @@ SEEDS_ON_MASTER = ("project-seeds/11-p0-emulator-and-tools-on-windows/",)
 REMOTE_BRANCHES = "origin/"
 
 PYTHONS = (".venv/bin/python", "python", "python3")
+# The program that runs the converter and the file it is given, and the program that
+# installs the converter's packages and runs its suite, with the two ways it is run.
+NODE = "node"
+CONVERTER = "converter/odrig.js"
+NPM = "npm"
+NPM_COMMANDS = (["ci", "--prefix", "converter"], ["test", "--prefix", "converter"])
 # Programs of the system a page may use in a command, which have nothing to check.
 PLAIN_PROGRAMS = ("mkdir", "printf", "rm", "cd", "curl")
 GIT_SUBCOMMANDS = ("clone", "add", "commit", "show", "status", "branch", "switch", "merge", "fetch", "push", "log", "diff", "worktree")
@@ -207,6 +215,63 @@ def _python(words):
     return f"there is no module {module}"
 
 
+# What Node.js is given to put a command line before the converter: the tool's check of the
+# version of Node.js, then its parser. It prints what the tool says against the command
+# line, or nothing.
+_ASK_THE_CONVERTER = """
+const [version, parser, ...given] = process.argv.slice(1);
+const old = (await import(version)).refusal(process.versions.node);
+if (old !== null) {
+  console.log(old);
+} else {
+  try {
+    (await import(parser)).parse(given);
+  } catch (error) {
+    if (error.name !== "UsageError") {
+      throw error;
+    }
+    console.log(error.message);
+  }
+}
+"""
+
+
+@functools.lru_cache(maxsize=None)
+def _converter(arguments):
+    """What the converter says against the arguments of a command line: nothing when it
+    takes them. Its parser is asked, and nothing of the command is run."""
+    node = shutil.which(NODE)
+    if node is None:
+        return f'Node.js 20 or later is needed as `{NODE}` to put this command before the converter: see docs/converter.md, "Setup"'
+    modules = [(ROOT / "converter" / "cli" / name).as_uri() for name in ("version.js", "arguments.js")]
+    asked = subprocess.run([node, "--input-type=module", "--eval", _ASK_THE_CONVERTER, "--", *modules, *arguments], cwd=ROOT, capture_output=True, text=True)
+    if asked.returncode != 0:
+        return f"the parser of the converter could not be asked: {asked.stderr.strip()}"
+    return asked.stdout.strip() or None
+
+
+def _node(words):
+    """What is wrong with a command that starts Node.js: it starts the converter."""
+    if words == ["--version"]:
+        return None
+    if words[:1] != [CONVERTER]:
+        return f"{NODE} starts the converter: {NODE} {CONVERTER}"
+    return _converter(tuple(words[1:])) if words[1:] else None
+
+
+def _npm(words):
+    """What is wrong with a command of npm: it installs the packages of the converter, or
+    runs the converter's suite."""
+    if words not in NPM_COMMANDS:
+        return "npm is run as " + " or as ".join(f"{NPM} {' '.join(command)}" for command in NPM_COMMANDS)
+    if not (ROOT / "converter" / "package-lock.json").is_file():
+        return "converter/ has no package-lock.json"
+    package = json.loads((ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
+    if words[0] == "test" and "test" not in package.get("scripts", {}):
+        return "converter/package.json has no script test"
+    return None
+
+
 def _make(words):
     makefile = (ROOT / "core" / "Makefile").read_text(encoding="utf-8")
     targets = re.search(r"(?m)^\.PHONY: (.+)$", makefile).group(1).split()
@@ -224,6 +289,10 @@ def refusal(command):
     program, rest = words[0], words[1:]
     if program in PYTHONS:
         return _python(rest)
+    if program == NODE:
+        return _node(rest)
+    if program == NPM:
+        return _npm(rest)
     if program == "make":
         return _make(rest)
     if program == "git":
@@ -236,4 +305,4 @@ def refusal(command):
 def is_command(span):
     """Whether a code span of the prose is a command: it starts one of the checked programs."""
     words = span.split()
-    return len(words) > 1 and words[0] in PYTHONS + ("make", "git")
+    return len(words) > 1 and words[0] in PYTHONS + (NODE, NPM, "make", "git")

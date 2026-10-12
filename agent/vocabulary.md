@@ -50,8 +50,8 @@ the entry links to it.
 - **ODRG**: The format that is played: a compact binary file, ending in `.odrg`, made
   from a JSON frames file. It holds the same picture for every millisecond as its source.
   Its body is compressed or not, as whoever makes it chooses. See [format.md](../docs/format.md).
-- **generator**: A program that writes a source for the canvas of a mapping file. The
-  generators are in `odrig/generators/`.
+- **generator**: A Python program that writes a source for the canvas of a mapping file.
+  The generators are in `odrig/generators/`.
 - **show**: What can be played and what plays at power-on, written in a file named
   `show.json`. See [show.md](../docs/show.md).
 - **item**: One numbered entry of a show: one animation, or a list of animations to play
@@ -68,9 +68,15 @@ the entry links to it.
 
 ## The programs
 
-- **converter**: The command-line tool `odrig`, started as `python -m odrig`. It turns a
-  video or a GIF into a source, a source into an ODRG file and back, checks a file, and
-  packs a show into an installed file set. See [converter.md](../docs/converter.md).
+- **converter**: The command-line tool in `converter/`, written in JavaScript and started
+  as `node converter/odrig.js`. It turns a video or a GIF into a source, a source into an
+  ODRG file and back, checks a file, and packs a show into an installed file set. Its
+  library, `converter/lib/`, also runs in a web page. See
+  [converter.md](../docs/converter.md).
+- **reference converter**: The Python package `odrig/`, started as `python -m odrig`. It
+  was the converter before and does the same work. It is kept so that tests can compare
+  the converter with it, and nobody converts with it any more. The generators are part of
+  it. See [reference-converter.md](../docs/reference-converter.md).
 - **core**: The C++ library in `core/` that plays an installed file set: it reads the
   files, keeps time, handles commands and gives the colour of every LED of every leg.
   Everything that must behave the same wherever a show plays is in the core. See

@@ -35,6 +35,11 @@ SUITES = {
 }
 NEED_THE_BOARD = ("board", "air")
 
+# The suite of the converter, which lives beside the tool and not in tests/: its folder and
+# the command that runs it. The page gives it first among the suites to run after the setup.
+CONVERTER_SUITE = ("converter/tests", "npm test --prefix converter")
+CONVERTER = "node converter/odrig.js"
+
 
 def flat(text):
     return " ".join(text.split())
@@ -57,20 +62,26 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_has_to_be_on_the_computer(self):
         needed = flat(self.part("What you need"))
-        for phrase in ("A Mac", "run on macOS only at present", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`"):
+        for phrase in ("A Mac", "run on macOS only at present", "command-line developer tools", "`make`", "`git`", "Python 3.10 or later, as `python3`",
+                       "Node.js 20 or later, as `node`", "the `npm` that comes with it", "`node --version` has to say v20 or more"):
             self.assertIn(phrase, needed)
+        package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(package["engines"], {"node": ">=20"})
         self.assertIn("On a Windows computer read [On Windows](#on-windows) first.", flat(self.text.split("\n## ")[0]))
 
     def test_it_says_what_works_on_windows_today_and_whose_job_the_rest_is(self):
         windows = flat(self.part("On Windows"))
         for phrase in ("| The converter and its suite | Written to run there. They have been run on macOS only. |",
+                       "| The reference converter, the generators and their suite | The same: written to run there, run on macOS only. |",
                        "| The core's build, the emulator, the command tool | macOS only. |",
                        "| The firmware tool and the board | They stay with the first computer. |",
                        "is seed 11", f"`{SEED_FOR_WINDOWS}`", "the first job of the contributor on Windows",
-                       "its spec, its tasks and their implementation on the Windows computer", "Python 3.10 or later",
+                       "its spec, its tasks and their implementation on the Windows computer", "Python 3.10 or later", "Node.js 20 or later",
+                       "the converter and the generators can be tried on Windows", "which also runs the converter's suite on Windows",
                        "from `make -C core shared` on, is what seed 11 provides"):
             self.assertIn(phrase, windows)
-        self.assertIn("is verified on macOS", flat(support.read("docs/converter.md")))
+        self.assertIn("Windows and Linux are supported by construction and not verified: nothing has been run there.", flat(support.read("docs/converter.md")))
+        self.assertIn("It is verified on macOS with Python 3.14.", flat(support.read("docs/reference-converter.md")))
 
     def test_the_setup_on_windows_is_the_part_that_is_known_and_is_not_given_as_run(self):
         self.assertEqual(self.commands("On Windows"), [])
@@ -80,24 +91,36 @@ class GettingStarted(unittest.TestCase):
             "cd Odrig",
             "python -m venv .venv",
             ".venv\\Scripts\\python -m pip install -r requirements.txt",
+            "npm ci --prefix converter",
+            CONVERTER_SUITE[1],
             ".venv\\Scripts\\python -m unittest discover -s tests/converter -t .",
         ]])
         self.assertIn("none of it has been tried there", flat(self.part("On Windows")))
 
-    def test_the_setup_is_the_clone_the_environment_the_libraries_and_the_shared_library(self):
-        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "make -C core shared"])
+    def test_the_setup_is_the_clone_the_environment_the_libraries_the_packages_and_the_shared_library(self):
+        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "npm ci --prefix converter", "make -C core shared"])
         pinned = re.findall(r"(?m)^([a-z]+)==", (support.ROOT / "requirements.txt").read_text(encoding="utf-8"))
         self.assertEqual(sorted(set(pinned)), ["av", "numpy", "pillow"])
+        package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(package["dependencies"]), ["ffmpeg-static", "omggif"])
         setup = flat(self.part("Set up"))
-        for phrase in (f"`{CLONE}`", "numpy, Pillow and PyAV", "`core/build/libodrig_core.dylib`", "`.venv/bin/python` is the Python for every command", "write it as `python`"):
+        for phrase in (f"`{CLONE}`", "numpy, Pillow and PyAV", "with which the reference converter reads videos and GIFs", "the converter's two packages for the same job",
+                       "`converter/node_modules/`", "fetches a decoder program", "`core/build/libodrig_core.dylib`", "Git ignores these three folders",
+                       "`.venv/bin/python` is the Python for every command", "write it as `python`"):
             self.assertIn(phrase, setup)
+        ignored = (support.ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        for folder in ("/.venv/", "/converter/node_modules/", "/core/build/"):
+            self.assertIn(folder, ignored)
 
     def test_every_folder_of_tests_that_holds_a_suite_has_its_command(self):
         folders = sorted(path.name for path in (support.ROOT / "tests").iterdir() if any(path.glob("test_*.py")))
         self.assertEqual(folders, sorted(SUITES))
+        beside, of_the_converter = CONVERTER_SUITE
+        self.assertTrue(any((support.ROOT / beside).glob("*.test.js")))
         after_setup = self.commands("Run the tests")
-        self.assertEqual(after_setup, [command for command, at_once in SUITES.values() if at_once])
+        self.assertEqual(after_setup, [of_the_converter] + [command for command, at_once in SUITES.values() if at_once])
         given = flat(self.text)
+        self.assertIn(f"| `{beside}` |", given)
         for suite, (command, _) in SUITES.items():
             with self.subTest(suite=suite):
                 self.assertIn(command, given)
@@ -106,13 +129,18 @@ class GettingStarted(unittest.TestCase):
         for suite in NEED_THE_BOARD:
             self.assertIn(f"`tests/{suite}`", more)
         self.assertIn("need the board on USB and write to it", more)
-        self.assertIn("None needs the board or the network", flat(self.part("Run the tests")))
+        self.assertEqual(len(after_setup), 5)
+        self.assertIn("runs the five suites above", more)
+        after = flat(self.part("Run the tests"))
+        for phrase in ("The first ends with a list of counts, in which `fail 0` says that every test passed", "Each of the others ends with the line `OK`",
+                       "None needs the board or the network"):
+            self.assertIn(phrase, after)
 
     def test_it_packs_the_demo_show_from_what_the_generators_write_and_calls_it_test_content(self):
         commands = self.commands("Pack the demo show")
         self.assertEqual(commands[0], "mkdir -p build/demo-20/sources")
         self.assertEqual(sum(command.startswith(".venv/bin/python -m odrig.generators.") for command in commands), 2)
-        self.assertEqual(commands[-1], ".venv/bin/python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json --sources build/demo-20/sources --out build/demo-20/show")
+        self.assertEqual(commands[-1], f"{CONVERTER} pack --show shows/demo-20/show.json --mapping mapping/legs-20.json --sources build/demo-20/sources --out build/demo-20/show")
         show = json.loads((support.ROOT / "shows" / "demo-20" / "show.json").read_text(encoding="utf-8"))
         named = sorted(item["file"] for item in show["items"] if "file" in item)
         self.assertEqual(named, ["dvd.odrg", "hello.odrg"])

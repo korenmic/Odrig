@@ -86,6 +86,23 @@ class Guide(unittest.TestCase):
         for phrase in ("`fill`, the default", "`fit`", "`stretch`", "`--start`", "`--duration`", "`.mp4`, `.mov` or `.gif`", "`build/try/clip.gif`"):
             self.assertIn(phrase, imported)
 
+    def test_it_imports_checks_and_packs_with_the_converter_and_generates_with_python(self):
+        commands = dict((heading, command) for heading, command in support.page_commands(self.text) if not command.startswith(("mkdir", "printf")))
+        for heading, subcommand in (("An import", "import"), ("Check a source", "check"), ("Pack it into a show", "pack")):
+            with self.subTest(heading=heading):
+                self.assertTrue(commands[heading].startswith(f"{support.NODE} {support.CONVERTER} {subcommand} "), commands[heading])
+        self.assertTrue(commands["A generator"].startswith(".venv/bin/python -m odrig.generators."), commands["A generator"])
+
+    def test_it_names_the_known_fault_of_the_reference_converter_on_a_damaged_video(self):
+        imported = flat(self.part("An import"))
+        for phrase in ("Import with this tool only", "The `import` of the reference converter has a known fault",
+                       "a damaged or cut-off video file can make Python itself crash", "the reference for tests and not the one to use", "a fix is planned",
+                       "[reference-converter.md](../docs/reference-converter.md#command-line)"):
+            self.assertIn(phrase, imported)
+        reference = flat(support.read("docs/reference-converter.md").split("\n## Command line\n")[1].split("\n## ")[0])
+        for phrase in ("**Damaged media.**", "the Python tool has three known faults there, which are open", "ends Python itself with a fault of memory"):
+            self.assertIn(phrase, reference)
+
     def test_it_says_what_to_look_for_and_that_the_emulator_does_not_show_the_boards_rate(self):
         looked = self.part("Look at it in the emulator")
         self.assertEqual(len(re.findall(r"(?m)^- \*\*", looked)), 5)
