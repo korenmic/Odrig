@@ -1,0 +1,10 @@
+{
+  "number": 13,
+  "slug": "13-p2-damaged-media-in-the-reference-tool",
+  "state": "remaining",
+  "title": "Damaged media in the reference tool",
+  "priority": "P2",
+  "addedAt": "2026-10-12T05:14:29+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Make the Python reference tool refuse a damaged video or GIF with a named reason instead of crashing or ending in a traceback."
+}
