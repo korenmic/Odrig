@@ -42,10 +42,9 @@ arguments. A fault of memory in the child then ends it with status 10 or 11 and 
 crash report. `run_tool` returns the status, the output and the error stream, and raises
 `AssertionError` naming the signal when the status is 10 or 11.
 
-On Windows `ctypes.CDLL(None)` does not exist; the prelude skips the handlers there. Windows
-shows no dialog for a child that faults when the parent has set the error mode, which
-`subprocess` leaves as it is; the fault is then a non-zero status and the test fails with
-that status.
+On Windows `ctypes.CDLL(None)` does not exist; the prelude skips the handlers there, and a
+fault in the child is then a status that is neither 0 nor 1, on which the test fails. What
+Windows puts on the screen for such a child has not been looked at.
 
 ## Tests
 
