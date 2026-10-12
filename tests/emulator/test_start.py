@@ -108,7 +108,16 @@ class Start(unittest.TestCase):
     def test_an_emulator_that_cannot_be_sent_its_signal_is_ended_all_the_same(self):
         emulator = support.Emulator(self.example())
         page = emulator.port
-        with mock.patch.object(emulator.process, "send_signal", side_effect=OSError(6, "The handle is invalid")):
+        send = emulator.process.send_signal
+
+        def refused(number):
+            """Refuses the signal that asks the emulator to stop, and no other: where a
+            process is ended by a signal too, that one goes through."""
+            if number == support.STOP:
+                raise OSError(6, "The handle is invalid")
+            return send(number)
+
+        with mock.patch.object(emulator.process, "send_signal", side_effect=refused):
             emulator.stop()
         self.assertIsNotNone(emulator.process.poll())
         self.assertTrue(support.refused(page))
