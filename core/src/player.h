@@ -19,8 +19,10 @@ uint64_t clock_touch(Core &core, uint64_t now_ms);
 // its `start` names or from its first one.
 void player_start(Core &core);
 
-// Plays the item at this position of the item table from its first frame.
-void player_play(Core &core, uint32_t item);
+// Plays the cycle at this position of the item table, from the first frame of the first
+// animation of its list. An animation item is not played by itself: it has its turn of
+// the playlist.
+void player_play_cycle(Core &core, uint32_t item);
 
 // Plays the playlist: every animation item in turn, in the order of the item table, and
 // from the first again without end. It begins with the turn of the animation item at this

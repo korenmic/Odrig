@@ -15,6 +15,7 @@ EVENTS = {
     2500: ["brightness 0"],
     3000: ["brightness 128", "status"],
     4000: ["play 2", "status"],
+    4500: ["play all", "status"],
     5000: ["play 3"],
     5010: ["status"],
     7000: ["play 3", "status"],
@@ -60,6 +61,7 @@ class ScriptedSession(Playback):
         for brightness in (0, 1, 128, 255):
             self.assertIn(f"brightness {brightness}", lines)
         self.assertEqual(lines.count("play 3"), 2)
+        self.assertIn("play all", lines)
         self.assertEqual(len(LONG_LINE), 2049)
 
     def test_on_the_example_show_every_reply_and_every_refresh_is_the_reference_players(self):
@@ -83,13 +85,16 @@ class ScriptedSession(Playback):
                 by_time[int(line.split()[1]) - T0] = json.loads(reply[len("reply "):])
         # The cycle changes turns twice, at 22,000 and at 37,000 ms, the first time while
         # the LEDs are switched off.
-        self.assertEqual(by_time[7000]["animation"], 1)
+        # An animation is played in the playlist, and `play all` goes back to its start.
+        self.assertEqual((by_time[4000]["playing"], by_time[4000]["animation"]), ("all", 2))
+        self.assertEqual((by_time[4500]["playing"], by_time[4500]["animation"]), ("all", 1))
+        self.assertEqual((by_time[7000]["playing"], by_time[7000]["animation"]), (3, 1))
         self.assertEqual((by_time[21000]["on"], by_time[21000]["animation"]), (False, 1))
         self.assertEqual((by_time[22010]["on"], by_time[22010]["animation"]), (False, 2))
         self.assertEqual((by_time[23000]["on"], by_time[23000]["animation"]), (True, 2))
         self.assertEqual(by_time[36990]["animation"], 2)
         self.assertEqual(by_time[37010]["animation"], 1)
-        self.assertEqual(by_time[37500]["playing"], 1)
+        self.assertEqual((by_time[37500]["playing"], by_time[37500]["animation"]), ("all", 1))
         self.assertEqual({state["fps"] for time, state in by_time.items() if time >= 1000}, {50})
 
         shown = {time - T0: legs for time, legs in produced}

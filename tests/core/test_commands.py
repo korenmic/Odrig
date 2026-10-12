@@ -43,10 +43,14 @@ class EveryCommand(Commands):
         self.assertEqual(replies[:7], [OK] * 7)
         self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null}')
 
-    def test_play_plays_the_item(self):
-        for number, animation in ((1, 1), (2, 2), (3, 1)):
+    def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
+        for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
             state = self.status(support.example_show(), [support.line(T0, f"play {number}"), support.line(T0, "status")])
-            self.assertEqual((state["playing"], state["animation"]), (number, animation))
+            self.assertEqual((state["playing"], state["animation"]), (playing, animation))
+
+    def test_play_all_plays_the_playlist(self):
+        state = self.status(support.example_show(), [support.line(T0, "play all"), support.line(T0, "status")])
+        self.assertEqual((state["playing"], state["animation"]), ("all", 1))
 
     def test_on_and_off_switch_the_leds(self):
         state = self.status(support.example_show(), [support.line(T0, "off"), support.line(T0, "status")])
@@ -66,7 +70,7 @@ class EveryCommand(Commands):
         files["show.json"] = support.show_text(json.loads(files["show.json"])["items"] + [{"id": 7, "file": "dvd.odrg"}], 128, 3)
         self.assertEqual(self.replies(["play 007", "play 0000000000000000000000000000000000000000000000000000000007", "brightness 0255", "brightness 000"], files), [OK] * 4)
         state = self.status(files, [support.line(T0, "play 007"), support.line(T0, "brightness 0031"), support.line(T0, "status")])
-        self.assertEqual((state["playing"], state["brightness"]), (7, 31))
+        self.assertEqual((state["playing"], state["animation"], state["brightness"]), ("all", 7, 31))
 
 
 class EveryErrorCode(Commands):
@@ -215,7 +219,7 @@ class BytesOfATransport(Commands):
         self.assertEqual(answered[0][1], OK)
         self.assertEqual(json.loads(answered[1][1])["brightness"], 42)
         self.assertEqual(answered[2][1], OK)
-        self.assertEqual(json.loads(answered[3][1])["playing"], 2)
+        self.assertEqual((json.loads(answered[3][1])["playing"], json.loads(answered[3][1])["animation"]), ("all", 2))
 
     def test_bytes_without_a_newline_give_no_reply(self):
         self.assertEqual(self.fed([b"status", b"\r", b" on"]), [])
@@ -266,7 +270,7 @@ class BytesOfATransport(Commands):
     def test_a_long_line_does_not_spoil_the_line_after_it(self):
         answered = self.fed([b"x" * 2049 + b"\n" + b"play 2\n" + b"y" * 2050 + b"\r\n" + b"status\n"])
         self.assertEqual([line for line, _ in answered], [b"x" * 2048, b"play 2", b"y" * 2048, b"status"])
-        self.assertEqual(json.loads(answered[3][1])["playing"], 2)
+        self.assertEqual((json.loads(answered[3][1])["playing"], json.loads(answered[3][1])["animation"]), ("all", 2))
 
     def test_bytes_of_every_value_are_taken_as_they_are(self):
         answered = self.fed([bytes(range(256))])

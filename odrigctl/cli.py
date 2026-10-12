@@ -52,7 +52,7 @@ def parser():
         prog="python -m odrigctl",
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it.",
-        epilog="Commands: play ID, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -60,7 +60,7 @@ def parser():
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("command", metavar="COMMAND", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the N of brightness, the ID and the FILE of upload")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the FILE of upload")
     return made
 
 

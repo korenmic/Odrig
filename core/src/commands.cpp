@@ -212,21 +212,30 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return succeed(reply);
     }
     if (words.is(0, "play")) {
-        uint32_t id;
-        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
+        const bool all = words.count == 2 && words.is(1, "all");
+        uint32_t id = 0;
+        if (!all && (words.count != 2 || !number_word(words, 1, 1, 65535, &id))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        uint32_t item = 0;
-        while (item < core.item_count && core.items[item].id != id) {
-            ++item;
+        uint32_t item = player_first_animation(core);
+        if (!all) {
+            item = 0;
+            while (item < core.item_count && core.items[item].id != id) {
+                ++item;
+            }
         }
         if (item == core.item_count) {
             return refuse(reply, "unknown-id");
         }
-        player_play(core, item);
+        // An animation is played as its turn of the playlist, which goes on after it.
+        if (core.items[item].is_cycle) {
+            player_play_cycle(core, item);
+        } else {
+            player_play_all(core, item);
+        }
         return succeed(reply);
     }
     if (words.is(0, "space")) {

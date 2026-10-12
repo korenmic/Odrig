@@ -117,7 +117,7 @@ class Animation(Playback):
         script = polls(T0 + time for time in range(0, 16000, 20)) + [status_at(16000), at(16000, "play 3"), status_at(16000), at(16000, "play 2"), status_at(16000)]
         printed = self.assert_as_the_reference(support.example_show(), script)
         seen = [(state(line)["playing"], state(line)["animation"]) for line in printed[-5::2]]
-        self.assertEqual(seen, [(3, 2), (3, 1), (2, 2)])
+        self.assertEqual(seen, [(3, 2), (3, 1), ("all", 2)])
 
     def test_it_is_the_first_entry_of_a_cycle_that_starts_with_its_second_item(self):
         files = support.example_show()
@@ -208,7 +208,7 @@ class StateAfterStartup(Playback):
         with support.installed(files) as folder:
             first = support.session(folder, [at(0, "off"), at(0, "brightness 3"), at(0, "play 2"), status_at(0)])
             second = support.session(folder, [status_at(0)])
-        self.assertEqual(state(first.lines[-1])["playing"], 2)
+        self.assertEqual((state(first.lines[-1])["playing"], state(first.lines[-1])["animation"]), ("all", 2))
         self.assertEqual(state(second.lines[0]), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None})
 
 
@@ -291,7 +291,7 @@ class CommandsAndTheLeds(Playback):
         printed, shown = self.run_script(script)
         self.assertEqual(shown[100], {1: bytes(540), 2: bytes(540)})
         replies = [line for line in printed if line.startswith("reply ")]
-        self.assertEqual((state(replies[2])["playing"], state(replies[2])["animation"]), (2, 2))
+        self.assertEqual((state(replies[2])["playing"], state(replies[2])["animation"]), ("all", 2))
         dvd = support.example_show()
         dvd["show.json"] = support.show_text([{"id": 2, "file": "dvd.odrg"}], 255, 2)
         produced, _ = refreshes(support.start(dvd, every_20_ms(11)).lines)

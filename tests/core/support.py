@@ -527,7 +527,7 @@ class ReferencePlayer:
         self.clips = {}         # the frames of each file by name
         self.on = True
         self.brightness = 0
-        self.playing = None     # the id of the item being played, ALL for the playlist, or None
+        self.playing = None     # the id of the cycle being played, ALL for the playlist, or None
         self.turn = None        # while the playlist plays, the id of the animation whose turn it is
         self.zero = None        # the time zero of that item, once a refresh has set it
         self.shown = None       # the id of the animation item the latest refresh chose
@@ -606,10 +606,10 @@ class ReferencePlayer:
     ALL = "all"
 
     def _play(self, number):
+        """Starts a cycle. An animation is not played by itself: it has its turn."""
         self.playing = number
         self.zero = None
-        item = self.items[number]
-        self.shown = number if item.cycle is None else item.cycle[0]
+        self.shown = self.items[number].cycle[0]
 
     def _animations(self):
         """The ids of the animation items, in the order of the show: the playlist."""
@@ -657,12 +657,11 @@ class ReferencePlayer:
                 self.turn = order[(order.index(self.turn) + 1) % len(order)]
             item = self.items[self.turn]
         else:
-            item = self.items[self.playing]
-        if item.cycle is not None:
-            # Turn t shows the animation at place t mod n, with its time counted from the
-            # start of the turn.
-            turn, elapsed = divmod(elapsed, 1000 * item.seconds)
-            item = self.items[item.cycle[turn % len(item.cycle)]]
+            # Turn t of a cycle shows the animation at place t mod n, with its time
+            # counted from the start of the turn.
+            cycle = self.items[self.playing]
+            turn, elapsed = divmod(elapsed, 1000 * cycle.seconds)
+            item = self.items[cycle.cycle[turn % len(cycle.cycle)]]
         self.shown = item.id
         picture = self.clips[item.file].picture_at(elapsed)
         return picture if self.on else None
@@ -730,6 +729,13 @@ class ReferencePlayer:
             return "bad-argument"
         if name == b"upload":
             return self._upload(arguments)
+        if name == b"play" and arguments == [b"all"]:
+            if self.error is not None:
+                return "show-invalid"
+            if not self._animations():
+                return "unknown-id"
+            self._play_all()
+            return None
         value = None
         if arguments:
             if not arguments[0] or arguments[0].strip(b"0123456789"):
@@ -743,7 +749,10 @@ class ReferencePlayer:
                 return "show-invalid"
             if value not in self.items:
                 return "unknown-id"
-            self._play(value)
+            if self.items[value].cycle is None:
+                self._play_all(value)
+            else:
+                self._play(value)
         elif name == b"brightness":
             self.brightness = value
         elif name == b"space":
@@ -903,7 +912,7 @@ class ReferencePlayer:
                 # The animation whose turn it is has another file: its turn begins again.
                 self.zero = None
             played = None if self.playing == self.ALL else self.items.get(self.playing)
-            if played is not None and (played.id == number or number in (played.cycle or ())):
+            if played is not None and number in played.cycle:
                 self._play(self.playing)
         if old is None or old.file != name:
             self.files["show.json"] = self.show_text()

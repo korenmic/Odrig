@@ -2,6 +2,7 @@ import json
 import unittest
 
 from . import support
+from .test_commands import OK, refused
 from .test_playback import T0, Playback, polls, refreshes
 
 CANVAS = (3, 2)
@@ -36,20 +37,54 @@ def asked_at(times):
     return script
 
 
+def told(time, command):
+    """A command line at this time after power-on."""
+    return support.line(T0 + time, command)
+
+
+def with_a_cycle(files, cycle, start=None, first=False):
+    """The file set with a cycle item more in its show, the last item or the first one, and
+    played at power-on when `start` names it."""
+    show = json.loads(files["show.json"])
+    show["items"].insert(0 if first else len(show["items"]), cycle)
+    if start is not None:
+        show["start"] = start
+    return {**files, "show.json": json.dumps(show)}
+
+
+# A cycle of animation 3 and then animation 1, two seconds each.
+CYCLE = {"id": 8, "cycle": [3, 1], "seconds": 2}
+
+
 class ThePlaylist(Playback):
-    def playing_at(self, files, times, before=()):
-        """What `status` says plays and what is on the LEDs at each of these times, on the
-        core and on the reference player alike. The first turn begins at power-on: a
-        refresh is asked for then, whatever the times are."""
-        printed = self.assert_as_the_reference(files, [f"poll {T0}"] + list(before) + asked_at(times))
+    def playing_in(self, files, script):
+        """What `status` says plays and what is on the LEDs, for each `status` of a session,
+        on the core and on the reference player alike. The first turn begins at power-on:
+        a refresh is asked for then, before the script."""
+        printed = self.assert_as_the_reference(files, [f"poll {T0}"] + list(script))
         states = [json.loads(line[len("reply "):]) for line in printed if line.startswith('reply {"ok":true,"on"')]
-        self.assertEqual(len(states), len(times))
         return [(state["playing"], state["animation"]) for state in states]
 
-    def animation_at(self, files, times, before=()):
-        seen = self.playing_at(files, times, before)
+    def playing_at(self, files, times):
+        seen = self.playing_in(files, asked_at(times))
+        self.assertEqual(len(seen), len(times))
+        return seen
+
+    def animation_in(self, files, script):
+        seen = self.playing_in(files, script)
         self.assertEqual({playing for playing, _ in seen}, {"all"})
         return [animation for _, animation in seen]
+
+    def animation_at(self, files, times):
+        return self.animation_in(files, asked_at(times))
+
+    def pictures_in(self, files, script):
+        """The LED data of each refresh of a session, after the one at power-on that the
+        session begins with."""
+        printed = self.assert_as_the_reference(files, [f"poll {T0}"] + list(script))
+        produced, idle = refreshes([line for line in printed if not line.startswith("reply")])
+        self.assertEqual(idle, [])
+        return [legs[1] for _, legs in produced][1:]
 
     def pictures_at(self, files, times):
         """The LED data of the refresh at each of these times. The first turn begins at
@@ -189,11 +224,7 @@ class TheStart(ThePlaylist):
         self.assertEqual(self.playing_at(three(start=3), [0, 44980, 45000]), [("all", 3), ("all", 3), ("all", 1)])
 
     def test_a_start_that_names_a_cycle_plays_the_cycle(self):
-        files = three()
-        show = json.loads(files["show.json"])
-        show["items"].append({"id": 8, "cycle": [3, 1], "seconds": 2})
-        show["start"] = 8
-        files["show.json"] = json.dumps(show)
+        files = with_a_cycle(three(), CYCLE, start=8)
         self.assertEqual(self.playing_at(files, [0, 1980, 2000, 3980, 4000, 100000]), [(8, 3), (8, 3), (8, 1), (8, 1), (8, 3), (8, 3)])
 
     def test_a_show_without_an_animation_plays_nothing(self):
@@ -207,6 +238,131 @@ class TheStart(ThePlaylist):
         printed = self.assert_as_the_reference(files, asked_at([0]))
         self.assertIn('"playing":null,"animation":null', printed[-1])
         self.assertIn('"error":"file-missing ten.odrg"', printed[-1])
+
+
+class TheJump(ThePlaylist):
+    def test_play_of_an_animation_begins_its_turn_and_the_playlist_goes_on_after_it(self):
+        # At 5 seconds, in the turn of animation 1: the 30 seconds of animation 2, then the
+        # 45 of animation 3, then the 32 of animation 1.
+        script = [told(5000, "play 2")] + asked_at([5000, 34980, 35000, 79980, 80000, 111980, 112000])
+        self.assertEqual(self.animation_in(three(), script), [2, 2, 3, 3, 1, 1, 2])
+
+    def test_the_turn_begins_with_the_first_frame_at_the_refresh_after_the_command(self):
+        # The command comes between two refreshes, and the turn of 10 seconds begins at 5,020.
+        files = three(second={"repeat": 1})
+        seen = self.pictures_in(files, [told(5010, "play 2")] + polls(T0 + time for time in (5020, 6020, 15000, 15020)))
+        alone = self.pictures_at(show_of([{"id": 1, "file": "ten.odrg"}], {"ten.odrg": loop_of(10, 2)}), [0, 1000, 9980])
+        self.assertEqual(seen[:3], alone)
+        self.assertNotEqual(seen[3], alone[2])
+
+    def test_a_jump_to_the_animation_whose_turn_it_is_begins_the_turn_again(self):
+        script = [told(20000, "play 1")] + asked_at([20000, 51980, 52000])
+        self.assertEqual(self.animation_in(three(), script), [1, 1, 2])
+        again = self.pictures_in(three(), [told(2000, "play 1"), f"poll {T0 + 2000}"])
+        self.assertEqual(again, self.pictures_at(three(), [0]))
+
+    def test_a_jump_to_the_last_animation_goes_on_with_the_first(self):
+        script = [told(1000, "play 3")] + asked_at([1000, 45980, 46000, 77980, 78000])
+        self.assertEqual(self.animation_in(three(), script), [3, 3, 1, 1, 2])
+
+    def test_a_jump_out_of_a_cycle_plays_the_playlist(self):
+        files = with_a_cycle(three(), CYCLE, start=8)
+        script = asked_at([1000]) + [told(1500, "play 2")] + asked_at([1500, 31480, 31500, 76480, 76500])
+        self.assertEqual(self.playing_in(files, script), [(8, 3), ("all", 2), ("all", 2), ("all", 3), ("all", 3), ("all", 1)])
+
+    def test_a_jump_before_the_first_refresh(self):
+        printed = self.assert_as_the_reference(three(), [told(0, "play 3")] + asked_at([400, 45380, 45400]))
+        states = [json.loads(line[len("reply "):]) for line in printed if line.startswith('reply {"ok":true,"on"')]
+        self.assertEqual([(state["playing"], state["animation"]) for state in states], [("all", 3), ("all", 3), ("all", 1)])
+
+    def test_a_jump_while_the_leds_are_off(self):
+        files = three(second={"repeat": 1})
+        script = [told(1000, "off"), told(2000, "play 2")] + asked_at([2000, 11980, 12000]) + [told(13000, "on")] + asked_at([13000])
+        self.assertEqual(self.animation_in(files, script), [2, 2, 3, 3])
+
+    def test_play_of_a_cycle_plays_the_cycle_and_not_the_playlist(self):
+        files = with_a_cycle(three(), CYCLE)
+        script = asked_at([1000]) + [told(5000, "play 8")] + asked_at([5000, 6980, 7000, 8980, 9000, 505000])
+        self.assertEqual(self.playing_in(files, script), [("all", 1), (8, 3), (8, 3), (8, 1), (8, 1), (8, 3), (8, 3)])
+
+    def test_a_refused_play_leaves_the_playlist_where_it_is(self):
+        refusals = [told(5000, line) for line in ("play 9", "play 0", "play 65536", "play 2 2", "play", "play two")]
+        self.assertEqual(self.animation_in(three(), refusals + asked_at([5000, 31980, 32000])), [1, 1, 2])
+
+
+class PlayAll(ThePlaylist):
+    def replies_to(self, files, lines):
+        printed = self.assert_as_the_reference(files, [told(0, line) for line in lines])
+        return [line[len("reply "):] for line in printed]
+
+    def test_from_a_cycle_the_playlist_plays_from_its_first_animation(self):
+        files = with_a_cycle(three(), CYCLE, start=8)
+        script = asked_at([1000]) + [told(1500, "play all")] + asked_at([1500, 33480, 33500])
+        self.assertEqual(self.playing_in(files, script), [(8, 3), ("all", 1), ("all", 1), ("all", 2)])
+
+    def test_in_the_middle_of_the_playlist_it_goes_back_to_the_first_animation(self):
+        # At 40 seconds it is the turn of animation 2.
+        script = asked_at([40000]) + [told(40010, "play all")] + asked_at([40020, 72000, 72020])
+        self.assertEqual(self.animation_in(three(), script), [2, 1, 1, 2])
+        seen = self.pictures_in(three(), [told(40010, "play all"), f"poll {T0 + 40020}"])
+        self.assertEqual(seen, self.pictures_at(three(), [0]))
+
+    def test_during_the_first_turn_it_begins_that_turn_again(self):
+        script = [told(20000, "play all")] + asked_at([20000, 51980, 52000])
+        self.assertEqual(self.animation_in(three(), script), [1, 1, 2])
+
+    def test_it_begins_with_the_first_animation_whatever_the_show_starts_with(self):
+        script = asked_at([1000]) + [told(2000, "play all")] + asked_at([2000])
+        self.assertEqual(self.animation_in(three(start=3), script), [3, 1])
+
+    def test_a_cycle_that_is_the_first_item_is_not_where_it_begins(self):
+        files = with_a_cycle(three(), CYCLE, start=8, first=True)
+        self.assertEqual(self.playing_in(files, [told(1000, "play all")] + asked_at([1000])), [("all", 1)])
+
+    def test_before_the_first_refresh(self):
+        printed = self.assert_as_the_reference(three(start=2), [told(0, "play all")] + asked_at([400, 32380, 32400]))
+        states = [json.loads(line[len("reply "):]) for line in printed if line.startswith('reply {"ok":true,"on"')]
+        self.assertEqual([state["animation"] for state in states], [1, 1, 2])
+
+    def test_it_is_answered_as_every_command_that_was_carried_out(self):
+        self.assertEqual(self.replies_to(three(), ["play all", "play all"]), [OK, OK])
+        endings = [support.linehex(T0, b"play all" + ending) for ending in (b"\n", b"\r\n", b"\r")]
+        printed = self.assert_as_the_reference(three(), endings)
+        self.assertEqual([line[len("reply "):] for line in printed], [OK] * 3)
+
+    def test_a_show_without_an_animation_refuses_it_with_unknown_id(self):
+        self.assertEqual(self.replies_to(show_of([], {}), ["play all"]), [refused("unknown-id")])
+
+    def test_an_invalid_show_refuses_it_with_show_invalid(self):
+        files = three()
+        del files["ten.odrg"]
+        self.assertEqual(self.replies_to(files, ["play all"]), [refused("show-invalid")])
+
+    WRONG = ["play all 1", "play all all", "play all ", "play  all", "play ALL", "play All", "play al", "play alll", "play all\t", "play 1 all", "play -all", "play all,"]
+
+    def test_a_word_too_many_or_another_word_is_a_bad_argument(self):
+        self.assertEqual(self.replies_to(three(), self.WRONG), [refused("bad-argument")] * len(self.WRONG))
+
+    def test_a_bad_argument_is_named_before_an_invalid_show(self):
+        files = three()
+        del files["ten.odrg"]
+        self.assertEqual(self.replies_to(files, self.WRONG), [refused("bad-argument")] * len(self.WRONG))
+
+    def test_a_refused_one_leaves_what_plays(self):
+        files = with_a_cycle(three(), CYCLE, start=8)
+        script = asked_at([1000]) + [told(1500, line) for line in self.WRONG] + asked_at([1500])
+        self.assertEqual(self.playing_in(files, script), [(8, 3), (8, 3)])
+
+    def test_the_bytes_of_a_transport_are_answered_as_the_lines_are(self):
+        lines = [b"play all", b"status", b"play 3", b"status", b"play all now", b"play 9", b"play all", b"status"]
+        as_lines = self.assert_as_the_reference(three(), [support.linehex(T0, line) for line in lines])
+        text = b"\n".join(lines) + b"\n"
+        pieces = [text[at:at + 7] for at in range(0, len(text), 7)]
+        as_bytes = self.assert_as_the_reference(three(), [support.fed(T0, piece) for piece in pieces])
+        self.assertEqual([line for line in as_bytes if line.startswith("reply ")], as_lines)
+        self.assertEqual([bytes.fromhex(line[4:]) for line in as_bytes if line.startswith("fed")], lines)
+        self.assertIn('"playing":"all","animation":3', as_lines[3])
+        self.assertIn('"playing":"all","animation":1', as_lines[7])
 
 
 if __name__ == "__main__":

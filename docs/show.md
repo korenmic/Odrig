@@ -93,9 +93,13 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 
 ## Playing an item by command
 
-- Playing an animation item shows it from its first frame and loops it forever.
-- Playing a cycle shows each listed animation in order for `seconds`, then starts over, and
-  repeats forever. Each turn starts its animation from the first frame.
+- `play <id>` of an animation item plays the playlist from that animation: its turn
+  begins, with its first frame, and afterwards the playlist goes on with the animation
+  after it. No command plays one animation without end.
+- `play <id>` of a cycle shows each listed animation in order for `seconds`, then starts
+  over, and repeats forever. Each turn starts its animation from the first frame. While
+  a cycle plays, the playlist does not.
+- `play all` plays the playlist from its first animation, whatever `start` names.
 
 ## Changing a show while it runs
 

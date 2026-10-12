@@ -278,9 +278,10 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "upload begin <id> <file> <bytes>",
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
-        one_line = [command for command in documented if not command.startswith("upload ")]
+        # `play all` is `play` with the word in the place of the id.
+        one_line = [command for command in documented if not command.startswith("upload ") and command != "play all"]
         self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name != "upload"],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
@@ -302,6 +303,7 @@ class Usage(unittest.TestCase):
             (["on"], b"on\n"),
             (["off"], b"off\n"),
             (["play", "12"], b"play 12\n"),
+            (["play", "all"], b"play all\n"),
             (["brightness", "300"], b"brightness 300\n"),
             (["play", "abc"], b"play abc\n"),
             (["brightness", " 7"], b"brightness  7\n"),
@@ -312,6 +314,11 @@ class Usage(unittest.TestCase):
             (["remove", "x y"], b"remove x y\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
+
+    def test_the_help_names_play_all(self):
+        said = " ".join(cli.parser().format_help().split())
+        self.assertIn("Commands: play ID, play all, on, off,", said)
+        self.assertIn("the word all of play", said)
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
@@ -579,7 +586,7 @@ class Upload(Content):
                     result = support.run_tool(*target, "upload", "9", self.hello)
                     self.assertEqual((result.status, result.out), (0, OK))
                     self.assertRegex(result.err, rf"\Aupload: 100% {size}/{size} bytes \d+ B/s\nupload: checking\n\Z")
-                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, (9, 9, None)))
+                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, ("all", 9, None)))
                 finally:
                     emulator.stop()
                 self.assertEqual(support.files_of(self.folder)["hello-again.odrg"], self.before["hello.odrg"])
@@ -587,7 +594,7 @@ class Upload(Content):
                 again = support.Emulator(self.folder)
                 try:
                     target = targets(again)[transport]
-                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, (9, 9, None)))
+                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, ("all", 9, None)))
                     removed = support.run_tool(*target, "remove", "9")
                     self.assertEqual((removed.status, removed.out, removed.err), (0, OK, ""))
                     self.assertEqual(json.loads(support.run_tool(*target, "status").out)["playing"], None)

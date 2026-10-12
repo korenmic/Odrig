@@ -117,7 +117,7 @@ class NewAndReplaced(Uploads):
         self.assertEqual(json.loads(given[3])["items"][-1], {"id": 9, "file": "new.odrg", "bytes": len(clip)})
         self.assertEqual([item["id"] for item in json.loads(given[3])["items"]], [1, 2, 3, 4, 5, 6, 9])
         self.assertEqual(given[4], OK)
-        self.assertEqual((json.loads(given[5])["playing"], json.loads(given[6])["animation"]), (9, 9))
+        self.assertEqual((json.loads(given[5])["playing"], json.loads(given[5])["animation"], json.loads(given[6])["animation"]), ("all", 9, 9))
         self.assertEqual(json.loads(given[7])["animations"], 5)
         self.assertEqual(self.left["new.odrg"], clip)
         self.assertEqual(json.loads(self.left["show.json"])["items"][-1], {"id": 9, "file": "new.odrg"})
@@ -131,7 +131,7 @@ class NewAndReplaced(Uploads):
         again = Script().line("list", "play 700").polls(10).line("status")
         given = self.play(self.left, again)
         self.assertEqual(json.loads(given[0])["items"][-1], {"id": 700, "file": "kept.odrg", "bytes": len(clip)})
-        self.assertEqual(json.loads(given[2])["playing"], 700)
+        self.assertEqual((json.loads(given[2])["playing"], json.loads(given[2])["animation"]), ("all", 700))
 
     def test_a_replacement_under_the_same_name_leaves_the_show_file_and_restarts_what_plays(self):
         files = small_show(ITEMS, start=1)
@@ -727,7 +727,7 @@ class TwoEntries(Uploads):
         self.assertEqual(given[0], CHUNK)
         self.assertEqual(given[len(lines) - 1], received(len(clip)))
         self.assertEqual(given[len(lines):len(lines) + 2], [OK, OK])
-        self.assertEqual(json.loads(given[-1])["playing"], 9)
+        self.assertEqual((json.loads(given[-1])["playing"], json.loads(given[-1])["animation"]), ("all", 9))
         self.assertEqual(self.left["new.odrg"], clip)
 
     def test_playback_goes_on_as_without_the_upload_until_its_end(self):

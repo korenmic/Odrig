@@ -170,7 +170,7 @@ struct Core {
     // Playback.
     uint8_t on;
     uint8_t scale[256];     // what each colour value is sent as, at the current brightness
-    uint32_t playing;       // the position of the item being played, kPlaylist, or kNothing
+    uint32_t playing;       // the position of the cycle being played, kPlaylist, or kNothing
     uint32_t shown;         // the position of the animation item the latest refresh chose
     uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn

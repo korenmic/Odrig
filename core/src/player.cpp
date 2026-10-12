@@ -90,22 +90,22 @@ uint64_t playlist_turn(Core &core, uint64_t now) {
 // Brings the pixel buffer to the picture of what is being played at a moment. False when
 // there is no picture to show.
 bool advance(Core &core, uint64_t now) {
-    // An animation item is one turn without end. A cycle is a row of turns of equal
-    // length, each with the next animation of its list, counted from the turn's start.
-    // The playlist is a row of turns, each as long as its animation makes it.
-    uint32_t animation = core.playing;
-    uint64_t turn = 0;
-    uint64_t in_turn = now - core.zero;
+    // The playlist is a row of turns, each as long as its animation makes it. A cycle is
+    // a row of turns of equal length, each with the next animation of its list. The time
+    // of an animation is counted from the start of its turn.
+    uint32_t animation;
+    uint64_t turn;
+    uint64_t in_turn;
     if (core.playing == kPlaylist) {
         in_turn = playlist_turn(core, now);
         animation = core.turn_item;
         turn = core.turn_number;
-    } else if (core.items[core.playing].is_cycle) {
-        const ItemInfo &item = core.items[core.playing];
-        const uint64_t turn_length = 1000ull * item.seconds;
-        turn = in_turn / turn_length;
-        in_turn = in_turn % turn_length;
-        animation = core.entries[item.first + turn % item.count];
+    } else {
+        const ItemInfo &cycle = core.items[core.playing];
+        const uint64_t turn_length = 1000ull * cycle.seconds;
+        turn = (now - core.zero) / turn_length;
+        in_turn = (now - core.zero) % turn_length;
+        animation = core.entries[cycle.first + turn % cycle.count];
     }
     const FileInfo &file = core.files[core.items[animation].first];
     const uint64_t loop = in_turn / file.total_ms;
@@ -199,7 +199,7 @@ void player_start(Core &core) {
         return;
     }
     if (core.has_start && core.items[core.start_item].is_cycle) {
-        player_play(core, core.start_item);
+        player_play_cycle(core, core.start_item);
         return;
     }
     const uint32_t from = core.has_start ? core.start_item : player_first_animation(core);
@@ -208,12 +208,11 @@ void player_start(Core &core) {
     }
 }
 
-void player_play(Core &core, uint32_t item) {
+void player_play_cycle(Core &core, uint32_t item) {
     close_stream(core);
     core.playing = item;
     core.zero_pending = 1;
-    const ItemInfo &played = core.items[item];
-    core.shown = played.is_cycle ? core.entries[played.first] : item;
+    core.shown = core.entries[core.items[item].first];
 }
 
 void player_play_all(Core &core, uint32_t from) {
@@ -240,13 +239,13 @@ void player_file_replaced(Core &core, uint32_t item) {
         }
         return;
     }
-    const ItemInfo &played = core.items[core.playing];
-    bool plays = core.playing == item;
-    for (uint32_t entry = 0; played.is_cycle && entry < played.count; ++entry) {
-        plays = plays || core.entries[played.first + entry] == item;
+    const ItemInfo &cycle = core.items[core.playing];
+    bool plays = false;
+    for (uint32_t entry = 0; entry < cycle.count; ++entry) {
+        plays = plays || core.entries[cycle.first + entry] == item;
     }
     if (plays) {
-        player_play(core, core.playing);
+        player_play_cycle(core, core.playing);
     }
 }
 

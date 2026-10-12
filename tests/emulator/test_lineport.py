@@ -225,7 +225,7 @@ class TheEmulator(unittest.TestCase):
             self.assertTrue(reply.endswith(b"\n"), line)
             self.assertEqual(reply.count(b"\n"), 1, line)
             self.assertEqual(support.without_fps(reply), support.without_fps(expected), line)
-        self.assertEqual(self.emulator.status()["playing"], 2)
+        self.assertEqual((self.emulator.status()["playing"], self.emulator.status()["animation"]), ("all", 2))
         self.assertEqual(self.program().ask("play 3"), OK)
 
     def test_a_command_that_arrived_by_the_line_port_is_in_the_log_as_tcp(self):

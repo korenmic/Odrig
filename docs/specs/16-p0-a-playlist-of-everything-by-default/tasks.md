@@ -72,7 +72,7 @@ Rules for every task:
   - Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 5.1, 5.2,
     5.3, 5.4
 
-- [ ] 4. `play <id>` and `play all`
+- [x] 4. `play <id>` and `play all`
   - `core/src/commands.cpp`: `play` of an animation starts the playlist from it;
     `play all`. The reference player gets both.
   - `tests/core/`: a jump and what follows it; `play all` from a cycle and from the

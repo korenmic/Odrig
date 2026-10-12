@@ -44,7 +44,7 @@ class Commands(unittest.TestCase):
                     self.assertEqual(answer.headers["content-length"], str(len(answer.body)))
                     expected = player.command(100, line.encode("ascii"))
                     if line == "status":
-                        self.assertRegex(answer.body, rb'\A\{"ok":true,"on":(true|false),"brightness":[0-9]+,"playing":[0-9]+,"animation":[0-9]+,"fps":[0-9]+,"error":null\}\n\Z')
+                        self.assertRegex(answer.body, rb'\A\{"ok":true,"on":(true|false),"brightness":[0-9]+,"playing":([0-9]+|"all"),"animation":[0-9]+,"fps":[0-9]+,"error":null\}\n\Z')
                         self.assertEqual(support.without_fps(answer.body), support.without_fps(expected))
                     else:
                         self.assertEqual(answer.body, expected)

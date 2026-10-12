@@ -17,7 +17,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the item with that id from [show.json](show.md), from its first frame. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. |
+| `play all` | Plays the playlist, from its first animation. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
@@ -49,8 +50,8 @@ A number in a command is written in decimal digits.
 |---|---|
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Current brightness, 0 to 255. |
-| `playing` | What is being played: `"all"` for the playlist, the id of an item, or `null`. |
-| `animation` | The id of the animation item on the LEDs right now, or `null`. It differs from `playing` when the playlist or a cycle is playing. |
+| `playing` | What is being played: `"all"` for the playlist, the id of a cycle, or `null`. |
+| `animation` | The id of the animation item on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 
@@ -170,7 +171,7 @@ succeeds.
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
-| `unknown-id` | `play` or `remove` names an id that is not in `show.json`. |
+| `unknown-id` | `play` or `remove` names an id that is not in `show.json`; `play all` was sent to a show without an animation. |
 | `in-use` | `remove` names an animation that a cycle lists; `upload begin` names the id of a cycle, or a file name another item has. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
