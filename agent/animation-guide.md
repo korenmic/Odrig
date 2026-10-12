@@ -182,9 +182,8 @@ demo show is 1,210 bytes, and the dense clip 1.4 MB.
 
 The large hosting services for git refuse a single file above 100 MB and warn above 50 MB.
 Keep every source at 50 MB or less, a minute of video at 25 pictures a second, and cut a
-longer piece into several animations with `--start` and `--duration`. The owner has ruled
-that the JSON source is what is committed for every animation, whatever its size below that
-limit.
+longer piece into several animations with `--start` and `--duration`. By the owner's ruling
+the JSON source is what is committed for every animation, whatever its size.
 
 ## Dense animations on the board
 
