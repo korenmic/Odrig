@@ -7618,3 +7618,54 @@ client"; `tests/app/support.py`, `StandIn`.
 
 **Resolution.** `app/www/messages.js`, `ofRefusal`; `app/www/screens/show.js`, `draw`;
 `app/www/main.js`, `go` and the watcher of the client; `tests/app/test_look.py`.
+
+## Seed 09: The toolchain and the first APK
+
+**Question.** The design of the app assumed seven things about the build, T1 to T7, and
+named six facts to be read again before anything is pinned. What was found?
+
+**Answer.** The owner said yes to the downloads and to the SDK's licence on 2026-10-13,
+after the files, their sources and their sizes were named.
+
+- The facts, read again at their sources on that day, are as the design has them:
+  Capacitor 8.5.3, the Temurin JDK 21.0.12.1+1, the command-line tools 15859902, the
+  three SDK packages under `android-sdk-license`, and Gradle 8.14.3. Nothing else is
+  pinned.
+- T1 holds. `npm ci` with Node.js 26.5 installed the three packages at 8.5.3, and
+  `cap add android` made the project the design describes: API levels 24, 36 and 36, the
+  Android Gradle plugin 8.13.0, Gradle 8.14.3, the one permission `INTERNET`. The
+  template also puts Google's services plugin on the build's classpath; it is applied
+  only when a `google-services.json` is there, and none is.
+- T2 holds: Capacitor takes `../build/app/www` as its folder of web files.
+- T3 holds: `sdkmanager` ran on the JDK, asked once, and installed the three packages;
+  the SDK's folder of accepted licences holds `android-sdk-license` and nothing else.
+- T4 holds: after three builds the SDK holds the three packages and no other.
+- T5 did not hold at first. The Android build wrote `analytics.settings`, a record that
+  nothing is reported, into `.android` of the user's folder: Java takes that folder from
+  the system, whatever `HOME` and `ANDROID_USER_HOME` say. Gradle is now given
+  `-Duser.home` with a folder of the work folder, the file was removed, and after a
+  further build nothing new was in `.gradle`, `.android`, `.npm` or `.m2` of the user's
+  folder. One more thing was written there, by hand and not by the tool: the lock file
+  was made once with `npm install --package-lock-only` without the tool's environment,
+  and npm's own cache in the user's folder got the packages' descriptions and a log.
+  Every run of npm by the tool keeps its cache in the work folder.
+- T6 holds: Gradle took `distributionSha256Sum`, and Capacitor's `sync` left the file.
+- T7 was not tried as written, because no setting of the Mac is changed. With Gradle's
+  own `--offline`, a build from an emptied build folder of the Android project succeeded
+  in 5 seconds.
+- A setup took 16 seconds on this network. The first build took 56 seconds, with Gradle
+  fetching itself and what the Android build needs; a second build took 4.5 seconds. The
+  work folder `build/app/` has 2.2 GB after a build: 354 MB of kept archives, 336 MB of
+  JDK, 530 MB of SDK and 1.0 GB of Gradle with what it fetched. `app/node_modules/` has
+  31 MB.
+- The APK has 4,132,388 bytes, and every build of the same files gave the same bytes.
+- `npm audit` names three advisories of moderate severity, all through one package that
+  Capacitor's command line uses, `uuid`. It runs at build time only; nothing of it is in
+  the APK.
+- The JDK's archive holds links, so it is unpacked as a tar archive is and not as plain
+  data. A variable `ANDROID_SDK_ROOT` of the caller is not passed on.
+
+**Resolution.** `app/toolchain.json`, `app/package.json`, `app/apptool/toolchain.py`,
+`env.py` and `build.py`; `app/android/gradle/wrapper/gradle-wrapper.properties`;
+`docs/specs/09-p1-operators-app-for-android/design.md`, "The environment of every child
+process".

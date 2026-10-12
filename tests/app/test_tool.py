@@ -1,15 +1,25 @@
+import hashlib
 import http.client
+import http.server
+import io
+import json
 import os
 import pathlib
+import re
 import signal
+import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
+import threading
 import unittest
+import unittest.mock
+import zipfile
 
 from . import support
 
-from apptool import cli, webserver  # noqa: E402
+from apptool import Failure, build, cli, device, env, paths, stage, toolchain, webserver  # noqa: E402
 
 TOOL = [sys.executable, str(support.APP / "app.py")]
 
@@ -98,7 +108,8 @@ class TheCommand(unittest.TestCase):
         self.assertRegex(done.stderr, rf"\Aerror: address-in-use: 127\.0\.0\.1:{taken.port}: .+\n\Z")
 
     def test_a_command_line_that_is_not_understood_is_status_2(self):
-        for arguments in ([], ["dance"], ["serve", "--port"], ["serve", "--port", "70000"], ["serve", "--port", "-1"], ["serve", "--lan"], ["serve", "extra"]):
+        for arguments in ([], ["dance"], ["serve", "--port"], ["serve", "--port", "70000"], ["serve", "--port", "-1"], ["serve", "--lan"], ["serve", "extra"],
+                          ["setup", "now"], ["build", "--release"], ["install", "phone"], ["test"]):
             with self.subTest(arguments=arguments):
                 done = subprocess.run([*TOOL, *arguments], capture_output=True, text=True, timeout=20)
                 self.assertEqual((done.returncode, done.stdout), (2, ""))
@@ -115,6 +126,297 @@ class TheCommand(unittest.TestCase):
                     self.assertIn(words[1].split(".")[0], allowed, f"{path.name}: {line}")
         self.assertEqual(cli.parser().prog, "python3 app/app.py")
         self.assertEqual(os.listdir(support.APP / "apptool").count("__init__.py"), 1)
+
+
+def packed_jdk():
+    """The bytes of an archive laid out as a JDK for macOS is: a home with `bin/java`."""
+    data = io.BytesIO()
+    with tarfile.open(fileobj=data, mode="w:gz") as packed:
+        java = tarfile.TarInfo("jdk-0/Contents/Home/bin/java")
+        script = b"#!/bin/sh\necho 'openjdk version 0' 1>&2\n"
+        java.size, java.mode = len(script), 0o755
+        packed.addfile(java, io.BytesIO(script))
+    return data.getvalue()
+
+
+def packed_tools():
+    """The bytes of an archive laid out as the command-line tools are."""
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, "w") as packed:
+        for name, mode in (("cmdline-tools/bin/sdkmanager", 0o755), ("cmdline-tools/lib/tools.jar", 0o644), ("cmdline-tools/NOTICE.txt", 0o644)):
+            member = zipfile.ZipInfo(name)
+            member.external_attr = (stat.S_IFREG | mode) << 16
+            packed.writestr(member, b"#!/bin/sh\nexit 0\n")
+    return data.getvalue()
+
+
+class Archives(unittest.TestCase):
+    """The downloads, against a server of the test: nothing here asks another computer."""
+
+    def setUp(self):
+        self.work = pathlib.Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.downloads = self.work / "downloads"
+        self.served = {"/jdk.tar.gz": packed_jdk(), "/tools.zip": packed_tools()}
+        served, asked = self.served, []
+        self.asked = asked
+
+        class Files(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *arguments):
+                pass
+
+            def do_GET(self):
+                asked.append(self.path)
+                body = served.get(self.path)
+                self.send_response(404 if body is None else 200)
+                self.send_header("Content-Length", str(len(body or b"")))
+                self.end_headers()
+                self.wfile.write(body or b"")
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Files)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        thread.start()
+        self.addCleanup(lambda: (server.shutdown(), thread.join(), server.server_close()))
+        self.at = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def archive(self, path, **other):
+        data = self.served[path]
+        return {"url": self.at + path, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(), **other}
+
+    def refused(self, reason, call, *arguments, **settings):
+        with self.assertRaises(Failure) as failure:
+            call(*arguments, **settings)
+        self.assertEqual(failure.exception.reason, reason, failure.exception.detail)
+        return failure.exception.detail
+
+    def test_an_archive_with_its_size_and_its_sha256_is_kept_and_fetched_once(self):
+        kept = toolchain.fetched(self.archive("/jdk.tar.gz"), self.downloads)
+        self.assertEqual((kept, kept.read_bytes()), (self.downloads / "jdk.tar.gz", self.served["/jdk.tar.gz"]))
+        self.assertEqual(toolchain.fetched(self.archive("/jdk.tar.gz"), self.downloads), kept)
+        self.assertEqual(self.asked, ["/jdk.tar.gz"])
+        self.assertEqual(sorted(path.name for path in self.downloads.iterdir()), ["jdk.tar.gz"])
+
+    def test_an_archive_with_another_sha256_or_another_size_is_refused_and_removed_and_nothing_is_unpacked(self):
+        jdk = self.work / "jdk"
+        for what, other in (("sha256", {"sha256": "0" * 64}), ("size", {"bytes": len(self.served["/jdk.tar.gz"]) + 1})):
+            with self.subTest(what):
+                detail = self.refused("checksum-mismatch", lambda: toolchain.unpacked_jdk(toolchain.fetched(self.archive("/jdk.tar.gz", **other), self.downloads), jdk))
+                self.assertIn("jdk.tar.gz has", detail)
+                self.assertEqual(list(self.downloads.iterdir()), [])
+                self.assertFalse(jdk.exists(), "the archive was unpacked")
+
+    def test_a_file_that_lies_in_the_folder_of_downloads_is_checked_too(self):
+        self.downloads.mkdir()
+        (self.downloads / "jdk.tar.gz").write_bytes(b"something else")
+        self.refused("checksum-mismatch", toolchain.fetched, self.archive("/jdk.tar.gz"), self.downloads)
+        self.assertEqual((list(self.downloads.iterdir()), self.asked), ([], []))
+
+    def test_an_archive_that_cannot_be_fetched_is_download_failed_and_leaves_nothing(self):
+        self.refused("download-failed", toolchain.fetched, {"url": self.at + "/absent.zip", "bytes": 1, "sha256": "0" * 64}, self.downloads)
+        nowhere = {"url": f"http://127.0.0.1:{support.free_port()}/jdk.tar.gz", "bytes": 1, "sha256": "0" * 64}
+        self.refused("download-failed", toolchain.fetched, nowhere, self.downloads)
+        self.assertEqual(list(self.downloads.iterdir()), [])
+
+    def test_the_jdk_is_unpacked_and_its_home_is_the_folder_with_bin_java(self):
+        home = toolchain.unpacked_jdk(toolchain.fetched(self.archive("/jdk.tar.gz"), self.downloads), self.work / "jdk")
+        self.assertEqual(home, self.work / "jdk" / "jdk-0" / "Contents" / "Home")
+        self.assertTrue(os.access(home / "bin" / "java", os.X_OK))
+        self.assertEqual(toolchain.java_home(self.work / "jdk"), home)
+        self.assertIsNone(toolchain.java_home(self.work / "no-jdk"))
+
+    def test_the_command_line_tools_are_unpacked_as_latest_with_their_executable_bits(self):
+        sdk = self.work / "sdk"
+        latest = toolchain.unpacked_tools(toolchain.fetched(self.archive("/tools.zip"), self.downloads), sdk)
+        self.assertEqual(latest, sdk / "cmdline-tools" / "latest")
+        self.assertTrue(os.access(latest / "bin" / "sdkmanager", os.X_OK))
+        self.assertFalse(os.access(latest / "lib" / "tools.jar", os.X_OK))
+        self.assertEqual(sorted(path.name for path in sdk.iterdir()), ["cmdline-tools"])
+        self.assertEqual(sorted(path.name for path in (sdk / "cmdline-tools").iterdir()), ["latest"])
+
+
+class TheToolchain(unittest.TestCase):
+    def setUp(self):
+        self.work = pathlib.Path(self.enterContext(tempfile.TemporaryDirectory()))
+
+    def refused(self, reason, call, *arguments, **settings):
+        with self.assertRaises(Failure) as failure:
+            call(*arguments, **settings)
+        self.assertEqual(failure.exception.reason, reason, failure.exception.detail)
+        return failure.exception.detail
+
+    def test_every_download_is_named_by_one_exact_version_with_its_size_and_sha256(self):
+        listed = toolchain.read()
+        self.assertEqual(sorted(listed), ["command-line-tools", "jdk", "licence", "sdk-packages"])
+        for name in ("jdk", "command-line-tools"):
+            self.assertRegex(listed[name]["version"], r"\A[0-9][0-9.+]*\Z")
+            archive = listed[name]["darwin-arm64"]
+            self.assertEqual(sorted(archive), ["bytes", "sha256", "url"])
+            self.assertRegex(archive["url"], r"\Ahttps://[a-z0-9.-]+/")
+            self.assertRegex(archive["sha256"], r"\A[0-9a-f]{64}\Z")
+            self.assertGreater(archive["bytes"], 100_000_000)
+            self.assertIn(listed[name]["version"].split("+")[0], archive["url"])
+        self.assertEqual(listed["sdk-packages"], ["platform-tools", "platforms;android-36", "build-tools;35.0.0"])
+        self.assertEqual(listed["licence"], "android-sdk-license")
+
+    def test_the_packages_of_npm_are_three_at_one_exact_version_with_a_lock_file(self):
+        package = json.loads(paths.PACKAGE.read_text(encoding="utf-8"))
+        named = {**package["dependencies"], **package["devDependencies"]}
+        self.assertEqual(sorted(named), ["@capacitor/android", "@capacitor/cli", "@capacitor/core"])
+        self.assertEqual(len(set(named.values())), 1)
+        for version in named.values():
+            self.assertRegex(version, r"\A[0-9]+\.[0-9]+\.[0-9]+\Z")
+        self.assertIs(package["private"], True)
+        lock = json.loads(paths.LOCK.read_text(encoding="utf-8"))
+        for name, version in named.items():
+            self.assertEqual(lock["packages"][f"node_modules/{name}"]["version"], version)
+
+    def test_a_system_the_file_does_not_name_is_unsupported(self):
+        listed = toolchain.read()
+        self.assertEqual(toolchain.archive_of(listed, "jdk", "darwin-arm64"), listed["jdk"]["darwin-arm64"])
+        detail = self.refused("unsupported-platform", toolchain.archive_of, listed, "jdk", "plan9-mips")
+        self.assertIn("toolchain.json has no jdk for plan9-mips", detail)
+        self.assertRegex(toolchain.system(), r"\A[a-z0-9]+-[a-z0-9_]+\Z")
+
+    def test_the_environment_of_a_child_keeps_everything_in_the_work_folder(self):
+        home = self.work / "jdk" / "Home"
+        made = env.child(home, caller={"PATH": "/usr/bin:/bin", "HOME": "/Users/somebody", "ANDROID_SDK_ROOT": "/elsewhere", "KEPT": "1"})
+        work = str(paths.WORK)
+        self.assertEqual(paths.WORK, support.ROOT / "build" / "app")
+        for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache"):
+            self.assertTrue(made[name].startswith(work + os.sep), name)
+        self.assertEqual(len({made[name] for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache")}), 4)
+        self.assertEqual((made["JAVA_HOME"], made["PATH"]), (str(home), f"{home}/bin:/usr/bin:/bin"))
+        self.assertEqual((made["npm_config_update_notifier"], made["HOME"], made["KEPT"]), ("false", "/Users/somebody", "1"))
+        self.assertNotIn("ANDROID_SDK_ROOT", made)
+        # Capacitor's command line gets the work folder's own folder as the user's.
+        self.assertEqual(env.child(home, home=True, caller={"HOME": "/Users/somebody"})["HOME"], str(paths.WORK / "home"))
+        self.assertNotIn("JAVA_HOME", env.child(caller={"PATH": "/usr/bin"}))
+
+    def test_gradle_leaves_nothing_running_and_keeps_its_settings_in_the_work_folder(self):
+        command = build.gradle_command()
+        self.assertEqual(command[0], str(support.APP / "android" / "gradlew"))
+        self.assertEqual(command[1:3], ["--no-daemon", f"-Duser.home={support.ROOT / 'build' / 'app' / 'home'}"])
+        self.assertEqual(command[3:], ["-p", str(support.APP / "android"), "assembleDebug"])
+
+    def test_the_android_project_is_the_templates_with_the_checksum_of_gradle(self):
+        android = support.APP / "android"
+        wrapper = (android / "gradle" / "wrapper" / "gradle-wrapper.properties").read_text(encoding="utf-8")
+        self.assertRegex(wrapper, r"(?m)^distributionUrl=https\\://services\.gradle\.org/distributions/gradle-[0-9.]+-all\.zip$")
+        self.assertRegex(wrapper, r"(?m)^distributionSha256Sum=[0-9a-f]{64}$")
+        versions = (android / "variables.gradle").read_text(encoding="utf-8")
+        for expected in ("minSdkVersion = 24", "compileSdkVersion = 36", "targetSdkVersion = 36"):
+            self.assertIn(expected, versions)
+        tracked = subprocess.run(["git", "ls-files", "app/android"], cwd=support.ROOT, capture_output=True, text=True).stdout.split()
+        self.assertIn("app/android/gradlew", tracked)
+        self.assertEqual([path for path in tracked if "/build/" in path or "assets/public" in path or path.endswith(("local.properties", ".apk"))], [])
+        ignored = subprocess.run(["git", "check-ignore", "app/node_modules/x", "app/android/app/build/x", "app/android/app/src/main/assets/public/index.html", "app/android/local.properties", "build/app/x"],
+                                 cwd=support.ROOT, capture_output=True, text=True).stdout.split()
+        self.assertEqual(len(ignored), 5)
+
+    def manager(self, script):
+        """An SDK folder with a stand-in for `sdkmanager` that runs a shell script."""
+        sdk = self.work / "sdk"
+        program = sdk / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
+        program.parent.mkdir(parents=True)
+        program.write_text("#!/bin/sh\n" + script)
+        program.chmod(0o755)
+        return sdk, program
+
+    LISTED = {"sdk-packages": ["platform-tools", "platforms;android-36", "build-tools;35.0.0"], "licence": "android-sdk-license"}
+    INSTALLS = 'mkdir -p "$SDK/platform-tools" "$SDK/platforms/android-36" "$SDK/build-tools/35.0.0" "$SDK/licenses"\n'
+
+    def test_the_sdk_tool_is_given_one_yes_and_the_packages_and_the_one_licence_must_be_there(self):
+        script = 'SDK="${1#--sdk_root=}"\nshift\necho "$@" > "$SDK/asked.txt"\nread answer\nread more\necho "$answer|$more" > "$SDK/answered.txt"\n' + self.INSTALLS + 'echo accepted > "$SDK/licenses/android-sdk-license"\n'
+        sdk, program = self.manager(script)
+        toolchain.sdk_packages(self.LISTED, self.work / "jdk", sdk, program)
+        self.assertEqual((sdk / "asked.txt").read_text(), "platform-tools platforms;android-36 build-tools;35.0.0\n")
+        self.assertEqual((sdk / "answered.txt").read_text(), "y|\n")
+        # With the packages there, the tool is not started again.
+        (sdk / "asked.txt").unlink()
+        toolchain.sdk_packages(self.LISTED, self.work / "jdk", sdk, program)
+        self.assertFalse((sdk / "asked.txt").exists())
+
+    def test_another_licence_or_a_missing_package_is_licence_refused(self):
+        both = 'SDK="${1#--sdk_root=}"\n' + self.INSTALLS + 'echo a > "$SDK/licenses/android-sdk-license"\necho b > "$SDK/licenses/android-sdk-preview-license"\n'
+        sdk, program = self.manager(both)
+        detail = self.refused("licence-refused", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program)
+        self.assertIn("android-sdk-preview-license", detail)
+        (sdk / "licenses" / "android-sdk-preview-license").unlink()
+        toolchain.sdk_packages(self.LISTED, self.work / "jdk", sdk, program)
+        (sdk / "build-tools" / "35.0.0").rmdir()
+        program.write_text("#!/bin/sh\nexit 0\n")
+        self.assertIn("build-tools;35.0.0", self.refused("licence-refused", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program))
+        program.write_text("#!/bin/sh\necho 'no network' 1>&2\nexit 7\n")
+        self.assertIn("status 7: no network", self.refused("setup-failed", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program))
+
+    def test_a_node_that_is_missing_or_too_old_is_node_missing(self):
+        programs = self.work / "bin"
+        programs.mkdir()
+        with unittest.mock.patch.dict(os.environ, {"PATH": str(programs)}):
+            self.assertIn("node is not on the path", self.refused("node-missing", toolchain.node_version))
+            node = programs / "node"
+            node.write_text("#!/bin/sh\necho v18.20.4\n")
+            node.chmod(0o755)
+            self.assertIn("node is v18.20.4", self.refused("node-missing", toolchain.node_version))
+            node.write_text("#!/bin/sh\necho v22.0.0\n")
+            self.assertEqual(toolchain.node_version(), 22)
+
+
+class TheStagedFolder(unittest.TestCase):
+    def test_it_holds_the_web_code_as_it_is_and_a_note_of_what_it_was_built_from(self):
+        work = pathlib.Path(self.enterContext(tempfile.TemporaryDirectory()))
+        folder = work / "www"
+        folder.mkdir()
+        (folder / "left-over.js").write_text("old")
+        made = stage.staged(folder)
+        source = {path.relative_to(support.WWW).as_posix(): path.read_bytes() for path in support.WWW.rglob("*") if path.is_file()}
+        staged = {path.relative_to(made).as_posix(): path.read_bytes() for path in made.rglob("*") if path.is_file()}
+        note = json.loads(staged.pop("build.json"))
+        self.assertEqual(staged, source)
+        self.assertEqual(sorted(note), ["changed", "commit"])
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=support.ROOT, capture_output=True, text=True).stdout.strip()
+        self.assertEqual((note["commit"], type(note["changed"])), (head, bool))
+        self.assertNotIn("build.json", source)
+        self.assertEqual(paths.STAGED, support.ROOT / "build" / "app" / "www")
+
+    def test_capacitor_is_given_that_folder_and_the_page_for_an_old_web_view(self):
+        config = json.loads((support.APP / "capacitor.config.json").read_text(encoding="utf-8"))
+        self.assertEqual(config, {"appId": "app.odrig.operators", "appName": "odrig", "webDir": "../build/app/www",
+                                  "android": {"minWebViewVersion": 80, "backgroundColor": "#000000"}, "server": {"errorPath": "old.html"}})
+        self.assertEqual((support.APP / config["webDir"]).resolve(), paths.STAGED)
+        old = (support.WWW / "old.html").read_text(encoding="utf-8")
+        self.assertNotRegex(old, r"<script|src=|href=")
+        self.assertIn('update "Android System WebView"', old)
+
+
+class ThePhone(unittest.TestCase):
+    def setUp(self):
+        self.work = pathlib.Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.apk = self.work / "odrig-debug.apk"
+        self.apk.write_bytes(b"apk")
+
+    def adb(self, listed):
+        program = self.work / "adb"
+        program.write_text(f"#!/bin/sh\nif [ \"$1\" = devices ]; then printf '{listed}'; else echo \"$@\" > '{self.work}/ran.txt'; fi\n")
+        program.chmod(0o755)
+        return program
+
+    def test_the_devices_that_are_ready(self):
+        self.assertEqual(device.devices("List of devices attached\nR58M123\tdevice\nemulator-5554\toffline\nABC\tunauthorized\n\n"), ["R58M123"])
+        self.assertEqual(device.devices("List of devices attached\n\n"), [])
+
+    def test_it_installs_on_the_one_phone_and_refuses_none_and_two(self):
+        out = io.StringIO()
+        with unittest.mock.patch.object(paths, "ROOT", self.work):
+            self.assertEqual(device.install(out, self.adb("List of devices attached\\nR58M123\\tdevice\\n"), self.apk), 0)
+            self.assertEqual((self.work / "ran.txt").read_text(), f"-s R58M123 install -r {self.apk}\n")
+            self.assertEqual(out.getvalue(), "installed: odrig-debug.apk on R58M123\n")
+            for listed in ("List of devices attached\\n", "List of devices attached\\nA\\tdevice\\nB\\tdevice\\n", "List of devices attached\\nA\\tunauthorized\\n"):
+                with self.assertRaises(Failure) as failure:
+                    device.install(out, self.adb(listed), self.apk)
+                self.assertEqual(failure.exception.reason, "no-device")
+            with self.assertRaises(Failure) as failure:
+                device.install(out, self.adb(""), self.work / "absent.apk")
+            self.assertEqual(failure.exception.reason, "build-failed")
 
 
 if __name__ == "__main__":

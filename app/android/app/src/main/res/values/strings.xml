@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">odrig</string>
+    <string name="title_activity_main">odrig</string>
+    <string name="package_name">app.odrig.operators</string>
+    <string name="custom_url_scheme">app.odrig.operators</string>
+</resources>

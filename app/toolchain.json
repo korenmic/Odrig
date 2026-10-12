@@ -1,0 +1,20 @@
+{
+  "jdk": {
+    "version": "21.0.12.1+1",
+    "darwin-arm64": {
+      "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz",
+      "bytes": 200073404,
+      "sha256": "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998"
+    }
+  },
+  "command-line-tools": {
+    "version": "15859902",
+    "darwin-arm64": {
+      "url": "https://dl.google.com/android/repository/commandlinetools-mac_arm64-15859902_latest.zip",
+      "bytes": 156083281,
+      "sha256": "835b62a26162b229b441d1f6d4680383815a270809eb33522c0d480fa5002c4e"
+    }
+  },
+  "sdk-packages": ["platform-tools", "platforms;android-36", "build-tools;35.0.0"],
+  "licence": "android-sdk-license"
+}

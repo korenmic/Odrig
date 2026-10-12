@@ -8,3 +8,4 @@ __pycache__/
 /tools/
 .DS_Store
 /converter/node_modules/
+/app/node_modules/

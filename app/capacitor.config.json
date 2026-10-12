@@ -1,0 +1,7 @@
+{
+  "appId": "app.odrig.operators",
+  "appName": "odrig",
+  "webDir": "../build/app/www",
+  "android": {"minWebViewVersion": 80, "backgroundColor": "#000000"},
+  "server": {"errorPath": "old.html"}
+}

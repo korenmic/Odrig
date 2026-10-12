@@ -10,7 +10,7 @@ import signal
 import sys
 import threading
 
-from . import Failure, webserver
+from . import Failure, build, device, toolchain, webserver
 
 WAIT_SECONDS = 0.2
 
@@ -22,8 +22,11 @@ def _port(text):
 
 
 def parser():
-    made = argparse.ArgumentParser(prog="python3 app/app.py", description="Serves the web code of the operators' app to a browser on this computer.")
+    made = argparse.ArgumentParser(prog="python3 app/app.py", description="Sets up the build tools of the operators' app, builds its APK, installs it on a phone, and serves its web code to a browser.")
     commands = made.add_subparsers(dest="command", metavar="COMMAND", required=True)
+    commands.add_parser("setup", help="put the build tools into app/node_modules/ and build/app/")
+    commands.add_parser("build", help="build the debug APK, build/app/odrig-debug.apk")
+    commands.add_parser("install", help="install the built APK on the one phone that is connected by USB")
     serve = commands.add_parser("serve", help="serve the web code on 127.0.0.1, for a browser on this computer")
     serve.add_argument("--port", metavar="N", type=_port, default=webserver.PORT, help=f"the port on 127.0.0.1; 0 takes any free port (default: {webserver.PORT})")
     return made
@@ -45,7 +48,21 @@ def _serve(arguments, out):
     return 0
 
 
-ACTIONS = {"serve": _serve}
+def _setup(arguments, out):
+    toolchain.setup(out)
+    return 0
+
+
+def _build(arguments, out):
+    build.build(out)
+    return 0
+
+
+def _install(arguments, out):
+    return device.install(out)
+
+
+ACTIONS = {"setup": _setup, "build": _build, "install": _install, "serve": _serve}
 
 
 def main(argv=None, out=None):

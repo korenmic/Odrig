@@ -100,7 +100,7 @@ Rules for every task:
     against a table without `show-invalid`, fails and names the code.
   - Requirements: 6.3, 9.1, 9.2, 9.3, 9.4, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.8
 
-- [ ] 6. The toolchain and a first APK
+- [x] 6. The toolchain and a first APK
   - Tell the owner the files to be downloaded, their sources and their sizes, and wait
     for a yes.
   - Read F1, F3, F7, F8, F10 and F11 of the design again at their sources, and pin what

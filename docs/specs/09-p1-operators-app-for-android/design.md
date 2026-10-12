@@ -291,7 +291,9 @@ both into the documentation.
 | `HOME` | `build/app/home` | Capacitor's command line only, which keeps a settings file in the user's folder |
 | `PATH` | the JDK's `bin` first | all |
 
-Gradle runs with `--no-daemon`, so nothing of a build stays running.
+Gradle runs with `--no-daemon`, so nothing of a build stays running, and with
+`-Duser.home=build/app/home`: Java takes the user's folder from the system and not from
+`HOME`, and the Android build keeps a settings file in it.
 
 ### `setup`
 
