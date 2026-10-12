@@ -139,7 +139,7 @@ Rules for every task:
     do.
   - Requirements: 1.3, 1.5, 1.6, 3.7, 4.1, 6.1, 6.3, 6.4, 7.1, 7.2
 
-- [ ] 7. The final check, and the seed's state
+- [x] 7. The final check, and the seed's state
   - Read the acceptance criteria of Requirements 1 to 8 once more and name, for each one a
     program can check, the test that checks it; add a test where one is missing.
   - Read the six pages once more, in the order a newcomer reads them: `AGENTS.md`, the
