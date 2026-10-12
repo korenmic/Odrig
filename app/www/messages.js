@@ -21,3 +21,8 @@ export function ofInvalidShow(reason) {
 export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
 }
+
+// The message of a command the target refused.
+export function ofRefusal(refusal) {
+  return `The installation refused the command. (${refusal.code})`;
+}

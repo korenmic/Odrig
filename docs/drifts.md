@@ -7567,3 +7567,28 @@ first run of the suite show?
 **Resolution.** `app/www/commands.js`, `list`; `app/www/client.js`, `due`;
 `app/www/screens/show.js`; `docs/specs/09-p1-operators-app-for-android/design.md`, "The
 client"; `tests/app/support.py`, `StandIn`.
+
+## Seed 09: The controls of the show screen
+
+**Question.** What did building the controls settle that the design left open?
+
+**Answer.**
+
+- The status that follows a command of the operator goes before a list that waits, so
+  that the screen shows at once what the command did.
+- "The value at which the slider is let go is always sent" would send a tap on the
+  slider twice, as the move and as the letting go. The value is sent again at the
+  letting go only when its command went out a second ago or more: somebody else may
+  have set another brightness since. A brightness command still keeps 200 ms from the
+  one before it.
+- The slider counts as held from its first move until it is let go.
+- What the operator asked for and was not sent yet is dropped when the app leaves the
+  screen of the phone: it is not sent later, when the app comes back.
+- The animations are buttons, and the buttons are made again only when the list is
+  another one. A status arrives every second; making them again each time could lose a
+  press.
+- A refusal is shown as one general sentence with its code. The table of messages comes
+  with the task of the messages.
+
+**Resolution.** `app/www/client.js`, `give`, `want` and the handler of
+`visibilitychange`; `app/www/screens/show.js`, `sendLevel`, `drawRows` and `start`.

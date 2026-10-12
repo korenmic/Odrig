@@ -69,3 +69,26 @@ export async function list(from = 0) {
     next: reply.next,
   };
 }
+
+// Plays the playlist from the animation with this id, or the cycle with this id.
+export async function play(id) {
+  await carriedOut(`play ${id}`);
+}
+
+// Plays the playlist from its first animation.
+export async function playAll() {
+  await carriedOut("play all");
+}
+
+export async function on() {
+  await carriedOut("on");
+}
+
+export async function off() {
+  await carriedOut("off");
+}
+
+// Sets the brightness, 0 to 255.
+export async function brightness(value) {
+  await carriedOut(`brightness ${value}`);
+}

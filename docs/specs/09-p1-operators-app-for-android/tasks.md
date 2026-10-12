@@ -81,7 +81,7 @@ Rules for every task:
     asks for `list` once, fails: the rows end where the first reply ends.
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
 
-- [ ] 4. The controls
+- [x] 4. The controls
   - `commands.js` for `play <id>`, `play all`, `on`, `off` and `brightness <n>`; the
     order of the queue and a waiting brightness replaced; the buttons and the slider of
     `screens/show.js`.

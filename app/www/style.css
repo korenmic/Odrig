@@ -113,34 +113,28 @@ nav button[aria-current="true"] {
   color: var(--marked);
 }
 
-ol {
-  margin: 8px 0;
-  padding: 0;
-  list-style: none;
+#animations button {
+  text-align: left;
+  color: var(--text);
 }
 
-ol li {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  min-height: 56px;
-  margin: 8px 0;
-  padding: 8px 12px;
-  border: 1px solid var(--edge);
-  border-radius: 8px;
-  background: var(--button);
-}
-
-ol li[aria-current="true"] {
+#animations button[aria-current="true"],
+button[aria-pressed="true"] {
   border-color: var(--marked);
   color: var(--marked);
 }
 
-ol .id {
+#animations .id {
+  display: inline-block;
   min-width: 3ch;
   color: var(--lesser);
 }
 
-ol .file {
+#animations .file {
   overflow-wrap: anywhere;
+}
+
+input[type="range"] {
+  padding: 0;
+  accent-color: var(--marked);
 }

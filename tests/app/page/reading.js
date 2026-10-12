@@ -23,6 +23,17 @@ export function state(app) {
   };
 }
 
+// The controls as the screen shows them: which of `On` and `Off` is marked, and where
+// the slider stands.
+export function controls(app) {
+  return {
+    on: app.byId("on").getAttribute("aria-pressed") === "true",
+    off: app.byId("off").getAttribute("aria-pressed") === "true",
+    slider: Number(app.byId("level").value),
+    number: app.text("level-number"),
+  };
+}
+
 // Waits for the show screen with a status and with the rows a test expects.
 export async function shown(app, count) {
   await app.until(() => app.shown() === "show", "the show screen is shown");

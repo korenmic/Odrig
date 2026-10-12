@@ -67,6 +67,15 @@ function tools(frame) {
       field.value = text;
       field.dispatchEvent(new Event("input", {bubbles: true}));
     },
+    // Moves a slider to a value, as a finger on it does, and lets it go.
+    slide(id, value) {
+      const slider = app.byId(id);
+      slider.value = String(value);
+      slider.dispatchEvent(new Event("input", {bubbles: true}));
+    },
+    release(id) {
+      app.byId(id).dispatchEvent(new Event("change", {bubbles: true}));
+    },
     // Waits until a check gives something, and gives that.
     async until(check, what, ms = 8000) {
       const end = performance.now() + ms;

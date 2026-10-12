@@ -17,6 +17,11 @@ const LIST_EVERY_MS = 10000;
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: []};
 
 const watchers = new Set();
+// What the operator asked for and was not sent yet, in its order: each a kind and the
+// function that carries it to the target.
+const wanted = [];
+// Told of every refusal of what the operator asked for.
+let refused = () => {};
 let underWay = false;
 let statusDue = false;
 let statusTimer = null;
@@ -143,12 +148,42 @@ async function askListPart() {
   changed();
 }
 
-// The request to send now, or null when nothing is due: a status that is due, then a
-// list that is due or the next part of one. Nothing is due while the app is not on the
-// screen.
+// Sends what the operator asked for, once. A status is due at once after its reply.
+async function give(request) {
+  const asked = target;
+  try {
+    await request.carry();
+    if (asked !== target) {
+      return;
+    }
+    heard();
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+      refused(error);
+    } else {
+      failed(error);
+    }
+  }
+  // The status that shows what the command did goes before a list that waits.
+  statusDue = true;
+  listWaited = false;
+  changed();
+}
+
+// The request to send now, or null when nothing is due: what the operator asked for,
+// then a status that is due, then a list that is due or the next part of one. Nothing is
+// due while the app is not on the screen.
 function due() {
   if (document.hidden) {
     return null;
+  }
+  if (wanted.length > 0) {
+    const request = wanted.shift();
+    return () => give(request);
   }
   const listWaits = listing !== null || listDue;
   if (statusDue && !(listWaits && listWaited)) {
@@ -192,6 +227,7 @@ export function begin() {
   state.answered = false;
   state.animations = null;
   state.cycles = [];
+  wanted.length = 0;
   statusDue = true;
   listDue = false;
   listing = null;
@@ -214,8 +250,48 @@ export function showing(name) {
   }
 }
 
+// Takes something the operator asked for. A brightness that still waits is replaced by a
+// newer one, at its place.
+function want(kind, carry) {
+  const waiting = kind === "brightness" ? wanted.findIndex((request) => request.kind === kind) : -1;
+  if (waiting === -1) {
+    wanted.push({kind, carry});
+  } else {
+    wanted[waiting] = {kind, carry};
+  }
+  next();
+}
+
+export function play(id) {
+  want("play", () => commands.play(id));
+}
+
+export function playAll() {
+  want("play", () => commands.playAll());
+}
+
+export function switchOn() {
+  want("on", () => commands.on());
+}
+
+export function switchOff() {
+  want("off", () => commands.off());
+}
+
+export function setBrightness(value) {
+  want("brightness", () => commands.brightness(value));
+}
+
+// Names the function that is told of every refusal of what the operator asked for.
+export function onRefusal(handler) {
+  refused = handler;
+}
+
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
+  if (document.hidden) {
+    // What was asked for and not sent is not sent later, when the app comes back.
+    wanted.length = 0;
+  } else {
     statusDue = true;
     next();
   }

@@ -17,8 +17,15 @@
 <p id="fps">-</p>
 </div>
 <p id="silent" hidden></p>
+<div class="pair">
+<button id="on" type="button">On</button>
+<button id="off" type="button">Off</button>
+</div>
+<label for="level">Set the brightness to <span id="level-number">-</span></label>
+<input id="level" type="range" min="0" max="255" step="1" value="0">
+<button id="play-all" type="button">Playlist from the start</button>
 <h1>Animations</h1>
-<ol id="animations"></ol>
+<div id="animations"></div>
 <p id="none" hidden>No animation is installed.</p>
 </section>
 <section id="target">

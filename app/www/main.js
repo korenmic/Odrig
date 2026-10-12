@@ -1,6 +1,7 @@
 // The start of the app: which screen is shown, and the place for a message.
 
 import * as client from "./client.js";
+import * as messages from "./messages.js";
 import * as showScreen from "./screens/show.js";
 import * as targetScreen from "./screens/target.js";
 
@@ -38,6 +39,7 @@ byId("to-target").addEventListener("click", () => show("target"));
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 showScreen.start();
+client.onRefusal((refusal) => message(messages.ofRefusal(refusal)));
 client.watch((state) => {
   // The app begins on the target screen and goes to the show screen as soon as the
   // target has answered once.
