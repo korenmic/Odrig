@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-from emulator import app, failure, hub, recfile
+from emulator import app, binding, failure, hub, recfile
 from odrig import odrg
 from odrigctl import cli
 
@@ -59,17 +59,23 @@ class EmulatorDocument(unittest.TestCase):
     def test_it_has_a_section_for_everything_the_requirements_list(self):
         headings = re.findall(r"(?m)^##+ (.+)$", self.text)
         for heading in ("Commands", "Two shows to run", "Starting", "The serial port", "The line port", "Commands over HTTP", "The page", "The LEDs view", "The mapping view",
-                        "The event stream", "The command tool", "Record mode", "The script", "The record file", "Exit statuses", "The check list by eye"):
+                        "The event stream", "The command tool", "Record mode", "The script", "The record file", "Exit statuses", "On Windows", "The check list by eye"):
             self.assertIn(heading, headings)
         for target in re.findall(r"\]\(#([a-z-]+)\)", self.text):
             self.assertIn(target, [heading.lower().replace(" ", "-") for heading in headings], target)
 
     def test_it_gives_the_command_that_builds_the_library_and_the_test_command_and_what_each_needs(self):
         rows = dict(re.findall(r"(?m)^\| `([^`]+)` \| .+ \| (.+) \|$", section(self.text, "Commands")))
-        self.assertEqual(sorted(rows), ["make -C core shared", "python3 -m unittest discover -s tests/emulator -t ."])
+        self.assertEqual(sorted(rows), ["make -C core shared", "python -m unittest discover -s tests/emulator -t .", "python core/build.py shared", "python3 -m unittest discover -s tests/emulator -t ."])
         self.assertIn("command-line developer tools", rows["make -C core shared"])
         self.assertIn("Python 3.10", rows["python3 -m unittest discover -s tests/emulator -t ."])
         self.assertIn("JavaScript shell", rows["python3 -m unittest discover -s tests/emulator -t ."])
+        for needed in ("`g++` or `clang++`", "`tools/`", "Microsoft's C++ build tools", "No GNU Make"):
+            self.assertIn(needed, rows["python core/build.py shared"])
+        for needed in ("Python 3.10", "Node.js as the JavaScript shell"):
+            self.assertIn(needed, rows["python -m unittest discover -s tests/emulator -t ."])
+        self.assertIn(f"core/build/{binding.library_of('win32')[0]}", self.text)
+        self.assertEqual(binding.library_of("win32")[1], "python core/build.py shared")
         makefile = (support.ROOT / "core" / "Makefile").read_text(encoding="utf-8")
         self.assertRegex(makefile, r"(?m)^shared: \$\(SHARED\)$")
         self.assertRegex(makefile, r"(?m)^\$\(SHARED\): \$\(OBJECTS\)\n\t\$\(CXX\) -dynamiclib -o \$@ \$\(OBJECTS\)$")

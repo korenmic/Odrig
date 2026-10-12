@@ -61,7 +61,7 @@ replies are the same on every transport.
 | Where | Serial | Network |
 |---|---|---|
 | Board | The USB serial port. | HTTP over Wi-Fi, on the board's web server. |
-| Emulator | A virtual serial port on the Mac. | HTTP on the emulator's page address. |
+| Emulator | A virtual serial port on a Mac. On Windows, and on a Mac when asked, the same lines on a TCP port of 127.0.0.1. | HTTP on the emulator's page address. |
 
 **HTTP.** A command is sent as `POST /odrig` with the command line as the request body, with
 or without the final newline. The response body is the reply line, with content type

@@ -14,7 +14,7 @@ repository holds everything between a video or an idea and what the LEDs show:
   tracks, a source into the file that is played, and a list of animations into a show;
 - the **core**, `core/`: C++. It is the player, the one piece of code that runs both on the
   board and on a computer;
-- the **emulator**, `emulator/`: Python, on macOS today. It runs the core on a computer and
+- the **emulator**, `emulator/`: Python, on macOS and on Windows. It runs the core on a computer and
   draws every LED in a web page, so a show can be tried without the board;
 - the **command tool**, `odrigctl/`: Python. It sends commands, such as play or
   brightness, to the emulator or to the board;

@@ -5413,3 +5413,40 @@ compared within 2 percent; with zlib-ng they still are within that.
 **Resolution.** `tests/converter/test_mapping_page.py`, `tests/converter/test_scope.py`,
 `tests/converter/build_vectors.py`: `fixed_block` and `fixed_codes`, and
 `tests/converter/test_vectors.py`, the class `TheBuilder`.
+
+## Seed 11: The pages after the work on Windows
+
+**Question.** The getting-started page and the animation guide are each 200 lines long,
+the most the quick suite lets a page be, and the walk-through runs their commands on the
+first computer. How do they give the commands of Windows? And the decisions said the
+emulator runs on macOS for now: who changes that?
+
+**Answer.**
+
+- The pages keep their commands, which are those of macOS and which the walk-through runs.
+  The section "On Windows" of the getting-started page has what a Windows computer needs,
+  one block with the setup and the four suites, and one table that says how everything
+  else on the two pages is written on Windows: the Python of the environment, the build
+  script in place of `make`, `mkdir`, the file a script is written to, and the line port in
+  place of the serial port. The block is not marked as a shell block, so the walk-through
+  does not run it; the quick suite asks each tool whether it understands its commands, and
+  compares the four suites with the four the page runs after the setup.
+- The quick suite knows `.venv\Scripts\python` as a Python and `core/build.py` as a
+  program, and takes `tools/` and `scratch/` as folders no clone has to hold.
+- The owner said during this work where a Windows contributor puts what is fetched: nothing
+  is installed in the system; a program that is needed is unpacked into `tools/`, and a
+  trial goes into `scratch/`. Both are ignored by git. `AGENTS.md` has it as a rule under
+  "If you work on Windows", and the build script looks into `tools/` for a compiler.
+- `docs/decisions.md` now says that the emulator runs on macOS and on Windows, that it is
+  our own program, no longer "Mac program", and that on Windows the lines of the serial
+  port travel over a TCP port. The seed, which the owner wrote, asked for exactly this, so
+  the sentences follow the seed and no decision is made here. The change log has an entry.
+- `AGENTS.md` no longer lists seed 11 under "What is coming".
+- The walk-through suite and the firmware tool were not ported: the seed leaves the
+  firmware and the board with the first computer, and the walk-through follows the
+  commands of macOS.
+
+**Resolution.** `agent/getting-started.md`, "On Windows"; `agent/animation-guide.md`, its
+first paragraph; `AGENTS.md`, "If you work on Windows"; `docs/emulator.md`, "Commands" and
+"On Windows"; `docs/core.md`, "Commands"; `docs/commands.md`, "Transports";
+`docs/decisions.md`; `tests/onboarding/`.

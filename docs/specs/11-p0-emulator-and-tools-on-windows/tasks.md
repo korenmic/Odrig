@@ -92,7 +92,7 @@ Rules for every task:
   - Run the suite; it passes on Windows.
   - Requirements 5.1 and 6.2.
 
-- [ ] 7. The pages
+- [x] 7. The pages
   - `agent/getting-started.md`, `agent/animation-guide.md`, `agent/README.md`,
     `agent/vocabulary.md`, `AGENTS.md`, `README.md`, `docs/emulator.md`, `docs/core.md`,
     `docs/commands.md`, and the change log of `docs/decisions.md`.

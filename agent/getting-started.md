@@ -6,8 +6,8 @@ computer read [On Windows](#on-windows) first.
 
 ## What you need
 
-- **A Mac.** The core's build, the emulator, the command tool and the firmware tool run on
-  macOS only at present.
+- **A Mac, or a Windows computer**; [On Windows](#on-windows) has how the commands are
+  written there. The firmware tool runs on macOS only at present.
 - **Apple's command-line developer tools**, which bring `make`, the C++ compiler and
   `git`. `xcode-select --install` installs them.
 - **Python 3.10 or later, as `python3`.** The Python that comes with the developer tools is
@@ -17,33 +17,33 @@ computer read [On Windows](#on-windows) first.
 
 ## On Windows
 
-Only a part of the project works on Windows today, and none of it has been tried there:
-
-| What | On Windows today |
-|---|---|
-| The converter and its suite | Written to run there. They have been run on macOS only. |
-| The core's build, the emulator, the command tool | macOS only. |
-| The firmware tool and the board | They stay with the first computer. |
-
-Making the emulator and the tools run on Windows is seed 11,
-`project-seeds/11-p0-emulator-and-tools-on-windows/`. It is the first job of the
-contributor on Windows, who takes it through its spec, its tasks and their implementation
-on the Windows computer. Until then this is the setup as far as it is known. It needs git
-and Python 3.10 or later, and `python` stands for however that Python is started:
+The converter, the core's build, the emulator, the command tool and their suites work on
+Windows 10 and 11. The firmware tool, the board and the walk-through suite stay with the
+first computer. A Windows computer needs git, Python 3.10 or later as `python`, a C++
+compiler, and Node.js for the emulator suite. The build finds `g++` or `clang++` on the
+path, and Microsoft's C++ build tools. With none of them, unpack a GCC for Windows, such as
+the WinLibs build of MinGW-w64, into the folder `tools/` of the repository: nothing is
+installed. The setup and the four suites, in PowerShell:
 
 ```text
 git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
+.venv\Scripts\python core/build.py test
+.venv\Scripts\python -m unittest discover -s tests/emulator -t .
+.venv\Scripts\python -m unittest discover -s tests/onboarding -t .
 ```
 
-With that, the commands of the converter on this page and in the animation guide are the
-same, with `.venv\Scripts\python` in place of `.venv/bin/python`: the generators, `import`,
-`check` and `pack`. Everything else, from `make -C core shared` on, is what seed 11
-provides: the core's build, the other suites, the emulator, its record mode and the
-command tool. Linux is in the same position, and nobody has tried it.
+| The rest of this page and the animation guide, on macOS | On Windows |
+|---|---|
+| `.venv/bin/python` | `.venv\Scripts\python` |
+| `make -C core shared`, which builds `core/build/libodrig_core.dylib` | `core/build.py shared` as above, which builds `core/build/odrig_core.dll` |
+| `mkdir -p build/demo-20/sources` | `mkdir build\demo-20\sources` |
+| `printf '1000 status\n' > FILE` | `Set-Content FILE "1000 status"` |
+| The emulator's line `serial:`, and `--port build/emulator/serial` | Its line `tcp: 127.0.0.1:8601`, and `--tcp 127.0.0.1:8601` |
 
 ## Set up
 

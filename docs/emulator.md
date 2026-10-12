@@ -1,6 +1,6 @@
 # The emulator
 
-The emulator is a Mac program that runs the core of [core.md](core.md) on an installed show,
+The emulator is a program for macOS and Windows that runs the core of [core.md](core.md) on an installed show,
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
 repository root and uses only the Python standard library. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
@@ -11,7 +11,8 @@ This page covers the [commands](#commands) that build and test it, the
 [serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
 [command tool](#the-command-tool), [the page](#the-page) with its two views, the
 [event stream](#the-event-stream), [record mode](#record-mode), the
-[exit statuses](#exit-statuses) and the [check list by eye](#the-check-list-by-eye).
+[exit statuses](#exit-statuses), what is [open after the work on Windows](#on-windows) and
+the [check list by eye](#the-check-list-by-eye).
 
 ## Commands
 
@@ -22,12 +23,28 @@ Run from the repository root.
 | `make -C core shared` | Builds `core/build/libodrig_core.dylib`, the library the emulator loads, from every `core/src/*.cpp` with the flags of `make -C core`. | Apple's command-line developer tools: `make` and `c++`. |
 | `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and the JavaScript shell that is part of macOS. |
 
+On Windows the two commands are these. `python` there is the Python of the virtual
+environment, `.venv\Scripts\python`.
+
+| Command | What it does | What it needs |
+|---|---|---|
+| `python core/build.py shared` | Builds `core/build/odrig_core.dll`, the same library for Windows, from every `core/src/*.cpp`. It builds again only what changed. | A C++ compiler: `g++` or `clang++`, on the path or unpacked under the folder `tools/`, or Microsoft's C++ build tools. No GNU Make. |
+| `python -m unittest discover -s tests/emulator -t .` | Builds the shared library with the build script and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and Node.js as the JavaScript shell. |
+
+Windows does not let a library be written while a running emulator has it loaded. A build
+with nothing to do leaves the library alone, so the suite runs beside an open emulator.
+When a source of the core has changed, stop the emulator first: the build script says so.
+
 The emulator never builds the library itself. The suite is every `test_*.py` file in
 `tests/emulator/`, found by discovery; importing the test package runs `make -C core shared`
 first, and when that fails no test runs and make's output is the failure. The suite needs
 no hardware, no network connection and no browser. The page's geometry is run in the
 JavaScript shell of macOS,
 `/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`.
+Where that shell is not there, the suite builds with the build script and takes Node.js
+with `tests/emulator/js/shell.js`, a small program that takes the command line of `jsc`.
+A test that needs the pseudo-terminal is skipped on Windows, and a test that only sends
+lines beside HTTP sends them through the [line port](#the-line-port) there.
 
 ## Two shows to run
 
@@ -90,8 +107,8 @@ serial: /Users/you/odrig/build/emulator/serial
 It then asks the core for a refresh at every grid time, 20 ms apart, with a timestamp in
 whole milliseconds from a clock that does not go backwards. When a request is late it
 carries the current time; the grid times that were missed are not asked for again. The
-emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, and then
-removes the link to its port and exits with status 0.
+emulator runs until it receives an interrupt (Ctrl-C) or a termination signal, on Windows
+Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with status 0.
 
 | Option | Meaning | Without it |
 |---|---|---|
@@ -745,6 +762,40 @@ the ticks to a Python program.
 Whether the folder holds a valid show is not the emulator's judgement but the core's: any
 folder is recorded, and with an invalid show the LED data is dark and `status` gives the
 reason.
+
+## On Windows
+
+The emulator, the command tool and the suite of both work on Windows 10 and 11. What is
+different there is said where it belongs on this page: the [build](#commands), the
+[line port](#the-line-port) in place of the serial port, and `--tcp` and a `COM` name in
+the [command tool](#the-command-tool). Two lists are open after that work.
+
+**Open for the first computer.** The work was done on a Windows computer, and nothing of
+it could be run on macOS. To be seen there:
+
+- The suites pass as before: `make -C core test`, the emulator suite, the converter
+  suite and the onboarding suite. The tests that used the serial port as the transport
+  beside HTTP now take it through a helper, and the tests of the JavaScript shell start
+  `jsc` through one.
+- The emulator opens its serial port and prints its two lines as before, and with
+  `--tcp-port 0` prints `tcp:` as a third line and answers on that port.
+- The command tool reaches the emulator and the board through `--port` as before:
+  `odrigctl/client.py` kept its functions for the serial port of macOS and gained a
+  choice between them and the port of Windows.
+- The core suite passes with the name `_strlen` in `tests/core/allowed_symbols.txt`,
+  which Apple's compiler does not use.
+- `python3 core/build.py shared` is not how macOS builds, and has not been run there.
+
+**Open for whoever has a board on a Windows computer.** No board was connected to the
+Windows computer. To be seen with one:
+
+- `python -m odrigctl --port COM<n> status` prints the board's status.
+- The board does not restart when the port is opened, the first time after it is plugged
+  in and the times after. Windows raises DTR and RTS when a port is opened that has not
+  been set otherwise, before a program can say anything; the tool lowers RTS, then DTR,
+  and leaves the port set so that the next opening raises neither. Whether the first
+  opening restarts the board is not known.
+- The firmware tool, `firmware/fw.py`, has not been run on Windows at all.
 
 ## The check list by eye
 

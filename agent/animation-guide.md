@@ -1,7 +1,7 @@
 # Making an animation
 
 How to make an animation and try it without the board, in a clone that is set up as
-[getting-started.md](getting-started.md) says. The project's words are explained in
+[getting-started.md](getting-started.md) says, on Windows with the commands as its section [On Windows](getting-started.md#on-windows) writes them. The project's words are explained in
 [vocabulary.md](vocabulary.md). The commands make everything for the target, by naming its
 mapping file, `mapping/legs-20.json`. For the bench build name `mapping/legs-2.json`.
 
