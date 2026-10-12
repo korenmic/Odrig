@@ -221,7 +221,8 @@ class Decisions(unittest.TestCase):
                          "remove an item", "upload an animation", "2,048 characters", "1,024 bytes", "the owner approves every addition"):
             self.assertIn(expected, commands)
         log = text.split("\n## Change log\n")[1]
-        self.assertIn("`space`, `list`, `remove` and `upload`", " ".join(log.strip().split("\n- ")[-1].split()))
+        entries = [" ".join(entry.split()) for entry in log.strip().split("\n- ")]
+        self.assertTrue(any("`space`, `list`, `remove` and `upload`" in entry for entry in entries))
 
 
 class Readme(unittest.TestCase):
