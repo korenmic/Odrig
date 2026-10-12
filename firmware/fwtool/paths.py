@@ -15,6 +15,7 @@ PIO_CACHE = WORK / "pio-cache"
 NPM_CACHE = WORK / "npm-cache"
 PIP_CACHE = WORK / "pip-cache"
 WLED = WORK / "WLED"
+STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
 STORAGE = WORK / "storage"
 

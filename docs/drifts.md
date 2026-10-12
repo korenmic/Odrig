@@ -7055,3 +7055,33 @@ limit of the limit file back, and so does `python3 firmware/fw.py set-limit`.
 
 **Resolution.** `tests/board/test_limit.py`; `tests/board/support.py`, `ensure_settings`;
 `tests/board/__init__.py`, the last step.
+
+## Seed 12: The RMT method is the library's own
+
+**Question.** The design gives four legs to "the RMT methods" of the LED library. WLED
+does not use those on this chip: it adds a driver of its own to the library, in its
+folder `lib/`, and uses that for its RMT outputs.
+
+**Answer.** The standalone firmware uses the library's own RMT method,
+`NeoEsp32RmtNWs2812xMethod`, with one channel for each of the four legs. WLED's driver is
+a file of WLED, and the standalone firmware compiles none. The trial program showed the
+library's method beside the sixteen-lane parallel one on the board: 4,320 pulses on each
+of the four pins in every send, 50 sends a second.
+
+**Resolution.** `firmware/standalone/src/main.cpp`; `docs/firmware.md`, "Verified on the
+board", S2.
+
+## Seed 12: The spike's findings
+
+**Question.** Task 1 was to settle six assumptions before anything else was written.
+Does a finding change the design?
+
+**Answer.** None does. Five hold as assumed, with numbers in `docs/firmware.md`; the
+sixth, that a source file of the usermod can be compiled into the standalone program, is
+task 2's. Two things were learned beside them: `--standalone` on `build` cannot be one of
+the exclusive options beside `--stock` and `--probe`, because it goes with `--probe`, so
+the tool refuses `--standalone --stock` itself, as a usage error before anything is set
+up; and the libraries of the standalone project are kept in that project's own folder
+under `build/firmware/standalone/`.
+
+**Resolution.** `firmware/fwtool/cli.py`, `parsed`; `tests/firmware/test_standalone.py`.

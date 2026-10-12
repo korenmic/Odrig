@@ -1,0 +1,39 @@
+; The build environments of the standalone firmware. `python3 firmware/fw.py build
+; --standalone` writes this file into the work folder as platformio.ini, with the
+; repository's path in place of @REPO@ and the path of WLED's checkout in place of @WLED@.
+; The platform, the board, the flash settings, the partition table and the libraries are
+; the ones WLED 16.0.1 has for this board. No file of WLED is compiled.
+
+[platformio]
+src_dir = @REPO@/firmware/standalone/src
+
+[env:odrig_standalone]
+platform = https://github.com/tasmota/platform-espressif32/releases/download/2024.06.00/platform-espressif32.zip
+framework = arduino
+board = esp32-s3-devkitc-1
+board_build.arduino.memory_type = qio_opi
+board_build.partitions = @WLED@/tools/WLED_ESP32_16MB_9MB_FS.csv
+board_build.filesystem = littlefs
+board_upload.flash_size = 16MB
+board_upload.maximum_size = 16777216
+board_build.f_flash = 80000000L
+board_build.flash_mode = qio
+lib_deps =
+  https://github.com/Makuna/NeoPixelBus.git#1d7ff38f14d04a976f9c6e365c83a232bcba04fc
+  https://github.com/Aircoookie/ESPAsyncWebServer.git#v2.4.2
+  esp32async/AsyncTCP @ 3.4.7
+  odrig_core = symlink://@REPO@/core
+build_flags = -g
+  -DARDUINO_USB_MSC_ON_BOOT=0 -DARDUINO_DFU_ON_BOOT=0
+  -D ARDUINO_USB_CDC_ON_BOOT=1
+  -DBOARD_HAS_PSRAM
+  -D CONFIG_ASYNC_TCP_USE_WDT=0
+  -D CONFIG_ASYNC_TCP_STACK_SIZE=8192
+  -I@REPO@/firmware/standalone/platform
+  -I@REPO@/firmware/usermod
+  -I@REPO@/core/include
+
+[env:odrig_standalone_probe]
+extends = env:odrig_standalone
+build_flags = ${env:odrig_standalone.build_flags}
+  -D ODRIG_PROBE

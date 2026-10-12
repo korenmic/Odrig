@@ -90,8 +90,8 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--verbose]
-python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe] [--wait SECONDS]
+python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
+python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
@@ -197,6 +197,16 @@ libraries outside WLED's folder: the build compiles `core/src/*.cpp` from `core/
 compiler flags of the environment, and nothing is copied. `core/library.json` is what lets
 PlatformIO take `core/` as a library. A repository path with a space in it is refused.
 
+`build --standalone` builds the standalone firmware, a program without WLED, as a
+project of its own in `build/firmware/standalone/`, and keeps `odrig-standalone.bin`;
+with `--probe` it builds its probe build, `odrig-standalone-probe.bin`. The tool writes
+that project's `platformio.ini` from `firmware/standalone/platformio.ini.in`, with the
+repository's path and the path of WLED's checkout filled in: the platform, the board, the
+flash settings and the libraries are the ones WLED has for this board, and the partition
+table is WLED's own file. WLED's files are not patched for it and none is compiled.
+`--standalone` does not go with `--stock`. The standalone firmware is being built; for
+now it is a trial program, see [Verified on the board](#verified-on-the-board).
+
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
 standard output names the image:
@@ -225,7 +235,8 @@ Writes a built image to the board over USB and prints what the board answers aft
    `v`; with `--expect probe` the probe build's report; without the option the firmware's
    reply to `status`.
 
-Without `--image` the image is `build/firmware/out/odrig-firmware.bin`. The bootloader, the
+Without `--image` the image is `build/firmware/out/odrig-firmware.bin`, and with
+`--standalone` it is `odrig-standalone.bin`. The bootloader, the
 partition table and storage are not written: WLED's settings and the installed show stay.
 So `flash` leaves the name and the password of the board's network as storage has them;
 for a board that never got them, `install-firmware` is the command.
@@ -1086,8 +1097,9 @@ firmware of that seed, before the target became twenty upright legs: on the benc
 and on mappings of ten row legs on pins 1 to 10, with a dense 60 x 30 clip. From "Twenty
 outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60. The
 part "Files written while the show plays" is what seed 07 tried for the commands that
-change the content. The last part, "The network's name and password", is what seed 08
-tried.
+change the content. "The network's name and password" is what seed 08 tried, "The limit
+on LED current" what seed 15 tried, and the last part, "A program without WLED", what
+seed 12 tried first.
 
 | # | Assumption | What was found |
 |---|---|---|
@@ -1425,3 +1437,26 @@ showed on the board, with Hello world for the target file at brightness 40.
 `set-limit` took 36 seconds. Storage read back held 0 and then 850, and between the two
 only `hw.led.maxpwr` of `/cfg.json` differed. `read-limit` printed `limit: off` and then
 `limit: 850 mA`.
+
+**A program without WLED.** What the design of the standalone firmware assumed, in its
+table "Assumed, to be verified by task 1", and what a trial program found on the board.
+The trial is `firmware/standalone/src/main.cpp` as that task left it: it mounts the
+storage, makes twenty outputs of 180 LEDs on the pins of the target file, sends a dim
+point of light along each 50 times a second, counts the pulses on one pin at each send,
+and answers `#probe`. The letters are those of that table.
+
+| # | Assumption | What was found |
+|---|---|---|
+| S1 | PlatformIO in the work folder builds a project that lies outside WLED's folder, with WLED's platform and libraries. | It does, in 12 seconds for the first build: the platform was there, and the libraries were taken into the project's own folder. The image has 175,104 bytes. |
+| S2 | Without WLED, sixteen outputs of the LED library's sixteen-lane parallel method and four of its RMT method work side by side, 180 LEDs each. | They do. Every one of the twenty pins carried 4,320 pulses in a send, which is 24 for each of 180 LEDs, and the program made 50 sends in every second of six, the longest taking 7.8 ms. The RMT method is the library's own, not the one WLED adds to it. |
+| S3 | `LittleFS.begin(false)` mounts the file system WLED made, and the files of `/odrig` are read. | It does: the mount succeeded, and `/odrig` held `dvd.odrg` with 1,612 bytes, `hello.odrg` with 1,138, `mapping.json` with 184 and `show.json` with 162, the installed example show. Nothing was formatted or written. |
+| S4 | A source file of the usermod is compiled into the standalone program through a file of one line that includes it. | Not tried by the trial; the task after it does. |
+| S5 | The parallel driver's buffer for sixteen lanes of 180 LEDs fits the memory it can use. | It does: with the twenty outputs made, 343,904 bytes of internal memory were free, and 8,386,091 of the external. |
+| S6 | The pulse counter counts the rising edges on a pin that an output drives. | It does, on RMT pins and on pins of the parallel driver alike. |
+
+The WLED-based firmware gives legs 1 to 4 to RMT and legs 5 to 20 to the parallel driver:
+its probe build reports `rmt` for the first four outputs of the target file and `parallel`
+for the other sixteen. The trial did the same.
+
+Afterwards the WLED-based firmware was flashed again, and the board answered `status`
+with the example show playing: the switch there and back left the show in storage.

@@ -38,10 +38,12 @@ def parser():
     kind = builder.add_mutually_exclusive_group()
     kind.add_argument("--stock", dest="kind", action="store_const", const="stock", default="firmware", help="build WLED's own environment, unchanged")
     kind.add_argument("--probe", dest="kind", action="store_const", const="probe", help="build the probe build, which also reports measurements")
+    builder.add_argument("--standalone", action="store_true", help="build the standalone firmware, which holds nothing of WLED; with --probe, its probe build")
     builder.add_argument("--verbose", action="store_true", help="show every command of the build")
     flash = commands.add_parser("flash", help="write a built image to the board over USB")
     flash.add_argument("--port", metavar="P", help="the board's USB serial port")
     flash.add_argument("--image", metavar="PATH", type=pathlib.Path, help="the image to write, with its .sha256 beside it")
+    flash.add_argument("--standalone", action="store_true", help="without --image, write the standalone firmware")
     flash.add_argument("--expect", choices=sorted(board.EXPECTED), default="status", help="what must answer afterwards: the firmware's status, WLED's handshake, or the probe build")
     flash.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's answer after its restart (default: 20)")
     restore = commands.add_parser("restore-stock", help="write the stock WLED image to the board")
@@ -91,7 +93,8 @@ def _setup(arguments):
 
 
 def _build(arguments):
-    image, size = build.build(arguments.kind, arguments.verbose)
+    kind = {"firmware": "standalone", "probe": "standalone-probe"}[arguments.kind] if arguments.standalone else arguments.kind
+    image, size = build.build(kind, arguments.verbose)
     print(f"{image}: {size} bytes, SHA-256 {build.sha256(image)}")
     return 0
 
@@ -113,7 +116,8 @@ def write_application(port, image, extra=(), table=None, expect="status", wait=b
 
 
 def _flash(arguments):
-    image = build.checked_image(arguments.image if arguments.image is not None else build.image_path("firmware"))
+    built = build.image_path("standalone" if arguments.standalone else "firmware")
+    image = build.checked_image(arguments.image if arguments.image is not None else built)
     build.check_size(image)
     port = board.find(arguments.port)
     print(write_application(port, image, expect=arguments.expect, wait=arguments.wait))
@@ -309,9 +313,18 @@ def report(failure):
     return 1
 
 
+def parsed(argv):
+    """The arguments of a command line. What does not go together is a usage error."""
+    made = parser()
+    arguments = made.parse_args(argv)
+    if arguments.command == "build" and arguments.standalone and arguments.kind == "stock":
+        made.error("--standalone does not go with --stock: the standalone firmware holds nothing of WLED")
+    return arguments
+
+
 def main(argv=None):
     """Runs one command in this interpreter, which is the work folder's Python."""
-    arguments = parser().parse_args(argv)
+    arguments = parsed(argv)
     try:
         return ACTIONS[arguments.command](arguments)
     except Failure as failure:
@@ -321,7 +334,7 @@ def main(argv=None):
 def launch(argv):
     """Checks the command line, makes sure the work folder's Python environment is there,
     and hands the command to that environment's Python."""
-    parser().parse_args(argv)
+    parsed(argv)
     try:
         toolchain.python_environment()
     except Failure as failure:

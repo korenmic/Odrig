@@ -350,7 +350,7 @@ class Flash(OnASmallLayout):
         self.assertEqual([address for address, _ in esptool.wrote], [0x10000])
         self.assertFalse(any(word.startswith("0x61") for word in esptool.words()))
         self.assertEqual(self.kept(), {})
-        self.assertEqual(options_of("flash"), {"-h", "--help", "--port", "--image", "--expect", "--wait"})
+        self.assertEqual(options_of("flash"), {"-h", "--help", "--port", "--image", "--standalone", "--expect", "--wait"})
 
 
 if __name__ == "__main__":

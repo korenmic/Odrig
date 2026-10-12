@@ -49,7 +49,7 @@ Rules for every task:
   staged.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Spike on the board: a bare program with the outputs, the storage and the port
+- [x] 1. Spike on the board: a bare program with the outputs, the storage and the port
   - Set `"state": "in_progress"` in
     `project-seeds/12-p2-standalone-firmware-as-a-fallback/state.json`.
   - `firmware/standalone/platformio.ini.in` and `firmware/fwtool/standalone.py`, as far
