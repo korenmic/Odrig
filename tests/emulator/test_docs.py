@@ -85,16 +85,24 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]", self.text)
-        self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan]\n", self.text)
+        self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]\n", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--record", "--seconds", "--script"})
         self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
         self.assertIn("page: http://127.0.0.1:8600/", self.text)
         self.assertRegex(self.text, r"serial: \S+/build/emulator/serial")
         self.assertIn("| `--port N` | The port of the address on 127.0.0.1; 0 takes any free port. | 8600 |", self.text)
+
+    def test_it_says_how_a_phone_reaches_the_emulator(self):
+        said = " ".join(section(self.text, "From a phone").split())
+        for phrase in ("python -m emulator build/demo-20/show --lan", "lan: http://192.168.1.23:8600/", "`lan: no address`",
+                       "warning: --lan: anyone on the local network can send commands to this emulator and open its page", "The emulator has no password.",
+                       "The serial port and the [line port](#the-line-port) stay on this computer.", "`--lan` does not go with `--record`"):
+            self.assertIn(phrase, said)
+        self.assertIn("warning: --lan: anyone on the local network can send commands to this emulator and open its page", (support.ROOT / "emulator" / "app.py").read_text(encoding="utf-8"))
 
     def test_every_emulator_command_it_gives_is_understood_by_the_emulator(self):
         given = [line for line in self.commands if line.startswith("python -m emulator ") and "[" not in line]

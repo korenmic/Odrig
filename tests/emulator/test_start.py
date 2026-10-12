@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from emulator import app, binding
+from emulator import app, binding, httpd
 from tests.core import support as core_support
 
 from . import support
@@ -210,6 +210,8 @@ class Start(unittest.TestCase):
             [folder, "--record", self.work / "out.odrr", "--seconds", 1, "--storage", "many"],
             [folder, "--width", 60],
             [folder, "--address", "0.0.0.0"],
+            [folder, "--lan", "yes"],
+            [folder, "--record", self.work / "out.odrr", "--seconds", 1, "--lan"],
         ):
             result = support.run(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -232,7 +234,29 @@ class Start(unittest.TestCase):
 
     def test_no_option_names_the_size_of_the_canvas_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--record", "--seconds", "--script"})
+        self.assertIs(app.parse([str(self.work)]).lan, False)
+        self.assertIs(app.parse([str(self.work), "--lan"]).lan, True)
+
+    WARNING = "warning: --lan: anyone on the local network can send commands to this emulator and open its page\n"
+
+    def test_with_lan_one_more_line_names_the_address_for_a_phone_and_a_warning_is_written(self):
+        emulator = self.started(self.example(), "--lan")
+        self.assertRegex(emulator.lan, rf"\A(http://[0-9]+(\.[0-9]+){{3}}:{emulator.port}/|no address)\Z")
+        self.assertFalse(emulator.lan.startswith("http://127."))
+        self.assertEqual(emulator.status()["ok"], True)
+        result = emulator.stop()
+        printed = result.out.splitlines()
+        self.assertEqual(printed[0], f"page: http://127.0.0.1:{emulator.port}/")
+        self.assertEqual(printed[-1], f"lan: {emulator.lan}")
+        self.assertEqual(len(printed), 3)
+        self.assertEqual((result.status, result.err), (0, self.WARNING))
+
+    def test_the_address_for_a_phone_is_the_one_of_the_default_route_or_none(self):
+        address = httpd.lan_address()
+        if address is not None:
+            self.assertRegex(address, r"\A[0-9]+(\.[0-9]+){3}\Z")
+            self.assertFalse(address.startswith("127."))
 
 
 if __name__ == "__main__":

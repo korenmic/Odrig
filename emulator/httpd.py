@@ -11,6 +11,11 @@ import threading
 from . import failure
 
 ADDRESS = "127.0.0.1"
+# Every IPv4 address of this computer: where the server listens when it is to be reached
+# from the local network.
+EVERY_ADDRESS = "0.0.0.0"
+# An address reserved for documents. Nothing is sent to it.
+NOWHERE = "192.0.2.1"
 # Lets a server take its port again right after an earlier one closed. Windows needs no
 # such leave, and there it would let a second server take a port that is in use.
 REUSE_ADDRESS = sys.platform != "win32"
@@ -180,17 +185,32 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.flush()
 
 
+def lan_address():
+    """The address this computer has on the network that carries its default route, or
+    None when it is on no network. Connecting a datagram socket sends nothing: it asks
+    the system which of the computer's addresses would be used."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect((NOWHERE, 9))
+        except OSError:
+            return None
+        address = probe.getsockname()[0]
+    return None if address.startswith("127.") else address
+
+
 class Server(http.server.ThreadingHTTPServer):
+    """The server on 127.0.0.1, or with `lan` on every address of this computer."""
+
     daemon_threads = True
     allow_reuse_address = REUSE_ADDRESS
 
-    def __init__(self, port, engine, show_dir, hello):
+    def __init__(self, port, engine, show_dir, hello, lan=False):
         self.engine = engine
         self.show_dir = os.fspath(show_dir)
         self.hello = hello
         self.pages = page_files()
         try:
-            super().__init__((ADDRESS, port), Handler)
+            super().__init__((EVERY_ADDRESS if lan else ADDRESS, port), Handler)
         except OSError as error:
             raise failure.Failure(failure.ADDRESS_IN_USE, f"{ADDRESS}:{port}: {error.strerror or type(error).__name__}") from None
         self._thread = threading.Thread(target=self.serve_forever, kwargs={"poll_interval": 0.05}, name="http", daemon=True)

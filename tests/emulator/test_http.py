@@ -169,6 +169,35 @@ class Commands(unittest.TestCase):
         self.assertEqual(support.listening(self.emulator), expected)
 
 
+class OnTheLocalNetwork(unittest.TestCase):
+    def test_with_lan_the_page_and_the_commands_are_on_every_address_and_the_line_port_is_not(self):
+        folder = support.entered(self, support.example_show())
+        emulator = support.entered(self, support.Emulator(folder, "--lan", tcp_port=0))
+        self.assertEqual(emulator.url, f"http://127.0.0.1:{emulator.port}/")
+        self.assertEqual(emulator.status()["ok"], True)
+        self.assertTrue(emulator.tcp.startswith("127.0.0.1:"))
+        every_address = {"*", "0.0.0.0"}
+        listening = support.listening(emulator)
+        self.assertEqual(len(listening), 2, listening)
+        self.assertIn(emulator.tcp, listening)
+        page = next(address for address in listening if address != emulator.tcp)
+        self.assertEqual((page.rsplit(":", 1)[0] in every_address, page.rsplit(":", 1)[1]), (True, str(emulator.port)), listening)
+        if emulator.lan != "no address":
+            address = emulator.lan[len("http://"):].rstrip("/").rsplit(":", 1)[0]
+            connection = http.client.HTTPConnection(address, emulator.port, timeout=10)
+            try:
+                connection.request("POST", "/odrig", body=b"status")
+                answer = connection.getresponse()
+                self.assertEqual((answer.status, json.loads(answer.read())["ok"]), (200, True))
+                connection.request("GET", "/")
+                page = connection.getresponse()
+                self.assertEqual(page.status, 200)
+                page.read()
+            finally:
+                connection.close()
+            self.assertTrue(support.refused(int(emulator.tcp.rsplit(":", 1)[1]), address))
+
+
 class Engine:
     """Stands in for the engine: keeps every line the server hands it."""
 

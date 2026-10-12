@@ -165,7 +165,8 @@ class Emulator:
     page address it named, `serial` the path of its serial port and `tcp` the address of
     its line port, each `None` when it has none. Without `serial_link` the link to the
     serial port is made in a temporary folder. Where there is no serial port the line port
-    is opened on a free port; elsewhere `tcp_port` asks for it.
+    is opened on a free port; elsewhere `tcp_port` asks for it. Started with the option
+    `--lan`, `lan` holds what its `lan:` line says.
     """
 
     START_SECONDS = 15
@@ -200,6 +201,7 @@ class Emulator:
             self.port = int(self.url.rstrip("/").rsplit(":", 1)[1])
             self.serial = self._printed_line("serial: ") if HAS_SERIAL else None
             self.tcp = self._printed_line("tcp: ") if tcp_port is not None else None
+            self.lan = self._printed_line("lan: ") if "--lan" in options else None
         except BaseException:
             self.stop()
             raise

@@ -96,7 +96,7 @@ of the Python package of [reference-converter.md](reference-converter.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -122,9 +122,11 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
 | `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
+| `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 
-There is no option for the size of the canvas and none for an address: the canvas is the
-one of `mapping.json` in the folder, and the address is always 127.0.0.1.
+There is no option for the size of the canvas and none that names an address: the canvas
+is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
+with `--lan` on every address this computer has.
 
 **Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
 the folder it was started on, and on nothing else: a name with a path separator, or one
@@ -235,6 +237,37 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
 - An answer without a body closes its connection.
+
+## From a phone
+
+A phone cannot reach 127.0.0.1 of a computer. Started with `--lan`, the emulator listens
+for HTTP on every IPv4 address of this computer, and prints one more line with the
+address a phone on the same network is given:
+
+```
+python -m emulator build/demo-20/show --lan
+```
+
+```
+page: http://127.0.0.1:8600/
+serial: /Users/you/odrig/build/emulator/serial
+lan: http://192.168.1.23:8600/
+```
+
+The address is the one this computer has on the network that carries its default route.
+On a computer that is on no network the line is `lan: no address`. Before it starts, the
+emulator writes this to standard error:
+
+```
+warning: --lan: anyone on the local network can send commands to this emulator and open its page
+```
+
+- The whole HTTP server is on the network then: the commands, the page, the event stream
+  and the mapping file. The emulator has no password.
+- The serial port and the [line port](#the-line-port) stay on this computer.
+- macOS may ask whether Python may accept incoming connections. A phone reaches the
+  emulator only when that is allowed.
+- `--lan` does not go with `--record`: record mode opens no address.
 
 ## The page
 

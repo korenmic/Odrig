@@ -44,7 +44,7 @@ Rules for every task:
   needs the owner is asked in words: an addition to the command list, hardware, a
   download, and what only a phone shows.
 
-- [ ] 1. The emulator on the local network
+- [x] 1. The emulator on the local network
   - Set `"state": "in_progress"` in
     `project-seeds/09-p1-operators-app-for-android/state.json`.
   - `emulator/httpd.py` and `emulator/app.py`: `--lan`, the `lan:` line, the warning, the

@@ -65,6 +65,7 @@ def parser():
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
     made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
                       help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
+    made.add_argument("--lan", action="store_true", help="let other devices of the local network open the page and send commands over HTTP")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -80,8 +81,8 @@ def parse(argv):
     else:
         if arguments.seconds is None:
             made.error("record mode needs its length: --seconds S")
-        if arguments.port is not None or arguments.serial_link is not None or arguments.tcp_port is not None or arguments.verbose:
-            made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port and --verbose do not go with --record")
+        if arguments.port is not None or arguments.serial_link is not None or arguments.tcp_port is not None or arguments.verbose or arguments.lan:
+            made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port, --verbose and --lan do not go with --record")
     return arguments
 
 
@@ -119,9 +120,12 @@ def serve(arguments, out):
             "legs": [list(leg) for leg in core.legs],
             "t0": running.t0,
         }
+        if arguments.lan:
+            print("warning: --lan: anyone on the local network can send commands to this emulator and open its page", file=sys.stderr, flush=True)
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
             lambda: {"show": described["show"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
+            lan=arguments.lan,
         )
 
         stopped = threading.Event()
@@ -134,6 +138,10 @@ def serve(arguments, out):
             print(f"serial: {port.link}", file=out)
         if line_port is not None:
             print(f"tcp: {line_port.address}", file=out)
+        if arguments.lan:
+            # The address a phone on the same network is given.
+            address = httpd.lan_address()
+            print("lan: no address" if address is None else f"lan: http://{address}:{server.port}/", file=out)
         out.flush()
 
         if port is not None:

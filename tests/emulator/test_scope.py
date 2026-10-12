@@ -71,16 +71,19 @@ class Scope(unittest.TestCase):
         users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
         self.assertEqual(users, ["hub.py"])
 
-    def test_the_only_address_a_source_names_is_127_0_0_1(self):
+    def test_the_addresses_a_source_names_are_this_computer_every_address_and_one_for_documents(self):
+        # 127.0.0.1 is where everything listens; 0.0.0.0 is where the page listens when
+        # the local network is asked for; 192.0.2.1 is reserved for documents and is
+        # only used to ask the system which address of this computer a phone would reach.
         addresses = []
         for package in PACKAGES:
             for path, tree in modules(package):
                 for text in texts(tree):
                     if re.fullmatch(r"[0-9]+(\.[0-9]+){3}|localhost|::1?|\[::1?\]", text.strip()):
                         addresses.append((f"{package.name}/{path.name}", text))
-        self.assertEqual(addresses, [("emulator/httpd.py", "127.0.0.1")])
+        self.assertEqual(sorted(addresses), [("emulator/httpd.py", "0.0.0.0"), ("emulator/httpd.py", "127.0.0.1"), ("emulator/httpd.py", "192.0.2.1")])
         server = (EMULATOR / "httpd.py").read_text(encoding="utf-8")
-        self.assertIn("super().__init__((ADDRESS, port), Handler)", server)
+        self.assertIn("super().__init__((EVERY_ADDRESS if lan else ADDRESS, port), Handler)", server)
         line_port = (EMULATOR / "lineport.py").read_text(encoding="utf-8")
         self.assertIn("super().__init__((httpd.ADDRESS, port), Connection)", line_port)
         for path, tree in modules(EMULATOR):
