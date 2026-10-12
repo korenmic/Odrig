@@ -4,7 +4,7 @@ Each task is one commit that also ticks its checkbox. A test for a fault is run 
 the unchanged tool first and what it showed goes into the commit message. The suite is run
 with `.venv/bin/python -m unittest discover -s tests/converter -t .`.
 
-- [ ] 1. A video stream without a decoder is refused
+- [x] 1. A video stream without a decoder is refused
   - Add `tests/converter/quiet.py` with `run_tool`, as the design describes.
   - Add `tests/converter/test_import_damaged.py` with the test of the 993-byte video.
     Run it against the unchanged tool: the child ends with status 11.

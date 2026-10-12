@@ -205,6 +205,8 @@ def _video_frames(path):
             if not container.streams.video:
                 raise errors.Rejection(errors.UNREADABLE_MEDIA, "the file has no video stream")
             stream = container.streams.video[0]
+            if stream.codec_context is None:
+                raise errors.Rejection(errors.UNREADABLE_MEDIA, "the video stream has no decoder")
             first = None
             held = None
             count = 0
