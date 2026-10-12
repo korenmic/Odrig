@@ -73,9 +73,6 @@ function read(bytes) {
   strictjson.members(top, MEMBERS, OPTIONAL);
   const brightness = strictjson.integer(top.get("brightness"), 0, 255, "brightness");
   const listed = strictjson.array(top.get("items"), "items");
-  if (listed.length === 0) {
-    throw malformed("items is empty");
-  }
   const items = listed.map((entry, position) => itemOf(entry, `entry ${position + 1} of items`));
   const start = top.has("start") ? strictjson.integer(top.get("start"), null, null, "start") : null;
   return {brightness, items, start};
