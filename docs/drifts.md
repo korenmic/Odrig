@@ -5559,3 +5559,24 @@ memory is free, and every start takes a little longer.
 `tests/core/test_docs.py`, `Decisions` and
 `test_a_show_without_items_is_not_listed_as_malformed`; `docs/decisions.md`, "Commands"
 and the change log; `docs/firmware.md`, "Measurements on the board".
+
+## Seed 07: The owner's check is open
+
+**Question.** Task 9 is the upload over the board's Wi-Fi: a phone or a computer joined
+to the board's network. No agent joins that network, and this run was told not to join
+it and not to change a Wi-Fi setting.
+
+**Answer.** The task stays open, its checkbox unticked, and the seed stays `in_progress`.
+Under the task, `tasks.md` has what a program established over USB: the command tool
+uploads Hello world to the board, lists it, plays it and removes it, by hand and in the
+board suite with a restart in it, with the replies the emulator gives; and the test over
+the air passes with an emulator in the place of the board's network. What remains is
+step 7 of "The owner's checks" in `docs/firmware.md`, and
+`python3 firmware/fw.py test-air --http 4.3.2.1` with this Mac joined to the board's
+network. Two things only that run can show: that the board's web server carries a line
+of 2,048 characters, which is what an `upload data` line is, and the speed of an upload
+over Wi-Fi. When both pass, the owner sets the seed to `completed`.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, task 9; `docs/firmware.md`,
+"The owner's checks", step 7; `project-seeds/07-p1-content-commands/state.json` is not
+changed.

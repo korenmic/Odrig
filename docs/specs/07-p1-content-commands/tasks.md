@@ -243,4 +243,25 @@ Rules for every task:
     of every step, with the speed over Wi-Fi, in the commit message.
   - Set `"state": "completed"` and `completedAt` in
     `project-seeds/07-p1-content-commands/state.json`.
+  - Open: the owner has not done this check. What a program established over USB on
+    2026-10-12, with the firmware of task 7 on the board and the example show at
+    brightness 32:
+    - `python -m odrigctl --port /dev/cu.usbmodem101 upload 9 build/hello-bench.odrg`
+      wrote `upload: 100% 1138/1138 bytes 3907 B/s` and `upload: checking` and ended with
+      `{"ok":true}`, 6.1 seconds after it was started. `list` showed
+      `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item, `play 9` played
+      it by what `status` reported, `remove 9` removed it, and `play 3` brought the cycle
+      back.
+    - The same session is in the board suite, with the board's storage read back and the
+      board restarted in the middle of it; its replies are those of the emulator. The
+      whole suite passes, 37 tests.
+    - `tests/air/test_upload.py` passes with an emulator in the place of the board's
+      network and the board on USB.
+    - A file of 868,712 bytes is uploaded over USB at 12,674 bytes a second.
+    - Not established by any program: that the board's web server carries a line of
+      2,048 characters, which every `upload data` line of a full piece is; the speed of
+      an upload over Wi-Fi; and that WLED's pages still open with the 65,000 bytes of
+      internal memory that are free with the target file. The steps for the owner are
+      step 7 of "The owner's checks" in `docs/firmware.md`, and
+      `python3 firmware/fw.py test-air --http 4.3.2.1`.
   - Requirements: 21.5, 21.6
