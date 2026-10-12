@@ -150,7 +150,7 @@ Rules for every task:
   - Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 13.1, 13.2, 13.3, 13.4,
     13.5, 13.6, 15.1, 15.2, 15.3, 15.4, 15.5
 
-- [ ] 8. Media on the command line: the two packages and `import`
+- [x] 8. Media on the command line: the two packages and `import`
   - Add `ffmpeg-static` 5.3.0 and `omggif` 1.0.10 to `converter/package.json` at these
     exact versions, run `npm install --prefix converter`, and track
     `converter/package-lock.json`. Before the install, list the entries of the home folder

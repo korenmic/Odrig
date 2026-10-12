@@ -64,6 +64,8 @@ function environment(more) {
 const LARGEST_OUTPUT = 1 << 30;
 // How long a program the tests start may run before it is ended and the test fails.
 const LONGEST_RUN_MS = 600000;
+// reference.py ends quietly with the number of the signal when a library fails this way.
+const FAULTS = {4: "SIGILL", 6: "SIGABRT", 8: "SIGFPE", 10: "SIGBUS", 11: "SIGSEGV"};
 
 // Runs `node converter/odrig.js` with the arguments. The result is `{status, out, err}`,
 // the two streams as text. `options.cwd` is the folder it is started in, the repository
@@ -80,7 +82,9 @@ export function runJs(argv, options = {}) {
   return finished(done, "node");
 }
 
-// Runs `python -m odrig` with the arguments, in the same folder as `runJs`.
+// Runs `python -m odrig` with the arguments, in the same folder as `runJs`. A video that is
+// cut or damaged is never given to the Python tool this way: PyAV can end Python with a
+// fault of memory on such a file. `runPythonMany` looks at a video first.
 export function runPython(argv, options = {}) {
   const done = spawnSync(python(), ["-m", options.module ?? "odrig", ...argv.map(String)], {
     cwd: options.cwd ?? ROOT,
@@ -120,7 +124,8 @@ export function reference(request, argv = [], input = null) {
       throw new Error(`reference.py ${request} did not come to an end: ${done.error.message}`);
     }
     if (done.status !== 0) {
-      throw new Error(`reference.py ${request} ended with status ${done.status}: ${done.stderr}`);
+      const fault = FAULTS[done.status] === undefined ? "" : `, which is ${FAULTS[done.status]}: a library of Python met a fault of memory`;
+      throw new Error(`reference.py ${request} ended with status ${done.status}${fault}: ${done.stderr}`);
     }
     return JSON.parse(fs.readFileSync(answered, "utf8"));
   } finally {
@@ -226,7 +231,11 @@ export function libraryJsonCheck(bytes) {
 // Whether the detail of an error line of the Python tool holds text of a library, which
 // the JavaScript tool words itself.
 export function libraryText(line) {
-  return /^error: bad-json: [^:]+: line \d+, column \d+: /.test(line) || /^error: bad-deflate: /.test(line);
+  return (
+    /^error: bad-json: [^:]+: line \d+, column \d+: /.test(line) ||
+    /^error: bad-deflate: /.test(line) ||
+    /^error: unreadable-media: .*: the (GIF|video) cannot be decoded: /.test(line)
+  );
 }
 
 // Compares what the two tools say of one file: the same status; for an accepted file the
@@ -343,7 +352,9 @@ export function animationFrom(seed, {largestWidth = 40, largestHeight = 30} = {}
 
 // Runs command lines of the Python tool one after the other in one Python, in the folder
 // `cwd`: for each `{status, out, err}`. It is the command line of `python -m odrig` without
-// a new program for each line.
+// a new program for each line. An `import` of a video for whose first video stream PyAV has
+// no decoder is not run, because PyAV would end Python with a fault of memory: its status
+// is null and `err` says why.
 export function runPythonMany(commands, cwd = ROOT) {
   const results = reference("run", [], {cwd, commands: commands.map((argv) => argv.map(String))});
   return results.map(([status, out, err]) => ({status, out, err}));

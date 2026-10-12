@@ -7,14 +7,17 @@ decimal text.
 """
 
 import contextlib
+import ctypes
 import fractions
 import hashlib
 import importlib
 import io
 import json
 import os
+import signal
 import sys
 import tempfile
+import traceback
 import types
 import zlib
 
@@ -24,11 +27,68 @@ sys.path.insert(0, ROOT)
 from odrig import cli, errors, jsonframes, mapping, odrg, show  # noqa: E402
 
 
+def _quiet_faults():
+    """Makes a fault of memory in a library end this program quietly, with the number of the
+    signal as its status, in place of a crash report on the screen of whoever sits at the
+    computer. The test that asked then fails with that status."""
+    try:
+        libc = ctypes.CDLL(None)
+        libc.signal.restype = ctypes.c_void_p
+        libc.signal.argtypes = [ctypes.c_int, ctypes.c_void_p]
+        leave = ctypes.cast(libc._exit, ctypes.c_void_p)
+    except (OSError, AttributeError):
+        return
+    for name in ("SIGSEGV", "SIGBUS", "SIGILL", "SIGFPE", "SIGABRT"):
+        number = getattr(signal, name, None)
+        if number is not None:
+            libc.signal(int(number), leave)
+
+
+VIDEO_ENDINGS = (".mp4", ".mov")
+
+
+def _undecodable_video(argv):
+    """Why the Python tool must not be given this `import` command line, or None.
+
+    PyAV 17 ends the whole program with a fault of memory when it is asked to decode a video
+    stream for which it has no decoder, which is what `odrig/media.py` asks of the first
+    video stream of a file. A file that is cut inside its header has such a stream. This
+    looks at the streams without decoding anything.
+    """
+    if len(argv) < 2 or argv[0] != "import" or not argv[1].lower().endswith(VIDEO_ENDINGS):
+        return None
+    if not os.path.isfile(argv[1]):
+        return None
+    import av
+
+    try:
+        with av.open(argv[1]) as container:
+            videos = container.streams.video
+            if videos and videos[0].codec_context is None:
+                return f"{argv[1]}: PyAV has no decoder for the first video stream and would end Python with a fault of memory"
+    except Exception:  # noqa: BLE001  the tool meets the same failure and reports it
+        return None
+    return None
+
+
 def _run(argv):
-    """One command line of the Python tool, run in this interpreter: status and both streams."""
+    """One command line of the Python tool, run in this interpreter: status and both streams.
+
+    An `import` of a video that would end Python with a fault of memory is not run: its
+    status is None and its standard error says why. An error the tool does not catch gives
+    status 1 and its traceback on standard error, as it does when the tool is a program of
+    its own.
+    """
+    refused = _undecodable_video(argv)
+    if refused is not None:
+        return [None, "", refused]
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        status = cli.main(argv)
+        try:
+            status = cli.main(argv)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+            status = 1
     return [status, out.getvalue(), err.getvalue()]
 
 
@@ -444,6 +504,225 @@ def timeline(arguments, cases):
     return results
 
 
+def _block(image, at, size, colour):
+    """Paints a block of one colour, or of one palette index, into an image."""
+    for x in range(at[0], min(image.width, at[0] + size[0])):
+        for y in range(at[1], min(image.height, at[1] + size[1])):
+            image.putpixel((x, y), colour)
+
+
+def _palette_frames(seed_value, size, count):
+    """Frames of a palette image whose index 0 is transparent: each has one or two blocks of
+    a colour on a ground that is nowhere painted."""
+    import random
+
+    from PIL import Image
+
+    from tests.converter import media_fixtures as fixtures
+
+    rng = random.Random(seed_value)
+    colours = fixtures.COLOURS
+    frames = []
+    for _ in range(count):
+        image = Image.new("P", size, 0)
+        image.putpalette([0, 0, 0] + [channel for colour in colours for channel in colour])
+        for _ in range(rng.choice((1, 1, 2))):
+            at = (rng.randrange(size[0]), rng.randrange(size[1]))
+            block = (rng.randint(1, max(1, size[0] // 2)), rng.randint(1, max(1, size[1] // 2)))
+            _block(image, at, block, rng.randint(1, len(colours)))
+        frames.append(image)
+    return frames
+
+
+def _video(path, pictures, pts, rate, codec="mpeg4", pixels="yuv420p", sound=False, only_sound=False):
+    """An mp4 or mov whose frames are the given pictures of red, green, blue and alpha, each
+    at its presentation time in units of 1 / rate second."""
+    import av
+    import numpy
+
+    with av.open(path, "w") as container:
+        audio = None
+        if sound or only_sound:
+            audio = container.add_stream("aac", rate=44100)
+        if not only_sound:
+            height, width = pictures[0].shape[:2]
+            stream = container.add_stream(codec, rate=rate)
+            stream.width, stream.height, stream.pix_fmt = width, height, pixels
+            stream.codec_context.time_base = 1 / fractions.Fraction(rate)
+            for number, picture in zip(pts, pictures):
+                frame = av.VideoFrame.from_ndarray(picture, format="rgba")
+                frame.pts = number
+                frame.time_base = 1 / fractions.Fraction(rate)
+                for packet in stream.encode(frame):
+                    container.mux(packet)
+            for packet in stream.encode():
+                container.mux(packet)
+        if audio is not None:
+            for number in range(8):
+                samples = numpy.zeros((2, 1024), dtype="float32")
+                samples[0, ::16] = 0.25
+                frame = av.AudioFrame.from_ndarray(samples, format="fltp", layout="stereo")
+                frame.sample_rate = 44100
+                frame.pts = number * 1024
+                for packet in audio.encode(frame):
+                    container.mux(packet)
+            for packet in audio.encode():
+                container.mux(packet)
+
+
+def media(arguments, given):
+    """Writes the media files the import tests read into the folder `given["folder"]`, with
+    Pillow and PyAV, and gives their names: `gifs`, `videos`, and `skipped`, a name with
+    the reason for each file that could not be made on this computer.
+
+    The GIFs and the videos of the Python suite's import tests are among them, made by
+    `tests/converter/media_fixtures.py`.
+    """
+    import random
+
+    import numpy
+    from PIL import Image
+
+    from tests.converter import media_fixtures as fixtures
+
+    folder = given["folder"]
+    colours = fixtures.COLOURS
+    gifs, videos, skipped = [], [], {}
+
+    def gif(name, make):
+        make(os.path.join(folder, name))
+        gifs.append(name)
+
+    def video(name, make):
+        try:
+            make(os.path.join(folder, name))
+        except Exception as failure:  # a codec this build of PyAV does not have
+            skipped[name] = f"{type(failure).__name__}: {failure}"
+            with contextlib.suppress(OSError):
+                os.remove(os.path.join(folder, name))
+            return
+        videos.append(name)
+
+    # The GIFs of the Python suite.
+    gif("clip.gif", lambda path: fixtures.write_gif(path, colours[:4], [30, 50, 70, 0]))
+    gif("delays.gif", lambda path: fixtures.write_gif(path, colours[:3], [10, 20, 100]))
+
+    def transparent(path):
+        first = Image.new("RGBA", (8, 4), colours[0] + (255,))
+        for x in range(4, 8):
+            for y in range(4):
+                first.putpixel((x, y), colours[1] + (0,))
+        fixtures.save_gif(path, [first, Image.new("RGBA", (8, 4), colours[2] + (255,))], [40, 40])
+
+    gif("transparent.gif", transparent)
+
+    def rows(path):
+        image = Image.new("RGB", (60, 6), colours[2])
+        for x in range(60):
+            image.putpixel((x, 0), colours[0])
+        fixtures.save_gif(path, [image], [100])
+
+    gif("rows.gif", rows)
+    gif("still.gif", lambda path: Image.new("RGB", (8, 4), colours[5]).save(path))
+
+    def corners(path):
+        image = Image.new("RGB", (12, 8), colours[7])
+        for at, colour in (((0, 0), colours[0]), ((11, 0), colours[1]), ((0, 7), colours[2]), ((11, 7), colours[3])):
+            image.putpixel(at, colour)
+        fixtures.save_gif(path, [image], [100])
+
+    gif("corners.gif", corners)
+
+    # A transparent index on every frame.
+    def index(path):
+        frames = _palette_frames(1, (12, 6), 4)
+        frames[0].save(path, save_all=True, append_images=frames[1:], duration=[40, 60, 80, 40], loop=0, transparency=0, disposal=2)
+
+    gif("index.gif", index)
+
+    # Later frames that are smaller than the screen: Pillow writes only the part that changed.
+    def smaller(path):
+        frames = []
+        for number in range(5):
+            image = Image.new("RGB", (16, 8), colours[9])
+            _block(image, (2 + 2 * number, 1 + number), (3, 2), colours[number])
+            frames.append(image)
+        fixtures.save_gif(path, frames, [40, 40, 60, 60, 100])
+
+    gif("smaller.gif", smaller)
+
+    # One for each disposal, with a transparent index on every frame and the disposal named
+    # on every frame.
+    for disposal in (0, 1, 2, 3):
+
+        def disposed(path, disposal=disposal):
+            frames = _palette_frames(10 + disposal, (14, 7), 5)
+            frames[0].save(path, save_all=True, append_images=frames[1:], duration=[40, 40, 60, 40, 80], loop=0, transparency=0, disposal=disposal)
+
+        gif(f"disposal-{disposal}.gif", disposed)
+
+    # GIFs from seeds: pictures in a few colours, as Pillow writes them by itself, and
+    # palette pictures with a transparent index and one disposal for all frames.
+    for number in range(1, 41):
+        rng = random.Random(8000 + number)
+        size = (rng.randint(1, 20), rng.randint(1, 12))
+        count = rng.randint(1, 6)
+        delays = [rng.choice((0, 10, 20, 30, 40, 50, 70, 100, 250)) for _ in range(count)]
+
+        def plain(path, rng=rng, size=size, count=count, delays=delays):
+            frames = []
+            ground = rng.choice(colours)
+            for _ in range(count):
+                image = Image.new("RGB", size, ground)
+                for _ in range(rng.randint(0, 3)):
+                    at = (rng.randrange(size[0]), rng.randrange(size[1]))
+                    _block(image, at, (rng.randint(1, size[0]), rng.randint(1, size[1])), rng.choice(colours))
+                frames.append(image)
+            fixtures.save_gif(path, frames, delays)
+
+        gif(f"plain-{number}.gif", plain)
+
+        def indexed(path, number=number, rng=rng, size=size, count=count, delays=delays):
+            frames = _palette_frames(9000 + number, size, count)
+            disposal = rng.choice((1, 2, 3))
+            frames[0].save(path, save_all=True, append_images=frames[1:], duration=delays, loop=0, transparency=0, disposal=disposal)
+
+        gif(f"indexed-{number}.gif", indexed)
+
+    # The videos of the Python suite.
+    video("clip.mp4", lambda path: fixtures.write_video(path, colours))
+    video("clip.mov", lambda path: fixtures.write_video(path, colours))
+    video("three.mp4", lambda path: fixtures.write_video(path, colours[:3]))
+    video("one.mp4", lambda path: fixtures.write_video(path, colours[:1]))
+    video("late.mp4", lambda path: fixtures.write_video(path, colours[:4], first_pts=7))
+    video("late.mov", lambda path: fixtures.write_video(path, colours[:4], first_pts=7))
+    video("alpha.mov", lambda path: fixtures.write_video(path, colours[:2], codec="qtrle", pixels="argb", alpha=colours[1]))
+
+    def flat(colour, size=(64, 36)):
+        picture = numpy.zeros((size[1], size[0], 4), dtype=numpy.uint8)
+        picture[:, :, :3] = colour
+        picture[:, :, 3] = 255
+        return picture
+
+    def ramp(number, size=(96, 54)):
+        picture = numpy.zeros((size[1], size[0], 4), dtype=numpy.uint8)
+        picture[:, :, 0] = numpy.linspace(0, 255, size[0], dtype=numpy.uint8)[None, :]
+        picture[:, :, 1] = numpy.linspace(255, 0, size[1], dtype=numpy.uint8)[:, None]
+        picture[:, :, 2] = (40 * number) % 256
+        picture[:, :, 3] = 255
+        return picture
+
+    video("gaps.mp4", lambda path: _video(path, [flat(colour) for colour in colours[:7]], [0, 1, 2, 5, 6, 10, 11], 25))
+    video("ntsc.mp4", lambda path: _video(path, [flat(colour) for colour in colours], list(range(10)), fractions.Fraction(30000, 1001)))
+    video("sixty.mov", lambda path: _video(path, [flat(colour) for colour in colours], list(range(10)), 60))
+    video("ramp.mp4", lambda path: _video(path, [ramp(number) for number in range(6)], list(range(6)), 25))
+    video("tall.mp4", lambda path: _video(path, [flat(colour, (36, 64)) for colour in colours[:5]], list(range(5)), 25))
+    video("h264.mp4", lambda path: _video(path, [flat(colour) for colour in colours * 2], list(range(20)), 25, codec="libx264"))
+    video("sound.mp4", lambda path: _video(path, [flat(colour) for colour in colours[:5]], list(range(5)), 25, sound=True))
+    video("only-sound.mp4", lambda path: _video(path, [], [], 25, only_sound=True))
+    return {"gifs": gifs, "videos": videos, "skipped": skipped}
+
+
 def run(arguments, given):
     """What `python -m odrig` gives for each of the command lines of `given["commands"]`,
     run one after the other in this interpreter, in the folder `given["cwd"]`: for each its
@@ -473,12 +752,14 @@ REQUESTS = {
     "resample": resample,
     "ticks": ticks,
     "timeline": timeline,
+    "media": media,
     "run": run,
 }
 
 
 def main(argv):
     request, asked, answered, arguments = argv[0], argv[1], argv[2], argv[3:]
+    _quiet_faults()
     with open(asked, encoding="utf-8") as file:
         given = json.load(file)
     result = REQUESTS[request](arguments, given)

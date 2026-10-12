@@ -4721,3 +4721,225 @@ a floor 38 tests fail, among them the one the task names.
 
 **Resolution.** `converter/tests/reference.py`, `rects`, `resample`, `ticks` and
 `timeline`; `converter/tests/fit.test.js`, `converter/tests/timeline.test.js`.
+
+## Seed 06: Python crashing while it decodes a video for a comparison
+
+**Question.** While the task that adds `import` was being done, macOS showed "Python quit
+unexpectedly" 22 times in two minutes. Every report is a fault of memory (SIGSEGV) in a
+Python whose parent is `node`, inside PyAV: `VideoStream.decode`, called from
+`Packet.decode` in the generator of `InputContainer`. What asked Python to do that, and is
+it the tests or the Python tool?
+
+**Answer.** It is the Python tool's own `import`, on a video it cannot decode, and a probe
+of this task gave it such videos. The probe was not part of the suite: to see whether the
+two tools judge a broken file alike (the design's assumption A5), it wrote 480 cut and
+damaged copies of four test videos and ran `python -m odrig import` on each, one program
+after the other. Nothing ran at the same moment, no container was closed early and no
+program was ended from outside.
+
+The cause: for a file that is cut inside its header, PyAV 17.1.0 lists a video stream for
+which it has no decoder: `container.streams.video[0].codec_context` is None.
+`odrig/media.py` takes the first video stream and calls `container.decode(stream)`
+(lines 207 and 211), and PyAV then follows the missing decoder without looking and ends
+the whole program. 21 of the 480 copies are of this kind, and 21 of the reports have this
+place; the other report is of the first run of the probe, in which one Python read all
+copies. It was seen again once, on purpose, in a program that ends quietly: the file is
+opened, has one stream of type video, its `codec_context` is None, and the first frame
+asked of `container.decode` ends Python with signal 11.
+
+To see it without a report on the screen, in the repository root:
+
+```
+.venv/bin/python -c "
+from tests.converter import media_fixtures as f
+f.write_video('build/whole.mp4', f.COLOURS)
+open('build/cut.mp4', 'wb').write(open('build/whole.mp4', 'rb').read()[:993])
+import av
+print(av.open('build/cut.mp4').streams.video[0].codec_context)"
+```
+
+prints `None` (the folder `build/` must be there; the whole file has 1,529 bytes with
+PyAV 17.1.0, and cuts at 993 to 1,070 bytes are of this kind). Then
+`.venv/bin/python -m odrig import build/cut.mp4 build/out.json --mapping mapping/legs-2.json`
+ends Python with the fault, and macOS shows its dialog. Whether a whole video in a codec
+that PyAV's FFmpeg does not have is of this kind too was not tried; it would have the same
+missing decoder.
+
+The same probe found two more ways in which the Python tool ends without its error line,
+with a traceback and status 1: a video whose metadata is not UTF-8 (3 of the 480 copies;
+`UnicodeDecodeError` from `av.open`, which is not one of PyAV's own errors), and a GIF that
+is cut short (298 of 970 cut and damaged copies of three GIFs; `IndexError` and
+`struct.error` from Pillow, which `odrig/media.py` does not catch).
+
+No file of `odrig/` changes in this seed (Requirement 18 criterion 8), so the Python tool
+is as it was: this needs the owner, as a seed of its own. The mending is small:
+`_video_frames` refuses a stream without a `codec_context` as `unreadable-media` and
+catches `UnicodeDecodeError`, and `_gif_frames` catches `IndexError` and `struct.error`.
+The JavaScript tool gives `unreadable-media` for all of these files.
+
+What changed on the side of the tests, so that no test can do this to whoever sits at the
+computer:
+
+- The suite never gives the Python tool a cut or damaged video as a program of its own.
+  Such files are imported by the JavaScript tool alone, which must end with a file or
+  with `unreadable-media`.
+- Where a test compares the two tools on a file that is no whole video, the Python side
+  goes through `reference.py`, which looks at the streams of a video before it runs
+  `import`, without decoding, and does not run it when the first video stream has no
+  decoder; the test then gets no status and the reason.
+- `reference.py` makes a fault of memory end it quietly, with the number of the signal as
+  its status, by naming the C function `_exit` as the handler of the signal. The test that
+  asked fails and says which signal it was.
+
+**Resolution.** `converter/tests/reference.py`, `_quiet_faults`, `_undecodable_video` and
+`_run`; `converter/tests/support.js`, `runPython` and `runPythonMany`;
+`converter/tests/import.test.js`, "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy". Open for the owner: the three
+faults of `odrig/media.py` named above.
+
+## Seed 06: What the install of the two packages needs and leaves, with npm 12
+
+**Question.** The design's assumption A1: the decoder program of `ffmpeg-static` 5.3.0
+installs under npm 12 on this Mac and runs. Its facts V1 to V4 were read on the registry
+and not tried.
+
+**Answer.** A1 holds with one addition, and one fact is other than read.
+
+- npm 12 runs no install script of a dependency unless `package.json` allows it. After
+  `npm install --prefix converter` the package was there without its program, and npm
+  said that the install script of `ffmpeg-static@5.3.0` was blocked.
+  `converter/package.json` therefore has, beside the design's members,
+  `"allowScripts": {"ffmpeg-static@5.3.0": true}`, written by
+  `npm install-scripts approve ffmpeg-static` and pinned to the version. With it,
+  `npm ci --prefix converter` fetches the program. The script was read first: it fetches
+  `ffmpeg-darwin-arm64.gz`, a README and a licence from the release `b6.1.1` of the
+  package's GitHub repository into the package's folder and makes the program executable,
+  as fact V2 says. An npm older than 12 does not know the member and runs the script
+  anyway.
+- The program of that release for macOS on Apple Silicon is ffmpeg 6.0, not 6.1.1: its
+  first line is `ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers`. It has
+  45,568,216 bytes and the SHA-256
+  `a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584`, which
+  `converter/ffmpeg.sha256` holds for `darwin-arm64`.
+- 21 packages are installed for the two that are named: `ffmpeg-static` needs four for its
+  install script, and those need others. `converter/node_modules/` has 45 MB.
+- Outside the project folder the install wrote two things, found by listing the home
+  folder, `~/Library/Caches`, `~/.npm` and `~/.cache` before and after:
+  `~/Library/Caches/ffmpeg-static-nodejs`, new, 6 files of 19,255,699 bytes, the package's
+  copy of what it fetched; and npm's own cache and log, `~/.npm/_cacache` and
+  `~/.npm/_logs`, which were there. Nothing new is in the home folder itself or in
+  `~/.cache`.
+- The tool does not ask the package for the path of its program: the package gives the
+  value of the environment variable `FFMPEG_BIN` in place of its own path when that is
+  set (fact V4), which could be an ffmpeg of the system. `cli/video.js` takes the program
+  at `converter/node_modules/ffmpeg-static/ffmpeg`, `ffmpeg.exe` on Windows, and nothing
+  else. When the package's folder or the program is not there, `import` of a video ends
+  with `decoder-missing`. `omggif` is loaded with `import()`.
+- `decoder-missing` is checked after the mapping file, the name of the media file and
+  that it is there, and before the start and the duration. Its detail names the package
+  and the command with the folder the tool is in, `npm ci --prefix <folder>`.
+
+**Resolution.** `converter/package.json`, `converter/package-lock.json`,
+`converter/ffmpeg.sha256`; `converter/cli/video.js`, `program`;
+`converter/tests/import.test.js`, "the packages" and "a tool without its packages".
+
+## Seed 06: The decoder program as found: assumptions A2 to A5
+
+**Question.** The design's assumptions about what ffmpeg writes and how it ends, to be
+verified by the task that adds `import`.
+
+**Answer.**
+
+- **A2 holds.** The filter `showinfo` of ffmpeg 6.0 writes
+  `config in time_base: 1/12800, frame_rate: 25/1` and for each frame a line with `n:`,
+  `pts:` and `s:<w>x<h>`, the `pts` in that time base, which is the stream's. Two
+  additions to the design's call: `-copyts`, without which ffmpeg counts the times from
+  the start of the file and not as the file records them, and `file:` in front of the
+  path, so that a name is never read as an address of another kind. After each frame line
+  comes a line on colour, and the scaler writes lines of its own; the reader passes over
+  both.
+- **A3 holds.** A mov with `qtrle` and transparency comes out with its alpha: the pixels
+  of the transparent half are `0 200 0 0`.
+- **A4 holds, with no difference at all.** 55 imports of 15 videos, with each fit and with
+  a part, give the bytes of the Python tool's file: mpeg4 in mp4 and mov, `qtrle`, H.264
+  with frames that are stored out of order, 25, 29.97 and 60 frames a second, frames with
+  gaps, a ramp of colours, a picture higher than wide, and sound beside the video. PyAV 17
+  carries FFmpeg 8 and the package ffmpeg 6.0.
+- **A5 holds; `-xerror` is not added.** A text file, an empty file and a file cut short
+  end ffmpeg with status 1, or with all the frames the file still has. A file without a
+  video stream makes it say `Stream map '0:v:0' matches no streams`, which the reader
+  reports with the Python tool's words, `the file has no video stream`. With `-xerror`
+  ffmpeg refused 43 of 480 cut and damaged copies of four videos that the Python tool
+  reads, against 16 that it reads and the Python tool refuses without it; so it is left
+  out.
+
+The two tools do not always judge a file that is damaged alike, and nothing in this seed
+makes them. Of the 480 copies of videos, 230 are refused by both and 203 give the same
+file; 21 cannot be given to the Python tool at all (see "Python crashing while it decodes
+a video for a comparison"); 16 are read by the JavaScript tool and refused by the Python
+tool; on 3 the Python tool ends with a traceback; and 7 are read by both with other
+pixels. Of 970 such copies of three GIFs, 501 are refused by both and 96 give the same
+file; 70 are refused by the JavaScript tool and read by Pillow: files cut inside a later
+frame, of which Pillow shows the frames before the cut, frames that reach beyond the
+screen, and blocks the package does not know; on 298 the Python tool ends with a
+traceback; 4 are read by both with other pixels, and 1 by the JavaScript tool alone. Both
+tools read a GIF under the name `.mp4`, as a video, and both refuse a video under the name
+`.gif`.
+
+The reader holds at most 64 MB of frames that the library has not asked for yet and makes
+the program wait meanwhile; the log is read all the time.
+
+**Resolution.** `converter/cli/video.js`; `converter/tests/import.test.js`.
+
+## Seed 06: GIF pictures as found (A6), and a damaged GIF that kept the package busy without end
+
+**Question.** The design's assumption A6: for the GIFs of the Python suite and for GIFs
+that stay out of Pillow's three corners, the pictures built from what `omggif` gives equal
+Pillow's. And what does the package do with a file that is damaged?
+
+**Answer.** A6 holds: 368 imports of 92 GIFs give the bytes of the Python tool's file. The
+GIFs are those of the Python suite, one with a transparent index on every frame, one whose
+later frames are smaller than the screen, one for each disposal from 0 to 3 with a
+transparent index and the disposal named on every frame, 40 GIFs from seeds as Pillow
+writes pictures of a few colours by itself, and 40 palette GIFs from seeds with a
+transparent index and one disposal for all frames.
+
+The package does not judge the codes of a frame's data. Three of 970 damaged copies kept
+it busy without end: a code that the table does not have yet makes its table point
+at itself. `cli/gif.js` therefore goes through the codes of a frame before the package
+draws it, as the package reads them, and refuses data with a code the table does not
+have, with a first code after a cleared table that is no colour, or that spells more or
+fewer pixels than the frame has. Data that passes cannot keep the package busy, because
+every entry of the table then points at an earlier one. The package still draws every
+pixel; the reader of the design, which watches for the package's warning, stays as a
+second look. The suite reads every cut and every changed byte of four GIFs, more than
+3,000 files, in a program of its own with a limit of two minutes,
+`converter/tests/gifs.js`.
+
+A frame without a palette, which the package would draw from the wrong bytes, is
+`unreadable-media` as well. A file that ends after its header and has no frame gives
+`the file holds no picture`. The delay of a frame is the file's hundredths of a second
+times 10.
+
+**Resolution.** `converter/cli/gif.js`, `codeFault` and `frames`;
+`converter/tests/import.test.js`, "the pictures of a GIF are built by the rules of the
+format as browsers apply them" and "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy"; `converter/tests/gifs.js`.
+
+## Seed 06: The media of the import tests, and what is not verified of import
+
+**Question.** The task names the media of the import tests and leaves their making to the
+requests `gif` and `video` of `reference.py`.
+
+**Answer.** One request, `media`, writes them all into a temporary folder: the GIFs above
+and fifteen videos, with `tests/converter/media_fixtures.py` where the Python suite has
+the file and with PyAV directly for the others. A file that this build of PyAV cannot
+write is left out and named; on this Mac none was. The JavaScript side imports in the
+test's own program and the Python side in one Python, and five files are imported once
+more by both tools as programs of their own.
+
+Not verified: a rotation that a file records for display. The call has `-noautorotate`,
+and no test file with a rotation was made, because PyAV writes none in a simple way. Not
+verified either: a video of a real camera or phone, and anything on Windows or Linux.
+
+**Resolution.** `converter/tests/reference.py`, `media`; `converter/tests/import.test.js`.

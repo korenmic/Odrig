@@ -3,10 +3,83 @@
 // Exit status 0 means the subcommand did its work, 1 that an input was rejected, and 2
 // that the command line was not understood.
 
-import {errors, jsonframes, odrg, whole} from "../lib/index.js";
+import fs from "node:fs";
+
+import {errors, jsonframes, mapping, odrg, timeline, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
+import * as gif from "./gif.js";
+import * as video from "./video.js";
+
+// The reader of each kind of media file, by the ending of its name.
+const KINDS = {".gif": "gif", ".mp4": "video", ".mov": "video"};
+
+// The ending of a file name, in small letters: what follows the last point of the last
+// part of the path, when that part does not begin with it.
+export function ending(name) {
+  const separators = process.platform === "win32" ? ["/", "\\"] : ["/"];
+  const base = Math.max(...separators.map((separator) => name.lastIndexOf(separator))) + 1;
+  const point = name.lastIndexOf(".");
+  let first = base;
+  while (first < point && name[first] === ".") {
+    first += 1;
+  }
+  return first < point ? name.slice(point).toLowerCase() : "";
+}
+
+function isFile(name) {
+  try {
+    return fs.statSync(name).isFile();
+  } catch (error) {
+    if (!files.isSystemError(error)) {
+      throw error;
+    }
+    return false;
+  }
+}
+
+// Seconds given as a decimal number, in whole milliseconds, rounded to the nearest, halves
+// away from zero.
+export function milliseconds(text) {
+  return whole.whole(whole.rounded(whole.fromDecimal(text, 1000)));
+}
+
+// The checks run in this order: the mapping file, the name of the media file, that it is
+// there, the packages that read it, a negative start and a duration that is not above 0,
+// the content, and last the part against the length of the media.
+async function importMedia(values) {
+  const mappingBytes = files.read(values.mapping, errors.MAPPING_MISSING);
+  const canvas = errors.naming(values.mapping, () => mapping.loads(mappingBytes));
+  const kind = KINDS[ending(values.input)];
+  if (kind === undefined) {
+    throw new errors.Rejection(errors.UNSUPPORTED_MEDIA, `${values.input}: the name does not end in .mp4, .mov or .gif`);
+  }
+  if (!isFile(values.input)) {
+    throw new errors.Rejection(errors.NOT_FOUND, `${values.input}: there is no such file`);
+  }
+  let frames;
+  if (kind === "gif") {
+    const found = await gif.reader();
+    if (found.failure !== undefined) {
+      throw found.failure;
+    }
+    frames = gif.frames(values.input, found.GifReader);
+  } else {
+    const found = video.program();
+    if (found.failure !== undefined) {
+      throw found.failure;
+    }
+    frames = video.frames(values.input, found.file);
+  }
+  const options = {
+    fit: values.fit,
+    startMs: milliseconds(values.start),
+    durationMs: values.duration === null ? null : milliseconds(values.duration),
+  };
+  const animation = await errors.naming(values.input, () => timeline.importFrames({kind, frames}, canvas, options));
+  files.write(values.output, jsonframes.dumps(animation));
+}
 
 function encode(values) {
   const source = files.read(values.input);
@@ -67,6 +140,7 @@ function check(values, streams) {
 // The subcommands that can be run: for each name the function that does the work. It is
 // given the values of the arguments and the two streams.
 export const SUBCOMMANDS = new Map([
+  ["import", importMedia],
   ["encode", encode],
   ["decode", decode],
   ["check", check],
