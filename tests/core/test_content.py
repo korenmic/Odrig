@@ -414,7 +414,8 @@ class Remove(Content):
         return [dict(item, bytes=len(files[item["file"]])) if "file" in item else item for item in listed]
 
     def test_removing_the_start_item_leaves_the_show_without_start(self):
-        for start, number in ((6, 6), (1, 1), (3, 3)):
+        # Without a start, the show that is left plays the playlist from its first animation.
+        for start, number, first in ((6, 6, 1), (1, 1, 2), (3, 3, 1)):
             files = small_show(self.ITEMS, start=start)
             before = [support.line(T0, "play 4")] + every_20_ms(25)
             if number == 1:
@@ -422,7 +423,8 @@ class Remove(Content):
             self.removed(files, number, before=before)
             written = json.loads(self.left["show.json"])
             self.assertNotIn("start", written)
-            self.assertEqual(support.start(self.left, [support.line(T0, "status")]).lines, ['reply {"ok":true,"on":true,"brightness":128,"playing":null,"animation":null,"fps":0,"error":null}'])
+            self.assertEqual(support.start(self.left, [support.line(T0, "status")]).lines,
+                             ['reply {"ok":true,"on":true,"brightness":128,"playing":"all","animation":%d,"fps":0,"error":null}' % first])
         files = small_show(self.ITEMS, start=6)
         self.removed(files, 3, before=every_20_ms(25))
         self.assertEqual(json.loads(self.left["show.json"])["start"], 6)
@@ -455,7 +457,13 @@ class Remove(Content):
                 plain = [support.line(T0, f"remove {other}") for other in first] + every_20_ms(25) + every_20_ms(30, T0 + 500) + every_20_ms(20, T0 + 1100)
                 without = self.run_both(files, plain)
                 self.assertEqual([line for line in with_removal if not line.startswith("reply")], [line for line in without if not line.startswith("reply")])
-                self.assertEqual(json.loads(replies(with_removal)[-1])["playing"], played)
+                # A cycle that was the start plays on; an animation that was the start
+                # still has its turn in the playlist.
+                state = json.loads(replies(with_removal)[-1])
+                if played in (3, 6):
+                    self.assertEqual(state["playing"], played)
+                else:
+                    self.assertEqual((state["playing"], state["animation"]), ("all", played))
 
     def test_the_last_item_can_be_removed_and_the_show_without_items_is_valid(self):
         files = small_show([animation(9, "only.odrg")], start=9, brightness=77)

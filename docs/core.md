@@ -180,6 +180,16 @@ An item's time starts at the grid time of the first refresh after it was played,
 since then, as [format.md](format.md) defines; a cycle counts each turn's time from the
 start of the turn. Playback time goes on while the LEDs are switched off.
 
+The playlist of [show.md](show.md) is played in the same way, one turn at a time. The
+core keeps the animation whose turn it is and the moment that turn began, which for the
+first turn is the grid time of the first refresh. At a refresh, while the time since then
+is at or above the length of the turn, the turn of the next animation begins exactly
+where this one ended, however late the refresh is; whole rounds of the playlist are taken
+off first, by division, so a host that asked for no refresh for a long time costs one
+walk over the items. The length of a turn is worked out from the length of the
+animation's loop, which the check of the file found, and from `repeat`, `max_seconds` and
+`min_seconds`. Every turn opens its file anew.
+
 `status` reports as `fps` the number of refreshes produced in the last whole second that
 ended before the command's timestamp, with seconds counted from the power-on moment.
 
@@ -258,9 +268,10 @@ first check that fails decides. The texts are listed in [reasons.md](reasons.md)
 core". The other commands work as ever.
 
 After startup the LEDs are switched on. With a valid show, brightness is the value of
-`show.json` and the `start` item is playing if there is one. With an invalid show nothing
-is playing, and brightness is the value of `show.json` when that file and its ids are
-sound, and 0 otherwise.
+`show.json`, and the playlist plays, from its first animation or from the animation
+`start` names; a `start` that names a cycle plays that cycle; a show without an animation
+plays nothing. With an invalid show nothing is playing, and brightness is the value of
+`show.json` when that file and its ids are sound, and 0 otherwise.
 
 A file can also fail while it plays: it is gone, cannot be read, or no longer follows the
 format. From that refresh on the show is invalid in the same way, until the next startup.
@@ -398,7 +409,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,256 |
+| The core object | fixed | 3,272 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -414,12 +425,12 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,501** |
+| **Total** | | **124,517** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the check of an
 uploaded file takes 46,008 of them. The example show on the two-leg mapping asks for
-87,986 bytes. A host without storage that can be changed is not asked for the chunk
-buffer and the three blocks of the check: 76,993 bytes for the target file. The size and the number of frames of an
+88,002 bytes. A host without storage that can be changed is not asked for the chunk
+buffer and the three blocks of the check: 77,009 bytes for the target file. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 

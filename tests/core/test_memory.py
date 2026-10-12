@@ -169,7 +169,7 @@ class FixedMemory(unittest.TestCase):
                 script = [f"poll {time}" for time in range(0, 40 * frames, 500)] + [support.line(40 * frames, "status")]
                 run = support.start(files, script)
                 self.assertIsNone(run.error)
-                self.assertIn('"playing":1', run.lines[-1])
+                self.assertIn('"playing":"all","animation":1', run.lines[-1])
                 self.assertIn('"error":null', run.lines[-1])
                 sizes[frames, compressed] = len(clip)
                 memory.add(run.memory)

@@ -527,7 +527,8 @@ class ReferencePlayer:
         self.clips = {}         # the frames of each file by name
         self.on = True
         self.brightness = 0
-        self.playing = None     # the id of the item being played
+        self.playing = None     # the id of the item being played, ALL for the playlist, or None
+        self.turn = None        # while the playlist plays, the id of the animation whose turn it is
         self.zero = None        # the time zero of that item, once a refresh has set it
         self.shown = None       # the id of the animation item the latest refresh chose
         self.t0 = None          # the power-on moment
@@ -545,8 +546,12 @@ class ReferencePlayer:
         except _Invalid as invalid:
             self.error = str(invalid)
         else:
-            if start is not None:
+            # A cycle named as the start plays. Otherwise the playlist plays, from the
+            # animation the start names or from its first, when the show has one.
+            if start is not None and self.items[start].cycle is not None:
                 self._play(start)
+            elif start is not None or self._animations():
+                self._play_all(start)
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
@@ -598,11 +603,32 @@ class ReferencePlayer:
                 raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
         return listed.start
 
+    ALL = "all"
+
     def _play(self, number):
         self.playing = number
         self.zero = None
         item = self.items[number]
         self.shown = number if item.cycle is None else item.cycle[0]
+
+    def _animations(self):
+        """The ids of the animation items, in the order of the show: the playlist."""
+        return [item.id for item in self.items.values() if item.cycle is None]
+
+    def _play_all(self, number=None):
+        """Starts the playlist with the turn of an animation, or of its first one."""
+        self.playing = self.ALL
+        self.zero = None
+        self.turn = self.shown = self._animations()[0] if number is None else number
+
+    def _turn_ms(self, number):
+        """How long the turn of an animation lasts: its loops, which are the show's
+        `repeat` or the fewest that last `min_seconds`, cut at its `max_seconds`."""
+        item = self.items[number]
+        loop = self.clips[item.file].total
+        loops = item.repeat if item.repeat is not None else -(-1000 * self.min_seconds // loop)
+        turn = loops * loop
+        return turn if item.max_seconds is None else min(turn, 1000 * item.max_seconds)
 
     def _touch(self, now):
         """Takes the timestamp of a call and gives the time the call happens at."""
@@ -620,8 +646,18 @@ class ReferencePlayer:
             return None
         if self.zero is None:
             self.zero = grid
-        item = self.items[self.playing]
         elapsed = now - self.zero
+        if self.playing == self.ALL:
+            # The turn that this moment falls into. A turn begins where the one before it
+            # ended, however late the refresh comes.
+            order = self._animations()
+            while elapsed >= self._turn_ms(self.turn):
+                elapsed -= self._turn_ms(self.turn)
+                self.zero += self._turn_ms(self.turn)
+                self.turn = order[(order.index(self.turn) + 1) % len(order)]
+            item = self.items[self.turn]
+        else:
+            item = self.items[self.playing]
         if item.cycle is not None:
             # Turn t shows the animation at place t mod n, with its time counted from the
             # start of the turn.
@@ -863,7 +899,10 @@ class ReferencePlayer:
             if old.file != name and all(other.file != old.file for other in self.items.values()):
                 self.files.pop(old.file, None)
                 self.clips.pop(old.file, None)
-            played = self.items.get(self.playing)
+            if self.playing == self.ALL and self.turn == number:
+                # The animation whose turn it is has another file: its turn begins again.
+                self.zero = None
+            played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and (played.id == number or number in (played.cycle or ())):
                 self._play(self.playing)
         if old is None or old.file != name:
@@ -919,8 +958,8 @@ class ReferencePlayer:
         item = self.items.pop(number)
         if self.start == number:
             self.start = None
-        if self.playing == number:
-            self.playing = self.shown = self.zero = None
+        if self.playing == number or (self.playing == self.ALL and self.turn == number):
+            self.playing = self.shown = self.zero = self.turn = None
         if item.file is not None and all(other.file != item.file for other in self.items.values()):
             self.files.pop(item.file, None)
             self.clips.pop(item.file, None)

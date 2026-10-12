@@ -134,7 +134,7 @@ class Animation(Playback):
 
     def test_it_is_null_when_nothing_plays(self):
         files = support.example_show()
-        files["show.json"] = support.show_text(json.loads(files["show.json"])["items"], 128)
+        files["show.json"] = support.show_text([], 128)
         printed = self.assert_as_the_reference(files, [status_at(0), f"poll {T0}", status_at(10)])
         for line in (printed[0], printed[-1]):
             self.assertEqual((state(line)["playing"], state(line)["animation"]), (None, None))
@@ -152,9 +152,16 @@ class StateAfterStartup(Playback):
         )
         self.assertEqual(self.started(hello_only(7))["brightness"], 7)
 
-    def test_a_valid_show_without_start_plays_nothing(self):
+    def test_a_valid_show_without_start_plays_the_playlist_from_its_first_animation(self):
         files = support.example_show()
         files["show.json"] = support.show_text(json.loads(files["show.json"])["items"], 31)
+        self.assertEqual(
+            self.started(files), {"ok": True, "on": True, "brightness": 31, "playing": "all", "animation": 1, "fps": 0, "error": None}
+        )
+
+    def test_a_valid_show_without_an_animation_plays_nothing(self):
+        files = support.example_show()
+        files["show.json"] = support.show_text([], 31)
         self.assertEqual(
             self.started(files), {"ok": True, "on": True, "brightness": 31, "playing": None, "animation": None, "fps": 0, "error": None}
         )

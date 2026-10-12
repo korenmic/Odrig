@@ -20,6 +20,15 @@ def playing(files, start):
     return files
 
 
+def alone(files, number):
+    """The file set with a show of one of its animations and nothing else: the playlist is
+    that animation, again and again."""
+    listed = json.loads(files["show.json"])
+    files = dict(files)
+    files["show.json"] = support.show_text([item for item in listed["items"] if item["id"] == number], listed["brightness"])
+    return files
+
+
 def one_clip(mapping_text, clip, brightness=255, start=1):
     """A file set of one animation, `clip.odrg`, that plays from power-on."""
     return {
@@ -89,7 +98,7 @@ class OneLoopAndIntoTheNext(Playback):
         self.assertEqual({leg: len(data) for leg, data in produced[0][1].items()}, {1: 540, 2: 540})
 
     def test_dvd_bounce_on_the_two_leg_mapping(self):
-        files = playing(support.example_show(), 2)
+        files = alone(support.example_show(), 2)
         frames = odrg.decode(files["dvd.odrg"]).records
         total = sum(duration for duration, _ in frames)
         self.assertGreater(total, 40000)
@@ -299,7 +308,7 @@ class Brightness(Playback):
 
 class TheGrid(Playback):
     def hello(self):
-        return playing(support.example_show(), 1)
+        return alone(support.example_show(), 1)
 
     def test_polls_1_ms_apart_give_one_refresh_for_each_grid_time(self):
         printed = self.assert_as_the_reference(self.hello(), polls(range(T0, T0 + 201)))
@@ -379,9 +388,9 @@ class NothingToShow(Playback):
             for rgb in data.values():
                 self.assertEqual(rgb, bytes(540))
 
-    def test_a_show_without_start_gives_dark_refreshes(self):
+    def test_a_show_without_an_animation_gives_dark_refreshes(self):
         files = support.example_show()
-        files["show.json"] = support.show_text(json.loads(files["show.json"])["items"], 128)
+        files["show.json"] = support.show_text([], 128)
         self.assert_dark(files, [1, 2])
 
     def test_an_invalid_show_gives_dark_refreshes(self):

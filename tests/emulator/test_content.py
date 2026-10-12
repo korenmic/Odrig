@@ -141,7 +141,7 @@ class ListAndRemove(unittest.TestCase):
         self.assertEqual(over_serial(again, "list"), listed)
         self.assertEqual(listed, b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138}],"next":null}\n')
         state = again.status()
-        self.assertEqual((state["playing"], state["error"]), (None, None))
+        self.assertEqual((state["playing"], state["animation"], state["error"]), ("all", 1, None))
         self.assertEqual(over_http(again, "play 1"), b'{"ok":true}\n')
         self.assertEqual(again.status()["animation"], 1)
         self.assertEqual(json.loads(over_http(again, "space"))["animations"], 1)

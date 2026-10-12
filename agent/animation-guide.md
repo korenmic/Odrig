@@ -140,7 +140,8 @@ printf '1000 status\n' > build/try/ask.txt
 ```
 
 It prints one line that begins with `reply 1000`, as in getting started. In it,
-`"error":null` says the show is valid, and `"playing":1` that item 1 is playing.
+`"error":null` says the show is valid, `"playing":"all"` that the animations of the show
+play in turn, and `"animation":1` that item 1 is the one playing now.
 
 ## Where things go
 

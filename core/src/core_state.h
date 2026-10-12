@@ -44,8 +44,9 @@ struct FileInfo {
     uint64_t total_ms;
 };
 
-// Stands for no item.
+// Stands for no item, and for the playlist: every animation item of the show in turn.
 const uint32_t kNothing = 0xFFFFFFFFu;
+const uint32_t kPlaylist = 0xFFFFFFFEu;
 
 // What checks an uploaded file beside playback: a second source, which reads the file
 // back from storage, and second decoders.
@@ -169,10 +170,12 @@ struct Core {
     // Playback.
     uint8_t on;
     uint8_t scale[256];     // what each colour value is sent as, at the current brightness
-    uint32_t playing;       // the position of the item being played, or kNothing
+    uint32_t playing;       // the position of the item being played, kPlaylist, or kNothing
     uint32_t shown;         // the position of the animation item the latest refresh chose
     uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
-    uint64_t zero;          // the item's time zero
+    uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
+    uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
+    uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
     // The file that is open for playback: an animation item in one turn and one loop.
     uint8_t stream_open;

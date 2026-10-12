@@ -14,12 +14,23 @@ const uint32_t kGridStep = 20;
 // latest counts as the latest. Returns the time the call happens at.
 uint64_t clock_touch(Core &core, uint64_t now_ms);
 
-// The power-on state: switched on, the brightness the startup left, and the `start` item
-// playing when the show is valid and has one.
+// The power-on state: switched on, the brightness the startup left, and what a valid show
+// plays by itself: the cycle its `start` names, or else the playlist, from the animation
+// its `start` names or from its first one.
 void player_start(Core &core);
 
 // Plays the item at this position of the item table from its first frame.
 void player_play(Core &core, uint32_t item);
+
+// Plays the playlist: every animation item in turn, in the order of the item table, and
+// from the first again without end. It begins with the turn of the animation item at this
+// position. A turn is the animation's loops, which are the number the show gives it or
+// the fewest that last the show's shortest time, and ends at the animation's longest
+// time when it has one.
+void player_play_all(Core &core, uint32_t from);
+
+// The position of the first animation item, or the number of items when there is none.
+uint32_t player_first_animation(const Core &core);
 
 // The file of the animation item at this position is about to be replaced under its
 // name: the player closes it when it has it open. It opens again at the next refresh.
@@ -27,13 +38,14 @@ void player_releases_file(Core &core, uint32_t item);
 
 // The animation item at this position has another animation now. When it is the item
 // being played, or an animation of the cycle being played, what is played starts again
-// from its first frame at the next refresh.
+// from its first frame at the next refresh. When it is the animation whose turn it is in
+// the playlist, its turn begins again.
 void player_file_replaced(Core &core, uint32_t item);
 
 // The item at this position is about to leave the item table, and every item after it
-// moves up by one. When it is the item being played, playback stops and the file that is
-// open is closed. Otherwise the positions the player holds follow the items, and what
-// plays goes on as it was.
+// moves up by one. When it is the item being played, or the animation whose turn it is
+// in the playlist, playback stops and the file that is open is closed. Otherwise the
+// positions the player holds follow the items, and what plays goes on as it was.
 void player_item_leaves(Core &core, uint32_t item);
 
 // Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.

@@ -32,7 +32,7 @@ A UTF-8 JSON object with exactly these members:
 | `version` | integer | Format version. This document describes version 1. |
 | `brightness` | integer | Brightness at power-on, 0 to 255. |
 | `items` | array | The items that can be played. It may be empty. |
-| `start` | integer | Optional. The `id` of the item that plays at power-on. Without it the LEDs stay dark until a play command arrives. |
+| `start` | integer | Optional. The `id` of an item. A cycle named here plays at power-on. An animation named here is where the playlist begins at power-on; without `start` it begins with the first animation. |
 | `min_seconds` | integer | Optional, 1 to 65,535, and 30 without it: how long an animation plays at least when it has no `repeat`. |
 
 The file is read as strictly as a JSON frames file (see [format.md](format.md)): UTF-8
@@ -63,7 +63,35 @@ power-on.
 }
 ```
 
-## Playing
+## The playlist
+
+The playlist is every animation item of the show, in the order of `show.json`. It is what
+a show plays by itself: each animation has its turn, then the next one, and after the
+last the first again, without end. A show with one animation plays it turn after turn. A
+show without an animation plays nothing.
+
+At power-on a show plays the playlist, from its first animation, or from the animation
+`start` names. Only a `start` that names a cycle plays something else: that cycle.
+
+A cycle has no turn in the playlist, wherever it stands among the items.
+
+## The turn of an animation
+
+How long an animation has before the next one starts follows from the length of its loop,
+which is the sum of the durations of its frames, and from three numbers:
+
+- With `repeat`, the turn is that many loops.
+- Without `repeat`, the animation is played through again and again until at least
+  `min_seconds` have passed, 30 when the show names none, and the loop it is in then is
+  played to its end. So the turn is the fewest loops that last that long: 8 loops for an
+  animation of 4 seconds, 3 loops for one of 10 seconds, one loop for one of 45 seconds.
+- With `max_seconds`, the turn ends when that time is reached, in the middle of a loop if
+  need be.
+
+A turn begins with the first frame of its animation, and at the moment the turn before
+it ended. The time of the playlist goes on while the LEDs are switched off.
+
+## Playing an item by command
 
 - Playing an animation item shows it from its first frame and loops it forever.
 - Playing a cycle shows each listed animation in order for `seconds`, then starts over, and

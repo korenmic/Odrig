@@ -58,7 +58,7 @@ Rules for every task:
     the show, fails against the writer as it is: the member is gone.
   - Requirements: 1.5, 6.8, 7.1, 7.2
 
-- [ ] 3. The playlist: the turn, the start and `status`
+- [x] 3. The playlist: the turn, the start and `status`
   - `core/src/player.cpp`, `player.h`, `core_state.h` and `commands.cpp`: the turn, the
     playlist with its fields, `player_play_all`, `player_start`, and `"all"` in `status`.
   - `tests/core/support.py`: the reference player's playlist, written from the design.

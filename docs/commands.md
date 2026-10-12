@@ -30,8 +30,9 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
 
-At power-on the LEDs are on, brightness is the value in `show.json`, and the `start` item
-is playing if there is one. What `play`, `on`, `off` and `brightness` change is not kept
+At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
+what [show.md](show.md) says it plays by itself: the playlist of all its animations, or
+the cycle its `start` names. What `play`, `on`, `off` and `brightness` change is not kept
 across a restart. What `remove` and `upload` change is: they change the installed show.
 
 Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
@@ -48,8 +49,8 @@ A number in a command is written in decimal digits.
 |---|---|
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Current brightness, 0 to 255. |
-| `playing` | The id of the item being played, or `null`. |
-| `animation` | The id of the animation item on the LEDs right now, or `null`. It differs from `playing` when a cycle is playing. |
+| `playing` | What is being played: `"all"` for the playlist, the id of an item, or `null`. |
+| `animation` | The id of the animation item on the LEDs right now, or `null`. It differs from `playing` when the playlist or a cycle is playing. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 

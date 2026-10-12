@@ -37,10 +37,13 @@ struct Reply {
         }
     }
 
-    // The id of the item at a position of the item table, or `null` for no item.
+    // The id of the item at a position of the item table, `null` for no item, or `"all"`
+    // for the playlist.
     void id_or_null(const Core &core, uint32_t item) {
         if (item == kNothing) {
             text("null");
+        } else if (item == kPlaylist) {
+            text("\"all\"");
         } else {
             number(core.items[item].id);
         }

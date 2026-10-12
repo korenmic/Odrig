@@ -169,7 +169,7 @@ class FreshCopy(unittest.TestCase):
         self.assertEqual(len(recorded), 1)
         answer = reply(recorded[0])
         self.assertIsNotNone(answer, recorded[0])
-        for member in ('"ok":true', '"playing":1', '"animation":1', '"error":null'):
+        for member in ('"ok":true', '"playing":"all"', '"animation":1', '"error":null'):
             self.assertIn(member, answer)
 
 
