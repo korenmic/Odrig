@@ -1,14 +1,17 @@
 # Reasons
 
-When the tool refuses an input it writes one line to standard error,
+When a converter refuses an input it writes one line to standard error,
 
 ```
 error: <reason>: <detail>
 ```
 
-and exits with status 1. The reason is a fixed name made of lower-case letters, digits and
-hyphens; every implementation that reads the same files uses the same names. The detail is
-free text for people and names the file concerned.
+and exits with status 1. This holds for both converters, the JavaScript tool of
+[converter.md](converter.md) and the Python reference of
+[reference-converter.md](reference-converter.md): they write this line and use the names
+of this page. The reason is a fixed name made of lower-case letters, digits and hyphens;
+every implementation that reads the same files uses the same names. The detail is free
+text for people and names the file concerned.
 
 When a file has more than one defect, the reason is that of the defect met first when the
 file is read from front to back.

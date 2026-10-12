@@ -5271,3 +5271,818 @@ is about real LEDs on the board.
 
 **Resolution.** Seed 03 `tasks.md`, task 11, ticked; the seed's `state.json` set to
 `completed`.
+## Seed 06: Where the check of the Node.js version lives
+
+**Question.** The design has `converter/odrig.js` check the version of Node.js and then
+import `cli/main.js`, and has a test give the check a version. A test that imports
+`odrig.js` starts the tool, and an old Node.js that reads `cli/main.js` before the check
+runs stops at the first word it does not know, with its own message.
+
+**Answer.** The check is a function of a file of its own, `converter/cli/version.js`,
+which the design's layout does not list. It is written in the oldest form of the language
+that knows modules, and `odrig.js` imports nothing else before the check has run:
+`cli/main.js` is imported afterwards, with `import()`. The test calls the function with
+versions, and starts the tool once with a Node.js that is made to report version 18.
+
+**Resolution.** `converter/cli/version.js`, `converter/odrig.js`;
+`converter/tests/cli.test.js`, "an old version of Node.js is refused".
+
+## Seed 06: The status of an error that is not a rejection
+
+**Question.** Requirement 2 criterion 10 asks that an error that is no rejection ends the
+program with Node's own message and a status that is neither 0, 1 nor 2. Node.js ends a
+program with status 1 when an error is not caught, which is the status of a rejected
+input.
+
+**Answer.** `main` of `cli/main.js` throws such an error on, as the design says.
+`converter/odrig.js` writes the error as Node.js prints it, with the places it passed
+through, to standard error and ends with status 70.
+
+**Resolution.** `converter/odrig.js`; `converter/tests/cli.test.js`, "an error that is no
+rejection is thrown on".
+
+## Seed 06: Arguments that begin with a minus sign, and seconds the parser refuses
+
+**Question.** The design takes the argument after an option for its value "unless it
+begins with `-` and is not a minus sign followed by digits with an optional fraction".
+The `argparse` of Python 3.14, which runs the reference here, reads more arguments as
+values: every argument in which a minus sign is followed by a digit, or by a point and a
+digit, so `-1e3` and `-1.` as well; a minus sign alone; and an argument that holds a
+space. Requirement 2 criterion 9 asks for the status of the Python tool.
+
+**Answer.** The parser follows the `argparse` that is installed: an argument is a value,
+after an option and among the positional arguments, when it does not begin with a minus
+sign, when a digit or a point and a digit follow the minus sign, when it is the minus sign
+alone, or when it holds a space. Anything else that begins with a minus sign and is no
+option of the subcommand is an unknown option. An older Python reads `-1e3` after
+`--start` as an unknown option and ends with status 2, where the JavaScript tool reads the
+start and ends with status 1.
+
+The parser checks the form of `--start` and `--duration` and keeps their text; the
+subcommand turns the text into milliseconds with the library. Seconds may be written
+`1.` and `.5`, as Python reads them. An exponent beyond 9999, plus or minus, is not a
+number of seconds. The Python tool ends a command line with such an exponent above zero
+with a traceback of its `decimal` module, and reads one with such an exponent below zero
+as 0 seconds; nobody writes either.
+
+`-h` is read as `--help`, as the Python tool reads it. A `--` in front of the subcommand,
+which the Python tool passes over, is not: the first argument is the subcommand or
+`--help`.
+
+**Resolution.** `converter/cli/arguments.js`; `converter/tests/cli.test.js`, "the parser".
+
+## Seed 06: The Python program the suite compares with, in a checkout without `.venv`
+
+**Question.** Requirement 18 criterion 4 takes the Python tool from `.venv/bin/python` of
+the repository, or from the program the environment variable `ODRIG_PYTHON` names. The
+tasks of this seed were run in a second checkout of the repository, a git worktree, which
+has no `.venv` folder of its own. Which of the two is asked first?
+
+**Answer.** `.venv` of the repository when it is there, else the program `ODRIG_PYTHON`
+names. With neither, every test that needs the Python tool fails with one message that
+names both ways and the two commands that make `.venv`. The suite was run in the worktree
+with `ODRIG_PYTHON` set to `.venv/bin/python` of the main checkout, and the three Python
+suites with that same program started in the worktree's root, so that it loads the
+worktree's `odrig`. In the main checkout nothing needs to be set. The suite gives
+`PYTHONPATH` the repository root when it starts Python, so that both tools can be started
+in a temporary folder and name a file by the same relative path.
+
+**Resolution.** `converter/tests/support.js`, `pythonFrom`, `python` and `runPython`;
+`converter/tests/cli.test.js`, "the Python tool the suite compares with".
+
+## Seed 06: The queue records of a run in a worktree
+
+**Question.** The tasks were queued and run in a git worktree while another run used the
+queue of the main checkout. The queue file is not tracked.
+
+**Answer.** The worktree has its own `.codex/local-task-queue.md` and
+`.codex/tactic/session.json`. Its records are numbered from Q-201, so that they can be
+appended to the main checkout's queue, whose numbers are lower. The records have no
+`TaskId` and no `TaskIdPacked`, as the records of the seeds before, because the task-id
+script does not run on this Mac.
+
+**Resolution.** `.codex/local-task-queue.md` of the worktree, records Q-201 to Q-210.
+
+## Seed 06: When the reader of JSON finds a member named twice, and how deep Python reads
+
+**Question.** The design refuses a member name "that is already there". The Python tool
+finds a name given twice when the object ends, and a `NaN` when it reads it, so a text
+with two defects gets the detail of the one Python meets first. The design's test of
+depth compares both tools at 512 and 513 levels.
+
+**Answer.** The reader keeps the names and values of an object as they come and checks
+the names when the object ends, in the order of the text, so `{"a": 1, "a": NaN}` gets
+`NaN is not a JSON value` and `{"a": {"b": 1, "b": 2}, "a": 3}` names `b`, as in the
+Python tool. `NaN`, `Infinity` and `-Infinity` are refused where they stand.
+
+Python 3.14 on this Mac reads arrays nested 100,000 deep and refuses a million. A text of
+513 or 600 levels is `bad-json` in both tools here, because its top level is an array,
+with another detail in each; the test compares the reason for these and the whole line
+for texts of 512 levels and of a million.
+
+**Resolution.** `converter/lib/strictjson.js`; `converter/tests/strictjson.test.js`.
+
+## Seed 06: Six significant digits, where the rounding of JavaScript is not Python's
+
+**Question.** The design writes the end of the media in a `bad-range` detail with
+`toPrecision(6)` of the fraction as a `Number`. `toPrecision` takes a half at the last
+digit upward, and Python's `format(x, ".6g")` takes it to the even digit: 123456.5 is
+`123457` in JavaScript and `123456` in Python. A fraction of two numbers beyond 2 to the
+power 53 is also not turned into the nearest `Number` by dividing two `Number`s.
+
+**Answer.** `sixDigits` of `whole.js` does both by itself. It finds the floating-point
+number nearest to the fraction, halves to the even one, from the two `BigInt`s; it takes
+that number as the exact fraction it is and rounds it to six significant digits, halves to
+the even digit; and it writes the digits in the form of Python's `g`. The suite compares
+it with Python for 600 fractions from seeds, for halves at the sixth digit, and for
+fractions beside a half of the floating-point grid.
+
+**Resolution.** `converter/lib/whole.js`, `sixDigits`; `converter/tests/whole.test.js`.
+
+## Seed 06: What the tests ask of reference.py, and test files the design does not list
+
+**Question.** The design lists seven requests of `converter/tests/reference.py` and
+fifteen test files. The tests need more of the Python side than the list has.
+
+**Answer.** `reference.py` gets a request wherever a test needs a value only Python has;
+the requests are named in its `REQUESTS`. With the second task these are: `check`, which
+runs `check --format` of the Python tool on many files in one interpreter, each under the
+name `case.json` or `case.odrg` in an empty folder, because a new Python for each of some
+hundred texts would take most of the suite's time; `dumps`, the bytes of
+`odrig.jsonframes.dumps`; `sixdigits`, Python's `format(x, ".6g")`; and `milliseconds`,
+the seconds of the command line as the Python tool reads them. The tests of `whole.js`
+are in a file of their own, `converter/tests/whole.test.js`.
+
+**Resolution.** `converter/tests/reference.py`; `converter/tests/support.js`,
+`pythonChecks`.
+
+## Seed 06: A Gamma code too long for Python to print
+
+**Question.** The value of a Gamma code has as many bits as the code has zero bits in
+front, plus one, and the data of a record can hold a code of more than 200,000 bits. The
+reference names the length of the run, g - 1, in the detail of `run-past-end`. Python
+refuses to write a whole number of more than 4,300 digits as text: for a Gamma code of
+more than about 14,000 bits the Python tool ends with a traceback, `ValueError: Exceeds
+the limit (4300 digits) for integer string conversion`, and status 1.
+
+**Answer.** The JavaScript decoder reads a Gamma code of up to 30 bits as a `Number` and a
+longer one as a `BigInt`, and writes every digit. For a code of 14,000 bits and more it
+gives `error: run-past-end: ...` with the whole number, where the Python tool gives its
+traceback; the status is 1 in both. No encoder writes such a code: a run cannot be longer
+than N, which is at most 65,534.
+
+**Resolution.** `converter/lib/odrg.js`, `gamma` in `coded`;
+`converter/tests/decode.test.js`, "codes are read whole before they are judged, and
+padding is not looked at", which has codes of 40 and of 60 bits.
+
+## Seed 06: What the DEFLATE decoder says, and what the tests of the decoders compare
+
+**Question.** The design gives `inflateRaw` two reasons and leaves its details open, and
+lists what the tests of the two decoders hold without saying how many files.
+
+**Answer.** A stream that ends early is `truncated` with the sentence of the Python tool,
+`the file ends inside the DEFLATE stream`, so the ODRG decoder passes it on as it is. A
+stream that is not valid is `bad-deflate` with words of the decoder's own for each defect.
+
+`inflate.test.js` compares the verdict with zlib's for 126 streams zlib makes of nine
+inputs, at every level and with each of its strategies, each cut at every length and
+damaged in every byte where it has 400 bytes or fewer, for 6,000 streams both damaged and
+cut, for 3,000 inputs of noise, and for 27 streams with one defect each that the test
+writes out bit by bit. `decode.test.js` compares the whole error line with the Python
+tool's for 13,556 copies of the valid vectors: cut at every length, with a byte added,
+and with every byte changed twice, where a vector has 420 bytes or fewer, and at 420
+places from a seed where it has more. `reference.py` has the requests `inflate` and
+`deflate` for this. `summary` of `cli/main.js` gives the lines of `check` for bytes, so
+that these comparisons need no new program for each file.
+
+**Resolution.** `converter/lib/inflate.js`; `converter/tests/inflate.test.js`,
+`converter/tests/decode.test.js`; `converter/cli/main.js`, `summary`.
+
+## Seed 06: The compressor gives the bytes of zlib 1.2.12, and what is still asked of it
+
+**Question.** The design asks for zlib's method at level 9 and not for its bytes: the
+sketch made for it gave zlib's bytes for one body of six. How closely does the
+compressor of the library follow zlib, and what do the tests ask?
+
+**Answer.** `converter/lib/deflate.js` follows zlib step for step, also where a choice
+does not change what a decoder reads: position 0 of the input is never taken for the start
+of a match, as in zlib, where 0 stands for "none"; among two symbols that appear equally
+often the one whose tree is less deep is joined first; the code lengths are listed with
+zlib's rules for the repeat symbols 16, 17 and 18; and a comparison that runs past the
+end of the input meets zeros. The streams it writes for the six bodies of the design's
+table, for the dense 60 x 60 clip of ten seconds, and for 403 inputs made from seeds
+for this task, of up to 200,000 bytes, are the bytes zlib 1.2.12 writes at level 9 with
+its default memory level, which is how the Python tool calls it:
+
+| Body | Bytes | zlib 1.2.12, level 9 | `deflateRaw` |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 | 17,715 | 1,122 | 1,122 |
+| DVD bounce, 60 x 6 | 3,783 | 1,596 | 1,596 |
+| Dense, 60 x 6, 2 s | 34,462 | 32,826 | 32,826 |
+| Hello world, 60 x 60 | 19,356 | 1,194 | 1,194 |
+| DVD bounce, 60 x 60 | 2,324 | 1,036 | 1,036 |
+| Dense, 60 x 60, 1 s | 146,717 | 140,856 | 140,856 |
+| Dense, 60 x 60, 10 s | 1,462,220 | 1,383,750 | 1,383,750, in 0.05 s |
+
+The tests ask what Requirement 8 asks and no more: every stream is inflated by zlib and
+by the library to its input with nothing left over, two runs give the same bytes, and a
+stream is at most 5 percent larger than zlib's. They do not ask for zlib's bytes, because
+another build of zlib, such as the one some Pythons carry in place of zlib 1.2, writes
+other bytes; the test prints for each body whether the bytes are the same. One place
+where the bytes can differ from zlib 1.2.12 is known: within the last 258 bytes of an
+input longer than 65,274 bytes, zlib compares past the end of the input with bytes left
+over from 32,768 bytes earlier, where this compressor meets zeros, so among two matches
+that both reach the end of the input it can take another one.
+
+`reference.py` has the request `encode`, which gives the uncompressed and the compressed
+file of `odrig.odrg.encode` for an animation or for a generator of the Python tool and a
+mapping file; the body is the file without its 16-byte header. Its request `deflate`
+calls zlib with the default memory level, as the Python tool does.
+
+**Resolution.** `converter/lib/deflate.js`; `converter/tests/deflate.test.js`;
+`converter/tests/reference.py`, `encode` and `deflate`.
+
+## Seed 06: The files of the JavaScript encoder beside the Python tool's
+
+**Question.** Requirement 7 asks for identical uncompressed files and Requirement 8 for
+compressed files within 5 percent. What do the two tools write for the tracked animations
+and the dense clip?
+
+**Answer.** The same bytes in every case that was run, compressed as well, with zlib
+1.2.12 on the Python side:
+
+| Source | Uncompressed, both tools | Compressed, JavaScript | Compressed, Python |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 (`animations/hello.json`) | 17,731 | 1,138 | 1,138 |
+| DVD bounce, 60 x 6 (`animations/dvd.json`) | 3,799 | 1,612 | 1,612 |
+| Hello world, 60 x 60 | 19,372 | 1,210 | 1,210 |
+| DVD bounce, 60 x 60 | 2,340 | 1,052 | 1,052 |
+| Dense, 60 x 60, 2 s | 299,683 | 285,360 | 285,360 |
+| Source of the vector `encoded.pal` | 202 | 184 | 184 |
+| Source of the vector `encoded.rgb` | 169 | 78 | 78 |
+
+The tests ask for identical uncompressed files and, for compressed ones, the same frame
+records from the reference decoder and from the library's own, and a size within 5
+percent; they print whether the compressed bytes are the same.
+
+**Resolution.** `converter/tests/encode.test.js`; `converter/tests/deflate.test.js`,
+"whole files, through the command line of both tools".
+
+## Seed 06: Details of the encoder that the design leaves open
+
+**Question.** The design names the functions of the encoder and not their shapes, and its
+count of frame records is "the sum over the frames of `ceil(ms / 65535)`", where `ms` can
+be a number of thirty digits.
+
+**Answer.** A palette is one `Uint8Array` of three bytes for each colour, or null.
+`hueOrder(r, g, b)` gives five whole numbers: the hue and the saturation each as a
+numerator and a denominator, and the largest channel; two colours are compared by
+cross-multiplying. The number of records of a frame is worked out without a division of
+floating-point numbers: with the remainder for a `Number`, and in `BigInt`s for a longer
+time, so `too-many-frames` names the count the Python tool names for a frame of 10 to the
+power 30 ms. `bestRecord` keeps the codes of the form it chose and writes the record from
+them; `codedRecord` writes one given form and refuses, as a mistake of the program and not
+as a rejection, a form whose data is longer than the pixel buffer, as the Python function
+does. `toBuffer` is offered beside the functions the task lists.
+
+`reference.py` has two more requests: `forms`, the 64 coded records of
+`odrig.odrg.coded_record` for a pair of pixel buffers with the record `best_record`
+chooses, and `decode`, the frame records of `odrig.odrg.decode` with the SHA-256 of each
+picture. The first lets a test compare every form of the search and not only the one that
+wins; the second gives the frame records of the reference decoder, which `decode` on the
+command line merges. `support.js` makes the 200 animations from seeds and has the
+generators of the Python tool write their sources into a temporary folder.
+
+**Resolution.** `converter/lib/odrg.js`; `converter/tests/reference.py`, `forms` and
+`decode`; `converter/tests/support.js`, `animationFrom` and `generated`.
+
+## Seed 06: The order of the first checks of pack, and what the library says of a source it was not given
+
+**Question.** The design has `pack` on the command line read the mapping file, read the
+show file, and then call `pack.begin`, which checks the mapping and then the show. The
+Python tool reads and checks the mapping file before it reads the show file: a mapping
+file that breaks a rule and a show file that is not there is `mapping-malformed` in the
+Python tool and would be `show-missing` in that order. The library also packs from bytes
+held in memory, where a source that is missing has no words of the operating system.
+
+**Answer.** `cli/folder.js` reads the mapping file, checks it with the library's reader,
+and only then reads the show file and calls `pack.begin`. The mapping is read twice; it is
+a few hundred bytes. `pack.pack` of the library gives `file-missing` for a source that is
+not among the bytes it was given, with the detail `X.json: the show names X.odrg and its
+source is not there`; on the command line the detail is the operating system's, as in the
+Python tool. An item of a show is `{id, file, cycle, seconds}` with null for what its kind
+does not have, as the Python reader has it. A folder and a name are joined as Python's
+`os.path.join` joins them, so an empty sources folder gives the name alone. The folders
+above the output folder are made one by one, the topmost first, as Python's `os.makedirs`
+makes them, so that a failure names the same path in both tools.
+
+**Resolution.** `converter/cli/folder.js`; `converter/lib/pack.js`, `converter/lib/show.js`;
+`converter/tests/pack.test.js`, "a mapping file that breaks a rule and a show file that is
+not there" and "the output folder".
+
+## Seed 06: How mapping files and shows are compared before import is there, and tables of command lines
+
+**Question.** The design reads every mapping file "by both tools through `import`", and
+`import` is added two tasks after the reader of mapping files. Its tables of shows and of
+mapping files have some hundred entries, each a command line for both tools.
+
+**Answer.** `mapping.test.js` compares the two readers themselves: `reference.py` gives
+what `odrig.mapping.loads` returns or rejects, for the tracked files, for the made-up
+files of `tests/core/support.py` and for 73 files of each kind that break a rule, and the
+library must give the same kind, canvas, legs and counts of LEDs, or the same reason and
+detail. It compares the two command lines through `pack`, the one subcommand that reads a
+mapping file at this point: a file that breaks a rule gives the same error line, and a
+file that is as the format says gives `size-mismatch` for a source of another canvas, whose
+detail names the canvas of the mapping. The task that adds `import` reads mapping files
+through `import` as well. `pack.test.js` compares the readers of show files in the same
+way.
+
+Where a table has many command lines, the Python side runs them in one Python, through
+the request `run` of `reference.py`, which calls the command line of the Python tool once
+for each, and the JavaScript side calls `main` of `cli/main.js` in the test's own program.
+A few entries of every table are run once more as programs of their own, and the three
+shows of Requirement 11, the output folder with paths from the folder the tool is started
+in, and the usage errors always are. A new Python for each of 300 command lines would take
+most of a minute.
+
+`reference.py` has the requests `mappings`, `read_mappings`, `read_shows` and `run` for
+this.
+
+**Resolution.** `converter/tests/mapping.test.js`, `converter/tests/pack.test.js`;
+`converter/tests/support.js`, `runPythonMany` and `runJsHere`.
+
+## Seed 06: A request to reference.py that never came back, and how the tests now ask
+
+**Question.** The design gives the Python side its input on standard input. In one run of
+the whole suite, the twelfth or so, a request of `inflate.test.js` with 6,000 streams did
+not come back: the Python program waited to read its standard input, and the test's
+Node.js 26.5 waited, inside the call that starts a program and waits for it, for the
+program to end. Neither moved for ten minutes; the suite has no time limit of its own. The
+Python program was ended by its process number, and the test then failed.
+
+**Answer.** The cause was not found: both sides were waiting on a pipe whose other end was
+open, which points at Node.js or the system and not at the tests. The requests no longer
+use a pipe for their data. `reference` of `support.js` writes the input into a file of a
+temporary folder and names it, and a second file for the answer, on the command line of
+`reference.py`, which reads the one and writes the other; the folder is removed after the
+call. Every program the tests start, both tools and `reference.py`, is started without a
+standard input and with a limit of ten minutes, after which it is ended and the test fails
+with a message, so a program that stalls can no longer hold the suite. The whole suite ran
+three times in a row after the change, 1,016 tests each time, in 22 seconds.
+
+This was seen once and is recorded so that a second sighting is recognised: if a test
+fails after ten minutes with "did not come to an end", it is this.
+
+**Resolution.** `converter/tests/support.js`, `reference`, `runJs` and `runPython`;
+`converter/tests/reference.py`, `main`.
+
+## Seed 06: What importFrames takes and when it asks, for whoever hands it frames
+
+**Question.** The design gives the shape of a source and of a frame. It leaves open what
+happens with a time that is a `Number` with a fraction, with a GIF frame without a delay,
+with a picture without pixels, and how many frames of a video are asked for when only a
+part is wanted. The app of seed 09 hands the library its frames and has to know.
+
+**Answer.** As the Python tool has it wherever the Python tool has the case:
+
+- A time, and a delay, is a `Number` that is a safe integer, a `BigInt`, or `[n, d]` of two
+  of these. A `Number` that is not whole, such as 33.3667, is refused as a mistake of the
+  caller, with a `RangeError` and not with a rejection: the caller gives the fraction it
+  has, for a timestamp in microseconds `[timestamp, 1000]`.
+- A frame of a video without a `time`, or with null, is `unreadable-media`, "a frame has
+  no presentation time". A frame of a GIF without a `delayMs`, or with null, counts as a
+  delay of 0, which is 100 ms, as in the Python tool when the file records none.
+- A frame of width or height 0 is `unreadable-media`, "a picture has no pixels", when it
+  is handed over, whether it is on screen at a tick or not. Its pixels are looked at only
+  when it is on screen at a tick.
+- A frame of a video is complete when the next one has come, because it is on screen until
+  then. So `importFrames` asks for one frame more than the part shows, and a fault of that
+  frame, a missing time or a time that goes backwards, is reported, as in the Python tool,
+  whose decoder runs one frame ahead in the same way. A frame of a GIF is complete by
+  itself.
+- When the part is covered, the iteration is left with `break`, so an iterator with a
+  `return` method has it called, once, and is awaited when it is asynchronous. A source
+  that is read to its end is not told to stop.
+- A start or a duration that is negative or 0 is refused before the first frame is asked
+  for.
+- `fit.place(source, w, h, fit)` is the whole fitting of one source picture, for a caller
+  that wants a still picture and no timeline.
+
+**Resolution.** `converter/lib/timeline.js`, `converter/lib/fit.js`;
+`converter/tests/timeline.test.js`, "importFrames takes frames from whoever has them".
+
+## Seed 06: How fitting and the timeline are compared with the Python tool without a media file
+
+**Question.** The task makes its frames in the tests and reads no media file, and the
+Python tool's timing rules for video and GIF are inside the functions that open a file
+with PyAV and Pillow. The design asks for a case on each side of 2 to the power 53.
+
+**Answer.** `reference.py` has four requests. `rects` is `odrig.media.source_rect`.
+`resample` lays a source picture over black and fits it, or fits a picture to a rectangle
+it is given. `ticks` is `odrig.media.tick_pictures` on frames that have times only, and
+reports which frame is at each tick, which frames were fitted and how many were asked
+for. `timeline` runs `odrig.media.import_media` itself, with stand-ins in place of
+`av.open` and `PIL.Image.open` that hand out made-up frames with a presentation time and
+a time base, or a delay: everything after the decoder is the Python tool's own code, and
+the test compares the JSON frames file byte for byte, the rejection with its detail, and
+the number of frames asked for, for 700 videos and GIFs from seeds.
+
+The border of the `Number` arithmetic is reached with a picture of 64 x 32,768 pixels
+stretched to a canvas of 64 columns: 511 times the area passes 2 to the power 53 between
+canvases of 32,832 and 32,833 rows. Both pictures are the Python tool's, the second
+computed in `BigInt`s. A smaller picture cannot reach the border with values other than
+black, because the area in the tool's units is 4 times the pixels of the canvas times the
+pixels of the rectangle. The limit of 2 to the power 63 is met with a rectangle far larger
+than its picture.
+
+The floor of `whole.js` decides more than the bar on the left that the task names: the
+last source pixel a slice covers is found with a ceiling, which is a floor of the negated
+value, so a floor that rounds toward zero drops the pixel in which a slice ends. With such
+a floor 38 tests fail, among them the one the task names.
+
+**Resolution.** `converter/tests/reference.py`, `rects`, `resample`, `ticks` and
+`timeline`; `converter/tests/fit.test.js`, `converter/tests/timeline.test.js`.
+
+## Seed 06: Python crashing while it decodes a video for a comparison
+
+**Question.** While the task that adds `import` was being done, macOS showed "Python quit
+unexpectedly" 22 times in two minutes. Every report is a fault of memory (SIGSEGV) in a
+Python whose parent is `node`, inside PyAV: `VideoStream.decode`, called from
+`Packet.decode` in the generator of `InputContainer`. What asked Python to do that, and is
+it the tests or the Python tool?
+
+**Answer.** It is the Python tool's own `import`, on a video it cannot decode, and a probe
+of this task gave it such videos. The probe was not part of the suite: to see whether the
+two tools judge a broken file alike (the design's assumption A5), it wrote 480 cut and
+damaged copies of four test videos and ran `python -m odrig import` on each, one program
+after the other. Nothing ran at the same moment, no container was closed early and no
+program was ended from outside.
+
+The cause: for a file that is cut inside its header, PyAV 17.1.0 lists a video stream for
+which it has no decoder: `container.streams.video[0].codec_context` is None.
+`odrig/media.py` takes the first video stream and calls `container.decode(stream)`
+(lines 207 and 211), and PyAV then follows the missing decoder without looking and ends
+the whole program. 21 of the 480 copies are of this kind, and 21 of the reports have this
+place; the other report is of the first run of the probe, in which one Python read all
+copies. It was seen again once, on purpose, in a program that ends quietly: the file is
+opened, has one stream of type video, its `codec_context` is None, and the first frame
+asked of `container.decode` ends Python with signal 11.
+
+To see it without a report on the screen, in the repository root:
+
+```
+.venv/bin/python -c "
+from tests.converter import media_fixtures as f
+f.write_video('build/whole.mp4', f.COLOURS)
+open('build/cut.mp4', 'wb').write(open('build/whole.mp4', 'rb').read()[:993])
+import av
+print(av.open('build/cut.mp4').streams.video[0].codec_context)"
+```
+
+prints `None` (the folder `build/` must be there; the whole file has 1,529 bytes with
+PyAV 17.1.0, and cuts at 993 to 1,070 bytes are of this kind). Then
+`.venv/bin/python -m odrig import build/cut.mp4 build/out.json --mapping mapping/legs-2.json`
+ends Python with the fault, and macOS shows its dialog. Whether a whole video in a codec
+that PyAV's FFmpeg does not have is of this kind too was not tried; it would have the same
+missing decoder.
+
+The same probe found two more ways in which the Python tool ends without its error line,
+with a traceback and status 1: a video whose metadata is not UTF-8 (3 of the 480 copies;
+`UnicodeDecodeError` from `av.open`, which is not one of PyAV's own errors), and a GIF that
+is cut short (298 of 970 cut and damaged copies of three GIFs; `IndexError` and
+`struct.error` from Pillow, which `odrig/media.py` does not catch).
+
+No file of `odrig/` changes in this seed (Requirement 18 criterion 8), so the Python tool
+is as it was: this needs the owner, as a seed of its own. The mending is small:
+`_video_frames` refuses a stream without a `codec_context` as `unreadable-media` and
+catches `UnicodeDecodeError`, and `_gif_frames` catches `IndexError` and `struct.error`.
+The JavaScript tool gives `unreadable-media` for all of these files.
+
+What changed on the side of the tests, so that no test can do this to whoever sits at the
+computer:
+
+- The suite never gives the Python tool a cut or damaged video as a program of its own.
+  Such files are imported by the JavaScript tool alone, which must end with a file or
+  with `unreadable-media`.
+- Where a test compares the two tools on a file that is no whole video, the Python side
+  goes through `reference.py`, which looks at the streams of a video before it runs
+  `import`, without decoding, and does not run it when the first video stream has no
+  decoder; the test then gets no status and the reason.
+- `reference.py` makes a fault of memory end it quietly, with the number of the signal as
+  its status, by naming the C function `_exit` as the handler of the signal. The test that
+  asked fails and says which signal it was.
+
+**Resolution.** `converter/tests/reference.py`, `_quiet_faults`, `_undecodable_video` and
+`_run`; `converter/tests/support.js`, `runPython` and `runPythonMany`;
+`converter/tests/import.test.js`, "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy". Open for the owner: the three
+faults of `odrig/media.py` named above.
+
+## Seed 06: What the install of the two packages needs and leaves, with npm 12
+
+**Question.** The design's assumption A1: the decoder program of `ffmpeg-static` 5.3.0
+installs under npm 12 on this Mac and runs. Its facts V1 to V4 were read on the registry
+and not tried.
+
+**Answer.** A1 holds with one addition, and one fact is other than read.
+
+- npm 12 runs no install script of a dependency unless `package.json` allows it. After
+  `npm install --prefix converter` the package was there without its program, and npm
+  said that the install script of `ffmpeg-static@5.3.0` was blocked.
+  `converter/package.json` therefore has, beside the design's members,
+  `"allowScripts": {"ffmpeg-static@5.3.0": true}`, written by
+  `npm install-scripts approve ffmpeg-static` and pinned to the version. With it,
+  `npm ci --prefix converter` fetches the program. The script was read first: it fetches
+  `ffmpeg-darwin-arm64.gz`, a README and a licence from the release `b6.1.1` of the
+  package's GitHub repository into the package's folder and makes the program executable,
+  as fact V2 says. An npm older than 12 does not know the member and runs the script
+  anyway.
+- The program of that release for macOS on Apple Silicon is ffmpeg 6.0, not 6.1.1: its
+  first line is `ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers`. It has
+  45,568,216 bytes and the SHA-256
+  `a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584`, which
+  `converter/ffmpeg.sha256` holds for `darwin-arm64`.
+- 21 packages are installed for the two that are named: `ffmpeg-static` needs four for its
+  install script, and those need others. `converter/node_modules/` has 45 MB.
+- Outside the project folder the install wrote two things, found by listing the home
+  folder, `~/Library/Caches`, `~/.npm` and `~/.cache` before and after:
+  `~/Library/Caches/ffmpeg-static-nodejs`, new, 6 files of 19,255,699 bytes, the package's
+  copy of what it fetched; and npm's own cache and log, `~/.npm/_cacache` and
+  `~/.npm/_logs`, which were there. Nothing new is in the home folder itself or in
+  `~/.cache`.
+- The tool does not ask the package for the path of its program: the package gives the
+  value of the environment variable `FFMPEG_BIN` in place of its own path when that is
+  set (fact V4), which could be an ffmpeg of the system. `cli/video.js` takes the program
+  at `converter/node_modules/ffmpeg-static/ffmpeg`, `ffmpeg.exe` on Windows, and nothing
+  else. When the package's folder or the program is not there, `import` of a video ends
+  with `decoder-missing`. `omggif` is loaded with `import()`.
+- `decoder-missing` is checked after the mapping file, the name of the media file and
+  that it is there, and before the start and the duration. Its detail names the package
+  and the command with the folder the tool is in, `npm ci --prefix <folder>`.
+
+**Resolution.** `converter/package.json`, `converter/package-lock.json`,
+`converter/ffmpeg.sha256`; `converter/cli/video.js`, `program`;
+`converter/tests/import.test.js`, "the packages" and "a tool without its packages".
+
+## Seed 06: The decoder program as found: assumptions A2 to A5
+
+**Question.** The design's assumptions about what ffmpeg writes and how it ends, to be
+verified by the task that adds `import`.
+
+**Answer.**
+
+- **A2 holds.** The filter `showinfo` of ffmpeg 6.0 writes
+  `config in time_base: 1/12800, frame_rate: 25/1` and for each frame a line with `n:`,
+  `pts:` and `s:<w>x<h>`, the `pts` in that time base, which is the stream's. Two
+  additions to the design's call: `-copyts`, without which ffmpeg counts the times from
+  the start of the file and not as the file records them, and `file:` in front of the
+  path, so that a name is never read as an address of another kind. After each frame line
+  comes a line on colour, and the scaler writes lines of its own; the reader passes over
+  both.
+- **A3 holds.** A mov with `qtrle` and transparency comes out with its alpha: the pixels
+  of the transparent half are `0 200 0 0`.
+- **A4 holds, with no difference at all.** 55 imports of 15 videos, with each fit and with
+  a part, give the bytes of the Python tool's file: mpeg4 in mp4 and mov, `qtrle`, H.264
+  with frames that are stored out of order, 25, 29.97 and 60 frames a second, frames with
+  gaps, a ramp of colours, a picture higher than wide, and sound beside the video. PyAV 17
+  carries FFmpeg 8 and the package ffmpeg 6.0.
+- **A5 holds; `-xerror` is not added.** A text file, an empty file and a file cut short
+  end ffmpeg with status 1, or with all the frames the file still has. A file without a
+  video stream makes it say `Stream map '0:v:0' matches no streams`, which the reader
+  reports with the Python tool's words, `the file has no video stream`. With `-xerror`
+  ffmpeg refused 43 of 480 cut and damaged copies of four videos that the Python tool
+  reads, against 16 that it reads and the Python tool refuses without it; so it is left
+  out.
+
+The two tools do not always judge a file that is damaged alike, and nothing in this seed
+makes them. Of the 480 copies of videos, 230 are refused by both and 203 give the same
+file; 21 cannot be given to the Python tool at all (see "Python crashing while it decodes
+a video for a comparison"); 16 are read by the JavaScript tool and refused by the Python
+tool; on 3 the Python tool ends with a traceback; and 7 are read by both with other
+pixels. Of 970 such copies of three GIFs, 501 are refused by both and 96 give the same
+file; 70 are refused by the JavaScript tool and read by Pillow: files cut inside a later
+frame, of which Pillow shows the frames before the cut, frames that reach beyond the
+screen, and blocks the package does not know; on 298 the Python tool ends with a
+traceback; 4 are read by both with other pixels, and 1 by the JavaScript tool alone. Both
+tools read a GIF under the name `.mp4`, as a video, and both refuse a video under the name
+`.gif`.
+
+The reader holds at most 64 MB of frames that the library has not asked for yet and makes
+the program wait meanwhile; the log is read all the time.
+
+**Resolution.** `converter/cli/video.js`; `converter/tests/import.test.js`.
+
+## Seed 06: GIF pictures as found (A6), and a damaged GIF that kept the package busy without end
+
+**Question.** The design's assumption A6: for the GIFs of the Python suite and for GIFs
+that stay out of Pillow's three corners, the pictures built from what `omggif` gives equal
+Pillow's. And what does the package do with a file that is damaged?
+
+**Answer.** A6 holds: 368 imports of 92 GIFs give the bytes of the Python tool's file. The
+GIFs are those of the Python suite, one with a transparent index on every frame, one whose
+later frames are smaller than the screen, one for each disposal from 0 to 3 with a
+transparent index and the disposal named on every frame, 40 GIFs from seeds as Pillow
+writes pictures of a few colours by itself, and 40 palette GIFs from seeds with a
+transparent index and one disposal for all frames.
+
+The package does not judge the codes of a frame's data. Three of 970 damaged copies kept
+it busy without end: a code that the table does not have yet makes its table point
+at itself. `cli/gif.js` therefore goes through the codes of a frame before the package
+draws it, as the package reads them, and refuses data with a code the table does not
+have, with a first code after a cleared table that is no colour, or that spells more or
+fewer pixels than the frame has. Data that passes cannot keep the package busy, because
+every entry of the table then points at an earlier one. The package still draws every
+pixel; the reader of the design, which watches for the package's warning, stays as a
+second look. The suite reads every cut and every changed byte of four GIFs, more than
+3,000 files, in a program of its own with a limit of two minutes,
+`converter/tests/gifs.js`.
+
+A frame without a palette, which the package would draw from the wrong bytes, is
+`unreadable-media` as well. A file that ends after its header and has no frame gives
+`the file holds no picture`. The delay of a frame is the file's hundredths of a second
+times 10.
+
+**Resolution.** `converter/cli/gif.js`, `codeFault` and `frames`;
+`converter/tests/import.test.js`, "the pictures of a GIF are built by the rules of the
+format as browsers apply them" and "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy"; `converter/tests/gifs.js`.
+
+## Seed 06: The media of the import tests, and what is not verified of import
+
+**Question.** The task names the media of the import tests and leaves their making to the
+requests `gif` and `video` of `reference.py`.
+
+**Answer.** One request, `media`, writes them all into a temporary folder: the GIFs above
+and fifteen videos, with `tests/converter/media_fixtures.py` where the Python suite has
+the file and with PyAV directly for the others. A file that this build of PyAV cannot
+write is left out and named; on this Mac none was. The JavaScript side imports in the
+test's own program and the Python side in one Python, and five files are imported once
+more by both tools as programs of their own.
+
+Not verified: a rotation that a file records for display. The call has `-noautorotate`,
+and no test file with a rotation was made, because PyAV writes none in a simple way. Not
+verified either: a video of a real camera or phone, and anything on Windows or Linux.
+
+**Resolution.** `converter/tests/reference.py`, `media`; `converter/tests/import.test.js`.
+
+## Seed 06: The page of the Chrome test, as built
+
+**Question.** The design has `page.js` import `/lib/index.js`, and has the test compare
+the page's results with "what the same calls give in Node.js". A module that imports the
+library at its top cannot post an error when the import fails: the script then does not
+run at all, and the test would wait for its minute. And how are "the same calls" kept the
+same?
+
+**Answer.** `converter/tests/page/page.js` has one function, `work`, which is given the
+library and the bytes of the source and does everything that is compared: it reads Hello
+world, encodes it compressed and uncompressed, decodes both, imports three source pictures
+it fills by a fixed rule as a GIF with each fit and as a video, and fits each picture to
+three canvases with each fit. It uses nothing but the library and the language. In a page
+the file loads the library with `import()` inside a `try`, fetches the source, calls
+`work`, and posts the results, or the name and the message of the error; the test in
+Node.js imports the same file and calls the same `work` with the library it imported
+itself. The file imports nothing when it is loaded, and the page has the one script.
+Bytes travel as base64, which the file writes itself.
+
+The test asserts that the page was served every file of `converter/lib/`, so a module the
+page did not load cannot go unnoticed. Chrome gets three arguments beside the design's:
+`--use-mock-keychain` and `--password-store=basic`, so that a new profile does not ask
+macOS for the keychain, and `--disable-breakpad`. Chrome is ended by the process number
+the test started, and the profile folder is removed and checked to be gone.
+
+It ran with Google Chrome 154.0.8037.98 on this Mac, without a window; the page reports
+`HeadlessChrome/154.0.0.0`. Every result of the page equals Node's, and the two files
+equal what `node converter/odrig.js encode` writes.
+
+**Resolution.** `converter/tests/page/index.html`, `converter/tests/page/page.js`,
+`converter/tests/browser.test.js`.
+
+## Seed 06: The documents as written, and pages and tests the task does not list
+
+**Question.** The design's table "Documents" lists seven documents and two test files, and
+the task a third test file. Other pages pointed at sections of `docs/converter.md` that
+moved, another test of the Python suite read that page, and the emulator's suite ran the
+pack commands of its page with Python. What else changed, and what does a suite need now?
+
+**Answer.**
+
+- `docs/core.md`, `docs/format.md` and `docs/mapping.md` named `converter.md` for the
+  generators, for the Python that runs `odrig.mapdoc`, and for the readers the core's suite
+  compares with. They name `reference-converter.md` now, and the bench target of the core,
+  which starts the Python tool, is said to use the reference converter. Nothing else of
+  these pages changed.
+- `tests/converter/test_generators.py` read the sizes of the dense clip in
+  `docs/converter.md`. It reads them in `docs/reference-converter.md`, as Requirement 19
+  criterion 7 asks of every test of the Python suite that read the page.
+- The emulator's suite runs the commands of its page as they are written. Three of them
+  are now `node converter/odrig.js pack`, so that suite needs Node.js 20 or later as
+  `node`, and the page says so in its table of commands. Without it the test fails and
+  says what is missing. It is not skipped: a skipped test would leave the commands of the
+  page and its table of sizes unchecked. The sizes of that table are compared exactly now,
+  not within 2 percent, because the converter gives them on every computer.
+- `docs/firmware.md` says beside its pack command that it needs Node.js as `node`. The
+  firmware tool installs a Node.js 20 of its own into its work folder, for WLED's build;
+  that one is not on the path, and the tool is as it was.
+- Hello world and DVD bounce are called test content on both pages, as the owner sees
+  them: made to try the tools and the board, and not finished animations of the
+  installation.
+- `docs/converter.md` has what the design lists, and for the library also the calls with
+  what goes in and what comes out, because the app of seed 09 is written against them.
+  `docs/reference-converter.md` has, beside what the design lists, where the two tools are
+  known to differ, and the three known faults of the Python tool on damaged media, with a
+  pointer to the entry "Python crashing while it decodes a video for a comparison".
+- "Conversion" in `docs/decisions.md` says that the library has been run in Chrome and not
+  inside an app yet.
+
+**Resolution.** `docs/converter.md`, `docs/reference-converter.md`, `README.md`,
+`docs/emulator.md`, `docs/firmware.md`, `docs/reasons.md`, `docs/decisions.md`,
+`docs/core.md`, `docs/format.md`, `docs/mapping.md`; `converter/tests/docs.test.js`;
+`tests/converter/test_docs.py`, `tests/converter/test_generators.py`,
+`tests/emulator/test_docs.py`, `tests/firmware/test_docs.py`.
+
+## Seed 06: Which test checks which criterion, and the test that was missing
+
+**Question.** The last task asks to read every acceptance criterion of Requirements 1 to
+19 once more and to name, for each one a program can check, the test that checks it.
+
+**Answer.** The tests are those of `converter/tests/`, named here by their file without
+its ending and, where it helps, by the title of the test.
+
+| Requirement | Checked by |
+|---|---|
+| 1, the two parts | `library`: criteria 3, 4 and 5 by "the library is made of its own files only" and "index.js offers every module of the library"; criteria 1, 2, 6 and 7 by "the tool is the library and a command line part that is built on it", which was missing and is added; criterion 8 by `cli`, "an old version of Node.js is refused"; criterion 9 by `browser`. |
+| 2, the command line | `cli`: "the statuses", "the error line", "--help", "the parser", "the command line as a program", "reading and writing files"; criterion 8 also by `whole`, "fromDecimal reads a number from its digits", and `import`, "seconds on the command line are rounded ..."; criterion 11 by `encode` and `import`, "the same ... give the same ... on every run". |
+| 3, reasons and messages | `library`, "the reasons are those of the Python tool"; the comparisons of whole error lines in `strictjson`, `jsonframes`, `decode`, `mapping`, `pack`, `timeline` and `import`; criterion 5 by `cli`, "reading and writing files"; criterion 7 by `cli`, "--help" and "the parser". |
+| 4, strict JSON and JSON frames | `strictjson`, `jsonframes`; criterion 5 by "a file of 20 MB is read in under 10 seconds". |
+| 5, the ODRG decoder | `decode`. |
+| 6, a compressed body | `inflate`; criterion 4 by `decode`, with the vector `trailing-bytes.after-deflate`. |
+| 7, the encoder | `encode`. |
+| 8, compression | `deflate`; criterion 5 also by `browser`. |
+| 9, decode and check | `decode`, and `cli`, "check tells the format from the name, and --format overrides it". |
+| 10, mapping files | `mapping`, and `import`, "both command lines read a mapping file the same way, through import". |
+| 11, shows and pack | `pack`. |
+| 12, the timeline | `timeline`. |
+| 13, fitting | `fit`. |
+| 14, media on the command line | `import`; criterion 4 but for the rotation, see below. |
+| 15, frames from whoever has them | `timeline`, "importFrames takes frames from whoever has them"; criterion 6 by the added test of `library`. |
+| 16, the library in a page | `browser`. |
+| 17, dependencies | `import`, "the packages" and "a tool without its packages"; criterion 4 by `library`; criterion 6 by `docs`. |
+| 18, tests | criteria 2 and 5 by the added test of `library` and by `docs`; criterion 3 by the files named above; criterion 4 by `cli`, "the Python tool the suite compares with". |
+| 19, documentation | `docs`, and `tests/converter/test_docs.py`, `tests/emulator/test_docs.py` and `tests/firmware/test_docs.py`. |
+
+No program of the suite checks these:
+
+- Requirement 1 criterion 9 asks for the same result in a web view "for every function".
+  The page calls `jsonframes.loads` and `dumps`, `odrg.encode` and `decode`,
+  `timeline.importFrames` and `fit.place`, which pass through every file of the library
+  but not through every function by itself.
+- Requirement 14 criterion 4, that a rotation recorded for display is not applied: the
+  call has `-noautorotate`, and no test file with a rotation was made.
+- Requirement 16 criterion 5, the test reported as skipped where there is no Chrome: on
+  this Mac there is one, so the skipping was read and not seen.
+- Requirement 18 criterion 6, no network connection: nothing of the suite opens one but
+  the Chrome test, to `127.0.0.1`; no program proves it.
+- Requirement 18 criteria 7 and 8 are checked by running the other suites and by
+  `git diff` against the commit this seed started from, which shows no file of `odrig/`,
+  `core/`, `emulator/`, `odrigctl/` or `firmware/`.
+- Requirement 19 criterion 6: `docs` checks that the versions are named, not that they
+  are the ones that were used.
+
+**Resolution.** `converter/tests/library.test.js`, "the tool is the library and a command
+line part that is built on it".
+
+## Seed 06: The last check: what was run, and the suite of the firmware tool that was not
+
+**Question.** Requirement 18 criterion 7 names four suites that need no board, among them
+`python3 firmware/fw.py test`, and the last task runs them. The run that did the tasks of
+this seed was told not to start the firmware tool, because another run was working with
+the board through it.
+
+**Answer.** Run after the last change, all passing:
+
+| Command | Tests |
+|---|---:|
+| `npm test --prefix converter`, Node.js 26.5.0 | 1,286 |
+| The same suite with Node.js 20.18.0, started as `node --test` in `converter/` | 1,286 |
+| `.venv/bin/python -m unittest discover -s tests/converter -t .` | 616 |
+| `make -C core test` | 246 |
+| `python3 -m unittest discover -s tests/emulator -t .` | 328 |
+| `python3 -m unittest tests.firmware.test_docs` | 12 |
+
+The Node.js 20 is the one the firmware tool keeps in its work folder,
+`build/firmware/venv/bin/node` of the main checkout, started by itself. Of the firmware
+tool's suite only the last line was run: the one file of tests that reads
+`docs/firmware.md`, by itself and without the tool. The rest of that suite was not run. No
+file of `firmware/` changed in this seed, and no other test of that suite reads a file
+this seed changed, so nothing of it should differ. The state of the seed is set to
+completed with that one run open: whoever merges this seed runs
+`python3 firmware/fw.py test` when the board is free.
+
+The versions: macOS 26.5 (25F71) on Apple Silicon, npm 12.0.2, Chrome 154.0.8037.98,
+Python 3.14.6 with zlib 1.2.12, PyAV 17.1.0 and Pillow 12.3.0, and ffmpeg 6.0 as the
+decoder program. The suites ran in a second checkout of the repository, a git worktree,
+with the environment variable `ODRIG_PYTHON` naming the Python of the main checkout's
+`.venv`.
+
+**Resolution.** `docs/converter.md`, "What is verified";
+`project-seeds/06-p1-javascript-converter/state.json`.

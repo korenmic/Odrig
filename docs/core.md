@@ -23,7 +23,7 @@ Run from the repository root.
 |---|---|---|
 | `make -C core` | Builds the library `core/build/libodrig_core.a` from every `core/src/*.cpp`, with every compiler warning treated as an error. | Apple's command-line developer tools: `make`, `c++` and `ar`. |
 | `make -C core test` | Builds the library and the test host `core/build/odrig_host`, then runs the suite of `tests/core/`. | The same, and Python 3.10 or later with no added package. |
-| `make -C core bench` | Builds `core/build/odrig_bench`, has the converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
+| `make -C core bench` | Builds `core/build/odrig_bench`, has the reference converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
 | `make -C core clean` | Removes `core/build/`. | |
 
 The test command uses `python3`. Another Python is named on the command line, by its full
@@ -35,7 +35,8 @@ make -C core test PYTHON="$PWD/.venv/bin/python"
 
 The suite is every `test_*.py` file in `tests/core/`, found by discovery. It drives the
 test host as a child process and compares what the core does with the reference decoder and
-the readers of the converter, [converter.md](converter.md), and with a reference player
+the readers of the reference converter,
+[reference-converter.md](reference-converter.md), and with a reference player
 written in Python, `ReferencePlayer` in `tests/core/support.py`. The test host is built with
 the address and undefined-behaviour sanitizers. The suite needs no hardware and no network
 connection.

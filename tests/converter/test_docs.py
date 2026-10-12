@@ -55,6 +55,11 @@ class ReasonsDocument(unittest.TestCase):
 
 
 class ConverterDocument(unittest.TestCase):
+    """The page of the converter people use, the JavaScript tool: its commands are that
+    tool's, and what belongs to the Python tool is on the page of the reference."""
+
+    TOOL = "node converter/odrig.js"
+
     @classmethod
     def setUpClass(cls):
         cls.text = (DOCS / "converter.md").read_text(encoding="utf-8")
@@ -64,7 +69,49 @@ class ConverterDocument(unittest.TestCase):
             with self.subTest(subcommand=subcommand.name):
                 self.assertIn(f"\n## {subcommand.name}\n", self.text)
                 section = self.text.split(f"\n## {subcommand.name}\n")[1].split("\n## ")[0]
-                self.assertGreaterEqual(section.count(f"python -m odrig {subcommand.name} "), 2)
+                self.assertGreaterEqual(section.count(f"{self.TOOL} {subcommand.name} "), 2)
+
+    def test_no_command_of_it_starts_the_python_tool(self):
+        self.assertNotIn("python -m odrig", self.text)
+        self.assertNotIn("python3 -m venv", self.text)
+
+    def test_it_gives_the_setup_and_the_test_command_of_the_javascript_tool(self):
+        self.assertIn("\nnpm ci --prefix converter\n", self.text)
+        self.assertIn("\nnpm test --prefix converter\n", self.text)
+
+    def test_it_describes_the_three_fits(self):
+        section = self.text.split("\n## import\n")[1].split("\n## ")[0]
+        for fit in ("fill", "fit", "stretch"):
+            self.assertIn(f"| `{fit}` |", section)
+
+    def test_it_packs_the_example_show_into_build_example_show(self):
+        command = (
+            f"{self.TOOL} pack --show shows/example/show.json --mapping mapping/legs-2.json \\\n"
+            "    --sources animations --out build/example-show"
+        )
+        self.assertIn(command, self.text)
+
+    def test_it_points_to_the_page_of_the_reference(self):
+        self.assertIn("(reference-converter.md)", self.text)
+
+
+class ReferenceDocument(unittest.TestCase):
+    """The page of the Python tool, the reference the JavaScript tool is compared with."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = (DOCS / "reference-converter.md").read_text(encoding="utf-8")
+
+    def test_it_says_that_the_tool_is_the_reference_and_points_to_the_converter(self):
+        opening = " ".join(self.text.split("\n## ")[0].split())
+        self.assertIn("reference", opening)
+        self.assertIn("[converter.md](converter.md)", opening)
+
+    def test_it_gives_the_usage_line_of_every_subcommand(self):
+        section = self.text.split("\n## Command line\n")[1].split("\n## ")[0]
+        for subcommand in cli.SUBCOMMANDS:
+            with self.subTest(subcommand=subcommand.name):
+                self.assertEqual(section.count(f"\npython -m odrig {subcommand.name} "), 1)
 
     def test_it_gives_the_test_command(self):
         self.assertIn("python -m unittest discover -s tests/converter -t .", self.text)
@@ -81,21 +128,12 @@ class ConverterDocument(unittest.TestCase):
         for version in pinned.values():
             self.assertIn(version, self.text)
 
-    def test_it_describes_the_three_fits(self):
-        section = self.text.split("\n## import\n")[1].split("\n## ")[0]
-        for fit in ("fill", "fit", "stretch"):
-            self.assertIn(f"| `{fit}` |", section)
-
     def test_it_describes_the_generators(self):
         for name in ("hello_world", "dvd_bounce", "dense"):
             self.assertIn(f"python -m odrig.generators.{name} ", self.text)
 
-    def test_it_packs_the_example_show_into_build_example_show(self):
-        command = (
-            "python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \\\n"
-            "    --sources animations --out build/example-show"
-        )
-        self.assertIn(command, self.text)
+    def test_it_names_the_program_that_writes_the_mapping_document(self):
+        self.assertIn("`python -m odrig.mapdoc`", self.text)
 
     def test_it_describes_the_layout_of_the_test_vectors_and_how_to_build_them(self):
         for phrase in ("tests/vectors/valid/", "tests/vectors/invalid/", "NAME.json", "REASON.CASE.odrg", "python -m tests.converter.build_vectors"):
@@ -112,11 +150,17 @@ class ConverterDocument(unittest.TestCase):
             if len(parts) == 3:
                 self.assertIn(f"`{parts[1]}`", section, path.name)
 
+    def test_it_describes_the_use_from_python(self):
+        section = self.text.split("\n## From Python\n")[1].split("\n## ")[0]
+        for call in ("odrig.odrg.decode(data)", "odrig.odrg.encode(animation, compressed=True)", "odrig.mapping.read(path)", "odrig.show.read(path)"):
+            self.assertIn(f"`{call}`", section)
+
 
 class Readme(unittest.TestCase):
-    def test_it_points_to_the_converter_document(self):
+    def test_it_points_to_the_converter_document_and_to_the_document_of_the_reference(self):
         text = (support.ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("(docs/converter.md)", text)
+        self.assertIn("(docs/reference-converter.md)", text)
 
 
 class TheTenLegFile(unittest.TestCase):

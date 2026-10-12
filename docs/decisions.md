@@ -100,9 +100,15 @@ it stands now.
 
 - Converting media to JSON frames and to ODRG runs on phones and PCs, never on the board and
   never in the emulator.
-- There is to be one converter that runs from the command line without compiling and inside
-  the Capacitor and Tauri apps. It will be written in JavaScript, with the Python converter
-  kept as the independent check that tests compare it against.
+- There is one converter, made to run from the command line without compiling and inside
+  the Capacitor and Tauri apps. It is written in JavaScript and is the folder `converter/`:
+  a library that reads no file and runs as it is in Node.js and in a web page, and a
+  command line on top of it. See [converter.md](converter.md). The library has been run in
+  Chrome; it has not been run inside an app yet.
+- The Python converter is kept as the independent check: the suite of the JavaScript
+  converter runs both on the same inputs and compares. It also holds the generators of the
+  tracked animations and builds the test vectors. See
+  [reference-converter.md](reference-converter.md).
 
 ## Animation formats
 
@@ -287,3 +293,10 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-12: A second firmware without WLED, hosting the same shared core on the same
   twenty outputs, is planned as a fallback for the event (seed 12). The WLED-based firmware
   stays the one in use.
+- 2026-10-12: Seed 06 wrote the JavaScript converter, `converter/`, and the documents now
+  present it as the converter: a library that also runs in a web page, with a DEFLATE
+  compressor of its own, so that a compressed file has the same bytes on every computer,
+  and a command line with `import`, `encode`, `decode`, `check` and `pack`. The Python tool
+  is the reference its suite compares with, and keeps the generators and the test vectors.
+  For everything the suite gives them the two tools write the same files. Verified on
+  macOS, with Node.js and in Chrome; not on Windows, on Linux or inside an app.

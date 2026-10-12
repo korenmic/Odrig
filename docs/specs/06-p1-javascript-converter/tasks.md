@@ -39,7 +39,7 @@ Rules for every task:
   Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The frame of the tool, and the test command
+- [x] 1. The frame of the tool, and the test command
   - Set `"state": "in_progress"` in `project-seeds/06-p1-javascript-converter/state.json`.
   - Create `converter/package.json` as the design prints it, without `dependencies` for
     now, and add `/converter/node_modules/` to `.gitignore`.
@@ -64,7 +64,7 @@ Rules for every task:
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.8, 2.1, 2.3, 2.4, 2.5, 2.6, 2.7, 2.10, 3.1, 3.5,
     3.7, 17.4, 18.1, 18.2, 18.4
 
-- [ ] 2. Whole numbers, strict JSON and JSON frames
+- [x] 2. Whole numbers, strict JSON and JSON frames
   - Create `lib/whole.js`, `lib/strictjson.js` and `lib/jsonframes.js` as the design's
     sections of those names describe them.
   - Create `converter/tests/reference.py` with its first requests, as the tests of this
@@ -82,7 +82,7 @@ Rules for every task:
     is expected. Undo it.
   - Requirements: 1.5, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5
 
-- [ ] 3. The DEFLATE decoder, the ODRG decoder, `decode` and `check`
+- [x] 3. The DEFLATE decoder, the ODRG decoder, `decode` and `check`
   - Create `lib/inflate.js` and the decoder of `lib/odrg.js`. Add `decode` and `check` to
     the table of subcommands.
   - `tests/inflate.test.js` and `tests/decode.test.js` as the design lists them, with the
@@ -94,7 +94,7 @@ Rules for every task:
     accepted. Undo it.
   - Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 9.1, 9.2, 9.3, 9.4
 
-- [ ] 4. The DEFLATE compressor
+- [x] 4. The DEFLATE compressor
   - Create `lib/deflate.js` as the design's "The DEFLATE compressor" describes it.
   - `tests/deflate.test.js`, the parts that need no encoder: for the six bodies of the
     design's table, given by the request `encode` of `reference.py`, and for the inputs of
@@ -107,7 +107,7 @@ Rules for every task:
   - Put the measured sizes of the six bodies into the commit message.
   - Requirements: 8.1, 8.4, 8.5, 8.6, 8.7
 
-- [ ] 5. The encoder and `encode`
+- [x] 5. The encoder and `encode`
   - Add the encoder to `lib/odrg.js`: `paletteFor`, `hueOrder`, `codes`, `dataSizes`,
     `bestRecord`, `codedRecord`, `storedRecord`, `container` and `encode`. Add `encode` to
     the table of subcommands.
@@ -120,7 +120,7 @@ Rules for every task:
     the first byte that differs into the commit message. Undo it.
   - Requirements: 1.9, 2.11, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.2, 8.3, 9.5
 
-- [ ] 6. Mapping files, show files and `pack`
+- [x] 6. Mapping files, show files and `pack`
   - Create `lib/mapping.js`, `lib/show.js`, `lib/pack.js` and `cli/folder.js`, from the
     Python files as they are in the repository. Add `pack` to the table of subcommands.
   - `tests/mapping.test.js` and `tests/pack.test.js` as the design lists them. The demo
@@ -133,7 +133,7 @@ Rules for every task:
     `file-missing` where `output-not-empty` is expected. Undo it.
   - Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7
 
-- [ ] 7. Fitting and the timeline, in the library
+- [x] 7. Fitting and the timeline, in the library
   - Create `lib/fit.js` and `lib/timeline.js` as the design's sections "fit", "timeline"
     and "How the library is given frames" describe them.
   - `tests/fit.test.js` and `tests/timeline.test.js` as the design lists them, with the
@@ -150,7 +150,7 @@ Rules for every task:
   - Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 13.1, 13.2, 13.3, 13.4,
     13.5, 13.6, 15.1, 15.2, 15.3, 15.4, 15.5
 
-- [ ] 8. Media on the command line: the two packages and `import`
+- [x] 8. Media on the command line: the two packages and `import`
   - Add `ffmpeg-static` 5.3.0 and `omggif` 1.0.10 to `converter/package.json` at these
     exact versions, run `npm install --prefix converter`, and track
     `converter/package-lock.json`. Before the install, list the entries of the home folder
@@ -172,7 +172,7 @@ Rules for every task:
   - Requirements: 1.6, 1.7, 2.2, 2.8, 2.9, 2.11, 3.6, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6,
     14.7, 14.8, 14.9, 14.10, 14.11, 15.6, 17.1, 17.2, 17.3, 17.5, 18.3, 18.5, 18.6
 
-- [ ] 9. The library in Chrome
+- [x] 9. The library in Chrome
   - Create `converter/tests/page/index.html` and `page/page.js`, and
     `tests/browser.test.js`, as the design's "The page of the Chrome test" describes them.
   - Run it with the Chrome that is installed. Record Chrome's version in the commit
@@ -184,7 +184,7 @@ Rules for every task:
     was tried, leave this task open and say so in the hand-over.
   - Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 1.9
 
-- [ ] 10. The documents and the last check
+- [x] 10. The documents and the last check
   - Rewrite `docs/converter.md` and create `docs/reference-converter.md` as the design's
     table "Documents" lists them. Change `README.md`, `docs/emulator.md`,
     `docs/firmware.md`, `docs/reasons.md` and `docs/decisions.md` as it lists them.

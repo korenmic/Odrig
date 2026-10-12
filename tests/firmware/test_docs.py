@@ -140,7 +140,7 @@ class Firmware(unittest.TestCase):
         self.assertLessEqual(show["brightness"], 40)
         self.assertEqual(show["items"], [{"id": 1, "file": "hello.odrg"}])
         for line in ("python -m odrig.generators.hello_world build/lane/sources/hello.json --mapping build/lane/mapping.json",
-                     "python -m odrig pack --show build/lane/show.json --mapping build/lane/mapping.json --sources build/lane/sources --out build/lane/show",
+                     "node converter/odrig.js pack --show build/lane/show.json --mapping build/lane/mapping.json --sources build/lane/sources --out build/lane/show",
                      "python3 firmware/fw.py install-show build/lane/show"):
             self.assertIn(line, lines)
         self.assertIn("`build/lane/mapping.json`", body)
