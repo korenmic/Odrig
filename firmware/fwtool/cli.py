@@ -57,6 +57,10 @@ def parser():
     network.add_argument("--port", metavar="P", help="the board's USB serial port")
     network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
     network.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    scratch = commands.add_parser("install-firmware", help="write the built firmware to the board and then the network's name and password into its storage")
+    scratch.add_argument("--port", metavar="P", help="the board's USB serial port")
+    scratch.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
+    scratch.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after each restart (default: 20)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
     read.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -194,6 +198,16 @@ def _set_wifi(arguments):
     return store_settings(board.find(arguments.port), settings, arguments.wait)
 
 
+def _install_firmware(arguments):
+    from . import wifi
+    settings = wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
+    image = build.checked_image(build.image_path("firmware"))
+    build.check_size(image)
+    port = board.find(arguments.port)
+    write_application(port, image, expect="status", wait=arguments.wait)
+    return store_settings(port, settings, arguments.wait)
+
+
 def _read_show(arguments):
     from . import storage
     out = paths.output(arguments.out)
@@ -233,7 +247,7 @@ def _test_air(arguments):
 
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
-    "install-show": _install_show, "set-wifi": _set_wifi, "read-show": _read_show,
+    "install-show": _install_show, "set-wifi": _set_wifi, "install-firmware": _install_firmware, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
 

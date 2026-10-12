@@ -129,6 +129,18 @@ def flash(kind):
     return done
 
 
+def install_firmware(*extra):
+    """Runs `install-firmware` with the built firmware and remembers that the board then
+    runs the firmware."""
+    global _running
+    _running = None
+    built("firmware")
+    done = on_port("install-firmware", "--wait", START_SECONDS, *extra)
+    if done.status == 0:
+        _running = "firmware"
+    return done
+
+
 def restore_stock():
     """Restores stock WLED and waits for its handshake."""
     global _running

@@ -141,5 +141,51 @@ class TheSettings(unittest.TestCase):
         self.assertIsNone(self.status_after["error"])
 
 
+class FromScratch(unittest.TestCase):
+    """`install-firmware` on a board whose storage holds another name and password."""
+
+    @classmethod
+    def setUpClass(cls):
+        holder = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(holder.cleanup)
+        cls.other = wifi.Settings("odrig-test-" + secrets.token_hex(3), secrets.token_urlsafe(24))
+        given = pathlib.Path(holder.name, "settings.json")
+        given.write_text(json.dumps({"name": cls.other.name, "password": cls.other.password}))
+        cls.prepared = support.on_port("set-wifi", "--settings", given, "--wait", support.START_SECONDS)
+        cls.before = support.storage_image()
+
+        started = time.monotonic()
+        cls.done = support.install_firmware()
+        cls.seconds = time.monotonic() - started
+        cls.runs = support.running()
+        cls.status = support.command(PORT, "status")
+        cls.after = support.storage_image()
+        print(json.dumps({"install_firmware_seconds": round(cls.seconds, 1)}))
+
+    def test_the_board_held_other_settings_before(self):
+        self.assertEqual(self.prepared.status, 0, self.prepared.err)
+        self.assertTrue(wifi.holds(self.before, self.other))
+        self.assertFalse(wifi.holds(self.before, wifi.read()))
+
+    def test_it_ends_with_status_0_and_prints_what_set_wifi_prints(self):
+        self.assertEqual(self.done.status, 0, self.done.err)
+        lines = self.done.out.splitlines()
+        self.assertEqual(lines[:2], ["name: odrig", "password: set"])
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(json.loads(lines[2])["ok"])
+        self.assertFalse(wifi.read().password in self.done.out + self.done.err)
+
+    def test_the_firmware_answers_status_and_plays_the_show(self):
+        self.assertEqual(self.runs, "firmware")
+        status, reply = self.status
+        self.assertEqual(status, 0)
+        self.assertEqual((reply["ok"], reply["playing"], reply["error"]), (True, 3, None))
+
+    def test_storage_holds_the_settings_of_the_settings_file(self):
+        self.assertTrue(wifi.holds(self.after, wifi.read()), "storage does not hold the settings of the settings file")
+        self.assertEqual(wifi.name_in(self.after), "odrig")
+        self.assertTrue(storage.show_of(self.after) == storage.show_of(self.before))
+
+
 if __name__ == "__main__":
     unittest.main()

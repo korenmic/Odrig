@@ -47,7 +47,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_names_every_command_of_the_tool_with_a_section_and_an_example(self):
         commands = self.commands()
-        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "set-wifi", "read-show", "test", "test-board", "test-air"})
+        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "set-wifi", "install-firmware", "read-show", "test", "test-board", "test-air"})
         for name in commands:
             self.assertRegex(self.text, rf"(?m)^### {re.escape(name)}$", name)
             self.assertRegex(self.text, rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b", name)
@@ -68,7 +68,23 @@ class Firmware(unittest.TestCase):
                          "printable ASCII", "`/cfg.json`", "`/wsec.json`", "`ap.ssid`", "`ap.pskl`", "`ap.psk`", "The password is never printed",
                          "no option and no variable carries either", "`no-reply`", "[wifi.md](wifi.md)"):
             self.assertIn(expected, told)
-        self.assertRegex(section(self.text, "The regions of the flash"), r"(?m)^\| Storage \(`spiffs`\) \| .* \| `install-show` and `set-wifi`, changed blocks only \|$")
+        regions = section(self.text, "The regions of the flash")
+        self.assertRegex(regions, r"(?m)^\| Storage \(`spiffs`\) \| .* \| `install-show`, `set-wifi` and `install-firmware`, changed blocks only \|$")
+        self.assertRegex(regions, r"(?m)^\| First application \(`app0`\) \| .* \| `flash`, `install-firmware`, `restore-stock` \|$")
+        self.assertRegex(regions, r"(?m)^\| Boot selection \(`otadata`\) \| .* \| erased by `flash`, `install-firmware` and `restore-stock` \|$")
+
+    def test_it_says_what_install_firmware_does_and_where_it_takes_the_place_of_flash(self):
+        commands = section(self.text, "Commands")
+        told = " ".join(commands.split("\n### install-firmware\n")[1].split("\n### ")[0].split())
+        for expected in ("a board from scratch", "as `flash` does", "what `set-wifi` does", "`name: <name>`", "`password: set`", "`--settings FILE`", "`--wait SECONDS`",
+                         "the board has not been touched", "`build/firmware/out/odrig-firmware.bin`", "after each of its two restarts",
+                         "`flash` and `restore-stock` do not apply the settings"):
+            self.assertIn(expected, told)
+        flash = " ".join(commands.split("\n### flash\n")[1].split("\n### ")[0].split())
+        self.assertIn("`flash` leaves the name and the password of the board's network as storage has them", flash)
+        scratch = section(self.text, "From nothing to a playing board")
+        self.assertRegex(scratch, r"(?m)^python3 firmware/fw\.py build\npython3 firmware/fw\.py install-firmware\n")
+        self.assertNotRegex(scratch, r"(?m)^python3 firmware/fw\.py flash\b")
 
     def test_it_names_the_three_test_commands_and_their_folders(self):
         for name, folder in TEST_COMMANDS.items():

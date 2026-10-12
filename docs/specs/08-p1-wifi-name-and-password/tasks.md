@@ -140,7 +140,7 @@ Rules for every task:
   - Requirements: 1.5, 1.6, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.10, 5.1, 5.3, 5.4,
     7.1, 7.4, 7.5, 8.1, 8.2, 8.5, 8.6, 9.4, 10.1, 10.2
 
-- [ ] 5. `install-firmware`: a board from scratch
+- [x] 5. `install-firmware`: a board from scratch
   - Add the subcommand `install-firmware` with `--port`, `--settings` and `--wait`, as the
     design gives it. `flash` and `restore-stock` are not changed.
   - `tests/firmware/test_wifi_commands.py`, the parts about `install-firmware`, and that

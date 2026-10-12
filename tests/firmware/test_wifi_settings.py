@@ -2,8 +2,9 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
-from fwtool import Failure, paths, wifi
+from fwtool import Failure, build, paths, wifi
 
 from . import ROOT, support
 
@@ -142,7 +143,7 @@ class Reading(unittest.TestCase):
 
 
 # The commands that read a settings file.
-COMMANDS = ("set-wifi",)
+COMMANDS = ("set-wifi", "install-firmware")
 
 REFUSED = {
     "wifi-settings-malformed": ('["%s", "%s"]' % (NAME, PASSWORD), '{"name": "%s"}' % NAME, text_of() + text_of(), ""),
@@ -157,6 +158,13 @@ class ThroughTheCommands(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.folder = pathlib.Path(folder.name)
 
+    def built(self):
+        """A built image in place, with its checksum beside it."""
+        image = self.folder / "odrig-firmware.bin"
+        image.write_bytes(support.PROGRAM)
+        build.write_checksum(image)
+        return image
+
     def test_a_settings_file_that_is_refused_stops_the_command_before_the_board_is_touched(self):
         for command in COMMANDS:
             for reason, contents in REFUSED.items():
@@ -169,6 +177,8 @@ class ThroughTheCommands(unittest.TestCase):
                         self.assertEqual(result.status, 1)
                         self.assertEqual(result.out, "")
                         self.assertRegex(result.err, rf"\Aerror: {reason}: [^\n]+\n\Z")
+                        with support.untouched_board(), mock.patch.object(build, "checked_image", side_effect=lambda image: self.built()):
+                            self.assertEqual(support.run_main(command, "--settings", path), result)
 
     def test_a_settings_file_that_is_not_there_stops_the_command_before_the_board_is_touched(self):
         for command in COMMANDS:

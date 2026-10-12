@@ -95,6 +95,7 @@ python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|pro
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
+python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
@@ -221,6 +222,8 @@ Writes a built image to the board over USB and prints what the board answers aft
 
 Without `--image` the image is `build/firmware/out/odrig-firmware.bin`. The bootloader, the
 partition table and storage are not written: WLED's settings and the installed show stay.
+So `flash` leaves the name and the password of the board's network as storage has them;
+for a board that never got them, `install-firmware` is the command.
 
 ### restore-stock
 
@@ -334,6 +337,30 @@ stored and checked.
 `flash`, `restore-stock` and `install-show` leave the name and the password as storage
 has them.
 
+### install-firmware
+
+```
+python3 firmware/fw.py install-firmware
+```
+
+The command for a board from scratch: one that runs stock WLED or an earlier build, or
+whose storage does not hold the network's name and password yet. It writes the built
+firmware to the board as `flash` does, waits for the firmware's reply to `status`, and
+then does what `set-wifi` does: it puts the name and the password of the settings file
+into storage, restarts the board again, and prints `name: <name>`, `password: set` and
+the reply to `status`.
+
+The settings file is read and checked first, and then the image
+`build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When either is
+refused, the board has not been touched. `--settings FILE` reads another settings file,
+and `--wait SECONDS` is the time the command waits for the board's reply after each of
+its two restarts, 20 seconds without it. The command takes 50 seconds on the bench board.
+
+When the command fails after the firmware was written, the board runs the firmware with
+the name and the password its storage had. Running the command again, or `set-wifi`,
+finishes the work. `flash` and `restore-stock` do not apply the settings: they leave
+storage as it is.
+
 ### read-show
 
 ```
@@ -396,7 +423,7 @@ With the board on USB, from the repository root:
 
 ```
 python3 firmware/fw.py build
-python3 firmware/fw.py flash
+python3 firmware/fw.py install-firmware
 node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python3 firmware/fw.py install-show build/example-show
@@ -404,6 +431,8 @@ python -m odrigctl --port /dev/cu.usbmodem101 status
 ```
 
 The first command also sets up the tools and fetches WLED, which needs the network once.
+`install-firmware` writes the firmware and gives the board's network the name and the
+password of `firmware/wifi.json`; see [wifi.md](wifi.md).
 `pack` is the converter's command of [converter.md](converter.md), which needs Node.js 20
 or later as `node` and nothing else; `shows/example/show.json`
 has brightness 128, so for a strip fed from the board's 3.3 V pin pack a copy of it with a
@@ -821,9 +850,9 @@ touches these regions only:
 |---|---|---|---|
 | Bootloader | `0x0` | up to `0x8000` | `restore-stock --full` only |
 | Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
-| Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash` and `restore-stock` |
-| First application (`app0`) | `0x10000` | `0x300000` | `flash`, `restore-stock` |
-| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show` and `set-wifi`, changed blocks only |
+| Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash`, `install-firmware` and `restore-stock` |
+| First application (`app0`) | `0x10000` | `0x300000` | `flash`, `install-firmware`, `restore-stock` |
+| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi` and `install-firmware`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
 partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
@@ -1320,3 +1349,7 @@ the board. The letters are those of that table.
 `set-wifi` took 36.5 seconds, the wait for the board's reply in it. Between storage
 before the first run and after the second, every file other than `/cfg.json` and
 `/wsec.json` kept its bytes, and `/cfg.json` differed in `ap` only.
+
+`install-firmware`, on a board whose storage held another name and password, took 50.2
+seconds. Afterwards the firmware answered `status` with the show playing, and storage
+read back held the name and the password of the settings file and the same show.

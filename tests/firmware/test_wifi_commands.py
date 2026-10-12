@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from fwtool import Failure, board, cli, paths, storage, wifi
+from fwtool import Failure, board, build, cli, paths, storage, wifi
 
 from . import support
 
@@ -47,6 +47,9 @@ class OnASmallLayout(unittest.TestCase):
         self.table = support.partition_table(support.small_layout())
         self.results = []
         self.esptools = []
+        self.image = pathlib.Path(holder.name, "odrig-firmware.bin")
+        self.image.write_bytes((support.PROGRAM + bytes(range(256)) * 16)[:4096])
+        build.write_checksum(self.image)
 
     def esptool(self, image=None, **named):
         """The stand-in with a board that holds an image. It confirms the checksum of
@@ -206,6 +209,95 @@ class SetWifi(OnASmallLayout):
         self.set_wifi(self.esptool(support.storage_image({**support.BENCH_FILES, "/wsec.json": b'"a text"'}), failing_verifies=1))
         self.assertEqual([result.status for result in self.results], [0, 0, 1, 1, 1])
         self.nothing_shows_the_password()
+
+
+class InstallFirmware(OnASmallLayout):
+    def install(self, esptool, *extra, **named):
+        with mock.patch.object(build, "checked_image", side_effect=lambda image: self.image) as self.checked:
+            return self.run_command("install-firmware", esptool, *extra, **named)
+
+    def test_it_writes_the_firmware_and_then_does_what_set_wifi_does(self):
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(result.out, f"name: {NAME}\npassword: set\n{REPLY}\n")
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.checked.assert_called_once_with(build.image_path("firmware"))
+        program, data = [call for call in esptool.calls if "write-flash" in call]
+        self.assertEqual([(address, pathlib.Path(name).name) for address, name in esptool.pairs(program[program.index("write-flash") + 1:])], [("0x10000", "odrig-firmware.bin")])
+        self.assertNotIn("--force", program)
+        self.assertIn("--force", data)
+        erase = next(call for call in esptool.calls if "erase-region" in call)
+        self.assertEqual(erase[erase.index("erase-region") + 1:], ["0xe000", "0x2000"])
+        in_storage = [(address, content) for address, content in esptool.wrote if address >= STORAGE_AT]
+        self.assertEqual(len(in_storage), len(esptool.wrote) - 1)
+        self.assertTrue(wifi.holds(applied(self.old, in_storage), self.settings))
+
+    def test_storage_is_read_only_after_the_firmware_has_answered(self):
+        esptool = self.esptool()
+        answered = []
+
+        def status(port, wait=0):
+            answered.append(len(esptool.calls))
+            return REPLY
+        self.install(esptool, status=status)
+        self.assertEqual(answered, [3, 7])
+        reads_of_storage = [number for number, call in enumerate(esptool.calls) if "read-flash" in call and "0x610000" in call]
+        self.assertEqual(reads_of_storage, [4])
+
+    def test_the_reply_is_waited_for_after_each_of_the_two_restarts(self):
+        esptool = self.esptool()
+        self.install(esptool)
+        self.install(esptool, "--wait", "90")
+        self.assertEqual(esptool.waited, [20.0, 20.0, 90.0, 90.0])
+
+    def test_a_refused_settings_file_makes_no_call_at_all(self):
+        self.settings_file.write_text('{"name": "%s", "password": "short"}' % NAME)
+        with support.untouched_board(), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image) as checked:
+            result = support.run_main("install-firmware", "--settings", self.settings_file)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"\Aerror: wifi-password-invalid: [^\n]*\n\Z")
+        checked.assert_not_called()
+
+    def test_without_a_built_image_it_makes_no_call_at_all(self):
+        with support.untouched_board(), mock.patch.object(build, "image_path", lambda kind: self.work / "absent.bin"):
+            result = support.run_main("install-firmware", "--settings", self.settings_file)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"\Aerror: image-missing: [^\n]*\n\Z")
+
+    def test_a_board_that_does_not_answer_after_the_flash_gets_no_settings(self):
+        def silent(port, wait=0):
+            raise Failure("no-reply", "nothing arrived")
+        esptool = self.esptool()
+        result = self.install(esptool, status=silent)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"\Aerror: no-reply: ")
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash"])
+
+    def test_it_has_no_option_that_carries_a_name_or_a_password(self):
+        self.assertEqual(options_of("install-firmware"), {"-h", "--help", "--port", "--settings", "--wait"})
+
+    def test_nothing_of_these_runs_shows_the_password(self):
+        first = self.esptool()
+        self.install(first)
+        self.install(self.esptool(applied(self.old, [(address, content) for address, content in first.wrote if address >= STORAGE_AT])))
+        self.install(self.esptool(failing_verifies=2))
+        self.assertEqual([result.status for result in self.results], [0, 0, 1])
+        self.nothing_shows_the_password()
+
+
+class Flash(OnASmallLayout):
+    def test_flash_makes_no_call_that_reads_or_writes_storage(self):
+        esptool = self.esptool()
+        with support.no_board(esptool, answer=REPLY):
+            result = support.run_main("flash", "--image", self.image)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash"])
+        self.assertEqual(esptool.call("read-flash")[:2], ["0x8000", "0xc00"])
+        self.assertEqual([address for address, _ in esptool.wrote], [0x10000])
+        self.assertFalse(any(word.startswith("0x61") for word in esptool.words()))
+        self.assertEqual(self.kept(), {})
+        self.assertEqual(options_of("flash"), {"-h", "--help", "--port", "--image", "--expect", "--wait"})
 
 
 if __name__ == "__main__":
