@@ -5450,3 +5450,32 @@ emulator runs on macOS for now: who changes that?
 first paragraph; `AGENTS.md`, "If you work on Windows"; `docs/emulator.md`, "Commands" and
 "On Windows"; `docs/core.md`, "Commands"; `docs/commands.md`, "Transports";
 `docs/decisions.md`; `tests/onboarding/`.
+
+## Seed 11: The final check on Windows
+
+**Question.** What was seen working on the Windows computer, with what, and what did the
+check itself turn up?
+
+**Answer.** What was seen is in `docs/emulator.md` under "What has been checked on
+Windows". Three things came up on the way and were settled.
+
+- The fresh clone was set up with Python 3.12 where the rest of the work used 3.14, to
+  have a second Python and a zlib that is not zlib-ng. There one test of the command tool
+  failed: it sets a time limit of 0.4 seconds and measured 0.391. The clock a program reads
+  with Python 3.12 and earlier on Windows counts in steps of 1/64 of a second, so a wait of
+  0.4 seconds can measure one step short. The limit was kept; the two tests that measure
+  it allow one step of the clock, which on macOS is next to nothing.
+- The fresh clone was made with git set to convert line endings, `core.autocrlf` true,
+  which is what the installer of git for Windows proposes. No file was converted: the
+  first line of `.gitattributes` holds.
+- A video for the import was made with PyAV, which the converter's environment has: the
+  folder of leads the owner gave holds GIFs only.
+
+The check list by eye was not gone through step by step on Windows. A program read the
+header and took screenshots in Chrome and in Edge without a window, and the screenshots of
+the LEDs view and of the mapping view were looked at. A person at a screen, Python 3.10
+and 3.11, a Mac and a board on a `COM` port are what is left, and each is listed in
+`docs/emulator.md`.
+
+**Resolution.** `docs/emulator.md`, "What has been checked on Windows" and "On Windows".
+`tests/emulator/support.py`, `CLOCK_STEP`, and `tests/emulator/test_tool.py`.

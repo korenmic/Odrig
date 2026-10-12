@@ -961,3 +961,51 @@ What is left for a person:
 - The page in a light appearance of the system, and a file whose legs start at the top or
   whose pins the board lacks: the list has no step for them. The suite covers the
   geometry of such files, and nobody looked at them in this pass.
+
+### What has been checked on Windows
+
+The work on Windows was checked on one computer: Windows 11, with Python 3.14.2 and, in a
+fresh clone, Python 3.12.10; GCC 16.1 of WinLibs and Microsoft's compiler 14.50; and
+Node.js 24.13. The page was read in Chrome 154 and in Edge 151, both without a window, by a
+program that drives the browser through its remote-debugging port, as on the Mac. The
+program and its screenshots are in `scratch/`, which git ignores.
+
+- **The suites.** With Python 3.14: the converter suite, 622 tests; the core suite, 246,
+  and with Microsoft's compiler 246 of which 10 are skipped; the suite of the emulator and
+  the command tool, 450 of which 15 are skipped; the onboarding suite, 75. In a fresh
+  clone, made with git set to convert line endings and set up with Python 3.12 as the
+  getting-started page says, no file had a carriage return and the same four suites
+  passed, after one test of a time limit was made to allow for the clock of that Python,
+  which counts in steps of 1/64 of a second.
+- **The demo show.** Packed with the commands of Windows, `dvd.odrg` has 1,052 bytes and
+  `hello.odrg` 1,213, three more than in the table above, which was made with another
+  zlib. Record mode prints the reply the getting-started page shows. The emulator prints
+  its `page:` and its `tcp:` line. `status`, `play 2`, `brightness 40`, `play 3` and
+  `play 99` gave the replies of [commands.md](commands.md) over HTTP and over the line
+  port, with the exit statuses 0 and 1, and each stood in the log of the page as `http` or
+  `tcp`.
+- **The page.** In both browsers the LEDs view shows HELLO WORLD upright in the rows 28 to
+  33 and the twenty legs in their colours, and the mapping view the board beside the
+  canvas with a line from every pin. `core` was 50 and `page` 49 to 51 in every second
+  read: eight seconds in the LEDs view and six in the mapping view, in a window of
+  1280 x 800 in both browsers and of 756 x 900 in Chrome. Neither browser reported an
+  error of the page. The header shows `tcp 127.0.0.1:8601` in the place of the serial port.
+- **An import.** A GIF of 40 x 40 with 36 pictures and a video of three seconds, H.264 at
+  25 pictures a second, were imported for the target, checked, packed with the bouncing
+  square and played, as the animation guide describes. `core` and `page` stayed at 50.
+- **A show of 113 animations**, made from GIFs with the converter on another computer,
+  was read by the core without a complaint and played, in a cycle and one by one.
+- **A serial port.** The computer has a port `COM1` with nothing connected. The command
+  tool opened it; afterwards the system reported 115200 baud, 8 data bits, DTR off and RTS
+  off for it, where it had reported 1200, 7, on and on; and the tool ended with status 3,
+  `no reply within 1 seconds`. The port was set back.
+
+What is left on Windows:
+
+- The 22 steps of the list above were not gone through one by one there. What is said
+  above was seen; the pointing of step 18 and the invalid show of step 22 were not looked
+  at on Windows, and the suite covers both.
+- A person at a screen has not gone through the list on Windows either, and Python 3.10
+  and 3.11 were not installed on that computer.
+- The two lists under [On Windows](#on-windows): what only the first computer can see, and
+  what needs a board on a Windows computer.

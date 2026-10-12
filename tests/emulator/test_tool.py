@@ -201,7 +201,7 @@ class Unreachable(unittest.TestCase):
         elapsed = time.monotonic() - started
         self.assert_unreachable(result)
         self.assertIn("no reply within 0.4 seconds", result.err)
-        self.assertGreaterEqual(elapsed, 0.4)
+        self.assertGreaterEqual(elapsed, 0.4 - support.CLOCK_STEP)
         self.assertLess(elapsed, 2)
 
     def test_an_address_that_accepts_and_never_answers_exits_with_3_after_the_time_limit(self):
@@ -212,7 +212,7 @@ class Unreachable(unittest.TestCase):
             result = support.run_tool("--http", f"127.0.0.1:{listener.getsockname()[1]}", "--timeout", "0.4", "status")
             elapsed = time.monotonic() - started
         self.assert_unreachable(result)
-        self.assertGreaterEqual(elapsed, 0.4)
+        self.assertGreaterEqual(elapsed, 0.4 - support.CLOCK_STEP)
         self.assertLess(elapsed, 2)
 
     def test_another_status_than_200_exits_with_3(self):

@@ -43,6 +43,9 @@ needs_serial = unittest.skipUnless(HAS_SERIAL, NO_SERIAL)
 STOP = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
 STOPS = (signal.CTRL_BREAK_EVENT,) if hasattr(signal, "CTRL_BREAK_EVENT") else (signal.SIGTERM, signal.SIGINT)
 OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+# The clock a test measures a length of time with counts in steps on some systems: 1/64 of
+# a second with Python 3.12 and earlier on Windows. A wait may measure one step short.
+CLOCK_STEP = time.get_clock_info("monotonic").resolution
 # The transport that carries bytes to the emulator of this system, as the log names it.
 LINES = "serial" if HAS_SERIAL else "tcp"
 

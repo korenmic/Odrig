@@ -103,7 +103,7 @@ Rules for every task:
   - Run the four quick suites; they pass on Windows.
   - Requirements 5.4 and 7.
 
-- [ ] 8. The final check, and the seed's state
+- [x] 8. The final check, and the seed's state
   - In a fresh clone on the Windows computer, set up as the getting-started page says: the
     four quick suites pass.
   - The demo show plays in the emulator; the page is looked at in Edge and in Chrome, LEDs
