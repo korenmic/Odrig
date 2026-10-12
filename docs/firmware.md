@@ -448,7 +448,7 @@ started. It also changes the installed show with the commands of
 [commands.md](commands.md): it uploads animations and removes them again. It builds an
 image the work folder does not hold. Its last step leaves the board with the firmware and
 the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
-takes about 45 minutes. Without a board it stops with `no-board` and runs nothing.
+takes about 55 minutes. Without a board it stops with `no-board` and runs nothing.
 
 ### test-air
 
@@ -811,11 +811,11 @@ WLED's maximum current was 850 mA, so on the target file the limiter dimmed ever
 
 | Show | Working outputs | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest | Free internal memory |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 213 ms | 2,082 to 2,131 | 50 | 50 | 44 ms | 0.97 ms | 24.3 ms | 1.03 ms | 1.24 ms | 150,972 bytes |
-| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 215 ms | 325 to 369 | 50 | 50 | 43 ms | 1.83 ms | 24.0 ms | 15.6 ms | 16.1 ms | 65,020 bytes |
-| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,107 ms | 504 to 748 | 29 to 36 | 34 | 42 ms | 25.7 ms | 47.9 ms | 20.0 ms | 31.7 ms | 65,004 bytes |
-| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 58 s | 4,278 ms | 130 to 154 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.9 ms | 19.7 ms | 33.5 ms | 65,032 bytes |
-| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 180 s | 39,172 ms | 525 to 803 | 28 to 35 | 31 | 42 ms | 26.0 ms | 50.8 ms | 20.0 ms | 32.6 ms | 64,988 bytes |
+| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 37 s | 216 ms | 1,989 to 2,052 | 50 | 50 | 44 ms | 1.12 ms | 24.5 ms | 1.03 ms | 1.24 ms | 150,940 bytes |
+| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,913 bytes | 37 s | 217 ms | 319 to 363 | 50 | 50 | 43 ms | 1.91 ms | 24.4 ms | 15.6 ms | 16.0 ms | 64,956 bytes |
+| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 58 s | 6,109 ms | 580 to 928 | 24 to 33 | 32 | 52 ms | 30.4 ms | 48.4 ms | 20.0 ms | 31.9 ms | 64,940 bytes |
+| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 58 s | 4,279 ms | 134 to 154 | 44 or 45 | 44 | 36 ms | 13.1 ms | 34.0 ms | 19.8 ms | 33.2 ms | 64,952 bytes |
+| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 176 s | 39,173 ms | 656 to 924 | 24 to 32 | 27 | 61 ms | 31.3 ms | 70.2 ms | 20.0 ms | 32.9 ms | 64,940 bytes |
 
 The files of a row are the whole show folder. The mean request is the time the core worked
 in a second over the refreshes sent in it; at a rate below 50 one request decodes every
@@ -827,24 +827,24 @@ What the figures say:
   to 18, 21 and 47.
 - **Every rate is inside the 20 to 50 a second the owner accepts.** A show that is not
   dense plays at 50 on twenty legs as on two. The dense clip, in which every LED changes
-  at every frame, plays at 44 or 45 uncompressed and at 29 to 36 compressed in the probe
+  at every frame, plays at 44 or 45 uncompressed and at 24 to 33 compressed in the probe
   build; the firmware itself reports 45 to 47 and 36 to 42, see
   [Verified on the board](#verified-on-the-board). A dense file plays faster uncompressed.
 - **A send to twenty outputs** takes 15.6 ms with the limiter's dimming of every LED in
   it, and 20 ms while the core decodes a dense clip on the chip's other processor core.
   The LEDs need 5.7 ms on the wire after that.
 - **The long requests** are those in which the core opens a file, at the start of every
-  loop of an animation and at every turn of a cycle: 24 ms for a small file, and up to
-  51 ms with dense clips, when the frames that came due meanwhile are decoded in the same
+  loop of an animation and at every turn of the playlist or of a cycle: 24 ms for a small
+  file, and up to 70 ms with dense clips, when the frames that came due meanwhile are decoded in the same
   request.
 - **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 215 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
+  by decoding it: 217 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
   compressed and 4.3 s uncompressed, and 39 s for a storage filled with 9 MB of such
   clips. For that time the LEDs are dark and the board answers nothing, on the port or on
   the network; WLED opens its access point only afterwards. `install-show` and `flash`
   wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
   large show.
-- **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
+- **`install-show`** takes 37 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. One dense
   clip takes a minute and 9 MB take three.
 - **Memory.** 65,000 bytes of the chip's internal memory are free with twenty outputs of
@@ -1040,10 +1040,11 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    it with `python3 firmware/fw.py install-show build/demo-20/show`, switch the board's
    power off and on and send no command. *Seen:* the words HELLO WORLD stand upright in the middle of
    the canvas, in the rows 28 to 33, readable from left to right across the legs 2 to 19.
-   After 15 seconds a square of four LEDs takes their place and runs along the diagonal,
+   After half a minute a square of four LEDs takes their place and runs along the diagonal,
    from the top-left corner to the bottom-right one and back, over every one of the twenty
-   legs. The two take turns every 15 seconds.
-   `python -m odrigctl --port /dev/cu.usbmodem101 status` reports `"playing":3` and
+   legs, for 42 seconds. The two go on taking turns so: the show has no cycle, and this is
+   its playlist.
+   `python -m odrigctl --port /dev/cu.usbmodem101 status` reports `"playing":"all"` and
    `"error":null`, and WLED's Info page shows `odrig outputs` with `20/20`. The `fps` of
    that reply is worth writing down: the rate of the demo show on the board has not been
    measured.
@@ -1063,9 +1064,11 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    *Seen:* `upload` writes a line with the percentage and the speed, then
    `upload: checking`, and after about five seconds `{"ok":true}`, while the show plays
    on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
-   after `play 9` the words HELLO WORLD stay and the bouncing square no longer takes its
-   turn; `remove 9` answers `{"ok":true}` and the LEDs go dark; `play 3` brings the two
-   back, taking turns. The speed is worth writing down: no program has measured an
+   after `play 9` the words HELLO WORLD begin again and stay for half a minute, which is
+   the turn of the new item in the playlist; `remove 9`, sent within that half minute,
+   answers `{"ok":true}` and the playlist goes on with its first animation, the same
+   words; `play 3` brings the cycle back, in which the words and the bouncing square take
+   turns every 15 seconds. The speed is worth writing down: no program has measured an
    upload over Wi-Fi. With this Mac joined and the board on USB,
    `python3 firmware/fw.py test-air --http 4.3.2.1` of step 3 runs the same session by
    itself and writes the speed to `build/firmware/out/upload-air.json`.
@@ -1074,7 +1077,8 @@ Before twenty legs are lit, raise WLED's maximum current as [What the firmware
 does](#what-the-firmware-does) says.
 
 What a program established without the owner, over USB: the board plays the installed show
-from its start with no command sent, as `status` reports `playing` 3 after every restart;
+from its start with no command sent, as `status` reports `playing` 3 after every restart,
+and `"all"` for a show that names no start;
 the outputs hold the bytes the emulator records for the same show; `status` reports 49 or
 more with the example show, with one strip wired; WLED reports its access point as up; and
 the tests of `test-air` that send commands pass against the emulator. For steps 5 and 6:
@@ -1460,3 +1464,26 @@ for the other sixteen. The trial did the same.
 
 Afterwards the WLED-based firmware was flashed again, and the board answered `status`
 with the example show playing: the switch there and back left the show in storage.
+
+**The playlist.** What the firmware gave on the board over USB on 2026-10-12, built with
+the core that plays the playlist. No source of the usermod changed: the firmware and the
+probe build were built again with the core and flashed.
+
+- A show of two animations without `start`, at brightness 32: after a restart `status`
+  answered `"playing":"all","animation":1`. The first animation, a loop of one second
+  with a `repeat` of 4, had turns of 4 seconds, and the second, a loop of 3 seconds in a
+  show with a `min_seconds` of 5, turns of 6 seconds: each as long as that within 0.6
+  seconds, as `status` asked four times a second saw them over 26 seconds.
+- The firmware from before, given the same show, answered `status` with the error
+  `show-malformed`, brightness 0 and nothing playing: it does not know the members
+  `repeat`, `max_seconds` and `min_seconds`. A show that has one of them goes on a board
+  together with this firmware.
+- The session of commands, with `play all` and `play` of an animation in it, got the
+  replies the emulator gives.
+- The demo show on the target file, which now plays its playlist, is refreshed 50 times
+  a second, and so is the example show. The dense 60 x 60 clip compressed had 24 to 33
+  sends a second in the probe build, where the run before this core recorded 29 to 36;
+  uncompressed it had 44 or 45, as before. Every rate is inside the 20 to 50 the owner
+  accepts, and what made the compressed clip slower in this run was not looked for.
+- The whole board suite, 53 tests, passes in 55 minutes. Its last step leaves the
+  firmware and the dim example show, whose cycle plays from its start.

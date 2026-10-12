@@ -85,7 +85,7 @@ class Install(unittest.TestCase):
             with support.dim_show(show=one_animation(work, "hello.odrg")) as second:
                 done = support.install(second)
                 self.assertEqual(done.status, 0, done.err)
-                self.assertEqual(json.loads(done.out)["playing"], 1)
+                self.assertEqual((json.loads(done.out)["playing"], json.loads(done.out)["animation"]), ("all", 1))
                 self.assertEqual(support.installed(), support.files_of(second))
                 self.assertEqual(sorted(support.installed()), ["hello.odrg", "mapping.json", "show.json"])
 

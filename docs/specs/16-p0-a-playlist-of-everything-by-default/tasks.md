@@ -107,7 +107,7 @@ Rules for every task:
     and the test as it is, fails: `playing` is `"all"` where it expects the cycle's id.
   - Requirements: 8.1, 8.2, 8.4, 10.3
 
-- [ ] 7. The firmware on the board
+- [x] 7. The firmware on the board
   - `python3 firmware/fw.py build`, `flash`. `tests/board/`: the playlist from power-on
     with a show of two animations without `start`; `play all` and a `play <id>` of an
     animation in the session that is compared with the emulator.

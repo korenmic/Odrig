@@ -46,7 +46,7 @@ class ContentCommands(unittest.TestCase):
         size = self.hello.stat().st_size
         self.assertEqual(by_http[2][1:], (0, {"ok": True}), "the reply that ended the upload over HTTP")
         self.assertEqual(by_http[3][2]["items"][-1], {"id": board_support.NEW_ITEM, "file": board_support.HELLO_NAME, "bytes": size})
-        self.assertEqual((by_http[5][2]["playing"], by_http[5][2]["animation"]), (board_support.NEW_ITEM, board_support.NEW_ITEM))
+        self.assertEqual((by_http[5][2]["playing"], by_http[5][2]["animation"]), ("all", board_support.NEW_ITEM))
         self.assertEqual(by_http[11][1:], (0, {"ok": True}))
         self.assertEqual([item["id"] for item in by_http[12][2]["items"]], [1, 2, 3])
         for number, ((line, *over_http), (_, *over_the_port)) in enumerate(zip(by_http, by_port), 1):

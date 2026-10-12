@@ -56,6 +56,8 @@ SESSION = (
     "play 2", "status",
     "off", "status",
     "on", "status",
+    "play all", "status",
+    "play 2", "status",
     "play 1", "status",
     "play 99",
     "play abc",
@@ -393,16 +395,23 @@ def own_colour(position):
 
 
 @contextlib.contextmanager
-def show_folder(mapping, animations, brightness=DIM, start=1):
+def show_folder(mapping, animations, brightness=DIM, start=1, turns=(), **more):
     """A temporary show folder: a mapping, given as a path or as text, and one animation
-    item for each `(name, animation bytes)`, the first one starting at power-on."""
+    item for each `(name, animation bytes)`, the playlist beginning with the first one at
+    power-on. `start=None` leaves the show without a start. `turns` gives the items, in
+    their order, more members, and `more` gives the show more."""
     with tempfile.TemporaryDirectory() as work:
         folder = pathlib.Path(work, "show")
         folder.mkdir()
         data = mapping.read_bytes() if isinstance(mapping, pathlib.Path) else mapping.encode()
         (folder / "mapping.json").write_bytes(data)
         items = [{"id": number, "file": name} for number, (name, _) in enumerate(animations, 1)]
-        (folder / "show.json").write_text(json.dumps({"version": 1, "brightness": brightness, "items": items, "start": start}))
+        for item, members in zip(items, turns):
+            item.update(members)
+        show = {"version": 1, "brightness": brightness, "items": items, **more}
+        if start is not None:
+            show["start"] = start
+        (folder / "show.json").write_text(json.dumps(show))
         for name, content in animations:
             (folder / name).write_bytes(content)
         yield folder
@@ -411,19 +420,14 @@ def show_folder(mapping, animations, brightness=DIM, start=1):
 @contextlib.contextmanager
 def demo_show(mapping=TARGET, brightness=DIM):
     """A temporary show folder with the demo show made for a mapping, dimmed: Hello world
-    and DVD bounce as their generators write them for the mapping's canvas, taking turns
-    every 15 seconds from power-on."""
+    and DVD bounce as their generators write them for the mapping's canvas, and nothing
+    else, so that the playlist of the two plays from power-on."""
     width, height = canvas_of(mapping)
     animations = {
         "hello.odrg": odrg.encode(jsonframes.Animation(width, height, tuple(hello_world.frames(width, height)))),
         "dvd.odrg": odrg.encode(jsonframes.Animation(width, height, tuple(dvd_bounce.frames(width, height)))),
     }
-    show = {
-        "version": 1,
-        "brightness": brightness,
-        "items": [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}, {"id": 3, "cycle": [1, 2], "seconds": 15}],
-        "start": 3,
-    }
+    show = {"version": 1, "brightness": brightness, "items": [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}]}
     with tempfile.TemporaryDirectory() as work:
         folder = pathlib.Path(work, "show")
         folder.mkdir()

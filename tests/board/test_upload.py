@@ -227,18 +227,19 @@ class ContentCommands(unittest.TestCase):
         before = replies[1][1]["items"]
         self.assertEqual([item["id"] for item in before], [1, 2, 3])
         self.assertEqual(replies[3], (0, {"ok": True, "items": before + [new], "next": None}))
-        self.assertEqual(replies[5][1], {"ok": True, "on": True, "brightness": support.DIM, "playing": NEW_ITEM, "animation": NEW_ITEM, "error": None})
+        self.assertEqual(replies[5][1], {"ok": True, "on": True, "brightness": support.DIM, "playing": "all", "animation": NEW_ITEM, "error": None})
         self.assertEqual((replies[0][1]["animations"], replies[6][1]["animations"], replies[6][1]["total"]), (2, 3, BOARD_TOTAL))
         # After the restart the show still has the item, plays its start item, and plays
-        # the new one when it is told to.
+        # the new one in the playlist when it is told to. When the new one is removed in
+        # its turn, the playlist goes on with the animation after it, which is the first.
         self.assertEqual(replies[7], replies[3])
         self.assertEqual(sorted(kept), sorted([*self.installed, HELLO_NAME]))
         self.assertEqual(kept[HELLO_NAME], self.hello.read_bytes())
         self.assertEqual((replies[8][1]["playing"], replies[8][1]["animation"], replies[8][1]["error"]), (3, 1, None))
-        self.assertEqual((replies[10][1]["playing"], replies[10][1]["animation"]), (NEW_ITEM, NEW_ITEM))
+        self.assertEqual((replies[10][1]["playing"], replies[10][1]["animation"]), ("all", NEW_ITEM))
         self.assertEqual(replies[11], (0, {"ok": True}))
         self.assertEqual(replies[12], (0, {"ok": True, "items": before, "next": None}))
-        self.assertEqual((replies[13][1]["playing"], replies[13][1]["error"]), (None, None))
+        self.assertEqual((replies[13][1]["playing"], replies[13][1]["animation"], replies[13][1]["error"]), ("all", 1, None))
         self.assertEqual([replies[number] for number in (15, 16, 17)], [(1, {"ok": False, "error": "in-use"})] * 2 + [(1, {"ok": False, "error": "unknown-id"})])
 
         left = support.read_back()

@@ -34,6 +34,11 @@ class Commands(unittest.TestCase):
         self.assertEqual(errors, {"unknown-id", "bad-argument", "line-too-long"})
         first = answers[0][2]
         self.assertEqual((first["on"], first["brightness"], first["playing"], first["animation"], first["error"]), (True, support.DIM, 3, 1, None))
+        # An animation is played in the playlist, `play all` goes back to its first
+        # animation, and the cycle is played by itself.
+        self.assertIn("play all", support.SESSION)
+        playing = [(reply["playing"], reply["animation"]) for line, _, reply in answers if line == "status"]
+        self.assertEqual(playing, [(3, 1), (3, 1), ("all", 2), ("all", 2), ("all", 2), ("all", 1), ("all", 2), ("all", 1), ("all", 1), ("all", 1), (3, 1)])
         for line in support.SESSION:
             if line.startswith("brightness ") and int(line.split(" ")[1]) <= 255:
                 self.assertLessEqual(int(line.split(" ")[1]), support.BRIGHTEST, line)

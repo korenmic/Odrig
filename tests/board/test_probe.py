@@ -165,7 +165,7 @@ class Outputs(unittest.TestCase):
         self.assertEqual([held(report)[0], held(report)[2]], [crc(expected[0]), crc(expected[2])])
         self.assertGreaterEqual(min(row["sent"] for row in support.each_second(3)), 49)
         status = support.command(PORT, "status")[1]
-        self.assertEqual((status["error"], status["playing"]), (None, 1))
+        self.assertEqual((status["error"], status["playing"], status["animation"]), (None, "all", 1))
 
     def test_an_invalid_mapping_leaves_wleds_own_outputs_and_keeps_them_dark(self):
         with support.dim_show() as packed, tempfile.TemporaryDirectory() as work:
