@@ -5256,3 +5256,39 @@ or the document change?
 repository, `make -C core test PYTHON="$PWD/.venv/bin/python"` passes all 246 tests.
 
 **Resolution.** `docs/core.md`, the test command.
+
+## Seed 11: What the seed leaves to its spec
+
+**Question.** The seed asks for a tracked script that builds the core on Windows, for the
+line protocol on a local TCP port, and for the command tool to reach it. It names no file,
+no option, no port number and no printed line. What are they?
+
+**Answer.**
+
+- The build script is `core/build.py`, written in Python with the standard library alone:
+  Python is the one program every contributor already has. It finds the compiler itself and
+  looks in the folder `tools/` of the repository before the path, so that a compiler can be
+  unpacked there without being installed. `tools/` is ignored by git. `core/Makefile` stays
+  as it is and stays the way macOS builds.
+- The shared library is `core/build/odrig_core.dll` on Windows, whichever compiler built it.
+- The emulator's option is `--tcp-port N`, the port without the option is 8601, one above
+  the page's, and the printed line is `tcp: 127.0.0.1:<port>`. On macOS the option opens the
+  line port beside the serial port and does not take its place, so that nothing a Mac prints
+  or opens changes unless the option is given.
+- On Windows `--serial-link` is refused with the reason `serial-unavailable`, which the
+  emulator already has, and not with a new reason.
+- The command tool's option is `--tcp ADDRESS`, where the address must have its port: the
+  board has no such port, so no port number is the usual one.
+- A command that arrived by the line port has the transport `tcp` in the log. This adds no
+  command: the line protocol and the list of commands are those of `docs/commands.md`.
+- A real serial port on Windows is opened through `kernel32` with `ctypes`, which is part
+  of Python. The rule of seed 03 that only the emulator's binding uses `ctypes` gives way
+  for this one module of the command tool.
+- The JavaScript shell of the emulator suite on Windows is Node.js, which a developer there
+  usually has. macOS keeps `jsc`.
+- The core suite needs the object listing and the syntax checks of a GNU-style toolchain.
+  With Microsoft's toolchain the build script builds the libraries and the test host, and
+  the tests that question a GNU-style compiler are skipped with that reason.
+
+**Resolution.** `docs/specs/11-p0-emulator-and-tools-on-windows/`: `requirements.md`,
+`design.md` and `tasks.md`.
