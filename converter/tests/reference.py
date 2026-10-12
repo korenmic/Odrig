@@ -274,8 +274,10 @@ def read_shows(arguments, files):
             {
                 "brightness": listed.brightness,
                 "start": listed.start,
+                "minSeconds": listed.min_seconds,
                 "items": [
-                    {"id": item.id, "file": item.file, "cycle": None if item.cycle is None else list(item.cycle), "seconds": item.seconds}
+                    {"id": item.id, "file": item.file, "cycle": None if item.cycle is None else list(item.cycle), "seconds": item.seconds,
+                     "repeat": item.repeat, "maxSeconds": item.max_seconds}
                     for item in listed.items
                 ],
                 "files": show.files(listed),

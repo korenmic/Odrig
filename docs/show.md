@@ -33,17 +33,18 @@ A UTF-8 JSON object with exactly these members:
 | `brightness` | integer | Brightness at power-on, 0 to 255. |
 | `items` | array | The items that can be played. It may be empty. |
 | `start` | integer | Optional. The `id` of the item that plays at power-on. Without it the LEDs stay dark until a play command arrives. |
+| `min_seconds` | integer | Optional, 1 to 65,535, and 30 without it: how long an animation plays at least when it has no `repeat`. |
 
 The file is read as strictly as a JSON frames file (see [format.md](format.md)): UTF-8
 without a byte-order mark, exactly one JSON value, no member named twice in one object, and
 integers written without a fraction and without an exponent.
 
 Each item has an `id`, an integer from 1 to 65,535 that is unique in the file, and is one of
-two kinds, with exactly the members of its kind:
+two kinds, with the members of its kind and no other:
 
 | Kind | Members | Meaning |
 |---|---|---|
-| Animation | `id`, `file` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. |
+| Animation | `id`, `file`, and optionally `repeat` and `max_seconds` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
 | Cycle | `id`, `cycle`, `seconds` | `cycle` is a list of one or more ids of animation items. `seconds` is how long each one is shown, 1 to 65,535. |
 
 Example: two animations, and a cycle that alternates them every 15 seconds and starts at

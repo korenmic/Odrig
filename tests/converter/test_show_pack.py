@@ -57,6 +57,22 @@ class Accepted(unittest.TestCase):
     def test_a_show_without_start(self):
         self.assertIsNone(show.loads(source()).start)
 
+    def test_an_animation_with_a_repeat_count_and_a_longest_duration(self):
+        items = [{"id": 1, "file": "a.odrg", "repeat": 3, "max_seconds": 120}, {"id": 2, "file": "b.odrg", "max_seconds": 1},
+                 {"id": 3, "file": "c.odrg", "repeat": 65535}, {"id": 4, "file": "d.odrg"}, {"id": 5, "cycle": [1, 4], "seconds": 9}]
+        result = show.loads(source(items=items, start=5))
+        self.assertEqual([(item.repeat, item.max_seconds) for item in result.items], [(3, 120), (None, 1), (65535, None), (None, None), (None, None)])
+        self.assertEqual(result.items[0], show.Item(1, "a.odrg", None, None, 3, 120))
+        self.assertEqual(result.items[3], show.Item(4, "d.odrg", None, None))
+        for repeat, longest in ((1, 1), (65535, 65535)):
+            read = show.loads(source(items=[{"id": 1, "file": "a.odrg", "repeat": repeat, "max_seconds": longest}])).items[0]
+            self.assertEqual((read.repeat, read.max_seconds), (repeat, longest))
+
+    def test_the_shortest_time_of_an_animation_is_30_seconds_unless_the_show_says_another(self):
+        self.assertEqual(show.loads(source()).min_seconds, 30)
+        for seconds in (1, 30, 45, 65535):
+            self.assertEqual(show.loads(source(min_seconds=seconds)).min_seconds, seconds)
+
     def test_a_show_without_items(self):
         result = show.loads(source(items=[]))
         self.assertEqual((result.brightness, result.items, result.start), (128, (), None))
@@ -156,6 +172,32 @@ class Malformed(unittest.TestCase):
         self.check(source(items=[{"id": 1, "seconds": 5}]), "missing-member")
         self.check(source(items=[{"file": "a.odrg"}]), "missing-member")
         self.check(source(items=[{"cycle": [1], "seconds": 5}]), "missing-member")
+
+    def test_a_repeat_count_or_a_longest_duration_that_is_no_whole_number_from_1_to_65535(self):
+        for member in ("repeat", "max_seconds"):
+            with self.subTest(member=member):
+                for value in (0, -1, 65536):
+                    self.check(source(items=[{"id": 1, "file": "a.odrg", member: value}]), "out-of-range")
+                for value in ("3", None, True, [3], {"n": 3}):
+                    self.check(source(items=[{"id": 1, "file": "a.odrg", member: value}]), "bad-type")
+                self.check(source(items=[{"id": 1, "file": "a.odrg", member: 3}]).replace(b": 3}", b": 3.0}"), "bad-type")
+                self.check(source(items=[{"id": 1, "file": "a.odrg", member: 3}]).replace(b": 3}", b": 3e0}"), "bad-type")
+
+    def test_a_cycle_has_neither_of_the_two(self):
+        for member in ("repeat", "max_seconds"):
+            self.check(source(items=[{"id": 1, "file": "a.odrg"}, {"id": 2, "cycle": [1], "seconds": 5, member: 2}]), "unknown-member")
+
+    def test_a_shortest_time_that_is_no_whole_number_from_1_to_65535(self):
+        for value in (0, -30, 65536):
+            self.check(source(min_seconds=value), "out-of-range")
+        for value in ("30", None, False, [30]):
+            self.check(source(min_seconds=value), "bad-type")
+        self.check(source(min_seconds=30).replace(b'"min_seconds": 30', b'"min_seconds": 30.0'), "bad-type")
+
+    def test_the_two_are_no_members_of_the_show_and_the_shortest_time_none_of_an_item(self):
+        self.check(source(repeat=2), "unknown-member")
+        self.check(source(max_seconds=2), "unknown-member")
+        self.check(source(items=[{"id": 1, "file": "a.odrg", "min_seconds": 30}]), "unknown-member")
 
     def test_an_id_outside_1_to_65535(self):
         self.check(source(items=[{"id": 0, "file": "a.odrg"}]), "out-of-range")
@@ -296,6 +338,16 @@ class Pack(unittest.TestCase):
         self.assertEqual(sorted(entry.name for entry in self.out.iterdir()), ["mapping.json", "show.json"])
         self.assertEqual((self.out / "show.json").read_bytes(), show_path.read_bytes())
         self.assertEqual((self.out / "mapping.json").read_bytes(), LEGS_2.read_bytes())
+
+    def test_the_turns_of_the_animations_go_into_the_installed_show_as_the_show_file_has_them(self):
+        items = [{"id": 1, "file": "hello.odrg", "repeat": 3, "max_seconds": 120}, {"id": 2, "file": "dvd.odrg", "max_seconds": 9}]
+        show_path = self.show_file(items=items, brightness=40, min_seconds=45)
+        result = self.pack(show_path, LEGS_2, ANIMATIONS)
+        self.assertEqual(result, support.Result(0, "", ""))
+        self.assertEqual((self.out / "show.json").read_bytes(), show_path.read_bytes())
+        packed = show.read(self.out / "show.json")
+        self.assertEqual(packed.min_seconds, 45)
+        self.assertEqual([(item.repeat, item.max_seconds) for item in packed.items], [(3, 120), (None, 9)])
 
     def test_the_example_show_gives_exactly_the_installed_file_set(self):
         result = self.pack()

@@ -35,7 +35,7 @@ Rules for every task:
 - Before a push, fetch: another contributor pushes to this repository.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The show file: three optional members, in the page and in both converters
+- [x] 1. The show file: three optional members, in the page and in both converters
   - Set `"state": "in_progress"` in
     `project-seeds/16-p0-a-playlist-of-everything-by-default/state.json`.
   - `docs/show.md`: `min_seconds`, `repeat` and `max_seconds` in the tables of members,

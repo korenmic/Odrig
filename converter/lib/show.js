@@ -16,19 +16,25 @@ import * as strictjson from "./strictjson.js";
 export const VERSION = 1;
 export const LARGEST_ID = 65535;
 export const LONGEST_TURN = 65535;
+export const MOST_LOOPS = 65535;
+// How long an animation without a repeat count plays at least, in a show that does not say.
+export const MIN_SECONDS = 30;
 export const FILE_NAME = /^[a-z0-9._-]{1,32}$/;
 export const ENDING = ".odrg";
 
 const MEMBERS = ["version", "brightness", "items"];
-const OPTIONAL = ["start"];
+const OPTIONAL = ["start", "min_seconds"];
 const ANIMATION_MEMBERS = ["id", "file"];
+const ANIMATION_OPTIONAL = ["repeat", "max_seconds"];
 const CYCLE_MEMBERS = ["id", "cycle", "seconds"];
 
 // Reads a show file given as bytes: its format first, then its ids.
 //
-// The result is `{brightness, items, start}`. An item is `{id, file, cycle, seconds}`: an
-// animation has a `file` and null for the other two, a cycle has `cycle`, the ids it names
-// in order, and `seconds`, and null for `file`. `start` is null when the file has none.
+// The result is `{brightness, items, start, minSeconds}`. An item is
+// `{id, file, cycle, seconds, repeat, maxSeconds}`: an animation has a `file`, and
+// `repeat` and `maxSeconds` when the file gives them, each null otherwise; a cycle has
+// `cycle`, the ids it names in order, and `seconds`. What an item does not have is null.
+// `start` is null when the file has none, and `minSeconds` is 30 then.
 export function loads(bytes) {
   let show;
   try {
@@ -75,7 +81,8 @@ function read(bytes) {
   const listed = strictjson.array(top.get("items"), "items");
   const items = listed.map((entry, position) => itemOf(entry, `entry ${position + 1} of items`));
   const start = top.has("start") ? strictjson.integer(top.get("start"), null, null, "start") : null;
-  return {brightness, items, start};
+  const minSeconds = top.has("min_seconds") ? strictjson.integer(top.get("min_seconds"), 1, LONGEST_TURN, "min_seconds") : MIN_SECONDS;
+  return {brightness, items, start, minSeconds};
 }
 
 function itemOf(entry, what) {
@@ -83,7 +90,7 @@ function itemOf(entry, what) {
     throw new Rejection(BAD_TYPE, `${what} is not an object`);
   }
   if (entry.has("file")) {
-    strictjson.members(entry, ANIMATION_MEMBERS, [], what);
+    strictjson.members(entry, ANIMATION_MEMBERS, ANIMATION_OPTIONAL, what);
   } else {
     strictjson.members(entry, CYCLE_MEMBERS, [], what);
   }
@@ -96,7 +103,9 @@ function itemOf(entry, what) {
     if (!FILE_NAME.test(name) || !name.endsWith(ENDING)) {
       throw malformed(`file of item ${number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in ${ENDING}`);
     }
-    return {id: number, file: name, cycle: null, seconds: null};
+    const repeat = entry.has("repeat") ? strictjson.integer(entry.get("repeat"), 1, MOST_LOOPS, `repeat of item ${number}`) : null;
+    const maxSeconds = entry.has("max_seconds") ? strictjson.integer(entry.get("max_seconds"), 1, LONGEST_TURN, `max_seconds of item ${number}`) : null;
+    return {id: number, file: name, cycle: null, seconds: null, repeat, maxSeconds};
   }
   const cycle = strictjson.array(entry.get("cycle"), `cycle of item ${number}`);
   if (cycle.length === 0) {
@@ -106,7 +115,7 @@ function itemOf(entry, what) {
     strictjson.integer(named, null, null, `an entry of the cycle of item ${number}`);
   }
   const seconds = strictjson.integer(entry.get("seconds"), 1, LONGEST_TURN, `seconds of item ${number}`);
-  return {id: number, file: null, cycle: cycle.slice(), seconds};
+  return {id: number, file: null, cycle: cycle.slice(), seconds, repeat: null, maxSeconds: null};
 }
 
 // Repeated ids first, then ids that no item has, then cycles that name a cycle.

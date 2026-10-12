@@ -8,12 +8,16 @@ from . import errors, files as input_files, strictjson
 VERSION = 1
 LARGEST_ID = 65535
 LONGEST_TURN = 65535
+MOST_LOOPS = 65535
+# How long an animation without a repeat count plays at least, in a show that does not say.
+MIN_SECONDS = 30
 FILE_NAME = re.compile(r"[a-z0-9._-]{1,32}")
 ENDING = ".odrg"
 
 _MEMBERS = ("version", "brightness", "items")
-_OPTIONAL = ("start",)
+_OPTIONAL = ("start", "min_seconds")
 _ANIMATION_MEMBERS = ("id", "file")
+_ANIMATION_OPTIONAL = ("repeat", "max_seconds")
 _CYCLE_MEMBERS = ("id", "cycle", "seconds")
 
 
@@ -23,6 +27,8 @@ class Item:
     file: str | None
     cycle: tuple[int, ...] | None
     seconds: int | None
+    repeat: int | None = None
+    max_seconds: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -30,6 +36,7 @@ class Show:
     brightness: int
     items: tuple[Item, ...]
     start: int | None
+    min_seconds: int = MIN_SECONDS
 
 
 def read(path):
@@ -78,14 +85,15 @@ def _show(data):
     listed = strictjson.array(top["items"], what="items")
     items = tuple(_item(entry, f"entry {position} of items") for position, entry in enumerate(listed, 1))
     start = strictjson.integer(top["start"], what="start") if "start" in top else None
-    return Show(brightness, items, start)
+    shortest = strictjson.integer(top["min_seconds"], 1, LONGEST_TURN, what="min_seconds") if "min_seconds" in top else MIN_SECONDS
+    return Show(brightness, items, start, shortest)
 
 
 def _item(entry, what):
     if type(entry) is not dict:
         raise errors.Rejection(errors.BAD_TYPE, f"{what} is not an object")
     if "file" in entry:
-        strictjson.members(entry, _ANIMATION_MEMBERS, what=what)
+        strictjson.members(entry, _ANIMATION_MEMBERS, _ANIMATION_OPTIONAL, what=what)
     else:
         strictjson.members(entry, _CYCLE_MEMBERS, what=what)
     number = strictjson.integer(entry["id"], 1, LARGEST_ID, what=f"id of {what}")
@@ -97,7 +105,9 @@ def _item(entry, what):
             raise _malformed(
                 f"file of item {number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in {ENDING}"
             )
-        return Item(number, name, None, None)
+        repeat = strictjson.integer(entry["repeat"], 1, MOST_LOOPS, what=f"repeat of item {number}") if "repeat" in entry else None
+        longest = strictjson.integer(entry["max_seconds"], 1, LONGEST_TURN, what=f"max_seconds of item {number}") if "max_seconds" in entry else None
+        return Item(number, name, None, None, repeat, longest)
     cycle = strictjson.array(entry["cycle"], what=f"cycle of item {number}")
     if not cycle:
         raise _malformed(f"cycle of item {number} is empty")

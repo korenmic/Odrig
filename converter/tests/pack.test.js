@@ -27,7 +27,8 @@ function generate(generator, mapping, out, seconds = null) {
 // The three shows of Requirement 11: the example show on the bench canvas, the demo show
 // on 60 x 60, and a show of one dense clip of 2 seconds on 60 x 60. The sources of the
 // last two are written by the generators of the Python tool. Beside them, a show without
-// items, which packs to the two JSON files.
+// items, which packs to the two JSON files, and one whose animations have a repeat count
+// and a longest duration, which go into the installed show as the show file has them.
 function shows(folder) {
   const demo = path.join(folder, "demo-sources");
   fs.mkdirSync(demo);
@@ -40,11 +41,14 @@ function shows(folder) {
   fs.writeFileSync(denseShow, '{"version": 1, "brightness": 64, "items": [{"id": 7, "file": "dense.odrg"}], "start": 7}\n');
   const emptyShow = path.join(folder, "empty-show.json");
   fs.writeFileSync(emptyShow, '{"version": 1, "brightness": 40, "items": []}\n');
+  const turnsShow = path.join(folder, "turns-show.json");
+  fs.writeFileSync(turnsShow, '{"version": 1, "brightness": 40, "min_seconds": 45,\n "items": [{"id": 1, "file": "hello.odrg", "repeat": 3, "max_seconds": 120}, {"id": 2, "file": "dvd.odrg", "max_seconds": 9}]}\n');
   return [
     {label: "the example show on the bench canvas", show: "shows/example/show.json", mapping: BENCH, sources: "animations", names: ["dvd.odrg", "hello.odrg"]},
     {label: "the demo show on 60 x 60", show: "shows/demo-20/show.json", mapping: TARGET, sources: demo, names: ["dvd.odrg", "hello.odrg"]},
     {label: "a show of one dense clip on 60 x 60", show: denseShow, mapping: TARGET, sources: dense, names: ["dense.odrg"]},
     {label: "a show without items on the bench canvas", show: emptyShow, mapping: BENCH, sources: "animations", names: []},
+    {label: "a show whose animations have turns of their own", show: turnsShow, mapping: BENCH, sources: "animations", names: ["dvd.odrg", "hello.odrg"]},
   ];
 }
 
@@ -274,6 +278,24 @@ const BROKEN_SHOWS = [
   ["a cycle that names a cycle", showFile({items: [A, B, CYCLE, {id: 4, cycle: [1, 3], seconds: 5}]})],
   ["a cycle that names itself", showFile({items: [A, B, {...CYCLE, cycle: [3]}]})],
   ["a cycle that names a cycle that comes after it", showFile({items: [A, {id: 3, cycle: [4, 1], seconds: 1}, {id: 4, cycle: [1], seconds: 1}], start: 1})],
+  ["a repeat count of 0", showFile({items: [{...A, repeat: 0}], start: null})],
+  ["a repeat count of 65536", showFile({items: [{...A, repeat: 65536}], start: null})],
+  ["a repeat count that is a string", showFile({items: [{...A, repeat: "3"}], start: null})],
+  ["a repeat count with a fraction", JSON.stringify(showFile({items: [{...A, repeat: 3}], start: null})).replace('"repeat":3', '"repeat":3.0')],
+  ["a repeat count that is null", showFile({items: [{...A, repeat: null}], start: null})],
+  ["a longest duration of 0", showFile({items: [{...A, max_seconds: 0}], start: null})],
+  ["a longest duration of 65536", showFile({items: [{...A, max_seconds: 65536}], start: null})],
+  ["a longest duration that is a list", showFile({items: [{...A, max_seconds: [60]}], start: null})],
+  ["a repeat count on a cycle", showFile({items: [A, B, {...CYCLE, repeat: 2}]})],
+  ["a longest duration on a cycle", showFile({items: [A, B, {...CYCLE, max_seconds: 60}]})],
+  ["a shortest time on an item", showFile({items: [{...A, min_seconds: 30}], start: null})],
+  ["a shortest time of 0", showFile({more: {min_seconds: 0}})],
+  ["a shortest time of 65536", showFile({more: {min_seconds: 65536}})],
+  ["a shortest time that is a string", showFile({more: {min_seconds: "30"}})],
+  ["a repeat count of the show", showFile({more: {repeat: 2}})],
+  ["a bad repeat count and a bad longest duration", showFile({items: [{...A, repeat: 0, max_seconds: 0}], start: null})],
+  ["a bad file name and a bad repeat count", showFile({items: [{id: 1, file: "A.odrg", repeat: 0}], start: null})],
+  ["a bad start and a bad shortest time", {...showFile({more: {min_seconds: 0}}), start: "3"}],
 ];
 
 // Shows that are as docs/show.md says.
@@ -290,6 +312,12 @@ const WHOLE_SHOWS = [
   ["the largest numbers", showFile({brightness: 255, items: [A, {id: 65535, cycle: [1], seconds: 65535}], start: 65535})],
   ["a brightness of 0", showFile({brightness: 0})],
   ["items that is empty", showFile({items: [], start: null})],
+  ["an animation with a repeat count and a longest duration", showFile({items: [{...A, repeat: 3, max_seconds: 120}, B, CYCLE]})],
+  ["the largest repeat count and the largest longest duration", showFile({items: [{...A, repeat: 65535, max_seconds: 65535}], start: 1})],
+  ["a repeat count of 1 and a longest duration of 1", showFile({items: [{...A, repeat: 1}, {...B, max_seconds: 1}], start: null})],
+  ["a shortest time of 1", showFile({more: {min_seconds: 1}})],
+  ["a shortest time of 65535, with no start", showFile({start: null, more: {min_seconds: 65535}})],
+  ["all three, with the members of an item in another order", {version: 1, min_seconds: 45, brightness: 9, items: [{max_seconds: 7, repeat: 2, file: "a.odrg", id: 1}]}],
   ["the members in another order", {start: 3, items: showFile().items, brightness: 1, version: 1}],
 ];
 
@@ -302,7 +330,7 @@ function bytesOf(file) {
 function readShow(bytes) {
   try {
     const listed = show.loads(bytes);
-    return {brightness: listed.brightness, start: listed.start, items: listed.items, files: show.files(listed)};
+    return {brightness: listed.brightness, start: listed.start, minSeconds: listed.minSeconds, items: listed.items, files: show.files(listed)};
   } catch (error) {
     if (!(error instanceof errors.Rejection)) {
       throw error;
