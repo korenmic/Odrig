@@ -115,8 +115,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 present, and do not build on them.
 
 - **The emulator and the tools on Windows**, seed 11, as the section above says.
-- **Four more commands**, seed 07: report the free storage, list what is installed,
-  remove an animation, and upload one.
 - **The board's Wi-Fi name and password**, seed 08, set from a tracked settings file.
   Today the board's network has the defaults of WLED; see [docs/wifi.md](docs/wifi.md).
 - **An app for the operators, for Android**, seed 09. The first notes are in

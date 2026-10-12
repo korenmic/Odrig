@@ -57,6 +57,13 @@ class Vocabulary(unittest.TestCase):
         self.assertIn("`mapping/legs-20.json`", defined["target"])
         self.assertIn("not wired", defined["target"])
 
+    def test_the_entry_for_command_names_every_command_of_the_command_list(self):
+        table = support.read("docs/commands.md").split("\n## Commands\n")[1].split("\n## ")[0]
+        listed = sorted({row.split("`")[1].split(" ")[0] for row in table.splitlines() if row.startswith("| `")})
+        self.assertEqual(listed, ["brightness", "list", "off", "on", "play", "remove", "space", "status", "upload"])
+        named = sorted({span.split(" ")[0] for span in re.findall(r"`([^`]+)`", dict(self.entries)["command"])})
+        self.assertEqual(named, listed)
+
     def test_the_entries_are_found_as_they_are_written(self):
         text = "## A\n\n- **one**: First. Second\n  line.\n- **two words**: Third.\n\n## B\n\n- **three**: Fourth.\n"
         self.assertEqual(entries(text), [("one", "First. Second line."), ("two words", "Third."), ("three", "Fourth.")])

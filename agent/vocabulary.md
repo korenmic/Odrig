@@ -62,9 +62,10 @@ the entry links to it.
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show
   reads this folder and nothing else. A folder made this way is also called a packed show.
   See [show.md](../docs/show.md#installed-file-set).
-- **command**: One line of text sent to whatever is playing a show. There are five:
-  `play <id>`, `on`, `off`, `brightness <n>` and `status`. Each is answered by one line of
-  JSON. See [commands.md](../docs/commands.md).
+- **command**: One line of text sent to whatever is playing a show. There are nine:
+  `play <id>`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`, `remove <id>` and
+  `upload`, which sends a file as several lines. Each is answered by one line of JSON. See
+  [commands.md](../docs/commands.md).
 
 ## The programs
 

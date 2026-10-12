@@ -17,7 +17,7 @@ PRIVATE = {
 }
 
 # Words for what is planned and not yet in the repository.
-PLANNED = re.compile(r"Android|Capacitor|Tauri|\bseeds? 0?[7-9]\b")
+PLANNED = re.compile(r"Android|Capacitor|Tauri|\bseeds? 0?[89]\b")
 WHERE_THE_PLANNED_IS_NAMED = (support.ENTRY, "What is coming")
 
 # A command that converts, checks or packs with the reference converter, which no page gives.

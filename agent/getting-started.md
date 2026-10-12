@@ -165,7 +165,7 @@ takes them over Wi-Fi:
 
 Each prints the reply, one line of JSON like the one under the next heading. The page
 shows every command in its log as it arrives. Stop the emulator with Ctrl-C in its
-terminal. [commands.md](../docs/commands.md) has the five commands and
+terminal. [commands.md](../docs/commands.md) has every command and
 [emulator.md](../docs/emulator.md) everything about the emulator and its page.
 
 ## Check it without a screen
