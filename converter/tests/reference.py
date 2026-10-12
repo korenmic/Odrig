@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import tempfile
+import types
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -253,6 +254,196 @@ def read_shows(arguments, files):
     return results
 
 
+def _fraction(value):
+    """A whole number given as text, or a fraction given as `[n, d]` of texts."""
+    if isinstance(value, list):
+        return fractions.Fraction(int(value[0]), int(value[1]))
+    return fractions.Fraction(int(value))
+
+
+def _refusal(rejection):
+    return {"reason": rejection.reason, "detail": rejection.detail}
+
+
+def rects(arguments, cases):
+    """`odrig.media.source_rect` for each `[sw, sh, w, h, fit]`: left, top, width and height,
+    each as `[n, d]` of texts."""
+    from odrig import media
+
+    return [[[str(value.numerator), str(value.denominator)] for value in media.source_rect(*case)] for case in cases]
+
+
+def resample(arguments, cases):
+    """The canvas picture `odrig.media` gives for each case, or its rejection.
+
+    A case has `columns`, `rows`, `w` and `h`, and either `rgba` and `fits`, a source picture
+    that is laid over black and fitted with each of the fits, which gives a list, or `rgb`
+    and `rect`, a picture and the rectangle of it to show, its four values each a whole
+    number or `[n, d]`.
+    """
+    import numpy
+
+    from odrig import media
+
+    def one(picture, rect, w, h):
+        try:
+            return media.resample(picture, rect, w, h).hex()
+        except errors.Rejection as rejection:
+            return _refusal(rejection)
+
+    results = []
+    for given in cases:
+        columns, rows, w, h = given["columns"], given["rows"], given["w"], given["h"]
+        if "rgba" in given:
+            rgba = numpy.frombuffer(bytes.fromhex(given["rgba"]), dtype=numpy.uint8).reshape(rows, columns, 4)
+            try:
+                picture = media._over_black(rgba)
+            except errors.Rejection as rejection:
+                results.append([_refusal(rejection) for fit in given["fits"]])
+                continue
+            results.append([one(picture, media.source_rect(columns, rows, w, h, fit), w, h) for fit in given["fits"]])
+        else:
+            picture = numpy.frombuffer(bytes.fromhex(given["rgb"]), dtype=numpy.uint8).reshape(rows, columns, 3)
+            results.append(one(picture, tuple(_fraction(value) for value in given["rect"]), w, h))
+    return results
+
+
+def ticks(arguments, cases):
+    """`odrig.media.tick_pictures` on frames that have times only.
+
+    A case has `frames`, the start and the end of each in milliseconds, `start` and
+    `duration`. The result has the number of the frame that is shown at each tick, the
+    frames that were fitted, in order, and how many frames were asked for; or the rejection.
+    """
+    from odrig import media
+
+    results = []
+    for given in cases:
+        frames = [(_fraction(start), _fraction(end), number) for number, (start, end) in enumerate(given["frames"])]
+        asked = []
+        fitted = []
+
+        def each():
+            for frame in frames:
+                asked.append(frame[2])
+                yield frame
+
+        def place(number):
+            fitted.append(number)
+            return number
+
+        duration = None if given["duration"] is None else int(given["duration"])
+        try:
+            shown = media.tick_pictures(each(), int(given["start"]), duration, place)
+        except errors.Rejection as rejection:
+            results.append({**_refusal(rejection), "asked": len(asked)})
+            continue
+        results.append({"ticks": shown, "fitted": fitted, "asked": len(asked)})
+    return results
+
+
+class _FakeVideo:
+    """What `odrig.media` uses of an opened video, with frames that are made up."""
+
+    def __init__(self, frames, time_base):
+        self.frames = frames
+        self.asked = 0
+        self.streams = types.SimpleNamespace(video=[types.SimpleNamespace(time_base=time_base)])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *failure):
+        return False
+
+    def decode(self, stream):
+        for pts, picture in self.frames:
+            self.asked += 1
+            yield types.SimpleNamespace(pts=pts, to_ndarray=lambda format, picture=picture: picture)
+
+
+class _FakeGif:
+    """What `odrig.media` uses of an opened GIF, with frames that are made up."""
+
+    def __init__(self, frames):
+        self.frames = frames
+        self.asked = 0
+        self.n_frames = len(frames)
+        self.info = {}
+        self.current = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *failure):
+        return False
+
+    def seek(self, number):
+        self.asked += 1
+        self.current = number
+        delay = self.frames[number][0]
+        self.info = {} if delay is None else {"duration": delay}
+
+    def convert(self, mode):
+        return self.frames[self.current][1]
+
+
+def timeline(arguments, cases):
+    """`odrig.media.import_media` on frames that are made up, in place of a file's.
+
+    A case has `kind`, "video" or "gif"; `frames`, each with `width`, `height` and `rgba`,
+    and with `pts`, a whole number or null, for a video, or `delay` in milliseconds or null
+    for a GIF; `time_base` as `[n, d]` for a video; the canvas `width` and `height`; `fit`,
+    `start` and `duration`. The libraries that open a file are replaced by stand-ins that
+    hand out these frames, so everything after the decoder is the Python tool's own. The
+    result has the JSON frames file of the animation and how many frames were asked for, or
+    the rejection, whose detail names the file as clip.mp4 or clip.gif.
+    """
+    from unittest import mock
+
+    import av
+    import numpy
+    import PIL.Image
+
+    from odrig import media
+
+    results = []
+    before = os.getcwd()
+    with tempfile.TemporaryDirectory() as folder:
+        os.chdir(folder)
+        try:
+            for name in ("clip.mp4", "clip.gif"):
+                open(name, "wb").close()
+            for given in cases:
+                pictures = [
+                    numpy.frombuffer(bytes.fromhex(frame["rgba"]), dtype=numpy.uint8).reshape(frame["height"], frame["width"], 4)
+                    for frame in given["frames"]
+                ]
+                if given["kind"] == "video":
+                    name = "clip.mp4"
+                    opened = _FakeVideo(
+                        [(frame["pts"], picture) for frame, picture in zip(given["frames"], pictures)],
+                        _fraction(given["time_base"]),
+                    )
+                    patch = mock.patch.object(av, "open", lambda path, opened=opened: opened)
+                else:
+                    name = "clip.gif"
+                    opened = _FakeGif([(frame["delay"], picture) for frame, picture in zip(given["frames"], pictures)])
+                    patch = mock.patch.object(PIL.Image, "open", lambda path, formats=None, opened=opened: opened)
+                canvas = types.SimpleNamespace(width=given["width"], height=given["height"])
+                duration = None if given["duration"] is None else int(given["duration"])
+                try:
+                    with patch:
+                        animation = media.import_media(name, canvas, given["fit"], int(given["start"]), duration)
+                except errors.Rejection as rejection:
+                    results.append({**_refusal(rejection), "asked": opened.asked})
+                    continue
+                results.append({"file": jsonframes.dumps(animation).hex(), "ticks": len(animation.frames), "asked": opened.asked})
+        finally:
+            os.chdir(before)
+    return results
+
+
 def run(arguments, given):
     """What `python -m odrig` gives for each of the command lines of `given["commands"]`,
     run one after the other in this interpreter, in the folder `given["cwd"]`: for each its
@@ -278,6 +469,10 @@ REQUESTS = {
     "milliseconds": milliseconds,
     "inflate": inflate,
     "deflate": deflate,
+    "rects": rects,
+    "resample": resample,
+    "ticks": ticks,
+    "timeline": timeline,
     "run": run,
 }
 

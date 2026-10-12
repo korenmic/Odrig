@@ -133,7 +133,7 @@ Rules for every task:
     `file-missing` where `output-not-empty` is expected. Undo it.
   - Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7
 
-- [ ] 7. Fitting and the timeline, in the library
+- [x] 7. Fitting and the timeline, in the library
   - Create `lib/fit.js` and `lib/timeline.js` as the design's sections "fit", "timeline"
     and "How the library is given frames" describe them.
   - `tests/fit.test.js` and `tests/timeline.test.js` as the design lists them, with the

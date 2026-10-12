@@ -4654,3 +4654,70 @@ fails after ten minutes with "did not come to an end", it is this.
 
 **Resolution.** `converter/tests/support.js`, `reference`, `runJs` and `runPython`;
 `converter/tests/reference.py`, `main`.
+
+## Seed 06: What importFrames takes and when it asks, for whoever hands it frames
+
+**Question.** The design gives the shape of a source and of a frame. It leaves open what
+happens with a time that is a `Number` with a fraction, with a GIF frame without a delay,
+with a picture without pixels, and how many frames of a video are asked for when only a
+part is wanted. The app of seed 09 hands the library its frames and has to know.
+
+**Answer.** As the Python tool has it wherever the Python tool has the case:
+
+- A time, and a delay, is a `Number` that is a safe integer, a `BigInt`, or `[n, d]` of two
+  of these. A `Number` that is not whole, such as 33.3667, is refused as a mistake of the
+  caller, with a `RangeError` and not with a rejection: the caller gives the fraction it
+  has, for a timestamp in microseconds `[timestamp, 1000]`.
+- A frame of a video without a `time`, or with null, is `unreadable-media`, "a frame has
+  no presentation time". A frame of a GIF without a `delayMs`, or with null, counts as a
+  delay of 0, which is 100 ms, as in the Python tool when the file records none.
+- A frame of width or height 0 is `unreadable-media`, "a picture has no pixels", when it
+  is handed over, whether it is on screen at a tick or not. Its pixels are looked at only
+  when it is on screen at a tick.
+- A frame of a video is complete when the next one has come, because it is on screen until
+  then. So `importFrames` asks for one frame more than the part shows, and a fault of that
+  frame, a missing time or a time that goes backwards, is reported, as in the Python tool,
+  whose decoder runs one frame ahead in the same way. A frame of a GIF is complete by
+  itself.
+- When the part is covered, the iteration is left with `break`, so an iterator with a
+  `return` method has it called, once, and is awaited when it is asynchronous. A source
+  that is read to its end is not told to stop.
+- A start or a duration that is negative or 0 is refused before the first frame is asked
+  for.
+- `fit.place(source, w, h, fit)` is the whole fitting of one source picture, for a caller
+  that wants a still picture and no timeline.
+
+**Resolution.** `converter/lib/timeline.js`, `converter/lib/fit.js`;
+`converter/tests/timeline.test.js`, "importFrames takes frames from whoever has them".
+
+## Seed 06: How fitting and the timeline are compared with the Python tool without a media file
+
+**Question.** The task makes its frames in the tests and reads no media file, and the
+Python tool's timing rules for video and GIF are inside the functions that open a file
+with PyAV and Pillow. The design asks for a case on each side of 2 to the power 53.
+
+**Answer.** `reference.py` has four requests. `rects` is `odrig.media.source_rect`.
+`resample` lays a source picture over black and fits it, or fits a picture to a rectangle
+it is given. `ticks` is `odrig.media.tick_pictures` on frames that have times only, and
+reports which frame is at each tick, which frames were fitted and how many were asked
+for. `timeline` runs `odrig.media.import_media` itself, with stand-ins in place of
+`av.open` and `PIL.Image.open` that hand out made-up frames with a presentation time and
+a time base, or a delay: everything after the decoder is the Python tool's own code, and
+the test compares the JSON frames file byte for byte, the rejection with its detail, and
+the number of frames asked for, for 700 videos and GIFs from seeds.
+
+The border of the `Number` arithmetic is reached with a picture of 64 x 32,768 pixels
+stretched to a canvas of 64 columns: 511 times the area passes 2 to the power 53 between
+canvases of 32,832 and 32,833 rows. Both pictures are the Python tool's, the second
+computed in `BigInt`s. A smaller picture cannot reach the border with values other than
+black, because the area in the tool's units is 4 times the pixels of the canvas times the
+pixels of the rectangle. The limit of 2 to the power 63 is met with a rectangle far larger
+than its picture.
+
+The floor of `whole.js` decides more than the bar on the left that the task names: the
+last source pixel a slice covers is found with a ceiling, which is a floor of the negated
+value, so a floor that rounds toward zero drops the pixel in which a slice ends. With such
+a floor 38 tests fail, among them the one the task names.
+
+**Resolution.** `converter/tests/reference.py`, `rects`, `resample`, `ticks` and
+`timeline`; `converter/tests/fit.test.js`, `converter/tests/timeline.test.js`.
