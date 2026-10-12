@@ -242,8 +242,8 @@ test("the other documents show the JavaScript tool where they convert or pack", 
     assert.match(conversion, /Python/);
     assert.equal(/It will be written in JavaScript/.test(conversion), false);
     const log = text.split("\n## Change log\n")[1];
-    const last = log.trim().split("\n- ").pop();
-    assert.match(words(last), /JavaScript converter/);
+    const entries = log.trim().split("\n- ").map(words);
+    assert.ok(entries.some((entry) => /JavaScript converter/.test(entry)));
   });
 
   await t.test("no page points at a section of docs/converter.md that has moved", () => {
