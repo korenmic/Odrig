@@ -131,7 +131,9 @@ class ListAndRemove(unittest.TestCase):
         try:
             self.assertEqual(emulator.status()["playing"], 3)
             self.assertEqual(over_serial(emulator, "remove 3"), b'{"ok":true}\n')
-            self.assertEqual(emulator.status()["playing"], None)
+            # The cycle that played is gone: the playlist plays, from its first animation.
+            state = emulator.status()
+            self.assertEqual((state["playing"], state["animation"]), ("all", 1))
             self.assertEqual(over_http(emulator, "remove 2"), b'{"ok":true}\n')
             listed = over_http(emulator, "list")
         finally:

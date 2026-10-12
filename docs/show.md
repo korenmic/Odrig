@@ -109,9 +109,15 @@ writes `show.json` and the `.odrg` file, and a restart finds the show as it was 
 
 - A new item is added at the end of `items`. Its `id` is the one the upload named: any
   id from 1 to 65,535 that no item has. Ids need not follow each other, and the id of a
-  removed item can be used again.
-- An upload to the id of an animation item replaces its animation. The item keeps its id
-  and its position, and gets the file name the upload named.
+  removed item can be used again. It has its turn in the playlist after the items
+  before it, without a `repeat` or a `max_seconds` of its own.
+- An upload to the id of an animation item replaces its animation. The item keeps its
+  id, its position, its `repeat` and its `max_seconds`, and gets the file name the upload
+  named. When it is the animation whose turn it is, the turn begins again with the new
+  animation.
+- When the animation whose turn it is is removed, the playlist goes on with the animation
+  after it. When the cycle that plays is removed, the playlist plays, from its first
+  animation.
 - A cycle cannot be made or changed by a command. A cycle can be removed, and an
   animation can be removed once no cycle lists it.
 - Two items do not get the same file by an upload: a file name that another item has is
@@ -119,7 +125,7 @@ writes `show.json` and the `.odrg` file, and a restart finds the show as it was 
   file is deleted when the last item that names it is removed.
 - An `.odrg` file that no item names any more is deleted.
 - The show may end up without items. It is valid: nothing plays until an animation is
-  uploaded.
+  uploaded, and then the playlist plays.
 - `brightness` and `start` of `show.json` are not changed by an upload. Removing the
   `start` item removes `start`.
 - `mapping.json` is never changed.

@@ -430,8 +430,10 @@ class Remove(Content):
         self.assertEqual(json.loads(self.left["show.json"])["start"], 6)
         self.assertEqual(json.loads(support.start(self.left, [support.line(T0, "status")]).lines[0][6:])["playing"], 6)
 
-    def test_removing_the_item_that_plays_stops_playback_and_the_leds_go_dark(self):
-        for number in (6, 4, 3):
+    def test_removing_what_plays_leaves_the_playlist_playing(self):
+        # A cycle that plays leaves: the playlist plays, from its first animation. The
+        # animation whose turn it is leaves: the playlist goes on with the one after it.
+        for number, then in ((6, 1), (4, 5), (3, 1)):
             with self.subTest(playing=number):
                 files = small_show(self.ITEMS, start=number)
                 before = every_20_ms(25)
@@ -440,9 +442,9 @@ class Remove(Content):
                 printed = self.removed(files, number, before=before)
                 produced, _ = refreshes([line for line in printed if line.startswith(("refresh", "data"))])
                 lit = [any(any(data) for data in legs.values()) for _, legs in produced]
-                self.assertEqual(lit, [True] * 25 + [False] * 30)
+                self.assertEqual(lit, [True] * 55)
                 states = [json.loads(reply) for reply in replies(printed) if '"playing"' in reply]
-                self.assertEqual([(state["playing"], state["animation"]) for state in states], [(None, None), (None, None)])
+                self.assertEqual([(state["playing"], state["animation"]) for state in states], [("all", then), ("all", then)])
                 self.assertEqual({state["error"] for state in states}, {None})
 
     def test_removing_another_item_leaves_what_plays_undisturbed(self):

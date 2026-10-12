@@ -914,6 +914,9 @@ class ReferencePlayer:
             played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and number in played.cycle:
                 self._play(self.playing)
+        elif self.playing is None:
+            # The show had no animation, and nothing played: the playlist starts.
+            self._play_all()
         if old is None or old.file != name:
             self.files["show.json"] = self.show_text()
 
@@ -964,11 +967,22 @@ class ReferencePlayer:
     def _remove(self, number):
         """Takes an item out of the show, and its file out of the folder when no other
         item names it."""
+        order = self._animations()
+        goes_on = None
+        if self.playing == self.ALL and self.turn == number:
+            # The playlist goes on with the animation after the one that leaves.
+            goes_on = order[(order.index(number) + 1) % len(order)]
+        elif self.playing == number:
+            # The cycle that plays leaves: the playlist plays, from its first animation.
+            goes_on = order[0]
         item = self.items.pop(number)
         if self.start == number:
             self.start = None
-        if self.playing == number or (self.playing == self.ALL and self.turn == number):
+        if goes_on == number:
+            # It was the only animation of the show.
             self.playing = self.shown = self.zero = self.turn = None
+        elif goes_on is not None:
+            self._play_all(goes_on)
         if item.file is not None and all(other.file != item.file for other in self.items.values()):
             self.files.pop(item.file, None)
             self.clips.pop(item.file, None)

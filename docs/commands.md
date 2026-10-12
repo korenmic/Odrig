@@ -92,8 +92,11 @@ The item leaves the show, and the items after it move up.
 
 - An animation that a cycle lists is refused with `in-use`: remove the cycle first.
 - If the item is the `start` item, the show has no `start` afterwards.
-- If the item is playing, playback stops and the LEDs go dark. Anything else that plays
-  goes on undisturbed.
+- If the item is the animation whose turn it is in the playlist, the playlist goes on
+  with the animation after it, from its first frame. If it was the only animation of the
+  show, nothing plays and the LEDs are dark.
+- If the item is the cycle that is playing, the playlist plays, from its first animation.
+- Anything else that plays goes on undisturbed.
 - The animation's file is deleted when no remaining item names it.
 - While an upload is open, `remove` is refused with `busy`.
 
@@ -149,9 +152,11 @@ nine bytes `123456789` is `cbf43926`.
   member, `{"ok":false,"error":"bad-file","reason":"<reason>"}`: a reason of "ODRG files"
   in [reasons.md](reasons.md), or `size-mismatch` when the file is for another canvas
   size. The upload is discarded.
-- On success the file is in place and the item is in the show. It can be played at once.
-  If the item that is playing got a new animation, or a cycle that is playing lists it,
-  what is playing starts again from its first frame.
+- On success the file is in place and the item is in the show. A new item has its turn in
+  the playlist after the items before it, and `play` can play it at once. If nothing was
+  playing, the playlist starts. If the animation whose turn it is got a new animation,
+  its turn begins again; if a cycle that is playing lists it, the cycle starts again from
+  its first frame.
 
 **`upload cancel`** discards the open upload. An upload on which nothing has moved for 60
 seconds is discarded too: no data arrived, and no check is running.

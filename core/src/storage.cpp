@@ -162,6 +162,7 @@ bool storage_install_upload(Core &core) {
     // The show in storage is the new one from here on.
     if (is_new) {
         content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms);
+        player_item_added(core);
     } else {
         content_change_file(core, position, upload.name, upload.size, upload.total_ms);
         player_file_replaced(core, position);

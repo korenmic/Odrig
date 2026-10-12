@@ -597,7 +597,9 @@ class Upload(Content):
                     self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, ("all", 9, None)))
                     removed = support.run_tool(*target, "remove", "9")
                     self.assertEqual((removed.status, removed.out, removed.err), (0, OK, ""))
-                    self.assertEqual(json.loads(support.run_tool(*target, "status").out)["playing"], None)
+                    # It was the last animation of the playlist: the first one is next.
+                    state = json.loads(support.run_tool(*target, "status").out)
+                    self.assertEqual((state["playing"], state["animation"]), ("all", 1))
                 finally:
                     again.stop()
                 self.assert_as_before()

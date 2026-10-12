@@ -353,12 +353,17 @@ never written in place. The text of `show.json` is the one of [show.md](show.md)
   plays goes on undisturbed. A new item is written at the end of the item table and of
   the file table. A replaced item's entry of the file table gets the new name, size and
   duration; when another item named the old file too, the item gets an entry of its own.
-- **What plays.** When the removed item is the one that plays, playback stops, the file
-  that is open is closed, and the next refresh is dark. When the file of the animation
-  that plays is replaced, or of an animation the playing cycle lists, what plays starts
-  again from its first frame at the next refresh. Before a file is renamed onto a name
-  or removed, the player closes it when it has it open. Every other change leaves the LED
-  data as it would have been.
+- **What plays.** When the removed item is the animation whose turn it is in the
+  playlist, the file that is open is closed and the playlist goes on with the animation
+  after it, whose turn begins at the next refresh; when it was the only animation,
+  nothing plays and the next refresh is dark. When the removed item is the cycle that
+  plays, the playlist plays from its first animation. When the file of the animation
+  whose turn it is is replaced, its turn begins again at the next refresh; when the
+  file of an animation the playing cycle lists is replaced, the cycle starts again from
+  its first frame. A new item has its turn when the playlist comes to it; when nothing
+  played, the playlist starts. Before a file is renamed onto a name or removed, the
+  player closes it when it has it open. Every other change leaves the LED data as it
+  would have been.
 - The item table and the file table have room for 32 items more than `show.json` lists at
   startup, and for at least 128. A new item beyond that is refused with `no-space`.
 - An item of the item table has 16 bytes, whatever it is. An animation item keeps its

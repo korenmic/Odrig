@@ -38,16 +38,21 @@ uint32_t player_first_animation(const Core &core);
 // name: the player closes it when it has it open. It opens again at the next refresh.
 void player_releases_file(Core &core, uint32_t item);
 
-// The animation item at this position has another animation now. When it is the item
-// being played, or an animation of the cycle being played, what is played starts again
-// from its first frame at the next refresh. When it is the animation whose turn it is in
-// the playlist, its turn begins again.
+// The animation item at this position has another animation now. When it is the
+// animation whose turn it is in the playlist, its turn begins again at the next refresh.
+// When the cycle being played lists it, the cycle starts again from its first frame.
 void player_file_replaced(Core &core, uint32_t item);
 
+// An animation item was added at the end of the item table. The playlist meets it when
+// its turn comes. When nothing plays, the playlist starts from its first animation.
+void player_item_added(Core &core);
+
 // The item at this position is about to leave the item table, and every item after it
-// moves up by one. When it is the item being played, or the animation whose turn it is
-// in the playlist, playback stops and the file that is open is closed. Otherwise the
-// positions the player holds follow the items, and what plays goes on as it was.
+// moves up by one. When it is the animation whose turn it is in the playlist, the
+// playlist goes on with the animation after it, or nothing plays when it was the only
+// one. When it is the cycle being played, the playlist plays from its first animation.
+// Otherwise the positions the player holds follow the items, and what plays goes on as
+// it was.
 void player_item_leaves(Core &core, uint32_t item);
 
 // Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.

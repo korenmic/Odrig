@@ -84,7 +84,7 @@ Rules for every task:
     `bad-argument`.
   - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 8.3
 
-- [ ] 5. The show changed while the playlist plays
+- [x] 5. The show changed while the playlist plays
   - `core/src/player.cpp` and `content.cpp`: an item added, an animation replaced, an
     item leaving, as the design gives them. The reference player gets the same.
   - `tests/core/`: an upload of a new item during the playlist, into an empty show, and

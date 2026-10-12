@@ -249,12 +249,26 @@ void player_file_replaced(Core &core, uint32_t item) {
     }
 }
 
+void player_item_added(Core &core) {
+    if (core.playing == kNothing) {
+        player_play_all(core, player_first_animation(core));
+    }
+}
+
 void player_item_leaves(Core &core, uint32_t item) {
-    if (core.playing == item || (core.playing == kPlaylist && core.turn_item == item)) {
-        close_stream(core);
-        core.playing = kNothing;
-        core.shown = kNothing;
-        return;
+    if (core.playing == kPlaylist && core.turn_item == item) {
+        const uint32_t next = next_animation(core, item);
+        if (next == item) {
+            // It was the only animation of the show.
+            close_stream(core);
+            core.playing = kNothing;
+            core.shown = kNothing;
+            return;
+        }
+        player_play_all(core, next);
+    } else if (core.playing == item) {
+        // A cycle lists an animation, so the show has one.
+        player_play_all(core, player_first_animation(core));
     }
     if (core.playing == kPlaylist) {
         if (core.turn_item > item) {
