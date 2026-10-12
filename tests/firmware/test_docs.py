@@ -47,7 +47,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_names_every_command_of_the_tool_with_a_section_and_an_example(self):
         commands = self.commands()
-        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "read-show", "test", "test-board", "test-air"})
+        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "set-wifi", "read-show", "test", "test-board", "test-air"})
         for name in commands:
             self.assertRegex(self.text, rf"(?m)^### {re.escape(name)}$", name)
             self.assertRegex(self.text, rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b", name)
@@ -58,6 +58,17 @@ class Firmware(unittest.TestCase):
                 for option in action.option_strings:
                     if option.startswith("--") and option != "--help":
                         self.assertRegex(section(self.text, "Commands"), rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b.*{re.escape(option)}\b", f"{name} {option}")
+
+    def test_it_says_what_set_wifi_does_and_names_its_reasons(self):
+        commands = section(self.text, "Commands")
+        for reason in ("wifi-settings-missing", "wifi-settings-malformed", "wifi-name-invalid", "wifi-password-invalid", "wled-settings-malformed"):
+            self.assertRegex(commands, rf"(?m)^\| `{reason}` \| ", reason)
+        told = " ".join(commands.split("\n### set-wifi\n")[1].split("\n### ")[0].split())
+        for expected in ("`name: <name>`", "`password: set`", "`firmware/wifi.json`", "`--settings FILE`", "`--wait SECONDS`", "1 to 32 characters", "8 to 63",
+                         "printable ASCII", "`/cfg.json`", "`/wsec.json`", "`ap.ssid`", "`ap.pskl`", "`ap.psk`", "The password is never printed",
+                         "no option and no variable carries either", "`no-reply`", "[wifi.md](wifi.md)"):
+            self.assertIn(expected, told)
+        self.assertRegex(section(self.text, "The regions of the flash"), r"(?m)^\| Storage \(`spiffs`\) \| .* \| `install-show` and `set-wifi`, changed blocks only \|$")
 
     def test_it_names_the_three_test_commands_and_their_folders(self):
         for name, folder in TEST_COMMANDS.items():

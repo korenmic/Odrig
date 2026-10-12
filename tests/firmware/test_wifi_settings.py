@@ -5,7 +5,7 @@ import unittest
 
 from fwtool import Failure, paths, wifi
 
-from . import ROOT
+from . import ROOT, support
 
 SETTINGS_FILE = ROOT / "firmware" / "wifi.json"
 
@@ -139,6 +139,44 @@ class Reading(unittest.TestCase):
             self.assertNotIn(PASSWORD, text)
             self.assertIn(NAME, text)
         self.assertEqual(repr(read), f"Settings(name={NAME!r}, password=<hidden>)")
+
+
+# The commands that read a settings file.
+COMMANDS = ("set-wifi",)
+
+REFUSED = {
+    "wifi-settings-malformed": ('["%s", "%s"]' % (NAME, PASSWORD), '{"name": "%s"}' % NAME, text_of() + text_of(), ""),
+    "wifi-name-invalid": (text_of(name=""), text_of(name="n" * 33)),
+    "wifi-password-invalid": (text_of(password="p" * 7), text_of(password="p" * 64)),
+}
+
+
+class ThroughTheCommands(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = pathlib.Path(folder.name)
+
+    def test_a_settings_file_that_is_refused_stops_the_command_before_the_board_is_touched(self):
+        for command in COMMANDS:
+            for reason, contents in REFUSED.items():
+                for number, content in enumerate(contents):
+                    with self.subTest(command=command, reason=reason, number=number):
+                        path = self.folder / "settings.json"
+                        path.write_text(content)
+                        with support.untouched_board():
+                            result = support.run_main(command, "--settings", path)
+                        self.assertEqual(result.status, 1)
+                        self.assertEqual(result.out, "")
+                        self.assertRegex(result.err, rf"\Aerror: {reason}: [^\n]+\n\Z")
+
+    def test_a_settings_file_that_is_not_there_stops_the_command_before_the_board_is_touched(self):
+        for command in COMMANDS:
+            with self.subTest(command=command):
+                with support.untouched_board():
+                    result = support.run_main(command, "--settings", self.folder / "nothing.json")
+                self.assertEqual(result.status, 1)
+                self.assertRegex(result.err, r"\Aerror: wifi-settings-missing: [^\n]+\n\Z")
 
 
 class TheSettingsFile(unittest.TestCase):

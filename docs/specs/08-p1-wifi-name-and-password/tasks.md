@@ -108,7 +108,7 @@ Rules for every task:
   - The board is not touched.
   - Requirements: 3.8, 3.9, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
 
-- [ ] 4. `set-wifi`: the settings on the board
+- [x] 4. `set-wifi`: the settings on the board
   - In `firmware/fwtool/cli.py`, take the writing of a storage image out of
     `_install_show` into `write_storage`, as the design gives it, and add the subcommand
     `set-wifi` with `--port`, `--settings` and `--wait`. The tests of `install-show` pass

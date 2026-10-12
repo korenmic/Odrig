@@ -94,6 +94,7 @@ python3 firmware/fw.py build [--stock | --probe] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
+python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
@@ -128,6 +129,11 @@ with that environment's Python.
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
 | `output-not-empty` | The folder `read-show` is to write exists and is not an empty folder. |
+| `wifi-settings-missing` | The settings file to read is not there or is not a file. |
+| `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
+| `wifi-name-invalid` | The name does not have 1 to 32 characters of printable ASCII. |
+| `wifi-password-invalid` | The password does not have 8 to 63 characters of printable ASCII. |
+| `wled-settings-malformed` | `/cfg.json` or `/wsec.json` in the board's storage is not a JSON object, or its `ap` is not an object. Nothing was written to the board. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
@@ -282,6 +288,51 @@ storage outside `/odrig`, WLED's settings among them, keeps its content.
 Every show installed on the board while one 60-LED strip is fed from the board's 3.3 V pin
 must have a brightness of 40 or less in its `show.json`. The tool does not check this; the
 board tests do, for every show they install.
+
+### set-wifi
+
+```
+python3 firmware/fw.py set-wifi
+```
+
+Puts the name and the password of the board's Wi-Fi network into the board's storage,
+checks what was written, restarts the board, and prints three lines: `name: <name>`,
+`password: set`, and the board's reply to `status`. [wifi.md](wifi.md) describes the
+network.
+
+The two values come from the settings file, `firmware/wifi.json`, a JSON object with
+exactly the strings `name` and `password`, and from nowhere else: no option and no
+variable carries either. `--settings FILE` reads another file of the same format. A name
+has 1 to 32 characters and a password 8 to 63, all of them printable ASCII; a file that
+is refused stops the command before the board is touched. The password is never printed:
+not by this command, and not in the detail of a refusal.
+
+The network is WLED's, and WLED keeps its name in `/cfg.json` and its password in
+`/wsec.json`, two files in the top folder of storage. The command edits those two files
+the way `install-show` writes a show:
+
+1. It reads the partition table and gets storage as it is, as `install-show` does.
+2. In `/cfg.json` it sets `ap.ssid` to the name and `ap.pskl` to the number of characters
+   of the password, and removes `ap.psk` when it is there. In `/wsec.json` it sets
+   `ap.psk` to the password. A file or an `ap` object that is missing is made. Every
+   other member keeps its value and its place, and a file that needs no change keeps its
+   bytes. A file that is not a JSON object is `wled-settings-malformed`, and nothing has
+   been written to the board then.
+3. It checks the new image: both files hold the settings, differ from the old ones in
+   nothing else, and every other file is as it was.
+4. It writes the blocks that changed, has the chip compare the whole partition with the
+   new image, and restarts the board. On a board that holds the settings already nothing
+   is written.
+
+The command takes 36 seconds on the bench board. The tool waits 20 seconds for the reply
+to `status`, or as long as `--wait SECONDS` says.
+The reply shows that the firmware runs again; the command does not look into it, and its
+status is 0 also when the reply reports an invalid show. On a board that answers no
+`status`, stock WLED for one, the command ends with `no-reply` after the settings were
+stored and checked.
+
+`flash`, `restore-stock` and `install-show` leave the name and the password as storage
+has them.
 
 ### read-show
 
@@ -587,7 +638,7 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
  "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
  "space_us":29110,
  "store":{"calls":0,"longest_us":0,"total_us":0,"check_steps":0,"check_longest_us":0,"check_total_us":0},
- "ap":1,"ap_name":"WLED-AP","ap_auth":3,"error":null,
+ "ap":1,"ap_name":"odrig","ap_auth":3,"error":null,
  "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"7b7d9750","pulses":4320}]}
 ```
 
@@ -772,7 +823,7 @@ touches these regions only:
 | Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
 | Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash` and `restore-stock` |
 | First application (`app0`) | `0x10000` | `0x300000` | `flash`, `restore-stock` |
-| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, changed blocks only |
+| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show` and `set-wifi`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
 partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
@@ -1262,3 +1313,10 @@ the board. The letters are those of that table.
 | # | Assumption | What was found |
 |---|---|---|
 | A1 | `esp_wifi_get_config(WIFI_IF_AP, ...)` compiles in the usermod with `wled.h` alone, can be called from the loop task, and gives the name and the protection of the access point WLED opened. Before any setting is applied it gives `WLED-AP` and 3. | It does. The probe build was built with no other header, and the call is made from the loop task for every report. After a restart the reports had `ap` 0 with `ap_name` and `ap_auth` `null`, and from the first report with `ap` 1 on, `ap_name` `WLED-AP` and `ap_auth` 3. The firmware is not changed by the two members: built before and after in the same work folder, its image has the same SHA-256. |
+| A2 | WLED on the board reads the `/cfg.json` to which the tool added `ap` and the `/wsec.json` the tool created, opens the access point under that name with that password, and is otherwise as before. | It does. After `set-wifi` with settings made for the test the probe build reported `ap` 1, `ap_name` the test's name and `ap_auth` 3, and after `set-wifi` with the settings file `ap_name` `odrig` and `ap_auth` 3. `status` reported the same show playing as before, with no error. That the password is the one of the file is established from storage, read back; that a device joins with it is the owner's check. |
+| A3 | WLED does not write its settings files at a start because of the edit: storage read back after the restart is the image the tool wrote. | It does not. After the restart, with the access point up, the chip confirmed the checksum of the image the tool kept, and the image read back was that image, byte for byte. |
+| A4 | A file littlefs-python wrote into the top folder of the file system is read by WLED, a new `/wsec.json` among them. | It is: the access point is protected with the password that only `/wsec.json` holds, by A2 and by how WLED reads its settings. |
+
+`set-wifi` took 36.5 seconds, the wait for the board's reply in it. Between storage
+before the first run and after the second, every file other than `/cfg.json` and
+`/wsec.json` kept its bytes, and `/cfg.json` differed in `ap` only.

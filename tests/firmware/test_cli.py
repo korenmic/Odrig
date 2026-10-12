@@ -21,7 +21,7 @@ class UsageErrors(unittest.TestCase):
         self.assertEqual(support.run_tool("fly").status, 2)
 
     def test_an_unknown_option_is_a_usage_error(self):
-        for command in ("setup", "build", "flash", "restore-stock", "test", "test-board"):
+        for command in ("setup", "build", "flash", "restore-stock", "set-wifi", "test", "test-board"):
             self.assertEqual(support.run_tool(command, "--sideways").status, 2, command)
         for command in ("install-show", "read-show"):
             self.assertEqual(support.run_tool(command).status, 2, command)

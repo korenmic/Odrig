@@ -6906,3 +6906,36 @@ password.
 
 **Resolution.** `tests/firmware/test_wifi_storage.py`,
 `test_a_password_in_the_configuration_is_gone_afterwards`; `docs/wifi.md`, in task 6.
+
+## Seed 08: `write_storage` is given the making of the new image
+
+**Question.** The design gives `write_storage(on_port, region, before, after)` the new
+image. `install-show` has made its new image inside the block that restarts the board
+when something fails, so that a show that does not fit, `no-space`, leaves a board that
+runs again and not one that waits in its bootloader. With the new image made by the
+caller, each caller would have to repeat that.
+
+**Answer.** `write_storage(on_port, region, before, make)` gets a function that makes
+the new image from the one the board holds, and calls it inside the block. `install-show`
+passes `storage.with_show`, `set-wifi` passes `wifi.apply`. So a refusal of either, also
+`wled-settings-malformed`, restarts the board and writes nothing, and `install-show`
+behaves as it did: its tests pass unchanged.
+
+**Resolution.** `firmware/fwtool/cli.py`, `write_storage`, `_install_show` and
+`store_settings`; `tests/firmware/test_wifi_commands.py`,
+`test_settings_of_wled_that_are_no_object_are_refused_and_nothing_is_written`.
+
+## Seed 08: The stand-in for esptool confirms a kept image
+
+**Question.** In the command tests a second run on "another board" took the image the
+work folder kept from the run before, and a storage that should have been refused was
+never looked at. Why?
+
+**Answer.** The tool takes its newest kept image when the chip confirms that image's
+checksum, and the stand-in for esptool confirms every comparison unless it is told to
+fail one. That is right for a second run on the same board. Where a test means a board
+that holds something else, it tells the stand-in to fail the first comparison, and the
+tool reads storage again, as it does on a real board.
+
+**Resolution.** `tests/firmware/test_wifi_commands.py`, `OnASmallLayout.esptool` and the
+tests that pass `failing_verifies`.

@@ -23,12 +23,30 @@ is no connection after start-up, whenever disconnected, always, or never. It can
 one or more networks to join. Source:
 [WLED settings](https://kno.wled.ge/features/settings/).
 
-## What our board does today
+## The board's network
 
-The board has no network to join configured, so it hosts its own access point from power-on.
-Asked for its state over USB on 2026-10-11, it reported its access point as up.
+The board hosts a Wi-Fi network named `odrig`. It is protected with WPA2, and its
+password is the one in `firmware/wifi.json`. That file is the only place in this
+repository that holds the password, and whoever can read the repository can read it. The
+owner allows that.
 
-The access point still has WLED's default name and password.
+On its own network the board has the address `4.3.2.1`. Commands go to
+`http://4.3.2.1/odrig`; see [commands.md](commands.md).
+
+The network is WLED's. WLED opens it about two seconds after the firmware has started,
+because the board has no network to join configured. With a network to join configured in
+WLED's settings, WLED opens it only when that network is not reached, twelve seconds after
+the start; with WLED's setting "never", it opens it only by the board's button. The
+firmware tool changes neither of the two.
+
+Four devices can be joined at once. That is the limit of the chip's software as WLED
+uses it, read in the source and not tried.
+
+The name and the password are put on a board with `python3 firmware/fw.py set-wifi`; see
+[firmware.md](firmware.md#set-wifi). On 2026-10-12 the bench board was asked over USB
+after that command: it reported its access point as up under the name `odrig`, protected
+with WPA2, and its storage held the name and the password of the settings file. That a
+phone joins with the password is the owner's check and is open.
 
 ## Who hosts the network
 
@@ -45,8 +63,6 @@ workbench. It is not needed at the event.
 
 ## Not yet decided or verified
 
-- The access point's own name and password. The default password is public knowledge, so the
-  operators should choose their own before the event.
-- How many phones can be connected at once. The limit is set by the firmware and has not been
-  looked up or tested.
+- That a phone or a computer joins the network with the password and reaches the board.
+- Four phones connected at once. The limit was read in the source and has not been tried.
 - Range on site, with the board in its enclosure.

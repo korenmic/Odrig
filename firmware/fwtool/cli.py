@@ -53,6 +53,10 @@ def parser():
     install.add_argument("--port", metavar="P", help="the board's USB serial port")
     install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    network = commands.add_parser("set-wifi", help="put the network's name and password from the settings file into the board's storage")
+    network.add_argument("--port", metavar="P", help="the board's USB serial port")
+    network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
+    network.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
     read.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -126,15 +130,19 @@ def storage_of(port):
     return on_port, region, storage.from_board(on_port, region)
 
 
-def _install_show(arguments):
+def write_storage(on_port, region, before, make):
+    """Puts a new storage image on the board. `make` gives the new image for the one the
+    board holds.
+
+    The blocks in which the two differ are written in one call, the whole partition is
+    compared with the new image, and the board is restarted. The new image is then the
+    newest one the work folder keeps. When any of it fails, the new image is not kept
+    and the board is restarted.
+    """
     from . import storage
-    files = storage.folder_files(arguments.dir, check=not arguments.no_check)
-    port = board.find(arguments.port)
-    on_port, region, before_path = storage_of(port)
     new_path = None
     try:
-        before = before_path.read_bytes()
-        after = storage.with_show(before, files)
+        after = make(before)
         new_path = storage.pending(after)
         changed = storage.runs(before, after, storage.geometry(before)[1])
         pieces = []
@@ -154,9 +162,36 @@ def _install_show(arguments):
             storage.discard(new_path)
         on_port.restart()
         raise
+
+
+def _install_show(arguments):
+    from . import storage
+    files = storage.folder_files(arguments.dir, check=not arguments.no_check)
+    port = board.find(arguments.port)
+    on_port, region, before_path = storage_of(port)
+    write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
     reply = board.EXPECTED["status"](port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
+
+
+def store_settings(port, settings, wait):
+    """Puts a name and a password into WLED's stored settings on the board, restarts it,
+    and prints what was set and the board's reply to `status`."""
+    from . import wifi
+    on_port, region, before_path = storage_of(port)
+    write_storage(on_port, region, before_path.read_bytes(), lambda before: wifi.apply(before, settings))
+    reply = board.EXPECTED["status"](port, wait)
+    print(f"name: {settings.name}")
+    print("password: set")
+    print(reply)
+    return 0
+
+
+def _set_wifi(arguments):
+    from . import wifi
+    settings = wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
+    return store_settings(board.find(arguments.port), settings, arguments.wait)
 
 
 def _read_show(arguments):
@@ -198,7 +233,7 @@ def _test_air(arguments):
 
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
-    "install-show": _install_show, "read-show": _read_show,
+    "install-show": _install_show, "set-wifi": _set_wifi, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
 

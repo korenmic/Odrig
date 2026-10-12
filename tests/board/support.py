@@ -18,7 +18,7 @@ from odrig.generators import dense, dvd_bounce, hello_world
 from odrigctl import cli as command_tool
 from odrigctl import client, content
 
-from fwtool import Failure, board, build, cli, flasher, paths, storage
+from fwtool import Failure, board, build, cli, flasher, paths, storage, wifi
 
 from . import PORT, ROOT
 
@@ -151,7 +151,17 @@ def leave_the_board():
     ensure(LEFT_ON_THE_BOARD)
     with dim_show() as folder:
         ensure_installed(folder)
+    ensure_settings()
     restart()
+
+
+def ensure_settings():
+    """Makes the board's storage hold the name and the password of the settings file,
+    applying them only when it holds something else."""
+    if not wifi.holds(storage_image(), wifi.read()):
+        done = on_port("set-wifi", "--wait", START_SECONDS)
+        if done.status != 0:
+            raise AssertionError(f"applying the settings file failed: {done.err}")
 
 
 def ensure_installed(folder, *extra):
