@@ -123,6 +123,8 @@ present, and do not build on them.
   [docs/android-app.md](docs/android-app.md). The converter's library is made to run
   inside it. It has been run with Node.js and in Chrome, and never inside an app.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
+- **Damaged media in the reference converter**, seed 13: it refuses a damaged video or
+  GIF with a named reason; today it can crash on one.
 
 The state of every seed is in the `state.json` of its folder.
 
