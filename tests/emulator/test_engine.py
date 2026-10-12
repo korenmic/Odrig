@@ -47,16 +47,19 @@ class OnTheExampleShow(unittest.TestCase):
 
     def test_the_line_of_an_entry_is_the_one_the_byte_entry_of_the_core_hands_back(self):
         player = ReferencePlayer(support.files_of(self.folder))
-        lines = [b"status", b"status\n", b"on\r\n", b"on\r", b"off\r\r\n", b"x" * 64, b"x" * 64 + b"\r\n", b"y" * 65, b"z" * 128, b"", b"\n", b"\r\n", b" on "]
+        lines = [b"status", b"status\n", b"on\r\n", b"on\r", b"off\r\r\n", b"x" * 2048, b"x" * 2048 + b"\r\n", b"y" * 2049, b"z" * 4096, b"", b"\n", b"\r\n", b" on ", b"v" * 200, b"w" * 201]
         for line in lines:
             self.engine.line(line, "http")
         handed_back = [player.feed(0, line if line.endswith(b"\n") else line + b"\n")[0][0] for line in lines]
         entries = self.hub.entries()
-        self.assertEqual([entry["line"] for entry in entries], [hub.shown(line) for line in handed_back])
-        self.assertEqual([entry["cut"] for entry in entries], [len(line) == 64 and b"x" not in line for line in handed_back])
+        self.assertEqual([entry["line"] for entry in entries], [hub.shown(line[:200]) for line in handed_back])
+        self.assertEqual([entry["length"] for entry in entries], [len(line) for line in handed_back])
+        self.assertEqual([entry["cut"] for entry in entries], [len(line) == 2048 and b"x" not in line for line in handed_back])
         self.assertEqual([entry["line"] for entry in entries[:5]], ["status", "status", "on", "on", "off\\x0D"])
-        self.assertEqual((entries[7]["line"], entries[7]["cut"]), ("y" * 64, True))
-        self.assertEqual((entries[8]["line"], entries[8]["cut"]), ("z" * 64, True))
+        self.assertEqual((entries[7]["line"], entries[7]["length"], entries[7]["cut"]), ("y" * 200, 2048, True))
+        self.assertEqual((entries[8]["line"], entries[8]["length"], entries[8]["cut"]), ("z" * 200, 2048, True))
+        self.assertEqual((entries[13]["line"], entries[13]["length"], entries[13]["cut"]), ("v" * 200, 200, False))
+        self.assertEqual((entries[14]["line"], entries[14]["length"], entries[14]["cut"]), ("w" * 200, 201, False))
 
     def test_a_newline_inside_the_body_of_a_request_is_part_of_its_one_line(self):
         self.assertEqual(self.engine.line(b"on\noff\n", "http"), b'{"ok":false,"error":"unknown-command"}\n')
@@ -109,13 +112,23 @@ class OnTheExampleShow(unittest.TestCase):
         self.hub.close()
         self.assertIsNone(other.take(5))
 
-    def test_a_long_line_is_entered_with_its_first_64_characters_and_marked_as_cut(self):
-        long_line = b"play " + b"7" * 75
+    def test_a_line_above_the_limit_is_entered_with_its_first_200_characters_the_length_read_and_marked_as_cut(self):
+        long_line = b"play " + b"7" * 2075
         self.engine.feed(long_line + b"\n", "serial")
         self.engine.line(long_line, "http")
+        self.assertEqual(len(self.hub.entries()), 2)
         for entry in self.hub.entries():
-            self.assertEqual((entry["line"], entry["cut"]), (long_line[:64].decode("ascii"), True))
+            self.assertEqual((entry["line"], entry["length"], entry["cut"]), (long_line[:200].decode("ascii"), 2048, True))
             self.assertEqual(entry["reply"], '{"ok":false,"error":"line-too-long"}')
+
+    def test_a_line_of_300_characters_is_entered_with_its_first_200_and_its_length(self):
+        line = b"play " + b"7" * 295
+        self.engine.feed(line + b"\r\n", "serial")
+        self.engine.line(line + b"\n", "http")
+        self.assertEqual(len(self.hub.entries()), 2)
+        for entry in self.hub.entries():
+            self.assertEqual((entry["line"], entry["length"], entry["cut"]), (line[:200].decode("ascii"), 300, False))
+            self.assertEqual(entry["reply"], '{"ok":false,"error":"bad-argument"}')
 
     def test_bytes_outside_printable_ascii_are_entered_as_escapes(self):
         self.engine.feed(b"pl\x00y \xff\x7f\t~\n", "serial")

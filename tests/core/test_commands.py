@@ -7,6 +7,7 @@ from . import support
 from .test_playback import T0, Playback
 
 OK = '{"ok":true}'
+LONGEST = 2048
 
 
 def refused(code):
@@ -79,6 +80,8 @@ class EveryErrorCode(Commands):
             "play 0x1", "play 0", "play 00", "play 65536", "play 99999", "play 4294967297", "play " + "9" * 30,
             "brightness", "brightness ", "brightness 256", "brightness -1", "brightness 1 1", "brightness  1", "brightness 12.5", "brightness " + "1" * 30,
             "on 1", "on ", "off 0", "off  ", "status 1", "status ", "status  ", "status status",
+            "play 1 2 3 4", "play 1 2 3 4 5", "play 1 2 3 4 5 6 7 8 9", "status 1 2 3 4 5", "on" + " " * 5, "off" + " x" * 1000,
+            "brightness 1 2 3 4 5 6", "play" + " " * 2044, "status" + " " * 2042,
         ]
         self.assertEqual(self.replies(lines), [refused("bad-argument")] * len(lines))
 
@@ -95,15 +98,30 @@ class EveryErrorCode(Commands):
         self.assertEqual(self.replies(lines, invalid_show()), [refused("show-invalid")] * len(lines))
 
     def test_line_too_long(self):
-        lines = ["x" * 65, "status" + " " * 59, "play " + "1" * 60, "brightness " + "0" * 54, "x" * 192, "x" * 5000]
+        lines = ["x" * 2049, "status" + " " * 2043, "play " + "1" * 2044, "brightness " + "0" * 2038, "x" * 4096, "x" * 5000, "x" * 70000, " " * 2049]
+        self.assertEqual([len(line) > LONGEST for line in lines], [True] * len(lines))
         self.assertEqual(self.replies(lines), [refused("line-too-long")] * len(lines))
+
+    def test_a_line_of_some_hundred_characters_is_read_as_a_command(self):
+        lines = {
+            "x" * 65: "unknown-command",
+            "x" * 192: "unknown-command",
+            "status" + " " * 59: "bad-argument",
+            "play " + "1" * 60: "bad-argument",
+            "play " + "0" * 59 + "4": "unknown-id",
+        }
+        self.assertEqual(self.replies(list(lines)), [refused(code) for code in lines.values()])
+        self.assertEqual(self.replies(["brightness " + "0" * 54, "play " + "0" * 59 + "2"]), [OK, OK])
 
     def test_of_two_codes_that_apply_the_first_of_the_table_is_given(self):
         valid = {
-            "y" * 65: "line-too-long",
-            "play " + "x" * 60: "line-too-long",
-            "play 99" + " " * 58: "line-too-long",
+            "y" * 2049: "line-too-long",
+            "play " + "x" * 2044: "line-too-long",
+            "play 99" + " " * 2042: "line-too-long",
+            "stop" + " 1" * 1023: "line-too-long",
             "stop 1 2 3": "unknown-command",
+            "stop 1 2 3 4 5 6": "unknown-command",
+            "stop" + " 1" * 1022: "unknown-command",
             "stop ": "unknown-command",
             "playing x": "unknown-command",
             "play 99 99": "bad-argument",
@@ -112,8 +130,10 @@ class EveryErrorCode(Commands):
         }
         self.assertEqual(self.replies(list(valid)), [refused(code) for code in valid.values()])
         invalid = {
-            "play " + "1" * 60: "line-too-long",
+            "play " + "1" * 2044: "line-too-long",
             "plays 1": "unknown-command",
+            "plays 1 2 3 4 5 6": "unknown-command",
+            "play 1 2 3 4 5 6": "bad-argument",
             "play x": "bad-argument",
             "play 0": "bad-argument",
             "play 65536": "bad-argument",
@@ -126,7 +146,7 @@ class EveryErrorCode(Commands):
     def test_a_line_that_is_refused_changes_nothing(self):
         files = support.example_show()
         before = self.status(files, [support.line(T0, "status")])
-        refusals = ["play 4", "play 0", "brightness 256", "off 1", "on 1", "bogus", "play 1" + "0" * 70, "brightness", "Off", "OFF"]
+        refusals = ["play 4", "play 0", "brightness 256", "off 1", "on 1", "bogus", "play 1" + "0" * 70, "play 1" + "0" * 2043, "brightness", "Off", "OFF", "off 1 2 3 4 5 6"]
         after = self.status(files, [support.line(T0, line) for line in refusals] + [support.line(T0, "status")])
         self.assertEqual(after, before)
 
@@ -145,19 +165,19 @@ class LineEndings(Commands):
         lines = [b"", b"\n", b"\r\n", b"\r", b" ", b"  "]
         self.assertEqual(self.replies(lines, as_bytes=True), [refused("unknown-command")] * len(lines))
 
-    def test_lines_of_exactly_64_and_65_characters(self):
-        sixty_four = "brightness " + "0" * 50 + "200"
-        self.assertEqual(len(sixty_four), 64)
-        lines = [sixty_four, sixty_four + "\n", sixty_four + "\r\n", sixty_four + "\r"]
+    def test_lines_of_exactly_2048_and_2049_characters(self):
+        longest = "brightness " + "0" * 2034 + "200"
+        self.assertEqual(len(longest), 2048)
+        lines = [longest, longest + "\n", longest + "\r\n", longest + "\r"]
         self.assertEqual(self.replies([line.encode() for line in lines], as_bytes=True), [OK] * 4)
-        sixty_five = "brightness " + "0" * 51 + "200"
-        self.assertEqual(len(sixty_five), 65)
-        lines = [sixty_five, sixty_five + "\n", sixty_five + "\r\n", sixty_four + "\r\r\n", sixty_four + " "]
+        one_more = "brightness " + "0" * 2035 + "200"
+        self.assertEqual(len(one_more), 2049)
+        lines = [one_more, one_more + "\n", one_more + "\r\n", longest + "\r\r\n", longest + " "]
         self.assertEqual(self.replies([line.encode() for line in lines], as_bytes=True), [refused("line-too-long")] * 5)
-        state = self.status(support.example_show(), [support.line(T0, sixty_four), support.line(T0, "status")])
+        state = self.status(support.example_show(), [support.line(T0, longest), support.line(T0, "status")])
         self.assertEqual(state["brightness"], 200)
 
-    def test_every_reply_is_one_line_of_at_most_192_bytes(self):
+    def test_the_longest_reply_to_status_is_one_line_of_under_192_bytes(self):
         longest_name = "a" * 27 + ".odrg"
         bad_index = odrg.container(60, 6, [b"\1\2\3", b"\4\5\6"], [odrg.stored_record(bytes([2]) * 360, 20)])
         files = support.example_show()
@@ -209,38 +229,54 @@ class BytesOfATransport(Commands):
 
     def test_10000_bytes_without_a_newline_then_a_newline_and_a_valid_command(self):
         answered = self.fed([b"z" * 10000, b"\non\n"])
-        self.assertEqual(answered, [(b"z" * 64, refused("line-too-long")), (b"on", OK)])
+        self.assertEqual(answered, [(b"z" * 2048, refused("line-too-long")), (b"on", OK)])
         answered = self.fed([b"q" * 4000] + [b"q" * 3000, b"q" * 3000 + b"\n", b"off\r\n"])
-        self.assertEqual(answered, [(b"q" * 64, refused("line-too-long")), (b"off", OK)])
+        self.assertEqual(answered, [(b"q" * 2048, refused("line-too-long")), (b"off", OK)])
+        answered = self.fed([b"w" * 70000, b"\r\n", b"status\n"])
+        self.assertEqual(answered[0], (b"w" * 2048, refused("line-too-long")))
+        self.assertEqual(answered[1][0], b"status")
 
-    def test_lines_of_64_and_65_characters(self):
-        sixty_four = b"brightness " + b"0" * 50 + b"123"
-        sixty_five = b"brightness " + b"0" * 51 + b"123"
-        answered = self.fed([sixty_four + b"\n", sixty_four + b"\r\n", sixty_five + b"\n", sixty_five + b"\r\n", sixty_four + b"\r\r\n", sixty_four + b" \n", b"status\n"])
+    def test_lines_of_2048_and_2049_characters(self):
+        longest = b"brightness " + b"0" * 2034 + b"123"
+        one_more = b"brightness " + b"0" * 2035 + b"123"
+        self.assertEqual((len(longest), len(one_more)), (2048, 2049))
+        answered = self.fed([longest + b"\n", longest + b"\r\n", one_more + b"\n", one_more + b"\r\n", longest + b"\r\r\n", longest + b" \n", b"status\n"])
         self.assertEqual(
             answered[:6],
             [
-                (sixty_four, OK),
-                (sixty_four, OK),
-                (sixty_five[:64], refused("line-too-long")),
-                (sixty_five[:64], refused("line-too-long")),
-                (sixty_four, refused("line-too-long")),
-                (sixty_four, refused("line-too-long")),
+                (longest, OK),
+                (longest, OK),
+                (one_more[:2048], refused("line-too-long")),
+                (one_more[:2048], refused("line-too-long")),
+                (longest, refused("line-too-long")),
+                (longest, refused("line-too-long")),
             ],
         )
         self.assertEqual(json.loads(answered[6][1])["brightness"], 123)
 
+    def test_a_line_of_2048_characters_that_arrives_in_pieces(self):
+        longest = b"brightness " + b"0" * 2035 + b"77"
+        self.assertEqual(len(longest), 2048)
+        for size in (1, 7, 256, 2047, 2048):
+            pieces = [longest[at:at + size] for at in range(0, len(longest), size)] + [b"\r", b"\n", b"status\n"]
+            answered = self.fed(pieces)
+            self.assertEqual(answered[0], (longest, OK), size)
+            self.assertEqual(json.loads(answered[1][1])["brightness"], 77, size)
+
     def test_a_long_line_does_not_spoil_the_line_after_it(self):
-        answered = self.fed([b"x" * 65 + b"\n" + b"play 2\n" + b"y" * 66 + b"\r\n" + b"status\n"])
-        self.assertEqual([line for line, _ in answered], [b"x" * 64, b"play 2", b"y" * 64, b"status"])
+        answered = self.fed([b"x" * 2049 + b"\n" + b"play 2\n" + b"y" * 2050 + b"\r\n" + b"status\n"])
+        self.assertEqual([line for line, _ in answered], [b"x" * 2048, b"play 2", b"y" * 2048, b"status"])
         self.assertEqual(json.loads(answered[3][1])["playing"], 2)
 
     def test_bytes_of_every_value_are_taken_as_they_are(self):
         answered = self.fed([bytes(range(256))])
         self.assertEqual(answered, [(bytes(range(10)), refused("unknown-command"))])
         answered = self.fed([bytes(range(11, 256)) + b"\n", b"\x00\n", b"on\x00\n", b"\xff\xfe\n"])
-        self.assertEqual([reply for _, reply in answered], [refused("line-too-long")] + [refused("unknown-command")] * 3)
-        self.assertEqual(answered[0][0], bytes(range(11, 75)))
+        self.assertEqual([reply for _, reply in answered], [refused("unknown-command")] * 4)
+        self.assertEqual(answered[0][0], bytes(range(11, 256)))
+        every_value = bytes(value for value in range(256) if value != 10) * 9
+        answered = self.fed([every_value[:2049] + b"\n"])
+        self.assertEqual(answered, [(every_value[:2048], refused("line-too-long"))])
 
     def test_bytes_and_whole_lines_can_be_mixed(self):
         script = [support.fed(T0, b"brightn"), support.line(T0 + 1, "off"), support.fed(T0 + 2, b"ess 77\n"), support.line(T0 + 3, "status")]

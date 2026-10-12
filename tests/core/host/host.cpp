@@ -1,9 +1,12 @@
 // The test host: a program around the core that the suite of tests/core drives as a child
 // process. It has no clock; whatever it prints depends on its arguments and its input only.
 
+#include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +29,11 @@ namespace {
 const int kUsage = 64;
 const int kFileMisuse = 71;
 const int kBadReply = 72;
+const int kPowerCut = 75;
+
+// The storage of the board: the size of its partition and of a block of its file system.
+const uint64_t kBoardStorage = 10354688;
+const uint64_t kStorageBlock = 4096;
 
 int usage() {
     std::fputs(
@@ -33,11 +41,15 @@ int usage() {
         "       odrig_host inflate [--batch]\n"
         "       odrig_host decode FILE | --batch\n"
         "       odrig_host session DIR | --batch [options]\n"
-        "       odrig_host guard alloc | new | read\n"
+        "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
+        "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
         "options of a session:\n"
         "       --alloc-fails-at N  --dirty-memory  --trace-files\n"
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
-        "       --remove-after FILE N  --swap-after FILE N OTHER\n",
+        "       --remove-after FILE N  --swap-after FILE N OTHER\n"
+        "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
+        "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
+        "       --read-back-fails OFFSET  --read-back-differs OFFSET\n",
         stderr);
     return kUsage;
 }
@@ -105,6 +117,17 @@ struct Options {
     long swap_after = 0;            // after this many openings
     std::string swap_other;         // the content of this other file is served
     bool trace_files = false;       // print `open <name> <result>` for every `open`
+    uint64_t storage = kBoardStorage;   // the total space `space` reports
+    bool no_storage = false;        // the seven storage functions are null pointers
+    bool only_space = false;        // of the seven, only `space` is there
+    bool space_unknown = false;     // `space` returns -1
+    long store_fails_at = 0;        // the number of the storage call that fails; 0 for none
+    long cut_at = 0;                // the number of the storage call at which the power is cut
+    long cut_keeps = 0;             // the bytes of that call that are written first, for a `write`
+    bool trace_store = false;       // print `store <call> <arguments> <result>` for every storage call
+    long read_back_fails = -1;      // the offset from which `read_at` returns -1; none below 0
+    long read_back_differs = -1;    // the offset of the byte `read_at` gives with one bit changed
+    bool check_names = false;       // stop when the core names a file outside its names
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -151,6 +174,14 @@ public:
         functions.read = read;
         functions.close = close;
         functions.log = log;
+        const bool changes = from_ != kFromMemory && !options_.no_storage && !options_.only_space;
+        functions.write_open = changes ? write_open : nullptr;
+        functions.write = changes ? write : nullptr;
+        functions.write_close = changes ? write_close : nullptr;
+        functions.rename = changes ? rename : nullptr;
+        functions.remove = changes ? remove : nullptr;
+        functions.space = from_ != kFromMemory && !options_.no_storage ? space : nullptr;
+        functions.read_at = changes ? read_at : nullptr;
         return functions;
     }
 
@@ -189,6 +220,7 @@ private:
         if (host.is_open_) {
             stop("file misuse", kFileMisuse);
         }
+        host.check_name(name);
         // What the name stands for now: nothing once the file is removed, another file
         // once it is swapped.
         const Options &options = host.options_;
@@ -262,6 +294,277 @@ private:
         std::printf("log %s\n", text);
     }
 
+    // The storage functions. A storage call is one of `write_open`, `write`, `write_close`,
+    // `rename` and `remove`: these are counted, may fail or be where the power is cut, and
+    // are traced.
+
+    static int write_open(void *ctx, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        host.check_name(name);
+        if (host.writing_) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (host.store_call()) {
+            result = host.begin_file(name) ? 1 : -1;
+        }
+        if (result == 1) {
+            host.writing_ = true;
+            host.writing_name_ = name;
+        }
+        host.trace("write_open", name, result);
+        return result;
+    }
+
+    static int write(void *ctx, const uint8_t *bytes, size_t length) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (!host.writing_ || length == 0 || length > 1500) {
+            stop("file misuse", kFileMisuse);
+        }
+        ++host.store_calls_;
+        if (host.store_calls_ == host.options_.cut_at) {
+            host.add_bytes(bytes, std::min(length, static_cast<size_t>(host.options_.cut_keeps)));
+            stop("power cut", kPowerCut);
+        }
+        int result = -1;
+        if (host.store_calls_ != host.options_.store_fails_at) {
+            result = host.add_bytes(bytes, length) ? 1 : -1;
+        }
+        host.trace("write", std::to_string(length), result);
+        return result;
+    }
+
+    static int write_close(void *ctx) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (!host.writing_) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (host.store_call()) {
+            result = host.end_file() ? 1 : -1;
+            host.writing_ = false;
+        }
+        host.trace("write_close", "", result);
+        return result;
+    }
+
+    static int rename(void *ctx, const char *from, const char *to) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        host.check_name(from);
+        host.check_name(to);
+        if (host.holds(from) || host.holds(to)) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (host.store_call()) {
+            result = host.rename_file(from, to) ? 1 : -1;
+        }
+        host.trace("rename", std::string(from) + " " + to, result);
+        return result;
+    }
+
+    static int remove(void *ctx, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        host.check_name(name);
+        if (host.is_open_ && host.open_name_ == name) {
+            stop("file misuse", kFileMisuse);
+        }
+        int result = -1;
+        if (host.store_call()) {
+            if (host.writing_ && host.writing_name_ == name) {
+                host.end_file();
+                host.writing_ = false;
+            }
+            result = host.remove_file(name);
+        }
+        host.trace("remove", name, result);
+        return result;
+    }
+
+    static int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (host.options_.space_unknown) {
+            return -1;
+        }
+        const uint64_t total = host.options_.storage;
+        const uint64_t used = host.used_bytes();
+        *total_bytes = static_cast<uint32_t>(total);
+        *free_bytes = static_cast<uint32_t>(used < total ? total - used : 0);
+        return 1;
+    }
+
+    static int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        host.check_name(name);
+        const bool goes_on = host.read_at_name_ == name && offset == host.read_at_end_;
+        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on)) {
+            stop("file misuse", kFileMisuse);
+        }
+        std::string content;
+        if (!host.whole_file(name, &content)) {
+            return -1;
+        }
+        size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
+        count = std::min(count, capacity);
+        count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
+        const long fails = host.options_.read_back_fails;
+        if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
+            if (offset >= static_cast<size_t>(fails)) {
+                return -1;
+            }
+            count = static_cast<size_t>(fails) - offset;
+        }
+        const long differs = host.options_.read_back_differs;
+        if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
+            content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
+        }
+        std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
+        host.read_at_name_ = name;
+        host.read_at_end_ = offset + static_cast<uint32_t>(count);
+        return static_cast<int32_t>(count);
+    }
+
+    // Stops the program when a name the core gives is not one of its names: 1 to 32
+    // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` file or
+    // one of the five fixed names.
+    void check_name(const char *name) const {
+        if (!options_.check_names) {
+            return;
+        }
+        const std::string given = name;
+        bool sound = !given.empty() && given.size() <= 32 &&
+                     given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
+        const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
+        const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
+                           given == "show.part" || given == "pending.txt";
+        if (!sound || !(animation || fixed)) {
+            stop("file misuse", kFileMisuse);
+        }
+    }
+
+    // Counts a storage call that is no `write`. False when this one fails. The program
+    // ends here when this one is where the power is cut.
+    bool store_call() {
+        ++store_calls_;
+        if (store_calls_ == options_.cut_at) {
+            stop("power cut", kPowerCut);
+        }
+        return store_calls_ != options_.store_fails_at;
+    }
+
+    void trace(const char *call, const std::string &arguments, int result) const {
+        if (options_.trace_store) {
+            std::printf("store %s%s%s %d\n", call, arguments.empty() ? "" : " ", arguments.c_str(), result);
+        }
+    }
+
+    // Whether a name is the file that `open` holds or the one being written.
+    bool holds(const char *name) const {
+        return (is_open_ && open_name_ == name) || (writing_ && writing_name_ == name);
+    }
+
+    std::string path_of(const std::string &name) const { return folder_ + "/" + name; }
+
+    // The files as they are stored: in the folder, or in the set held in memory.
+
+    bool begin_file(const char *name) {
+        if (from_ == kFromFiles) {
+            files_[name].clear();
+            return true;
+        }
+        written_ = std::fopen(path_of(name).c_str(), "wb");
+        return written_ != nullptr;
+    }
+
+    // Adds bytes to the file being written, so that they are there when the program ends.
+    bool add_bytes(const uint8_t *bytes, size_t length) {
+        if (from_ == kFromFiles) {
+            files_[writing_name_].append(reinterpret_cast<const char *>(bytes), length);
+            return true;
+        }
+        return std::fwrite(bytes, 1, length, written_) == length && std::fflush(written_) == 0;
+    }
+
+    bool end_file() {
+        if (from_ == kFromFiles) {
+            return true;
+        }
+        std::FILE *file = written_;
+        written_ = nullptr;
+        return file != nullptr && std::fclose(file) == 0;
+    }
+
+    bool rename_file(const char *from, const char *to) {
+        if (from_ == kFromFiles) {
+            auto file = files_.find(from);
+            if (file == files_.end()) {
+                return false;
+            }
+            std::string content = file->second;
+            files_.erase(file);
+            files_[to] = content;
+            return true;
+        }
+        return ::rename(path_of(from).c_str(), path_of(to).c_str()) == 0;
+    }
+
+    // 1 when a file was removed, 0 when there was none, -1 otherwise.
+    int remove_file(const char *name) {
+        if (from_ == kFromFiles) {
+            return files_.erase(name) != 0 ? 1 : 0;
+        }
+        if (::unlink(path_of(name).c_str()) == 0) {
+            return 1;
+        }
+        return errno == ENOENT ? 0 : -1;
+    }
+
+    bool whole_file(const char *name, std::string *content) {
+        if (from_ == kFromFiles) {
+            auto file = files_.find(name);
+            if (file == files_.end()) {
+                return false;
+            }
+            *content = file->second;
+            return true;
+        }
+        std::string kept = content_;
+        const bool loaded = load(name) == 1;
+        *content = content_;
+        content_ = kept;
+        return loaded;
+    }
+
+    // The space the files take: the size of each, rounded up to a whole block.
+    uint64_t used_bytes() const {
+        uint64_t used = 0;
+        if (from_ == kFromFiles) {
+            for (const auto &file : files_) {
+                used += (file.second.size() + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            }
+            return used;
+        }
+        DIR *folder = opendir(folder_.c_str());
+        if (folder == nullptr) {
+            return 0;
+        }
+        while (const dirent *entry = readdir(folder)) {
+            struct stat status;
+            if (stat(path_of(entry->d_name).c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
+                used += (static_cast<uint64_t>(status.st_size) + kStorageBlock - 1) / kStorageBlock * kStorageBlock;
+            }
+        }
+        closedir(folder);
+        return used;
+    }
+
     // Loads a file of the folder: 1 when loaded, 0 when there is no such file, -1 otherwise.
     int load(const char *name) {
         if (std::strchr(name, '/') != nullptr) {
@@ -305,6 +608,14 @@ private:
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
+
+    bool writing_ = false;
+    std::string writing_name_;
+    std::FILE *written_ = nullptr;
+    long store_calls_ = 0;
+    std::string read_at_name_;
+    uint32_t read_at_end_ = 0;
+    size_t reads_at_ = 0;
 
     long alloc_calls_ = 0;
     size_t bytes_given_ = 0;
@@ -659,6 +970,69 @@ int guard_check(const std::string &what) {
     return 1;
 }
 
+const char *const kStorageGuards[] = {"write", "write-none", "close-none", "two-files", "name",
+                                      "rename-open", "remove-open", "read-at", "read-at-offset"};
+
+bool is_storage_guard(const std::string &what) {
+    for (const char *guard_name : kStorageGuards) {
+        if (what == guard_name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Uses the storage functions as the core never may: each of these stops the program.
+int storage_guard_check(const std::string &what) {
+    Options options;
+    options.check_names = true;
+    std::map<std::string, std::string> files;
+    files["show.json"] = "{}";
+    files["a.odrg"] = "0123456789";
+    Host host = Host::of_files(files, options);
+    odrig_host functions = host.interface();
+    void *ctx = functions.ctx;
+    uint8_t buffer[1501];
+    std::memset(buffer, 0, sizeof buffer);
+    guard::InCore inside;
+    if (what == "write") {
+        functions.write_open(ctx, "upload.part");
+        functions.write(ctx, buffer, 1500);
+        functions.write(ctx, buffer, 1501);
+    } else if (what == "write-none") {
+        functions.write(ctx, buffer, 1);
+    } else if (what == "close-none") {
+        functions.write_close(ctx);
+    } else if (what == "two-files") {
+        functions.write_open(ctx, "upload.part");
+        functions.write_open(ctx, "show.part");
+    } else if (what == "name") {
+        functions.remove(ctx, "pending.txt");
+        functions.remove(ctx, "a.odrg");
+        functions.remove(ctx, "notes.txt");
+    } else if (what == "rename-open") {
+        functions.write_open(ctx, "upload.part");
+        functions.write_close(ctx);
+        functions.rename(ctx, "upload.part", "b.odrg");
+        functions.open(ctx, "a.odrg");
+        functions.rename(ctx, "b.odrg", "a.odrg");
+    } else if (what == "remove-open") {
+        functions.open(ctx, "a.odrg");
+        functions.remove(ctx, "show.part");
+        functions.remove(ctx, "a.odrg");
+    } else if (what == "read-at") {
+        functions.read_at(ctx, "a.odrg", 0, buffer, 512);
+        functions.read_at(ctx, "a.odrg", 0, buffer, 513);
+    } else {
+        int32_t first = functions.read_at(ctx, "a.odrg", 0, buffer, 4);
+        functions.read_at(ctx, "a.odrg", static_cast<uint32_t>(first), buffer, 4);
+        functions.read_at(ctx, "a.odrg", 0, buffer, 4);
+        functions.read_at(ctx, "a.odrg", 9, buffer, 4);
+    }
+    std::printf("the guard let it pass\n");
+    return 1;
+}
+
 // Runs one session for each job of a batch on standard input. A job is the number of its
 // files as text, then a name and a content for each file, then its script. After the lines
 // of each session comes the line `end`.
@@ -693,6 +1067,15 @@ bool whole_number(const std::string &text, long *value) {
     return true;
 }
 
+// A number of bytes of storage: decimal digits with a value up to 4,294,967,295.
+bool storage_bytes(const std::string &text, uint64_t *value) {
+    if (text.empty() || text.size() > 10 || text.find_first_not_of("0123456789") != std::string::npos) {
+        return false;
+    }
+    *value = std::strtoull(text.c_str(), nullptr, 10);
+    return *value <= 0xFFFFFFFFull;
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -717,8 +1100,12 @@ int main(int argc, char **argv) {
         (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {
         return guard_check(arguments[1]);
     }
+    if (invocation == "guard" && arguments.size() == 2 && is_storage_guard(arguments[1])) {
+        return storage_guard_check(arguments[1]);
+    }
     if (invocation == "session" && arguments.size() >= 2) {
         Options options;
+        options.check_names = true;
         size_t at = 2;
         while (at < arguments.size()) {
             if (arguments[at] == "--alloc-fails-at" && at + 1 < arguments.size() &&
@@ -748,6 +1135,36 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--trace-files") {
                 options.trace_files = true;
                 at += 1;
+            } else if (arguments[at] == "--storage" && at + 1 < arguments.size() &&
+                       storage_bytes(arguments[at + 1], &options.storage)) {
+                at += 2;
+            } else if (arguments[at] == "--no-storage") {
+                options.no_storage = true;
+                at += 1;
+            } else if (arguments[at] == "--only-space") {
+                options.only_space = true;
+                at += 1;
+            } else if (arguments[at] == "--space-unknown") {
+                options.space_unknown = true;
+                at += 1;
+            } else if (arguments[at] == "--store-fails-at" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.store_fails_at)) {
+                at += 2;
+            } else if (arguments[at] == "--cut-at" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.cut_at)) {
+                at += 2;
+            } else if (arguments[at] == "--cut-keeps" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.cut_keeps)) {
+                at += 2;
+            } else if (arguments[at] == "--trace-store") {
+                options.trace_store = true;
+                at += 1;
+            } else if (arguments[at] == "--read-back-fails" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.read_back_fails)) {
+                at += 2;
+            } else if (arguments[at] == "--read-back-differs" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.read_back_differs)) {
+                at += 2;
             } else {
                 return usage();
             }

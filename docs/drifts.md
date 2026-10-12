@@ -6196,3 +6196,582 @@ Python tool now reads it before decoding.
 
 **Resolution.** `converter/tests/import.test.js`, `KNOWN_DIFFERENCES` and the test of 80
 cuts and 80 changed bytes; `converter/tests/reference.py`, without `_undecodable_video`.
+
+## Seed 07: What seed 05 left, where this spec expected something else
+
+**Question.** The spec of seed 07 was written while seed 05 was being implemented, from
+the design of seed 05. Its tasks say: where the code differs, follow the code and record
+the difference. What differs?
+
+**Answer.** The code was read before the first task. The core, the emulator and the
+command tool are as the design's table "What this design relies on" has them. Four things
+differ, all on the board:
+
+- The request for a refresh has a task of its own, `odrig`, on the chip's other processor
+  core, and the core's lock is held for a whole request, 9 to 17 ms with a dense clip. The
+  design names this as its risk 6. So a step of the check will run on that task, and the
+  storage calls of a command on WLED's loop, for the port, and on the network task, for
+  HTTP. The spike of task 3 measures the pacing in that arrangement.
+- The port no longer feeds the core one byte at a time. It collects the bytes of a pass,
+  at most 272, and hands them on at the end of a line or when the buffer is full, each
+  hand-over under one hold of the lock. A line of 2,048 characters so reaches the core in
+  eight or more pieces, which the core's byte entry joins.
+- The owner has ruled, in seed 05, that any rate from 20 to 50 refreshes a second is fine
+  on the board for any content. The session that coordinates this run passed the ruling on
+  for this seed: where the seed and this spec ask for 25 or more during an upload and 49
+  or more afterwards, the board tests assert 20 or more in both places, and the measured
+  figures are written down as they are. Requirement 17 criteria 4 and 7 and Requirement 21
+  criterion 3 are read that way from here on.
+- This run works in a checkout of its own, beside the first one. The stock WLED files and
+  the factory backup exist in the first checkout only. The tool of this checkout builds in
+  its own `build/firmware/`; where a board test restores stock WLED, the stock files are
+  read from the first checkout through a link that is removed afterwards, and nothing of
+  that folder is copied or changed.
+
+The session of the board suite, `tests/board/support.py`, has one line that must be too
+long. It had 75 characters and gets 2,055 in the first task, with the limit, although the
+board suite runs again only in task 3, when the firmware with the longer line is on the
+board.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, tasks 3 and 7;
+`tests/board/support.py`, `SESSION`.
+
+## Seed 07: The byte entry without its two blocks, and where the blocks are taken
+
+**Question.** The line and the reply of the byte entry leave the core object and become
+two blocks taken at startup. The design does not say when, or what `odrig_core_feed` does
+when the host could not supply them. A reply of 1,024 bytes cannot stand on the stack of
+a function of the core, so without the blocks the entry has nowhere to put a line or a
+reply.
+
+**Answer.** The two blocks are the first the core asks for after its own object, before
+the mapping is read: commands arrive whatever the show is, also when there is none. When
+either is missing the show is invalid with `out-of-memory`, as for every later block,
+`odrig_core_feed` takes no bytes and calls nothing, and `odrig_core_command`, which writes
+into the caller's room, works as ever. So a host that could not give 3 KB answers over
+HTTP and not over its serial port, and `status` says why. The numbers of the blocks in
+the tests of a failing `alloc` move up by two.
+
+A line is split into up to five words; a line with more is `bad-argument` for every
+command, and `unknown-command` when its first word is no command, which comes first in
+the order of the codes.
+
+**Resolution.** `core/src/core.cpp`, `start`; `core/src/commands.cpp`, `Words` and
+`odrig_core_feed`; `docs/core.md`, "Command lines" and "Memory";
+`tests/core/test_memory.py`.
+
+## Seed 07: The length in a log entry of a line that was cut
+
+**Question.** A log entry of the emulator gets `length`, "the number of characters of the
+line as the core read it". Of a line of more than 2,048 characters the core hands back
+its first 2,048, and of a body of more than 4,096 bytes the emulator keeps 4,096.
+
+**Answer.** `length` is the length of the line the core read: 2,048 for every line that
+was cut, with `cut` true. The page shows such a line with its first 200 characters and
+`more than 2048 characters`, and a shorter long line with its first 200 and its real
+length.
+
+**Resolution.** `emulator/hub.py`, `Hub.log`; `emulator/web/app.js`; `docs/emulator.md`,
+"The page" and "The event stream".
+
+## Seed 07: Queue and session files in a checkout of its own
+
+**Question.** The run works in a checkout of its own. Where do the queue and the session
+state go, and how are the records numbered?
+
+**Answer.** Into `.codex/` of that checkout, which git ignores: the queue records Q-401
+to Q-409, one for each task of this spec, without task ids, because the script that makes
+them does not run on this Mac, and the session state in `.codex/tactic/session.json`. No
+branch is pushed: there is no remote.
+
+**Resolution.** `.codex/local-task-queue.md` and `.codex/tactic/session.json` of the
+checkout, untracked.
+
+## Seed 07: What the test host has beyond the design's list, and what it takes for misuse
+
+**Question.** The design lists six options for the test host and the misuses it stops. It
+asks for `space` to be tested "with a host that cannot tell", and for a host whose
+`write_open` is `NULL` while `space` answers, and has no option for either. It says each
+new check is "shown to stop the test host", and the core never does what the checks
+stop, so no session can show it. The header lets a host give up a file that is being
+written when `write_open` is called again, while Requirement 19 has the test host stop
+when the core "has two files being written".
+
+**Answer.** Two options more: `--space-unknown`, with which `space` returns -1, and
+`--only-space`, with which only `space` of the seven is there. `--no-storage` makes all
+seven `NULL`, as the design says. Nine invocations more, `odrig_host guard write`,
+`write-none`, `close-none`, `two-files`, `name`, `rename-open`, `remove-open`, `read-at`
+and `read-at-offset`, each of which uses the storage functions as the core never may and
+is stopped with `file misuse`. A second `write_open` while a file is being written is
+misuse for the test host: the core removes or closes a file before it begins another, and
+a host only has to cope with the other case. `read_at` may always start again at
+offset 0, which is how the core begins the check of every upload. The name check covers
+`open` too, in sessions.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host";
+`tests/core/test_content.py`, `StorageGuards`.
+
+## Seed 07: Where `space` and the reply live in the core, and what `storage-error` says for now
+
+**Question.** The design puts `space` into `content.cpp`, which its task list creates
+only in task 4, and leaves the `Reply` in `commands.cpp`, where `content.cpp` cannot
+reach it. `docs/commands.md` is to list only what exists, and the design's sentence for
+`storage-error` speaks of a show and of an upload.
+
+**Answer.** `content.cpp` begins in task 2 with `space`. The `Reply`, with `succeed` and
+`refuse`, moves to `commands.h`, so that `content.cpp` and later `upload.cpp` write
+replies with the same code. `storage.h` holds the three names the core keeps for itself
+and the question whether the host's storage can be changed. Until the commands that
+write exist, `docs/commands.md` gives `storage-error` as what `space` is answered with on
+a board that cannot tell its space, and the test of the command tool that compares the
+tool's commands with the document says that `space` is in the document and not yet in
+the tool.
+
+**Resolution.** `core/src/content.cpp`, `commands.h`, `storage.h`; `docs/commands.md`,
+"Error codes"; `tests/emulator/test_tool.py`,
+`test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The emulator's host: which names it takes, and a host object without storage
+
+**Question.** The emulator "refuses a name with a path separator" and uses a name "only
+when it is one the core may use". A test of seed 03 forbids the emulator to write out the
+name `show.json`, so it cannot list the core's names. The binding is also used with host
+objects that only read.
+
+**Answer.** `FolderHost` takes a name of 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
+and `.` that is not made of dots alone, and refuses every other: such a name has no
+separator and cannot leave the folder. The binding gives the core the seven storage
+functions when the host object has `write_open`, and seven null pointers otherwise.
+`FolderHost.close` stays what the core calls to close the open file; `release` closes
+every file the host holds, at the end of the program.
+
+**Resolution.** `emulator/host.py`; `emulator/binding.py`, `Core.__init__`;
+`docs/emulator.md`, "Starting".
+
+## Seed 07: The board cannot tell its space quickly, so the usermod keeps the number
+
+**Question.** The design assumed, as B5, that the file system tells its used bytes in
+under 100 ms with storage nearly full, and named what to do otherwise. The spike measured
+30 ms with the example show, 79 ms with one dense clip of 1.4 MB and 377 ms with 9 MB.
+The player waits for the same lock for that long.
+
+**Answer.** The design's other way is taken. The usermod asks the file system once,
+before the core starts, and keeps the number of used blocks up by what its storage
+functions write, replace and remove: no block for a file of 512 bytes or less, which the
+file system keeps beside the name, and for a longer file the blocks of 4,096 bytes that
+the file system needs for it, the pointers at the start of each block counted. `space`
+is answered from that number with no call to the file system, in every state of the
+board. The number is an account, not a measurement: it leaves out the blocks the file
+system takes for its own lists as a folder grows. The board test allows 16,384 bytes
+between the number kept and the number after a restart, and the spec has the core keep a
+reserve of that size when it judges whether an upload fits. Every start takes the number
+afresh.
+
+A client sees nothing else than the design describes: `free` in whole blocks. On the
+board `free` after an upload or a removal can differ by a few blocks from what the same
+command reports after the next start.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `askSpace`, `blocksOf` and
+`tellSpace`; `docs/firmware.md`, "What the firmware does", "Storage", and B5 in "Verified
+on the board"; `tests/firmware/test_usermod_files.py`; `tests/board/test_upload.py`,
+`test_the_space_is_told_without_a_storage_call_and_follows_what_is_written_and_removed`;
+`tests/board/test_measure.py`, `space_us`.
+
+## Seed 07: How the pacing counts, and the rates it was measured with
+
+**Question.** The design holds command lines after a storage call for the longer of 20 ms
+and twice the call's time. A command makes several storage calls in a row, and the spike
+found a write of 1,500 bytes slower than the design assumed: 31 ms in the mean and 152 ms
+at the longest, where the design expected a few milliseconds and some tens for one in
+three. The design asked for 25 refreshes a second or more during the writes, and for the
+writes to move to a task of their own if that failed.
+
+**Answer.** The times of the storage calls are added up until a hold has run out, and the
+hold is the longer of 20 ms and twice that sum, counted from the end of the last call. So
+a command that makes five calls is followed by one hold for all five. A read through
+`read_at` is not counted: the check of an upload reads inside the player's own request
+for a refresh. A command over HTTP waits in the network task before it takes the lock.
+
+With that pacing the board sent 34 to 46 refreshes in every second while a megabyte was
+written, and 50 in each of the ten seconds after. With the pacing taken out it sent 10 or
+11. The owner accepts every rate from 20 to 50 on the board, so the writes stay where
+they are, and the board tests assert 20 or more during an upload and after it, where the
+spec has 25 and 49. The figures measured are in `docs/firmware.md`.
+
+Not tried: writes while a dense 60 x 60 clip plays. A storage call stops the player for
+as long as it takes, and the player then decodes every frame that came due meanwhile in
+one request, so a rate below 20 in the second of a long call is possible there.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `Timed` and `holding`;
+`odrig_serial.cpp`, `poll`; `odrig_usermod.cpp`, `commandLine`; `docs/firmware.md`,
+"Storage calls are paced" and B3; `tests/board/test_upload.py`, `LOWEST`;
+`tests/firmware/test_usermod_files.py`, `Pacing`.
+
+## Seed 07: What the probe build gained for the spike
+
+**Question.** The design gives the probe build a `store` object in its report and says
+that the spike writes a megabyte through the usermod's storage functions "from a probe
+command". It does not say what that command is, or what `check_steps` counts before the
+core has a check.
+
+**Answer.** The probe build answers a second line, `#store <bytes>`, as it answers
+`#probe`: on the port only, at the start of a line, and without the core seeing it. It
+writes, renames, reads back and removes a file of its own in `/odrig`, `probe.part` and
+`probe.odrg`, a step in each pass of the loop that the pacing allows, and answers with
+one line of times. The firmware itself has no such line. A file named `probe.odrg` or
+`probe.part` in a show would be overwritten by the trial; no show of the repository has
+one. The report gains `space_us`, the time the file system took to tell its space at the
+start, beside `store`. `check_steps` counts the requests for a refresh during which a
+second file was read by anyone, so the trial's own read-back shows up in it; with the
+core's check it is the number of steps of the check.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`, `storeStep`, `fitOf` and `report`;
+`docs/firmware.md`, "The probe build"; `tests/board/test_upload.py`, `Spike`.
+
+## Seed 07: The board tests keep the port open and send one line at a time
+
+**Question.** The board tests sent each command through the command tool, which opens
+the port, waits and closes it for every line. The spike has to ask for a report once a
+second while a trial runs. The first run of the whole suite also failed in two tests
+after a test had written two lines of 2,048 characters in one piece: 4,098 bytes do not
+fit the port's queue of 4,096, and the rest of the second line stayed in the core's line
+until the next test's first command, which was then answered with `line-too-long`.
+
+**Answer.** `tests/board/support.py` gains `Port`, the port kept open for several
+exchanges, opened as the command tool opens it. It sends one newline when it opens and
+discards what arrives, so that a line a test before it left unfinished ends there. The
+tests send one line and wait for its reply before the next, as the command tool does;
+the design's B4 is one line in one piece, and that is what is tried.
+
+The board suite also needs the stock files of `firmware/wled-16.0.1/`, which exist in
+the main checkout only. In another checkout the suite's test of `restore-stock` has no
+files to compare with; for this seed's runs a link to the main checkout's folder stood
+in the worktree, untracked, and was removed afterwards.
+
+**Resolution.** `tests/board/support.py`, `Port`; `tests/board/test_upload.py`,
+`test_a_line_of_2048_characters_in_one_piece_is_read_and_one_of_2049_is_too_long`;
+`docs/firmware.md`, B4.
+
+## Seed 07: What the documents say of the show before the upload exists
+
+**Question.** Task 4 puts "the texts of the design" into `docs/show.md` and `busy` and
+`in-use` into `docs/commands.md`. Those texts speak of the upload: a new item, a file
+replaced, `busy` while an upload is open. The upload is task 5, and a document lists only
+what exists. The design's example of a written `show.json` also has a cycle that lists
+id 2 while no item has that id, which is not a valid show.
+
+**Answer.** With task 4 `docs/show.md` has the design's texts as far as they hold with
+`remove` alone: "Changing a show while it runs" speaks of `remove`, and the sentences on
+uploads, on a new item and on the room for one are added with task 5. `docs/commands.md`
+gets `list`, `remove` and `in-use`; `busy` comes with task 5, when something can be busy.
+The example of a written `show.json` is a valid show: items 1 and 2 and a cycle 4 that
+lists them, with `start`. Task 8 compares both pages with the design word for word.
+
+**Resolution.** `docs/show.md`, "Changing a show while it runs" and "show.json after a
+change"; `docs/commands.md`, "Storage and the installed items" and "Removing an item";
+`tests/core/test_docs.py`.
+
+## Seed 07: What a removal leaves when storage fails half-way
+
+**Question.** The design gives the sequence of a removal: `pending.txt` with the file's
+name, `show.part`, the rename onto `show.json`, the file removed, `pending.txt` removed.
+It says what a power cut leaves. It does not say what the core does when a call fails
+after the rename, or what the start does with a `pending.txt` whose file cannot be
+removed or that cannot be read.
+
+**Answer.** Up to the rename a failure undoes the command: `show.part` and `pending.txt`
+are removed, the show in memory is unchanged, and the reply is `storage-error`. From the
+rename on the command has succeeded, whatever follows: the show in storage is the new
+one, so the reply is `{"ok":true}`. If the file then cannot be removed, `pending.txt`
+stays, and the next start removes the file. At the start, `pending.txt` is removed only
+when every file it names is gone or is named by an item; if a removal fails or the file
+cannot be read, it stays for the start after. A line of `pending.txt` that is not a file
+name is skipped, and so is a last line without a line feed, which is what a power cut
+during the write leaves.
+
+**Resolution.** `core/src/storage.cpp`, `storage_remove_item` and
+`storage_settle_pending`; `docs/core.md`, "The files the core writes";
+`tests/core/test_powercut.py`, `Removal`; `tests/core/test_startup.py`, `Leftovers`.
+
+## Seed 07: The empty show in the converter, and the test of the tool's commands
+
+**Question.** Task 4 changes `odrig/show.py` for a show without items, "and
+`converter/lib/show.js` if it is there". It also adds commands to `docs/commands.md`
+that the command tool gets only in task 6, while a test of the tool holds the tool's
+commands and the document's to be the same.
+
+**Answer.** This branch has no `converter/` folder, so only the Python reader changes;
+the JavaScript converter of the main line needs the same change when the two are merged:
+a show with `"items":[]` is valid. The tool's test says, until task 6, which commands
+the document has that the tool does not send yet.
+
+**Resolution.** `odrig/show.py`; `tests/converter/test_show_pack.py`;
+`tests/emulator/test_tool.py`, `test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The check stands still while the player is late
+
+**Question.** The design gives the check of an uploaded file one step after a refresh
+that came in step: on the grid slot right after the one before. That keeps the check
+from taking time the player needs. It does not say what follows when no refresh is in
+step for a long time, which is the case when content plays at 25 refreshes a second or
+fewer: every refresh is then a slot late.
+
+**Answer.** It is built as designed, and what follows is this. A step of the check is
+what counts as progress of an upload in the checking state. With no step for 60 seconds
+the upload is discarded like any other on which nothing moved, and the next `upload end`
+is answered with `no-upload`. A client sees `busy` for up to a minute and then
+`no-upload`. At rates between 25 and 50 the check runs, slower the more refreshes are
+late: a step for every refresh that follows another without a gap.
+
+On the board this matters for a show whose content is dense enough to play below 50: the
+dense 60 x 60 clip plays at 28 to 37 compressed. An upload while such content plays is
+checked slowly, and at 25 or fewer not at all. `off`, or playing an item that keeps the
+rate at 50, lets the check run at full speed: one frame of the file for each refresh.
+The owner should see this before the event; a change, such as a step for every refresh
+when the last step is more than a second old, would change the design and is not made
+here.
+
+**Resolution.** `core/src/player.cpp`, `in_step`; `core/src/upload.cpp`, `upload_step`
+and `upload_touch`; `docs/core.md`, "Uploads and the check"; `tests/core/test_upload.py`,
+`TheCheck`.
+
+## Seed 07: The codes of a file that storage gave back wrong
+
+**Question.** The check reads the uploaded file back from storage. The design answers a
+file that is not valid with `bad-file` and storage that failed with `storage-error`. It
+does not say which of the two a file gets whose bytes, read back, are not the bytes that
+were received.
+
+**Answer.** The check decodes what it reads back and, at the end, compares the number of
+bytes and their CRC-32 with what was received. A read that fails is `storage-error`.
+Bytes that differ and still decode are `storage-error`, found at the end. Bytes that
+differ and do not decode are `bad-file` with the decoder's reason, because the decoder
+meets them first; `bad-file` is also the earlier of the two in the order of the codes.
+The upload is discarded in all three cases. The test host gets two options for these
+cases beyond the design's list: `--read-back-fails OFFSET`, from which on `read_at`
+answers -1, and `--read-back-differs OFFSET`, the place of one byte that `read_at` gives
+back with one bit changed.
+
+**Resolution.** `core/src/upload.cpp`, `upload_step` and `upload_end`;
+`tests/core/host/host.cpp`; `docs/core.md`, "The test host"; `tests/core/test_upload.py`.
+
+## Seed 07: What the reference player and the emulator needed for the upload
+
+**Question.** The reference player counts the check in refreshes, so it has to know
+after how many steps the core's decoder refuses a damaged file; the converter's decoder,
+which the reference player uses, refuses a file as a whole. The emulator tells the core
+the space of its folder from the sizes of the files, while Python keeps written bytes in
+a buffer of its own.
+
+**Answer.** For a file whose body is refused, a test tells the reference player how many
+frame records decode before the refused one, by the CRC-32 of the file; without that it
+takes the number the header names. The check then ends two steps later, as for a sound
+file: one step for the header and one for the end. The emulator's host opens the file it
+writes without a buffer, so that every piece is in the folder when the core has given
+it, and `space` during an upload counts it.
+
+**Resolution.** `tests/core/support.py`, `ReferencePlayer.sound_records`;
+`emulator/host.py`, `write_open`; `tests/emulator/test_content.py`, `Uploads`.
+
+## Seed 07: When the command tool writes a progress line
+
+**Question.** The design has the tool write progress "one line for each report", and
+calls `progress` after every acknowledged piece; Requirement 18.5 asks for a line "at
+least once a second, and a last time when the data is sent". Over USB a piece is
+acknowledged nine times a second, so a line for every piece is 900 lines for a file of
+1.4 MB when standard error is a file or a pipe.
+
+**Answer.** `odrigctl.content.upload` calls `progress` after every acknowledged piece, as
+designed, and the board tests use that. The command line writes a report when half a
+second has passed since the one before, and always for the last piece, so a small file
+gives one line with 100%. The speed in a line is whole bytes a second, rounded, and 0
+when no time has passed. On a terminal the one line is written over again and ended
+before the reply is printed.
+
+**Resolution.** `odrigctl/cli.py`, `Progress`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `ProgressLines`.
+
+## Seed 07: What the tool's session does with a reply that comes late
+
+**Question.** Through the port the replies carry no mark of the line they answer; the
+session takes the next reply for the answer. The design has the tool send an
+`upload data` line once more when no reply came in time. If the first reply was only
+late, two replies are then on their way for one piece, and the second would be taken for
+the answer of the next piece.
+
+**Answer.** Two rules in the session, for the port only. A line that arrived whole before
+a line is sent is no answer to it and is dropped; the beginning of a line that has not
+ended is kept and judged with its end. And after a second `upload data` line that was
+answered with anything but `bad-offset`, the tool drops what arrives in the next half
+second. A reply later than that still ends the upload with `bad-offset`, a cancel and
+status 1; the upload can be sent again. Over HTTP a late reply belongs to a request that
+was closed and is never seen.
+
+Only an `upload data` line is sent twice. Without a reply to `upload begin`, to
+`upload end` or to a line of another command the tool exits with status 3 and sends no
+cancel: it cannot reach the target. An upload left open so is discarded by the target
+after 60 seconds, and after a lost reply to `upload end` the file may be installed all
+the same; `list` tells.
+
+**Resolution.** `odrigctl/client.py`, `Session.exchange` and `Session.discard`;
+`odrigctl/content.py`, `upload`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `LostReply` and `SessionOfExchanges`.
+
+## Seed 07: When the tool cancels an upload
+
+**Question.** Requirement 18.7 has the tool send `upload cancel` after a reply that is
+not ok "when an upload it opened may still be open". It does not say after which replies
+that is.
+
+**Answer.** After a refused `upload begin` the tool sends no cancel: it opened nothing,
+and with `busy` the open upload is another sender's. After a reply to a piece or to
+`upload end` that is not ok it sends `upload cancel`, unless the code is one after which
+the target holds no upload: `no-upload`, `bad-checksum`, `bad-file`, `storage-error` or
+`show-invalid`. So a cancel follows `bad-offset`, `bad-argument`, `incomplete`, and
+`busy` after 600 seconds. The reply to the cancel is not printed and does not change the
+status.
+
+Beside what the design names, `cli.checked` gives the command and its arguments after
+their number is checked, and every command, also the five of before, goes through a
+`Session`.
+
+**Resolution.** `odrigctl/content.py`, `GONE` and `_given_up`; `odrigctl/cli.py`;
+`tests/emulator/test_tool.py`, `UploadSteps` and
+`test_an_upload_that_is_refused_at_its_begin_cancels_nothing`.
+
+## Seed 07: An upload while dense content plays
+
+**Question.** The spec measures the rate during an upload with the bench show playing,
+which plays at 50 refreshes a second with room to spare. At the event the board plays
+60 x 60 content, and a dense clip already plays below 50. Nothing in the spec says what
+an upload does there.
+
+**Answer.** It was tried once, outside the suite, with the firmware and the dense
+60 x 60 clip playing compressed on the target file, 40 to 42 refreshes a second before
+the upload. Every upload succeeded. While the data of a file of 285,360 bytes arrived,
+`status` reported 16 to 27, below 20 in 13 of the 60 seconds, and the file arrived at
+4,714 bytes a second, where the bench show gives 12,583. Its check of 100 frames took 17
+seconds at 25 to 29 refreshes a second. In the second in which a file was put in place,
+`status` reported 6 or 7. So an upload while dense content plays can take the board
+below the 20 the owner accepts, for as long as the data arrives.
+
+Nothing is changed for it: the pacing is the design's, and a longer hold would make the
+upload slower still. What an operator can do today is to send `off`, or to play an item
+that is not dense, for the time of an upload; the app of seed 09 could do that by
+itself. Whether the board should do more, such as a longer hold while the rate is low,
+is the owner's to decide and would be a seed of its own.
+
+**Resolution.** `docs/firmware.md`, "Measurements on the board", "An upload over USB";
+no code.
+
+## Seed 07: What the board tests of the upload run on, and what they compare
+
+**Question.** Task 7 asks for one session on the board with the command tool, for the
+rate during an upload of a dense bench clip of 60 seconds with the probe's figures, for
+`read-show` to give "the folder as it was at the start", and for the replies to equal an
+emulator's "apart from `fps` and `free`".
+
+**Answer.** The session runs on the firmware, the image the board is left with, and
+the large upload on the probe build, whose report has the storage calls. Both assert 20
+refreshes a second or more where the spec has 25 and 49, by the owner's ruling. The
+session ends with three refusals, so that `in-use` and `unknown-id` are met on the board
+too. After it, the folder read back from the board has the files that were installed,
+with `show.json` as the core writes it: one line, the same show. It is byte for byte the
+folder the emulator has after the same session, and that is what the test compares, so a
+board that wrote a show file of its own kind would be seen. The suite's cache of what it
+installed is cleared whenever commands changed the show, so that the next test asks the
+board. The last step of the suite now also asks `list`, `status` and `space`, for the
+three items of the example show and nothing else.
+
+**Resolution.** `tests/board/test_upload.py`, `ContentCommands` and `DenseUpload`;
+`tests/board/support.py`, `content_session`, `measured_upload`, `changed_by_commands`
+and `read_back`; `tests/board/__init__.py`, `LeaveTheBoard`.
+
+## Seed 07: The test over the air, and how it was run without the air
+
+**Question.** Task 7 asks for "the same session over HTTP" in `tests/air/`, which no
+agent can run, and to run its session against the emulator. The session of the board
+test restarts the board, and a restart takes the board's network away from the computer
+that joined it.
+
+**Answer.** The test over the air sends the same session without the restart, once over
+HTTP and once through the port, and holds the replies to be the same, as the suite's
+other tests do. A second test uploads the dense bench clip of ten seconds over HTTP,
+asks `status` once a second, asserts 20 or more, and writes the speed to
+`build/firmware/out/upload-air.json`: the first figure for an upload over Wi-Fi will
+come from the owner's run. Both were run with an emulator in the place of the board's
+network: the suite was given the address of an emulator started on the dim example show,
+with the board on USB, so the HTTP half of each test spoke to the emulator and the port
+half to the board. Both passed so. That says the session and the comparison are sound;
+it says nothing of the board's web server with lines of 2,048 characters, which only the
+owner's check can show.
+
+**Resolution.** `tests/air/test_upload.py`; `docs/firmware.md`, "test-air" and step 7 of
+"The owner's checks".
+
+## Seed 07: The last check: what the documents were compared with, and the tests added
+
+**Question.** Task 8 compares `docs/commands.md` and `docs/show.md` with the design word
+for word, reads every acceptance criterion once more, and adds a test where a program can
+check a criterion and none did.
+
+**Answer.** `docs/commands.md` is the design's text, byte for byte. `docs/show.md` has
+the design's four texts word for word, apart from the example of a written `show.json`,
+which the design gives with a cycle that lists an id no item has; the page has a valid
+show there, as recorded with task 4. No other difference was found, so nothing else was
+settled.
+
+Six criteria had no test and got one:
+
+- 13.5, no array above 256 bytes in a function of the core: a scan of the sources,
+  beside the compiler's limit of 512 bytes for a frame and the assertion that holds the
+  core object to 4,096 bytes.
+- 15.1, no host looks into a line: the emulator's sources also hold none of the words
+  `list` and `upload` and none of the core's three file names; `space` and `remove` are
+  allowed in the binding alone, where they are members of the host record.
+- 16.4, the emulator's host refuses a name that is no file name of the folder: now also
+  for the five storage methods that take a name.
+- 20.5 and 21.2, `docs/firmware.md` has the storage functions, the pacing, the probe's
+  members and the measured upload.
+- 20.6, `docs/reasons.md` no longer lists a show without items as malformed.
+- 20.7, `docs/decisions.md` lists the commands and the two limits.
+
+What no program checks: 14.4 as far as it is the file system's own promise for a power
+cut during a rename, which no task tries on the board; 14.6, which holds because no host
+function calls the core, and is seen in the traces of the storage calls; and 21.5 and
+21.6, the owner's check.
+
+The first table of "Measurements on the board" was taken again with the firmware as it
+is now: the core asks for more memory at its start, so less of the chip's internal
+memory is free, and every start takes a little longer.
+
+**Resolution.** `tests/core/test_build.py`,
+`test_no_function_has_an_array_above_256_bytes`; `tests/emulator/test_scope.py`;
+`tests/emulator/test_binding.py`,
+`test_the_storage_methods_refuse_every_name_that_is_not_a_file_name_of_the_folder`;
+`tests/firmware/test_docs.py`,
+`test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured`;
+`tests/core/test_docs.py`, `Decisions` and
+`test_a_show_without_items_is_not_listed_as_malformed`; `docs/decisions.md`, "Commands"
+and the change log; `docs/firmware.md`, "Measurements on the board".
+
+## Seed 07: The owner's check is open
+
+**Question.** Task 9 is the upload over the board's Wi-Fi: a phone or a computer joined
+to the board's network. No agent joins that network, and this run was told not to join
+it and not to change a Wi-Fi setting.
+
+**Answer.** The task stays open, its checkbox unticked, and the seed stays `in_progress`.
+Under the task, `tasks.md` has what a program established over USB: the command tool
+uploads Hello world to the board, lists it, plays it and removes it, by hand and in the
+board suite with a restart in it, with the replies the emulator gives; and the test over
+the air passes with an emulator in the place of the board's network. What remains is
+step 7 of "The owner's checks" in `docs/firmware.md`, and
+`python3 firmware/fw.py test-air --http 4.3.2.1` with this Mac joined to the board's
+network. Two things only that run can show: that the board's web server carries a line
+of 2,048 characters, which is what an `upload data` line is, and the speed of an upload
+over Wi-Fi. When both pass, the owner sets the seed to `completed`.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, task 9; `docs/firmware.md`,
+"The owner's checks", step 7; `project-seeds/07-p1-content-commands/state.json` is not
+changed.

@@ -66,7 +66,7 @@ class ValidShow(unittest.TestCase):
         run = support.start(example(), options=["--trace-files"])
         self.assertEqual(
             run.opened,
-            (("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("hello.odrg", 1), ("dvd.odrg", 1)),
+            (("mapping.json", 1), ("mapping.json", 1), ("show.json", 1), ("show.json", 1), ("pending.txt", 0), ("hello.odrg", 1), ("dvd.odrg", 1)),
         )
 
     def test_a_file_named_twice_is_opened_for_checking_once(self):
@@ -232,8 +232,8 @@ class EachReason(unittest.TestCase):
 
     def test_out_of_memory(self):
         blocks = support.start(example()).memory[1]
-        self.assertEqual(blocks, 10)
-        for number in (8, 9, 10):
+        self.assertEqual(blocks, 16)
+        for number in (10, 11, 12, 13, 14, 15, 16):
             self.check(example(), "out-of-memory", ["--alloc-fails-at", str(number)])
 
 
@@ -303,6 +303,191 @@ class OrderOfTheChecks(unittest.TestCase):
         run = support.start(example(show_json=show(start=9)), options=["--trace-files"])
         self.assertEqual(run.error, "undefined-id 9")
         self.assertEqual([name for name, _ in run.opened if name.endswith(".odrg")], [])
+
+
+class Leftovers(unittest.TestCase):
+    """What the start removes of a change that was interrupted."""
+
+    CLIP = support.clip(4, 60, 6)
+
+    def started(self, files, options=()):
+        """Starts the core on the files, with its storage calls and its openings traced.
+        Returns the run and the files of the folder afterwards. The reference player
+        leaves the same files."""
+        run, left = support.start_and_keep(files, [support.line(T0, "status")], ["--trace-store", "--trace-files", *options])
+        return run, left
+
+    def assert_as_the_reference(self, files, left):
+        expected = support.ReferencePlayer(files).files
+        self.assertEqual(sorted(left), sorted(expected))
+        self.assertEqual(left, expected)
+
+    def test_a_folder_without_leftovers_gets_two_removals_one_opening_and_no_other_storage_call(self):
+        for files in (example(), support.demo_show()):
+            run, left = self.started(files)
+            self.assertIsNone(run.error)
+            self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
+            self.assertEqual(run.opened.count(("pending.txt", 0)), 1)
+            self.assertEqual(run.opened.index(("pending.txt", 0)), 4)
+            self.assertFalse(any(line.startswith("store ") for line in run.lines))
+            self.assertEqual(left, {name: content if isinstance(content, bytes) else content.encode() for name, content in files.items()})
+
+    def test_each_leftover_alone_and_with_the_others_is_removed(self):
+        leftovers = {"upload.part": b"half an upload", "show.part": b'{"version":1,"brigh', "pending.txt": b"stray.odrg\n", "stray.odrg": self.CLIP}
+        names = sorted(leftovers)
+        plain = {name: content if isinstance(content, bytes) else content.encode() for name, content in example().items()}
+        for chosen in range(1, 2 ** len(names)):
+            there = [name for bit, name in enumerate(names) if chosen >> bit & 1]
+            with self.subTest(leftovers=there):
+                files = example(**{name.replace(".", "_"): leftovers[name] for name in there})
+                run, left = self.started(files)
+                self.assertIsNone(run.error)
+                self.assert_as_the_reference(files, left)
+                # A file that no item names and that `pending.txt` does not name is not
+                # the core's to find: it stays.
+                stays = {"stray.odrg"} if "stray.odrg" in there and "pending.txt" not in there else set()
+                self.assertEqual(set(left), set(plain) | stays)
+                self.assertEqual({name: left[name] for name in plain}, plain)
+                expected = [f"remove upload.part {int('upload.part' in there)}", f"remove show.part {int('show.part' in there)}"]
+                if "pending.txt" in there:
+                    expected += [f"remove stray.odrg {int('stray.odrg' in there)}", "remove pending.txt 1"]
+                self.assertEqual(list(run.stored), expected)
+
+    def test_a_file_that_an_item_names_is_not_removed_whatever_pending_says(self):
+        files = example(pending_txt=b"hello.odrg\nstray.odrg\ndvd.odrg\nhello.odrg\nstray.odrg\n", stray_odrg=self.CLIP)
+        run, left = self.started(files)
+        self.assertIsNone(run.error)
+        self.assertEqual(sorted(left), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+        self.assertEqual(list(run.stored)[2:], ["remove stray.odrg 1", "remove stray.odrg 0", "remove pending.txt 1"])
+        self.assert_as_the_reference(files, left)
+
+    def test_a_cut_line_of_pending_names_nothing(self):
+        for text in (b"stray.odrg", b"stray.od", b"", b"other.odrg\nstray.odrg", b"other.odrg\nstray"):
+            with self.subTest(pending=text):
+                files = example(pending_txt=text, stray_odrg=self.CLIP, other_odrg=self.CLIP)
+                run, left = self.started(files)
+                self.assertIsNone(run.error)
+                self.assertIn("stray.odrg", left)
+                self.assertEqual("other.odrg" in left, not text.startswith(b"other.odrg\n"))
+                self.assertNotIn("pending.txt", left)
+                self.assert_as_the_reference(files, left)
+
+    def test_a_line_of_pending_that_is_no_file_name_names_nothing(self):
+        lines = [b"show.json", b"mapping.json", b"pending.txt", b"upload.part", b"stray.txt", b"STRAY.odrg", b"../stray.odrg", b"./stray.odrg", b"stray.odrg ", b" stray.odrg",
+                 b"stray.odrg\r", b"", b"a" * 28 + b".odrg", b"stray\x00.odrg", b"str\xc3\xa4y.odrg", b"stray.odrgx", b"/stray.odrg", b"odrg"]
+        files = example(pending_txt=b"".join(line + b"\n" for line in lines), stray_odrg=self.CLIP)
+        run, left = self.started(files)
+        self.assertIsNone(run.error)
+        self.assertEqual(sorted(left), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json", "stray.odrg"])
+        self.assertEqual(list(run.stored)[2:], ["remove pending.txt 1"])
+        self.assert_as_the_reference(files, left)
+
+    def test_the_shortest_and_the_longest_file_name_of_pending_are_taken(self):
+        longest = "b" * 27 + ".odrg"
+        files = example(pending_txt=f".odrg\n{longest}\n".encode(), **{"_odrg": self.CLIP, longest.replace(".", "_"): self.CLIP})
+        run, left = self.started(files)
+        self.assertEqual(list(run.stored)[2:], ["remove .odrg 1", f"remove {longest} 1", "remove pending.txt 1"])
+        self.assertEqual(sorted(left), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+
+    def test_of_a_long_pending_the_first_512_bytes_are_read(self):
+        names = [f"stray-{number:03d}.odrg" for number in range(40)]
+        self.assertEqual(len(names[0]), 14)
+        files = example(pending_txt="".join(f"{name}\n" for name in names).encode())
+        files.update({name: self.CLIP for name in names})
+        run, left = self.started(files)
+        self.assertIsNone(run.error)
+        # 34 lines of 15 bytes are 510 bytes; the 35th is cut by the limit.
+        self.assertEqual(sorted(name for name in left if name.startswith("stray-")), names[34:])
+        self.assertNotIn("pending.txt", left)
+        self.assert_as_the_reference(files, left)
+
+    def test_beside_a_show_file_that_cannot_be_used_pending_is_left_alone(self):
+        unusable = {
+            "show-missing": {"show_json": None},
+            "show-malformed": {"show_json": "{"},
+            "duplicate-id 1": {"show_json": support.show_text([animation(1, "hello.odrg"), animation(1, "dvd.odrg")])},
+            "undefined-id 7": {"show_json": show(start=7)},
+            "nested-cycle 4": {"show_json": show(cycle(3, [1]), cycle(4, [3]))},
+            "mapping-missing": {"mapping_json": None},
+            "mapping-malformed": {"mapping_json": "{"},
+        }
+        for reason, changes in unusable.items():
+            with self.subTest(reason=reason):
+                files = example(pending_txt=b"stray.odrg\nhello.odrg\n", stray_odrg=self.CLIP, upload_part=b"x", show_part=b"y", **changes)
+                run, left = self.started(files)
+                self.assertEqual(run.error, reason)
+                self.assertEqual(run.stored, ("remove upload.part 1", "remove show.part 1"))
+                self.assertEqual(left["pending.txt"], b"stray.odrg\nhello.odrg\n")
+                self.assertIn("stray.odrg", left)
+                self.assertNotIn("upload.part", left)
+                self.assertNotIn("show.part", left)
+                self.assert_as_the_reference(files, left)
+
+    def test_beside_a_show_whose_file_is_missing_pending_is_settled(self):
+        files = example(pending_txt=b"stray.odrg\n", stray_odrg=self.CLIP, dvd_odrg=None)
+        run, left = self.started(files)
+        self.assertEqual(run.error, "file-missing dvd.odrg")
+        self.assertEqual(sorted(left), ["hello.odrg", "mapping.json", "show.json"])
+        self.assert_as_the_reference(files, left)
+
+    def test_a_pending_that_cannot_be_read_is_left_with_what_it_names(self):
+        files = example(pending_txt=b"stray.odrg\nother.odrg\n", stray_odrg=self.CLIP, other_odrg=self.CLIP)
+        for offset in (0, 5, 11, 21, 22):
+            run, left = self.started(files, ["--read-fails", "pending.txt", str(offset)])
+            self.assertIsNone(run.error)
+            self.assertEqual(run.stored, ("remove upload.part 0", "remove show.part 0"))
+            self.assertEqual(sorted(left), sorted(files))
+        run, left = self.started(files, ["--read-fails", "pending.txt", "23"])
+        self.assertEqual(sorted(left), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+
+    def test_a_host_without_storage_that_can_be_changed_removes_nothing(self):
+        files = example(pending_txt=b"stray.odrg\n", stray_odrg=self.CLIP, upload_part=b"x", show_part=b"y")
+        for option in ("--no-storage", "--only-space"):
+            run, left = self.started(files, [option])
+            self.assertIsNone(run.error)
+            self.assertEqual(run.stored, ())
+            self.assertNotIn("pending.txt", [name for name, _ in run.opened])
+            self.assertEqual(sorted(left), sorted(files))
+
+    def test_a_removal_at_the_start_that_fails_does_not_stop_the_start(self):
+        files = example(pending_txt=b"stray.odrg\n", stray_odrg=self.CLIP, upload_part=b"x", show_part=b"y")
+        for number in (1, 2, 3, 4):
+            run, left = self.started(files, ["--store-fails-at", str(number)])
+            self.assertIsNone(run.error)
+            self.assertEqual(json.loads(run.lines[-1][len("reply "):])["playing"], 3)
+            # A file that could not be removed stays named: `pending.txt` is kept for it.
+            self.assertEqual(len(run.stored), 3 if number == 3 else 4)
+            self.assertEqual([entry.endswith(" -1") for entry in run.stored], [position == number - 1 for position in range(len(run.stored))])
+            self.assertEqual("pending.txt" in left, number in (3, 4))
+            self.assertEqual("stray.odrg" in left, number == 3)
+
+
+class TablesWithRoom(unittest.TestCase):
+    def memory(self, count):
+        """The bytes the core asks for with a show of `count` animation items that name
+        one file, on the two-leg mapping."""
+        items = [animation(number, "hello.odrg") for number in range(1, count + 1)]
+        run = support.start(example(show_json=support.show_text(items)))
+        self.assertIsNone(run.error)
+        self.assertEqual(run.memory[1], 16)
+        return run.memory[0]
+
+    def test_the_tables_have_room_for_32_items_more_than_the_show_and_for_128_at_least(self):
+        small = self.memory(0)
+        self.assertEqual([self.memory(count) for count in (1, 2, 50, 96)], [small] * 4)
+        # An item of the table is 16 bytes and a file 48.
+        self.assertEqual(self.memory(97) - small, 64)
+        self.assertEqual(self.memory(98) - small, 2 * 64)
+        self.assertEqual(self.memory(300) - small, (300 + 32 - 128) * 64)
+
+    def test_a_show_without_items_starts_and_plays_nothing(self):
+        files = example(show_json='{"version": 1, "brightness": 9, "items": []}', hello_odrg=None, dvd_odrg=None)
+        run = support.start(files, QUESTIONS[:3] + [support.line(T0, "play 1"), support.line(T0, "list")])
+        self.assertIsNone(run.error)
+        self.assertEqual(run.legs, EXAMPLE_LEGS)
+        self.assertEqual(json.loads(run.lines[1][len("reply "):]), {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None})
+        self.assertEqual(run.lines[-2:], ['reply {"ok":false,"error":"unknown-id"}', 'reply {"ok":true,"items":[],"next":null}'])
+        self.assertEqual(run.lines, support.ReferencePlayer(files).run(QUESTIONS[:3] + [support.line(T0, "play 1"), support.line(T0, "list")]))
 
 
 if __name__ == "__main__":

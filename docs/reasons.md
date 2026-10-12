@@ -106,7 +106,7 @@ reason that applies.
 |---|---|
 | `mapping-missing`, `mapping-malformed` | As under "Mapping files". |
 | `show-missing` | The show file does not exist. |
-| `show-malformed` | The show file breaks its format: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `brightness` is not 0 to 255; there is no item; an item is neither an animation item nor a cycle item; an `id` is not 1 to 65,535; a `file` name is outside the naming rule; `seconds` is not 1 to 65,535; or a `cycle` is empty. The detail says which. |
+| `show-malformed` | The show file breaks its format: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `brightness` is not 0 to 255; an item is neither an animation item nor a cycle item; an `id` is not 1 to 65,535; a `file` name is outside the naming rule; `seconds` is not 1 to 65,535; or a `cycle` is empty. The detail says which. |
 | `duplicate-id` | Two items have the same `id`. |
 | `undefined-id` | A cycle, or `start`, names an id that no item has. |
 | `nested-cycle` | A cycle names an item that is a cycle. |

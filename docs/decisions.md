@@ -165,9 +165,18 @@ are in [format.md](format.md), "Measured sizes".
 - The board and the emulator accept exactly the same commands, handled by the same
   front-end code. There are no emulator-only commands.
 - A command exists only if something really uses it. Today those are: play an item by its
-  ID, switch on, switch off, set brightness, and report status.
-- Commands are plain text lines and every reply is one JSON line. See
-  [commands.md](commands.md).
+  ID, switch on, switch off, set brightness, and report status; and for the content:
+  report the free storage, list what is installed, remove an item, and upload an animation.
+- Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
+  characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
+- An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
+  base64 on one line each and each acknowledged, with a CRC-32 of the whole file at the
+  end. The board takes the file only after it has decoded all of it, while the show goes
+  on playing; then it can be played at once. One upload is open at a time, whichever
+  route its lines arrive by.
+- A removal and an upload change the show on the board and are kept across a restart. A
+  power cut at any moment leaves the show from before the command or the one after it.
+  A cycle is not made or changed by a command.
 - Commands travel over serial and over HTTP, on the board and on the emulator alike. A
   command-line tool sends them to either target by either route.
 - There is one list of commands for every route. A command is added to all routes or to
@@ -306,3 +315,11 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-12: The owner ruled that the JSON source stays the one thing committed for every
   animation, whatever its size; the question about large video-derived sources is closed.
   The owner checks only real LEDs on the board, not pages or screens.
+- 2026-10-12: Seed 07 added the content commands, in the form the owner approved: `space`,
+  `list`, `remove` and `upload`, on every route, in the core, with lines of up to 2,048
+  characters and replies of up to 1,024 bytes. The firmware writes to the board's storage
+  for them, and the command tool sends them. Measured on the board over USB: a file of
+  868,712 bytes is uploaded at 12,674 bytes a second while the bench show plays at 36 to
+  44 refreshes a second, and its check takes as long as the animation lasts. With a dense
+  60 x 60 clip playing, an upload takes the rate to 16 to 27. The upload over the board's
+  Wi-Fi is the owner's check and is open.

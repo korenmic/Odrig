@@ -38,6 +38,12 @@ def _port(text):
     return int(text)
 
 
+def _storage(text):
+    if not text.isascii() or not text.isdigit() or int(text) > host.MOST_STORAGE:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of bytes from 0 to {host.MOST_STORAGE}")
+    return int(text)
+
+
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m emulator",
@@ -49,6 +55,8 @@ def parser():
     made.add_argument("--serial-link", metavar="PATH", help="where the link to the virtual serial port is made (default: build/emulator/serial)")
     made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help="the core's shared library (default: core/build/libodrig_core.dylib)")
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
+    made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
+                      help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -72,7 +80,7 @@ def parse(argv):
 def serve(arguments, out):
     """Real time: starts the core, opens the port and the page address, and runs until a
     signal. A step that fails undoes the ones before it."""
-    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose)
+    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage)
     port = None
     server = None
     try:
@@ -109,7 +117,7 @@ def serve(arguments, out):
             server.server_close()
         if port is not None:
             port.close()
-        files.close()
+        files.release()
     return 0
 
 
@@ -117,7 +125,7 @@ def run(arguments, out):
     if not os.path.isdir(arguments.show_dir):
         raise failure.Failure(failure.NOT_A_FOLDER, f"{arguments.show_dir}: there is no such folder")
     if arguments.record is not None:
-        record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core, out)
+        record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core, out, arguments.storage)
         return 0
     return serve(arguments, out)
 

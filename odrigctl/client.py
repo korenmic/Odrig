@@ -1,4 +1,9 @@
-"""One exchange with a target: a line out and its reply back, over serial or over HTTP."""
+"""Exchanges with a target: a line out and its reply back, over serial or over HTTP.
+
+`serial_exchange` and `http_exchange` are one exchange each, for one command. A `Session`
+is several exchanges with the same target, and through a serial port it keeps the port open
+for all of them.
+"""
 
 import fcntl
 import http.client
@@ -85,38 +90,74 @@ def _write(descriptor, data, seconds):
             select.select([], [descriptor], [], left)
 
 
+def _named(port, error):
+    return Unreachable(f"{port}: {error.strerror or type(error).__name__}")
+
+
+def _ready(port):
+    """Opens a serial port, lets it settle, and discards what was waiting in it."""
+    try:
+        descriptor = _open(port)
+    except OSError as error:
+        raise _named(port, error) from None
+    except termios.error:
+        raise Unreachable(f"{port}: this is not a serial port") from None
+    try:
+        time.sleep(SETTLE_SECONDS)
+        for _ in _received(descriptor, DISCARD_SECONDS):
+            pass
+    except OSError as error:
+        os.close(descriptor)
+        raise _named(port, error) from None
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _arrived(descriptor):
+    """What a port has received and not given yet, without waiting for more."""
+    received = b""
+    while True:
+        try:
+            piece = os.read(descriptor, 65536)
+        except BlockingIOError:
+            return received
+        if not piece:
+            return received
+        received += piece
+
+
+def _exchanged(descriptor, port, data, timeout, accept, waiting=b""):
+    """Sends bytes to an open port. Returns the first received line that `accept` takes,
+    without its line end, and what arrived after it. Every other line is dropped.
+    `waiting` is the beginning of a line that arrived before the bytes are sent."""
+    try:
+        _write(descriptor, data, timeout)
+    except OSError as error:
+        raise _named(port, error) from None
+    try:
+        for piece in _received(descriptor, timeout):
+            waiting += piece
+            while b"\n" in waiting:
+                line, waiting = waiting.split(b"\n", 1)
+                line = line.rstrip(b"\r")
+                if accept(line):
+                    return line, waiting
+    except OSError as error:
+        raise _named(port, error) from None
+    raise Unreachable(f"{port}: no reply within {timeout:g} seconds")
+
+
 def serial_exchange(port, data, timeout, accept=is_reply):
     """Sends bytes to a serial port and returns the first received line that `accept`
     takes, without its line end. Every other line is dropped.
 
     What was waiting in the port when it was opened is discarded first.
     """
+    descriptor = _ready(port)
     try:
-        descriptor = _open(port)
-    except OSError as error:
-        raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-    except termios.error:
-        raise Unreachable(f"{port}: this is not a serial port") from None
-    try:
-        try:
-            time.sleep(SETTLE_SECONDS)
-            for _ in _received(descriptor, DISCARD_SECONDS):
-                pass
-            _write(descriptor, data, timeout)
-        except OSError as error:
-            raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-        waiting = b""
-        try:
-            for piece in _received(descriptor, timeout):
-                waiting += piece
-                while b"\n" in waiting:
-                    line, waiting = waiting.split(b"\n", 1)
-                    line = line.rstrip(b"\r")
-                    if accept(line):
-                        return line
-        except OSError as error:
-            raise Unreachable(f"{port}: {error.strerror or type(error).__name__}") from None
-        raise Unreachable(f"{port}: no reply within {timeout:g} seconds")
+        return _exchanged(descriptor, port, data, timeout, accept)[0]
     finally:
         os.close(descriptor)
 
@@ -145,3 +186,62 @@ def http_exchange(address, line, timeout):
     if answer.status != 200:
         raise Unreachable(f"{address}: status {answer.status} for POST {COMMAND_PATH}")
     return body[:-1] if body.endswith(b"\n") else body
+
+
+class Session:
+    """Several exchanges with one target, one after the other.
+
+    Through a serial port the port is opened once, as `serial_exchange` opens it, and stays
+    open until `close`. A line that arrived whole before a line is sent is no answer to
+    it and is dropped. Over HTTP every exchange is one request, and `close` does nothing.
+    """
+
+    def __init__(self, port=None, http=None, timeout=2.0):
+        if (port is None) == (http is None):
+            raise ValueError("a session is with a port or with an address, one of the two")
+        self.port = port
+        self.http = http
+        self.timeout = timeout
+        self._waiting = b""
+        self._descriptor = None if port is None else _ready(port)
+
+    def exchange(self, line):
+        """Sends one line, with its newline, and returns the reply without its line end.
+        Raises `Unreachable` when none arrives in time."""
+        if self.http is not None:
+            reply = http_exchange(self.http, line, self.timeout)
+            if not is_reply(reply):
+                raise Unreachable(f"{self.http}: the answer is not a reply")
+            return reply
+        if self._descriptor is None:
+            raise Unreachable(f"{self.port}: the session is closed")
+        try:
+            # Of what arrived since the last reply, only the beginning of a line that has
+            # not ended yet can still become part of the answer.
+            fresh = (self._waiting + _arrived(self._descriptor)).rsplit(b"\n", 1)[-1]
+        except OSError as error:
+            raise _named(self.port, error) from None
+        reply, self._waiting = _exchanged(self._descriptor, self.port, line, self.timeout, is_reply, fresh)
+        return reply
+
+    def discard(self, seconds):
+        """Drops what arrives through the port within a length of time: a reply that comes
+        after its exchange has given up would be taken for the answer of the next one."""
+        if self._descriptor is not None:
+            self._waiting = b""
+            try:
+                for _ in _received(self._descriptor, seconds):
+                    pass
+            except OSError as error:
+                raise _named(self.port, error) from None
+
+    def close(self):
+        if self._descriptor is not None:
+            os.close(self._descriptor)
+            self._descriptor = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()

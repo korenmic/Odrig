@@ -10,8 +10,8 @@ from ctypes import CFUNCTYPE, POINTER, Structure, c_char, c_char_p, c_int, c_int
 
 from . import failure
 
-LINE_MAX = 64
-REPLY_MAX = 192
+LINE_MAX = 2048
+REPLY_MAX = 1024
 
 BUILD_COMMAND = "make -C core shared"
 
@@ -20,13 +20,24 @@ OPEN = CFUNCTYPE(c_int, c_void_p, c_char_p)
 READ = CFUNCTYPE(c_int32, c_void_p, POINTER(c_uint8), c_size_t)
 CLOSE = CFUNCTYPE(None, c_void_p)
 LOG = CFUNCTYPE(None, c_void_p, c_char_p)
+WRITE_OPEN = CFUNCTYPE(c_int, c_void_p, c_char_p)
+WRITE = CFUNCTYPE(c_int, c_void_p, POINTER(c_uint8), c_size_t)
+WRITE_CLOSE = CFUNCTYPE(c_int, c_void_p)
+RENAME = CFUNCTYPE(c_int, c_void_p, c_char_p, c_char_p)
+REMOVE = CFUNCTYPE(c_int, c_void_p, c_char_p)
+SPACE = CFUNCTYPE(c_int, c_void_p, POINTER(c_uint32), POINTER(c_uint32))
+READ_AT = CFUNCTYPE(c_int32, c_void_p, c_char_p, c_uint32, POINTER(c_uint8), c_size_t)
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
 class HostRecord(Structure):
     """`odrig_host`."""
 
-    _fields_ = [("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG)]
+    _fields_ = [
+        ("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG),
+        ("write_open", WRITE_OPEN), ("write", WRITE), ("write_close", WRITE_CLOSE), ("rename", RENAME), ("remove", REMOVE),
+        ("space", SPACE), ("read_at", READ_AT),
+    ]
 
 
 class LegRecord(Structure):
@@ -49,6 +60,7 @@ FUNCTIONS = {
 Leg = collections.namedtuple("Leg", "leg pin led_count")
 
 TOO_LONG = b'"line-too-long"'
+MOST_BYTES = 4294967295
 
 
 def load(library_path):
@@ -71,7 +83,10 @@ class Core:
     """The core, started on the files a host object hands out.
 
     The host object has the methods `open(name)`, `read(capacity)`, `close()` and
-    `log(text)` of `host.FolderHost`. The core is used by one caller at a time.
+    `log(text)` of `host.FolderHost`. When it also has `write_open`, it has the seven
+    storage methods of `host.FolderHost`, and the core gets storage that can be changed;
+    otherwise the core gets a host without storage. The core is used by one caller at a
+    time.
     """
 
     def __init__(self, library_path, host):
@@ -80,6 +95,13 @@ class Core:
         self._blocks = []
         self._answered = []
         self._functions = (ALLOC(self._alloc), OPEN(self._open), READ(self._read), CLOSE(self._close), LOG(self._log))
+        if hasattr(host, "write_open"):
+            self._functions += (
+                WRITE_OPEN(self._write_open), WRITE(self._write), WRITE_CLOSE(self._write_close), RENAME(self._rename),
+                REMOVE(self._remove), SPACE(self._space), READ_AT(self._read_at),
+            )
+        else:
+            self._functions += (WRITE_OPEN(), WRITE(), WRITE_CLOSE(), RENAME(), REMOVE(), SPACE(), READ_AT())
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -117,6 +139,35 @@ class Core:
     def _log(self, _ctx, text):
         self._host.log(text.decode("utf-8", "replace"))
 
+    def _write_open(self, _ctx, name):
+        return self._host.write_open(name.decode("utf-8", "replace"))
+
+    def _write(self, _ctx, data, length):
+        return self._host.write(ctypes.string_at(data, length))
+
+    def _write_close(self, _ctx):
+        return self._host.write_close()
+
+    def _rename(self, _ctx, old, new):
+        return self._host.rename(old.decode("utf-8", "replace"), new.decode("utf-8", "replace"))
+
+    def _remove(self, _ctx, name):
+        return self._host.remove(name.decode("utf-8", "replace"))
+
+    def _space(self, _ctx, free_bytes, total_bytes):
+        told = self._host.space()
+        if told is None:
+            return -1
+        free_bytes[0], total_bytes[0] = (min(max(int(value), 0), MOST_BYTES) for value in told)
+        return 1
+
+    def _read_at(self, _ctx, name, offset, buffer, capacity):
+        data = self._host.read_at(name.decode("utf-8", "replace"), offset, capacity)
+        if data is None or len(data) > capacity:
+            return -1
+        ctypes.memmove(buffer, data, len(data))
+        return len(data)
+
     def _collect(self, _ctx, line, line_length, reply, reply_length):
         answer = ctypes.string_at(reply, reply_length)
         self._answered.append((ctypes.string_at(line, line_length), answer, TOO_LONG in answer))
@@ -137,8 +188,8 @@ class Core:
 
     def feed(self, now_ms, data):
         """Bytes of a transport. Returns `(line, reply, cut)` for every line they finish:
-        the line as the core read it, its reply, and whether the line was cut to its first
-        64 characters."""
+        the line as the core read it, its reply, and whether the line was longer than the
+        core's limit and was cut to it."""
         self._answered = []
         self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []

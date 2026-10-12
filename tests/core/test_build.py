@@ -14,6 +14,15 @@ SYSTEM_HEADERS = ("stdint.h", "stddef.h", "string.h")
 INCLUDE_LINE = re.compile(r'(?m)^[ \t]*#[ \t]*include[ \t]*([<"])([^>"]+)[>"]')
 FLOATING_POINT = re.compile(r"\b(?:float|double)\b")
 
+# An array declared inside a block: its element type, whether it holds pointers, its name
+# and its number of elements as the source writes it.
+ARRAY_IN_A_BLOCK = re.compile(r"(?m)^[ \t]+(?:const[ \t]+)?([A-Za-z_]\w*)[ \t]+(\*?)[ \t]*([A-Za-z_]\w*)\[([^\]\n]+)\];")
+CONSTANT = re.compile(r"(?m)^const[ \t]+\w+[ \t]+(k\w+)[ \t]*=[ \t]*([^;\n]+);")
+ELEMENT_BYTES = {"char": 1, "uint8_t": 1, "int8_t": 1, "uint16_t": 2, "int16_t": 2, "uint32_t": 4, "int32_t": 4, "uint64_t": 8, "int64_t": 8}
+NO_TYPES = ("return", "else", "case", "goto", "delete", "throw", "sizeof")
+# The most bytes an array inside a function of the core may have.
+LARGEST_LOCAL_ARRAY = 256
+
 
 def core_sources():
     """Every source file and header of the core."""
@@ -33,6 +42,37 @@ def foreign_headers(text, own):
         allowed = name in SYSTEM_HEADERS if bracket == "<" else name in own
         if not allowed:
             found.append(name)
+    return found
+
+
+def number(text, constants):
+    """The value of a number of elements: digits, constants of the same source, and the
+    signs of a sum or a product."""
+    if not re.fullmatch(r"[\w \t+*()-]+", text):
+        raise ValueError(f"not a plain number of elements: {text}")
+    return int(eval(text, {"__builtins__": {}}, dict(constants)))
+
+
+def constants_of(code, known=()):
+    """The constants a source defines as plain numbers, by name, beside the ones known."""
+    constants = dict(known)
+    for name, value in CONSTANT.findall(code):
+        try:
+            constants[name] = number(value, constants)
+        except (ValueError, NameError, SyntaxError):
+            pass
+    return constants
+
+
+def arrays_in_blocks(code, known=()):
+    """`(name, bytes)` of every array a source declares inside a block. `known` holds the
+    constants of the headers it includes."""
+    constants = constants_of(code, known)
+    found = []
+    for element, pointer, name, count in ARRAY_IN_A_BLOCK.findall(code):
+        if element in NO_TYPES:
+            continue
+        found.append((name, number(count, constants) * (8 if pointer else ELEMENT_BYTES[element])))
     return found
 
 
@@ -97,7 +137,7 @@ class Sources(unittest.TestCase):
     def test_there_are_sources_to_check(self):
         names = {path.name for path in core_sources()}
         expected = ("core.cpp", "core_state.h", "reasons.cpp", "reasons.h", "arena.h", "file_source.cpp", "inflate.cpp", "odrg_decoder.cpp",
-                    "json_reader.cpp", "mapping.cpp", "show.cpp", "player.cpp", "commands.cpp", "odrig_core.h")
+                    "json_reader.cpp", "mapping.cpp", "show.cpp", "player.cpp", "commands.cpp", "content.cpp", "content.h", "storage.h", "odrig_core.h")
         for name in expected:
             self.assertIn(name, names)
 
@@ -121,6 +161,28 @@ class Sources(unittest.TestCase):
                 if re.match(r"^\s+static\b", line):
                     self.fail(f"{path.name} has a static inside a block: {line.strip()}")
 
+    def test_no_function_has_an_array_above_256_bytes(self):
+        found = []
+        shared = {}
+        for path in sorted(SOURCES.glob("*.h")):
+            shared = constants_of(without_comments_and_strings(path.read_text(encoding="utf-8")), shared)
+        self.assertEqual((shared["kIdTextSize"], shared["kFileBufferSize"]), (12, 512))
+        for path in sorted(SOURCES.glob("*.cpp")):
+            code = without_comments_and_strings(path.read_text(encoding="utf-8"))
+            for name, size in arrays_in_blocks(code, shared):
+                found.append((path.name, name, size))
+                self.assertLessEqual(size, LARGEST_LOCAL_ARRAY, f"{path.name}: {name} has {size} bytes")
+        # The check reads the arrays the sources have: names of files and ids, the tables
+        # of a Huffman code, the start of a file and of a frame record.
+        self.assertGreaterEqual(len(found), 15)
+        self.assertLessEqual({("show.cpp", "file", 33), ("odrg_decoder.cpp", "header", 16), ("inflate.cpp", "offset", 32), ("commands.cpp", "text", 40)}, set(found))
+        # The compiler holds every function to a frame of 512 bytes, and the core object to
+        # 4,096 bytes.
+        makefile = (support.CORE / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("-Wframe-larger-than=512", makefile)
+        self.assertIn("-Werror", makefile)
+        self.assertIn("static_assert(sizeof(odrig_core) <= 4096,", (SOURCES / "core_state.h").read_text(encoding="utf-8"))
+
     def test_they_are_valid_in_every_standard_from_cpp11_on(self):
         sources = sorted(SOURCES.glob("*.cpp"))
         self.assertGreaterEqual(len(sources), 10)
@@ -138,6 +200,11 @@ class Sources(unittest.TestCase):
         self.assertEqual(foreign_headers(text, own), ["vector", "other.h"])
         code = without_comments_and_strings('int a; // a double\nconst char *b = "float"; /* float */ double c;')
         self.assertEqual(FLOATING_POINT.findall(code), ["double"])
+        code = "const uint32_t kSize = 100;\nconst uint32_t kMore = kSize + 29;\nvoid f() {\n    uint8_t small[kSize];\n    uint16_t large[kMore];\n    const char *words[4];\n" \
+               "    return small[0];\n        char one[257];\n}\nuint8_t outside[1000];\n"
+        self.assertEqual(arrays_in_blocks(code), [("small", 100), ("large", 258), ("words", 32), ("one", 257)])
+        with self.assertRaises(KeyError):
+            arrays_in_blocks("void f() {\n    Thing things[4];\n}\n")
 
 
 # A host written against the interface, valid as C and as C++.
@@ -150,18 +217,29 @@ static int open_file(void *ctx, const char *name) { (void)ctx; (void)name; retur
 static int32_t read_file(void *ctx, uint8_t *buffer, size_t capacity) { (void)ctx; (void)buffer; (void)capacity; return 0; }
 static void close_file(void *ctx) { (void)ctx; }
 static void log_line(void *ctx, const char *text) { (void)ctx; (void)text; }
+static int begin_file(void *ctx, const char *name) { (void)ctx; (void)name; return -1; }
+static int add_bytes(void *ctx, const uint8_t *bytes, size_t length) { (void)ctx; (void)bytes; (void)length; return -1; }
+static int end_file(void *ctx) { (void)ctx; return -1; }
+static int rename_file(void *ctx, const char *from, const char *to) { (void)ctx; (void)from; (void)to; return -1; }
+static int remove_file(void *ctx, const char *name) { (void)ctx; (void)name; return -1; }
+static int tell_space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes) { (void)ctx; *free_bytes = 1; *total_bytes = 2; return 1; }
+static int32_t read_part(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity) {
+    (void)ctx; (void)name; (void)offset; (void)buffer; (void)capacity; return -1;
+}
 static void on_reply(void *ctx, const char *line, size_t line_length, const char *reply, size_t reply_length) {
     (void)ctx; (void)line; (void)line_length; (void)reply; (void)reply_length;
 }
 
 int main(void) {
-    odrig_host host = {0, give, open_file, read_file, close_file, log_line};
+    odrig_host host = {0, give, open_file, read_file, close_file, log_line,
+                       begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];
     const uint8_t bytes[1] = {10};
     odrig_reply_fn answered = on_reply;
-    odrig_core *core = odrig_core_begin(&host);
+    odrig_core *core = odrig_core_begin(plain.write_open == 0 ? &host : &plain);
     uint64_t now = 0;
     uint32_t legs = odrig_core_leg_count(core);
     int produced = odrig_core_poll(core, now);
