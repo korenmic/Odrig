@@ -44,33 +44,6 @@ def _quiet_faults():
             libc.signal(int(number), leave)
 
 
-VIDEO_ENDINGS = (".mp4", ".mov")
-
-
-def _undecodable_video(argv):
-    """Why the Python tool must not be given this `import` command line, or None.
-
-    PyAV 17 ends the whole program with a fault of memory when it is asked to decode a video
-    stream for which it has no decoder, which is what `odrig/media.py` asks of the first
-    video stream of a file. A file that is cut inside its header has such a stream. This
-    looks at the streams without decoding anything.
-    """
-    if len(argv) < 2 or argv[0] != "import" or not argv[1].lower().endswith(VIDEO_ENDINGS):
-        return None
-    if not os.path.isfile(argv[1]):
-        return None
-    import av
-
-    try:
-        with av.open(argv[1]) as container:
-            videos = container.streams.video
-            if videos and videos[0].codec_context is None:
-                return f"{argv[1]}: PyAV has no decoder for the first video stream and would end Python with a fault of memory"
-    except Exception:  # noqa: BLE001  the tool meets the same failure and reports it
-        return None
-    return None
-
-
 def _run(argv):
     """One command line of the Python tool, run in this interpreter: status and both streams.
 
@@ -79,9 +52,6 @@ def _run(argv):
     status 1 and its traceback on standard error, as it does when the tool is a program of
     its own.
     """
-    refused = _undecodable_video(argv)
-    if refused is not None:
-        return [None, "", refused]
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         try:
@@ -408,7 +378,7 @@ class _FakeVideo:
     def __init__(self, frames, time_base):
         self.frames = frames
         self.asked = 0
-        self.streams = types.SimpleNamespace(video=[types.SimpleNamespace(time_base=time_base)])
+        self.streams = types.SimpleNamespace(video=[types.SimpleNamespace(time_base=time_base, codec_context=object())])
 
     def __enter__(self):
         return self

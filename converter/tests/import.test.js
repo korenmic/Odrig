@@ -593,6 +593,12 @@ test("the pictures of a GIF are built by the rules of the format as browsers app
   });
 });
 
+// Damaged videos that one tool reads and the other refuses. The two tools decode with
+// different builds of FFmpeg, and one may recover a picture from a file the other gives up on.
+const KNOWN_DIFFERENCES = [
+  "alpha.mov byte 1137 changed by 245: JavaScript reads it, Python refuses it",
+];
+
 test("a damaged or cut media file ends the import with a result or with unreadable-media, and never keeps it busy", async (t) => {
   const from = numbers(808);
   const copies = (name, limit) => {
@@ -603,7 +609,7 @@ test("a damaged or cut media file ends the import with a result or with unreadab
     for (const length of lengths) {
       const file = media(`cut-${(outputs += 1)}${ending2}`);
       fs.writeFileSync(file, bytes.subarray(0, length));
-      files.push(file);
+      files.push({file, label: `${name} cut after ${length}`});
     }
     const places = bytes.length <= limit ? Array.from({length: bytes.length}, (unused, i) => i) : Array.from({length: limit}, () => from.below(bytes.length));
     for (const at of places) {
@@ -612,14 +618,14 @@ test("a damaged or cut media file ends the import with a result or with unreadab
         damaged[at] ^= change;
         const file = media(`damaged-${(outputs += 1)}${ending2}`);
         fs.writeFileSync(file, damaged);
-        files.push(file);
+        files.push({file, label: `${name} byte ${at} changed by ${change}`});
       }
     }
     return files;
   };
 
   await t.test("every cut and every changed byte of four GIFs, in a program with a limit of two minutes", () => {
-    const files = ["clip.gif", "smaller.gif", "disposal-2.gif", "disposal-3.gif"].flatMap((name) => copies(name, 400));
+    const files = ["clip.gif", "smaller.gif", "disposal-2.gif", "disposal-3.gif"].flatMap((name) => copies(name, 400)).map((copy) => copy.file);
     assert.ok(files.length > 3000, `${files.length} files`);
     const list = media("gifs.json");
     fs.writeFileSync(list, JSON.stringify(files));
@@ -645,7 +651,8 @@ test("a damaged or cut media file ends the import with a result or with unreadab
   await t.test("80 cuts and 80 changed bytes of an mp4 and of a mov", async () => {
     const files = ["clip.mp4", "alpha.mov"].flatMap((name) => copies(name, 40));
     const counts = {written: 0, refused: 0};
-    for (const file of files) {
+    const ours = [];
+    for (const {file} of files) {
       const out = fresh("js");
       const result = await runJsHere(["import", file, out, "--mapping", BENCH]);
       if (result.status === 0) {
@@ -657,9 +664,25 @@ test("a damaged or cut media file ends the import with a result or with unreadab
         assert.equal(fs.existsSync(out), false);
         counts.refused += 1;
       }
+      ours.push(result);
     }
     assert.equal(counts.written + counts.refused, 160);
     assert.ok(counts.written >= 20 && counts.refused >= 60, JSON.stringify(counts));
+
+    // The Python tool reads the same files, each of them, and ends with a file or a reason.
+    const theirs = runPythonMany(files.map(({file}) => ["import", file, fresh("py"), "--mapping", BENCH]));
+    const reason = (err) => (/^error: ([a-z-]+): /.exec(err) ?? [])[1];
+    const different = [];
+    files.forEach(({label}, i) => {
+      assert.ok(theirs[i].status === 0 || theirs[i].status === 1, `${label}: the Python tool ended with ${theirs[i].status}: ${theirs[i].err}`);
+      assert.doesNotMatch(theirs[i].err, /Traceback/, label);
+      if (ours[i].status === 1 && theirs[i].status === 1) {
+        assert.equal(reason(theirs[i].err), reason(ours[i].err), label);
+      } else if (ours[i].status !== theirs[i].status) {
+        different.push(`${label}: ${ours[i].status === 0 ? "JavaScript reads it, Python refuses it" : "Python reads it, JavaScript refuses it"}`);
+      }
+    });
+    assert.deepEqual(different, KNOWN_DIFFERENCES);
   });
 });
 

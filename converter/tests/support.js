@@ -352,9 +352,7 @@ export function animationFrom(seed, {largestWidth = 40, largestHeight = 30} = {}
 
 // Runs command lines of the Python tool one after the other in one Python, in the folder
 // `cwd`: for each `{status, out, err}`. It is the command line of `python -m odrig` without
-// a new program for each line. An `import` of a video for whose first video stream PyAV has
-// no decoder is not run, because PyAV would end Python with a fault of memory: its status
-// is null and `err` says why.
+// a new program for each line.
 export function runPythonMany(commands, cwd = ROOT) {
   const results = reference("run", [], {cwd, commands: commands.map((argv) => argv.map(String))});
   return results.map(([status, out, err]) => ({status, out, err}));

@@ -25,7 +25,7 @@ with `.venv/bin/python -m unittest discover -s tests/converter -t .`.
   - Add the test that a whole video and a whole GIF give the bytes they gave before.
   - Requirements 1.3 and 3.
 
-- [ ] 4. The two tools are compared on damaged files again
+- [x] 4. The two tools are compared on damaged files again
   - `converter/tests/reference.py`: remove `_undecodable_video` and its use.
   - `converter/tests/import.test.js`: equal reasons where both refuse, and the table of
     known differences.

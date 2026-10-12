@@ -6177,3 +6177,22 @@ files.
 
 **Resolution.** Seed 13 `tasks.md`, task 3; the commit message of task 3 records the
 comparison.
+
+## Seed 13: Where the two tools differ on a damaged video
+
+**Question.** The JavaScript converter's suite again gives the Python tool every cut and
+damaged video it gives the JavaScript tool, 160 files. Do the two tools agree on them?
+
+**Answer.** On 159 of 160. Where both refuse a file they give the same reason,
+`unreadable-media`. One file is read by the JavaScript tool and refused by the Python tool:
+`alpha.mov` with the byte at 1137 changed by 245. The two tools decode with different builds
+of FFmpeg, and one recovers a picture where the other gives up. The file is named in the
+table `KNOWN_DIFFERENCES` of the test, and a difference that is not in the table fails the
+test. The Python tool ended every one of the 160 with status 0 or 1 and without a traceback,
+and no crash report was written.
+
+The made-up video of `converter/tests/reference.py` gained a `codec_context`, because the
+Python tool now reads it before decoding.
+
+**Resolution.** `converter/tests/import.test.js`, `KNOWN_DIFFERENCES` and the test of 80
+cuts and 80 changed bytes; `converter/tests/reference.py`, without `_undecodable_video`.
