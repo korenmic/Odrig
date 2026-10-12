@@ -94,7 +94,7 @@ Rules for every task:
     password it had.
   - Requirements: 4.7, 7.2, 7.3
 
-- [ ] 3. Editing WLED's stored settings in a storage image
+- [x] 3. Editing WLED's stored settings in a storage image
   - Add `apply`, `holds` and `name_in` to `firmware/fwtool/wifi.py`, with the reason
     `wled-settings-malformed`, as the design's "Editing WLED's stored settings" gives them.
   - Add to `tests/firmware/support.py` two sets of files for a storage image: the files the

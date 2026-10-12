@@ -6890,3 +6890,19 @@ is not needed: without it the limit is 850 with both firmwares. So the order is 
 then seed 12, and seed 15 at any point after seed 08.
 
 **Resolution.** `tasks.md`, the opening; `design.md`, "What this design relies on".
+
+## Seed 08: What a file system keeps of a file that was rewritten
+
+**Question.** A test of the edit looked for a password that had stood in `/cfg.json` in
+the bytes of the whole storage image afterwards, and found it. Is the edit wrong?
+
+**Answer.** No. The file no longer holds it: the file system writes a changed file into
+other blocks and does not erase the blocks it frees. So after a change of the password,
+the bytes of the old one can stay in storage, outside every file, until those blocks are
+used again, and in the storage images the work folder keeps. WLED serves files and not
+blocks, so nothing on the network gives them out; reading the flash over USB does. The
+test now reads the file. `docs/wifi.md` says this where it says what else holds the
+password.
+
+**Resolution.** `tests/firmware/test_wifi_storage.py`,
+`test_a_password_in_the_configuration_is_gone_afterwards`; `docs/wifi.md`, in task 6.

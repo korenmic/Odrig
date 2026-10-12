@@ -180,6 +180,51 @@ WLED_FILES = {
 }
 
 
+# The settings files as the bench board holds them before a name and a password are set:
+# written by a deploy script, never saved by WLED, and no file of secrets.
+BENCH_FILES = {
+    "/cfg.json": b'{"hw":{"led":{"total":360,"maxpwr":850,"fps":50,"ins":[{"start":0,"len":180,"pin":[1],"order":1,"type":22},{"start":180,"len":180,"pin":[2],"order":1,"type":22}],"matrix":{"mpc":1,"panels":[{"b":false,"r":false,"v":false,"s":true,"x":0,"y":0,"h":6,"w":60}]}}},"def":{"ps":0,"on":true,"bri":128}}',
+    "/presets.json": b'{"0":{}}',
+    "/odrig/mapping.json": b"a mapping",
+    "/odrig/show.json": b"a show",
+    "/odrig/hello.odrg": b"an animation" * 300,
+}
+
+# The settings files as WLED writes them when it saves its settings: every part of its
+# configuration, its file of secrets, and its copy of the configuration from before. The
+# passwords in them are texts made for the tests.
+SAVED_CONFIG = (
+    '{"rev":[1,0],"vid":2606300,"id":{"mdns":"wled-bench","name":"Wänd ß","inv":"Light","sui":false},'
+    '"nw":{"ins":[{"ssid":"Your_Network","pskl":0,"ip":[0,0,0,0],"gw":[0,0,0,0],"sn":[255,255,255,0]}],"dns":[8,8,8,8]},'
+    '"ap":{"ssid":"WLED-AP","pskl":8,"chan":11,"hide":1,"behav":2,"ip":[4,3,2,1]},'
+    '"wifi":{"sleep":false,"phy":false,"txpwr":78},'
+    '"hw":{"led":{"total":360,"maxpwr":850,"cct":false,"cr":false,"ic":false,"cb":0,"fps":42,"rgbwm":255,"ld":true,'
+    '"ins":[{"start":0,"len":180,"pin":[1],"order":1,"rev":false,"skip":0,"type":22,"ref":false,"rgbwm":255,"freq":0,"maxpwr":425,"ledma":55}]},'
+    '"com":[],"btn":{"max":4,"pull":true,"ins":[{"type":2,"pin":[0],"macros":[0,0,0]}],"tt":32,"mqtt":false},'
+    '"ir":{"pin":-1,"type":0,"sel":true},"relay":{"pin":-1,"rev":false,"odrain":false},"baud":1152},'
+    '"light":{"scale-bri":100,"pal-mode":0,"aseg":false,"gc":{"bri":1.0,"col":2.2,"val":2.8},'
+    '"tr":{"dur":7,"rpc":true,"hrp":false},"nl":{"mode":1,"dur":60,"tbri":0}},'
+    '"def":{"ps":0,"on":true,"bri":128},'
+    '"if":{"sync":{"port0":21324,"port1":65506},"mqtt":{"en":false,"broker":"","port":1883,"user":"","pskl":7,"cid":"WLED-bench"},'
+    '"hue":{"en":false,"id":1,"ip":[0,0,0,0]},"ntp":{"en":false,"host":"0.wled.pool.ntp.org","tz":0,"offset":0,"lt":-0.5,"ln":1e-7}},'
+    '"ol":{"clock":0,"cntdwn":false},"timers":{"cntdwn":{"goal":[20,1,1,0,0,0],"macro":0},"ins":[]},'
+    '"ota":{"lock":false,"lock-wifi":false,"pskl":7,"aota":true},"um":{}}'
+)
+SAVED_SECRETS = (
+    '{"nw":{"ins":[{"psk":"a made-up key of a network"}]},"ap":{"psk":"wled1234"},'
+    '"if":{"mqtt":{"psk":"made-up"},"hue":{"key":"api"}},"pin":"","ota":{"pwd":"made-up","lock":false,"lock-wifi":false,"aota":true}}'
+)
+SAVED_FILES = {
+    "/cfg.json": SAVED_CONFIG.encode("utf-8"),
+    "/wsec.json": SAVED_SECRETS.encode("utf-8"),
+    "/bkp.cfg.json": b'{"rev":[1,0],"vid":2606300,"ap":{"ssid":"an-older-name","pskl":8,"chan":1,"hide":0,"behav":0,"ip":[4,3,2,1]}}',
+    "/presets.json": b'{"0":{},"5":{"n":"hello"}}',
+    "/odrig/mapping.json": b"a mapping",
+    "/odrig/show.json": b"a show",
+    "/odrig/dvd.odrg": bytes(range(256)) * 30,
+}
+
+
 def storage_image(files=None, blocks=64, version=DISK_VERSION_2_0):
     """A storage image with a LittleFS file system of the given disk version."""
     from littlefs import LittleFS
