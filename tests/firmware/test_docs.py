@@ -4,7 +4,7 @@ import shlex
 import unittest
 
 from fwtool import cli, flasher
-from odrig import mapping
+from odrig import jsonframes, mapping, odrg
 from odrig.generators import hello_world
 
 from . import ROOT
@@ -15,7 +15,10 @@ TEST_COMMANDS = {
     "test-board": "tests/board/",
     "test-air": "tests/air/",
 }
-OWNERS_CHECKS = 6
+OWNERS_CHECKS = 7
+# How a step of the owner's checks is headed: its number, what it is, and the criterion it
+# covers, marked with the seed when it is not a criterion of seed 04.
+STEP = r"(?m)^(\d+)\. \*\*(.+?) \((seed 0[57], )?(\d+\.\d+)\)\.\*\*"
 # The pins of the target file, and how many of the legs of a mapping file get an RMT output.
 TARGET_PINS = [*range(1, 19), 21, 47]
 RMT_OUTPUTS = 4
@@ -88,7 +91,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_lists_the_owners_checks_as_numbered_steps_with_what_must_be_seen(self):
         checks = section(self.text, "The owner's checks")
-        steps = re.findall(r"(?m)^(\d+)\. \*\*(.+?) \((seed 05, )?(\d+\.\d+)\)\.\*\*", checks)
+        steps = re.findall(STEP, checks)
         self.assertEqual([number for number, _, _, _ in steps], [str(number) for number in range(1, OWNERS_CHECKS + 1)])
         self.assertEqual(len(re.findall(r"(?m)^\d+\. \*\*", checks)), OWNERS_CHECKS)
         bodies = re.split(r"(?m)^\d+\. \*\*", checks)[1:]
@@ -98,8 +101,8 @@ class Firmware(unittest.TestCase):
 
     def test_the_owners_checks_of_the_target_are_a_strip_on_the_parallel_driver_and_twenty_wired_legs(self):
         checks = section(self.text, "The owner's checks")
-        steps = re.findall(r"(?m)^(\d+)\. \*\*(.+?) \((seed 05, )?(\d+\.\d+)\)\.\*\*", checks)
-        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked], [("5", "18.3"), ("6", "18.3")])
+        steps = re.findall(STEP, checks)
+        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked == "seed 05, "], [("5", "18.3"), ("6", "18.3")])
         self.assertEqual([criterion.split(".")[0] for _, _, marked, criterion in steps if not marked], ["16"] * 4)
         bodies = dict(zip((number for number, _, _, _ in steps), re.split(r"(?m)^\d+\. \*\*", checks)[1:]))
         self.assertIn("parallel driver", bodies["5"])
@@ -113,6 +116,35 @@ class Firmware(unittest.TestCase):
         opening = " ".join(checks.split("\n1. **")[0].split())
         self.assertIn("Steps 5 and 6 stay listed as open and do not hold seed 05 open", opening)
         self.assertIn("the owner accepts any rate from 20 to 50", opening)
+
+    def test_the_owners_check_of_the_content_commands_is_an_upload_over_the_boards_network(self):
+        from odrigctl import cli as command_tool
+
+        checks = section(self.text, "The owner's checks")
+        steps = re.findall(STEP, checks)
+        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked == "seed 07, "], [("7", "21.5")])
+        body = re.split(r"(?m)^\d+\. \*\*", checks)[7]
+        (block,) = [re.sub(r"(?m)^   ", "", found) for found in re.findall(r"(?s)```\n(.*?)```", body)]
+        lines = block.splitlines()
+        self.assertEqual(lines[0], "python -m odrig encode animations/hello.json build/hello-bench.odrg")
+        made = command_tool.parser()
+        sent = [command_tool.checked(made, made.parse_args(shlex.split(line)[3:])) for line in lines[1:]]
+        self.assertEqual(sent, [["upload", "9", "build/hello-bench.odrg"], ["list"], ["play", "9"], ["remove", "9"], ["play", "3"]])
+        self.assertTrue(all(line.startswith("python -m odrigctl --http 4.3.2.1 ") for line in lines[1:]))
+        said = " ".join(body.split())
+        for expected in ("`upload: checking`", '`{"id":9,"file":"hello-bench.odrg","bytes":1138}`', "`build/firmware/out/upload-air.json`", "`python3 firmware/fw.py test-air --http 4.3.2.1`"):
+            self.assertIn(expected, said)
+        requirements = (ROOT / "docs" / "specs" / "07-p1-content-commands" / "requirements.md").read_text(encoding="utf-8")
+        asked = " ".join(requirements.split("\n## Requirement 21:")[1].split("\n5. ")[1].split("\n6. ")[0].split())
+        self.assertIn("an animation SHALL be uploaded over HTTP, listed, played and removed", asked)
+        opening = " ".join(checks.split("\n1. **")[0].split())
+        self.assertIn("seed 07 when step 7 is done", opening)
+        # The file of the step is the one the example show has as hello.odrg, under a name
+        # no item has.
+        self.assertEqual(len(odrg.encode(jsonframes.read(ROOT / "animations" / "hello.json"))), 1138)
+        show = json.loads((ROOT / "shows" / "example" / "show.json").read_text(encoding="utf-8"))
+        self.assertNotIn("hello-bench.odrg", [item.get("file") for item in show["items"]])
+        self.assertNotIn(9, [item["id"] for item in show["items"]])
 
     def test_the_mapping_of_the_fifth_check_puts_the_wired_strip_on_the_last_lane_and_the_strip_shows_what_the_check_says(self):
         body = re.split(r"(?m)^\d+\. \*\*", section(self.text, "The owner's checks"))[5]

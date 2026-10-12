@@ -29,6 +29,14 @@ class LeaveTheBoard(unittest.TestCase):
         from . import support
         support.leave_the_board()
         self.assertEqual(support.running(), support.LEFT_ON_THE_BOARD)
+        # The show is the bench show and nothing else: the three items of the example
+        # show, at a brightness the wired strip allows, playing from its start.
+        _, listed = support.command(PORT, "list")
+        self.assertEqual([(item["id"], item.get("file")) for item in listed["items"]], [(1, "hello.odrg"), (2, "dvd.odrg"), (3, None)])
+        _, status = support.command(PORT, "status")
+        self.assertEqual((status["playing"], status["error"]), (3, None))
+        self.assertLessEqual(status["brightness"], support.BRIGHTEST)
+        self.assertEqual(support.command(PORT, "space")[1]["animations"], 2)
 
 
 def load_tests(loader, standard_tests, pattern):

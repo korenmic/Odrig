@@ -189,7 +189,7 @@ Rules for every task:
     `busy`, the upload test fails with status 1 and the reply `busy`. Undo it.
   - Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8, 18.9, 18.10, 18.11, 19.5
 
-- [ ] 7. The board: every command over USB, and the measurements
+- [x] 7. The board: every command over USB, and the measurements
   - `build` and `build --probe` with the core as it is now; flash the firmware.
   - `tests/board/test_upload.py`, the rest: with the dim example show, the command tool
     over the port uploads an animation made for the bench canvas; `list` shows it; `play`

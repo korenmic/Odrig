@@ -16,7 +16,7 @@ from emulator import recfile
 from odrig import jsonframes, mapping as mapping_file, odrg, pack
 from odrig.generators import dense, dvd_bounce, hello_world
 from odrigctl import cli as command_tool
-from odrigctl import client
+from odrigctl import client, content
 
 from fwtool import Failure, board, build, cli, flasher, paths, storage
 
@@ -173,6 +173,13 @@ def restart():
     wait_for_the_board()
 
 
+def changed_by_commands():
+    """Says that commands have changed the show on the board: what this run installed
+    last is no longer what the board holds, so the board is asked the next time."""
+    global _installed
+    _installed = None
+
+
 def command(port, *words, timeout=3.0):
     """Sends one command with the command tool. Returns the tool's exit status and the
     reply as it printed it, read as JSON."""
@@ -203,15 +210,16 @@ def session(port, lines=SESSION):
 
 
 @contextlib.contextmanager
-def emulator(folder):
-    """Runs the emulator on a show folder and gives the path of its serial port."""
+def emulator(folder, *options):
+    """Runs the emulator on a show folder, with more options when some are given, and
+    gives the path of its serial port."""
     built = subprocess.run(["make", "-C", str(ROOT / "core"), "shared"], capture_output=True, text=True)
     if built.returncode != 0:
         raise AssertionError(f"`make -C core shared` failed:\n{built.stdout}{built.stderr}")
     with tempfile.TemporaryDirectory() as work:
         link = pathlib.Path(work, "serial")
         process = subprocess.Popen(
-            [sys.executable, "-m", "emulator", str(folder), "--port", "0", "--serial-link", str(link)],
+            [sys.executable, "-m", "emulator", str(folder), "--port", "0", "--serial-link", str(link), *(str(option) for option in options)],
             cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
         try:
@@ -286,6 +294,14 @@ def storage_image():
 def installed():
     """The files of the show installed on the board: the content of each by its name."""
     return storage.show_of(storage_image())
+
+
+def read_back():
+    """The files of the show on the board, read now and remembered as what it holds."""
+    global _installed
+    _installed = None
+    _installed = installed()
+    return _installed
 
 
 def wait_for_the_board():
@@ -414,6 +430,12 @@ def one_frame_show(mapping=TWO_LEGS, brightness=DIM, ms=1000):
     return show_folder(mapping, [("frame.odrg", one_frame(mapping, ms))], brightness)
 
 
+def hello_for(mapping):
+    """Hello world as its generator writes it for the canvas of a mapping."""
+    width, height = canvas_of(mapping)
+    return odrg.encode(jsonframes.Animation(width, height, tuple(hello_world.frames(width, height))))
+
+
 def dense_clip(compressed, seconds=10, width=60, height=60):
     """The dense clip of some seconds for a canvas: a smooth full-colour field, every LED
     lit."""
@@ -446,6 +468,77 @@ def leg_bytes(recording, ms):
         found.append(tick.data[start:start + 3 * count])
         start += 3 * count
     return found
+
+
+# The item the tests of the content commands upload, and the name its file gets.
+NEW_ITEM = 9
+HELLO_NAME = "hello-bench.odrg"
+
+
+def content_session(ask, restart, path):
+    """The session of the content commands: an upload, what `list` and `status` say of
+    it before and after a restart, its removal, and three refusals. `ask` sends one
+    command with the command tool and gives the tool's status and the reply. Returns, for
+    each command, its first two words, the status and the reply without `fps` and `free`,
+    the two members that differ between a board and an emulator."""
+    given = []
+
+    def step(*words):
+        status, reply = ask(*(str(word) for word in words))
+        given.append((" ".join(str(word) for word in words[:2]), status, {name: value for name, value in reply.items() if name not in ("fps", "free")}))
+
+    step("space")
+    step("list")
+    step("upload", NEW_ITEM, path)
+    step("list")
+    step("play", NEW_ITEM)
+    step("status")
+    step("space")
+    restart()
+    step("list")
+    step("status")
+    step("play", NEW_ITEM)
+    step("status")
+    step("remove", NEW_ITEM)
+    step("list")
+    step("status")
+    step("space")
+    step("upload", 3, path)
+    step("remove", 1)
+    step("remove", NEW_ITEM)
+    return given
+
+
+def measured_upload(session, number, name, data):
+    """Uploads a file through a session of the command tool and asks for the status
+    through the same session once a second meanwhile. Returns the reply that ended the
+    upload; the `fps` of each status while the data was sent, under `data`, and while the
+    file was checked, under `check`; and the seconds each of the two took."""
+    rates = {"data": [], "check": []}
+    times = {"data": 0.0, "check": 0.0}
+    state = {"phase": "data", "asked": time.monotonic(), "check_began": None}
+
+    def ask_each_second():
+        if time.monotonic() - state["asked"] >= 1.0:
+            state["asked"] += 1.0
+            rates[state["phase"]].append(json.loads(session.exchange(b"status\n"))["fps"])
+
+    def progress(sent, total, seconds):
+        times["data"] = seconds
+        ask_each_second()
+
+    def checking():
+        state["phase"] = "check"
+        state["check_began"] = time.monotonic()
+
+    def sleep(seconds):
+        ask_each_second()
+        time.sleep(seconds)
+
+    reply = json.loads(content.upload(session, number, name, data, progress, checking, sleep=sleep))
+    if state["check_began"] is not None:
+        times["check"] = time.monotonic() - state["check_began"]
+    return reply, rates, times
 
 
 class Port:

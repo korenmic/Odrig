@@ -5443,3 +5443,73 @@ their number is checked, and every command, also the five of before, goes throug
 **Resolution.** `odrigctl/content.py`, `GONE` and `_given_up`; `odrigctl/cli.py`;
 `tests/emulator/test_tool.py`, `UploadSteps` and
 `test_an_upload_that_is_refused_at_its_begin_cancels_nothing`.
+
+## Seed 07: An upload while dense content plays
+
+**Question.** The spec measures the rate during an upload with the bench show playing,
+which plays at 50 refreshes a second with room to spare. At the event the board plays
+60 x 60 content, and a dense clip already plays below 50. Nothing in the spec says what
+an upload does there.
+
+**Answer.** It was tried once, outside the suite, with the firmware and the dense
+60 x 60 clip playing compressed on the target file, 40 to 42 refreshes a second before
+the upload. Every upload succeeded. While the data of a file of 285,360 bytes arrived,
+`status` reported 16 to 27, below 20 in 13 of the 60 seconds, and the file arrived at
+4,714 bytes a second, where the bench show gives 12,583. Its check of 100 frames took 17
+seconds at 25 to 29 refreshes a second. In the second in which a file was put in place,
+`status` reported 6 or 7. So an upload while dense content plays can take the board
+below the 20 the owner accepts, for as long as the data arrives.
+
+Nothing is changed for it: the pacing is the design's, and a longer hold would make the
+upload slower still. What an operator can do today is to send `off`, or to play an item
+that is not dense, for the time of an upload; the app of seed 09 could do that by
+itself. Whether the board should do more, such as a longer hold while the rate is low,
+is the owner's to decide and would be a seed of its own.
+
+**Resolution.** `docs/firmware.md`, "Measurements on the board", "An upload over USB";
+no code.
+
+## Seed 07: What the board tests of the upload run on, and what they compare
+
+**Question.** Task 7 asks for one session on the board with the command tool, for the
+rate during an upload of a dense bench clip of 60 seconds with the probe's figures, for
+`read-show` to give "the folder as it was at the start", and for the replies to equal an
+emulator's "apart from `fps` and `free`".
+
+**Answer.** The session runs on the firmware, the image the board is left with, and
+the large upload on the probe build, whose report has the storage calls. Both assert 20
+refreshes a second or more where the spec has 25 and 49, by the owner's ruling. The
+session ends with three refusals, so that `in-use` and `unknown-id` are met on the board
+too. After it, the folder read back from the board has the files that were installed,
+with `show.json` as the core writes it: one line, the same show. It is byte for byte the
+folder the emulator has after the same session, and that is what the test compares, so a
+board that wrote a show file of its own kind would be seen. The suite's cache of what it
+installed is cleared whenever commands changed the show, so that the next test asks the
+board. The last step of the suite now also asks `list`, `status` and `space`, for the
+three items of the example show and nothing else.
+
+**Resolution.** `tests/board/test_upload.py`, `ContentCommands` and `DenseUpload`;
+`tests/board/support.py`, `content_session`, `measured_upload`, `changed_by_commands`
+and `read_back`; `tests/board/__init__.py`, `LeaveTheBoard`.
+
+## Seed 07: The test over the air, and how it was run without the air
+
+**Question.** Task 7 asks for "the same session over HTTP" in `tests/air/`, which no
+agent can run, and to run its session against the emulator. The session of the board
+test restarts the board, and a restart takes the board's network away from the computer
+that joined it.
+
+**Answer.** The test over the air sends the same session without the restart, once over
+HTTP and once through the port, and holds the replies to be the same, as the suite's
+other tests do. A second test uploads the dense bench clip of ten seconds over HTTP,
+asks `status` once a second, asserts 20 or more, and writes the speed to
+`build/firmware/out/upload-air.json`: the first figure for an upload over Wi-Fi will
+come from the owner's run. Both were run with an emulator in the place of the board's
+network: the suite was given the address of an emulator started on the dim example show,
+with the board on USB, so the HTTP half of each test spoke to the emulator and the port
+half to the board. Both passed so. That says the session and the comparison are sound;
+it says nothing of the board's web server with lines of 2,048 characters, which only the
+owner's check can show.
+
+**Resolution.** `tests/air/test_upload.py`; `docs/firmware.md`, "test-air" and step 7 of
+"The owner's checks".

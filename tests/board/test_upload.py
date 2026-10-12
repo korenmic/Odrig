@@ -1,6 +1,10 @@
 import json
+import pathlib
+import tempfile
 import time
 import unittest
+
+from odrigctl import client
 
 from fwtool import board, paths
 
@@ -13,6 +17,14 @@ STORE_BYTES = 1000000
 # The space the file system may keep for itself after a file was written and removed.
 SPACE_SLACK = 16384
 RESULT = paths.OUT / "store.json"
+# The item the tests upload, the names its files get, and where the figures of the large
+# upload are written.
+NEW_ITEM = support.NEW_ITEM
+HELLO_NAME = support.HELLO_NAME
+DENSE_NAME = "dense-bench.odrg"
+DENSE_SECONDS = 60
+UPLOAD_RESULT = paths.OUT / "upload.json"
+BOARD_TOTAL = 10354688
 TOO_LONG = {"ok": False, "error": "line-too-long"}
 UNKNOWN = {"ok": False, "error": "unknown-command"}
 
@@ -164,6 +176,158 @@ class Spike(unittest.TestCase):
                 self.assertEqual(port.ask(line), UNKNOWN, line)
             self.assertEqual(port.ask(b"on #store 5\n"), {"ok": False, "error": "bad-argument"})
             self.assertEqual(port.ask(b"#probe\n", board.is_probe)["probe"], 1)
+
+
+class Emulated:
+    """An emulator on a folder, with the board's total storage, that can be started again
+    on the same folder as a board is restarted."""
+
+    def __init__(self, folder):
+        self.folder = folder
+        self.start()
+
+    def start(self):
+        self._running = support.emulator(self.folder, "--storage", BOARD_TOTAL)
+        self.link = self._running.__enter__()
+
+    def stop(self):
+        self._running.__exit__(None, None, None)
+
+    def restart(self):
+        self.stop()
+        self.start()
+
+
+class ContentCommands(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        support.ensure("firmware")
+        cls.work = pathlib.Path(cls.enterClassContext(tempfile.TemporaryDirectory()))
+        with support.dim_show() as folder:
+            support.ensure_installed(folder)
+            cls.installed = support.files_of(folder)
+        cls.hello = cls.work / HELLO_NAME
+        cls.hello.write_bytes(support.hello_for(support.TWO_LEGS))
+
+    def test_the_tool_uploads_lists_plays_and_removes_an_animation_and_the_board_keeps_it_over_a_restart(self):
+        size = self.hello.stat().st_size
+        support.restart()
+        kept = {}
+        try:
+            # The restart in the middle of the session is the one that follows reading the
+            # board's storage, so that the folder with the uploaded file in it is seen.
+            on_the_board = support.content_session(lambda *words: support.command(PORT, *words), lambda: kept.update(support.read_back()), self.hello)
+        finally:
+            support.changed_by_commands()
+        replies = {number: (status, reply) for number, (_, status, reply) in enumerate(on_the_board)}
+        # The upload itself, before anything is compared: a board that cannot take a file
+        # says so here.
+        self.assertEqual(replies[2], (0, {"ok": True}), "the reply that ended the upload on the board")
+        new = {"id": NEW_ITEM, "file": HELLO_NAME, "bytes": size}
+        before = replies[1][1]["items"]
+        self.assertEqual([item["id"] for item in before], [1, 2, 3])
+        self.assertEqual(replies[3], (0, {"ok": True, "items": before + [new], "next": None}))
+        self.assertEqual(replies[5][1], {"ok": True, "on": True, "brightness": support.DIM, "playing": NEW_ITEM, "animation": NEW_ITEM, "error": None})
+        self.assertEqual((replies[0][1]["animations"], replies[6][1]["animations"], replies[6][1]["total"]), (2, 3, BOARD_TOTAL))
+        # After the restart the show still has the item, plays its start item, and plays
+        # the new one when it is told to.
+        self.assertEqual(replies[7], replies[3])
+        self.assertEqual(sorted(kept), sorted([*self.installed, HELLO_NAME]))
+        self.assertEqual(kept[HELLO_NAME], self.hello.read_bytes())
+        self.assertEqual((replies[8][1]["playing"], replies[8][1]["animation"], replies[8][1]["error"]), (3, 1, None))
+        self.assertEqual((replies[10][1]["playing"], replies[10][1]["animation"]), (NEW_ITEM, NEW_ITEM))
+        self.assertEqual(replies[11], (0, {"ok": True}))
+        self.assertEqual(replies[12], (0, {"ok": True, "items": before, "next": None}))
+        self.assertEqual((replies[13][1]["playing"], replies[13][1]["error"]), (None, None))
+        self.assertEqual([replies[number] for number in (15, 16, 17)], [(1, {"ok": False, "error": "in-use"})] * 2 + [(1, {"ok": False, "error": "unknown-id"})])
+
+        left = support.read_back()
+        folder = self.work / "emulated"
+        folder.mkdir()
+        for name, data in self.installed.items():
+            (folder / name).write_bytes(data)
+        emulated = Emulated(folder)
+        try:
+            in_the_emulator = support.content_session(lambda *words: support.command(emulated.link, *words), emulated.restart, self.hello)
+        finally:
+            emulated.stop()
+        self.assertEqual(len(on_the_board), 18)
+        for number, ((line, *board_answer), (_, *emulator_answer)) in enumerate(zip(on_the_board, in_the_emulator), 1):
+            self.assertEqual(board_answer, emulator_answer, f"command {number} of the session, `{line}`: the board's answer is the first")
+        # The folder on the board is as it was installed, with the show file as the core
+        # writes it, and it is byte for byte the folder the emulator has after the session.
+        self.assertEqual(left, support.files_of(folder))
+        self.assertEqual(sorted(left), sorted(self.installed))
+        self.assertEqual({name: data for name, data in left.items() if name != "show.json"}, {name: data for name, data in self.installed.items() if name != "show.json"})
+        self.assertEqual(json.loads(left["show.json"]), json.loads(self.installed["show.json"]))
+        status = support.command(PORT, "status")[1]
+        self.assertEqual((status["playing"], status["error"], status["brightness"]), (3, None, support.DIM))
+
+
+class DenseUpload(unittest.TestCase):
+    """The upload of a large file with the rate the board keeps meanwhile, measured with
+    the probe build."""
+
+    @classmethod
+    def setUpClass(cls):
+        support.ensure("probe")
+        with support.dim_show() as folder:
+            support.ensure_installed(folder)
+        width, height = support.canvas_of(support.TWO_LEGS)
+        cls.clip = support.dense_clip(True, DENSE_SECONDS, width, height)
+
+    def test_a_dense_clip_of_a_minute_is_uploaded_while_the_show_plays_at_20_refreshes_a_second_or_more(self):
+        support.restart()
+        support.probe()
+        try:
+            with client.Session(port=PORT, timeout=5.0) as port:
+                before = json.loads(port.exchange(b"space\n"))
+                reply, rates, times = support.measured_upload(port, NEW_ITEM, DENSE_NAME, self.clip)
+                after = support.each_second(SECONDS_AFTER, lambda: json.loads(port.exchange(b"status\n"))["fps"])
+                listed = json.loads(port.exchange(b"list\n"))
+                with_the_file = json.loads(port.exchange(b"space\n"))
+            report = support.probe()
+            with client.Session(port=PORT, timeout=5.0) as port:
+                removed = json.loads(port.exchange(b"remove %d\n" % NEW_ITEM))
+                later = json.loads(port.exchange(b"space\n"))
+        finally:
+            support.changed_by_commands()
+        speed = round(len(self.clip) / times["data"]) if times["data"] else 0
+        UPLOAD_RESULT.parent.mkdir(parents=True, exist_ok=True)
+        UPLOAD_RESULT.write_text(json.dumps({
+            "bytes": len(self.clip),
+            "frames": DENSE_SECONDS * 50,
+            "reply": reply,
+            "data_seconds": round(times["data"], 2),
+            "bytes_per_second": speed,
+            "check_seconds": round(times["check"], 2),
+            "fps_during_data": rates["data"],
+            "fps_during_check": rates["check"],
+            "fps_after": after,
+            "store": report["store"],
+            "gap_ms": report["gap_ms"],
+            "poll_us": report["poll_us"],
+            "space_before": before,
+            "space_with_the_file": with_the_file,
+            "space_after": later,
+        }, indent=2) + "\n")
+        self.assertEqual(reply, {"ok": True}, "the reply that ended the upload")
+        self.assertGreaterEqual(len(rates["data"]), 20, "the upload was over before its rate could be read")
+        self.assertGreaterEqual(len(rates["check"]), 20, "the check was over before its rate could be read")
+        self.assertGreaterEqual(min(rates["data"]), LOWEST, rates["data"])
+        self.assertGreaterEqual(min(rates["check"]), LOWEST, rates["check"])
+        self.assertGreaterEqual(min(after), LOWEST, after)
+        self.assertEqual(listed["items"][-1], {"id": NEW_ITEM, "file": DENSE_NAME, "bytes": len(self.clip)})
+        # The check decodes one frame of the file for each refresh, so it takes as long as
+        # the animation lasts, and it reads the file back from storage meanwhile.
+        self.assertGreaterEqual(times["check"], DENSE_SECONDS - 1)
+        self.assertGreater(report["store"]["check_steps"], 0)
+        self.assertEqual((report["error"], report["overwritten"]), (None, 0))
+        self.assertLessEqual(before["free"] - with_the_file["free"], len(self.clip) + len(self.clip) // 256 + SPACE_SLACK)
+        self.assertGreaterEqual(before["free"] - with_the_file["free"], len(self.clip))
+        self.assertEqual(removed, {"ok": True})
+        self.assertLessEqual(abs(later["free"] - before["free"]), SPACE_SLACK, (before, later))
+        self.assertGreater(speed, 0)
 
 
 if __name__ == "__main__":
