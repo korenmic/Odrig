@@ -7592,3 +7592,29 @@ client"; `tests/app/support.py`, `StandIn`.
 
 **Resolution.** `app/www/client.js`, `give`, `want` and the handler of
 `visibilitychange`; `app/www/screens/show.js`, `sendLevel`, `drawRows` and `start`.
+
+## Seed 09: Messages, the look and back
+
+**Question.** What did the tasks of the messages, the look and the back gesture settle?
+
+**Answer.**
+
+- A refusal's message is made from the line that was refused: `unknown-id` names the
+  animation of `play <id>`, and says that no animation is installed for `play all`. The
+  message of `show-invalid` has the reason when a status has said one, and does without
+  it otherwise. A code the app does not know, whatever its spelling, gets the general
+  sentence with the code in brackets.
+- While the target does not answer, the show screen has two lines: for how long, and the
+  message of the failure with its code, as the target screen has it.
+- Back. The app's entries of the page's history are its first screen, or that and the
+  other screen on top of it. When the target answers for the first time, the entry of
+  the target screen is replaced by one of the show screen, which is the app's first
+  screen from then on: back from the target screen shows it, and back from it leaves
+  the app. The button of the screen below goes back as the gesture does, so that no
+  entries pile up. Before the first answer the target screen is the first entry.
+- The style needed no change for the measures of the design: the suite measures them at
+  360 and at 320 pixels, with a file name of 32 characters, and with a control made too
+  low and a text made too dim two of its tests fail.
+
+**Resolution.** `app/www/messages.js`, `ofRefusal`; `app/www/screens/show.js`, `draw`;
+`app/www/main.js`, `go` and the watcher of the client; `tests/app/test_look.py`.

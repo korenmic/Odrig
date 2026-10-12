@@ -106,6 +106,7 @@ function draw(state) {
   byId("state").classList.toggle("stale", silent);
   byId("animations").classList.toggle("stale", silent);
   say("silent", silent ? messages.ofSilence(Math.floor((Date.now() - (state.heardAt === null ? state.since : state.heardAt)) / 1000)) : null);
+  say("silent-why", silent ? messages.ofFailure(state.failure) : null);
 }
 
 // Sends the slider's value as a brightness command, now or as soon as the shortest time

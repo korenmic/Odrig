@@ -19,6 +19,7 @@ export function state(app) {
     fps: app.text("fps"),
     none: app.text("none"),
     silent: app.text("silent"),
+    why: app.text("silent-why"),
     dimmed: app.byId("state").classList.contains("stale"),
   };
 }

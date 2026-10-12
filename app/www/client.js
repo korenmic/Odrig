@@ -163,6 +163,10 @@ async function give(request) {
     }
     if (error instanceof commands.Refusal) {
       heard();
+      if (error.code === "unknown-id") {
+        // The list the operator chose from is not what the target has any more.
+        listDue = true;
+      }
       refused(error);
     } else {
       failed(error);

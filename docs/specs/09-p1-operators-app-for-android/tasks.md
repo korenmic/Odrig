@@ -91,7 +91,7 @@ Rules for every task:
     more than five.
   - Requirements: 1.3, 6.1, 6.2, 6.4, 7.1, 7.2, 7.3, 7.4, 8.2, 8.3, 8.5
 
-- [ ] 5. Every message, the look and back
+- [x] 5. Every message, the look and back
   - `messages.js` with the whole table and the codes the app cannot get; a message that
     stays; the list asked for again after `unknown-id`. `style.css` to the design's
     measures; the history entries.

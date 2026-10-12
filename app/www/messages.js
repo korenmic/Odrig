@@ -22,7 +22,27 @@ export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
 }
 
-// The message of a command the target refused.
-export function ofRefusal(refusal) {
-  return `The installation refused the command. (${refusal.code})`;
+// The error codes of the command list that no command of the app can get: they belong to
+// `remove`, `space` and `upload`, which the app does not send.
+export const NOT_FOR_THE_APP = ["no-upload", "incomplete", "bad-checksum", "busy", "in-use", "no-space", "bad-offset", "bad-file", "storage-error"];
+
+const NOT_UNDERSTOOD = () => "The installation did not understand the app. Its software and this app do not match.";
+const REFUSED = () => "The installation refused the command.";
+
+// The text for each error code a command of the app can get, from the line that was
+// refused and from the reason of an invalid show, when the target has said one.
+const REFUSALS = {
+  "line-too-long": NOT_UNDERSTOOD,
+  "unknown-command": NOT_UNDERSTOOD,
+  "bad-argument": NOT_UNDERSTOOD,
+  "show-invalid": (line, reason) =>
+    `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
+  "unknown-id": (line) => (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+};
+
+// The message of a command the target refused. A code without a text of its own gets
+// the general sentence.
+export function ofRefusal(refusal, reason = null) {
+  const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
+  return `${text(refusal.line, reason)} (${refusal.code})`;
 }

@@ -1,4 +1,5 @@
-// The start of the app: which screen is shown, and the place for a message.
+// The start of the app: which screen is shown, the place for a message, and what the
+// system's back gesture does.
 
 import * as client from "./client.js";
 import * as messages from "./messages.js";
@@ -33,21 +34,52 @@ function message(text) {
 byId("message-close").addEventListener("click", () => {
   byId("message").hidden = true;
 });
-byId("to-show").addEventListener("click", () => show("show"));
-byId("to-target").addEventListener("click", () => show("target"));
+// The page's history holds one entry of the app, its first screen, or two, with the
+// other screen on top. So the back gesture goes from the second screen to the first,
+// and from the first it leaves the app.
+function onTop() {
+  return window.history.state !== null && window.history.state.depth === 1;
+}
 
+// Goes to a screen as a press of its button does.
+function go(name) {
+  if (name === screen) {
+    return;
+  }
+  if (onTop()) {
+    window.history.back();
+  } else {
+    window.history.pushState({screen: name, depth: 1}, "");
+    show(name);
+  }
+}
+
+window.addEventListener("popstate", (event) => {
+  if (event.state !== null && SCREENS.includes(event.state.screen)) {
+    show(event.state.screen);
+  }
+});
+byId("to-show").addEventListener("click", () => go("show"));
+byId("to-target").addEventListener("click", () => go("target"));
+
+window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 showScreen.start();
-client.onRefusal((refusal) => message(messages.ofRefusal(refusal)));
+client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
   // The app begins on the target screen and goes to the show screen as soon as the
-  // target has answered once.
+  // target has answered once. The show screen is the app's first screen from then on.
   if (!state.answered) {
     led = false;
   } else if (!led) {
     led = true;
-    show("show");
+    if (screen === "target" && onTop()) {
+      window.history.back();
+    } else if (screen === "target") {
+      window.history.replaceState({screen: "show", depth: 0}, "");
+      show("show");
+    }
   }
 });
 client.begin();
