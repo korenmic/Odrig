@@ -37,6 +37,9 @@ SUITES = 5
 CONVERTER_SUITE = "npm test --prefix converter"
 NONE_FAILED = re.compile(r"(?m)^\S+ fail 0$")
 SOME_PASSED = re.compile(r"(?m)^\S+ pass [1-9][0-9]*$")
+# The last line of a suite of Python that passed. It names the tests that were left out,
+# which the emulator's suite does for those of the other system.
+PASSED = re.compile(r"\AOK( \(skipped=[0-9]+\))?\Z")
 
 # What the setup of the page leaves in the copy: the Python of the environment, the two
 # packages of the converter with the decoder program, and the core's library.
@@ -130,7 +133,7 @@ class FreshCopy(unittest.TestCase):
                 self.assertRegex(output, NONE_FAILED, command)
                 self.assertRegex(output, SOME_PASSED, command)
             else:
-                self.assertEqual(output.strip().splitlines()[-1], "OK", command)
+                self.assertRegex(output.strip().splitlines()[-1], PASSED, command)
 
         show = self.copy / DEMO_SHOW
         self.assertEqual(sorted(path.name for path in show.iterdir()), sorted(DEMO_FILES))

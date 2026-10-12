@@ -81,7 +81,9 @@ make -C core test
 ```
 
 The first ends with a list of counts, in which `fail 0` says that every test passed. Each
-of the others ends with the line `OK`. None needs the board or the network.
+of the others ends with the line `OK`. The emulator's suite leaves out the tests that are
+for the other system and says how many, as in `OK (skipped=9)`. None needs the board or
+the network.
 
 | Suite | What it checks | Takes about |
 |---|---|---|

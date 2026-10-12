@@ -170,7 +170,7 @@ class GettingStarted(unittest.TestCase):
         self.assertEqual(len(after_setup), 5)
         self.assertIn("runs the five suites above", more)
         after = flat(self.part("Run the tests"))
-        for phrase in ("The first ends with a list of counts, in which `fail 0` says that every test passed", "Each of the others ends with the line `OK`",
+        for phrase in ("The first ends with a list of counts, in which `fail 0` says that every test passed", "Each of the others ends with the line `OK`", "leaves out the tests that are for the other system and says how many, as in `OK (skipped=9)`",
                        "None needs the board or the network"):
             self.assertIn(phrase, after)
 
