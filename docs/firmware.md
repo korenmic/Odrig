@@ -587,7 +587,7 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
  "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
  "space_us":29110,
  "store":{"calls":0,"longest_us":0,"total_us":0,"check_steps":0,"check_longest_us":0,"check_total_us":0},
- "ap":1,"error":null,
+ "ap":1,"ap_name":"WLED-AP","ap_auth":3,"error":null,
  "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"7b7d9750","pulses":4320}]}
 ```
 
@@ -606,6 +606,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `space_us` | The time the file system took to tell its size and its used bytes, when the usermod asked before the core started, in microseconds. |
 | `store` | The storage calls since the last `#probe`, reads aside: their number in `calls`, the longest in `longest_us` and their sum in `total_us`, in microseconds. And the requests for a refresh in which the core read a second file, which is how it checks an uploaded file: their number in `check_steps`, the longest in `check_longest_us` and their sum in `check_total_us`. |
 | `ap` | 1 while WLED's access point is up, else 0. |
+| `ap_name` | The name in the configuration the radio holds for its access point: the first `ssid_len` bytes of `ssid`, or up to the first zero byte when `ssid_len` is 0. `null` while `ap` is 0. A byte outside printable ASCII, a quotation mark and a backslash are written as `\u00XX`. |
+| `ap_auth` | The protection in that configuration, as the chip numbers it: 0 open, 3 WPA2 with a password. `null` while `ap` is 0. |
 | `error` | The reason the show is invalid, as `status` reports it, or `null`. |
 | `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt`, `parallel` or `none`, and the two members below. |
 | `crc` | Of an output: the CRC-32 of the colours it held when it was last read back after a send, as WLED gives them back: red, green and blue for each LED. With twenty outputs of 180 LEDs every output is read back once in twenty sends, 0.4 seconds; an output that was not read back yet is read for the report. |
@@ -944,8 +946,9 @@ The first part, down to "Twenty outputs", is the record of seed 04. It was tried
 firmware of that seed, before the target became twenty upright legs: on the bench file,
 and on mappings of ten row legs on pins 1 to 10, with a dense 60 x 30 clip. From "Twenty
 outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60. The
-last part, "Files written while the show plays", is what seed 07 tried for the commands
-that change the content.
+part "Files written while the show plays" is what seed 07 tried for the commands that
+change the content. The last part, "The network's name and password", is what seed 08
+tried.
 
 | # | Assumption | What was found |
 |---|---|---|
@@ -1251,3 +1254,11 @@ With the example show nothing of that is seen. With a dense 60 x 60 clip playing
 [Measurements on the board](#measurements-on-the-board) has what an upload does to the
 rate there. While `space` still asked the file system at every call, one call of 376 ms
 with the 9 MB show made `fps` in `status` fall to 3 for that second.
+
+**The network's name and password.** What the design of seed 08 assumed, in its table
+"Assumed, to be verified by an early task", and what was found with the probe build on
+the board. The letters are those of that table.
+
+| # | Assumption | What was found |
+|---|---|---|
+| A1 | `esp_wifi_get_config(WIFI_IF_AP, ...)` compiles in the usermod with `wled.h` alone, can be called from the loop task, and gives the name and the protection of the access point WLED opened. Before any setting is applied it gives `WLED-AP` and 3. | It does. The probe build was built with no other header, and the call is made from the loop task for every report. After a restart the reports had `ap` 0 with `ap_name` and `ap_auth` `null`, and from the first report with `ap` 1 on, `ap_name` `WLED-AP` and `ap_auth` 3. The firmware is not changed by the two members: built before and after in the same work folder, its image has the same SHA-256. |

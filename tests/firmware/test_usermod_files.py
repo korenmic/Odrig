@@ -122,6 +122,20 @@ class WebServer(unittest.TestCase):
         for path in SOURCES:
             self.assertNotRegex(text_of(path), r"\bWiFi\b|initAP|initConnection|apSSID|apPass|multiWiFi|forceReconnect|WLED_CONNECTED", path.name)
 
+    def test_the_radio_is_only_read_and_only_by_the_probe_build_for_its_report(self):
+        for path in SOURCES:
+            text = text_of(path)
+            if path.name == "odrig_probe.cpp":
+                self.assertEqual(set(re.findall(r"esp_wifi_\w+", text)), {"esp_wifi_get_config"})
+                self.assertEqual(text.count("esp_wifi_get_config"), 1)
+                for member in ("ap_name", "ap_auth"):
+                    self.assertEqual(text.count(f'\\"{member}\\"'), 1, member)
+            else:
+                self.assertNotRegex(text, r"esp_wifi_|ap_name|ap_auth|wifi_config_t|WIFI_IF_AP", path.name)
+        probe = text_of(USERMOD / "odrig_probe.cpp")
+        self.assertRegex(probe, r"const bool known = apActive && esp_wifi_get_config\(WIFI_IF_AP, &radio\) == ESP_OK;")
+        self.assertNotRegex(probe, r"esp_wifi_set|softAP|WIFI_MODE|esp_wifi_start|esp_wifi_stop")
+
     def test_the_captive_portal_is_kept_answering_and_an_update_stops_the_loop_first(self):
         text = text_of(USERMOD / "odrig_usermod.cpp")
         self.assertIn("if (apActive) dnsServer.processNextRequest();", text)

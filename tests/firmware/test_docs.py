@@ -177,6 +177,13 @@ class Firmware(unittest.TestCase):
             self.assertIn(line, lines)
         self.assertIn("`build/lane/mapping.json`", body)
 
+    def test_the_probe_report_has_the_access_points_name_and_protection(self):
+        probe = " ".join(section(self.text, "The probe build").split())
+        self.assertRegex(probe, r'"ap":1,"ap_name":"[^"]+","ap_auth":3,"error":null')
+        for expected in ("| `ap_name` | The name in the configuration the radio holds for its access point", "| `ap_auth` | The protection in that configuration",
+                         "0 open, 3 WPA2 with a password", "`null` while `ap` is 0"):
+            self.assertIn(expected, probe)
+
     def test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured(self):
         does = " ".join(section(self.text, "What the firmware does").split())
         for expected in ("**Storage.**", "Every path is `/odrig/<name>`", "The firmware writes, renames and deletes a file only there", "`upload.part`", "`show.part`", "`pending.txt`",

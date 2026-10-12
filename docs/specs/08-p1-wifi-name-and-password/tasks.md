@@ -69,7 +69,7 @@ Rules for every task:
   - The board is not touched.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.6, 5.2, 5.5, 5.6
 
-- [ ] 2. Spike: the probe build reports the access point's name and protection
+- [x] 2. Spike: the probe build reports the access point's name and protection
   - Add `ap_name` and `ap_auth` to the report in `firmware/usermod/odrig_probe.cpp`, as the
     design gives them: read with `esp_wifi_get_config`, `null` while `ap` is 0, the name
     written as a valid JSON string.

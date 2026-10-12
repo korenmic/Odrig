@@ -408,6 +408,36 @@ void report() {
   line += '}';
   line += F(",\"ap\":");
   line += apActive ? 1 : 0;
+  // What the radio holds for its access point. Until WLED has opened the access point,
+  // that is the configuration of the start before.
+  wifi_config_t radio;
+  const bool known = apActive && esp_wifi_get_config(WIFI_IF_AP, &radio) == ESP_OK;
+  line += F(",\"ap_name\":");
+  if (known) {
+    size_t length = radio.ap.ssid_len;
+    if (length == 0) length = strnlen((const char *)radio.ap.ssid, sizeof(radio.ap.ssid));
+    length = std::min(length, sizeof(radio.ap.ssid));
+    line += '"';
+    for (size_t i = 0; i < length; i++) {
+      const uint8_t byte = radio.ap.ssid[i];
+      if (byte < 0x20 || byte > 0x7E || byte == '"' || byte == '\\') {
+        char escaped[7];
+        snprintf(escaped, sizeof(escaped), "\\u%04x", (unsigned)byte);
+        line += escaped;
+      } else {
+        line += (char)byte;
+      }
+    }
+    line += '"';
+  } else {
+    line += F("null");
+  }
+  line += F(",\"ap_auth\":");
+  if (known) {
+    line += (uint32_t)radio.ap.authmode;
+  } else {
+    line += F("null");
+  }
   line += F(",\"error\":");
   const char *error = errorNow != nullptr ? errorNow() : nullptr;
   if (error != nullptr) {
