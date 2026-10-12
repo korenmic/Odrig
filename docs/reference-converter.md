@@ -90,13 +90,13 @@ output. Where they are known to differ:
   letters, and numbers of seconds in spellings the JavaScript tool refuses, such as
   `1_0`. It has no status 70 and no `decoder-missing`: without its libraries `import` ends
   with Python's own report of the missing module.
-- **Damaged media.** The two tools need not judge a damaged or cut media file alike, and
-  the Python tool has three known faults there, which are open: a video whose first video
-  stream has no decoder, as happens with an mp4 cut inside its header, ends Python itself
-  with a fault of memory; a video with metadata that is not UTF-8, and a GIF that is cut
-  short, end with a traceback in place of the error line. [drifts.md](drifts.md), "Seed
-  06: Python crashing while it decodes a video for a comparison", has the details and how
-  to see them.
+- **Damaged media.** The two tools need not judge a damaged or cut media file alike: they
+  decode with different builds of FFmpeg, and one may recover a picture where the other
+  gives up. Both refuse a file they cannot decode as `unreadable-media`. For the Python
+  tool that includes a video whose first video stream has no decoder, as happens with an
+  mp4 cut inside its header, a video whose metadata is not UTF-8, and a GIF that is cut
+  short. Of the 160 cut and damaged videos the suite gives both tools, one is read by the
+  JavaScript tool and refused by the Python tool.
 
 ## Generators
 

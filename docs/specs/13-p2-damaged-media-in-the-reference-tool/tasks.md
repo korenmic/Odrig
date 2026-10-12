@@ -32,7 +32,7 @@ with `.venv/bin/python -m unittest discover -s tests/converter -t .`.
   - Run `npm test --prefix converter` and confirm no crash report of Python was written.
   - Requirement 5 and Requirement 4.3.
 
-- [ ] 5. The documents, and the seed's state
+- [x] 5. The documents, and the seed's state
   - `docs/reasons.md`, `docs/reference-converter.md`, the page for newcomers that warns of
     the fault, and `AGENTS.md`.
   - Run every suite that needs no board.

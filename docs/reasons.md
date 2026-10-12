@@ -127,7 +127,7 @@ cycle.
 | Reason | Condition |
 |---|---|
 | `unsupported-media` | The file name does not end in `.mp4`, `.mov` or `.gif`. |
-| `unreadable-media` | The file cannot be decoded, or it holds no picture. |
+| `unreadable-media` | The file cannot be decoded, or it holds no picture. This includes a video whose first video stream has no decoder, a video whose metadata cannot be read, and a GIF that is cut short. |
 | `bad-range` | The start is negative, the duration is not above 0, the start is not before the end of the media, or the start plus the duration is after the end of the media. |
 
 ## Generators
