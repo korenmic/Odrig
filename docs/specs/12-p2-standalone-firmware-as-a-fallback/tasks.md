@@ -104,7 +104,7 @@ Rules for every task:
     the lowest bit of R7, differs from the reference.
   - Requirements: 6.2, 6.3
 
-- [ ] 5. The outputs
+- [x] 5. The outputs
   - `firmware/standalone/src/outputs.h` and `outputs.cpp`: one output per leg, the
     drivers as task 1 wrote them down, the refusal of pins 19 and 20, `fill` and `show`.
   - Tests in `tests/firmware/`: the source tests that concern the outputs: no file of
