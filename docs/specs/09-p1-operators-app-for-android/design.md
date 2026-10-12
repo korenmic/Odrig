@@ -480,6 +480,9 @@ app hopes.
 2. a `status` that is due;
 3. a `list` that is due, or the next part of one.
 
+A list that waited while a `status` was sent goes before the next `status`, so that a
+target that answers slowly does not keep the list away.
+
 A `brightness` that waits is replaced by a newer one. A `status` is due 1,000 ms after
 the one before was sent, and at once after the reply to a command of the first kind. A
 `list` is due when the target first answers, 10 seconds after the one before ended while

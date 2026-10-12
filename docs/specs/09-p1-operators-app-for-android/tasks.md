@@ -73,7 +73,7 @@ Rules for every task:
   - Requirements: 1.2, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 8.1, 8.4,
     8.6, 13.6, 13.8, 14.1, 14.2
 
-- [ ] 3. The show screen: the state and the list
+- [x] 3. The show screen: the state and the list
   - `commands.js` for `list`; `client.js`: when `status` and `list` are due, a list in
     parts, nothing sent while hidden; `screens/show.js` without its controls.
   - `tests/app/test_show.py`.

@@ -44,6 +44,11 @@ function tools(frame) {
     screen() {
       return app.doc.body.innerText;
     },
+    // Whether the screen says something that a pattern describes, its words taken with
+    // one space between them.
+    says(pattern) {
+      return new RegExp(pattern).test(app.screen().replace(/\s+/g, " "));
+    },
     // The id of the screen that is shown.
     shown() {
       return [...app.doc.querySelectorAll("main > section")].filter(displayed).map((section) => section.id).join(" ");

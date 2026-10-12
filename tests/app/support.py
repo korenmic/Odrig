@@ -97,8 +97,9 @@ class StandIn:
 
     It answers each `POST /odrig` with the next of the replies it was given, and with the
     last of them from then on, each after `delay` seconds. A reply is `(status, body)`,
-    or None for no answer at all. `lines` holds the lines it was sent, and `together` the
-    most requests it had at one moment.
+    or None for no answer at all, or a mapping from the first word of a line to one of
+    the two, in which a word that is missing is an unknown command. `lines` holds the
+    lines it was sent, and `together` the most requests it had at one moment.
     """
 
     def __init__(self, *replies, delay=0.0):
@@ -120,7 +121,10 @@ class StandIn:
             self._now += 1
             self.together = max(self.together, self._now)
             self.lines.append((path, line))
-            return self.replies[min(len(self.lines), len(self.replies)) - 1]
+            reply = self.replies[min(len(self.lines), len(self.replies)) - 1]
+        if isinstance(reply, dict):
+            reply = reply.get(line.split(b" ")[0].decode("ascii", "replace"), (200, '{"ok":false,"error":"unknown-command"}\n'))
+        return reply
 
     def left(self):
         with self._lock:
@@ -187,8 +191,11 @@ class _Pages(webserver.Handler):
         self.answer(502)
 
 
-# What `status` answers on a target where the playlist plays its first animation.
+# What `status` answers on a target where the playlist plays its first animation, what
+# `list` answers there, and a target that answers both so.
 PLAYING = (200, '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}\n')
+LISTED = (200, '{"ok":true,"items":[{"id":1,"file":"one.odrg","bytes":1138},{"id":2,"file":"two.odrg","bytes":1612}],"next":null}\n')
+SOUND = {"status": PLAYING, "list": LISTED}
 
 Run = collections.namedtuple("Run", "seen elsewhere")
 

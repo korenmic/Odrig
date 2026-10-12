@@ -64,7 +64,7 @@ class TheAddress(Target):
 
     def test_an_address_that_was_set_is_kept_when_the_app_is_opened_again_and_board_puts_the_boards_back(self):
         _, first = self.emulator()
-        other = entered(self, support.StandIn(support.PLAYING))
+        other = entered(self, support.StandIn(support.SOUND))
         found = support.run("kept", address=first, settings={"other": other.address})
         self.assertEqual(found.seen["reloaded"], {"field": other.address, "kept": other.address})
         self.assertEqual(found.seen["board"], {"field": "4.3.2.1", "kept": "4.3.2.1", "failure": NO_ANSWER.format("4.3.2.1")})
@@ -124,7 +124,7 @@ class WhetherTheTargetAnswers(Target):
             "a refusal without a code": (200, '{"ok":false}'),
         }
         targets = [entered(self, support.StandIn(reply)) for reply in answers.values()]
-        sound = entered(self, support.StandIn(support.PLAYING))
+        sound = entered(self, support.StandIn(support.SOUND))
         addresses = [target.address for target in targets] + [sound.address]
         found = support.run("addresses", address=sound.address, settings={"addresses": addresses})
         for what, target, seen in zip(answers, targets, found.seen):
@@ -146,28 +146,29 @@ class WhetherTheTargetAnswers(Target):
 
 class Requests(Target):
     STATUS = ("/odrig", b"status")
+    LIST = ("/odrig", b"list 0")
 
     def test_status_is_asked_once_a_second(self):
-        target = entered(self, support.StandIn(support.PLAYING))
+        target = entered(self, support.StandIn(support.SOUND))
         support.run("waits", address=target.address, settings={"ms": 5300})
-        self.assertEqual(set(target.lines), {self.STATUS})
-        self.assertIn(len(target.lines), (6, 7), target.lines)
+        self.assertEqual(set(target.lines), {self.STATUS, self.LIST})
+        self.assertIn(target.lines.count(self.STATUS), (6, 7), target.lines)
         self.assertEqual(target.together, 1)
 
     def test_one_request_is_under_way_at_a_time_also_when_a_reply_takes_longer_than_a_second(self):
-        slow = entered(self, support.StandIn(support.PLAYING, delay=1.6))
+        slow = entered(self, support.StandIn(support.SOUND, delay=1.6))
         found = support.run("waits", address=slow.address, settings={"ms": 5300})
         self.assertEqual(found.seen["link"], "Answers")
         self.assertEqual(slow.together, 1)
-        self.assertEqual(set(slow.lines), {self.STATUS})
+        self.assertEqual(set(slow.lines), {self.STATUS, self.LIST})
         self.assertIn(len(slow.lines), (3, 4), slow.lines)
 
     def test_the_line_is_sent_as_it_is_with_no_request_before_it(self):
         emulator, address = self.emulator()
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
-            logged = emulator_support.of_kind(stream.read_until(lambda events: any(event.kind == "log" for event in events), 5), "log")
-        self.assertEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http")})
+            logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
+        self.assertEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http")})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 
 

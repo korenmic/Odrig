@@ -7543,3 +7543,27 @@ first run of the suite show?
 
 **Resolution.** `tests/app/support.py`, `run` and `_Pages`; `tests/app/page/driver.js`;
 `app/www/target.js`, `parse`; `app/www/client.js`, `begin`.
+
+## Seed 09: The list on the show screen
+
+**Question.** What did building the show screen settle that the design left open?
+
+**Answer.**
+
+- The app asks for the list with `list 0` and then `list <next>`, and never with the bare
+  `list`: the two mean the same to the target, and one form is one line to check.
+- The design takes a `status` that is due before a list that is due. With a target whose
+  replies take longer than a second, a status is always due, and the list would never be
+  asked for. A list that waited while a status was sent goes before the next status. The
+  design says so now.
+- While the show is invalid, `list` is refused. The screen then has no rows and does not
+  say that no animation is installed: it does not know. The reason of the invalid show
+  stands where the screen says what plays.
+- While the target does not answer, the line reads `The installation has not answered
+  for 12 seconds.`, counted from the last reply, or from the start when there was none.
+- The stand-in target of the suite answers by the first word of a line, so that it can
+  stand for a target that knows `status` and `list`.
+
+**Resolution.** `app/www/commands.js`, `list`; `app/www/client.js`, `due`;
+`app/www/screens/show.js`; `docs/specs/09-p1-operators-app-for-android/design.md`, "The
+client"; `tests/app/support.py`, `StandIn`.

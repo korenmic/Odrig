@@ -16,3 +16,8 @@ export function ofFailure(failure) {
 export function ofInvalidShow(reason) {
   return `The installed show is invalid: ${reason}.`;
 }
+
+// The line of the show screen while the target does not answer.
+export function ofSilence(seconds) {
+  return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
+}

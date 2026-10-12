@@ -100,3 +100,47 @@ nav button[aria-current="true"] {
   border-radius: 8px;
   background: var(--button);
 }
+
+#state {
+  margin: 8px 0;
+}
+
+.stale {
+  opacity: 0.45;
+}
+
+#silent {
+  color: var(--marked);
+}
+
+ol {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+ol li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--button);
+}
+
+ol li[aria-current="true"] {
+  border-color: var(--marked);
+  color: var(--marked);
+}
+
+ol .id {
+  min-width: 3ch;
+  color: var(--lesser);
+}
+
+ol .file {
+  overflow-wrap: anywhere;
+}
