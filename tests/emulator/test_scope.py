@@ -41,7 +41,7 @@ class Scope(unittest.TestCase):
         names = {path.name for path, _ in modules(EMULATOR)}
         for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "recfile.py", "record.py", "serialport.py"):
             self.assertIn(expected, names)
-        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py"])
+        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py", "content.py"])
 
     def test_every_module_imports_only_the_standard_library_and_its_own_package(self):
         for package in PACKAGES:
@@ -92,7 +92,7 @@ class Scope(unittest.TestCase):
             self.assertNotIn(f"tools/{name}", listed)
         tracked = subprocess.run(["git", "ls-files", "odrigctl"], cwd=support.ROOT, capture_output=True, text=True, check=True).stdout.split()
         if tracked:
-            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py"])
+            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py", "odrigctl/content.py"])
 
     def test_no_commit_of_this_seed_changes_a_source_or_the_header_of_the_core(self):
         changed = subprocess.run(

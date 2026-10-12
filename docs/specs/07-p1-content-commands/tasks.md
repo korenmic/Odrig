@@ -174,7 +174,7 @@ Rules for every task:
     9.2, 9.3, 10.2, 10.3, 10.5, 10.6, 10.7, 13.3, 13.4, 13.6, 13.7, 15.1, 15.2, 15.3,
     16.6, 19.1, 19.2, 19.3, 19.4
 
-- [ ] 6. The command tool: `space`, `list`, `remove` and `upload`
+- [x] 6. The command tool: `space`, `list`, `remove` and `upload`
   - `odrigctl/client.py`: the session. `odrigctl/content.py`: `list_all` and `upload`.
     `odrigctl/cli.py`: the four commands, the progress lines, the statuses.
   - `docs/emulator.md`, "The command tool": the four commands with an example each over

@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import pathlib
@@ -10,7 +11,7 @@ import unittest
 
 from emulator import app, failure, hub, recfile
 from odrig import odrg
-from odrigctl import cli
+from odrigctl import cli, content
 
 from . import support
 from .test_layout import dump, meetings
@@ -106,23 +107,40 @@ class EmulatorDocument(unittest.TestCase):
         for line in given:
             arguments = made.parse_args(shlex.split(line)[3:])
             transport = "--port" if arguments.port is not None else "--http"
-            sent[transport].add(cli.command_line(made, arguments).decode("ascii").split()[0])
+            sent[transport].add(cli.checked(made, arguments)[0])
         self.assertEqual(sent["--port"], set(cli.COMMANDS))
         self.assertEqual(sent["--http"], set(cli.COMMANDS))
         for command, takes in cli.COMMANDS.items():
-            synopsis = f"python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] {command}" + (f" {takes}" if takes else "")
-            self.assertIn(synopsis, text)
-        for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (3, "error: unreachable: <detail>")):
+            synopsis = " ".join(["python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS]", command, *takes])
+            self.assertIn(synopsis + "\n", text)
+        for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (2, "error: not-found: <detail>"), (3, "error: unreachable: <detail>")):
             self.assertRegex(text, rf"(?m)^\| {status} \| .*{re.escape(meaning)}")
         self.assertIn("application/octet-stream", text)
         self.assertIn("lowers RTS before it lowers DTR", text)
 
+    def test_it_describes_the_upload_of_the_tool_as_the_tool_does_it(self):
+        text = " ".join(section(self.text, "The command tool").split())
+        self.assertIn("upload: 45% 613500/1362000 bytes 21400 B/s", section(self.text, "The command tool"))
+        written = io.StringIO()
+        now = [0.0]
+        progress = cli.Progress(written, clock=lambda: now[0])
+        now[0] = 28.67
+        progress.sent(613500, 1362000, 613500 / 21400)
+        progress.checking()
+        self.assertEqual(written.getvalue(), "upload: 45% 613500/1362000 bytes 21400 B/s\nupload: checking\n")
+        for phrase in ("`upload: checking`", f"every {content.BUSY_PAUSE_SECONDS:g} seconds", f"{content.BUSY_SECONDS:g} seconds", "`upload cancel`", "`bad-offset`",
+                       "the last part of the path", f"half a second", "keeps the port open", "`list <next>`"):
+            self.assertIn(phrase, text)
+        self.assertEqual(cli.REPORT_SECONDS, 0.5)
+        for function in ("odrigctl.client.Session(port=..., http=..., timeout=...)", "odrigctl.content.list_all(session, show)", "odrigctl.content.upload(session, item, name, data, progress)"):
+            self.assertIn(function, text)
+
     def test_every_tool_command_it_gives_anywhere_is_understood_by_the_tool(self):
         given = [line for line in self.commands if line.startswith("python -m odrigctl ") and "(" not in line]
-        self.assertGreaterEqual(len(given), 13)
+        self.assertGreaterEqual(len(given), 21)
         made = cli.parser()
         for line in given:
-            cli.command_line(made, made.parse_args(shlex.split(line)[3:]))
+            cli.checked(made, made.parse_args(shlex.split(line)[3:]))
 
     def test_it_describes_the_http_address_with_a_curl_example(self):
         text = section(self.text, "Commands over HTTP")

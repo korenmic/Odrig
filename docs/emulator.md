@@ -544,6 +544,10 @@ python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] on
 python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] brightness N
 python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] space
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] list
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] remove ID
+python -m odrigctl (--port NAME | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -555,6 +559,10 @@ python -m odrigctl --port build/emulator/serial on
 python -m odrigctl --port build/emulator/serial off
 python -m odrigctl --port build/emulator/serial brightness 40
 python -m odrigctl --port build/emulator/serial status
+python -m odrigctl --port build/emulator/serial space
+python -m odrigctl --port build/emulator/serial list
+python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial remove 9
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -566,6 +574,10 @@ python -m odrigctl --http 127.0.0.1:8600 on
 python -m odrigctl --http 127.0.0.1:8600 off
 python -m odrigctl --http 127.0.0.1:8600 brightness 40
 python -m odrigctl --http 127.0.0.1:8600 status
+python -m odrigctl --http 127.0.0.1:8600 space
+python -m odrigctl --http 127.0.0.1:8600 list
+python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
+python -m odrigctl --http 127.0.0.1:8600 remove 9
 ```
 
 The tool prints the reply line to standard output:
@@ -576,15 +588,19 @@ The tool prints the reply line to standard output:
 
 | Status | Meaning |
 |---:|---|
-| 0 | The reply has `"ok":true`. |
-| 1 | The reply has `"ok":false`. It is printed all the same. |
-| 2 | The command line was not understood. |
+| 0 | The reply has `"ok":true`: for `list` every reply, and for `upload` the reply to `upload end`. |
+| 1 | A reply has `"ok":false`. It is printed all the same. An upload the tool had opened is cancelled first. |
+| 2 | The command line was not understood, or the file to upload cannot be read: then one line `error: not-found: <detail>` is written to standard error and nothing is sent. |
 | 3 | The target could not be reached, or no reply arrived within the time limit. One line `error: unreachable: <detail>` is written to standard error. |
 
-- The line sent is `play <ID>`, `on`, `off`, `brightness <N>` or `status`, followed by a
-  newline. ID and N are sent as they were typed and are not checked: `play abc` is sent and
-  the reply says `bad-argument`. Every judgement is the command front-end's.
-- `--timeout SECONDS` is how long the tool waits for the reply; 2 seconds without it.
+- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `space`, `list` or
+  `remove <ID>`, followed by a newline. ID and N are sent as they were typed and are not
+  checked: `play abc` is sent and the reply says `bad-argument`. Every judgement is the
+  command front-end's.
+- `list` prints the reply, and for as long as the reply names a `next` position it sends
+  `list <next>` and prints that reply too: a line of output for each part of a long show.
+  It stops at a reply that is not ok.
+- `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
   what arrives in the next 0.1 seconds, and sends the line. The reply is the first received
@@ -597,11 +613,59 @@ The tool prints the reply line to standard output:
   response with status 200 as the reply. Any other status counts as not reached.
 - The options may stand before or after the command.
 
-Another program can use the two exchanges directly: `odrigctl.client.serial_exchange(port,
-data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` return the reply
-or raise `Unreachable`. `serial_exchange` takes a fourth argument, a function that says
-which received line is the answer, for a target whose answer is not a reply of
-[commands.md](commands.md).
+**`upload ID FILE`** sends an animation as the commands of [commands.md](commands.md),
+"Uploading an animation", describe it. The file is one the converter made for the canvas
+of the show, here Hello world for the bench file:
+
+```
+python -m odrig encode animations/hello.json build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+upload: 100% 1138/1138 bytes 1206147 B/s
+upload: checking
+{"ok":true}
+```
+
+The emulator takes a small file in a thousandth of a second, which is the speed shown
+here; the board's is in [firmware.md](firmware.md).
+
+- The tool reads the whole file before it sends anything. It sends `upload begin <ID>
+  <name> <bytes>`, where the name is the last part of the path as it is, then the file in
+  pieces of the size the reply names, each as one `upload data` line, and then
+  `upload end` with the CRC-32 of the file. ID and the name are not checked by the tool.
+- Progress goes to standard error: the percentage, the bytes acknowledged and the total,
+  and the speed, which is the bytes acknowledged over the time since `upload begin` was
+  answered. A report is written when half a second has passed since the one before, and
+  for the last piece; a long upload gives lines such as
+  `upload: 45% 613500/1362000 bytes 21400 B/s`. When standard error is a terminal, one line
+  is written over again.
+- After the last piece the tool writes `upload: checking` once. While the reply to
+  `upload end` is `busy`, the target is checking the file, and the tool sends
+  `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
+  `upload cancel`, prints the last reply and exits with status 1.
+- Standard output gets the reply that ended the command: the `{"ok":true}` of
+  `upload end`, or the first reply that was not ok. After such a reply to a piece or to
+  `upload end` the tool sends `upload cancel`, unless the reply says that the upload is
+  gone. A refused `upload begin` is not followed by a cancel: the upload that is open
+  then is someone else's.
+- When no reply to an `upload data` line arrives in time, the tool sends the same line
+  once more. `bad-offset` for that second line means that the first one was taken, and the
+  tool goes on. Without a reply to the second line either, it exits with status 3. No
+  other line is sent twice.
+- Through a serial port the tool keeps the port open for the whole upload.
+
+Another program can use the exchanges directly. `odrigctl.client.serial_exchange(port,
+data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` are one
+exchange each: they return the reply or raise `Unreachable`. `serial_exchange` takes a
+fourth argument, a function that says which received line is the answer, for a target
+whose answer is not a reply of [commands.md](commands.md).
+`odrigctl.client.Session(port=..., http=..., timeout=...)` is several exchanges with one
+target: `exchange(line)` returns the reply to a line, and `close()` ends the session. Over
+the port it opens the port once, as `serial_exchange` does, and keeps it open; a line that
+arrived whole before a line is sent is no answer to it and is dropped. Over HTTP every
+exchange is one request. `odrigctl.content.list_all(session, show)` and
+`odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
+take more than one exchange through a session; `progress(sent, total, seconds)` is called
+after every piece that was acknowledged.
 
 ## Record mode
 
@@ -630,9 +694,10 @@ python -m emulator build/example-show --record build/example.odrr --seconds 60
 Recording the same folder with the same length and the same script twice gives the same
 bytes. A script may hold the content commands of [commands.md](commands.md): they act on
 the folder as in real time, so the folder is changed afterwards, and "the same folder"
-means a folder with the same files as before the first recording. The emulator gives the core nothing of its own in this mode: only the requests for
-a refresh and the commands of the script. The options `--port`, `--serial-link` and
-`--verbose` belong to real time and do not go with `--record`.
+means a folder with the same files as before the first recording. The emulator gives the
+core nothing of its own in this mode: only the requests for a refresh and the commands of
+the script. The options `--port`, `--serial-link` and `--verbose` belong to real time and
+do not go with `--record`.
 
 ### The script
 

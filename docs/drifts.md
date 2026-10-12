@@ -5377,3 +5377,69 @@ it, and `space` during an upload counts it.
 
 **Resolution.** `tests/core/support.py`, `ReferencePlayer.sound_records`;
 `emulator/host.py`, `write_open`; `tests/emulator/test_content.py`, `Uploads`.
+
+## Seed 07: When the command tool writes a progress line
+
+**Question.** The design has the tool write progress "one line for each report", and
+calls `progress` after every acknowledged piece; Requirement 18.5 asks for a line "at
+least once a second, and a last time when the data is sent". Over USB a piece is
+acknowledged nine times a second, so a line for every piece is 900 lines for a file of
+1.4 MB when standard error is a file or a pipe.
+
+**Answer.** `odrigctl.content.upload` calls `progress` after every acknowledged piece, as
+designed, and the board tests use that. The command line writes a report when half a
+second has passed since the one before, and always for the last piece, so a small file
+gives one line with 100%. The speed in a line is whole bytes a second, rounded, and 0
+when no time has passed. On a terminal the one line is written over again and ended
+before the reply is printed.
+
+**Resolution.** `odrigctl/cli.py`, `Progress`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `ProgressLines`.
+
+## Seed 07: What the tool's session does with a reply that comes late
+
+**Question.** Through the port the replies carry no mark of the line they answer; the
+session takes the next reply for the answer. The design has the tool send an
+`upload data` line once more when no reply came in time. If the first reply was only
+late, two replies are then on their way for one piece, and the second would be taken for
+the answer of the next piece.
+
+**Answer.** Two rules in the session, for the port only. A line that arrived whole before
+a line is sent is no answer to it and is dropped; the beginning of a line that has not
+ended is kept and judged with its end. And after a second `upload data` line that was
+answered with anything but `bad-offset`, the tool drops what arrives in the next half
+second. A reply later than that still ends the upload with `bad-offset`, a cancel and
+status 1; the upload can be sent again. Over HTTP a late reply belongs to a request that
+was closed and is never seen.
+
+Only an `upload data` line is sent twice. Without a reply to `upload begin`, to
+`upload end` or to a line of another command the tool exits with status 3 and sends no
+cancel: it cannot reach the target. An upload left open so is discarded by the target
+after 60 seconds, and after a lost reply to `upload end` the file may be installed all
+the same; `list` tells.
+
+**Resolution.** `odrigctl/client.py`, `Session.exchange` and `Session.discard`;
+`odrigctl/content.py`, `upload`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `LostReply` and `SessionOfExchanges`.
+
+## Seed 07: When the tool cancels an upload
+
+**Question.** Requirement 18.7 has the tool send `upload cancel` after a reply that is
+not ok "when an upload it opened may still be open". It does not say after which replies
+that is.
+
+**Answer.** After a refused `upload begin` the tool sends no cancel: it opened nothing,
+and with `busy` the open upload is another sender's. After a reply to a piece or to
+`upload end` that is not ok it sends `upload cancel`, unless the code is one after which
+the target holds no upload: `no-upload`, `bad-checksum`, `bad-file`, `storage-error` or
+`show-invalid`. So a cancel follows `bad-offset`, `bad-argument`, `incomplete`, and
+`busy` after 600 seconds. The reply to the cancel is not printed and does not change the
+status.
+
+Beside what the design names, `cli.checked` gives the command and its arguments after
+their number is checked, and every command, also the five of before, goes through a
+`Session`.
+
+**Resolution.** `odrigctl/content.py`, `GONE` and `_given_up`; `odrigctl/cli.py`;
+`tests/emulator/test_tool.py`, `UploadSteps` and
+`test_an_upload_that_is_refused_at_its_begin_cancels_nothing`.
