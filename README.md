@@ -5,6 +5,21 @@ addressable LED strips. The target is a canvas of 60 x 60 LEDs on twenty legs, e
 pin of the board with three upright strips of 60 LEDs; the build on the bench today has two
 legs of three flat strips, 60 x 6.
 
+## Start here
+
+Read these four pages first, in this order:
+
+1. [agent/getting-started.md](agent/getting-started.md) takes you from a fresh clone to the
+   demo show playing in the emulator on your own computer. It needs no board.
+2. [agent/vocabulary.md](agent/vocabulary.md) says what the project's words mean.
+3. [agent/animation-guide.md](agent/animation-guide.md) shows how to make an animation and
+   try it without the board.
+4. [agent/working-rules.md](agent/working-rules.md) has the rules that bind every change.
+   Read it before you change anything.
+
+[agent/README.md](agent/README.md) introduces these pages. The rest of this page names
+the reference documents. Coding agents start at [AGENTS.md](AGENTS.md).
+
 ## Workstreams
 
 - **Firmware** — the program flashed onto the ESP32 that drives the LEDs and plays stored
@@ -25,8 +40,9 @@ legs of three flat strips, 60 x 6.
   Android app for operators.
 - **Tests** — automated checks for the mapping, the formats, the converters and playback.
 - **Git repo** — this repository: its structure, history and workflow.
-- **Agent files** — documents, policies and skills that tell coding agents what this project
-  is and how to work in it.
+- **Agent files** — the pages in the folder [agent/](agent/) that tell coding agents and new
+  contributors what this project is and how to work in it, with `AGENTS.md` and `CLAUDE.md`
+  at the top of the repository as the way in.
 
 Hardware and power wiring are not a workstream: they are handled on site by the operators.
 

@@ -24,10 +24,21 @@ it stands now.
 - Work is planned as seeds. A seed becomes a requirements / design / tasks trio, tasks are
   queued, and each task is one commit. Seeds live in `project-seeds/`, one folder per seed
   with its own state file.
-- All work is committed directly on `master`, and every significant advance is committed.
-  There is no remote yet.
-- The repository will carry a vocabulary file and agent policies, limited to the policies
-  that are relevant to this project.
+- Several contributors work at once, on separate computers. Each works on a branch of
+  their own, and nothing is committed directly on `master`. A branch is brought up to date
+  with `master` before it is merged, and it is merged only with every test suite that
+  needs no board passing. [drifts.md](drifts.md) and the change log of this file are only
+  ever added to at the end, so that two contributors' additions can both be kept. Every
+  significant advance is committed. The remote is `https://github.com/korenmic/Odrig`, a
+  private repository, and history that has been pushed to it is never rewritten. See
+  [working-rules.md](../agent/working-rules.md), "Several contributors at once".
+- The pages for newcomers are a workstream of their own and are in the folder `agent/`,
+  with `AGENTS.md` and `CLAUDE.md` at the top of the repository. Among them are a
+  vocabulary, [vocabulary.md](../agent/vocabulary.md), and the working rules,
+  [working-rules.md](../agent/working-rules.md), which hold the agent policies that are
+  relevant to this project.
+- A second contributor works on a Windows computer. Making the emulator and the tools run
+  there is seed 11.
 
 ## Canvas and coordinates
 
@@ -264,3 +275,15 @@ are in [format.md](format.md), "Measured sizes".
   rate from 20 to 50 a second is fine on the board, for any content. What fits into storage
   is computed again for 60 x 60: 65 to 74 seconds of the dense clip. The open question about
   legs 3 to 10 is now the one about twenty wired legs.
+- 2026-10-12: Several contributors now work at once, on separate computers. The rule that
+  all work goes directly on `master` gives way to a branch for each contributor, brought
+  up to date with `master` and merged only with every suite that needs no board passing.
+  `drifts.md` and this change log are added to at the end only. The repository carries the
+  vocabulary and the working rules.
+- 2026-10-12: The repository has a remote, `https://github.com/korenmic/Odrig`, private.
+  The pages for newcomers are a workstream of their own in the folder `agent/`. A second
+  contributor works on a Windows computer; making the emulator and the tools run there is
+  seed 11.
+- 2026-10-12: A second firmware without WLED, hosting the same shared core on the same
+  twenty outputs, is planned as a fallback for the event (seed 12). The WLED-based firmware
+  stays the one in use.
