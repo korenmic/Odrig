@@ -91,12 +91,15 @@ class Accepted(unittest.TestCase):
         self.assertTrue(example.endswith("}\n"))
         self.assertNotIn(" ", example)
         self.assertEqual(example, json.dumps(json.loads(example), separators=(",", ":")) + "\n")
-        self.assertEqual(list(json.loads(example)), ["version", "brightness", "items", "start"])
+        self.assertEqual(list(json.loads(example)), ["version", "brightness", "min_seconds", "items", "start"])
+        self.assertEqual(list(json.loads(example)["items"][0]), ["id", "file", "repeat", "max_seconds"])
         result = show.loads(example.encode())
-        self.assertEqual((result.brightness, result.start), (128, 4))
-        self.assertEqual(result.items, (show.Item(1, "hello.odrg", None, None), show.Item(2, "dvd.odrg", None, None), show.Item(4, None, (2, 1), 15)))
+        self.assertEqual((result.brightness, result.start, result.min_seconds), (128, 4, 45))
+        self.assertEqual(result.items, (show.Item(1, "hello.odrg", None, None, 3, 120), show.Item(2, "dvd.odrg", None, None), show.Item(4, None, (2, 1), 15)))
         for written in (
             b'{"version":1,"brightness":0,"items":[]}\n',
+            b'{"version":1,"brightness":0,"min_seconds":1,"items":[{"id":1,"file":"a.odrg","max_seconds":65535}]}\n',
+            b'{"version":1,"brightness":0,"items":[{"id":1,"file":"a.odrg","repeat":65535}]}\n',
             b'{"version":1,"brightness":255,"items":[{"id":65535,"file":".odrg"}]}\n',
             b'{"version":1,"brightness":7,"items":[{"id":2,"file":"a.odrg"},{"id":1,"cycle":[2,2,2],"seconds":65535}],"start":1}\n',
         ):

@@ -418,6 +418,15 @@ def with_first_item(text):
     return SHOW.replace('{"id": 1, "file": "hello.odrg"}', text)
 
 
+def with_turn(members):
+    """The show with more members on its first animation."""
+    return with_first_item('{"id": 1, "file": "hello.odrg", %s}' % members)
+
+
+def with_min_seconds(text):
+    return SHOW.replace('"brightness": 128', f'"brightness": 128, "min_seconds": {text}')
+
+
 # Texts used as show.json. Each is judged by the core and by the converter's reader.
 SHOW_TEXTS = {
     "the plain text": SHOW,
@@ -509,6 +518,36 @@ SHOW_TEXTS = {
     "seconds 0": with_seconds("0"),
     "seconds 1": with_seconds("1"),
     "seconds 65535": with_seconds("65535"),
+    "repeat 1": with_turn('"repeat": 1'),
+    "repeat 65535": with_turn('"repeat": 65535'),
+    "repeat 0": with_turn('"repeat": 0'),
+    "repeat 65536": with_turn('"repeat": 65536'),
+    "repeat -1": with_turn('"repeat": -1'),
+    "repeat 3.0": with_turn('"repeat": 3.0'),
+    "repeat 3e0": with_turn('"repeat": 3e0'),
+    "repeat as text": with_turn('"repeat": "3"'),
+    "repeat null": with_turn('"repeat": null'),
+    "repeat named twice": with_turn('"repeat": 3, "repeat": 3'),
+    "max_seconds 1": with_turn('"max_seconds": 1'),
+    "max_seconds 65535": with_turn('"max_seconds": 65535'),
+    "max_seconds 0": with_turn('"max_seconds": 0'),
+    "max_seconds 65536": with_turn('"max_seconds": 65536'),
+    "max_seconds as a list": with_turn('"max_seconds": [60]'),
+    "repeat and max_seconds": with_turn('"max_seconds": 120, "repeat": 3'),
+    "repeat before the file": with_first_item('{"repeat": 2, "id": 1, "max_seconds": 9, "file": "hello.odrg"}'),
+    "repeat on a cycle": SHOW.replace('"seconds": 15', '"seconds": 15, "repeat": 2'),
+    "max_seconds on a cycle": SHOW.replace('"seconds": 15', '"seconds": 15, "max_seconds": 60'),
+    "repeat without a file": with_first_item('{"id": 1, "repeat": 2}'),
+    "min_seconds on an item": with_turn('"min_seconds": 30'),
+    "min_seconds 1": with_min_seconds("1"),
+    "min_seconds 65535": with_min_seconds("65535"),
+    "min_seconds 0": with_min_seconds("0"),
+    "min_seconds 65536": with_min_seconds("65536"),
+    "min_seconds 30.0": with_min_seconds("30.0"),
+    "min_seconds as text": with_min_seconds('"30"'),
+    "min_seconds named twice": with_min_seconds("30").replace('"items"', '"min_seconds": 30, "items"'),
+    "min_seconds as the last member": SHOW[:-1] + ', "min_seconds": 45}',
+    "repeat of the show": SHOW[:-1] + ', "repeat": 2}',
     "seconds 65536": with_seconds("65536"),
     "seconds -0": with_seconds("-0"),
     "seconds as text": with_seconds('"15"'),
@@ -567,7 +606,9 @@ class ShowTexts(unittest.TestCase):
         self.assertEqual([judged_by_the_converter(as_bytes(text)) for text in with_start], ["undefined-id 1", "undefined-id 0"])
 
     def test_the_texts_it_must_accept_are_accepted(self):
-        for name in ("the plain text", "no start", "members in another order", "brightness -0", "a file name that is the ending", "a file name with an escaped letter", "seconds 65535"):
+        for name in ("the plain text", "no start", "members in another order", "brightness -0", "a file name that is the ending", "a file name with an escaped letter", "seconds 65535",
+                     "repeat 1", "repeat 65535", "max_seconds 1", "max_seconds 65535", "repeat and max_seconds", "repeat before the file", "min_seconds 1",
+                     "min_seconds 65535", "min_seconds as the last member"):
             with self.subTest(text=name):
                 self.assertTrue(judged_by_the_converter(as_bytes(SHOW_TEXTS[name])).startswith("file-missing "))
 

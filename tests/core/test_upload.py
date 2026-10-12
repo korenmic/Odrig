@@ -231,6 +231,66 @@ class NewAndReplaced(Uploads):
         self.assertEqual(len(f"upload data 0 {b64(large[:1525])}"), 2048)
 
 
+# A show whose animations say how long their turns are, in every way an item can.
+TURNS = [{"id": 1, "file": "one.odrg", "repeat": 3, "max_seconds": 120}, {"id": 2, "file": "two.odrg", "max_seconds": 9},
+         {"id": 3, "file": "three.odrg", "repeat": 2}, animation(4, "four.odrg"), cycle(6, [4, 2], 2)]
+
+
+def with_min_seconds(files, seconds):
+    """The file set with the shortest time of an animation named in its show file."""
+    show = json.loads(files["show.json"])
+    show["min_seconds"] = seconds
+    return files | {"show.json": json.dumps(show)}
+
+
+class WhatTheShowSaysOfTheTurns(Uploads):
+    """The file the core writes keeps every number of the show file about the turns."""
+
+    def test_the_file_written_after_a_removal_keeps_it(self):
+        files = with_min_seconds(small_show(TURNS, start=6), 45)
+        self.play(files, Script().polls(5).line("remove 3").polls(5))
+        self.assertEqual(self.answers("remove"), [OK])
+        self.assertEqual(
+            self.left["show.json"],
+            b'{"version":1,"brightness":128,"min_seconds":45,"items":[{"id":1,"file":"one.odrg","repeat":3,"max_seconds":120},'
+            b'{"id":2,"file":"two.odrg","max_seconds":9},{"id":4,"file":"four.odrg"},{"id":6,"cycle":[4,2],"seconds":2}],"start":6}\n')
+
+    def test_a_show_that_names_no_shortest_time_gets_none_written(self):
+        self.play(small_show(TURNS, start=6), Script().polls(5).line("remove 1").polls(5))
+        self.assertEqual(
+            self.left["show.json"],
+            b'{"version":1,"brightness":128,"items":[{"id":2,"file":"two.odrg","max_seconds":9},{"id":3,"file":"three.odrg","repeat":2},'
+            b'{"id":4,"file":"four.odrg"},{"id":6,"cycle":[4,2],"seconds":2}],"start":6}\n')
+
+    def test_an_animation_that_is_replaced_keeps_its_numbers_and_a_new_item_has_none(self):
+        clip = support.clip(12, 60, 6)
+        files = with_min_seconds(small_show(TURNS, start=6), 1)
+        script = Script().polls(5).upload(1, "newer.odrg", clip).polls(5).upload(9, "nine.odrg", clip).polls(5).upload(2, "two.odrg", clip).polls(5)
+        self.play(files, script)
+        self.assertEqual(self.answers("upload end"), [OK, OK, OK])
+        self.assertEqual(
+            self.left["show.json"],
+            b'{"version":1,"brightness":128,"min_seconds":1,"items":[{"id":1,"file":"newer.odrg","repeat":3,"max_seconds":120},'
+            b'{"id":2,"file":"two.odrg","max_seconds":9},{"id":3,"file":"three.odrg","repeat":2},{"id":4,"file":"four.odrg"},'
+            b'{"id":6,"cycle":[4,2],"seconds":2},{"id":9,"file":"nine.odrg"}],"start":6}\n')
+
+    def test_the_written_file_is_read_again_and_written_the_same(self):
+        files = with_min_seconds(small_show(TURNS, start=6), 65535)
+        self.play(files, Script().polls(5).line("remove 3").polls(5))
+        first = dict(self.left)
+        self.play(first, Script().polls(5).line("remove 6").polls(5))
+        self.assertEqual(self.answers("remove"), [OK])
+        self.assertEqual(
+            self.left["show.json"],
+            b'{"version":1,"brightness":128,"min_seconds":65535,"items":[{"id":1,"file":"one.odrg","repeat":3,"max_seconds":120},'
+            b'{"id":2,"file":"two.odrg","max_seconds":9},{"id":4,"file":"four.odrg"}]}\n')
+
+    def test_the_largest_numbers_are_written_whole(self):
+        items = [{"id": 1, "file": "one.odrg", "repeat": 65535, "max_seconds": 65535}, animation(2, "two.odrg")]
+        self.play(small_show(items), Script().polls(5).line("remove 2").polls(5))
+        self.assertEqual(self.left["show.json"], b'{"version":1,"brightness":128,"items":[{"id":1,"file":"one.odrg","repeat":65535,"max_seconds":65535}]}\n')
+
+
 class Arguments(Uploads):
     def test_base64_that_is_not_as_described_is_a_bad_argument(self):
         broken = ["", "A", "AAAAA", "AB", "AAB", "AA==", "AAA=", "AA+A", "AA/A", "AA.A", "AAA~", "AAAA\t", "QUJD=", "====", "=", "-", "A" * 2001, "A" * 2004, "A" * 2030]

@@ -103,14 +103,17 @@ or an item was removed.
 ## show.json after a change
 
 The player writes `show.json` as one line without spaces, followed by a line feed, with
-the members in this order, and `start` only when the show has one:
+the members in this order, and each of `min_seconds`, `repeat`, `max_seconds` and `start`
+only when the show has it:
 
 ```json
-{"version":1,"brightness":128,"items":[{"id":1,"file":"hello.odrg"},{"id":2,"file":"dvd.odrg"},{"id":4,"cycle":[2,1],"seconds":15}],"start":4}
+{"version":1,"brightness":128,"min_seconds":45,"items":[{"id":1,"file":"hello.odrg","repeat":3,"max_seconds":120},{"id":2,"file":"dvd.odrg"},{"id":4,"cycle":[2,1],"seconds":15}],"start":4}
 ```
 
-`brightness` is the value the file had when the player started. A file written by hand in
-another layout is read as before; it gets this layout the first time the show is changed.
+`brightness` is the value the file had when the player started. An animation that gets
+another file by an upload keeps its `repeat` and its `max_seconds`; an item that an upload
+adds has neither. A file written by hand in another layout is read as before; it gets this
+layout the first time the show is changed.
 
 ## When a show is invalid
 

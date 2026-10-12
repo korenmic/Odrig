@@ -47,7 +47,7 @@ Rules for every task:
     are, fails: the show is refused as malformed.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6
 
-- [ ] 2. The core reads and writes the members
+- [x] 2. The core reads and writes the members
   - `core/src/show.cpp`, `core_state.h` and `content.cpp`: the members into the item
     table and the core; the file the core writes, in the design's order.
   - `tests/core/`: every show file of task 1's cases judged by the core as the reference

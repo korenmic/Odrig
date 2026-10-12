@@ -510,6 +510,8 @@ class ReferencePlayer:
         self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
         self.start = None       # the id of the `start` item of the show
+        self.min_seconds = show.MIN_SECONDS     # how long an animation without `repeat` plays at least
+        self.says_min_seconds = False           # the show file names that time itself
         self.show_brightness = 0    # the brightness of the show file
         self.canvas = None      # the width and the height of the canvas
         self.capacity = 0       # the number of items there is room for
@@ -564,6 +566,8 @@ class ReferencePlayer:
         except errors.Rejection as rejection:
             raise _Invalid(show_refusal(rejection)) from None
         self.brightness = self.show_brightness = listed.brightness
+        self.min_seconds = listed.min_seconds
+        self.says_min_seconds = "min_seconds" in json.loads(files["show.json"])
         self.items = {item.id: item for item in listed.items}
         self.capacity = max(128, min(len(self.items) + 32, 65535), len(self.items))
         self.start = listed.start
@@ -853,7 +857,8 @@ class ReferencePlayer:
         old = self.items.get(number)
         self.files[name] = upload["data"]
         self.clips[name] = upload["clip"]
-        self.items[number] = show.Item(number, name, None, None)
+        # An item that gets another animation keeps what the show says of its turn.
+        self.items[number] = show.Item(number, name, None, None, old.repeat if old else None, old.max_seconds if old else None)
         if old is not None:
             if old.file != name and all(other.file != old.file for other in self.items.values()):
                 self.files.pop(old.file, None)
@@ -896,10 +901,14 @@ class ReferencePlayer:
         items = []
         for item in self.items.values():
             if item.cycle is None:
-                items.append({"id": item.id, "file": item.file})
+                turn = {name: value for name, value in (("repeat", item.repeat), ("max_seconds", item.max_seconds)) if value is not None}
+                items.append({"id": item.id, "file": item.file, **turn})
             else:
                 items.append({"id": item.id, "cycle": list(item.cycle), "seconds": item.seconds})
-        written = {"version": 1, "brightness": self.show_brightness, "items": items}
+        written = {"version": 1, "brightness": self.show_brightness}
+        if self.says_min_seconds:
+            written["min_seconds"] = self.min_seconds
+        written["items"] = items
         if self.start is not None:
             written["start"] = self.start
         return json.dumps(written, separators=(",", ":")).encode("ascii") + b"\n"

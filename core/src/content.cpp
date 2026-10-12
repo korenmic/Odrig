@@ -207,6 +207,10 @@ bool content_write_show(Core &core, const ShowChange &change) {
     out.failed = false;
     out.text("{\"version\":1,\"brightness\":");
     out.number(core.show_brightness);
+    if (core.has_min_seconds) {
+        out.text(",\"min_seconds\":");
+        out.number(core.min_seconds);
+    }
     out.text(",\"items\":[");
     bool first = true;
     for (uint32_t position = 0; position < core.item_count; ++position) {
@@ -223,7 +227,17 @@ bool content_write_show(Core &core, const ShowChange &change) {
         if (!item.is_cycle) {
             out.text(",\"file\":\"");
             out.text(position == change.renamed ? change.name : core.files[item.first].name);
-            out.text("\"}");
+            out.byte('"');
+            // What the show says of the animation's turn: its loops, and its longest time.
+            if (item.count != 0) {
+                out.text(",\"repeat\":");
+                out.number(item.count);
+            }
+            if (item.seconds != 0) {
+                out.text(",\"max_seconds\":");
+                out.number(item.seconds);
+            }
+            out.byte('}');
         } else {
             out.text(",\"cycle\":[");
             for (uint32_t entry = 0; entry < item.count; ++entry) {

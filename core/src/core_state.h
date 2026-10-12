@@ -23,9 +23,11 @@ struct LegInfo {
     uint32_t count;
 };
 
-// One item of the show. An animation item: `first` is its entry of the file table. A cycle
-// item: its animations are `count` entries of the entry table, from `first` on, each the
-// position of an animation item in the item table.
+// One item of the show. An animation item: `first` is its entry of the file table, `count`
+// the number of loops of its turn and `seconds` the longest its turn lasts, each 0 when
+// the show gives none. A cycle item: its animations are `count` entries of the entry
+// table, from `first` on, each the position of an animation item in the item table, and
+// `seconds` is the length of each of its turns.
 struct ItemInfo {
     uint16_t id;
     uint16_t seconds;
@@ -119,6 +121,10 @@ struct Core {
     uint8_t show_brightness;
     uint8_t has_start;
     uint32_t start_item;
+    // How long an animation without a number of loops plays at least, in seconds, and
+    // whether the show file says so itself.
+    uint16_t min_seconds;
+    uint8_t has_min_seconds;
 
     // A block of kChunkSize bytes for a host whose storage can be changed: a piece of an
     // upload or the text of a file the core writes, on its way to the host, and

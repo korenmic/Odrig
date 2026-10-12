@@ -9,6 +9,8 @@ namespace {
 
 const uint32_t kNameSize = 12;
 const uint32_t kLargestId = 65535;
+// How long an animation without a number of loops plays at least, in a show that does not say.
+const uint32_t kMinSeconds = 30;
 const uint32_t kMostToCount = 0xFFFFFFFFu;
 
 // What one reading of the file has seen so far.
@@ -27,6 +29,9 @@ struct Seen {
     bool has_start;
     bool start_negative;
     uint32_t start_size;
+
+    bool has_min_seconds;
+    uint32_t min_seconds;
 };
 
 void count_one(uint32_t *counter) {
@@ -77,6 +82,8 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
     uint32_t members = 0;
     uint32_t id = 0;
     uint32_t seconds = 0;
+    uint32_t repeat = 0;
+    uint32_t max_seconds = 0;
     uint32_t own_entries = 0;
 
     if (!json.object_begin()) {
@@ -92,6 +99,10 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
             member = 4;
         } else if (same_text(name, "seconds")) {
             member = 8;
+        } else if (same_text(name, "repeat")) {
+            member = 16;
+        } else if (same_text(name, "max_seconds")) {
+            member = 32;
         } else {
             return false;
         }
@@ -102,6 +113,14 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
 
         if (member == 1) {
             if (!json.integer(&id) || id < 1 || id > kLargestId) {
+                return false;
+            }
+        } else if (member == 16) {
+            if (!json.integer(&repeat) || repeat < 1 || repeat > 65535) {
+                return false;
+            }
+        } else if (member == 32) {
+            if (!json.integer(&max_seconds) || max_seconds < 1 || max_seconds > 65535) {
                 return false;
             }
         } else if (member == 2) {
@@ -144,10 +163,11 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
     if (json.failed) {
         return false;
     }
-    // An item with `file` is an animation and has no other member but `id`. Any other
-    // item is a cycle and has `id`, `cycle` and `seconds`.
+    // An item with `file` is an animation: it has `id`, and may have `repeat` and
+    // `max_seconds`, and no other member. Any other item is a cycle and has exactly `id`,
+    // `cycle` and `seconds`.
     const bool is_animation = (members & 2) != 0;
-    if (members != (is_animation ? 3u : 13u)) {
+    if (is_animation ? (members & ~48u) != 3u : members != 13u) {
         return false;
     }
 
@@ -157,10 +177,10 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
         }
         ItemInfo &item = core.items[seen.items];
         item.id = static_cast<uint16_t>(id);
-        item.seconds = static_cast<uint16_t>(seconds);
+        item.seconds = static_cast<uint16_t>(is_animation ? max_seconds : seconds);
         item.is_cycle = is_animation ? 0 : 1;
         item.first = is_animation ? file_entry(core, file) : seen.entries;
-        item.count = own_entries;
+        item.count = is_animation ? repeat : own_entries;
     }
     count_one(&seen.items);
     if (is_animation) {
@@ -187,6 +207,8 @@ bool read_file(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
             member = 4;
         } else if (same_text(name, "start")) {
             member = 8;
+        } else if (same_text(name, "min_seconds")) {
+            member = 16;
         } else {
             return false;
         }
@@ -195,7 +217,12 @@ bool read_file(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
         }
         members |= member;
 
-        if (member == 1) {
+        if (member == 16) {
+            if (!json.integer(&seen.min_seconds) || seen.min_seconds < 1 || seen.min_seconds > 65535) {
+                return false;
+            }
+            seen.has_min_seconds = true;
+        } else if (member == 1) {
             uint32_t version;
             if (!json.integer(&version) || version != 1) {
                 return false;
@@ -238,6 +265,8 @@ Reason read_once(Core &core, const Seen *limits, Seen &seen) {
     seen.has_start = false;
     seen.start_negative = false;
     seen.start_size = 0;
+    seen.has_min_seconds = false;
+    seen.min_seconds = 0;
     Reason opened = core.file.open(core.host, "show.json");
     if (opened == kFileMissing) {
         return kShowMissing;
@@ -315,6 +344,8 @@ Reason check_ids(Core &core, const Seen &seen, char *id_text) {
     }
     core.has_start = seen.has_start ? 1 : 0;
     core.start_item = start_item;
+    core.has_min_seconds = seen.has_min_seconds ? 1 : 0;
+    core.min_seconds = static_cast<uint16_t>(seen.has_min_seconds ? seen.min_seconds : kMinSeconds);
     return kNone;
 }
 

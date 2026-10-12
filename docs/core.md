@@ -350,6 +350,11 @@ never written in place. The text of `show.json` is the one of [show.md](show.md)
   data as it would have been.
 - The item table and the file table have room for 32 items more than `show.json` lists at
   startup, and for at least 128. A new item beyond that is refused with `no-space`.
+- An item of the item table has 16 bytes, whatever it is. An animation item keeps its
+  `repeat` and its `max_seconds` of [show.md](show.md) in two fields that only a cycle
+  used before, each 0 when the show gives none, so the table is no larger for them. The
+  show's `min_seconds` is one number of the core, 30 when the show names none. The file
+  the core writes has all three as the show had them.
 
 ## Uploads and the check
 
