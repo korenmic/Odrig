@@ -33,7 +33,7 @@ Rules for every task:
   staged.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The limit file and its checks
+- [x] 1. The limit file and its checks
   - `firmware/limit.json` with 850. `LIMIT_SETTINGS` in `firmware/fwtool/paths.py`.
     `firmware/fwtool/limit.py` with `read` and the three reasons.
   - `tests/firmware/test_limit_settings.py`, the parts that call `limit.read`.

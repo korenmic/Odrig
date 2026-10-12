@@ -3,14 +3,10 @@ settings files edited in a storage image."""
 
 import copy
 import json
-import re
 
 from littlefs.errors import LittleFSError
 
-from odrig import errors as json_errors
-from odrig import strictjson
-
-from . import Failure, paths, storage
+from . import Failure, paths, settingsfile, storage
 
 # WLED's stored settings: the name is in the first, the password in the second.
 CONFIG = "/cfg.json"
@@ -51,26 +47,9 @@ def _checked(value, limits, reason, what, of):
     return value
 
 
-def _fault(detail):
-    """What is wrong with a JSON text, in words that hold nothing of the text."""
-    placed = re.match(r"line \d+, column \d+", detail)
-    if placed:
-        return f"a fault at {placed.group(0)}"
-    if "appears twice" in detail:
-        return "a member is named twice"
-    if detail in ("not UTF-8", "starts with a byte-order mark", "nested too deeply"):
-        return detail
-    return "it is not one JSON value"
-
-
 def read(path=paths.WIFI_SETTINGS):
     """The settings of a settings file, checked. No detail of a refusal quotes the file."""
-    if not path.is_file():
-        raise Failure("wifi-settings-missing", f"{path} is not there or is not a file")
-    try:
-        value = strictjson.loads(path.read_bytes())
-    except json_errors.Rejection as refused:
-        raise Failure("wifi-settings-malformed", f"{path} is not JSON: {_fault(refused.detail)}") from None
+    value = settingsfile.value_of(path, "wifi-settings-missing", "wifi-settings-malformed")
     if not isinstance(value, dict) or sorted(value) != sorted(MEMBERS) or not all(isinstance(value[member], str) for member in MEMBERS):
         raise Failure("wifi-settings-malformed", f"{path} is not an object with exactly the strings name and password")
     name = _checked(value["name"], NAME_CHARACTERS, "wifi-name-invalid", "name", "a network name")
