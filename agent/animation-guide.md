@@ -148,7 +148,7 @@ It prints one line that begins with `reply 1000`, as in getting started. In it,
 | What | Where | Committed |
 |---|---|---|
 | A generator | `odrig/generators/`, its tests in `tests/converter/` | Yes. |
-| A source made by an import | `animations/NAME.json` | Yes, up to 50 MB; see the next section. |
+| A source made by an import | `animations/NAME.json` | Yes, always. Keep it to 50 MB or less; see the next section. |
 | A source a generator writes for the target | `build/`, written again whenever a show is packed | No. The generator is. |
 | A show file | `shows/NAME/show.json` | Yes. |
 | A mapping file | `mapping/` | Yes. It changes only when the LEDs are wired another way, which is the owner's to say. |
@@ -182,8 +182,9 @@ demo show is 1,210 bytes, and the dense clip 1.4 MB.
 
 The large hosting services for git refuse a single file above 100 MB and warn above 50 MB.
 Keep every source at 50 MB or less, a minute of video at 25 pictures a second, and cut a
-longer piece into several animations with `--start` and `--duration`. Whether sources of
-such sizes are tracked at all is an [open question](../docs/decisions.md#open-questions) for the owner.
+longer piece into several animations with `--start` and `--duration`. The owner has ruled
+that the JSON source is what is committed for every animation, whatever its size below that
+limit.
 
 ## Dense animations on the board
 

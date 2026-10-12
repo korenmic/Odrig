@@ -121,6 +121,11 @@ it stands now.
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
 
+The JSON source is committed for every animation, including those imported from video, and
+nothing else is committed in its place. A dense 60 x 60 clip is 16 MB of JSON per 10 seconds,
+and a hosting service refuses a single file above 100 MB, so a long piece is cut into several
+animations.
+
 Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
 
 ### Measurements behind the choice
@@ -198,8 +203,6 @@ are in [format.md](format.md), "Measured sizes".
 
 ## Open questions
 
-- Whether large video-derived JSON sources are tracked as they are (the dense 60 x 60 clip
-  is 16 MB of JSON per 10 seconds).
 - Decode speed of the custom format on the board at 50 frames per second. Measured on the
   board on 2026-10-11, before the target became twenty upright legs, with the firmware of
   seed 04 and a dense 60 x 30 clip on ten row legs, 1,800 LEDs: the core's work for one
@@ -300,3 +303,6 @@ are in [format.md](format.md), "Measured sizes".
   is the reference its suite compares with, and keeps the generators and the test vectors.
   For everything the suite gives them the two tools write the same files. Verified on
   macOS, with Node.js and in Chrome; not on Windows, on Linux or inside an app.
+- 2026-10-12: The owner ruled that the JSON source stays the one thing committed for every
+  animation, whatever its size; the question about large video-derived sources is closed.
+  The owner checks only real LEDs on the board, not pages or screens.

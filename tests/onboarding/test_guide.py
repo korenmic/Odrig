@@ -135,11 +135,11 @@ class Guide(unittest.TestCase):
                 animation = jsonframes.Animation(target.width, target.height, tuple(frames(target.width, target.height)))
                 self.assertEqual(rows[name], summary(animation, len(jsonframes.dumps(animation))))
 
-    def test_it_gives_the_limit_of_a_hosting_service_and_the_question_that_is_open(self):
+    def test_it_gives_the_limit_of_a_hosting_service_and_the_owners_ruling(self):
         sizes = flat(self.part("How large sources get"))
-        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "[open question](../docs/decisions.md#open-questions)", "1,210 bytes"):
+        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "the JSON source is what is committed for every animation", "1,210 bytes"):
             self.assertIn(phrase, sizes)
-        self.assertIn("Whether large video-derived JSON sources are tracked as they are", flat(support.read("docs/decisions.md")))
+        self.assertIn("The JSON source is committed for every animation", flat(support.read("docs/decisions.md")))
         self.assertIn("| 1,210 |", support.read("docs/emulator.md"))
 
     def test_the_rates_of_a_dense_animation_are_those_the_firmware_document_records(self):
