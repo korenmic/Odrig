@@ -25,7 +25,7 @@ HEADINGS = (
 BOOTSTRAP_HEADINGS = ("What the project is", "Read in this order", "What each file here is for", "Where everything else is")
 
 # The parts of the project, each with the folder that holds it.
-PARTS = {"converter": "odrig/", "core": "core/", "emulator": "emulator/", "command tool": "odrigctl/", "firmware tool": "firmware/"}
+PARTS = {"converter": "converter/", "reference converter": "odrig/", "core": "core/", "emulator": "emulator/", "command tool": "odrigctl/", "firmware tool": "firmware/"}
 
 # The pages of the folder in the order a newcomer reads them, and in the order the README
 # gives them to people.
@@ -75,6 +75,19 @@ class EntryFile(unittest.TestCase):
         first = support.section(self.text, "Read first")
         self.assertEqual(re.findall(r"(?m)^[0-9]+\. \[(agent/[A-Za-z-]+\.md)\]\(\1\)", first), [BOOTSTRAP, "agent/vocabulary.md", "agent/working-rules.md", "agent/getting-started.md"])
 
+    def test_it_says_which_tool_is_the_converter_and_what_the_python_package_is_for(self):
+        what = self.part("What this is")
+        for phrase in ("The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`", "The Python package `odrig/` was the converter before it",
+                       "the reference that tests compare the converter with", "it holds the generators", "Convert and pack with the JavaScript tool only"):
+            self.assertIn(phrase, what)
+        self.assertTrue((support.ROOT / support.CONVERTER).is_file())
+        self.assertTrue((support.ROOT / "odrig" / "generators").is_dir())
+        by_task = support.section(self.text, "Then read, by task")
+        rows = dict(re.findall(r"(?m)^\| (.+?) \| (.+) \|$", by_task))
+        self.assertIn("[docs/converter.md](docs/converter.md)", rows["Change the converter"])
+        self.assertIn("[docs/reference-converter.md](docs/reference-converter.md)", rows["Change the Python reference, a generator or the test vectors"])
+        self.assertIn("`converter/tests/`", flat(by_task))
+
     def test_every_document_and_every_page_is_linked_and_the_other_places_are_named(self):
         linked = {target.split("#")[0] for target in support.links(self.text)}
         documents = sorted(f"docs/{path.name}" for path in (support.ROOT / "docs").glob("*.md"))
@@ -113,14 +126,18 @@ class EntryFile(unittest.TestCase):
         windows = self.part("If you work on Windows")
         for phrase in ("The converter is written to run there, and so is its suite. Both have been run on macOS only.",
                        "The emulator and the command tool run on macOS only.", "The firmware tool and the board stay with the first computer.",
+                       "The same is true of the Python reference and the generators.",
                        "is seed 11", f"`{SEED_FOR_WINDOWS}`", "the first job of the contributor on Windows",
-                       "its spec, its tasks and their implementation", "[agent/getting-started.md](agent/getting-started.md#on-windows)"):
+                       "its spec, its tasks and their implementation", "Running the converter's suite there is part of it.",
+                       "[agent/getting-started.md](agent/getting-started.md#on-windows)"):
             self.assertIn(phrase, windows)
+        seed = flat((support.ROOT / SEED_FOR_WINDOWS / "seed.md").read_text(encoding="utf-8"))
+        self.assertIn("When the JavaScript converter is present in the repository, its suite is run on Windows too", seed)
 
     def test_what_is_coming_names_every_seed_that_is_not_begun_and_no_seed_that_is_completed(self):
         coming = self.part("What is coming")
         named = {int(number) for number in re.findall(r"\bseed ([0-9]{2})\b", coming)}
-        self.assertLessEqual({6, 7, 8, 9, 11, 12}, named)
+        self.assertLessEqual({7, 8, 9, 11, 12}, named)
         self.assertGreaterEqual(len(seeds()), 10)
         for number, state in seeds():
             with self.subTest(seed=number, state=state):
@@ -129,7 +146,8 @@ class EntryFile(unittest.TestCase):
                 if state == "completed":
                     self.assertNotIn(number, named)
         self.assertIn("not in the repository yet", coming)
-        self.assertIn("Today the Python tool is the converter", coming)
+        self.assertIn("It has been run with Node.js and in Chrome, and never inside an app.", coming)
+        self.assertIn("it has not been run inside an app yet", flat(support.read("docs/decisions.md")))
 
     def test_it_says_what_the_workflow_skills_are_and_that_they_are_not_needed(self):
         workflow = self.part("The owner's workflow")

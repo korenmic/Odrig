@@ -393,9 +393,13 @@ class BothKindsOfLeg(unittest.TestCase):
         text = said((DOCS / "converter.md").read_text(encoding="utf-8"))
         for phrase in ("with a row-leg file it is as wide as the mapping's `width` and as high as the number of rows the mapping lists",
                        "with a column-leg file it is as wide as the number of columns the mapping lists and as high as the mapping's `height`",
-                       "from a mapping file of either kind, a row-leg file or a column-leg file",
-                       "The show for the target build of twenty legs, 60 x 60, is the demo show `shows/demo-20/show.json`", "--mapping mapping/legs-20.json"):
+                       "The show for the target build of twenty legs, 60 x 60, is the demo show `shows/demo-20/show.json`"):
             self.assertIn(phrase, text)
+
+    def test_the_document_of_the_reference_has_the_generators_for_both_kinds_and_for_the_target(self):
+        generators = said((DOCS / "reference-converter.md").read_text(encoding="utf-8").split("\n## Generators\n")[1].split("\n## ")[0])
+        for phrase in ("from a mapping file of either kind, a row-leg file or a column-leg file", "--mapping mapping/legs-20.json"):
+            self.assertIn(phrase, generators)
 
 
 if __name__ == "__main__":

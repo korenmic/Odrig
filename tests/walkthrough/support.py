@@ -17,7 +17,7 @@ IDENTITY = ("-c", "user.name=walk-through", "-c", "user.email=walk-through@examp
 TIME_LIMIT = 1800
 
 # Variables of the caller that would make a command use another Python than the page's.
-NOT_PASSED_ON = ("VIRTUAL_ENV", "PYTHONPATH", "PYTHONHOME")
+NOT_PASSED_ON = ("VIRTUAL_ENV", "PYTHONPATH", "PYTHONHOME", "ODRIG_PYTHON")
 
 Done = collections.namedtuple("Done", "status output")
 

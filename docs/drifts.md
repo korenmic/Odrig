@@ -6086,3 +6086,77 @@ with the environment variable `ODRIG_PYTHON` naming the Python of the main check
 
 **Resolution.** `docs/converter.md`, "What is verified";
 `project-seeds/06-p1-javascript-converter/state.json`.
+
+## Seed 06: The pages for newcomers and their tests, once both seeds were on `master`
+
+**Question.** Seed 06 and seed 10 were built side by side, each correct on its own branch.
+Merged, the pages for newcomers, `AGENTS.md` and the folder `agent/`, still gave the Python
+tool as the converter, and four tests failed: two of `tests/onboarding/test_entry.py`, one
+of `tests/onboarding/test_start.py` and one of `tests/converter/test_docs.py`. Which
+failure is the fault of a page and which of a test, and what do the tests of the pages
+need to check a command that starts `node` or `npm`?
+
+**Answer.**
+
+- **The pages were out of date and are brought to the repository as it is.** `import`,
+  `check` and `pack` are commands of `node converter/odrig.js`; the setup has Node.js 20 or
+  later and `npm ci --prefix converter`; the suites to run gain
+  `npm test --prefix converter`; the generators stay Python commands. Seed 06 is no longer
+  under "What is coming", and the entry file links `docs/reference-converter.md`. The
+  Python package has a name of its own in the vocabulary and among the parts of the
+  project, the reference converter.
+- **Two tests looked for a sentence in a document that no longer holds it, and now look
+  where it is.** No document changed for them. "is verified on macOS" was a sentence of the
+  Python tool's setup: `test_start.py` now reads what each tool's own page says, "Windows
+  and Linux are supported by construction and not verified: nothing has been run there."
+  in `docs/converter.md` and "It is verified on macOS with Python 3.14." in
+  `docs/reference-converter.md`. "from a mapping file of either kind, a row-leg file or a
+  column-leg file" and a command with `--mapping mapping/legs-20.json` belong to the
+  generators and moved with them: `tests/converter/test_docs.py` reads both under
+  "Generators" of `docs/reference-converter.md`, in a test of its own.
+  `docs/converter.md` lost nothing true: its section "import" still gives the canvas for
+  both kinds of mapping file and names the demo show of the target, and the test that
+  asserted that still does.
+- **The other tests of the pages follow the pages**: the parts of the project, the
+  commands of the setup, of the suites and of the demo show, the setup shown for Windows,
+  and the words of the vocabulary. The test that keeps what is planned in one place no
+  longer counts "JavaScript" and seed 06 as planned. A new test asserts that no command of
+  a page converts, checks or packs with the reference converter.
+- **A command that starts the converter is put before the converter's own parser.**
+  Node.js loads `converter/cli/version.js` and `converter/cli/arguments.js` and gives the
+  arguments to `parse`; nothing of the command is run. So `tests/onboarding` now needs
+  Node.js as `node`. Without it the test fails and says what is missing, as the suite of
+  the emulator does; it is not skipped. Of `npm` the test takes the two commands of the
+  pages and no other. The suite takes two seconds, not one.
+- **Both pages were at their limit of 200 lines.** The getting-started page gives the two
+  suites that need more in one block and shows the reply to `status` once, under "Check it
+  without a screen", not twice. The animation guide lost words and no statement.
+- **The walk-through follows the pages as rewritten.** The setup of the page now runs
+  `npm ci --prefix converter` in the copy, so the packages land in the copy's
+  `converter/node_modules`, inside the temporary folder. Five suites run, and that of the
+  converter is judged by its counts, `fail 0` and a `pass` above 0, since it has no last
+  line `OK`. npm and the package `ffmpeg-static` keep their caches in the user's account,
+  as pip does; the walk-through leaves that as it is for anyone who follows the page. The
+  caller's `ODRIG_PYTHON` is not passed on, so the suite of the converter compares with
+  the Python of the copy.
+- **The known fault.** The animation guide says that the `import` of the reference
+  converter can end Python itself on a damaged or cut video, which is the first of the
+  three faults of the entry "Seed 06: Python crashing while it decodes a video for a
+  comparison", and that a fix is planned. That it is planned was said with the task of
+  this change; no seed for it exists yet.
+- **Windows.** The pages say what can be tried there today, the converter, the reference
+  converter, the generators and their two suites, all written to run there and none run
+  there, and that everything else waits for seed 11, whose Required Behavior 8 also has
+  the suite of the converter run on Windows.
+
+Run in a worktree after the change, all passing: `tests/onboarding`, `tests/walkthrough`,
+`tests/converter`, `npm test --prefix converter`, `tests/emulator` and `make -C core test`.
+Not run: `python3 firmware/fw.py test`, which needs the work folder `build/firmware/` that
+a worktree does not have, and anything on Windows or Linux.
+
+**Resolution.** `AGENTS.md`, `agent/README.md`, `agent/vocabulary.md`,
+`agent/working-rules.md`, `agent/getting-started.md`, `agent/animation-guide.md`;
+`tests/onboarding/support.py`, `_converter`, `_node` and `_npm`, and the tests of that
+folder; `tests/walkthrough/test_fresh_copy.py`, `tests/walkthrough/support.py`;
+`tests/converter/test_docs.py`, "the document of the reference has the generators for both
+kinds and for the target".

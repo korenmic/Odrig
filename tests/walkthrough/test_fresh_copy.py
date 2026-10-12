@@ -31,7 +31,17 @@ GUIDE = Followed(
 )
 PLAN = (START, GUIDE)
 
-SUITES = 4
+# The suites the getting-started page runs after the setup. The suite of the converter is
+# run by npm and ends with counts; each of the others ends with the line OK.
+SUITES = 5
+CONVERTER_SUITE = "npm test --prefix converter"
+NONE_FAILED = re.compile(r"(?m)^\S+ fail 0$")
+SOME_PASSED = re.compile(r"(?m)^\S+ pass [1-9][0-9]*$")
+
+# What the setup of the page leaves in the copy: the Python of the environment, the two
+# packages of the converter with the decoder program, and the core's library.
+INSTALLED = (".venv/bin/python", "converter/node_modules/omggif", "converter/node_modules/ffmpeg-static/ffmpeg", "core/build/libodrig_core.dylib")
+
 DEMO_SHOW = "build/demo-20/show"
 DEMO_FILES = ("dvd.odrg", "hello.odrg", "mapping.json", "show.json")
 DEMO_RECORD = "build/demo-20/check.odrr"
@@ -103,16 +113,24 @@ class FreshCopy(unittest.TestCase):
         self.assertEqual(support.git(self.copy, "status", "--porcelain"), "")
         for name in sorted(support.tracked(self.copy)):
             self.assertEqual((self.copy / name).read_bytes(), (support.ROOT / name).read_bytes(), name)
-        for made in ("build", ".venv", ".codex", "core/build"):
+        for made in ("build", ".venv", ".codex", "core/build", "converter/node_modules"):
             self.assertFalse((self.copy / made).exists(), made)
 
     def test_the_pages_can_be_followed_from_a_fresh_copy(self):
         started = self.follow(START)
 
+        for installed in INSTALLED:
+            self.assertTrue((self.copy / installed).exists(), installed)
+
         suites = started["Run the tests"]
         self.assertEqual(len(suites), SUITES)
+        self.assertEqual([command for command, _ in suites].count(CONVERTER_SUITE), 1)
         for command, output in suites:
-            self.assertEqual(output.strip().splitlines()[-1], "OK", command)
+            if command == CONVERTER_SUITE:
+                self.assertRegex(output, NONE_FAILED, command)
+                self.assertRegex(output, SOME_PASSED, command)
+            else:
+                self.assertEqual(output.strip().splitlines()[-1], "OK", command)
 
         show = self.copy / DEMO_SHOW
         self.assertEqual(sorted(path.name for path in show.iterdir()), sorted(DEMO_FILES))
