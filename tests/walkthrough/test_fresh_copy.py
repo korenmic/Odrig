@@ -144,7 +144,7 @@ class FreshCopy(unittest.TestCase):
         self.assertEqual(len(recorded), 1)
         answer = reply(recorded[0])
         self.assertIsNotNone(answer, recorded[0])
-        for member in ('"ok":true', '"playing":3', '"animation":1', '"error":null'):
+        for member in ('"ok":true', '"playing":"all"', '"animation":1', '"error":null'):
             self.assertIn(member, answer)
         self.assertEqual(self.shown(START, "Check it without a screen"), [f"reply 1000 {answer}\n"])
         recording = recfile.read(self.copy / DEMO_RECORD)

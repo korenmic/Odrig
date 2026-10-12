@@ -165,6 +165,12 @@ class Files(unittest.TestCase):
         steps = [build.index(step) for step in ("var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight, board);", "drawing = OdrigView.build(host, mapping, hello.legs, f, board);", "drawing.paint(newest);")]
         self.assertEqual(steps, sorted(steps))
 
+    def test_the_header_reads_playlist_where_the_status_says_all(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        status = app[app.index("function onStatus(event) {"):app.index("function cell(")]
+        self.assertEqual(status.count('byId("playing").textContent = status.playing === null ? "nothing" : status.playing === "all" ? "playlist" : String(status.playing);'), 1)
+        self.assertEqual(status.count('byId("animation").textContent = status.animation === null ? "none" : String(status.animation);'), 1)
+
     def test_the_readout_names_the_leg_and_the_pin_and_for_an_led_its_number_and_its_canvas_coordinates(self):
         app = (WEB / "app.js").read_text(encoding="utf-8")
         pointer = app[app.index("function onPointer(event) {"):app.index("function show(name) {")]

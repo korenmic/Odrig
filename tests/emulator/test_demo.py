@@ -32,9 +32,17 @@ def lit_pixels(canvas, data):
     return lit
 
 
+# The playlist of the demo show: Hello world for six loops of 5,100 ms, then DVD bounce for
+# two loops of 20,880 ms, and then from the start again.
+HELLO_MS = 6 * 5100
+DVD_LOOP_MS = 20880
+ROUND_MS = HELLO_MS + 2 * DVD_LOOP_MS
+SECONDS = 73
+
+
 class DemoShow(unittest.TestCase):
     """The demo show for the target file: generated and packed into a temporary folder, and
-    31 seconds of it recorded, once."""
+    73 seconds of it recorded, once: a round of its playlist and the start of the next."""
 
     @classmethod
     def setUpClass(cls):
@@ -48,17 +56,12 @@ class DemoShow(unittest.TestCase):
         cls.folder = cls.work / "show"
         cls.packed = support.run_module("pack", "--show", SHOW, "--mapping", support.TARGET, "--sources", cls.sources, "--out", cls.folder, module="odrig")
         cls.canvas = mapping.read(support.TARGET)
-        cls.recorded = support.run(cls.folder, "--record", cls.work / "demo.odrr", "--seconds", 31)
+        cls.recorded = support.run(cls.folder, "--record", cls.work / "demo.odrr", "--seconds", SECONDS)
         cls.recording = recfile.read(cls.work / "demo.odrr")
 
-    def test_the_tracked_show_file_has_the_two_animations_the_cycle_the_start_and_the_brightness(self):
+    def test_the_tracked_show_file_has_the_two_animations_and_the_brightness_and_nothing_else(self):
         show = json.loads(SHOW.read_text(encoding="utf-8"))
-        self.assertEqual(show, {
-            "version": 1,
-            "brightness": 128,
-            "items": [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}, {"id": 3, "cycle": [1, 2], "seconds": 15}],
-            "start": 3,
-        })
+        self.assertEqual(show, {"version": 1, "brightness": 128, "items": [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}]})
 
     def test_no_canvas_size_is_written_for_the_show(self):
         text = SHOW.read_text(encoding="utf-8")
@@ -89,21 +92,26 @@ class DemoShow(unittest.TestCase):
     def test_the_packed_folder_holds_the_files_the_other_tests_of_the_suites_play(self):
         self.assertEqual(support.files_of(self.folder), core_support.demo_show())
 
-    def test_31_seconds_of_it_equal_the_reference_at_every_tick(self):
+    def test_73_seconds_of_it_equal_the_reference_at_every_tick(self):
         self.assertEqual((self.recorded.status, self.recorded.out, self.recorded.err), (0, "", ""))
         recording = self.recording
         self.assertEqual(recording.legs, LEGS)
         self.assertEqual(recording.led_bytes, 10800)
-        self.assertEqual(len(recording.ticks), 1550)
-        refreshes, _ = support.reference(support.files_of(self.folder), range(0, 31000, 20))
+        self.assertEqual((HELLO_MS, ROUND_MS), (30600, 72360))
+        self.assertEqual(len(recording.ticks), 50 * SECONDS)
+        refreshes, _ = support.reference(support.files_of(self.folder), range(0, 1000 * SECONDS, 20))
         for tick, refresh in zip(recording.ticks, refreshes):
             self.assertTrue(tick.produced, tick.ms)
             for (leg, _, _), got, wanted in zip(recording.legs, recfile.split(recording, tick.data), refresh):
                 if got != wanted:
                     self.fail(f"tick {tick.ms}: the LED data of leg {leg} differs from the reference")
         by_time = {tick.ms: tick.data for tick in recording.ticks}
-        self.assertNotEqual(by_time[14980], by_time[15000])
-        self.assertEqual(by_time[30000], by_time[0])
+        # The turn of Hello world ends, and after the turn of DVD bounce the playlist
+        # begins again with the first frame of Hello world.
+        self.assertNotEqual(by_time[HELLO_MS - 20], by_time[HELLO_MS])
+        self.assertNotEqual(by_time[ROUND_MS - 20], by_time[ROUND_MS])
+        self.assertEqual(by_time[ROUND_MS], by_time[0])
+        self.assertEqual(by_time[ROUND_MS + 20], by_time[20])
         self.assertTrue(any(by_time[0]))
         self.assertEqual(max(by_time[0]), 128)
 
@@ -124,7 +132,7 @@ class DemoShow(unittest.TestCase):
             "X..X.XXXX.XXXX.XXXX..XX.....X...X..XX..X..X.XXXX.XXX.",
         ])
         # The same pixels are lit for as long as the words play, at every tick of the first turn.
-        for ms in (20, 5080, 5100, 14980):
+        for ms in (20, 5080, 5100, 14980, HELLO_MS - 20):
             self.assertEqual(lit_pixels(self.canvas, by_time[ms]), words, ms)
         # On a leg the rows 28 to 33 are the LEDs 28 to 33 of its first column, which runs
         # up, 88 to 93 of its second, which runs down, and 148 to 153 of its third.
@@ -139,9 +147,11 @@ class DemoShow(unittest.TestCase):
         self.assertEqual(lit_legs, set(range(2, 20)) - {10})
 
     def test_the_square_of_dvd_bounce_passes_over_leds_of_all_twenty_legs(self):
-        # The second turn of the cycle, from 15 to 30 seconds, plays DVD bounce from its start.
-        turn = [tick for tick in self.recording.ticks if 15000 <= tick.ms < 30000]
-        self.assertEqual(len(turn), 750)
+        # The second turn of the playlist plays DVD bounce from its start, twice through.
+        turn = [tick for tick in self.recording.ticks if HELLO_MS <= tick.ms < ROUND_MS]
+        self.assertEqual(len(turn), 2 * DVD_LOOP_MS // 20)
+        by_time = {tick.ms: tick.data for tick in turn}
+        self.assertEqual(by_time[HELLO_MS + DVD_LOOP_MS], by_time[HELLO_MS])
         lit_legs = set()
         corners = []
         for tick in turn:
@@ -168,7 +178,7 @@ class DemoShow(unittest.TestCase):
             frames = support.frames(events)
             self.assertEqual({len(data) for _, data in frames}, {10800})
             status = emulator.status()
-            self.assertEqual((status["playing"], status["animation"], status["brightness"], status["error"]), (3, 1, 128, None))
+            self.assertEqual((status["playing"], status["animation"], status["brightness"], status["error"]), ("all", 1, 128, None))
             player = ReferencePlayer(support.files_of(self.folder))
             player.poll(hello["t0"])
             for ms, data in frames:

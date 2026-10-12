@@ -138,7 +138,7 @@
     power.textContent = status.on ? "on" : "off";
     byId("brightness").textContent = String(status.brightness);
     byId("brightness-bar").style.width = Math.round(100 * status.brightness / 255) + "%";
-    byId("playing").textContent = status.playing === null ? "nothing" : String(status.playing);
+    byId("playing").textContent = status.playing === null ? "nothing" : status.playing === "all" ? "playlist" : String(status.playing);
     byId("animation").textContent = status.animation === null ? "none" : String(status.animation);
     byId("core-fps").textContent = String(status.fps);
     statusError = status.error;

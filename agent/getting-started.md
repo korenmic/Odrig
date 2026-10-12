@@ -117,8 +117,8 @@ runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
 ## Pack the demo show
 
 The demo show, `shows/demo-20/show.json`, is test content for the target and not finished
-work: two proof-of-concept animations, the words HELLO WORLD and a square that bounces, and
-a cycle that plays the two in turn, 15 seconds each, from power-on. Its two sources are not
+work: two proof-of-concept animations, the words HELLO WORLD and a square that bounces. It
+plays the two in turn from power-on, each for half a minute or more. Its two sources are not
 tracked. Two generators write them, and the converter's `pack` turns them and the show
 file into an installed file set:
 
@@ -148,7 +148,7 @@ serial: <the repository root>/build/emulator/serial
 ```
 
 Open the page's address in the browser. It draws all 3,600 LEDs, with the twenty legs in
-twenty colours. The words HELLO WORLD stand upright in the middle; after 15 seconds a
+twenty colours. The words HELLO WORLD stand upright in the middle; after half a minute a
 small square runs along the diagonal, and the two take turns. The header shows what is
 playing and two counts of refreshes a second, `core` and `page`, both about 50. The tab
 `Mapping` shows the board and how every leg is wired to it.
@@ -181,10 +181,10 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}
 ```
 
-`"error":null` says the show is valid, `"playing":3` that item 3, the cycle, is playing,
+`"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,
 and `"animation":1` that Hello world is on the LEDs. With a show that is not valid, `error`
 holds the reason, such as `file-missing dvd.odrg`; [reasons.md](../docs/reasons.md) lists them.
 The record file holds the colour of every LED at every refresh;

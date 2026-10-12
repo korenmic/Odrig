@@ -7453,3 +7453,38 @@ suite 523 of which 17 are skipped, the onboarding suite 81.
 **Resolution.** `odrigctl/client.py`: `Session`, `_ready`, `_take`, `_give`, `_had` and
 `_shut`; `tests/core/host/host.cpp`; `tests/emulator/support.py`: `BytePort`,
 `session_target`; `agent/getting-started.md` and `AGENTS.md`, the sections about Windows.
+
+## Seed 16: The page names the animation by its id
+
+**Question.** The design of the playlist says that the emulator's page shows `playlist`
+where `playing` is `"all"`, "and the file name of the animation on the LEDs beside it".
+The task says only the first. The page reads the `status` events and the mapping file; it
+does not read the items of the show, so it has no file name to show.
+
+**Answer.** The page shows `playlist` in its `playing` field and, as before, the id of the
+animation in its `animation` field. A file name would need the page to read the items and
+to read them again after every upload and removal, which is a part of the app of seed 09
+and not of this seed. The requirement, that the page shows that the playlist plays and
+which animation, is met by the id.
+
+**Resolution.** `emulator/web/app.js`, `onStatus`; `tests/emulator/test_page_files.py`;
+`docs/emulator.md`, the header.
+
+## Seed 16: What follows from an animation never playing alone
+
+**Question.** With `play <id>` of an animation a jump in the playlist, nothing plays an
+animation by itself any more. Does the core keep the code for it, and what do the pages
+count as a command?
+
+**Answer.** The core does not keep it: the player's function plays a cycle and is named
+so, and `playing` holds the playlist, a cycle or nothing. The tests that expected an
+animation to loop for ever after `play`, and the LEDs to go dark when what plays is
+removed, were rewritten to what the owner ruled; none was dropped. The vocabulary counts
+ten commands: `play all` has its own row in the table of `docs/commands.md`, and
+`upload` is counted once, as before. The demo show's test records 73 seconds where it
+recorded 31, a round of the playlist and the start of the next: the turn of Hello world
+is 30.6 seconds and that of the bouncing square 41.8.
+
+**Resolution.** `core/src/player.cpp`, `player_play_cycle`; `tests/core/test_content.py`,
+`test_removing_what_plays_leaves_the_playlist_playing`; `agent/vocabulary.md`;
+`tests/emulator/test_demo.py`.

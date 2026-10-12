@@ -185,9 +185,10 @@ class GettingStarted(unittest.TestCase):
         for name in named:
             self.assertTrue(any(f"build/demo-20/sources/{name[:-5]}.json" in command for command in commands), name)
             self.assertIn(f"`{name}`", self.part("Pack the demo show"))
-        self.assertEqual([item["seconds"] for item in show["items"] if "cycle" in item], [15])
+        # It has no cycle and no start: it plays its playlist.
+        self.assertEqual(([item for item in show["items"] if "cycle" in item], "start" in show), ([], False))
         packed = flat(self.part("Pack the demo show"))
-        for phrase in ("15 seconds each", "is test content for the target and not finished work", "two proof-of-concept animations"):
+        for phrase in ("plays the two in turn from power-on, each for half a minute or more", "is test content for the target and not finished work", "two proof-of-concept animations"):
             self.assertIn(phrase, packed)
 
     def test_it_runs_the_emulator_and_sends_it_a_command_by_each_way(self):
@@ -208,7 +209,7 @@ class GettingStarted(unittest.TestCase):
         self.assertIn("--record", commands[1])
         self.assertIn("--script", commands[1])
         said = flat(self.part("Check it without a screen"))
-        for phrase in ('reply 1000 {"ok":true', '`"error":null`', '`"playing":3`', "[reasons.md](../docs/reasons.md)"):
+        for phrase in ('reply 1000 {"ok":true', '`"error":null`', '`"playing":"all"`', "the playlist is playing", "[reasons.md](../docs/reasons.md)"):
             self.assertIn(phrase, said)
 
 

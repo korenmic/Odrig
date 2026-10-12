@@ -55,16 +55,22 @@ the entry links to it.
 - **show**: What can be played and what plays at power-on, written in a file named
   `show.json`. See [show.md](../docs/show.md).
 - **item**: One numbered entry of a show: one animation, or a list of animations to play
-  in turn. An item is asked for by its number.
-- **cycle**: An item of the second kind: it plays several animations in turn, each for a
-  number of seconds, and then starts over.
+  one after the other. An item is asked for by its number.
+- **cycle**: An item of the second kind: it plays several animations one after the other,
+  each for a number of seconds, and then starts over.
+- **playlist**: Every animation of a show, one after the other in the order of the show
+  file, and then from the first again. It is what a show plays by itself.
+- **turn**: The time an animation has in the playlist before the next one starts: unless
+  the show says otherwise, the fewest whole loops that last 30 seconds. See
+  [show.md](../docs/show.md#the-turn-of-an-animation).
 - **installed file set**: The one folder of files that a show is installed as:
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show
   reads this folder and nothing else. A folder made this way is also called a packed show.
   See [show.md](../docs/show.md#installed-file-set).
-- **command**: One line of text sent to whatever is playing a show. There are nine:
-  `play <id>`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`, `remove <id>` and
-  `upload`, which sends a file as several lines. Each is answered by one line of JSON. See
+- **command**: One line of text sent to whatever is playing a show. There are ten:
+  `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`,
+  `remove <id>` and `upload`, which sends a file as several lines. Each is answered by one
+  line of JSON. See
   [commands.md](../docs/commands.md).
 
 ## The programs

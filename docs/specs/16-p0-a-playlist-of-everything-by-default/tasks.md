@@ -97,7 +97,7 @@ Rules for every task:
     player as task 4 left it, fails: nothing plays afterwards.
   - Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
 
-- [ ] 6. The emulator, the demo show and the pages that run it
+- [x] 6. The emulator, the demo show and the pages that run it
   - `shows/demo-20/show.json`: two animation items, no cycle, no `start`.
   - `emulator/web/app.js`: `playlist` where `playing` is `"all"`.
   - `tests/emulator/`, `tests/walkthrough/` and the documents' tests that run the demo

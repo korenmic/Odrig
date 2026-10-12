@@ -65,9 +65,11 @@ python -m emulator build/example-show
 ```
 
 **The demo show**, for the target build of twenty legs, 60 x 60: the same two animations
-made for that canvas, alternating every 15 seconds and starting at power-on. Only
-`shows/demo-20/show.json` is tracked. The two sources come to 4.2 MB, so they are written
-by the generators into `build/`, which git ignores:
+made for that canvas, and nothing else: no cycle and no `start`. So it plays its
+playlist, as [show.md](show.md#the-playlist) describes it: Hello world for six loops,
+30.6 seconds, then the bouncing square for two loops, 41.8 seconds, and then from the
+start again. Only `shows/demo-20/show.json` is tracked. The two sources come to 4.2 MB,
+so they are written by the generators into `build/`, which git ignores:
 
 ```
 mkdir -p build/demo-20/sources
@@ -244,8 +246,9 @@ from the [event stream](#the-event-stream), so a command sent by any tool is see
 From top to bottom the page has:
 
 - **The header.** The show folder and the serial port, whether the event stream is
-  connected, and the current status as `status` returns it: on or off, brightness, the id
-  of the item playing and the id of the animation on the LEDs. `core` is the `fps` the core
+  connected, and the current status as `status` returns it: on or off, brightness, what
+  is playing, which reads `playlist` for the playlist and is the id of a cycle otherwise,
+  and the id of the animation on the LEDs. `core` is the `fps` the core
   reports: its refreshes in the last full second. `page` is the page's own count: the
   refreshes it drew in the last full second.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
@@ -652,7 +655,7 @@ python -m odrigctl --http 127.0.0.1:8600 remove 9
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":2,"animation":2,"fps":50,"error":null}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null}
 ```
 
 | Status | Meaning |
@@ -933,7 +936,7 @@ in a narrower window the mapping view of every other step has the arrangement of
    command appears as a new line of the log as it is sent, with its time, `serial` or
    `http`, the line, and the reply `{"ok":true}`.
 5. **The status follows (8.4).** After step 4. *Seen:* the header reads brightness 40,
-   playing 2, animation 2. Send `python -m odrigctl --http 127.0.0.1:8600 off`: the header
+   playing playlist, animation 2. Send `python -m odrigctl --http 127.0.0.1:8600 off`: the header
    reads off and every LED is dark. Send `on`: the square is back.
 6. **Row legs are drawn as before (seed 05, 10.1).** With the same show. *Seen:* in the
    LEDs view, at the left of the canvas, a bracket for each of the two legs with `leg 1`,
