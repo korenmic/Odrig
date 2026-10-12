@@ -654,6 +654,16 @@ The maximum is the limit of `firmware/limit.json`, which `set-limit` and
 holds. The firmware itself never sets it. A limit of 0 switches the limiter off: WLED
 then estimates nothing and dims nothing.
 
+| Limit | The bench: one strip fed from the board's 3.3 V pin | The installation: the LEDs fed from the supply |
+|---|---|---|
+| 850 mA, the tracked value | The limiter is what keeps a `brightness 255` on a white picture from asking the pin for more than it gives. | Every LED is held at its lowest level: 3,600 LEDs count as 3,600 mA at rest. Nothing can be shown. |
+| What the supply gives | Not for the bench. | The limiter dims a picture that would ask the supply for more. |
+| 0, the limiter off | Not for the bench: nothing protects the pin then. | Nothing is dimmed. No LED current passes through the board, so the board is not at risk; what the supply and the wiring bear is not the tool's to judge. |
+
+The limit stays 850 for as long as a strip is fed from the board. Which value the
+installation gets is the owner's to say: it is about power. The tool takes every whole
+number from 0 to 65,535.
+
 > With the twenty legs of the target, 3,600 LEDs, the estimate at rest alone is 3,600 mA.
 > With WLED's maximum of 850 mA the limiter then holds every LED at its lowest level,
 > whatever plays: as WLED's source has it, every channel of a colour that is lit is then

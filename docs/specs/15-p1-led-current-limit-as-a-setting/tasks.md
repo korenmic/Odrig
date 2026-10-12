@@ -81,7 +81,7 @@ Rules for every task:
     "Verified on the board".
   - Requirements: 5.1, 5.2, 5.3, 5.4, 6.1, 6.2, 6.3, 6.4
 
-- [ ] 5. The documents and the seed's state
+- [x] 5. The documents and the seed's state
   - `docs/firmware.md`: the table of what a value means for the bench and for the
     installation, and that the value for the installation is the owner's.
     `docs/decisions.md`: a line in the change log. `AGENTS.md`: seed 15 leaves "What is

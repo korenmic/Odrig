@@ -99,6 +99,19 @@ class Firmware(unittest.TestCase):
         for expected in ("`limit: <N> mA`", "`limit: off`", "`limit: not stored; WLED uses 850 mA`", "restarts the board", "It writes nothing"):
             self.assertIn(expected, told)
 
+    def test_it_says_what_a_limit_means_for_the_bench_and_for_the_installation(self):
+        does = section(self.text, "What the firmware does")
+        told = " ".join(does.split())
+        for expected in ("The maximum is the limit of `firmware/limit.json`", "`set-limit`", "`read-limit`", "The firmware itself never sets it",
+                         "A limit of 0 switches the limiter off", "The limit stays 850 for as long as a strip is fed from the board",
+                         "is the owner's to say", "every whole number from 0 to 65,535"):
+            self.assertIn(expected, told)
+        rows = [row for row in does.splitlines() if row.startswith("| ") and "bench" not in row.split("|")[1] and row.count("|") == 4]
+        named = [row.split("|")[1].strip() for row in rows]
+        for limit in ("850 mA, the tracked value", "What the supply gives", "0, the limiter off"):
+            self.assertIn(limit, named)
+        self.assertRegex(does, r"(?m)^\| Limit \| The bench: .* \| The installation: .* \|$")
+
     def test_it_names_the_three_test_commands_and_their_folders(self):
         for name, folder in TEST_COMMANDS.items():
             self.assertRegex(section(self.text, "Commands"), rf"(?s)### {re.escape(name)}\n.*?`{re.escape(folder)}`", name)

@@ -119,8 +119,6 @@ present, and do not build on them.
   [docs/android-app.md](docs/android-app.md). The converter's library is made to run
   inside it. It has been run with Node.js and in Chrome, and never inside an app.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **The limit on LED current as a setting**, seed 15, set from a tracked value. Today it
-  is WLED's 850 mA, with which the 3,600 LEDs of the target stay at their lowest level.
 - **Playing at once at power-on**, seed 14: the start item plays at once, and the
   installed animations are checked while it plays. Today the LEDs stay dark until every
   animation has been checked.

@@ -340,3 +340,8 @@ are in [format.md](format.md), "Measured sizes".
   the firmware tool put them into WLED's stored settings on a board. The bench board
   hosts `odrig`, protected with WPA2, since that day; a program established it over USB.
   That a phone joins with the password is the owner's check and is open.
+- 2026-10-12: Seed 15 made the limit on LED current a setting: `firmware/limit.json`
+  holds it, 850 mA, and `set-limit` and `install-firmware` put it on a board; `read-limit`
+  prints what a board holds. With 0 the limiter is off, which the probe build showed on
+  the board. The limit stays 850 while a strip is fed from the board's 3.3 V pin. The
+  value for the installation is the owner's to set.
