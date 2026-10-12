@@ -323,3 +323,15 @@ are in [format.md](format.md), "Measured sizes".
   44 refreshes a second, and its check takes as long as the animation lasts. With a dense
   60 x 60 clip playing, an upload takes the rate to 16 to 27. The upload over the board's
   Wi-Fi is the owner's check and is open.
+- 2026-10-12: The owner approved playing at once at power-on: the start item plays at
+  once and the installed animations are checked while it plays. It is seed 14 and is not
+  built yet.
+- 2026-10-12: The owner ruled to switch the current limiter off if that puts no hardware
+  at risk. It would on the bench, where a strip is fed from the board's 3.3 V pin, and
+  not in the installation. The limiter stays on today, and its maximum becomes a tracked
+  setting, seed 15, which can switch it off.
+- 2026-10-12: The owner asked whether ODRG could replace JSON frames as the committed
+  source, since it is lossless. Nothing changes: JSON frames stay the source. The idea is
+  noted here and is not planned.
+- 2026-10-12: The Python reference tool refuses a damaged video or GIF with
+  `unreadable-media` and no longer ends Python itself (seed 13).

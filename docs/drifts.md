@@ -6775,3 +6775,44 @@ over Wi-Fi. When both pass, the owner sets the seed to `completed`.
 **Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, task 9; `docs/firmware.md`,
 "The owner's checks", step 7; `project-seeds/07-p1-content-commands/state.json` is not
 changed.
+
+## Merging seed 07: a show without items, and the JavaScript converter
+
+**Question.** Seed 06 and seed 07 were done at the same time, each from a `master` that
+did not have the other. Seed 07 made a show without items valid and took the rule out of
+the Python reader. The JavaScript converter of seed 06 still refused such a show as
+`show-malformed`. After the merge the two tools disagreed, and eight tests of
+`npm test --prefix converter` failed. Is that a new seed, or part of the merge?
+
+**Answer.** Part of the merge. `master` is not pushed with a failing suite, and the rule
+is one line. The JavaScript reader accepts a show without items, the case moved from the
+broken shows of its suite to the whole ones, and `pack` is compared with the Python tool
+on such a show: the two JSON files and nothing else. Two pages that seed 07 wrote made
+the file of their upload example with the Python tool; they now use the converter, which
+writes the same 1,138 bytes. The pages for newcomers name nine commands, and the notes on
+the Android app no longer say that the list of items cannot be read.
+
+**Resolution.** `converter/lib/show.js`; `converter/tests/pack.test.js`, "a show without
+items on the bench canvas" and `WHOLE_SHOWS`; `docs/emulator.md` and `docs/firmware.md`,
+the upload examples; `tests/firmware/test_docs.py`; `agent/vocabulary.md`, "command";
+`tests/onboarding/test_vocabulary.py`,
+`test_the_entry_for_command_names_every_command_of_the_command_list`;
+`docs/android-app.md`.
+
+## The owner's ruling on the current limiter
+
+**Question.** The owner ruled on 2026-10-12: switch the limiter off if that does not
+burn the board and puts no hardware at risk. Does it?
+
+**Answer.** Not in the installation, and yes on the bench. With the LEDs fed from the
+power supply no LED current passes through the board, and the limiter protects nothing
+of it. On the bench one strip of 60 LEDs is fed from the board's 3.3 V pin; the rule of
+a brightness of 40 or less binds agents and not a command, and `brightness 255` on a
+white picture would ask that pin for about 3 A. There the limiter at 850 mA is the
+protection. So nothing was switched off on the board. The limit becomes a tracked
+setting, seed 15: 850 mA while a strip is fed from the board, and 0, which is off, or
+what the supply gives, once the LEDs have their own supply. The value for the
+installation is about power and is the owner's.
+
+**Resolution.** `project-seeds/15-p1-led-current-limit-as-a-setting/`; `AGENTS.md`,
+"What is coming".
