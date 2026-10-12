@@ -6816,3 +6816,77 @@ installation is about power and is the owner's.
 
 **Resolution.** `project-seeds/15-p1-led-current-limit-as-a-setting/`; `AGENTS.md`,
 "What is coming".
+
+## Seed 12 spec: Where the standalone firmware gets the network and the limit
+
+**Question.** The seed says the network's name and password come from the same tracked
+settings file the WLED-based firmware uses, and the limit on LED current from a tracked
+value. The tracked files are on the computer. How do the values reach a firmware that has
+no settings interface: compiled in at build time, or read on the board?
+
+**Answer.** Read on the board, from the two files WLED reads: `ap.ssid`, `ap.chan` and
+`hw.led.maxpwr` of `/cfg.json`, and `ap.psk` of `/wsec.json`. The firmware tool writes
+them from the tracked files (seed 08, and seed 15 for the limit). So a board has one set
+of stored settings, both firmwares use it, a switch needs no rebuild, and no image holds
+the password. Compiled in, the two firmwares could disagree after a change, and the
+password would be in a file under `build/`.
+
+**Resolution.** `docs/specs/12-p2-standalone-firmware-as-a-fallback/design.md`, "The
+stored settings"; `requirements.md`, 4.1, 4.4 and 6.1.
+
+## Seed 12 spec: No network without stored settings
+
+**Question.** WLED hosts a network with its public default name and password when none
+are stored. What does the standalone firmware do then?
+
+**Answer.** It hosts none. A default would have to be compiled in, and the seed for the
+password exists because a known password lets anyone at the event send commands. The
+board still plays and answers over USB, and the probe report says that no access point
+is up. Seed 08's `set-wifi` is what puts the settings there.
+
+**Resolution.** `requirements.md`, 4.3 and 4.4; `design.md`, "The network and HTTP".
+
+## Seed 12 spec: What the two firmwares share
+
+**Question.** The seed asks only that the core's files are used unchanged. The usermod
+has 1,100 lines around the core. Written again, or shared?
+
+**Answer.** Three files are shared: the files, the port and the HTTP transport. They
+take one object each from WLED, and they are where the pacing of storage calls and the
+handling of a request body live, which seed 07 measured and tuned. They now reach their
+platform through `odrig_platform.h`, of which each build has its own. The outputs are
+written anew, because the usermod's are WLED's bus layer. The lock, the task and the
+loop, 120 lines, are written again in `main.cpp`: sharing them would put the usermod's
+start behind an interface for no other gain. The price is a change to three files of the
+firmware in use, and task 2 runs the whole board suite on it.
+
+**Resolution.** `design.md`, "The platform header" and "The program"; `tasks.md`, task 2.
+
+## Seed 12 spec: A probe build of its own, and which board tests run
+
+**Question.** The seed asks that the board tests the WLED-based firmware passes are run
+against the standalone one, except those that depend on WLED. Most of them read the
+probe report. And "twenty outputs each carry a full 180-LED signal" has to be shown
+without eyes.
+
+**Answer.** The standalone firmware gets a probe build with the members of the report
+that mean something without WLED, among them `pulses`, the rising edges the chip counts
+on a pin: 4,320 for 180 LEDs. The pulse counter moves out of the usermod's probe file
+and is shared. The board suite is run a second time with `test-board --standalone`; a
+test that needs WLED is marked and skipped there. Both runs leave the WLED-based
+firmware on the board.
+
+**Resolution.** `requirements.md`, 9 and 10; `design.md`, "The probe build" and "The
+board suite".
+
+## Seed 12 spec: The order with seeds 08 and 15
+
+**Question.** Is seed 12 blocked?
+
+**Answer.** Its spec is not. Its implementation waits for seed 08: the network's name
+and password are in the board's stored settings only after it, and without them the
+standalone firmware hosts no network, so its HTTP transport could not be tried. Seed 15
+is not needed: without it the limit is 850 with both firmwares. So the order is seed 08,
+then seed 12, and seed 15 at any point after seed 08.
+
+**Resolution.** `tasks.md`, the opening; `design.md`, "What this design relies on".
