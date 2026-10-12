@@ -12,7 +12,7 @@ with `.venv/bin/python -m unittest discover -s tests/converter -t .`.
   - Set the seed's `state.json` to `in_progress`.
   - Requirements 1 and 4.
 
-- [ ] 2. Metadata that is not UTF-8 is refused
+- [x] 2. Metadata that is not UTF-8 is refused
   - Add the test with the damaged `title`. Against the unchanged tool: a traceback ending
     in `UnicodeDecodeError`, status 1.
   - `odrig/media.py`: catch `UnicodeDecodeError` in `_video_frames`.

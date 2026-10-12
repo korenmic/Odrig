@@ -226,7 +226,7 @@ def _video_frames(path):
             if held is not None:
                 interval = held[0] / (count - 1) if count > 1 else Fraction(TICK_MS)
                 yield held[0], held[0] + interval, held[1]
-    except av.error.FFmpegError as error:
+    except (av.error.FFmpegError, UnicodeDecodeError) as error:
         raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the video cannot be decoded: {error}") from None
 
 
