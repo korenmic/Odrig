@@ -175,10 +175,12 @@ milliseconds from any starting point, taken from one clock that does not go back
   invalid show, with nothing playing and with the LEDs switched off, the refresh is all
   zeros. Without a valid mapping there are no legs and no refreshes.
 
-An item's time starts at the grid time of the first refresh after it was played, by a
-`play` command or at power-on. Each refresh shows the frame whose time span holds the time
-since then, as [format.md](format.md) defines; a cycle counts each turn's time from the
-start of the turn. Playback time goes on while the LEDs are switched off.
+What plays is the playlist or a cycle, never an animation by itself. Its time starts at
+the grid time of the first refresh after it was played, by a `play` command or at
+power-on. Each refresh shows the frame whose time span holds the time since the start of
+the turn, as [format.md](format.md) defines: a cycle counts each turn's time from the
+start of the turn, and so does the playlist. Playback time goes on while the LEDs are
+switched off.
 
 The playlist of [show.md](show.md) is played in the same way, one turn at a time. The
 core keeps the animation whose turn it is and the moment that turn began, which for the

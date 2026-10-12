@@ -7488,3 +7488,25 @@ is 30.6 seconds and that of the bouncing square 41.8.
 **Resolution.** `core/src/player.cpp`, `player_play_cycle`; `tests/core/test_content.py`,
 `test_removing_what_plays_leaves_the_playlist_playing`; `agent/vocabulary.md`;
 `tests/emulator/test_demo.py`.
+
+## Seed 16: On the board, and the figures of the firmware page
+
+**Question.** The firmware page has a table of measurements "with the firmware as it
+is", taken by the board suite. After the firmware was built with the core that plays the
+playlist, are the figures of the earlier run kept?
+
+**Answer.** They are replaced by those of the run that verified this firmware, so that
+the page describes the firmware a reader builds. Two things of that run are recorded
+beside them. The dense 60 x 60 clip compressed had 24 to 33 sends a second in the probe
+build where the run before recorded 29 to 36; it is inside the 20 to 50 the owner
+accepts, and no work is done on a rate inside that range, so what made it slower was not
+looked for. And the firmware from before the seed refuses a show with one of the new
+members as `show-malformed`: the page says that such a show and this firmware go on a
+board together. The one line of the air suite that changed was not run, because that
+suite needs the Mac on the board's network. The text of seed 14 speaks of the start item
+playing at once; with the playlist it is whatever the show plays by itself, which its
+spec will say when it is written.
+
+**Resolution.** `docs/firmware.md`, "Measurements on the board" and "Verified on the
+board", the paragraph on the playlist; `tests/board/test_playlist.py`;
+`tests/air/test_upload.py`.

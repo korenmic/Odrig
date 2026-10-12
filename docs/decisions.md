@@ -165,8 +165,15 @@ are in [format.md](format.md), "Measured sizes".
 - The board and the emulator accept exactly the same commands, handled by the same
   front-end code. There are no emulator-only commands.
 - A command exists only if something really uses it. Today those are: play an item by its
-  ID, switch on, switch off, set brightness, and report status; and for the content:
-  report the free storage, list what is installed, remove an item, and upload an animation.
+  ID, play the playlist, switch on, switch off, set brightness, and report status; and for
+  the content: report the free storage, list what is installed, remove an item, and
+  upload an animation.
+- A show plays all its animations in turn by itself: the playlist. An animation plays
+  until at least 30 seconds have passed and then finishes the loop it is in, unless the
+  show gives it a repeat count, a longest duration, or another shortest time. Playing an
+  animation by its ID is a jump in the playlist, which goes on after it. A cycle plays
+  only when the show names it as its start or a command names it. See
+  [show.md](show.md).
 - Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
   characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
 - An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
@@ -363,3 +370,14 @@ are in [format.md](format.md), "Measured sizes".
   virtual serial port on a TCP port of 127.0.0.1, and the command tool has `--tcp` beside
   `--port` and `--http`. This adds no command. The command tool opens a real serial port
   of Windows by its `COM` name; that has not been tried with a board.
+- 2026-10-12: Seed 16 built the playlist. A valid show plays every animation in turn from
+  power-on, and `status` says `"playing":"all"` then. `play <id>` of an animation is a
+  jump in the playlist, the new command `play all` starts it from its first animation,
+  and a removal or an upload keeps it going: nothing plays only while the show has no
+  animation. No animation plays by itself any more; a cycle plays when the show names it
+  as its start or `play` names it. `show.json` has three optional members, `repeat` and
+  `max_seconds` of an animation and `min_seconds` of the show, and stays at version 1; a
+  firmware from before this seed refuses a show that has one of them, so both are
+  installed together. The demo show for the target has no cycle. On the board the
+  firmware built with this core passes the board suite, and the rates are inside what
+  the owner accepts.

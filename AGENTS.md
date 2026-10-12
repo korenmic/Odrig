@@ -116,9 +116,6 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **A playlist of everything by default**, seed 16: all installed animations play in
-  turn, each for at least 30 seconds or for a repeat count of its own, and `play all`
-  goes back to the playlist. Today a show plays only what it names as its start.
 - **An app for the operators, for Android**, in two parts. Seed 09 is command and
   control: what plays, the list of animations, play, on and off. Its spec was written
   for the whole app and is being written again. The first notes are in
@@ -127,8 +124,8 @@ present, and do not build on them.
   seed 09. The converter's library is made to run inside the app. It has been run with
   Node.js and in Chrome, and never inside an app.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **Playing at once at power-on**, seed 14: the start item plays at once, and the
-  installed animations are checked while it plays. Today the LEDs stay dark until every
+- **Playing at once at power-on**, seed 14: the show plays at once, and the installed
+  animations are checked while it plays. Today the LEDs stay dark until every
   animation has been checked.
 
 The state of every seed is in the `state.json` of its folder.

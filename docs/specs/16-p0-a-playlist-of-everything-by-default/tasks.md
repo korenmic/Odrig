@@ -117,7 +117,7 @@ Rules for every task:
     gave, and the rate.
   - Requirements: 8.1, 9.1, 9.2, 9.3, 7.3
 
-- [ ] 8. The documents and the seed's state
+- [x] 8. The documents and the seed's state
   - `docs/decisions.md`: a line in the change log. `AGENTS.md`: seed 16 leaves "What is
     coming". Every page of Requirement 10 read once more against the code.
   - Run every suite that needs no board.

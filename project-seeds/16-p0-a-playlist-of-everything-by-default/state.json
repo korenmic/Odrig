@@ -1,10 +1,11 @@
 {
   "number": 16,
   "slug": "16-p0-a-playlist-of-everything-by-default",
-  "state": "in_progress",
+  "state": "completed",
   "title": "A playlist of everything by default",
   "priority": "P0",
   "addedAt": "2026-10-12T18:49:01+03:00",
   "addedCommit": "pending-local",
-  "summary": "All installed animations play as a playlist by default, each for a turn of at least 30 seconds or for its own repeat count and maximum duration; play <id> jumps, and the new command play all starts the playlist."
+  "summary": "All installed animations play as a playlist by default, each for a turn of at least 30 seconds or for its own repeat count and maximum duration; play <id> jumps, and the new command play all starts the playlist.",
+  "completedAt": "2026-10-12T22:58:36+03:00"
 }

@@ -126,8 +126,8 @@ writes `show.json` and the `.odrg` file, and a restart finds the show as it was 
 - An `.odrg` file that no item names any more is deleted.
 - The show may end up without items. It is valid: nothing plays until an animation is
   uploaded, and then the playlist plays.
-- `brightness` and `start` of `show.json` are not changed by an upload. Removing the
-  `start` item removes `start`.
+- `brightness`, `min_seconds` and `start` of `show.json` are not changed by an upload.
+  Removing the `start` item removes `start`.
 - `mapping.json` is never changed.
 
 A change is made so that a power cut at any moment leaves a whole show in the folder: the

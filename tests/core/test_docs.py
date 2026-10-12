@@ -217,7 +217,7 @@ class Decisions(unittest.TestCase):
     def test_the_commands_section_lists_what_the_front_end_reads(self):
         text = (support.ROOT / "docs" / "decisions.md").read_text(encoding="utf-8")
         commands = " ".join(text.split("\n## Commands\n")[1].split("\n## ")[0].split())
-        for expected in ("play an item by its ID", "switch on", "switch off", "set brightness", "report status", "report the free storage", "list what is installed",
+        for expected in ("play an item by its ID", "play the playlist", "A show plays all its animations in turn by itself", "switch on", "switch off", "set brightness", "report status", "report the free storage", "list what is installed",
                          "remove an item", "upload an animation", "2,048 characters", "1,024 bytes", "the owner approves every addition"):
             self.assertIn(expected, commands)
         log = text.split("\n## Change log\n")[1]

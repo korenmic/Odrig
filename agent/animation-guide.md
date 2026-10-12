@@ -102,7 +102,7 @@ file_bytes: 306358
 
 A show file names each animation by the file it is played from, and `pack` makes
 `clip.odrg` from the source `build/try/sources/clip.json`. This writes a show with the two
-animations made above, the first of which plays from power-on, and packs it:
+animations made above, which play in turn from power-on, and packs it:
 
 ```sh
 printf '{"version": 1, "brightness": 128, "items": [{"id": 1, "file": "clip.odrg"}, {"id": 2, "file": "dvd.odrg"}], "start": 1}\n' > build/try/show.json

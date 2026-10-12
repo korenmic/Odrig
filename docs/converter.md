@@ -380,7 +380,7 @@ In Node.js the same line imports it, with the path of the file.
 | `odrg.encode(animation, {compressed})` | The bytes of the ODRG file of an animation. |
 | `odrg.decode(bytes)` | `{width, height, paletteSize, compressed, records, modes}`: for every frame record its duration and the picture after it, and its mode byte. |
 | `mapping.loads(bytes)` | `{kind, width, height, legs}` of a mapping file. |
-| `show.loads(bytes)` | `{brightness, items, start}` of a show file. |
+| `show.loads(bytes)` | `{brightness, items, start, minSeconds}` of a show file. An animation item has `repeat` and `maxSeconds`, each null where the file gives none; `minSeconds` is 30 where the file gives none. |
 | `pack.pack({mapping, show, sources}, {compressed})` | A `Map` from file name to bytes: the installed file set. `sources` holds the bytes of each JSON frames source by its name. |
 | `fit.place(source, w, h, fit)` | The canvas picture of one source picture. |
 | `timeline.importFrames(source, canvas, options)` | The animation of decoded frames. It is the only call that is asynchronous. |
