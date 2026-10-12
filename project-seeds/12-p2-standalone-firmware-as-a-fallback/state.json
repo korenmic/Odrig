@@ -1,0 +1,10 @@
+{
+  "number": 12,
+  "slug": "12-p2-standalone-firmware-as-a-fallback",
+  "state": "remaining",
+  "title": "Standalone firmware as a fallback",
+  "priority": "P2",
+  "addedAt": "2026-10-12T03:13:38+03:00",
+  "addedCommit": "pending-local",
+  "summary": "A second, small firmware without WLED that hosts the same shared core, drives the same twenty outputs and accepts the same commands, tested ahead of time as a fallback."
+}
