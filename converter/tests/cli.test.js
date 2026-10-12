@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import {pathToFileURL} from "node:url";
 
 import {NAMES, UsageError, parse} from "../cli/arguments.js";
 import * as files from "../cli/files.js";
@@ -372,7 +373,7 @@ test("an old version of Node.js is refused", async (t) => {
     const folder = temporary(t);
     const pretend = path.join(folder, "old.mjs");
     fs.writeFileSync(pretend, 'Object.defineProperty(process.versions, "node", {value: "18.20.4"});\n');
-    const result = runJs(["--help"], {env: {NODE_OPTIONS: `--import=${pretend}`}});
+    const result = runJs(["--help"], {env: {NODE_OPTIONS: `--import=${pathToFileURL(pretend).href}`}});
     assert.deepEqual(result, {
       status: 2,
       out: "",
