@@ -4943,3 +4943,35 @@ and no test file with a rotation was made, because PyAV writes none in a simple 
 verified either: a video of a real camera or phone, and anything on Windows or Linux.
 
 **Resolution.** `converter/tests/reference.py`, `media`; `converter/tests/import.test.js`.
+
+## Seed 06: The page of the Chrome test, as built
+
+**Question.** The design has `page.js` import `/lib/index.js`, and has the test compare
+the page's results with "what the same calls give in Node.js". A module that imports the
+library at its top cannot post an error when the import fails: the script then does not
+run at all, and the test would wait for its minute. And how are "the same calls" kept the
+same?
+
+**Answer.** `converter/tests/page/page.js` has one function, `work`, which is given the
+library and the bytes of the source and does everything that is compared: it reads Hello
+world, encodes it compressed and uncompressed, decodes both, imports three source pictures
+it fills by a fixed rule as a GIF with each fit and as a video, and fits each picture to
+three canvases with each fit. It uses nothing but the library and the language. In a page
+the file loads the library with `import()` inside a `try`, fetches the source, calls
+`work`, and posts the results, or the name and the message of the error; the test in
+Node.js imports the same file and calls the same `work` with the library it imported
+itself. The file imports nothing when it is loaded, and the page has the one script.
+Bytes travel as base64, which the file writes itself.
+
+The test asserts that the page was served every file of `converter/lib/`, so a module the
+page did not load cannot go unnoticed. Chrome gets three arguments beside the design's:
+`--use-mock-keychain` and `--password-store=basic`, so that a new profile does not ask
+macOS for the keychain, and `--disable-breakpad`. Chrome is ended by the process number
+the test started, and the profile folder is removed and checked to be gone.
+
+It ran with Google Chrome 154.0.8037.98 on this Mac, without a window; the page reports
+`HeadlessChrome/154.0.0.0`. Every result of the page equals Node's, and the two files
+equal what `node converter/odrig.js encode` writes.
+
+**Resolution.** `converter/tests/page/index.html`, `converter/tests/page/page.js`,
+`converter/tests/browser.test.js`.

@@ -172,7 +172,7 @@ Rules for every task:
   - Requirements: 1.6, 1.7, 2.2, 2.8, 2.9, 2.11, 3.6, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6,
     14.7, 14.8, 14.9, 14.10, 14.11, 15.6, 17.1, 17.2, 17.3, 17.5, 18.3, 18.5, 18.6
 
-- [ ] 9. The library in Chrome
+- [x] 9. The library in Chrome
   - Create `converter/tests/page/index.html` and `page/page.js`, and
     `tests/browser.test.js`, as the design's "The page of the Chrome test" describes them.
   - Run it with the Chrome that is installed. Record Chrome's version in the commit
