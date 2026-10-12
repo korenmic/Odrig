@@ -6939,3 +6939,46 @@ tool reads storage again, as it does on a real board.
 
 **Resolution.** `tests/firmware/test_wifi_commands.py`, `OnASmallLayout.esptool` and the
 tests that pass `failing_verifies`.
+
+## Seed 08: Which test checks which criterion
+
+**Question.** Task 6 asks to read the acceptance criteria of Requirements 1 to 9 once more
+and to name, for each one a program can check, the test that checks it. Where is that
+written, and what was missing?
+
+**Answer.** Here. The files are in `tests/firmware/` unless a folder is named.
+
+| Criteria | Checked by |
+|---|---|
+| 1.1 to 1.4 | `test_wifi_settings.py`, `TheSettingsFile` |
+| 1.5, 1.6 | `test_wifi_commands.py`: `test_it_has_no_option_that_carries_a_name_or_a_password` of both commands, `test_without_the_option_the_settings_file_is_read` of both, `WhereThePasswordGoes` |
+| 2.1 to 2.4, 2.6 | `test_wifi_settings.py`, `Reading` |
+| 2.5 | `test_wifi_settings.py`, `ThroughTheCommands` |
+| 3.1 to 3.7, 3.10 | `test_wifi_commands.py`, `SetWifi` |
+| 3.8 | `test_wifi_commands.py`, `test_settings_that_do_not_fit_into_storage_are_no_space_and_nothing_is_written`; `test_wifi_storage.py`, `test_a_file_system_with_no_room_is_no_space` |
+| 3.9 | `test_wifi_commands.py`, `test_settings_of_wled_that_are_no_object_are_refused_and_nothing_is_written`; `test_wifi_storage.py` |
+| 4.1 to 4.6 | `test_wifi_storage.py` |
+| 4.7 | `test_usermod_files.py`, `test_the_radio_is_only_read_and_only_by_the_probe_build_for_its_report`; `test_patches.py`; the firmware's SHA-256, recorded in `docs/firmware.md` |
+| 4.8 | `test_wifi_commands.py`, `test_flash_makes_no_call_that_reads_or_writes_storage`; `test_flasher.py`, `RestoreStock` |
+| 5.1 to 5.4 | `test_wifi_commands.py`, `test_nothing_of_these_runs_shows_the_password` of both commands, `WhereThePasswordGoes` |
+| 5.2, 5.5 | `test_wifi_settings.py`, `test_no_detail_quotes_text_of_the_file`, `test_the_text_form_of_the_settings_does_not_hold_the_password` |
+| 5.6 | by reading: every comparison of a password is `assertTrue` or `assertFalse` on a result |
+| 6.1 to 6.4 | `test_wifi_commands.py`, `InstallFirmware`; `tests/board/test_wifi.py`, `FromScratch` |
+| 6.5, 9.6 | `test_docs.py`, `test_it_says_what_set_wifi_does_and_names_its_reasons`, `test_it_says_what_install_firmware_does_and_where_it_takes_the_place_of_flash`, `test_the_probe_report_has_the_access_points_name_and_protection` |
+| 7.1, 7.2, 7.4 | `tests/board/test_wifi.py`, `TheReport` and `TheSettings` |
+| 7.3 | `test_usermod_files.py`, the test of the radio and `test_the_usermod_names_no_wifi_function_of_wled` |
+| 7.5 | `test_wifi_commands.py`, `test_no_tool_and_no_test_changes_the_network_settings_of_this_computer` |
+| 8.1 to 8.4 | the three suites, each found by discovery |
+| 8.5, 8.6 | `tests/board/test_wifi.py`; `tests/board/__init__.py`, `LeaveTheBoard` |
+| 8.3 | `tests/air/test_wifi.py`, written and run by no agent |
+| 9.1 to 9.5 | `test_wifi_docs.py` |
+
+Six tests were missing and were added: the `no-space` of 3.8 through the command, the
+settings file read by `install-firmware` without the option, the three of
+`WhereThePasswordGoes`, and the suite's last step now asks storage for the settings.
+
+Not in the spec, because the pages for newcomers did not exist when it was written:
+`AGENTS.md` no longer lists the name and the password under what is coming.
+
+**Resolution.** `tests/firmware/test_wifi_commands.py`; `tests/firmware/test_wifi_docs.py`;
+`tests/air/test_wifi.py`; `AGENTS.md`, "What is coming"; `tests/onboarding/test_entry.py`.

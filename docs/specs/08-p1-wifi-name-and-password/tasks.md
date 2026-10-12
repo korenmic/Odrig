@@ -162,7 +162,7 @@ Rules for every task:
     password of the settings file.
   - Requirements: 2.5, 4.8, 5.1, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2
 
-- [ ] 6. Documentation, the test for the owner's run, and the final check by program
+- [x] 6. Documentation, the test for the owner's run, and the final check by program
   - Complete `docs/wifi.md` as Requirement 9 and the design's table list it: changing the
     name or the password, what else changes them, the owner's check as numbered steps with
     what must be seen, four devices at once as read in the source, and the list of what is

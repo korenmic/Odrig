@@ -550,7 +550,9 @@ command, and `--data-binary` with the header above is exact for every body.
 **Wi-Fi is WLED's.** The usermod changes nothing of WLED's Wi-Fi behaviour or settings.
 With no network to join configured, WLED opens its access point about two seconds after
 start; the board's address on it is `4.3.2.1`. The name and the password of the access
-point are WLED's settings. The usermod keeps WLED's captive portal answering, which WLED
+point are WLED's settings; `set-wifi` and `install-firmware` put them there from the
+settings file, `firmware/wifi.json`, and [wifi.md](wifi.md) describes the network. The
+usermod keeps WLED's captive portal answering, which WLED
 itself does only outside its live mode. WLED's pages, its JSON interface and its updates
 through its own interface keep working; while WLED writes a new firmware, the usermod reads
 no file and sends nothing to the LEDs.
@@ -872,7 +874,9 @@ written back by hand with esptool, at address `0x0`, after its checksum has been
 ## The owner's checks
 
 What a program on this Mac cannot establish: what the LEDs show, and what a device joined to
-the board's Wi-Fi network gets. Each step says what to do and what must be seen. The number
+the board's Wi-Fi network, `odrig`, gets. Its password is in `firmware/wifi.json`, and
+[wifi.md](wifi.md) has the check of the network itself. Each step says what to do and what
+must be seen. The number
 in brackets is the criterion the step covers: in steps 1 to 4 a criterion of Requirement 16
 of `docs/specs/04-p1-firmware-build-with-the-player/requirements.md`, in steps 5 and 6,
 marked `seed 05`, criterion 3 of Requirement 18 of

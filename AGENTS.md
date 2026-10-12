@@ -115,8 +115,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 present, and do not build on them.
 
 - **The emulator and the tools on Windows**, seed 11, as the section above says.
-- **The board's Wi-Fi name and password**, seed 08, set from a tracked settings file.
-  Today the board's network has the defaults of WLED; see [docs/wifi.md](docs/wifi.md).
 - **An app for the operators, for Android**, seed 09. The first notes are in
   [docs/android-app.md](docs/android-app.md). The converter's library is made to run
   inside it. It has been run with Node.js and in Chrome, and never inside an app.

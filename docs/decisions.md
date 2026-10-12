@@ -335,3 +335,8 @@ are in [format.md](format.md), "Measured sizes".
   noted here and is not planned.
 - 2026-10-12: The Python reference tool refuses a damaged video or GIF with
   `unreadable-media` and no longer ends Python itself (seed 13).
+- 2026-10-12: Seed 08 gave the board's network its name and password. They are in the
+  tracked settings file `firmware/wifi.json`, and `set-wifi` and `install-firmware` of
+  the firmware tool put them into WLED's stored settings on a board. The bench board
+  hosts `odrig`, protected with WPA2, since that day; a program established it over USB.
+  That a phone joins with the password is the owner's check and is open.

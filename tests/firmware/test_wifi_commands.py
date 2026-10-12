@@ -1,7 +1,11 @@
 import pathlib
+import re
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
+
+from littlefs.errors import LittleFSError
 
 from fwtool import Failure, board, build, cli, paths, storage, wifi
 
@@ -186,6 +190,24 @@ class SetWifi(OnASmallLayout):
                 self.assertEqual(esptool.commands()[-1], "chip-id")
                 self.assertNotIn("write-flash", esptool.commands())
 
+    def test_settings_that_do_not_fit_into_storage_are_no_space_and_nothing_is_written(self):
+        given = dict(support.BENCH_FILES)
+        given["/cfg.json"] = b'{"um":{"note":"' + b"n" * 9000 + b'"}}'
+        system = storage.mount(support.storage_image(given, blocks=16))
+        full, number = bytes(system.context.buffer), 0
+        with self.assertRaises(LittleFSError):
+            while True:
+                with system.open(f"/fill-{number}.bin", "wb") as file:
+                    file.write(bytes(range(256)) * 16)
+                full, number = bytes(system.context.buffer), number + 1
+        self.table = support.partition_table(support.small_layout(blocks=16))
+        esptool = self.esptool(full)
+        result = self.set_wifi(esptool)
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"\Aerror: no-space: [^\n]*\n\Z")
+        self.assertEqual(esptool.wrote, [])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "chip-id"])
+
     def test_without_the_option_the_settings_file_is_read(self):
         esptool = self.esptool()
         with support.no_board(esptool, answer=REPLY):
@@ -251,6 +273,14 @@ class InstallFirmware(OnASmallLayout):
         self.install(esptool, "--wait", "90")
         self.assertEqual(esptool.waited, [20.0, 20.0, 90.0, 90.0])
 
+    def test_without_the_option_the_settings_file_is_read(self):
+        esptool = self.esptool()
+        with support.no_board(esptool, answer=REPLY), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image):
+            result = support.run_main("install-firmware")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(result.out.splitlines()[:2], ["name: odrig", "password: set"])
+        self.assertFalse(wifi.read().password in result.out + result.err)
+
     def test_a_refused_settings_file_makes_no_call_at_all(self):
         self.settings_file.write_text('{"name": "%s", "password": "short"}' % NAME)
         with support.untouched_board(), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image) as checked:
@@ -284,6 +314,29 @@ class InstallFirmware(OnASmallLayout):
         self.install(self.esptool(failing_verifies=2))
         self.assertEqual([result.status for result in self.results], [0, 0, 1])
         self.nothing_shows_the_password()
+
+
+class WhereThePasswordGoes(unittest.TestCase):
+    """What the sources say, beside what the runs show."""
+
+    def sources(self, *folders):
+        listed = subprocess.run(["git", "-C", str(support.ROOT), "ls-files", "-z", *folders], capture_output=True, check=True).stdout.decode("utf-8")
+        return [support.ROOT / name for name in listed.split("\0") if name.endswith(".py")]
+
+    def test_only_the_module_of_the_settings_reads_the_password_of_the_settings(self):
+        reading = [path.name for path in self.sources("firmware") if re.search(r"\.password\b", path.read_text(encoding="utf-8"))]
+        self.assertEqual(reading, ["wifi.py"])
+
+    def test_no_command_takes_a_name_or_a_password_from_the_environment(self):
+        for path in self.sources("firmware/fwtool"):
+            if path.name in ("wifi.py", "cli.py"):
+                self.assertNotRegex(path.read_text(encoding="utf-8"), r"os\.environ|getenv", path.name)
+
+    def test_no_tool_and_no_test_changes_the_network_settings_of_this_computer(self):
+        this = pathlib.Path(__file__).resolve()
+        for path in self.sources("firmware", "tests/firmware", "tests/board", "tests/air", "odrigctl"):
+            if path.resolve() != this:
+                self.assertNotRegex(path.read_text(encoding="utf-8"), r"networksetup|airport -|nmcli|netsh wlan|CoreWLAN", path.name)
 
 
 class Flash(OnASmallLayout):
