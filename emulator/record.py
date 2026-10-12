@@ -66,12 +66,13 @@ def ticks(core, count, commands, out):
     send(None)
 
 
-def run(show_dir, out_path, length_ms, script_path, library_path, out=None):
-    """Records `length_ms` of the show in a folder into a record file."""
+def run(show_dir, out_path, length_ms, script_path, library_path, out=None, storage=host.STORAGE_BYTES):
+    """Records `length_ms` of the show in a folder into a record file. `storage` is the
+    total space the core is told the folder's storage has."""
     out = sys.stdout if out is None else out
     count = tick_count(length_ms)
     commands = read_script(script_path, length_ms) if script_path is not None else []
-    files = host.FolderHost(show_dir)
+    files = host.FolderHost(show_dir, storage=storage)
     try:
         core = binding.Core(library_path, files)
         try:
@@ -79,5 +80,5 @@ def run(show_dir, out_path, length_ms, script_path, library_path, out=None):
         except OSError as error:
             raise failure.Failure(failure.CANNOT_WRITE, f"{out_path}: {error.strerror or type(error).__name__}") from None
     finally:
-        files.close()
+        files.release()
         out.flush()

@@ -1,5 +1,6 @@
 """Helpers shared by the tests of the core: where things are and how the test host is run."""
 
+import base64
 import bisect
 import collections
 import contextlib
@@ -239,7 +240,7 @@ def installed(files):
         yield folder
 
 
-Run = collections.namedtuple("Run", "status core memory error legs logs opened lines")
+Run = collections.namedtuple("Run", "status core memory error legs logs opened stored lines")
 Run.__doc__ = """One run of `odrig_host session`.
 
 `core` is "ok" or "null". `memory` is `(bytes, blocks)`: what the core asked the host for
@@ -247,8 +248,22 @@ while it started. `error` is the reason the show is invalid after startup, or `N
 `legs` holds `(leg, pin, LED count)` for each leg. `logs` are the diagnostic texts the core
 gave the host while it started. `opened` holds `(name, result)` for each file the core asked
 the host to open while it started, when the session has the option `--trace-files`.
-`lines` is everything printed after startup.
+`stored` holds the storage calls the core made while it started, each as the text after
+`store `, when the session has the option `--trace-store`. `lines` is everything printed
+after startup.
 """
+
+# The storage of the board and the block of its file system, which the test host and the
+# emulator report space by.
+BOARD_STORAGE = 10354688
+STORAGE_BLOCK = 4096
+
+
+def free_space(files, total=BOARD_STORAGE):
+    """The free bytes a host reports for these files: the total less the size of each file
+    rounded up to a whole block, and not below 0."""
+    used = sum(-(-len(content if isinstance(content, bytes) else content.encode("utf-8")) // STORAGE_BLOCK) * STORAGE_BLOCK for content in files.values())
+    return max(0, total - used)
 
 
 def _script_bytes(script):
@@ -271,6 +286,7 @@ def _run(status, printed):
     legs = []
     logs = []
     opened = []
+    stored = []
     position = 0
     for position, line in enumerate(printed):
         word, _, rest = line.partition(" ")
@@ -279,6 +295,8 @@ def _run(status, printed):
         elif word == "open" and core is None:
             name, _, answer = rest.rpartition(" ")
             opened.append((name, int(answer)))
+        elif word == "store" and core is None:
+            stored.append(rest)
         elif word == "core":
             core = rest
         elif word == "memory":
@@ -292,13 +310,26 @@ def _run(status, printed):
     else:
         position = len(printed)
     lines = printed[position + 1:] if position < len(printed) and printed[position] == "ready" else printed[position:]
-    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), lines)
+    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), tuple(stored), lines)
 
 
 def start(files, script=(), options=(), status=0):
     """Installs the files in a temporary folder and runs a session on it."""
     with installed(files) as folder:
         return session(folder, script, options, status)
+
+
+def folder_files(folder):
+    """The files of a folder: the content of each by its name."""
+    return {path.name: path.read_bytes() for path in sorted(pathlib.Path(folder).iterdir()) if path.is_file()}
+
+
+def start_and_keep(files, script=(), options=(), status=0):
+    """Installs the files in a temporary folder and runs a session on it. Returns the run
+    and the files the folder holds afterwards."""
+    with installed(files) as folder:
+        run = session(folder, script, options, status)
+        return run, folder_files(folder)
 
 
 def start_each(file_sets, script=(), options=()):
@@ -389,6 +420,20 @@ def dense_clip(width, height, seconds, compressed=True):
     return odrg.encode(animation, compressed=compressed)
 
 
+def upload_lines(number, name, data, piece=1500):
+    """The command lines that open an upload and send a file in pieces: `upload begin` and
+    one `upload data` for each piece."""
+    lines = [f"upload begin {number} {name} {len(data)}"]
+    for offset in range(0, len(data), piece):
+        lines.append(f"upload data {offset} {base64.urlsafe_b64encode(data[offset:offset + piece]).rstrip(b'=').decode('ascii')}")
+    return lines
+
+
+def upload_end(data):
+    """The command line that closes the upload of a file."""
+    return f"upload end {zlib.crc32(data):08x}"
+
+
 def show_refusal(rejection):
     """The reason text the core holds for a show file the converter's reader refuses."""
     if rejection.reason == "show-malformed":
@@ -460,10 +505,31 @@ class ReferencePlayer:
     """
 
     GRID = 20
+    PARTS = ("upload.part", "show.part")
+    PENDING = "pending.txt"
+    CHUNK = 1500
+    QUIET = 60000
+    RESERVE = 16384
+    BASE64 = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
-    def __init__(self, files):
-        """`files` maps the name of each installed file to its content."""
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True):
+        """`files` maps the name of each installed file to its content. `storage` is the
+        total space the host reports, or None for a host that cannot tell its space.
+        `changeable` says whether the host's storage can be changed."""
+        self.storage = storage
+        self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
+        self.start = None       # the id of the `start` item of the show
+        self.show_brightness = 0    # the brightness of the show file
+        self.canvas = None      # the width and the height of the canvas
+        self.capacity = 0       # the number of items there is room for
+        self.upload = None      # the open upload
+        self.had_refresh = False
+        self.last_grid = None   # the grid time of the latest refresh
+        # For a file whose body is refused: the frame records that decode before the one
+        # that is refused, by the CRC-32 of the file. The check ends two steps later.
+        # Without an entry the check is taken to end after every record the header names.
+        self.sound_records = {}
         self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
         self.items = {}         # the items of the show by id
         self.clips = {}         # the frames of each file by name
@@ -478,6 +544,10 @@ class ReferencePlayer:
         self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
         self.unfinished = b""   # the bytes of a transport since the last newline
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
+        self.files = content    # the files of the folder by name
+        if changeable:
+            for name in self.PARTS:
+                content.pop(name, None)
         try:
             start = self._check(content)
         except _Invalid as invalid:
@@ -495,6 +565,7 @@ class ReferencePlayer:
         except errors.Rejection:
             raise _Invalid("mapping-malformed") from None
         self.legs = [(leg.leg, leg.pin, led_pixels(canvas, leg)) for leg in canvas.legs]
+        self.canvas = (canvas.width, canvas.height)
 
         if "show.json" not in files:
             raise _Invalid("show-missing")
@@ -502,8 +573,17 @@ class ReferencePlayer:
             listed = show.loads(files["show.json"])
         except errors.Rejection as rejection:
             raise _Invalid(show_refusal(rejection)) from None
-        self.brightness = listed.brightness
+        self.brightness = self.show_brightness = listed.brightness
         self.items = {item.id: item for item in listed.items}
+        self.capacity = max(128, min(len(self.items) + 32, 65535), len(self.items))
+        self.start = listed.start
+        if self.changeable and self.PENDING in files:
+            # What an interrupted change left: a file named there that no item names.
+            named = show.files(listed)
+            for line in files.pop(self.PENDING)[:512].split(b"\n")[:-1]:
+                name = line.decode("latin-1")
+                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDING) and name not in named:
+                    files.pop(name, None)
 
         for name in show.files(listed):
             if name not in files:
@@ -535,6 +615,9 @@ class ReferencePlayer:
         if self.t0 is None:
             self.t0 = self.latest = self.next_due = now
         self.latest = max(self.latest, now)
+        # An upload on which nothing has moved for a minute is discarded.
+        if self.upload is not None and self.latest - self.upload["progress"] >= self.QUIET:
+            self._discard()
         return self.latest
 
     def _picture(self, now, grid):
@@ -565,14 +648,25 @@ class ReferencePlayer:
         grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
         self.next_due = grid + self.GRID
         self.refreshes_in[(now - self.t0) // 1000] += 1
+        in_step = self.had_refresh and grid == self.last_grid + self.GRID
+        self.had_refresh, self.last_grid = True, grid
         picture = self._picture(now, grid)
+        # The check of an uploaded file takes one step after a refresh that followed the
+        # one before it without a gap.
+        if in_step and self.upload is not None and self.upload["state"] == "checking":
+            self.upload["progress"] = now
+            self.upload["steps"] -= 1
+            if self.upload["steps"] == 0:
+                self.upload["state"] = "checked"
         if picture is None:
             return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
-    COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0}
-    RANGES = {b"play": (1, 65535), b"brightness": (0, 255)}
+    LINE_MAX = 2048
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
+    RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
+    REPLY_MAX = 1024
 
     def command(self, now, line):
         """One command line, given as bytes: carries it out and returns its reply."""
@@ -582,22 +676,30 @@ class ReferencePlayer:
         if line.endswith(b"\r"):
             line = line[:-1]
         code = self._obey(line)
+        if isinstance(code, bytes):
+            return code
         if code is not None:
             return b'{"ok":false,"error":"' + code.encode("ascii") + b'"}\n'
         if line == b"status":
             return self._status(now)
+        if line == b"space":
+            return self._space()
+        if line.split(b" ")[0] == b"list":
+            return self._list(int(line[5:]) if b" " in line else 0)
         return b'{"ok":true}\n'
 
     def _obey(self, line):
         """Carries out a command line. Returns the error code of a line that is no valid
         command, the first that applies, and changes nothing then."""
-        if len(line) > 64:
+        if len(line) > self.LINE_MAX:
             return "line-too-long"
         name, *arguments = line.split(b" ")
         if name not in self.COMMANDS:
             return "unknown-command"
-        if len(arguments) != self.COMMANDS[name]:
+        if len(arguments) not in self.COMMANDS[name]:
             return "bad-argument"
+        if name == b"upload":
+            return self._upload(arguments)
         value = None
         if arguments:
             if not arguments[0] or arguments[0].strip(b"0123456789"):
@@ -614,9 +716,221 @@ class ReferencePlayer:
             self._play(value)
         elif name == b"brightness":
             self.brightness = value
+        elif name == b"space":
+            if self.storage is None:
+                return "storage-error"
+        elif name == b"list":
+            if self.error is not None:
+                return "show-invalid"
+        elif name == b"remove":
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is not None:
+                return "busy"
+            if value not in self.items:
+                return "unknown-id"
+            if any(value in (other.cycle or ()) for other in self.items.values()):
+                return "in-use"
+            if not self.changeable:
+                return "storage-error"
+            self._remove(value)
         elif name != b"status":
             self.on = name == b"on"
         return None
+
+    @staticmethod
+    def _number(text, low, high):
+        """The value of an argument written in decimal digits, or None when it is no such
+        text or is outside its range."""
+        if not text or text.strip(b"0123456789"):
+            return None
+        value = int(text)
+        return value if low <= value <= high else None
+
+    def _decoded(self, text):
+        """The bytes a text stands for as base64 without padding, or None when it is not
+        that, or stands for no byte or for more than a piece may have."""
+        if not text or len(text) % 4 == 1 or not self.BASE64.issuperset(text):
+            return None
+        data = base64.urlsafe_b64decode(text + b"=" * (-len(text) % 4))
+        if base64.urlsafe_b64encode(data).rstrip(b"=") != text or not 1 <= len(data) <= self.CHUNK:
+            return None
+        return data
+
+    def _discard(self):
+        self.files.pop("upload.part", None)
+        self.upload = None
+
+    def _judge(self, data):
+        """What the check of an uploaded file finds: the steps it takes, and the reason
+        the file is refused for, or None with the frames of the file."""
+        if len(data) < 16:
+            return 1, "truncated", None
+        try:
+            odrg.decode(data[:16])
+        except errors.Rejection as rejection:
+            if rejection.reason != "truncated":
+                return 1, rejection.reason, None
+        if struct.unpack_from("<HH", data, 6) != self.canvas:
+            return 1, "size-mismatch", None
+        try:
+            records = odrg.decode(data).records
+        except errors.Rejection as rejection:
+            sound = self.sound_records.get(zlib.crc32(data), struct.unpack_from("<I", data, 12)[0])
+            return sound + 2, rejection.reason, None
+        return len(records) + 2, None, _Clip(records)
+
+    def _upload(self, arguments):
+        """The four `upload` commands. Returns an error code, a reply, or None."""
+        verb = arguments[0] if arguments else b""
+        if verb == b"begin":
+            number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
+            size = self._number(arguments[3], 1, 4294967295) if len(arguments) == 4 else None
+            name = arguments[2].decode("latin-1") if len(arguments) == 4 else ""
+            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDING):
+                return "bad-argument"
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is not None:
+                return "busy"
+            item = self.items.get(number)
+            if item is not None and item.cycle is not None:
+                return "in-use"
+            if any(other.file == name for other in self.items.values() if other.id != number):
+                return "in-use"
+            if item is None and len(self.items) >= self.capacity:
+                return "no-space"
+            if self.storage is not None and size + size // 256 + self.RESERVE > free_space(self.files, self.storage):
+                return "no-space"
+            if self.storage is None or not self.changeable:
+                return "storage-error"
+            self.upload = {"id": number, "name": name, "size": size, "data": b"", "state": "receiving", "progress": self.latest}
+            self.files["upload.part"] = b""
+            return b'{"ok":true,"chunk":1500}\n'
+        if verb == b"data":
+            offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 3 else None
+            data = self._decoded(arguments[2]) if len(arguments) == 3 else None
+            if offset is None or data is None:
+                return "bad-argument"
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is None:
+                return "no-upload"
+            upload = self.upload
+            if offset != len(upload["data"]) or len(data) > upload["size"] - len(upload["data"]):
+                return "bad-offset"
+            upload["data"] += data
+            upload["progress"] = self.latest
+            self.files["upload.part"] = upload["data"]
+            if len(upload["data"]) == upload["size"]:
+                upload["state"] = "checking"
+                upload["steps"], upload["reason"], upload["clip"] = self._judge(upload["data"])
+            return b'{"ok":true,"received":%d}\n' % len(upload["data"])
+        if verb == b"end":
+            if len(arguments) != 2 or not re.fullmatch(rb"[0-9a-f]{8}", arguments[1]):
+                return "bad-argument"
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is None:
+                return "no-upload"
+            upload = self.upload
+            if len(upload["data"]) < upload["size"]:
+                return "incomplete"
+            if zlib.crc32(upload["data"]) != int(arguments[1], 16):
+                self._discard()
+                return "bad-checksum"
+            if upload["state"] == "checking":
+                return "busy"
+            if upload["reason"] is not None:
+                self._discard()
+                return b'{"ok":false,"error":"bad-file","reason":"%s"}\n' % upload["reason"].encode("ascii")
+            self._install(upload)
+            return None
+        if verb == b"cancel" and len(arguments) == 1:
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is None:
+                return "no-upload"
+            self._discard()
+            return None
+        return "bad-argument"
+
+    def _install(self, upload):
+        """Puts an upload whose check has passed in place: the file, and its item as a new
+        last item or with the animation of the item that has its id."""
+        number, name = upload["id"], upload["name"]
+        self._discard()
+        old = self.items.get(number)
+        self.files[name] = upload["data"]
+        self.clips[name] = upload["clip"]
+        self.items[number] = show.Item(number, name, None, None)
+        if old is not None:
+            if old.file != name and all(other.file != old.file for other in self.items.values()):
+                self.files.pop(old.file, None)
+                self.clips.pop(old.file, None)
+            played = self.items.get(self.playing)
+            if played is not None and (played.id == number or number in (played.cycle or ())):
+                self._play(self.playing)
+        if old is None or old.file != name:
+            self.files["show.json"] = self.show_text()
+
+    def _listed(self, item, with_entries=True):
+        """One item as `list` writes it."""
+        if item.cycle is None:
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file])}, separators=(",", ":"))
+        return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
+
+    def _list(self, first):
+        """The reply to `list`: every item from a position on that fits into the reply."""
+        items = list(self.items.values())
+        head = '{"ok":true,"items":['
+
+        def tail(position):
+            return '],"next":' + (str(position) if position < len(items) else "null") + "}\n"
+
+        text = head
+        position = first
+        while position < len(items):
+            entry = self._listed(items[position])
+            if items[position].cycle is not None and len(head) + len(entry) + len(tail(position + 1)) > self.REPLY_MAX:
+                entry = self._listed(items[position], with_entries=False)
+            comma = "," if position != first else ""
+            if len(text) + len(comma) + len(entry) + len(tail(position + 1)) > self.REPLY_MAX:
+                break
+            text += comma + entry
+            position += 1
+        return (text + tail(position)).encode("ascii")
+
+    def show_text(self):
+        """The show file as the core writes it."""
+        items = []
+        for item in self.items.values():
+            if item.cycle is None:
+                items.append({"id": item.id, "file": item.file})
+            else:
+                items.append({"id": item.id, "cycle": list(item.cycle), "seconds": item.seconds})
+        written = {"version": 1, "brightness": self.show_brightness, "items": items}
+        if self.start is not None:
+            written["start"] = self.start
+        return json.dumps(written, separators=(",", ":")).encode("ascii") + b"\n"
+
+    def _remove(self, number):
+        """Takes an item out of the show, and its file out of the folder when no other
+        item names it."""
+        item = self.items.pop(number)
+        if self.start == number:
+            self.start = None
+        if self.playing == number:
+            self.playing = self.shown = self.zero = None
+        if item.file is not None and all(other.file != item.file for other in self.items.values()):
+            self.files.pop(item.file, None)
+            self.clips.pop(item.file, None)
+        self.files["show.json"] = self.show_text()
+
+    def _space(self):
+        animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)
+        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations}
+        return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def _status(self, now):
         second = (now - self.t0) // 1000
@@ -644,7 +958,7 @@ class ReferencePlayer:
             reply = self.command(now, line)
             if line.endswith(b"\r"):
                 line = line[:-1]
-            answered.append((line[:64], reply))
+            answered.append((line[:self.LINE_MAX], reply))
         return answered
 
     def answer(self, line):

@@ -273,9 +273,9 @@ different bytes.
 
 The last row was measured with the converter of this repository, with zlib 1.2.12: it is
 the clip the generator `dense` writes for the target file `mapping/legs-20.json`, see
-[converter.md](converter.md), "Generators". The reference decoder gives back every frame of
-both files, and the suite of the core plays the clip on the target file and compares every
-LED of every refresh with the reference.
+[reference-converter.md](reference-converter.md), "Generators". The reference decoder gives
+back every frame of both files, and the suite of the core plays the clip on the target file
+and compares every LED of every refresh with the reference.
 
 Decoding has been run and timed on the board: see [firmware.md](firmware.md), "Measurements
 on the board" and "Verified on the board".

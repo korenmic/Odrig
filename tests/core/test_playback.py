@@ -394,7 +394,7 @@ class NothingToShow(Playback):
         self.assert_dark(playing(support.example_show(), 9), [1, 2])
 
     def test_a_show_that_ran_out_of_memory_after_the_mapping_gives_dark_refreshes(self):
-        for block in (6, 7, 10):
+        for block in (8, 9, 12):
             run = support.start(playing(support.example_show(), 1), every_20_ms(3), ["--alloc-fails-at", str(block)])
             produced, idle = refreshes(run.lines)
             self.assertEqual(run.error, "out-of-memory")
@@ -413,7 +413,7 @@ class NothingToShow(Playback):
             self.assertEqual(printed, [f"idle {T0 + 20 * step}" for step in range(5)])
 
     def test_a_mapping_that_ran_out_of_memory_gives_idle(self):
-        run = support.start(playing(support.example_show(), 1), every_20_ms(2), ["--alloc-fails-at", "4"])
+        run = support.start(playing(support.example_show(), 1), every_20_ms(2), ["--alloc-fails-at", "6"])
         self.assertEqual(run.lines, [f"idle {T0}", f"idle {T0 + 20}"])
 
 

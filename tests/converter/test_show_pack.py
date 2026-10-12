@@ -57,6 +57,37 @@ class Accepted(unittest.TestCase):
     def test_a_show_without_start(self):
         self.assertIsNone(show.loads(source()).start)
 
+    def test_a_show_without_items(self):
+        result = show.loads(source(items=[]))
+        self.assertEqual((result.brightness, result.items, result.start), (128, (), None))
+        self.assertEqual(show.files(result), [])
+        self.assertEqual(show.loads(b'{"version":1,"brightness":0,"items":[]}\n').items, ())
+        with self.assertRaises(errors.Rejection) as caught:
+            show.loads(source(items=[], start=1))
+        self.assertEqual(caught.exception.reason, "undefined-id")
+
+    def test_the_show_file_as_the_player_writes_it_after_a_change(self):
+        text = (support.ROOT / "docs" / "show.md").read_text(encoding="utf-8")
+        section = text.split("\n## show.json after a change\n")[1].split("\n## ")[0]
+        example = re.search(r"```json\n(.*?)```", section, re.DOTALL).group(1)
+        # One line without spaces and a line feed, the members in the order of the table.
+        self.assertEqual(example.count("\n"), 1)
+        self.assertTrue(example.endswith("}\n"))
+        self.assertNotIn(" ", example)
+        self.assertEqual(example, json.dumps(json.loads(example), separators=(",", ":")) + "\n")
+        self.assertEqual(list(json.loads(example)), ["version", "brightness", "items", "start"])
+        result = show.loads(example.encode())
+        self.assertEqual((result.brightness, result.start), (128, 4))
+        self.assertEqual(result.items, (show.Item(1, "hello.odrg", None, None), show.Item(2, "dvd.odrg", None, None), show.Item(4, None, (2, 1), 15)))
+        for written in (
+            b'{"version":1,"brightness":0,"items":[]}\n',
+            b'{"version":1,"brightness":255,"items":[{"id":65535,"file":".odrg"}]}\n',
+            b'{"version":1,"brightness":7,"items":[{"id":2,"file":"a.odrg"},{"id":1,"cycle":[2,2,2],"seconds":65535}],"start":1}\n',
+        ):
+            read = show.loads(written)
+            self.assertEqual(len(read.items), written.count(b'"id"'))
+            self.assertEqual(read.start, 1 if b"start" in written else None)
+
     def test_the_limits(self):
         items = [
             {"id": 1, "file": ".odrg"},
@@ -111,10 +142,10 @@ class Malformed(unittest.TestCase):
         self.check(source(brightness="128"), "bad-type")
         self.check(source().replace(b"128", b"128.0"), "bad-type")
 
-    def test_no_items(self):
-        self.check(source(items=[]), "items is empty")
+    def test_items_that_are_no_list_of_items(self):
         self.check(source(items={}), "bad-type")
         self.check(source(items=[1]), "bad-type")
+        self.check(source(items="[]"), "bad-type")
 
     def test_an_item_that_is_neither_kind(self):
         self.check(source(items=[{"id": 1}]), "missing-member")
@@ -257,6 +288,14 @@ class Pack(unittest.TestCase):
         self.assertEqual(result.out, "")
         self.assertTrue(result.err.startswith(f"error: {expected}: "), result.err)
         self.assertEqual(result.err.count("\n"), 1)
+
+    def test_a_show_without_items_gives_the_two_json_files(self):
+        show_path = self.show_file(items=[], brightness=40)
+        result = self.pack(show_path, LEGS_2, self.sources)
+        self.assertEqual(result, support.Result(0, "", ""))
+        self.assertEqual(sorted(entry.name for entry in self.out.iterdir()), ["mapping.json", "show.json"])
+        self.assertEqual((self.out / "show.json").read_bytes(), show_path.read_bytes())
+        self.assertEqual((self.out / "mapping.json").read_bytes(), LEGS_2.read_bytes())
 
     def test_the_example_show_gives_exactly_the_installed_file_set(self):
         result = self.pack()

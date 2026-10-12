@@ -16,9 +16,10 @@ python -m odrig.mapdoc
 
 writes them again, each between the two comments that mark it in the source of this page,
 and changes nothing else. With `--check` it writes nothing, and fails with the name of the
-first drawing or table that is not what it would write; a test of the converter's suite
-runs that check. `python` is the Python of [converter.md](converter.md), "Setup", and this
-program needs none of the libraries.
+first drawing or table that is not what it would write; a test of the suite of the
+reference converter runs that check. `python` is the Python of
+[reference-converter.md](reference-converter.md), "Setup", and this program needs none of
+the libraries.
 
 ## Coordinates
 

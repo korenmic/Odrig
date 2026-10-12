@@ -90,10 +90,14 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--verbose]
-python3 firmware/fw.py flash [--port P] [--image PATH] [--expect status|wled|probe] [--wait SECONDS]
+python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
+python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
+python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
+python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
+python3 firmware/fw.py read-limit [--port P]
+python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--limit FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
@@ -128,6 +132,14 @@ with that environment's Python.
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
 | `output-not-empty` | The folder `read-show` is to write exists and is not an empty folder. |
+| `wifi-settings-missing` | The settings file to read is not there or is not a file. |
+| `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
+| `wifi-name-invalid` | The name does not have 1 to 32 characters of printable ASCII. |
+| `wifi-password-invalid` | The password does not have 8 to 63 characters of printable ASCII. |
+| `wled-settings-malformed` | `/cfg.json` or `/wsec.json` in the board's storage is not a JSON object, or its `ap`, its `hw` or its `hw.led` is not an object. Nothing was written to the board. |
+| `limit-settings-missing` | The limit file to read is not there or is not a file. |
+| `limit-settings-malformed` | The limit file is not a JSON object with exactly the whole number `milliamps`. |
+| `limit-invalid` | The limit is not from 0 to 65,535. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
@@ -185,6 +197,16 @@ libraries outside WLED's folder: the build compiles `core/src/*.cpp` from `core/
 compiler flags of the environment, and nothing is copied. `core/library.json` is what lets
 PlatformIO take `core/` as a library. A repository path with a space in it is refused.
 
+`build --standalone` builds the standalone firmware, a program without WLED, as a
+project of its own in `build/firmware/standalone/`, and keeps `odrig-standalone.bin`;
+with `--probe` it builds its probe build, `odrig-standalone-probe.bin`. The tool writes
+that project's `platformio.ini` from `firmware/standalone/platformio.ini.in`, with the
+repository's path and the path of WLED's checkout filled in: the platform, the board, the
+flash settings and the libraries are the ones WLED has for this board, and the partition
+table is WLED's own file. WLED's files are not patched for it and none is compiled.
+`--standalone` does not go with `--stock`. The standalone firmware is being built; for
+now it is a trial program, see [Verified on the board](#verified-on-the-board).
+
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
 standard output names the image:
@@ -213,8 +235,11 @@ Writes a built image to the board over USB and prints what the board answers aft
    `v`; with `--expect probe` the probe build's report; without the option the firmware's
    reply to `status`.
 
-Without `--image` the image is `build/firmware/out/odrig-firmware.bin`. The bootloader, the
+Without `--image` the image is `build/firmware/out/odrig-firmware.bin`, and with
+`--standalone` it is `odrig-standalone.bin`. The bootloader, the
 partition table and storage are not written: WLED's settings and the installed show stay.
+So `flash` leaves the name and the password of the board's network as storage has them;
+for a board that never got them, `install-firmware` is the command.
 
 ### restore-stock
 
@@ -243,7 +268,7 @@ Storage is not written, so WLED's settings and the show it played before are sti
 ### install-show
 
 ```
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python3 firmware/fw.py install-show build/example-show
 ```
@@ -283,6 +308,110 @@ Every show installed on the board while one 60-LED strip is fed from the board's
 must have a brightness of 40 or less in its `show.json`. The tool does not check this; the
 board tests do, for every show they install.
 
+### set-wifi
+
+```
+python3 firmware/fw.py set-wifi
+```
+
+Puts the name and the password of the board's Wi-Fi network into the board's storage,
+checks what was written, restarts the board, and prints three lines: `name: <name>`,
+`password: set`, and the board's reply to `status`. [wifi.md](wifi.md) describes the
+network.
+
+The two values come from the settings file, `firmware/wifi.json`, a JSON object with
+exactly the strings `name` and `password`, and from nowhere else: no option and no
+variable carries either. `--settings FILE` reads another file of the same format. A name
+has 1 to 32 characters and a password 8 to 63, all of them printable ASCII; a file that
+is refused stops the command before the board is touched. The password is never printed:
+not by this command, and not in the detail of a refusal.
+
+The network is WLED's, and WLED keeps its name in `/cfg.json` and its password in
+`/wsec.json`, two files in the top folder of storage. The command edits those two files
+the way `install-show` writes a show:
+
+1. It reads the partition table and gets storage as it is, as `install-show` does.
+2. In `/cfg.json` it sets `ap.ssid` to the name and `ap.pskl` to the number of characters
+   of the password, and removes `ap.psk` when it is there. In `/wsec.json` it sets
+   `ap.psk` to the password. A file or an `ap` object that is missing is made. Every
+   other member keeps its value and its place, and a file that needs no change keeps its
+   bytes. A file that is not a JSON object is `wled-settings-malformed`, and nothing has
+   been written to the board then.
+3. It checks the new image: both files hold the settings, differ from the old ones in
+   nothing else, and every other file is as it was.
+4. It writes the blocks that changed, has the chip compare the whole partition with the
+   new image, and restarts the board. On a board that holds the settings already nothing
+   is written.
+
+The command takes 36 seconds on the bench board. The tool waits 20 seconds for the reply
+to `status`, or as long as `--wait SECONDS` says.
+The reply shows that the firmware runs again; the command does not look into it, and its
+status is 0 also when the reply reports an invalid show. On a board that answers no
+`status`, stock WLED for one, the command ends with `no-reply` after the settings were
+stored and checked.
+
+`flash`, `restore-stock` and `install-show` leave the name and the password as storage
+has them.
+
+### set-limit
+
+```
+python3 firmware/fw.py set-limit
+```
+
+Puts the limit on LED current into the board's storage, checks what was written, restarts
+the board, and prints two lines: `limit: <N> mA`, or `limit: off` for a limit of 0, and
+the board's reply to `status`.
+
+The limit comes from the limit file, `firmware/limit.json`, a JSON object with exactly
+the whole number `milliamps`, from 0 to 65,535. It is the maximum for all LEDs together
+that WLED's limiter works with, and 0 switches the limiter off; see
+[The current limiter stays active](#what-the-firmware-does). `--settings FILE` reads
+another limit file. A file that is refused stops the command before the board is touched.
+
+WLED keeps the number as `hw.led.maxpwr` of `/cfg.json`. The command edits that file the
+way `set-wifi` does: every other member keeps its value and its place, a `hw` or a
+`hw.led` object that is missing is made, the new image is checked, the blocks that
+changed are written, and the chip compares the whole partition. On a board that holds
+the limit already nothing is written. The tool waits 20 seconds for the reply to
+`status`, or as long as `--wait SECONDS` says.
+
+### read-limit
+
+```
+python3 firmware/fw.py read-limit
+```
+
+Reads the board's storage, restarts the board, and prints the limit it holds in one line:
+`limit: <N> mA`, `limit: off`, or `limit: not stored; WLED uses 850 mA` when `/cfg.json`
+holds no `hw.led.maxpwr`. It writes nothing.
+
+### install-firmware
+
+```
+python3 firmware/fw.py install-firmware
+```
+
+The command for a board from scratch: one that runs stock WLED or an earlier build, or
+whose storage does not hold the network's name and password yet. It writes the built
+firmware to the board as `flash` does, waits for the firmware's reply to `status`, and
+then does what `set-wifi` and `set-limit` do, in one write: it puts the name and the
+password of the settings file and the limit of the limit file into storage, restarts the
+board again, and prints `name: <name>`, `password: set`, the line of the limit and the
+reply to `status`.
+
+The settings file and the limit file are read and checked first, and then the image
+`build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
+refused, the board has not been touched. `--settings FILE` reads another settings file,
+`--limit FILE` another limit file,
+and `--wait SECONDS` is the time the command waits for the board's reply after each of
+its two restarts, 20 seconds without it. The command takes 50 seconds on the bench board.
+
+When the command fails after the firmware was written, the board runs the firmware with
+the name and the password its storage had. Running the command again, or `set-wifi`,
+finishes the work. `flash` and `restore-stock` do not apply the settings: they leave
+storage as it is.
+
 ### read-show
 
 ```
@@ -315,9 +444,11 @@ python3 firmware/fw.py test-board
 Runs the suite in `tests/board/`, found by discovery in the same way. It needs the board on
 USB and writes to it: it flashes the firmware, the probe build and stock WLED, and installs
 shows, each with a brightness of 40 or less; a brighter show is refused before the tool is
-started. It builds an image the work folder does not hold. Its last step leaves the board
-with the firmware and the example show at brightness 32, playing. A run takes about half
-an hour. Without a board it stops with `no-board` and runs nothing.
+started. It also changes the installed show with the commands of
+[commands.md](commands.md): it uploads animations and removes them again. It builds an
+image the work folder does not hold. Its last step leaves the board with the firmware and
+the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
+takes about 45 minutes. Without a board it stops with `no-board` and runs nothing.
 
 ### test-air
 
@@ -331,8 +462,11 @@ joined to the board's Wi-Fi network; `ADDRESS` is the board's address on that ne
 suite sends commands over HTTP and through the port and compares them, asks WLED's own
 interface for its information, and once saves WLED's LED settings, with the pin of the last
 output changed, to see the mapping's outputs come back; WLED then stores the mapping's
-outputs as its LED settings. Without a board, or when the address answers no command, it
-stops with `no-board` and runs nothing.
+outputs as its LED settings. It uploads an animation over HTTP, plays it and removes it,
+and it uploads a dense bench clip of ten seconds and writes the speed and the rates of
+that upload to `build/firmware/out/upload-air.json`. For these it expects the example
+show on the board, as `test-board` leaves it. Without a board, or when the address answers
+no command, it stops with `no-board` and runs nothing.
 
 ## From nothing to a playing board
 
@@ -340,15 +474,18 @@ With the board on USB, from the repository root:
 
 ```
 python3 firmware/fw.py build
-python3 firmware/fw.py flash
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+python3 firmware/fw.py install-firmware
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python3 firmware/fw.py install-show build/example-show
 python -m odrigctl --port /dev/cu.usbmodem101 status
 ```
 
 The first command also sets up the tools and fetches WLED, which needs the network once.
-`pack` is the converter's command of [converter.md](converter.md); `shows/example/show.json`
+`install-firmware` writes the firmware and gives the board's network the name and the
+password of `firmware/wifi.json`; see [wifi.md](wifi.md).
+`pack` is the converter's command of [converter.md](converter.md), which needs Node.js 20
+or later as `node` and nothing else; `shows/example/show.json`
 has brightness 128, so for a strip fed from the board's 3.3 V pin pack a copy of it with a
 brightness of 40 or less. The example show is for today's build of two legs. The show for
 the target build of twenty legs, 60 x 60, is the demo show: [emulator.md](emulator.md),
@@ -371,8 +508,42 @@ carries.
 gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
 holds a whole file. The core's memory comes from the chip's internal memory, and from the
 external memory only when the internal memory has none. The time the core is given is the
-milliseconds since the chip started, from a 64-bit clock. The firmware never writes,
-creates or deletes a file in `/odrig`.
+milliseconds since the chip started, from a 64-bit clock.
+
+**Storage.** The usermod gives the core the seven storage functions of
+[core.md](core.md), on WLED's file system. Every path is `/odrig/<name>`, and a name is
+checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and
+not dots alone. The firmware writes, renames and deletes a file only there, and only
+inside one of these functions: nothing of the firmware decides to write. What is written
+is the core's matter: an uploaded animation, first as `upload.part`, the show file,
+first as `show.part`, and `pending.txt`; see [show.md](show.md) and [core.md](core.md),
+"The files the core writes".
+
+| Function | On the board |
+|---|---|
+| `write_open` | A file that was being written is closed and removed. The named file is opened for writing, which empties one that has the name. One file is written at a time. |
+| `write` | The bytes go to the open file in one write. |
+| `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
+| `rename` | The file system's rename. A file that has the new name is replaced by it. |
+| `remove` | The file is deleted; a name that has no file is told apart from a failure. |
+| `space` | The total size, and the free bytes in whole blocks of 4,096. |
+| `read_at` | A second file is read beside the one the player has open, and stays open from one call to the next while the calls go on where the last one ended. |
+
+The free space is not asked from the file system at every command: the file system walks
+its blocks for it, which takes 30 ms with a small show and 377 ms with 9 MB of files. The
+usermod asks once, before the core starts, and keeps the number of used blocks up from
+then on by the sizes of what it writes, replaces and removes: no block for a file of 512
+bytes or less, and for a longer file the blocks the file system needs for it, the
+pointers at the start of every block counted. `space` is answered from that number
+without a call to the file system. The number is taken again at every start.
+
+**Storage calls are paced.** A write to storage takes the file system up to a few hundred
+milliseconds, and the player waits for the same lock. So after storage calls that took a
+time d together, the board takes no command line for the longer of 20 ms and twice d,
+counted from the end of the last call: the port leaves what arrives in its queue, and a
+command over HTTP waits before it is handed to the core. Refreshes go on meanwhile. A
+sender needs no pause of its own: it sends the next line when it has the reply to the
+last one.
 
 **An invalid show** is the core's matter, as in the emulator: the LEDs stay dark, `status`
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
@@ -380,8 +551,11 @@ answered.
 
 **The port.** Every byte the board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
-nothing else. So the command tool of [emulator.md](emulator.md) works on the board as on
-the emulator:
+nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
+characters written in one piece arrives whole, also while the pacing holds lines back.
+Two such lines written together do not fit: a sender waits for the reply to a line before
+it sends the next. So the command tool of [emulator.md](emulator.md) works on the board
+as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
@@ -409,9 +583,11 @@ python -m odrigctl --http 4.3.2.1 status
 | A longer path, such as `/odrig/x` | Status 404. |
 | `POST /odrig` on a board whose core could not start | Status 503. |
 
-Of a body longer than 128 bytes the first 128 are passed on, which the core answers with
-`line-too-long`. What follows a `?` is ignored. WLED adds `Access-Control-Allow-Origin: *`
-to every response.
+Of a body longer than 4,096 bytes the first 4,096 are passed on, which the core answers
+with `line-too-long`. The body and the reply of a request are kept in memory of the
+request's own, which is given back with it, and not on the stack of the network task.
+What follows a `?` is ignored. WLED adds `Access-Control-Allow-Origin: *` to every
+response.
 
 **The content type of a request matters on the board.** WLED's web server takes a body
 apart as form fields, before any handler sees it, when the content type is
@@ -425,7 +601,9 @@ command, and `--data-binary` with the header above is exact for every body.
 **Wi-Fi is WLED's.** The usermod changes nothing of WLED's Wi-Fi behaviour or settings.
 With no network to join configured, WLED opens its access point about two seconds after
 start; the board's address on it is `4.3.2.1`. The name and the password of the access
-point are WLED's settings. The usermod keeps WLED's captive portal answering, which WLED
+point are WLED's settings; `set-wifi` and `install-firmware` put them there from the
+settings file, `firmware/wifi.json`, and [wifi.md](wifi.md) describes the network. The
+usermod keeps WLED's captive portal answering, which WLED
 itself does only outside its live mode. WLED's pages, its JSON interface and its updates
 through its own interface keep working; while WLED writes a new firmware, the usermod reads
 no file and sends nothing to the LEDs.
@@ -482,12 +660,27 @@ chip, and 55 mA for one LED at full white. It counts 1 mA for every LED at rest.
 estimate is above the maximum it dims the refresh; `status` still reports the core's
 brightness.
 
+The maximum is the limit of `firmware/limit.json`, which `set-limit` and
+`install-firmware` put into WLED's stored settings; `read-limit` prints what a board
+holds. The firmware itself never sets it. A limit of 0 switches the limiter off: WLED
+then estimates nothing and dims nothing.
+
+| Limit | The bench: one strip fed from the board's 3.3 V pin | The installation: the LEDs fed from the supply |
+|---|---|---|
+| 850 mA, the tracked value | The limiter is what keeps a `brightness 255` on a white picture from asking the pin for more than it gives. | Every LED is held at its lowest level: 3,600 LEDs count as 3,600 mA at rest. Nothing can be shown. |
+| What the supply gives | Not for the bench. | The limiter dims a picture that would ask the supply for more. |
+| 0, the limiter off | Not for the bench: nothing protects the pin then. | Nothing is dimmed. No LED current passes through the board, so the board is not at risk; what the supply and the wiring bear is not the tool's to judge. |
+
+The limit stays 850 for as long as a strip is fed from the board. Which value the
+installation gets is the owner's to say: it is about power. The tool takes every whole
+number from 0 to 65,535.
+
 > With the twenty legs of the target, 3,600 LEDs, the estimate at rest alone is 3,600 mA.
 > With WLED's maximum of 850 mA the limiter then holds every LED at its lowest level,
 > whatever plays: as WLED's source has it, every channel of a colour that is lit is then
 > sent as 1 of 255. The same holds for every mapping of 730 LEDs or more. Before twenty
-> legs are lit, the maximum current must be raised to what the power supply gives, in
-> WLED's LED settings, "Maximum PSU Current". The firmware does not change it. With two
+> legs are lit, the limit must be raised to what the power supply gives, or switched off:
+> edit `firmware/limit.json` and run `set-limit`. With two
 > legs, 360 LEDs, the limiter also dims a bright picture such as Hello world, at any
 > brightness at which the estimate passes 730 mA.
 
@@ -540,7 +733,9 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 {"probe":1,"start_ms":95,"heap":135736,"realtime":1,"loops":235,"sent":50,"gap_ms":20,
  "poll_us":578,"send_us":16525,"poll_total_us":28021,"send_total_us":816291,
  "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
- "ap":1,"error":null,
+ "space_us":29110,
+ "store":{"calls":0,"longest_us":0,"total_us":0,"check_steps":0,"check_longest_us":0,"check_total_us":0},
+ "ap":1,"ap_name":"odrig","ap_auth":3,"error":null,
  "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"7b7d9750","pulses":4320}]}
 ```
 
@@ -553,10 +748,14 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. A send is the copy into the outputs and WLED's show together; the wait for the outputs between the two is not in it. |
 | `poll_total_us`, `send_total_us` | The time all requests for a refresh and all sends took, in the last full second. |
 | `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. Some outputs are read back after each send and again before the next, each in its turn: as many as have 200 LEDs together, and one at least. |
-| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
-| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
+| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. With the limiter off it stays 0. |
+| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. Both are 0 while the limiter is off, which is a maximum of 0. |
 | `wire_us` | The shortest and the longest time, since the last `#probe`, from the end of a send until the parallel driver had finished its transfer and could take data again, in microseconds; `null` when no output is on the parallel driver or none was sent. A timer looks at the driver every tenth of a millisecond. An output of 180 LEDs is 570 bytes on the wire with its reset, 5.7 ms. |
+| `space_us` | The time the file system took to tell its size and its used bytes, when the usermod asked before the core started, in microseconds. |
+| `store` | The storage calls since the last `#probe`, reads aside: their number in `calls`, the longest in `longest_us` and their sum in `total_us`, in microseconds. And the requests for a refresh in which the core read a second file, which is how it checks an uploaded file: their number in `check_steps`, the longest in `check_longest_us` and their sum in `check_total_us`. |
 | `ap` | 1 while WLED's access point is up, else 0. |
+| `ap_name` | The name in the configuration the radio holds for its access point: the first `ssid_len` bytes of `ssid`, or up to the first zero byte when `ssid_len` is 0. `null` while `ap` is 0. A byte outside printable ASCII, a quotation mark and a backslash are written as `\u00XX`. |
+| `ap_auth` | The protection in that configuration, as the chip numbers it: 0 open, 3 WPA2 with a password. `null` while `ap` is 0. |
 | `error` | The reason the show is invalid, as `status` reports it, or `null`. |
 | `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt`, `parallel` or `none`, and the two members below. |
 | `crc` | Of an output: the CRC-32 of the colours it held when it was last read back after a send, as WLED gives them back: red, green and blue for each LED. With twenty outputs of 180 LEDs every output is read back once in twenty sends, 0.4 seconds; an output that was not read back yet is read for the report. |
@@ -564,16 +763,38 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 
 A `#probe` that arrives between the copy of a refresh into the outputs and its show is
 answered right after the show, so that a report never describes colours that were not
-sent. The report of twenty outputs is a line of 2,300 characters; the port writes it in the
+sent. The report of twenty outputs is a line of 2,400 characters; the port writes it in the
 pieces it takes without waiting and reads no command until it is written.
 
 While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
 dims, the output gives back the dimmed colours as WLED restores them, which at the
 limiter's lowest level is 128 for a channel that stayed lit and 0 for one that did not.
 
+The probe build has a second line, `#store <bytes>`, the store trial: it tries the
+storage functions as the core would use them, without the core. It writes a small file
+`probe.odrg` into `/odrig`, writes `<bytes>` bytes into `probe.part` in pieces of 1,500,
+renames that onto `probe.odrg`, reads the file back through `read_at` in pieces of 512,
+and removes it; a step in each pass of the loop that the pacing allows, with the lock
+held. Then it answers with one line:
+
+```json
+{"store":1,"bytes":1000000,"ok":true,"failed":null,"written":1000000,"read":1000000,
+ "writes":667,"write_us":[131,31421,151866],"write_ms":71502,"bytes_per_second":13985,
+ "seed_us":109863,"open_us":13945,"close_us":13914,"rename_us":43065,
+ "reads":1955,"read_us":[10,226,13126],"remove_us":37723}
+```
+
+`ok` is true when every step succeeded and the bytes read back are the bytes written, so
+when the rename replaced the small file. `failed` names the step that did not: `seed`,
+`open`, `write`, `close`, `rename`, `read`, `read-back` or `delete`. `write_us` and
+`read_us` are the shortest, the mean and the longest time of one call, `write_ms` the
+time from the first write to the last with the pacing's waits in it, and
+`bytes_per_second` the bytes written over that time. The show plays on during the trial.
+
 The port holds bytes at the start of a line back for as long as they are a beginning of
-`#probe` and a newline. The complete line is answered by the usermod and does not reach the
-core; every other byte is passed on to the core, unchanged and in order.
+`#probe` and a newline, or of `#store`, a number and a newline. The complete line is
+answered by the usermod and does not reach the core; every other byte is passed on to the
+core, unchanged and in order.
 
 The probe build plays as the firmware does. Reading the outputs back takes time, so its
 own rate can be a refresh or two below the firmware's.
@@ -590,11 +811,11 @@ WLED's maximum current was 850 mA, so on the target file the limiter dimmed ever
 
 | Show | Working outputs | Files | `install-show` | Start of the core | Passes of the loop a second | Refreshes a second | `fps` in `status` | Longest gap | Request for a refresh, mean | longest | Send, mean | longest | Free internal memory |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 171 ms | 2,293 to 2,365 | 50 | 50 | 43 ms | 0.98 ms | 23.3 ms | 1.03 ms | 1.22 ms | 202,760 bytes |
-| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 174 ms | 367 to 420 | 50 | 50 | 42 ms | 1.79 ms | 23.7 ms | 15.7 ms | 16.1 ms | 126,520 bytes |
-| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,011 ms | 507 to 851 | 28 to 37 | 33 | 42 ms | 25.9 ms | 48.1 ms | 20.0 ms | 31.8 ms | 126,624 bytes |
-| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 59 s | 4,183 ms | 140 to 152 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.6 ms | 19.8 ms | 33.1 ms | 126,592 bytes |
-| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 165 s | 38,747 ms | 555 to 982 | 25 to 35 | 32 | 60 ms | 26.6 ms | 68.5 ms | 20.0 ms | 33.3 ms | 126,212 bytes |
+| Example show, two legs, 360 LEDs | 2 of 2 | 3,096 bytes | 36 s | 213 ms | 2,082 to 2,131 | 50 | 50 | 44 ms | 0.97 ms | 24.3 ms | 1.03 ms | 1.24 ms | 150,972 bytes |
+| Demo show, the target file, 3,600 LEDs | 20 of 20 | 3,968 bytes | 37 s | 215 ms | 325 to 369 | 50 | 50 | 43 ms | 1.83 ms | 24.0 ms | 15.6 ms | 16.1 ms | 65,020 bytes |
+| Dense 60 x 60 clip of 10 s, compressed, the target file | 20 of 20 | 1,385,398 bytes | 59 s | 6,107 ms | 504 to 748 | 29 to 36 | 34 | 42 ms | 25.7 ms | 47.9 ms | 20.0 ms | 31.7 ms | 65,004 bytes |
+| The same clip, uncompressed | 20 of 20 | 1,463,868 bytes | 58 s | 4,278 ms | 130 to 154 | 44 or 45 | 45 | 36 ms | 12.9 ms | 33.9 ms | 19.7 ms | 33.5 ms | 65,032 bytes |
+| 9 MB of dense 60 x 60 clips: six of 10 s and one of 5 s, compressed | 20 of 20 | 9,009,652 bytes | 180 s | 39,172 ms | 525 to 803 | 28 to 35 | 31 | 42 ms | 26.0 ms | 50.8 ms | 20.0 ms | 32.6 ms | 64,988 bytes |
 
 The files of a row are the whole show folder. The mean request is the time the core worked
 in a second over the refreshes sent in it; at a rate below 50 one request decodes every
@@ -606,19 +827,19 @@ What the figures say:
   to 18, 21 and 47.
 - **Every rate is inside the 20 to 50 a second the owner accepts.** A show that is not
   dense plays at 50 on twenty legs as on two. The dense clip, in which every LED changes
-  at every frame, plays at 44 or 45 uncompressed and at 28 to 37 compressed in the probe
+  at every frame, plays at 44 or 45 uncompressed and at 29 to 36 compressed in the probe
   build; the firmware itself reports 45 to 47 and 36 to 42, see
   [Verified on the board](#verified-on-the-board). A dense file plays faster uncompressed.
-- **A send to twenty outputs** takes 15.7 ms with the limiter's dimming of every LED in
+- **A send to twenty outputs** takes 15.6 ms with the limiter's dimming of every LED in
   it, and 20 ms while the core decodes a dense clip on the chip's other processor core.
   The LEDs need 5.7 ms on the wire after that.
 - **The long requests** are those in which the core opens a file, at the start of every
-  loop of an animation and at every turn of a cycle: 23 ms for a small file, and up to
-  69 ms with dense clips, when the frames that came due meanwhile are decoded in the same
+  loop of an animation and at every turn of a cycle: 24 ms for a small file, and up to
+  51 ms with dense clips, when the frames that came due meanwhile are decoded in the same
   request.
 - **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 174 ms for the demo show, 6.0 s for one dense 60 x 60 clip of 10 seconds
-  compressed and 4.2 s uncompressed, and 39 s for a storage filled with 9 MB of such
+  by decoding it: 215 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
+  compressed and 4.3 s uncompressed, and 39 s for a storage filled with 9 MB of such
   clips. For that time the LEDs are dark and the board answers nothing, on the port or on
   the network; WLED opens its access point only afterwards. `install-show` and `flash`
   wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
@@ -626,11 +847,49 @@ What the figures say:
 - **`install-show`** takes 36 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. One dense
   clip takes a minute and 9 MB take three.
-- **Memory.** 126,000 bytes of the chip's internal memory are free with twenty outputs of
-  180 LEDs and the core, 203,000 with two.
+- **Memory.** 65,000 bytes of the chip's internal memory are free with twenty outputs of
+  180 LEDs and the core, 151,000 with two. Before the content commands these were 126,000
+  and 203,000: the core now takes at its start what the check of an uploaded file needs,
+  a second window of 32,768 bytes and a second picture of the canvas, and tables with
+  room for 128 items. It takes them from the internal memory first and from the external
+  memory only when the internal memory has none. WLED's pages and its interface over
+  Wi-Fi have not been tried with the memory that is left.
+
+**An upload over USB.** Taken by `tests/board/test_upload.py` on 2026-10-12 with the probe
+build, with the example show at brightness 32 playing on the bench file; the test writes
+the figures to `build/firmware/out/upload.json`. The file was the dense bench clip of 60
+seconds: 60 x 6, 3,000 frames, 868,712 bytes. The command tool's upload sent it through
+the port and asked for `status` once a second through the same session.
+
+- **The speed** was 12,674 bytes a second: 69 seconds for the file. It is the speed of
+  storage with its pacing, not of the port.
+- **While the data arrived** `status` reported 36 to 44 refreshes a second.
+- **The check** took 60.2 seconds: one frame of the file for each refresh, so as long as
+  the animation lasts. `status` reported 47 to 50 meanwhile. The core read the file back
+  in 1,698 of its requests for a refresh, and the longest of those requests took 27 ms.
+- **After `upload end`** `status` reported 50 in each of the ten seconds but the first,
+  which had 41: it is the second in which the file is put in place, with its storage
+  calls in a row. The longest time between two sends was 216 ms, there.
+- **The storage calls** of the whole upload were 591, 18.4 seconds together, and the
+  longest took 156 ms.
+- **The space.** `space` reported 872,448 bytes fewer free with the file in place, 213
+  blocks for 868,712 bytes, and the 10,211,328 of before once the item was removed.
+- **A small file**, Hello world for the bench file, 1,138 bytes and 255 frames, was
+  uploaded, checked and in place 6.1 seconds after the tool was started, with the
+  firmware; 5.1 of them are the check.
+- **While a dense clip plays** an upload costs more. Tried once, outside the suite, with
+  the firmware and the dense 60 x 60 clip playing compressed on the target file, at 40 to
+  42 refreshes a second before the upload: a file of 285,360 bytes arrived at 4,714 bytes
+  a second, and `status` reported 16 to 27 meanwhile, below 20 in 13 of the 60
+  seconds. Its check of 100 frames took 17 seconds, at 25 to 29 refreshes a second: a
+  step of the check follows only a refresh that came in step, about six a second there.
+  In the second in which a file was put in place, `status` reported 6 or 7. Hello world
+  for that canvas, 1,210 bytes, took 11 seconds in all. Every upload succeeded.
 
 Not measured, because the hardware is not wired: light on any leg but the one strip on
-pin 1, and the current the LEDs really draw.
+pin 1, and the current the LEDs really draw. Not measured either: an upload over Wi-Fi,
+which needs a person to join the board's network; see step 7 of [The owner's
+checks](#the-owners-checks).
 
 **What the firmware of seed 04 measured, kept as a record.** These figures were taken on
 2026-10-11, before the target became twenty upright legs: on the bench file, and on a
@@ -659,9 +918,9 @@ touches these regions only:
 |---|---|---|---|
 | Bootloader | `0x0` | up to `0x8000` | `restore-stock --full` only |
 | Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
-| Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash` and `restore-stock` |
-| First application (`app0`) | `0x10000` | `0x300000` | `flash`, `restore-stock` |
-| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, changed blocks only |
+| Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash`, `install-firmware` and `restore-stock` |
+| First application (`app0`) | `0x10000` | `0x300000` | `flash`, `install-firmware`, `restore-stock` |
+| Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
 partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
@@ -681,14 +940,18 @@ written back by hand with esptool, at address `0x0`, after its checksum has been
 ## The owner's checks
 
 What a program on this Mac cannot establish: what the LEDs show, and what a device joined to
-the board's Wi-Fi network gets. Each step says what to do and what must be seen. The number
+the board's Wi-Fi network, `odrig`, gets. Its password is in `firmware/wifi.json`, and
+[wifi.md](wifi.md) has the check of the network itself. Each step says what to do and what
+must be seen. The number
 in brackets is the criterion the step covers: in steps 1 to 4 a criterion of Requirement 16
-of `docs/specs/04-p1-firmware-build-with-the-player/requirements.md`, and in steps 5 and 6,
+of `docs/specs/04-p1-firmware-build-with-the-player/requirements.md`, in steps 5 and 6,
 marked `seed 05`, criterion 3 of Requirement 18 of
-`docs/specs/05-p0-canvas-60-by-60/requirements.md`.
+`docs/specs/05-p0-canvas-60-by-60/requirements.md`, and in step 7, marked `seed 07`,
+criterion 5 of Requirement 21 of `docs/specs/07-p1-content-commands/requirements.md`.
 
-Seed 04 is completed when steps 1 to 4 are done. Steps 5 and 6 stay listed as open and do
-not hold seed 05 open; criterion 4 of that Requirement 18 says so. Nothing a
+Seed 04 is completed when steps 1 to 4 are done, and seed 07 when step 7 is done. Steps 5
+and 6 stay listed as open and do not hold seed 05 open; criterion 4 of that Requirement 18
+says so. Nothing a
 program can establish holds seed 05 open either: the board tests pass with the target
 file, and the rate does not hold it open: the board plays a dense 60 x 60 clip at 36 to 47
 refreshes a second, and the owner accepts any rate from 20 to 50. See
@@ -752,7 +1015,7 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    mkdir -p build/lane/sources
    python -m odrig.generators.hello_world build/lane/sources/hello.json --mapping build/lane/mapping.json
    printf '{"version": 1, "brightness": 32, "items": [{"id": 1, "file": "hello.odrg"}], "start": 1}\n' > build/lane/show.json
-   python -m odrig pack --show build/lane/show.json --mapping build/lane/mapping.json \
+   node converter/odrig.js pack --show build/lane/show.json --mapping build/lane/mapping.json \
        --sources build/lane/sources --out build/lane/show
    python3 firmware/fw.py install-show build/lane/show
    ```
@@ -784,6 +1047,28 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    `"error":null`, and WLED's Info page shows `odrig outputs` with `20/20`. The `fps` of
    that reply is worth writing down: the rate of the demo show on the board has not been
    measured.
+7. **An animation uploaded over the board's network (seed 07, 21.5).** With the example
+   show installed as in step 1 and playing, make Hello world for the bench file under a
+   name no item of the show has, join the board's network with a computer, and send it:
+
+   ```
+   node converter/odrig.js encode animations/hello.json build/hello-bench.odrg
+   python -m odrigctl --http 4.3.2.1 upload 9 build/hello-bench.odrg
+   python -m odrigctl --http 4.3.2.1 list
+   python -m odrigctl --http 4.3.2.1 play 9
+   python -m odrigctl --http 4.3.2.1 remove 9
+   python -m odrigctl --http 4.3.2.1 play 3
+   ```
+
+   *Seen:* `upload` writes a line with the percentage and the speed, then
+   `upload: checking`, and after about five seconds `{"ok":true}`, while the show plays
+   on; `list` shows `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item;
+   after `play 9` the words HELLO WORLD stay and the bouncing square no longer takes its
+   turn; `remove 9` answers `{"ok":true}` and the LEDs go dark; `play 3` brings the two
+   back, taking turns. The speed is worth writing down: no program has measured an
+   upload over Wi-Fi. With this Mac joined and the board on USB,
+   `python3 firmware/fw.py test-air --http 4.3.2.1` of step 3 runs the same session by
+   itself and writes the speed to `build/firmware/out/upload-air.json`.
 
 Before twenty legs are lit, raise WLED's maximum current as [What the firmware
 does](#what-the-firmware-does) says.
@@ -796,8 +1081,11 @@ the tests of `test-air` that send commands pass against the emulator. For steps 
 with twenty legs in the mapping the firmware makes twenty working outputs, each of the
 twenty pins carries 24 pulses for every LED of a refresh, and the parallel driver is busy
 after a send for the time its LEDs take on the wire. That the pulses have the right widths,
-and that an LED on a lane of the parallel driver lights, no program can see. The six steps
-above have not been done.
+and that an LED on a lane of the parallel driver lights, no program can see. For step 7:
+over USB the command tool uploads Hello world to the board, `list` shows it, `play` plays
+it, it is there after a restart, and `remove` removes it, with the replies the emulator
+gives; and the session of `test-air` passes with the emulator in the place of the board's
+network. The seven steps above have not been done.
 
 ## Verified on the board
 
@@ -807,7 +1095,11 @@ letters are those of the design's table "Assumed, to be verified by an early tas
 The first part, down to "Twenty outputs", is the record of seed 04. It was tried with the
 firmware of that seed, before the target became twenty upright legs: on the bench file,
 and on mappings of ten row legs on pins 1 to 10, with a dense 60 x 30 clip. From "Twenty
-outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60.
+outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60. The
+part "Files written while the show plays" is what seed 07 tried for the commands that
+change the content. "The network's name and password" is what seed 08 tried, "The limit
+on LED current" what seed 15 tried, and the last part, "A program without WLED", what
+seed 12 tried first.
 
 | # | Assumption | What was found |
 |---|---|---|
@@ -1085,3 +1377,86 @@ folder of the application that ran the commands. No `~/.platformio` and no `~/.b
 appeared, and `~/.npm` and `~/Library/Caches/pip` kept their times. The same lists from
 before and after the first build differed in that entry and in
 `~/Library/Preferences/com.apple.xpc.activity2.plist`, a file of macOS.
+
+**Files written while the show plays.** What the design of the content commands assumed,
+tried on 2026-10-12 with the probe build by `tests/board/test_upload.py`, with the store
+trial of [The probe build](#the-probe-build). The show was the dim example show on the
+bench file, two outputs of 180 LEDs. The letters are those of that design's table
+"Assumed, to be verified on the board". The test writes the trial's figures to
+`build/firmware/out/store.json`.
+
+| # | Assumption | What was found |
+|---|---|---|
+| B1 | A rename onto a name that has a file replaces it, when neither file is open. | It does: after the rename of a file of a megabyte onto a file of 16 bytes, the name gave the megabyte back, byte for byte. The rename took 43 ms. |
+| B2 | A file can be written, renamed and read with a second handle while the player has another file open and reads it. | It can. The show played through the whole trial, `overwritten` stayed 0, and `read-show` afterwards gave the installed files back unchanged. A read of 512 bytes through the second handle took 0.23 ms in the mean and 13 ms at the longest. |
+| B3 | A write of 1,500 bytes takes a few milliseconds, and one in three some tens. With the pacing, `status` reports 25 or more with the bench show playing. | The writes are slower than assumed: 0.13 ms at the shortest, 31 ms in the mean and 152 ms at the longest; about one in three takes 87 ms, when the file system erases a block. With the pacing the board sent 34 to 46 refreshes in every second of the megabyte's 72 seconds, and 50 in each of the ten seconds after it; the longest time between two sends in a second was 90 to 161 ms. With the pacing taken out, the same trial ran at 44,148 bytes a second and the board sent 10 or 11 refreshes a second. The owner accepts 20 to 50, so the pacing stays as designed, and the writes need no task of their own. |
+| B4 | A line of 2,048 characters written to the port in one piece arrives whole with a queue of 4,096 bytes. | It does, twenty times out of twenty, and a line of 2,049 characters was answered with `line-too-long` twenty times. Two lines of 2,048 characters in one write, 4,098 bytes, do not fit the queue: the end of the second is lost. The command tool sends a line after the reply to the one before, so it never does that. |
+| B5 | `usedBytes` takes under 100 ms with storage nearly full. | It does not: 30 ms with the example show, 79 ms with one dense clip of 1.4 MB, and 377 ms with 9 MB of clips. So the usermod asks once, before the core starts, and keeps the number up itself, as [What the firmware does](#what-the-firmware-does) describes under "Storage"; `space` then makes no call to the file system. After a megabyte was written, renamed and removed, the number kept and the number the file system told after a restart were within 16,384 bytes of each other, which is what the test allows. |
+| B6 | An upload over USB carries 10,000 bytes a second or more. | It does: the command tool's upload of a file of 868,712 bytes ran at 12,674 bytes a second, see [Measurements on the board](#measurements-on-the-board). The storage side alone carries 13,985 bytes a second with the pacing: a megabyte in 72 seconds. |
+
+The other calls of the trial: opening a file for writing 14 ms, closing it 14 ms, removing
+the megabyte 38 ms, and writing the small file of 16 bytes, its open and its close with
+it, 36 ms in one run and 110 ms in another. With the example show 10,211,328 of the
+10,354,688 bytes of storage are free.
+
+A storage call stops the player for as long as it takes, because both wait for the same
+lock, and the player then decodes every frame that came due meanwhile in one request.
+With the example show nothing of that is seen. With a dense 60 x 60 clip playing it is:
+[Measurements on the board](#measurements-on-the-board) has what an upload does to the
+rate there. While `space` still asked the file system at every call, one call of 376 ms
+with the 9 MB show made `fps` in `status` fall to 3 for that second.
+
+**The network's name and password.** What the design of seed 08 assumed, in its table
+"Assumed, to be verified by an early task", and what was found with the probe build on
+the board. The letters are those of that table.
+
+| # | Assumption | What was found |
+|---|---|---|
+| A1 | `esp_wifi_get_config(WIFI_IF_AP, ...)` compiles in the usermod with `wled.h` alone, can be called from the loop task, and gives the name and the protection of the access point WLED opened. Before any setting is applied it gives `WLED-AP` and 3. | It does. The probe build was built with no other header, and the call is made from the loop task for every report. After a restart the reports had `ap` 0 with `ap_name` and `ap_auth` `null`, and from the first report with `ap` 1 on, `ap_name` `WLED-AP` and `ap_auth` 3. The firmware is not changed by the two members: built before and after in the same work folder, its image has the same SHA-256. |
+| A2 | WLED on the board reads the `/cfg.json` to which the tool added `ap` and the `/wsec.json` the tool created, opens the access point under that name with that password, and is otherwise as before. | It does. After `set-wifi` with settings made for the test the probe build reported `ap` 1, `ap_name` the test's name and `ap_auth` 3, and after `set-wifi` with the settings file `ap_name` `odrig` and `ap_auth` 3. `status` reported the same show playing as before, with no error. That the password is the one of the file is established from storage, read back; that a device joins with it is the owner's check. |
+| A3 | WLED does not write its settings files at a start because of the edit: storage read back after the restart is the image the tool wrote. | It does not. After the restart, with the access point up, the chip confirmed the checksum of the image the tool kept, and the image read back was that image, byte for byte. |
+| A4 | A file littlefs-python wrote into the top folder of the file system is read by WLED, a new `/wsec.json` among them. | It is: the access point is protected with the password that only `/wsec.json` holds, by A2 and by how WLED reads its settings. |
+
+`set-wifi` took 36.5 seconds, the wait for the board's reply in it. Between storage
+before the first run and after the second, every file other than `/cfg.json` and
+`/wsec.json` kept its bytes, and `/cfg.json` differed in `ap` only.
+
+`install-firmware`, on a board whose storage held another name and password, took 50.2
+seconds. Afterwards the firmware answered `status` with the show playing, and storage
+read back held the name and the password of the settings file and the same show.
+
+**The limit on LED current.** What the design of seed 15 assumed and the probe build then
+showed on the board, with Hello world for the target file at brightness 40.
+
+| Assumption | What was found |
+|---|---|
+| WLED takes `hw.led.maxpwr` of the `/cfg.json` the tool edited at its start. | It does. After `set-limit` with a limit of 850 the report had `limit_ma` 730 and `used_ma` 3,600, and after `set-limit` with 0 both were 0. |
+| With a limit of 0 nothing is dimmed. | Nothing was: over five seconds every report had `limited` 0, and 50 sends in the second. With 850 every send was dimmed: `limited` 49 to 51 from one report to the next, a second apart. |
+| The probe build's count is right with the limiter off. | It was not: it counted every send as dimmed, 49 to 67 in a report, because it compared an estimate of 0 with a limit of 0. It now counts only while WLED's maximum is above 0. The firmware has none of that code: built before and after, its image has the same SHA-256. |
+
+`set-limit` took 36 seconds. Storage read back held 0 and then 850, and between the two
+only `hw.led.maxpwr` of `/cfg.json` differed. `read-limit` printed `limit: off` and then
+`limit: 850 mA`.
+
+**A program without WLED.** What the design of the standalone firmware assumed, in its
+table "Assumed, to be verified by task 1", and what a trial program found on the board.
+The trial is `firmware/standalone/src/main.cpp` as that task left it: it mounts the
+storage, makes twenty outputs of 180 LEDs on the pins of the target file, sends a dim
+point of light along each 50 times a second, counts the pulses on one pin at each send,
+and answers `#probe`. The letters are those of that table.
+
+| # | Assumption | What was found |
+|---|---|---|
+| S1 | PlatformIO in the work folder builds a project that lies outside WLED's folder, with WLED's platform and libraries. | It does, in 12 seconds for the first build: the platform was there, and the libraries were taken into the project's own folder. The image has 175,104 bytes. |
+| S2 | Without WLED, sixteen outputs of the LED library's sixteen-lane parallel method and four of its RMT method work side by side, 180 LEDs each. | They do. Every one of the twenty pins carried 4,320 pulses in a send, which is 24 for each of 180 LEDs, and the program made 50 sends in every second of six, the longest taking 7.8 ms. The RMT method is the library's own, not the one WLED adds to it. |
+| S3 | `LittleFS.begin(false)` mounts the file system WLED made, and the files of `/odrig` are read. | It does: the mount succeeded, and `/odrig` held `dvd.odrg` with 1,612 bytes, `hello.odrg` with 1,138, `mapping.json` with 184 and `show.json` with 162, the installed example show. Nothing was formatted or written. |
+| S4 | A source file of the usermod is compiled into the standalone program through a file of one line that includes it. | It is. The three sources that both firmwares share, the files, the port and the HTTP transport, reach their platform through `odrig_platform.h`, of which each firmware has its own, and the trial was built with them: 238,064 bytes, and on the board it sent as before, 4,320 pulses on every pin and 50 sends a second. The WLED-based firmware is the same code after the change: its image differs from the one before in 65 bytes of 1,221,568, the hash of the build's own program file at `0xB0` and the checksum and hash at its end, because that file names the new header. |
+| S5 | The parallel driver's buffer for sixteen lanes of 180 LEDs fits the memory it can use. | It does: with the twenty outputs made, 343,904 bytes of internal memory were free, and 8,386,091 of the external. |
+| S6 | The pulse counter counts the rising edges on a pin that an output drives. | It does, on RMT pins and on pins of the parallel driver alike. |
+
+The WLED-based firmware gives legs 1 to 4 to RMT and legs 5 to 20 to the parallel driver:
+its probe build reports `rmt` for the first four outputs of the target file and `parallel`
+for the other sixteen. The trial did the same.
+
+Afterwards the WLED-based firmware was flashed again, and the board answered `status`
+with the example show playing: the switch there and back left the show in storage.

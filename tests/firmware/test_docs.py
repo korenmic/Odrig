@@ -4,7 +4,7 @@ import shlex
 import unittest
 
 from fwtool import cli, flasher
-from odrig import mapping
+from odrig import jsonframes, mapping, odrg
 from odrig.generators import hello_world
 
 from . import ROOT
@@ -15,7 +15,10 @@ TEST_COMMANDS = {
     "test-board": "tests/board/",
     "test-air": "tests/air/",
 }
-OWNERS_CHECKS = 6
+OWNERS_CHECKS = 7
+# How a step of the owner's checks is headed: its number, what it is, and the criterion it
+# covers, marked with the seed when it is not a criterion of seed 04.
+STEP = r"(?m)^(\d+)\. \*\*(.+?) \((seed 0[57], )?(\d+\.\d+)\)\.\*\*"
 # The pins of the target file, and how many of the legs of a mapping file get an RMT output.
 TARGET_PINS = [*range(1, 19), 21, 47]
 RMT_OUTPUTS = 4
@@ -44,7 +47,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_names_every_command_of_the_tool_with_a_section_and_an_example(self):
         commands = self.commands()
-        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "read-show", "test", "test-board", "test-air"})
+        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "set-wifi", "set-limit", "read-limit", "install-firmware", "read-show", "test", "test-board", "test-air"})
         for name in commands:
             self.assertRegex(self.text, rf"(?m)^### {re.escape(name)}$", name)
             self.assertRegex(self.text, rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b", name)
@@ -55,6 +58,59 @@ class Firmware(unittest.TestCase):
                 for option in action.option_strings:
                     if option.startswith("--") and option != "--help":
                         self.assertRegex(section(self.text, "Commands"), rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b.*{re.escape(option)}\b", f"{name} {option}")
+
+    def test_it_says_what_set_wifi_does_and_names_its_reasons(self):
+        commands = section(self.text, "Commands")
+        for reason in ("wifi-settings-missing", "wifi-settings-malformed", "wifi-name-invalid", "wifi-password-invalid", "wled-settings-malformed"):
+            self.assertRegex(commands, rf"(?m)^\| `{reason}` \| ", reason)
+        told = " ".join(commands.split("\n### set-wifi\n")[1].split("\n### ")[0].split())
+        for expected in ("`name: <name>`", "`password: set`", "`firmware/wifi.json`", "`--settings FILE`", "`--wait SECONDS`", "1 to 32 characters", "8 to 63",
+                         "printable ASCII", "`/cfg.json`", "`/wsec.json`", "`ap.ssid`", "`ap.pskl`", "`ap.psk`", "The password is never printed",
+                         "no option and no variable carries either", "`no-reply`", "[wifi.md](wifi.md)"):
+            self.assertIn(expected, told)
+        regions = section(self.text, "The regions of the flash")
+        self.assertRegex(regions, r"(?m)^\| Storage \(`spiffs`\) \| .* \| `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only \|$")
+        self.assertRegex(regions, r"(?m)^\| First application \(`app0`\) \| .* \| `flash`, `install-firmware`, `restore-stock` \|$")
+        self.assertRegex(regions, r"(?m)^\| Boot selection \(`otadata`\) \| .* \| erased by `flash`, `install-firmware` and `restore-stock` \|$")
+
+    def test_it_says_what_install_firmware_does_and_where_it_takes_the_place_of_flash(self):
+        commands = section(self.text, "Commands")
+        told = " ".join(commands.split("\n### install-firmware\n")[1].split("\n### ")[0].split())
+        for expected in ("a board from scratch", "as `flash` does", "what `set-wifi` and `set-limit` do, in one write", "`name: <name>`", "`password: set`",
+                         "the line of the limit", "`--settings FILE`", "`--limit FILE`", "`--wait SECONDS`",
+                         "the board has not been touched", "`build/firmware/out/odrig-firmware.bin`", "after each of its two restarts",
+                         "`flash` and `restore-stock` do not apply the settings"):
+            self.assertIn(expected, told)
+        flash = " ".join(commands.split("\n### flash\n")[1].split("\n### ")[0].split())
+        self.assertIn("`flash` leaves the name and the password of the board's network as storage has them", flash)
+        scratch = section(self.text, "From nothing to a playing board")
+        self.assertRegex(scratch, r"(?m)^python3 firmware/fw\.py build\npython3 firmware/fw\.py install-firmware\n")
+        self.assertNotRegex(scratch, r"(?m)^python3 firmware/fw\.py flash\b")
+
+    def test_it_says_what_set_limit_and_read_limit_do_and_names_their_reasons(self):
+        commands = section(self.text, "Commands")
+        for reason in ("limit-settings-missing", "limit-settings-malformed", "limit-invalid"):
+            self.assertRegex(commands, rf"(?m)^\| `{reason}` \| ", reason)
+        told = " ".join(commands.split("\n### set-limit\n")[1].split("\n### ")[0].split())
+        for expected in ("`limit: <N> mA`", "`limit: off`", "`firmware/limit.json`", "`milliamps`", "from 0 to 65,535", "0 switches the limiter off",
+                         "`--settings FILE`", "`--wait SECONDS`", "`hw.led.maxpwr`", "`/cfg.json`", "nothing is written"):
+            self.assertIn(expected, told)
+        told = " ".join(commands.split("\n### read-limit\n")[1].split("\n### ")[0].split())
+        for expected in ("`limit: <N> mA`", "`limit: off`", "`limit: not stored; WLED uses 850 mA`", "restarts the board", "It writes nothing"):
+            self.assertIn(expected, told)
+
+    def test_it_says_what_a_limit_means_for_the_bench_and_for_the_installation(self):
+        does = section(self.text, "What the firmware does")
+        told = " ".join(does.split())
+        for expected in ("The maximum is the limit of `firmware/limit.json`", "`set-limit`", "`read-limit`", "The firmware itself never sets it",
+                         "A limit of 0 switches the limiter off", "The limit stays 850 for as long as a strip is fed from the board",
+                         "is the owner's to say", "every whole number from 0 to 65,535"):
+            self.assertIn(expected, told)
+        rows = [row for row in does.splitlines() if row.startswith("| ") and "bench" not in row.split("|")[1] and row.count("|") == 4]
+        named = [row.split("|")[1].strip() for row in rows]
+        for limit in ("850 mA, the tracked value", "What the supply gives", "0, the limiter off"):
+            self.assertIn(limit, named)
+        self.assertRegex(does, r"(?m)^\| Limit \| The bench: .* \| The installation: .* \|$")
 
     def test_it_names_the_three_test_commands_and_their_folders(self):
         for name, folder in TEST_COMMANDS.items():
@@ -88,7 +144,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_lists_the_owners_checks_as_numbered_steps_with_what_must_be_seen(self):
         checks = section(self.text, "The owner's checks")
-        steps = re.findall(r"(?m)^(\d+)\. \*\*(.+?) \((seed 05, )?(\d+\.\d+)\)\.\*\*", checks)
+        steps = re.findall(STEP, checks)
         self.assertEqual([number for number, _, _, _ in steps], [str(number) for number in range(1, OWNERS_CHECKS + 1)])
         self.assertEqual(len(re.findall(r"(?m)^\d+\. \*\*", checks)), OWNERS_CHECKS)
         bodies = re.split(r"(?m)^\d+\. \*\*", checks)[1:]
@@ -98,8 +154,8 @@ class Firmware(unittest.TestCase):
 
     def test_the_owners_checks_of_the_target_are_a_strip_on_the_parallel_driver_and_twenty_wired_legs(self):
         checks = section(self.text, "The owner's checks")
-        steps = re.findall(r"(?m)^(\d+)\. \*\*(.+?) \((seed 05, )?(\d+\.\d+)\)\.\*\*", checks)
-        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked], [("5", "18.3"), ("6", "18.3")])
+        steps = re.findall(STEP, checks)
+        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked == "seed 05, "], [("5", "18.3"), ("6", "18.3")])
         self.assertEqual([criterion.split(".")[0] for _, _, marked, criterion in steps if not marked], ["16"] * 4)
         bodies = dict(zip((number for number, _, _, _ in steps), re.split(r"(?m)^\d+\. \*\*", checks)[1:]))
         self.assertIn("parallel driver", bodies["5"])
@@ -113,6 +169,35 @@ class Firmware(unittest.TestCase):
         opening = " ".join(checks.split("\n1. **")[0].split())
         self.assertIn("Steps 5 and 6 stay listed as open and do not hold seed 05 open", opening)
         self.assertIn("the owner accepts any rate from 20 to 50", opening)
+
+    def test_the_owners_check_of_the_content_commands_is_an_upload_over_the_boards_network(self):
+        from odrigctl import cli as command_tool
+
+        checks = section(self.text, "The owner's checks")
+        steps = re.findall(STEP, checks)
+        self.assertEqual([(number, criterion) for number, _, marked, criterion in steps if marked == "seed 07, "], [("7", "21.5")])
+        body = re.split(r"(?m)^\d+\. \*\*", checks)[7]
+        (block,) = [re.sub(r"(?m)^   ", "", found) for found in re.findall(r"(?s)```\n(.*?)```", body)]
+        lines = block.splitlines()
+        self.assertEqual(lines[0], "node converter/odrig.js encode animations/hello.json build/hello-bench.odrg")
+        made = command_tool.parser()
+        sent = [command_tool.checked(made, made.parse_args(shlex.split(line)[3:])) for line in lines[1:]]
+        self.assertEqual(sent, [["upload", "9", "build/hello-bench.odrg"], ["list"], ["play", "9"], ["remove", "9"], ["play", "3"]])
+        self.assertTrue(all(line.startswith("python -m odrigctl --http 4.3.2.1 ") for line in lines[1:]))
+        said = " ".join(body.split())
+        for expected in ("`upload: checking`", '`{"id":9,"file":"hello-bench.odrg","bytes":1138}`', "`build/firmware/out/upload-air.json`", "`python3 firmware/fw.py test-air --http 4.3.2.1`"):
+            self.assertIn(expected, said)
+        requirements = (ROOT / "docs" / "specs" / "07-p1-content-commands" / "requirements.md").read_text(encoding="utf-8")
+        asked = " ".join(requirements.split("\n## Requirement 21:")[1].split("\n5. ")[1].split("\n6. ")[0].split())
+        self.assertIn("an animation SHALL be uploaded over HTTP, listed, played and removed", asked)
+        opening = " ".join(checks.split("\n1. **")[0].split())
+        self.assertIn("seed 07 when step 7 is done", opening)
+        # The file of the step is the one the example show has as hello.odrg, under a name
+        # no item has.
+        self.assertEqual(len(odrg.encode(jsonframes.read(ROOT / "animations" / "hello.json"))), 1138)
+        show = json.loads((ROOT / "shows" / "example" / "show.json").read_text(encoding="utf-8"))
+        self.assertNotIn("hello-bench.odrg", [item.get("file") for item in show["items"]])
+        self.assertNotIn(9, [item["id"] for item in show["items"]])
 
     def test_the_mapping_of_the_fifth_check_puts_the_wired_strip_on_the_last_lane_and_the_strip_shows_what_the_check_says(self):
         body = re.split(r"(?m)^\d+\. \*\*", section(self.text, "The owner's checks"))[5]
@@ -140,10 +225,41 @@ class Firmware(unittest.TestCase):
         self.assertLessEqual(show["brightness"], 40)
         self.assertEqual(show["items"], [{"id": 1, "file": "hello.odrg"}])
         for line in ("python -m odrig.generators.hello_world build/lane/sources/hello.json --mapping build/lane/mapping.json",
-                     "python -m odrig pack --show build/lane/show.json --mapping build/lane/mapping.json --sources build/lane/sources --out build/lane/show",
+                     "node converter/odrig.js pack --show build/lane/show.json --mapping build/lane/mapping.json --sources build/lane/sources --out build/lane/show",
                      "python3 firmware/fw.py install-show build/lane/show"):
             self.assertIn(line, lines)
         self.assertIn("`build/lane/mapping.json`", body)
+
+    def test_the_probe_report_has_the_access_points_name_and_protection(self):
+        probe = " ".join(section(self.text, "The probe build").split())
+        self.assertRegex(probe, r'"ap":1,"ap_name":"[^"]+","ap_auth":3,"error":null')
+        for expected in ("| `ap_name` | The name in the configuration the radio holds for its access point", "| `ap_auth` | The protection in that configuration",
+                         "0 open, 3 WPA2 with a password", "`null` while `ap` is 0"):
+            self.assertIn(expected, probe)
+
+    def test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured(self):
+        does = " ".join(section(self.text, "What the firmware does").split())
+        for expected in ("**Storage.**", "Every path is `/odrig/<name>`", "The firmware writes, renames and deletes a file only there", "`upload.part`", "`show.part`", "`pending.txt`",
+                         "**Storage calls are paced.**", "the longer of 20 ms and twice d", "The port's queue for what arrives has 4,096 bytes",
+                         "Of a body longer than 4,096 bytes the first 4,096 are passed on"):
+            self.assertIn(expected, does)
+        for function in ("write_open", "write", "write_close", "rename", "remove", "space", "read_at"):
+            self.assertIn(f"| `{function}` | ", section(self.text, "What the firmware does"))
+        probe = " ".join(section(self.text, "The probe build").split())
+        for expected in ("`space_us`", "`store`", "`calls`", "`longest_us`", "`total_us`", "`check_steps`", "`check_longest_us`", "`check_total_us`", "`#store <bytes>`"):
+            self.assertIn(expected, probe)
+        measured = " ".join(section(self.text, "Measurements on the board").split())
+        self.assertIn("**An upload over USB.**", measured)
+        self.assertIn("`build/firmware/out/upload.json`", measured)
+        self.assertRegex(measured, r"\*\*The speed\*\* was [\d,]+ bytes a second")
+        self.assertRegex(measured, r"\*\*While the data arrived\*\* `status` reported \d+ to \d+ refreshes a second")
+        self.assertRegex(measured, r"\*\*After `upload end`\*\* `status` reported \d+")
+        self.assertRegex(measured, r"\*\*The storage calls\*\* .* the longest took \d+ ms")
+        rates = [int(rate) for rate in re.search(r"`status` reported (\d+) to (\d+) refreshes a second", measured).groups()]
+        self.assertTrue(all(20 <= rate <= 51 for rate in rates), rates)
+        verified = " ".join(section(self.text, "Verified on the board").split())
+        for letter in ("B1", "B2", "B3", "B4", "B5", "B6"):
+            self.assertIn(f"| {letter} | ", verified)
 
     def test_it_gives_the_measurements_made_on_the_board(self):
         measured = section(self.text, "Measurements on the board")

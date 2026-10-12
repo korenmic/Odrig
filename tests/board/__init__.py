@@ -27,8 +27,20 @@ class LeaveTheBoard(unittest.TestCase):
 
     def test_the_board_is_left_as_the_suite_leaves_it(self):
         from . import support
+        from fwtool import limit, wifi
         support.leave_the_board()
         self.assertEqual(support.running(), support.LEFT_ON_THE_BOARD)
+        image = support.storage_image()
+        self.assertTrue(wifi.holds(image, wifi.read()), "storage does not hold the name and the password of the settings file")
+        self.assertEqual(limit.stored(image), limit.read())
+        # The show is the bench show and nothing else: the three items of the example
+        # show, at a brightness the wired strip allows, playing from its start.
+        _, listed = support.command(PORT, "list")
+        self.assertEqual([(item["id"], item.get("file")) for item in listed["items"]], [(1, "hello.odrg"), (2, "dvd.odrg"), (3, None)])
+        _, status = support.command(PORT, "status")
+        self.assertEqual((status["playing"], status["error"]), (3, None))
+        self.assertLessEqual(status["brightness"], support.BRIGHTEST)
+        self.assertEqual(support.command(PORT, "space")[1]["animations"], 2)
 
 
 def load_tests(loader, standard_tests, pattern):

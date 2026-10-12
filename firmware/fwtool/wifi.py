@@ -1,0 +1,127 @@
+"""The network's name and password: a settings file read and checked, and WLED's two
+settings files edited in a storage image."""
+
+import copy
+
+from . import Failure, paths, settingsfile, wledfiles
+
+# WLED's stored settings: the name is in the first, the password in the second.
+CONFIG = wledfiles.CONFIG
+SECRETS = wledfiles.SECRETS
+ACCESS_POINT = "ap"
+
+MEMBERS = ("name", "password")
+NAME_CHARACTERS = (1, 32)
+PASSWORD_CHARACTERS = (8, 63)
+# Printable ASCII: with it a character is a byte, which is what the radio counts.
+PRINTABLE = (0x20, 0x7E)
+
+
+class Settings:
+    """A name and a password. Its text form does not show the password."""
+
+    def __init__(self, name, password):
+        self.name = name
+        self.password = password
+
+    def __eq__(self, other):
+        return isinstance(other, Settings) and (self.name, self.password) == (other.name, other.password)
+
+    def __hash__(self):
+        return hash((self.name, self.password))
+
+    def __repr__(self):
+        return f"Settings(name={self.name!r}, password=<hidden>)"
+
+
+def _checked(value, limits, reason, what, of):
+    """A value with a number of printable ASCII characters inside the limits."""
+    low, high = limits
+    if not low <= len(value) <= high:
+        raise Failure(reason, f"the {what} has {len(value)} characters; {of} has {low} to {high}")
+    if any(not PRINTABLE[0] <= ord(character) <= PRINTABLE[1] for character in value):
+        raise Failure(reason, f"the {what} has a character that is not printable ASCII")
+    return value
+
+
+def read(path=paths.WIFI_SETTINGS):
+    """The settings of a settings file, checked. No detail of a refusal quotes the file."""
+    value = settingsfile.value_of(path, "wifi-settings-missing", "wifi-settings-malformed")
+    if not isinstance(value, dict) or sorted(value) != sorted(MEMBERS) or not all(isinstance(value[member], str) for member in MEMBERS):
+        raise Failure("wifi-settings-malformed", f"{path} is not an object with exactly the strings name and password")
+    name = _checked(value["name"], NAME_CHARACTERS, "wifi-name-invalid", "name", "a network name")
+    password = _checked(value["password"], PASSWORD_CHARACTERS, "wifi-password-invalid", "password", "a Wi-Fi password")
+    return Settings(name, password)
+
+
+def _checked_object(files, path):
+    """The object of one of the two files, with an access point that is an object."""
+    value = wledfiles.object_of(files, path)
+    wledfiles.inner(value, path, ACCESS_POINT)
+    return value
+
+
+def _without_the_settings(value):
+    """A settings object without what the tool sets, as text, so that the order of the
+    members counts. An access point left empty by this counts as absent."""
+    left = copy.deepcopy(value)
+    if isinstance(left.get(ACCESS_POINT), dict):
+        for member in ("ssid", "pskl", "psk"):
+            left[ACCESS_POINT].pop(member, None)
+        if not left[ACCESS_POINT]:
+            del left[ACCESS_POINT]
+    return wledfiles.text_of(left)
+
+
+def _set(config, secrets, settings):
+    """The two objects with the name and the password in them."""
+    config, secrets = copy.deepcopy(config), copy.deepcopy(secrets)
+    access = config.setdefault(ACCESS_POINT, {})
+    access["ssid"] = settings.name
+    access["pskl"] = len(settings.password)
+    access.pop("psk", None)
+    secrets.setdefault(ACCESS_POINT, {})["psk"] = settings.password
+    return config, secrets
+
+
+def _holds(config, secrets, settings):
+    access, secret = config.get(ACCESS_POINT, {}), secrets.get(ACCESS_POINT, {})
+    return (access.get("ssid") == settings.name and access.get("pskl") == len(settings.password) and type(access.get("pskl")) is int
+            and "psk" not in access and secret.get("psk") == settings.password)
+
+
+def apply(image, settings):
+    """A storage image with the name and the password in WLED's stored settings, and
+    everything else as it was. The result is checked before it is returned. An image that
+    holds the settings already is returned as it is."""
+    before = wledfiles.files_of(image)
+    old = {path: _checked_object(before, path) for path in (CONFIG, SECRETS)}
+    new = dict(zip((CONFIG, SECRETS), _set(old[CONFIG], old[SECRETS], settings)))
+    changed = {path: new[path] for path in (CONFIG, SECRETS) if wledfiles.text_of(new[path]) != wledfiles.text_of(old[path])}
+    if not changed:
+        return image
+    made, after = wledfiles.written(image, changed)
+    if not holds(made, settings):
+        raise Failure("verify-failed", f"{CONFIG} and {SECRETS} in the new image do not hold the settings")
+    for path in (CONFIG, SECRETS):
+        if _without_the_settings(_checked_object(after, path)) != _without_the_settings(old[path]):
+            raise Failure("verify-failed", f"{path} in the new image differs in more than the name and the password")
+    return made
+
+
+def holds(image, settings):
+    """Whether WLED's stored settings in a storage image are these settings."""
+    files = wledfiles.files_of(image)
+    try:
+        return _holds(_checked_object(files, CONFIG), _checked_object(files, SECRETS), settings)
+    except Failure:
+        return False
+
+
+def name_in(image):
+    """The name in WLED's stored settings of a storage image, or None."""
+    try:
+        name = _checked_object(wledfiles.files_of(image), CONFIG).get(ACCESS_POINT, {}).get("ssid")
+    except Failure:
+        return None
+    return name if isinstance(name, str) else None

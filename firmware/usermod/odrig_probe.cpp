@@ -9,6 +9,7 @@
 #include "soc/lcd_cam_struct.h"
 #include "soc/pcnt_periph.h"
 
+#include "odrig_files.h"
 #include "odrig_leds.h"
 #include "odrig_serial.h"
 
@@ -16,6 +17,10 @@ namespace {
 
 const char LINE[] = "#probe\n";
 const size_t LINE_LENGTH = sizeof(LINE) - 1;
+// The line of the store trial: this word, a number of bytes in decimal digits, a newline.
+const char STORE_WORD[] = "#store ";
+const size_t STORE_WORD_LENGTH = sizeof(STORE_WORD) - 1;
+const size_t STORE_DIGITS = 10;
 const uint32_t MAX_OUTPUTS = 32;
 // What the outputs hold is read back after a send and again before the next one, for
 // some of the outputs at each send, each in its turn: as many as have this many LEDs
@@ -23,7 +28,10 @@ const uint32_t MAX_OUTPUTS = 32;
 // measure, however many outputs there are.
 const uint32_t READ_BACK_LEDS = 200;
 
-size_t matched = 0;
+// The bytes at the start of a line that are held back while they can still become a line
+// of the probe build.
+char heldBack[STORE_WORD_LENGTH + STORE_DIGITS + 1];
+size_t heldBytes = 0;
 bool atLineStart = true;
 
 uint32_t startMs = 0;
@@ -33,6 +41,9 @@ uint64_t secondStart = 0;
 uint32_t loopsNow = 0, loopsLast = 0;
 uint32_t sentNow = 0, sentLast = 0;
 uint32_t pollUsNow = 0, pollUsLast = 0, sendUsNow = 0, sendUsLast = 0;
+// The requests for a refresh in which the core read a second file, since the last report:
+// their number, the longest and the sum of their times.
+uint32_t checkSteps = 0, checkLongestUs = 0, checkTotalUs = 0;
 // The requests for a refresh are timed on the task that makes them, on the chip's other
 // processor core; their sums are kept under this guard.
 portMUX_TYPE pollGuard = portMUX_INITIALIZER_UNLOCKED;
@@ -214,12 +225,128 @@ void readTheCountedOutput() {
   countedOutput = NO_OUTPUT;
 }
 
+// With a maximum of 0 WLED's limiter is off: it dims nothing and estimates nothing.
+bool limiterOn() { return BusManager::ablMilliampsMax() > 0; }
+
 // The current the limiter allows the LEDs, and the current it estimated for the last send.
 uint32_t limitMa() {
   const uint32_t all = BusManager::ablMilliampsMax();
   return all > MA_FOR_ESP ? all - MA_FOR_ESP : 0;
 }
 uint32_t usedMa() { return BusManager::currentMilliamps() - MA_FOR_ESP; }
+
+// The store trial. `#store <bytes>` writes a file of that size into the folder of the show
+// through the host functions the core is given, renames it onto a name that has a file,
+// reads it back and removes it, a step in each pass of the loop that the pacing allows,
+// and then answers with the times.
+enum StoreStep { STORE_IDLE, STORE_SEED, STORE_OPEN, STORE_WRITE, STORE_CLOSE, STORE_RENAME, STORE_READ, STORE_REMOVE };
+const char STORE_PART[] = "probe.part";
+const char STORE_NAME[] = "probe.odrg";
+const size_t STORE_PIECE = 1500;
+const size_t STORE_READ_PIECE = 512;
+const uint32_t STORE_READS_IN_A_STEP = 4;
+const size_t STORE_SEED_BYTES = 16;
+
+// The shortest, the longest and the sum of some times, in microseconds.
+struct Spread {
+  void add(uint32_t us) {
+    if (count == 0 || us < shortest) shortest = us;
+    if (us > longest) longest = us;
+    total += us;
+    count++;
+  }
+  uint32_t mean() const { return count ? (uint32_t)(total / count) : 0; }
+  uint32_t count, shortest, longest;
+  uint64_t total;
+};
+
+odrig_host storeHost;
+StoreStep storeAt = STORE_IDLE;
+uint32_t storeBytes = 0, storeWritten = 0, storeRead = 0;
+uint32_t storeCrcWritten = 0, storeCrcRead = 0;
+Spread storeWrites, storeReads;
+uint32_t storeSeedUs = 0, storeOpenUs = 0, storeCloseUs = 0, storeRenameUs = 0, storeRemoveUs = 0;
+int64_t storeWriteBeganUs = 0, storeWriteEndedUs = 0;
+uint8_t storePiece[STORE_PIECE];
+
+uint32_t sinceUs(int64_t from) { return (uint32_t)(esp_timer_get_time() - from); }
+
+// The byte the trial writes at a place of its file.
+uint8_t storeByteAt(uint32_t place) { return (uint8_t)(place * 31u + (place >> 8) * 7u + 0x5Au); }
+
+void addSpread(String &line, const __FlashStringHelper *name, const Spread &spread) {
+  line += name;
+  line += '[';
+  line += spread.shortest;
+  line += ',';
+  line += spread.mean();
+  line += ',';
+  line += spread.longest;
+  line += ']';
+}
+
+// Ends the trial: removes what is left of it when it failed, and writes the answer.
+void storeAnswer(const char *failed) {
+  if (failed != nullptr) {
+    storeHost.remove(storeHost.ctx, STORE_PART);
+    storeHost.remove(storeHost.ctx, STORE_NAME);
+  }
+  const uint32_t writeMs = (uint32_t)((storeWriteEndedUs - storeWriteBeganUs) / 1000);
+  String line;
+  line.reserve(512);
+  line += F("{\"store\":1,\"bytes\":");
+  line += storeBytes;
+  line += F(",\"ok\":");
+  line += failed == nullptr ? F("true") : F("false");
+  line += F(",\"failed\":");
+  if (failed != nullptr) {
+    line += '"';
+    line += failed;
+    line += '"';
+  } else {
+    line += F("null");
+  }
+  line += F(",\"written\":");
+  line += storeWritten;
+  line += F(",\"read\":");
+  line += storeRead;
+  line += F(",\"writes\":");
+  line += storeWrites.count;
+  addSpread(line, F(",\"write_us\":"), storeWrites);
+  line += F(",\"write_ms\":");
+  line += writeMs;
+  line += F(",\"bytes_per_second\":");
+  line += writeMs ? (uint32_t)((uint64_t)storeWritten * 1000 / writeMs) : 0;
+  line += F(",\"seed_us\":");
+  line += storeSeedUs;
+  line += F(",\"open_us\":");
+  line += storeOpenUs;
+  line += F(",\"close_us\":");
+  line += storeCloseUs;
+  line += F(",\"rename_us\":");
+  line += storeRenameUs;
+  line += F(",\"reads\":");
+  line += storeReads.count;
+  addSpread(line, F(",\"read_us\":"), storeReads);
+  line += F(",\"remove_us\":");
+  line += storeRemoveUs;
+  line += F("}\n");
+  OdrigSerial::writeLong(line.c_str(), line.length());
+  storeAt = STORE_IDLE;
+}
+
+void storeBegin(uint32_t bytes) {
+  if (storeAt != STORE_IDLE) return;
+  storeHost = OdrigFiles::host();
+  storeBytes = bytes;
+  storeWritten = storeRead = 0;
+  storeCrcWritten = storeCrcRead = 0xFFFFFFFF;
+  storeWrites = Spread();
+  storeReads = Spread();
+  storeSeedUs = storeOpenUs = storeCloseUs = storeRenameUs = storeRemoveUs = 0;
+  storeWriteBeganUs = storeWriteEndedUs = esp_timer_get_time();
+  storeAt = STORE_SEED;
+}
 
 void report() {
   String line;
@@ -262,8 +389,58 @@ void report() {
   } else {
     line += F("null");
   }
+  const OdrigFiles::StoreTimes stored = OdrigFiles::takeStoreTimes();
+  portENTER_CRITICAL(&pollGuard);
+  const uint32_t steps = checkSteps, stepLongestUs = checkLongestUs, stepTotalUs = checkTotalUs;
+  checkSteps = checkLongestUs = checkTotalUs = 0;
+  portEXIT_CRITICAL(&pollGuard);
+  line += F(",\"space_us\":");
+  line += OdrigFiles::spaceAskedMicros();
+  line += F(",\"store\":{\"calls\":");
+  line += stored.calls;
+  line += F(",\"longest_us\":");
+  line += stored.longestUs;
+  line += F(",\"total_us\":");
+  line += stored.totalUs;
+  line += F(",\"check_steps\":");
+  line += steps;
+  line += F(",\"check_longest_us\":");
+  line += stepLongestUs;
+  line += F(",\"check_total_us\":");
+  line += stepTotalUs;
+  line += '}';
   line += F(",\"ap\":");
   line += apActive ? 1 : 0;
+  // What the radio holds for its access point. Until WLED has opened the access point,
+  // that is the configuration of the start before.
+  wifi_config_t radio;
+  const bool known = apActive && esp_wifi_get_config(WIFI_IF_AP, &radio) == ESP_OK;
+  line += F(",\"ap_name\":");
+  if (known) {
+    size_t length = radio.ap.ssid_len;
+    if (length == 0) length = strnlen((const char *)radio.ap.ssid, sizeof(radio.ap.ssid));
+    length = std::min(length, sizeof(radio.ap.ssid));
+    line += '"';
+    for (size_t i = 0; i < length; i++) {
+      const uint8_t byte = radio.ap.ssid[i];
+      if (byte < 0x20 || byte > 0x7E || byte == '"' || byte == '\\') {
+        char escaped[7];
+        snprintf(escaped, sizeof(escaped), "\\u%04x", (unsigned)byte);
+        line += escaped;
+      } else {
+        line += (char)byte;
+      }
+    }
+    line += '"';
+  } else {
+    line += F("null");
+  }
+  line += F(",\"ap_auth\":");
+  if (known) {
+    line += (uint32_t)radio.ap.authmode;
+  } else {
+    line += F("null");
+  }
   line += F(",\"error\":");
   const char *error = errorNow != nullptr ? errorNow() : nullptr;
   if (error != nullptr) {
@@ -340,11 +517,79 @@ void OdrigProbe::pass(uint64_t now_ms) {
   keepTheWireTime();
 }
 
-void OdrigProbe::polled(uint32_t poll_us) {
+void OdrigProbe::polled(uint32_t poll_us, bool read_second) {
   portENTER_CRITICAL(&pollGuard);
   pollUsNow += poll_us;
   if (poll_us > longestPollUs) longestPollUs = poll_us;
+  if (read_second) {
+    checkSteps++;
+    checkTotalUs += poll_us;
+    if (poll_us > checkLongestUs) checkLongestUs = poll_us;
+  }
   portEXIT_CRITICAL(&pollGuard);
+}
+
+bool OdrigProbe::storing() { return storeAt != STORE_IDLE; }
+
+void OdrigProbe::storeStep() {
+  void *ctx = storeHost.ctx;
+  const int64_t began = esp_timer_get_time();
+  if (storeAt == STORE_SEED) {
+    // A small file under the name the trial's file is renamed onto.
+    memset(storePiece, 0xEE, STORE_SEED_BYTES);
+    const bool seeded = storeHost.write_open(ctx, STORE_NAME) == 1 && storeHost.write(ctx, storePiece, STORE_SEED_BYTES) == 1 &&
+                        storeHost.write_close(ctx) == 1;
+    storeSeedUs = sinceUs(began);
+    if (!seeded) return storeAnswer("seed");
+    storeAt = STORE_OPEN;
+  } else if (storeAt == STORE_OPEN) {
+    const bool opened = storeHost.write_open(ctx, STORE_PART) == 1;
+    storeOpenUs = sinceUs(began);
+    if (!opened) return storeAnswer("open");
+    storeWriteBeganUs = storeWriteEndedUs = esp_timer_get_time();
+    storeAt = storeBytes ? STORE_WRITE : STORE_CLOSE;
+  } else if (storeAt == STORE_WRITE) {
+    const size_t length = std::min((size_t)(storeBytes - storeWritten), STORE_PIECE);
+    for (size_t i = 0; i < length; i++) {
+      storePiece[i] = storeByteAt(storeWritten + i);
+      storeCrcWritten = crcOf(storeCrcWritten, storePiece[i]);
+    }
+    const int64_t writeBegan = esp_timer_get_time();
+    const bool taken = storeHost.write(ctx, storePiece, length) == 1;
+    storeWrites.add(sinceUs(writeBegan));
+    storeWriteEndedUs = esp_timer_get_time();
+    if (!taken) return storeAnswer("write");
+    storeWritten += length;
+    if (storeWritten == storeBytes) storeAt = STORE_CLOSE;
+  } else if (storeAt == STORE_CLOSE) {
+    const bool closed = storeHost.write_close(ctx) == 1;
+    storeCloseUs = sinceUs(began);
+    if (!closed) return storeAnswer("close");
+    storeAt = STORE_RENAME;
+  } else if (storeAt == STORE_RENAME) {
+    const bool renamed = storeHost.rename(ctx, STORE_PART, STORE_NAME) == 1;
+    storeRenameUs = sinceUs(began);
+    if (!renamed) return storeAnswer("rename");
+    storeAt = STORE_READ;
+  } else if (storeAt == STORE_READ) {
+    for (uint32_t n = 0; n < STORE_READS_IN_A_STEP && storeAt == STORE_READ; n++) {
+      const int64_t readBegan = esp_timer_get_time();
+      const int32_t count = storeHost.read_at(ctx, STORE_NAME, storeRead, storePiece, STORE_READ_PIECE);
+      storeReads.add(sinceUs(readBegan));
+      if (count < 0) return storeAnswer("read");
+      for (int32_t i = 0; i < count; i++) storeCrcRead = crcOf(storeCrcRead, storePiece[i]);
+      storeRead += (uint32_t)count;
+      if (count == 0) storeAt = STORE_REMOVE;
+    }
+  } else if (storeAt == STORE_REMOVE) {
+    // What was read back is the trial's file when the rename replaced the small one.
+    const bool same = storeRead == storeBytes && storeCrcRead == storeCrcWritten;
+    const bool removed = storeHost.remove(ctx, STORE_NAME) == 1;
+    storeRemoveUs = sinceUs(began);
+    if (!same) return storeAnswer("read-back");
+    if (!removed) return storeAnswer("delete");
+    storeAnswer(nullptr);
+  }
 }
 
 void OdrigProbe::beforeFill() {
@@ -373,7 +618,7 @@ void OdrigProbe::afterShow(uint64_t now_ms, uint32_t send_us) {
   if (sentBefore && now_ms - lastSendMs > longestGapMs) longestGapMs = (uint32_t)(now_ms - lastSendMs);
   sentBefore = true;
   lastSendMs = now_ms;
-  if (usedMa() >= limitMa()) limited++;
+  if (limiterOn() && usedMa() >= limitMa()) limited++;
   readBackTheNextOutputs();
   filledNotShown = false;
   if (reportWaits) {
@@ -382,20 +627,52 @@ void OdrigProbe::afterShow(uint64_t now_ms, uint32_t send_us) {
   }
 }
 
+namespace {
+
+enum Fit { FIT_NONE, FIT_PART, FIT_PROBE, FIT_STORE };
+
+// What the bytes at the start of a line are: a beginning of a line of the probe build,
+// one of its two lines whole, or neither.
+Fit fitOf(const char *text, size_t length) {
+  if (length <= LINE_LENGTH && memcmp(text, LINE, length) == 0) return length == LINE_LENGTH ? FIT_PROBE : FIT_PART;
+  if (length <= STORE_WORD_LENGTH) return memcmp(text, STORE_WORD, length) == 0 ? FIT_PART : FIT_NONE;
+  if (memcmp(text, STORE_WORD, STORE_WORD_LENGTH) != 0) return FIT_NONE;
+  for (size_t at = STORE_WORD_LENGTH; at < length; at++) {
+    if (text[at] == '\n') return at > STORE_WORD_LENGTH && at == length - 1 ? FIT_STORE : FIT_NONE;
+    if (text[at] < '0' || text[at] > '9' || at - STORE_WORD_LENGTH >= STORE_DIGITS) return FIT_NONE;
+  }
+  return FIT_PART;
+}
+
+}  // namespace
+
 void OdrigProbe::feed(uint8_t byte, void (*pass)(uint8_t byte)) {
-  if ((matched > 0 || atLineStart) && byte == (uint8_t)LINE[matched]) {
-    if (++matched == LINE_LENGTH) {
-      matched = 0;
+  if (heldBytes > 0 || atLineStart) {
+    heldBack[heldBytes] = (char)byte;
+    const Fit fit = fitOf(heldBack, heldBytes + 1);
+    if (fit == FIT_PART) {
+      heldBytes++;
+      return;
+    }
+    if (fit == FIT_PROBE) {
+      heldBytes = 0;
       if (filledNotShown) {
         reportWaits = true;
       } else {
         report();
       }
+      return;
     }
-    return;
+    if (fit == FIT_STORE) {
+      uint64_t bytes = 0;
+      for (size_t at = STORE_WORD_LENGTH; at < heldBytes; at++) bytes = bytes * 10 + (uint64_t)(heldBack[at] - '0');
+      heldBytes = 0;
+      storeBegin(bytes > 0xFFFFFFFFull ? 0xFFFFFFFFu : (uint32_t)bytes);
+      return;
+    }
+    for (size_t i = 0; i < heldBytes; i++) pass((uint8_t)heldBack[i]);
+    heldBytes = 0;
   }
-  for (size_t i = 0; i < matched; i++) pass((uint8_t)LINE[i]);
-  matched = 0;
   pass(byte);
   atLineStart = byte == '\n';
 }

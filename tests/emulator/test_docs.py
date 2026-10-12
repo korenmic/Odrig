@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import pathlib
@@ -11,7 +12,7 @@ import unittest
 
 from emulator import app, binding, failure, hub, recfile
 from odrig import odrg
-from odrigctl import cli
+from odrigctl import cli, content
 
 from . import support
 from .test_layout import dump, meetings
@@ -84,10 +85,11 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose]", self.text)
-        self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH]", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]", self.text)
+        self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--record", "--seconds", "--script"})
+        self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
         self.assertIn("page: http://127.0.0.1:8600/", self.text)
@@ -112,28 +114,45 @@ class EmulatorDocument(unittest.TestCase):
         for line in given:
             arguments = made.parse_args(shlex.split(line)[3:])
             transport = "--port" if arguments.port is not None else "--tcp" if arguments.tcp is not None else "--http"
-            sent[transport].add(cli.command_line(made, arguments).decode("ascii").split()[0])
+            sent[transport].add(cli.checked(made, arguments)[0])
         for transport in sent:
             self.assertEqual(sent[transport], set(cli.COMMANDS), transport)
         for command, takes in cli.COMMANDS.items():
-            synopsis = f"python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] {command}" + (f" {takes}" if takes else "")
-            self.assertIn(synopsis, text)
-        for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (3, "error: unreachable: <detail>")):
+            synopsis = " ".join(["python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS]", command, *takes])
+            self.assertIn(synopsis + "\n", text)
+        for status, meaning in ((0, '"ok":true'), (1, '"ok":false'), (2, "not understood"), (2, "error: not-found: <detail>"), (3, "error: unreachable: <detail>")):
             self.assertRegex(text, rf"(?m)^\| {status} \| .*{re.escape(meaning)}")
         self.assertIn("application/octet-stream", text)
         self.assertIn("lowers RTS before it lowers DTR", text)
 
+    def test_it_describes_the_upload_of_the_tool_as_the_tool_does_it(self):
+        text = " ".join(section(self.text, "The command tool").split())
+        self.assertIn("upload: 45% 613500/1362000 bytes 21400 B/s", section(self.text, "The command tool"))
+        written = io.StringIO()
+        now = [0.0]
+        progress = cli.Progress(written, clock=lambda: now[0])
+        now[0] = 28.67
+        progress.sent(613500, 1362000, 613500 / 21400)
+        progress.checking()
+        self.assertEqual(written.getvalue(), "upload: 45% 613500/1362000 bytes 21400 B/s\nupload: checking\n")
+        for phrase in ("`upload: checking`", f"every {content.BUSY_PAUSE_SECONDS:g} seconds", f"{content.BUSY_SECONDS:g} seconds", "`upload cancel`", "`bad-offset`",
+                       "the last part of the path", f"half a second", "keeps the port open", "`list <next>`"):
+            self.assertIn(phrase, text)
+        self.assertEqual(cli.REPORT_SECONDS, 0.5)
+        for function in ("odrigctl.client.Session(port=..., http=..., timeout=...)", "odrigctl.content.list_all(session, show)", "odrigctl.content.upload(session, item, name, data, progress)"):
+            self.assertIn(function, text)
+
     def test_every_tool_command_it_gives_anywhere_is_understood_by_the_tool(self):
         given = [line for line in self.commands if line.startswith("python -m odrigctl ") and "(" not in line]
-        self.assertGreaterEqual(len(given), 13)
+        self.assertGreaterEqual(len(given), 21)
         made = cli.parser()
         for line in given:
-            cli.command_line(made, made.parse_args(shlex.split(line)[3:]))
+            cli.checked(made, made.parse_args(shlex.split(line)[3:]))
 
     def test_it_describes_the_http_address_with_a_curl_example(self):
         text = section(self.text, "Commands over HTTP")
         self.assertIn("curl --data-binary 'play 2' http://127.0.0.1:8600/odrig", text)
-        for phrase in ("`POST /odrig`", "Status 200", "`application/json`", "Status 405 with `Allow: POST`", "Status 411", "Status 404", "128", "`Access-Control-Allow-Origin: *`"):
+        for phrase in ("`POST /odrig`", "Status 200", "`application/json`", "Status 405 with `Allow: POST`", "Status 411", "Status 404", "4,096", "2,048", "`Access-Control-Allow-Origin: *`"):
             self.assertIn(phrase, text)
 
     def test_it_describes_the_port(self):
@@ -249,19 +268,27 @@ class EmulatorDocument(unittest.TestCase):
 
 class DocumentedShows(unittest.TestCase):
     """The commands the document gives for the two shows and for the dense clip, run as
-    they are written, in a folder that has the repository's tracked folders linked in."""
+    they are written, in a folder that has the repository's tracked folders linked in.
+    The shows are packed by the converter, a program for Node.js, and their sources are
+    written by the generators of the Python package."""
+
+    PACK = "node converter/odrig.js pack "
 
     def test_the_commands_for_the_shows_pack_three_folders_the_emulator_runs(self):
         text = DOCUMENT.read_text(encoding="utf-8")
         lines = blocks(section(text, "Two shows to run")) + blocks(section(text, "The check list by eye"))
-        commands = [line for line in lines if line.split(" ")[0] in ("mkdir", "printf") or line.startswith("python -m odrig")]
-        self.assertEqual(sum(line.startswith("python -m odrig pack ") for line in commands), 3)
+        commands = [line for line in lines if line.split(" ")[0] in ("mkdir", "printf") or line.startswith(("python -m odrig", "node converter/"))]
+        self.assertEqual(sum(line.startswith(self.PACK) for line in commands), 3)
+        self.assertEqual(sum(line.startswith("node ") for line in commands), 3)
         self.assertEqual(sum(line.startswith("python -m odrig.generators.") for line in commands), 3)
+        self.assertEqual(sum(line.startswith("python ") for line in commands), 3)
         for line in commands:
             self.assertNotRegex(line, r"\b(60|30)\b", line)
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "the pack commands of the document need Node.js 20 or later as `node`: see docs/converter.md, \"Setup\"")
         with tempfile.TemporaryDirectory() as folder:
             work = pathlib.Path(folder)
-            for name in ("odrig", "mapping", "shows", "animations"):
+            for name in ("odrig", "converter", "mapping", "shows", "animations"):
                 support.linked(support.ROOT / name, work / name)
             for line in commands:
                 words = shlex.split(line)
@@ -274,6 +301,8 @@ class DocumentedShows(unittest.TestCase):
                     continue
                 if words[0] == "python":
                     words[0] = sys.executable
+                if words[0] == "node":
+                    words[0] = node
                 done = subprocess.run(words, cwd=work, capture_output=True, text=True)
                 self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""), line)
             for show, legs in (("build/example-show", 2), ("build/demo-20/show", 20), ("build/dense/show", 20)):
@@ -284,16 +313,15 @@ class DocumentedShows(unittest.TestCase):
                 self.assertEqual(recording.led_bytes, 540 * legs, show)
                 self.assertTrue(all(tick.produced and any(tick.data) for tick in recording.ticks), show)
             packed = {path.name: path.read_bytes() for path in sorted((work / "build/demo-20/show").glob("*.odrg"))}
-        # The table of the demo show's two files: the frames, and the sizes within 2 percent,
-        # because a compressed size depends on the version of zlib.
+        # The table of the demo show's two files: the frames, and the sizes, which the
+        # converter gives on every computer.
         rows = re.findall(r"(?m)^\| `([a-z]+\.odrg)`, ([0-9.]+) s \| ([0-9]+) \| ([0-9,]+) \|$", section(text, "Two shows to run"))
         self.assertEqual([name for name, _, _, _ in rows], ["hello.odrg", "dvd.odrg"])
         for name, seconds, frames, size in rows:
             records = odrg.decode(packed[name]).records
             self.assertEqual(len(records), int(frames), name)
             self.assertEqual(f"{sum(ms for ms, _ in records) / 1000:.1f}", seconds, name)
-            documented = int(size.replace(",", ""))
-            self.assertLessEqual(abs(len(packed[name]) - documented) * 100, 2 * documented, (name, len(packed[name])))
+            self.assertEqual(len(packed[name]), int(size.replace(",", "")), name)
 
 
 class Readme(unittest.TestCase):

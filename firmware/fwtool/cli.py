@@ -38,10 +38,12 @@ def parser():
     kind = builder.add_mutually_exclusive_group()
     kind.add_argument("--stock", dest="kind", action="store_const", const="stock", default="firmware", help="build WLED's own environment, unchanged")
     kind.add_argument("--probe", dest="kind", action="store_const", const="probe", help="build the probe build, which also reports measurements")
+    builder.add_argument("--standalone", action="store_true", help="build the standalone firmware, which holds nothing of WLED; with --probe, its probe build")
     builder.add_argument("--verbose", action="store_true", help="show every command of the build")
     flash = commands.add_parser("flash", help="write a built image to the board over USB")
     flash.add_argument("--port", metavar="P", help="the board's USB serial port")
     flash.add_argument("--image", metavar="PATH", type=pathlib.Path, help="the image to write, with its .sha256 beside it")
+    flash.add_argument("--standalone", action="store_true", help="without --image, write the standalone firmware")
     flash.add_argument("--expect", choices=sorted(board.EXPECTED), default="status", help="what must answer afterwards: the firmware's status, WLED's handshake, or the probe build")
     flash.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's answer after its restart (default: 20)")
     restore = commands.add_parser("restore-stock", help="write the stock WLED image to the board")
@@ -53,6 +55,21 @@ def parser():
     install.add_argument("--port", metavar="P", help="the board's USB serial port")
     install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    network = commands.add_parser("set-wifi", help="put the network's name and password from the settings file into the board's storage")
+    network.add_argument("--port", metavar="P", help="the board's USB serial port")
+    network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
+    network.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    limiter = commands.add_parser("set-limit", help="put the limit on LED current from the limit file into the board's storage")
+    limiter.add_argument("--port", metavar="P", help="the board's USB serial port")
+    limiter.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a limit file other than firmware/limit.json")
+    limiter.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    limit_read = commands.add_parser("read-limit", help="print the limit on LED current that the board's storage holds")
+    limit_read.add_argument("--port", metavar="P", help="the board's USB serial port")
+    scratch = commands.add_parser("install-firmware", help="write the built firmware to the board and then the network's name and password and the limit on LED current into its storage")
+    scratch.add_argument("--port", metavar="P", help="the board's USB serial port")
+    scratch.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
+    scratch.add_argument("--limit", metavar="FILE", type=pathlib.Path, help="a limit file other than firmware/limit.json")
+    scratch.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after each restart (default: 20)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
     read.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -76,7 +93,8 @@ def _setup(arguments):
 
 
 def _build(arguments):
-    image, size = build.build(arguments.kind, arguments.verbose)
+    kind = {"firmware": "standalone", "probe": "standalone-probe"}[arguments.kind] if arguments.standalone else arguments.kind
+    image, size = build.build(kind, arguments.verbose)
     print(f"{image}: {size} bytes, SHA-256 {build.sha256(image)}")
     return 0
 
@@ -98,7 +116,8 @@ def write_application(port, image, extra=(), table=None, expect="status", wait=b
 
 
 def _flash(arguments):
-    image = build.checked_image(arguments.image if arguments.image is not None else build.image_path("firmware"))
+    built = build.image_path("standalone" if arguments.standalone else "firmware")
+    image = build.checked_image(arguments.image if arguments.image is not None else built)
     build.check_size(image)
     port = board.find(arguments.port)
     print(write_application(port, image, expect=arguments.expect, wait=arguments.wait))
@@ -126,15 +145,19 @@ def storage_of(port):
     return on_port, region, storage.from_board(on_port, region)
 
 
-def _install_show(arguments):
+def write_storage(on_port, region, before, make):
+    """Puts a new storage image on the board. `make` gives the new image for the one the
+    board holds.
+
+    The blocks in which the two differ are written in one call, the whole partition is
+    compared with the new image, and the board is restarted. The new image is then the
+    newest one the work folder keeps. When any of it fails, the new image is not kept
+    and the board is restarted.
+    """
     from . import storage
-    files = storage.folder_files(arguments.dir, check=not arguments.no_check)
-    port = board.find(arguments.port)
-    on_port, region, before_path = storage_of(port)
     new_path = None
     try:
-        before = before_path.read_bytes()
-        after = storage.with_show(before, files)
+        after = make(before)
         new_path = storage.pending(after)
         changed = storage.runs(before, after, storage.geometry(before)[1])
         pieces = []
@@ -154,9 +177,81 @@ def _install_show(arguments):
             storage.discard(new_path)
         on_port.restart()
         raise
+
+
+def _install_show(arguments):
+    from . import storage
+    files = storage.folder_files(arguments.dir, check=not arguments.no_check)
+    port = board.find(arguments.port)
+    on_port, region, before_path = storage_of(port)
+    write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
     reply = board.EXPECTED["status"](port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
+
+
+def store_settings(port, wait, network=None, milliamps=None):
+    """Puts settings into WLED's stored settings on the board in one write: the name and
+    the password of the network, the limit on LED current, or both. Restarts the board
+    and prints what was set and the board's reply to `status`."""
+    from . import limit, wifi
+
+    def make(image):
+        if network is not None:
+            image = wifi.apply(image, network)
+        if milliamps is not None:
+            image = limit.apply(image, milliamps)
+        return image
+
+    on_port, region, before_path = storage_of(port)
+    write_storage(on_port, region, before_path.read_bytes(), make)
+    reply = board.EXPECTED["status"](port, wait)
+    if network is not None:
+        print(f"name: {network.name}")
+        print("password: set")
+    if milliamps is not None:
+        print(limit.line(milliamps))
+    print(reply)
+    return 0
+
+
+def _network(arguments):
+    from . import wifi
+    return wifi.read(arguments.settings if arguments.settings is not None else paths.WIFI_SETTINGS)
+
+
+def _set_wifi(arguments):
+    network = _network(arguments)
+    return store_settings(board.find(arguments.port), arguments.wait, network=network)
+
+
+def _set_limit(arguments):
+    from . import limit
+    milliamps = limit.read(arguments.settings if arguments.settings is not None else paths.LIMIT_SETTINGS)
+    return store_settings(board.find(arguments.port), arguments.wait, milliamps=milliamps)
+
+
+def _read_limit(arguments):
+    from . import limit
+    port = board.find(arguments.port)
+    on_port, _, image_path = storage_of(port)
+    try:
+        found = limit.stored(image_path.read_bytes())
+    finally:
+        on_port.restart()
+    print(limit.NOT_STORED if found is None else limit.line(found))
+    return 0
+
+
+def _install_firmware(arguments):
+    from . import limit
+    network = _network(arguments)
+    milliamps = limit.read(arguments.limit if arguments.limit is not None else paths.LIMIT_SETTINGS)
+    image = build.checked_image(build.image_path("firmware"))
+    build.check_size(image)
+    port = board.find(arguments.port)
+    write_application(port, image, expect="status", wait=arguments.wait)
+    return store_settings(port, arguments.wait, network=network, milliamps=milliamps)
 
 
 def _read_show(arguments):
@@ -198,7 +293,8 @@ def _test_air(arguments):
 
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
-    "install-show": _install_show, "read-show": _read_show,
+    "install-show": _install_show, "set-wifi": _set_wifi, "set-limit": _set_limit, "read-limit": _read_limit,
+    "install-firmware": _install_firmware, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
 
@@ -217,9 +313,18 @@ def report(failure):
     return 1
 
 
+def parsed(argv):
+    """The arguments of a command line. What does not go together is a usage error."""
+    made = parser()
+    arguments = made.parse_args(argv)
+    if arguments.command == "build" and arguments.standalone and arguments.kind == "stock":
+        made.error("--standalone does not go with --stock: the standalone firmware holds nothing of WLED")
+    return arguments
+
+
 def main(argv=None):
     """Runs one command in this interpreter, which is the work folder's Python."""
-    arguments = parser().parse_args(argv)
+    arguments = parsed(argv)
     try:
         return ACTIONS[arguments.command](arguments)
     except Failure as failure:
@@ -229,7 +334,7 @@ def main(argv=None):
 def launch(argv):
     """Checks the command line, makes sure the work folder's Python environment is there,
     and hands the command to that environment's Python."""
-    parser().parse_args(argv)
+    parsed(argv)
     try:
         toolchain.python_environment()
     except Failure as failure:

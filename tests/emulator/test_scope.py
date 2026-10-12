@@ -41,7 +41,7 @@ class Scope(unittest.TestCase):
         names = {path.name for path, _ in modules(EMULATOR)}
         for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "lineport.py", "recfile.py", "record.py", "serialport.py"):
             self.assertIn(expected, names)
-        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py", "winserial.py"])
+        self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py", "content.py", "winserial.py"])
 
     def test_every_module_imports_only_the_standard_library_and_its_own_package(self):
         for package in PACKAGES:
@@ -63,7 +63,11 @@ class Scope(unittest.TestCase):
         for path, tree in modules(EMULATOR):
             self.assertNotIn("zlib", imported(tree), path.name)
             for text in texts(tree):
-                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off"), f"{path.name} writes out {text!r}")
+                self.assertNotIn(text, ("ODRG", "show.json", "play", "brightness", "on", "off", "list", "upload", "upload.part", "show.part", "pending.txt"), f"{path.name} writes out {text!r}")
+                # The binding names the members of the host record, and two of them are
+                # spelled as commands are.
+                if path.name != "binding.py":
+                    self.assertNotIn(text, ("space", "remove"), f"{path.name} writes out {text!r}")
         users = sorted(path.name for path, tree in modules(EMULATOR) if "json" in imported(tree))
         self.assertEqual(users, ["hub.py"])
 
@@ -94,7 +98,7 @@ class Scope(unittest.TestCase):
             self.assertNotIn(f"tools/{name}", listed)
         tracked = subprocess.run(["git", "ls-files", "odrigctl"], cwd=support.ROOT, capture_output=True, text=True, check=True).stdout.split()
         if tracked:
-            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py", "odrigctl/winserial.py"])
+            self.assertEqual(sorted(tracked), ["odrigctl/__init__.py", "odrigctl/__main__.py", "odrigctl/cli.py", "odrigctl/client.py", "odrigctl/content.py", "odrigctl/winserial.py"])
 
     def test_no_commit_of_this_seed_changes_a_source_or_the_header_of_the_core(self):
         changed = subprocess.run(

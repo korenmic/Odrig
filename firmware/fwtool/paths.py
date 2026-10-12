@@ -15,11 +15,14 @@ PIO_CACHE = WORK / "pio-cache"
 NPM_CACHE = WORK / "npm-cache"
 PIP_CACHE = WORK / "pip-cache"
 WLED = WORK / "WLED"
+STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
 STORAGE = WORK / "storage"
 
 PATCHES = FIRMWARE / "patches"
 REQUIREMENTS = FIRMWARE / "requirements.txt"
+WIFI_SETTINGS = FIRMWARE / "wifi.json"
+LIMIT_SETTINGS = FIRMWARE / "limit.json"
 
 # The factory backup of the board. Nothing is ever written, moved or deleted in it.
 PROTECTED = ROOT / "esp32-backup"

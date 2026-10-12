@@ -45,6 +45,12 @@ def _port(text):
     return int(text)
 
 
+def _storage(text):
+    if not text.isascii() or not text.isdigit() or int(text) > host.MOST_STORAGE:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of bytes from 0 to {host.MOST_STORAGE}")
+    return int(text)
+
+
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m emulator",
@@ -57,6 +63,8 @@ def parser():
     made.add_argument("--tcp-port", metavar="N", type=_port, help=f"the port on 127.0.0.1 that takes command lines over TCP; 0 takes any free port (default: {TCP_PORT} on a system without a virtual serial port, none elsewhere)")
     made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help=f"the core's shared library (default: core/build/{binding.LIBRARY_NAME})")
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
+    made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
+                      help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -91,7 +99,7 @@ def serve(arguments, out):
     """Real time: starts the core, opens the ports and the page address, and runs until a
     signal. A step that fails undoes the ones before it."""
     link, tcp_port = ports(arguments)
-    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose)
+    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage)
     port = None
     line_port = None
     server = None
@@ -150,7 +158,7 @@ def serve(arguments, out):
             line_port.close()
         if port is not None:
             port.close()
-        files.close()
+        files.release()
     return 0
 
 
@@ -158,7 +166,7 @@ def run(arguments, out):
     if not os.path.isdir(arguments.show_dir):
         raise failure.Failure(failure.NOT_A_FOLDER, f"{arguments.show_dir}: there is no such folder")
     if arguments.record is not None:
-        record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core, out)
+        record.run(arguments.show_dir, arguments.record, arguments.seconds, arguments.script, arguments.core, out, arguments.storage)
         return 0
     return serve(arguments, out)
 

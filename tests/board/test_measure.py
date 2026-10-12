@@ -2,13 +2,13 @@ import json
 import time
 import unittest
 
-from fwtool import paths
+from fwtool import board, paths
 
 from . import PORT, support
 
 SECONDS = 10
 RESULT = paths.OUT / "measurements.json"
-VALUES = ("outputs", "start_ms", "loops", "sent", "fps", "gap_ms", "poll_us", "poll_mean_us", "send_us", "send_mean_us", "heap", "install_seconds", "bytes")
+VALUES = ("outputs", "start_ms", "loops", "sent", "fps", "gap_ms", "poll_us", "poll_mean_us", "send_us", "send_mean_us", "heap", "install_seconds", "bytes", "space_us", "free")
 # The longest the core may take to start on a full storage before the tool gives up.
 LONG_START_SECONDS = 240
 
@@ -47,6 +47,11 @@ def measured(name, folder):
     support.probe()
     reports = support.each_second(SECONDS)
     sent = sum(report["sent"] for report in reports)
+    # At its start the firmware asks the file system for its space once, and the file
+    # system walks its blocks for the answer; the report has the time that took.
+    with support.Port() as port:
+        space = port.ask(b"space\n")
+        space_us = port.ask(b"#probe\n", board.is_probe)["space_us"]
     return {
         "show": name,
         "outputs": [sum(1 for output in reports[-1]["outputs"] if output["ok"]), len(reports[-1]["outputs"])],
@@ -63,6 +68,8 @@ def measured(name, folder):
         "send_mean_us": round(sum(report["send_total_us"] for report in reports) / sent) if sent else None,
         "limited": max(report["limited"] for report in reports),
         "heap": reports[-1]["heap"],
+        "space_us": space_us,
+        "free": space["free"],
     }
 
 

@@ -523,12 +523,17 @@ def listening(emulator):
 
 
 def linked(source, target):
-    """Makes a folder appear at a second place: as a symbolic link, or as a copy where the
-    system does not let this program make links."""
+    """Makes a folder appear at a second place: as a symbolic link, or where the system does
+    not let this program make one, as a junction on Windows and as a copy elsewhere."""
     try:
         os.symlink(source, target, target_is_directory=True)
     except OSError:
-        shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
+        if sys.platform == "win32":
+            import _winapi
+
+            _winapi.CreateJunction(str(source), str(target))
+        else:
+            shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__"))
 
 
 def lines(emulator):
@@ -540,6 +545,34 @@ def lines(emulator):
 def line_target(emulator):
     """The option of the command tool, and its value, that names that transport."""
     return ("--port", emulator.serial) if HAS_SERIAL else ("--tcp", emulator.tcp)
+
+
+def session_target(emulator):
+    """How a session of the command tool is told of that transport."""
+    return {"port": emulator.serial} if HAS_SERIAL else {"tcp": emulator.tcp}
+
+
+class BytePort:
+    """A port a test puts between the command tool and something of its own: every byte
+    the tool sends goes to `feed`, and what `feed` returns goes back. It is a virtual
+    serial port where the system has one and a line port elsewhere. `target` is the
+    option of the tool, and its value, that names it."""
+
+    def __init__(self, folder, feed):
+        if HAS_SERIAL:
+            from emulator import serialport
+
+            self.port = serialport.Port(pathlib.Path(folder, "serial"), feed)
+            self.target = ("--port", self.port.link)
+        else:
+            from emulator import lineport
+
+            self.port = lineport.Port(0, feed)
+            self.target = ("--tcp", self.port.address)
+        self.port.start()
+
+    def close(self):
+        self.port.close()
 
 
 def port_options(link):

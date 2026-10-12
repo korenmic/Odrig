@@ -4,6 +4,7 @@ import threading
 import time
 import unittest
 
+from emulator import lineport
 from odrigctl import cli, client
 from tests.core.support import ReferencePlayer
 
@@ -81,7 +82,7 @@ class AgainstTheEmulator(unittest.TestCase):
 
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for words, code in ((("play", "99"), "unknown-id"), (("play", "abc"), "bad-argument"), (("brightness", "256"), "bad-argument"), (("brightness", "-5"), "bad-argument"),
-                            (("play", ""), "bad-argument"), (("play", "1 2"), "bad-argument"), (("play", "1" * 70), "line-too-long")):
+                            (("play", ""), "bad-argument"), (("play", "1 2"), "bad-argument"), (("play", "1" * 70), "bad-argument"), (("play", "1" * 2050), "line-too-long")):
             with self.subTest(command=words):
                 result = support.run_tool(*self.target, *words)
                 self.assertEqual((result.status, result.out, result.err), (1, '{"ok":false,"error":"%s"}\n' % code, ""))
@@ -155,6 +156,57 @@ class TheExchange(unittest.TestCase):
                 client.tcp_address(wrong)
         with self.assertRaises(client.Unreachable):
             client.tcp_exchange("127.0.0.1", b"status\n", 1)
+
+
+class TheSession(unittest.TestCase):
+    """Several exchanges over one connection, as a session through a serial port has them
+    through one opening of the port."""
+
+    def port(self, feed):
+        taken = []
+
+        class Counted(lineport.Port):
+            def opened(self, connection):
+                taken.append(connection)
+                return super().opened(connection)
+
+        port = Counted(0, feed)
+        self.addCleanup(port.close)
+        port.start()
+        return port, taken
+
+    def test_a_session_keeps_one_connection_and_gives_each_line_its_reply(self):
+        port, taken = self.port(lambda data: b"".join(b'{"ok":true,"line":"' + line + b'"}\n' for line in data.split(b"\n")[:-1]))
+        with client.Session(tcp=port.address, timeout=2) as session:
+            self.assertEqual([session.exchange(line) for line in (b"a\n", b"b\n", b"c\n")], [b'{"ok":true,"line":"a"}', b'{"ok":true,"line":"b"}', b'{"ok":true,"line":"c"}'])
+            self.assertIsNotNone(session._descriptor)
+        self.assertEqual(len(taken), 1)
+        self.assertIsNone(session._descriptor)
+        with self.assertRaisesRegex(client.Unreachable, "the session is closed"):
+            session.exchange(b"d\n")
+
+    def test_a_line_that_arrived_whole_before_a_line_is_sent_is_no_answer_to_it(self):
+        answers = {b"a\n": b'boot\n{"ok":true,"n":1}\n{"ok":true,"stray":1}\nnoi', b"b\n": b'se\n{"ok":true,"n":2}\n{"ok":true,"stray":2}\n', b"c\n": b"", b"d\n": b'{"ok":true,"n":4}\n'}
+        port, _ = self.port(lambda data: answers[data])
+        with client.Session(tcp=port.address, timeout=0.4) as session:
+            self.assertEqual(session.exchange(b"a\n"), b'{"ok":true,"n":1}')
+            time.sleep(0.1)
+            self.assertEqual(session.exchange(b"b\n"), b'{"ok":true,"n":2}')
+            time.sleep(0.1)
+            with self.assertRaisesRegex(client.Unreachable, "no reply within 0.4 seconds"):
+                session.exchange(b"c\n")
+            self.assertEqual(session.exchange(b"d\n"), b'{"ok":true,"n":4}')
+
+    def test_what_a_session_discards_is_no_answer_and_nothing_listening_is_unreachable(self):
+        port, _ = self.port(lambda data: b'{"ok":true,"late":1}\n' if data == b"a\n" else b'{"ok":true,"n":2}\n')
+        with client.Session(tcp=port.address, timeout=1) as session:
+            session._descriptor.write(b"a\n", 1)
+            session.discard(0.3)
+            self.assertEqual(session.exchange(b"b\n"), b'{"ok":true,"n":2}')
+        with self.assertRaises(client.Unreachable):
+            client.Session(tcp=f"127.0.0.1:{support.free_port()}", timeout=1)
+        with self.assertRaises(client.Unreachable):
+            client.Session(tcp="127.0.0.1")
 
 
 class TheCommandLine(unittest.TestCase):

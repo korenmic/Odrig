@@ -76,8 +76,6 @@ def _show(data):
     strictjson.members(top, _MEMBERS, _OPTIONAL)
     brightness = strictjson.integer(top["brightness"], 0, 255, what="brightness")
     listed = strictjson.array(top["items"], what="items")
-    if not listed:
-        raise _malformed("items is empty")
     items = tuple(_item(entry, f"entry {position} of items") for position, entry in enumerate(listed, 1))
     start = strictjson.integer(top["start"], what="start") if "start" in top else None
     return Show(brightness, items, start)

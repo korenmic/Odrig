@@ -9,6 +9,7 @@ exact fractions of milliseconds.
 """
 
 import os
+import struct
 from fractions import Fraction
 
 from . import errors, jsonframes
@@ -188,7 +189,7 @@ def _gif_frames(path):
                 end = start + Fraction(delay)
                 yield start, end, _over_black(numpy.asarray(image.convert("RGBA")))
                 start = end
-    except (OSError, EOFError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
+    except (OSError, EOFError, ValueError, SyntaxError, IndexError, struct.error, Image.DecompressionBombError) as error:
         raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the GIF cannot be decoded: {error}") from None
 
 
@@ -205,6 +206,8 @@ def _video_frames(path):
             if not container.streams.video:
                 raise errors.Rejection(errors.UNREADABLE_MEDIA, "the file has no video stream")
             stream = container.streams.video[0]
+            if stream.codec_context is None:
+                raise errors.Rejection(errors.UNREADABLE_MEDIA, "the video stream has no decoder")
             first = None
             held = None
             count = 0
@@ -224,7 +227,7 @@ def _video_frames(path):
             if held is not None:
                 interval = held[0] / (count - 1) if count > 1 else Fraction(TICK_MS)
                 yield held[0], held[0] + interval, held[1]
-    except av.error.FFmpegError as error:
+    except (av.error.FFmpegError, UnicodeDecodeError) as error:
         raise errors.Rejection(errors.UNREADABLE_MEDIA, f"the video cannot be decoded: {error}") from None
 
 

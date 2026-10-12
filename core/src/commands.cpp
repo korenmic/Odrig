@@ -1,56 +1,14 @@
 #include "commands.h"
 
+#include "content.h"
 #include "odrig_core.h"
 #include "player.h"
+#include "show.h"
+#include "upload.h"
 
 namespace odrig {
 
 namespace {
-
-// A reply while it is written.
-struct Reply {
-    void text(const char *more) {
-        while (*more != '\0') {
-            bytes[length++] = *more++;
-        }
-    }
-
-    void number(uint32_t value) {
-        char digits[10];
-        uint32_t count = 0;
-        do {
-            digits[count++] = static_cast<char>('0' + value % 10);
-            value /= 10;
-        } while (value != 0);
-        while (count != 0) {
-            bytes[length++] = digits[--count];
-        }
-    }
-
-    // The id of the item at a position of the item table, or `null` for no item.
-    void id_or_null(const Core &core, uint32_t item) {
-        if (item == kNothing) {
-            text("null");
-        } else {
-            number(core.items[item].id);
-        }
-    }
-
-    char *bytes;
-    uint32_t length;
-};
-
-uint32_t succeed(Reply &reply) {
-    reply.text("{\"ok\":true}\n");
-    return reply.length;
-}
-
-uint32_t refuse(Reply &reply, const char *code) {
-    reply.text("{\"ok\":false,\"error\":\"");
-    reply.text(code);
-    reply.text("\"}\n");
-    return reply.length;
-}
 
 uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text("{\"ok\":true,\"on\":");
@@ -75,22 +33,52 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     return reply.length;
 }
 
-// Whether the first `length` bytes of the line are this word, byte for byte.
-bool is_word(const char *line, uint32_t length, const char *word) {
-    uint32_t at = 0;
-    while (at < length && word[at] != '\0' && line[at] == word[at]) {
-        ++at;
-    }
-    return at == length && word[at] == '\0';
-}
+// The most words a command has. A line with more is no valid command.
+const uint32_t kMostWords = 5;
 
-// The value of an argument made of decimal digits only. False for an empty argument and for
-// any other character. A value above `most` is given as `most` + 1.
-bool decimal(const char *text, uint32_t length, uint32_t most, uint32_t *value) {
+// The words of a line. The line is split at every space, so it has one word more than it
+// has spaces, and a word may be empty. The first kMostWords of them are kept.
+struct Words {
+    void split(const char *line, uint32_t length) {
+        count = 0;
+        uint32_t begin = 0;
+        for (uint32_t at = 0; at <= length; ++at) {
+            if (at < length && line[at] != ' ') {
+                continue;
+            }
+            if (count < kMostWords) {
+                text[count] = line + begin;
+                size[count] = at - begin;
+            }
+            ++count;
+            begin = at + 1;
+        }
+    }
+
+    // Whether a word is this text, byte for byte.
+    bool is(uint32_t word, const char *wanted) const {
+        const char *given = text[word];
+        uint32_t at = 0;
+        while (at < size[word] && wanted[at] != '\0' && given[at] == wanted[at]) {
+            ++at;
+        }
+        return at == size[word] && wanted[at] == '\0';
+    }
+
+    const char *text[kMostWords];
+    uint32_t size[kMostWords];
+    uint32_t count;
+};
+
+// The value of a word that must be a number from `least` to `most`, written in decimal
+// digits only. False for an empty word, for any other character and for any other value.
+bool number_word(const Words &words, uint32_t word, uint32_t least, uint32_t most, uint32_t *value) {
+    const char *text = words.text[word];
+    const uint32_t length = words.size[word];
     if (length == 0) {
         return false;
     }
-    uint32_t result = 0;
+    uint64_t result = 0;
     for (uint32_t at = 0; at < length; ++at) {
         if (text[at] < '0' || text[at] > '9') {
             return false;
@@ -99,14 +87,91 @@ bool decimal(const char *text, uint32_t length, uint32_t most, uint32_t *value) 
             result = result * 10 + static_cast<uint32_t>(text[at] - '0');
         }
     }
-    *value = result > most ? most + 1 : result;
+    if (result < least || result > most) {
+        return false;
+    }
+    *value = static_cast<uint32_t>(result);
     return true;
+}
+
+// The value of a word that must be exactly eight hexadecimal digits, 0-9 and a-f.
+bool crc_word(const Words &words, uint32_t word, uint32_t *value) {
+    if (words.size[word] != 8) {
+        return false;
+    }
+    uint32_t result = 0;
+    for (uint32_t at = 0; at < 8; ++at) {
+        const char digit = words.text[word][at];
+        if (digit >= '0' && digit <= '9') {
+            result = result << 4 | static_cast<uint32_t>(digit - '0');
+        } else if (digit >= 'a' && digit <= 'f') {
+            result = result << 4 | static_cast<uint32_t>(digit - 'a' + 10);
+        } else {
+            return false;
+        }
+    }
+    *value = result;
+    return true;
+}
+
+// The four `upload` commands. The words are read first, then the show is asked for.
+uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
+    if (words.count >= 2 && words.is(1, "begin")) {
+        uint32_t id;
+        uint32_t bytes;
+        char name[33];
+        if (words.count != 5 || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
+            !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes)) {
+            return refuse(reply, "bad-argument");
+        }
+        for (uint32_t at = 0; at < words.size[3]; ++at) {
+            name[at] = words.text[3][at];
+        }
+        name[words.size[3]] = '\0';
+        if (!is_file_name(name)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_begin(core, now, id, name, bytes, reply);
+    }
+    if (words.count >= 2 && words.is(1, "data")) {
+        uint32_t offset;
+        uint32_t count = 0;
+        if (words.count != 4 || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset) ||
+            (count = base64_size(words.text[3], words.size[3])) == 0) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_data(core, now, offset, words.text[3], words.size[3], count, reply);
+    }
+    if (words.count >= 2 && words.is(1, "end")) {
+        uint32_t crc;
+        if (words.count != 3 || !crc_word(words, 2, &crc)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_end(core, crc, reply);
+    }
+    if (words.count == 2 && words.is(1, "cancel")) {
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_cancel(core, reply);
+    }
+    return refuse(reply, "bad-argument");
 }
 
 }  // namespace
 
 uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t length, char *bytes) {
     const uint64_t now = clock_touch(core, now_ms);
+    upload_touch(core, now);
     Reply reply;
     reply.bytes = bytes;
     reply.length = 0;
@@ -121,46 +186,34 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return refuse(reply, "line-too-long");
     }
 
-    // The line is split at every space, so it has one word more than it has spaces.
-    uint32_t first = 0;
-    while (first < length && line[first] != ' ') {
-        ++first;
-    }
-    uint32_t more_words = 0;
-    for (uint32_t at = 0; at < length; ++at) {
-        if (line[at] == ' ') {
-            ++more_words;
-        }
-    }
-    // With two words, the second one is the argument.
-    const char *argument = more_words == 1 ? line + first + 1 : line;
-    const uint32_t argument_length = more_words == 1 ? length - first - 1 : 0;
+    Words words;
+    words.split(line, length);
 
-    if (is_word(line, first, "status")) {
-        if (more_words != 0) {
+    if (words.is(0, "status")) {
+        if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
         return status(core, now, reply);
     }
-    const bool switch_on = is_word(line, first, "on");
-    if (switch_on || is_word(line, first, "off")) {
-        if (more_words != 0) {
+    const bool switch_on = words.is(0, "on");
+    if (switch_on || words.is(0, "off")) {
+        if (words.count != 1) {
             return refuse(reply, "bad-argument");
         }
         core.on = switch_on ? 1 : 0;
         return succeed(reply);
     }
-    if (is_word(line, first, "brightness")) {
+    if (words.is(0, "brightness")) {
         uint32_t value;
-        if (more_words != 1 || !decimal(argument, argument_length, 255, &value) || value > 255) {
+        if (words.count != 2 || !number_word(words, 1, 0, 255, &value)) {
             return refuse(reply, "bad-argument");
         }
         player_set_brightness(core, static_cast<uint8_t>(value));
         return succeed(reply);
     }
-    if (is_word(line, first, "play")) {
+    if (words.is(0, "play")) {
         uint32_t id;
-        if (more_words != 1 || !decimal(argument, argument_length, 65535, &id) || id < 1 || id > 65535) {
+        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
@@ -175,6 +228,35 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         player_play(core, item);
         return succeed(reply);
+    }
+    if (words.is(0, "space")) {
+        if (words.count != 1) {
+            return refuse(reply, "bad-argument");
+        }
+        return content_space(core, reply);
+    }
+    if (words.is(0, "list")) {
+        uint32_t from = 0;
+        if (words.count > 2 || (words.count == 2 && !number_word(words, 1, 0, 65535, &from))) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return content_list(core, from, reply);
+    }
+    if (words.is(0, "remove")) {
+        uint32_t id;
+        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return content_remove(core, id, reply);
+    }
+    if (words.is(0, "upload")) {
+        return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");
 }
@@ -197,12 +279,15 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
         return;
     }
     odrig::Core &state = core->state;
-    odrig::clock_touch(state, now_ms);
-    char reply[ODRIG_REPLY_MAX];
+    odrig::upload_touch(state, odrig::clock_touch(state, now_ms));
+    if (state.line == nullptr || state.feed_reply == nullptr) {
+        return;
+    }
+    char *reply = state.feed_reply;
     for (size_t at = 0; at < length; ++at) {
         const char byte = static_cast<char>(bytes[at]);
         if (byte != '\n') {
-            // Room for 64 characters and the carriage return of a line that ends in one.
+            // Room for a whole line and the carriage return of a line that ends in one.
             if (state.line_length < ODRIG_LINE_MAX + 1) {
                 state.line[state.line_length++] = byte;
             } else {
@@ -210,9 +295,9 @@ void odrig_core_feed(odrig_core *core, uint64_t now_ms, const uint8_t *bytes, si
             }
             continue;
         }
-        // A line that outgrew the room is longer than 64 characters whatever it ends in.
-        // The host is handed the line as the command entry reads it: without one carriage
-        // return at its end, and its first 64 characters when it is longer.
+        // A line that outgrew the room is too long whatever it ends in. The host is handed
+        // the line as the command entry reads it: without one carriage return at its end,
+        // and its first ODRIG_LINE_MAX characters when it is longer.
         uint32_t kept = state.line_length;
         uint32_t reply_length;
         if (state.line_over) {

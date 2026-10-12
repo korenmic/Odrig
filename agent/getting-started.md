@@ -12,24 +12,28 @@ computer read [On Windows](#on-windows) first.
   `git`. `xcode-select --install` installs them.
 - **Python 3.10 or later, as `python3`.** The Python that comes with the developer tools is
   older. `python3 --version` has to say 3.10 or more before you go on.
+- **Node.js 20 or later, as `node`**, with the `npm` that comes with it. The converter
+  runs on it. `node --version` has to say v20 or more.
 - **A network connection** for the setup, once.
 - **Safari or Chrome**, to look at the emulator's page.
 
 ## On Windows
 
-The converter, the core's build, the emulator, the command tool and their suites work on
-Windows 10 and 11. The firmware tool, the board and the walk-through suite stay with the
-first computer. A Windows computer needs git, Python 3.10 or later as `python`, a C++
-compiler, and Node.js for the emulator suite. The build finds `g++` or `clang++` on the
-path, and Microsoft's C++ build tools. With none of them, unpack a GCC for Windows, such as
-the WinLibs build of MinGW-w64, into the folder `tools/` of the repository: nothing is
-installed. The setup and the four suites, in PowerShell:
+The reference converter, the core's build, the emulator, the command tool and their suites
+work on Windows 10 and 11. The converter's own suite, `npm test --prefix converter`, does
+not pass there yet. The firmware tool, the board and the walk-through suite stay with the
+first computer. A Windows computer needs git, Python 3.10 or later as `python`, Node.js 20
+or later, and a C++ compiler. The build finds `g++` or `clang++` on the path, and
+Microsoft's C++ build tools. With none of them, unpack a GCC for Windows, such as the
+WinLibs build of MinGW-w64, into the folder `tools/` of the repository: nothing is
+installed. The setup and the four suites that pass, in PowerShell:
 
 ```text
 git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
+npm ci --prefix converter
 .venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
 .venv\Scripts\python core/build.py test
@@ -54,55 +58,53 @@ command of this repository is run from that folder, the repository root.
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
+npm ci --prefix converter
 make -C core shared
 ```
 
 The first command makes a Python environment in the folder `.venv`. The second puts three
-libraries into it, numpy, Pillow and PyAV, which the converter needs to read videos and
-GIFs. The third builds the core as the library the emulator loads,
-`core/build/libodrig_core.dylib`. Git ignores both folders, `.venv/` and `core/build/`.
-`.venv/bin/python` is the Python for every command of this repository. The other documents
-write it as `python`.
+libraries into it, numpy, Pillow and PyAV, with which the reference converter reads videos
+and GIFs. The third puts the converter's two packages for the same job into
+`converter/node_modules/`; one of them fetches a decoder program, an ffmpeg built for your
+computer. The fourth builds the core as the library the emulator loads,
+`core/build/libodrig_core.dylib`. Git ignores these three folders. `.venv/bin/python` is
+the Python for every command of this repository. The other documents write it as `python`.
 
 ## Run the tests
 
 ```sh
+npm test --prefix converter
 .venv/bin/python -m unittest discover -s tests/converter -t .
 make -C core test
 .venv/bin/python -m unittest discover -s tests/emulator -t .
 .venv/bin/python -m unittest discover -s tests/onboarding -t .
 ```
 
-Each ends with the line `OK`. None needs the board or the network.
+The first ends with a list of counts, in which `fail 0` says that every test passed. Each
+of the others ends with the line `OK`. None needs the board or the network.
 
 | Suite | What it checks | Takes about |
 |---|---|---|
-| `tests/converter` | The converter, and every tracked document against the tools. | 20 seconds |
+| `converter/tests` | The converter: its results against those of the reference converter, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
+| `tests/converter` | The reference converter and the generators, and every tracked document against the tools. | 20 seconds |
 | `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 40 seconds |
 | `tests/emulator` | The emulator and the command tool. | 2 minutes |
-| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real. | a second |
+| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real. | 2 seconds |
 
 ## Suites that need more
 
-The firmware tool has a suite that needs no board:
-
 ```sh
 python3 firmware/fw.py test
-```
-
-It runs the tests in `tests/firmware`. The first time any command of that tool runs, it
-fetches WLED's source and its build tools into `build/firmware/`: about 260 MB, over the
-network. Run it when you work on the firmware or on its tool.
-
-One suite, `tests/walkthrough`, follows this page and the animation guide in a fresh copy
-of the repository, to see that their commands still work:
-
-```sh
 .venv/bin/python -m unittest discover -s tests/walkthrough -t .
 ```
 
-It sets up a clone in a temporary folder as this page says, which needs the network, runs
-the four suites above, packs and checks the demo show, and makes an animation as the guide
+The first is the suite of the firmware tool, `tests/firmware`, and needs no board. The
+first time that tool runs, it fetches WLED's source and its build tools into
+`build/firmware/`: about 260 MB, over the network. Run it when you work on the firmware.
+
+The second, `tests/walkthrough`, follows this page and the animation guide in a fresh copy:
+it sets up a clone in a temporary folder as this page says, which needs the network, runs
+the five suites above, packs and checks the demo show, and makes an animation as the guide
 says. It takes about four minutes. Run it when you have changed either page.
 
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
@@ -115,14 +117,14 @@ runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
 The demo show, `shows/demo-20/show.json`, is test content for the target and not finished
 work: two proof-of-concept animations, the words HELLO WORLD and a square that bounces, and
 a cycle that plays the two in turn, 15 seconds each, from power-on. Its two sources are not
-tracked. Two generators write them, and `pack` turns them and the show file into an
-installed file set:
+tracked. Two generators write them, and the converter's `pack` turns them and the show
+file into an installed file set:
 
 ```sh
 mkdir -p build/demo-20/sources
 .venv/bin/python -m odrig.generators.hello_world build/demo-20/sources/hello.json --mapping mapping/legs-20.json
 .venv/bin/python -m odrig.generators.dvd_bounce build/demo-20/sources/dvd.json --mapping mapping/legs-20.json
-.venv/bin/python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
     --sources build/demo-20/sources --out build/demo-20/show
 ```
 
@@ -159,14 +161,9 @@ takes them over Wi-Fi:
 .venv/bin/python -m odrigctl --http 127.0.0.1:8600 brightness 40
 ```
 
-Each prints the reply. The first one's is:
-
-```text
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
-```
-
-The page shows every command in its log as it arrives. Stop the emulator with Ctrl-C in
-its terminal. [commands.md](../docs/commands.md) has the five commands and
+Each prints the reply, one line of JSON like the one under the next heading. The page
+shows every command in its log as it arrives. Stop the emulator with Ctrl-C in its
+terminal. [commands.md](../docs/commands.md) has every command and
 [emulator.md](../docs/emulator.md) everything about the emulator and its page.
 
 ## Check it without a screen
@@ -196,5 +193,6 @@ The record file holds the colour of every LED at every refresh;
 - [animation-guide.md](animation-guide.md), to make an animation and try it here.
 - [working-rules.md](working-rules.md), before you change anything.
 - [converter.md](../docs/converter.md), [format.md](../docs/format.md) and [show.md](../docs/show.md) for the
-  tools and files used above, and [mapping.md](../docs/mapping.md) for how the canvas is wired.
+  tools and files used above, [reference-converter.md](../docs/reference-converter.md) for the generators, and
+  [mapping.md](../docs/mapping.md) for how the canvas is wired.
 - [decisions.md](../docs/decisions.md) for what has been decided and what is still open.

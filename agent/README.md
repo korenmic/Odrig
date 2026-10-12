@@ -10,8 +10,12 @@ odrig is the LED animation system of an installation for Midburn. A small board,
 ESP32-S3, drives a canvas of 60 x 60 LEDs and plays animations that are stored on it. The
 repository holds everything between a video or an idea and what the LEDs show:
 
-- the **converter**, `odrig/`: Python. It turns a video or a GIF into a source that git
-  tracks, a source into the file that is played, and a list of animations into a show;
+- the **converter**, `converter/`: JavaScript, run with Node.js. It turns a video or a GIF
+  into a source that git tracks, a source into the file that is played, and a list of
+  animations into a show;
+- the **reference converter**, `odrig/`: Python. It was the converter before and does the
+  same work. It is kept so that tests can compare the converter with it, and it holds the
+  generators, the programs that write animations. Nobody converts with it any more;
 - the **core**, `core/`: C++. It is the player, the one piece of code that runs both on the
   board and on a computer;
 - the **emulator**, `emulator/`: Python, on macOS and on Windows. It runs the core on a computer and
@@ -59,4 +63,5 @@ rules in short and the table from tasks to documents, and `CLAUDE.md` points to 
   the commands and each tool.
 - `project-seeds/`: the planned work, one folder for each seed.
 - `docs/specs/`: the specs made from the seeds, with their task lists.
-- `tests/`: the tests, one folder for each suite.
+- `tests/`: the tests, one folder for each suite. The converter's own suite is in
+  `converter/tests/`.

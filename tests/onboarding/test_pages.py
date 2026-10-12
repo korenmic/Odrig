@@ -17,8 +17,11 @@ PRIVATE = {
 }
 
 # Words for what is planned and not yet in the repository.
-PLANNED = re.compile(r"JavaScript|Android|Capacitor|Tauri|\bseeds? 0?[6-9]\b")
+PLANNED = re.compile(r"Android|Capacitor|Tauri|\bseeds? 0?9\b")
 WHERE_THE_PLANNED_IS_NAMED = (support.ENTRY, "What is coming")
+
+# A command that converts, checks or packs with the reference converter, which no page gives.
+WITH_THE_REFERENCE = re.compile(r"\S*python\S* -m odrig (?:import|encode|decode|check|pack)\b")
 
 COPIED_FROM = 60
 
@@ -51,11 +54,15 @@ def broken_links(page, text):
     return broken
 
 
+def given(text):
+    """Every command a page gives: in a command block, or as a code span of its prose."""
+    return [command for _, command in support.page_commands(text)] + [span for span in support.spans(text) if support.is_command(span)]
+
+
 def refused(text):
     """`command: what is wrong` for every command of a page that its tool does not take."""
-    given = [command for _, command in support.page_commands(text)] + [span for span in support.spans(text) if support.is_command(span)]
     found = []
-    for command in given:
+    for command in given(text):
         wrong = support.refusal(command)
         if wrong is not None:
             found.append(f"{command}: {wrong}")
@@ -82,6 +89,14 @@ class EveryPage(unittest.TestCase):
         for page, text in self.pages():
             with self.subTest(page=page):
                 self.assertEqual(refused(text), [])
+
+    def test_every_command_that_converts_checks_or_packs_starts_the_converter(self):
+        converting = 0
+        for page, text in self.pages():
+            with self.subTest(page=page):
+                self.assertEqual([command for command in given(text) if WITH_THE_REFERENCE.match(command)], [])
+                converting += sum(command.startswith(f"{support.NODE} {support.CONVERTER} ") for command in given(text))
+        self.assertGreaterEqual(converting, 4)
 
     def test_no_command_block_stages_broadly(self):
         for page, text in self.pages():
@@ -131,7 +146,7 @@ class TheChecks(unittest.TestCase):
             self.assertTrue(support.is_path(word) and not support.exists(word), word)
         for word in ("status", ".odrg", "(x, y)", "127.0.0.1:8600", "--mapping", "/odrig", "<id>"):
             self.assertFalse(support.is_path(word), word)
-        for word in ("build/demo-20/show", ".venv/bin/python", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json", "origin/master"):
+        for word in ("build/demo-20/show", ".venv/bin/python", "converter/node_modules/", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json", "origin/master"):
             self.assertFalse(support.looked_for(word), word)
 
     def test_a_seed_that_is_named_ahead_of_this_branch_is_on_master(self):
@@ -153,6 +168,13 @@ class TheChecks(unittest.TestCase):
 
     def test_a_command_is_given_to_its_tool(self):
         for command in (
+            "node converter/odrig.js pack --show shows/demo-20/show.json --mapping mapping/legs-20.json --sources build/s --out build/o",
+            "node converter/odrig.js import build/x.gif build/x.json --mapping mapping/legs-20.json --fit fit --start 12.5 --duration 4",
+            "node converter/odrig.js check build/x.json",
+            "node converter/odrig.js",
+            "node --version",
+            "npm ci --prefix converter",
+            "npm test --prefix converter",
             ".venv/bin/python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json --sources build/s --out build/o",
             ".venv/bin/python -m emulator build/demo-20/show --record build/x.odrr --seconds 2",
             ".venv/bin/python -m odrigctl --port build/emulator/serial play 2",
@@ -173,6 +195,13 @@ class TheChecks(unittest.TestCase):
         ):
             self.assertIsNone(support.refusal(command), command)
         for command, said in (
+            ("node converter/odrig.js check build/x.json --nope", "there is no option --nope"),
+            ("node converter/odrig.js pack --show shows/demo-20/show.json", "--mapping, --sources and --out are missing"),
+            ("node converter/odrig.js bake", "there is no subcommand bake"),
+            ("node converter/odrig.js import build/x.gif build/x.json --mapping mapping/legs-20.json --fit wide", "which is not fill, fit or stretch"),
+            ("node build/x.js", "node starts the converter"),
+            ("npm install", "npm is run as npm ci --prefix converter"),
+            ("npm test", "npm is run as npm ci --prefix converter"),
             (".venv/bin/python -m odrig check build/x.json --nope", "unrecognized arguments: --nope"),
             (".venv/bin/python -m odrig pack --show shows/demo-20/show.json", "arguments are required"),
             (".venv/bin/python -m odrig bake", "invalid choice"),
@@ -186,6 +215,13 @@ class TheChecks(unittest.TestCase):
             ("brew install python", "does not know"),
         ):
             self.assertIn(said, support.refusal(command) or "", command)
+
+    def test_a_command_of_the_reference_converter_is_told_from_the_other_commands_of_python(self):
+        for command in (".venv/bin/python -m odrig pack --show build/show.json", "python -m odrig import build/x.gif build/x.json", "python3 -m odrig check build/x.json"):
+            self.assertIsNotNone(WITH_THE_REFERENCE.match(command), command)
+        for command in ("python -m odrig", ".venv/bin/python -m odrig.generators.dvd_bounce build/dvd.json --mapping mapping/legs-20.json",
+                        ".venv/bin/python -m odrigctl --port build/emulator/serial play 2", "node converter/odrig.js pack --show build/show.json"):
+            self.assertIsNone(WITH_THE_REFERENCE.match(command), command)
 
     def test_the_text_of_a_page_is_split_into_prose_blocks_and_commands(self):
         text = "# T\n\n## One\n\nSee `a/b` and `python -m odrig`.\n\n```sh\nmkdir -p build/x\npython3 -m odrig check \\\n    build/x/a.json\n```\n\n## Two\n\n```text\nprinted\n```\n"

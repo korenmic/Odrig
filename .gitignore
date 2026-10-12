@@ -7,3 +7,4 @@ __pycache__/
 /scratch/
 /tools/
 .DS_Store
+/converter/node_modules/

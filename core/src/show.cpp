@@ -52,20 +52,6 @@ void write_id(char *text, bool negative, uint32_t size) {
     *text = '\0';
 }
 
-// The naming rule of a file: 1 to 32 characters from a-z, 0-9, `-`, `_` and `.`, ending in
-// `.odrg`. The text is known to be at most 32 characters long.
-bool is_file_name(const char *name) {
-    uint32_t length = 0;
-    for (; name[length] != '\0'; ++length) {
-        char c = name[length];
-        bool allowed = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.';
-        if (!allowed) {
-            return false;
-        }
-    }
-    return length >= 5 && same_text(name + length - 5, ".odrg");
-}
-
 // The entry of the file table with this name; a new one when no item named it before.
 uint32_t file_entry(Core &core, const char *name) {
     for (uint32_t index = 0; index < core.file_count; ++index) {
@@ -232,7 +218,7 @@ bool read_file(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
                     return false;
                 }
             }
-            if (json.failed || seen.items == 0) {
+            if (json.failed) {
                 return false;
             }
         }
@@ -334,6 +320,18 @@ Reason check_ids(Core &core, const Seen &seen, char *id_text) {
 
 }  // namespace
 
+bool is_file_name(const char *name) {
+    uint32_t length = 0;
+    for (; name[length] != '\0'; ++length) {
+        char c = name[length];
+        bool allowed = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.';
+        if (!allowed) {
+            return false;
+        }
+    }
+    return length >= 5 && same_text(name + length - 5, ".odrg");
+}
+
 Reason read_show(Core &core, char *id_text) {
     id_text[0] = '\0';
 
@@ -343,23 +341,25 @@ Reason read_show(Core &core, char *id_text) {
     if (reason != kNone) {
         return reason;
     }
-    if (first.items > kMostToCount / sizeof(ItemInfo) || first.entries > kMostToCount / 2 ||
-        first.animations > kMostToCount / sizeof(FileInfo)) {
+    // The item and the file table get room for more items than the show has now. A show
+    // with more items than there are ids is refused below, and until then has its room.
+    uint32_t capacity = first.items < kMostItems - kSpareItems ? first.items + kSpareItems : kMostItems;
+    if (capacity < kFewestItems) {
+        capacity = kFewestItems;
+    }
+    if (capacity < first.items) {
+        capacity = first.items;
+    }
+    if (capacity > kMostToCount / sizeof(FileInfo) || first.entries > kMostToCount / 2) {
         return kOutOfMemory;
     }
-    core.items = static_cast<ItemInfo *>(arena_take(core, first.items * static_cast<uint32_t>(sizeof(ItemInfo))));
-    bool supplied = core.items != nullptr;
-    if (first.entries != 0) {
-        core.entries = static_cast<uint16_t *>(arena_take(core, first.entries * 2));
-        supplied = supplied && core.entries != nullptr;
-    }
-    if (first.animations != 0) {
-        core.files = static_cast<FileInfo *>(arena_take(core, first.animations * static_cast<uint32_t>(sizeof(FileInfo))));
-        supplied = supplied && core.files != nullptr;
-    }
-    if (!supplied) {
+    core.items = static_cast<ItemInfo *>(arena_take(core, capacity * static_cast<uint32_t>(sizeof(ItemInfo))));
+    core.entries = static_cast<uint16_t *>(arena_take(core, (first.entries != 0 ? first.entries : 1) * 2));
+    core.files = static_cast<FileInfo *>(arena_take(core, capacity * static_cast<uint32_t>(sizeof(FileInfo))));
+    if (core.items == nullptr || core.entries == nullptr || core.files == nullptr) {
         return kOutOfMemory;
     }
+    core.item_capacity = capacity;
 
     // The second reading fills the tables. The items count only when it has ended well.
     Seen second;
@@ -383,6 +383,7 @@ Reason read_show(Core &core, char *id_text) {
         return reason;
     }
     core.brightness = static_cast<uint8_t>(second.brightness);
+    core.show_brightness = core.brightness;
     return kNone;
 }
 

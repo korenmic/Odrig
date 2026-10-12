@@ -1,0 +1,10 @@
+{
+  "number": 14,
+  "slug": "14-p1-playing-at-once-at-power-on",
+  "state": "remaining",
+  "title": "Playing at once at power-on",
+  "priority": "P1",
+  "addedAt": "2026-10-12T09:13:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "At power-on the core checks only the headers, plays the start item at once, and checks the bodies of the installed animations while the show plays."
+}

@@ -1,0 +1,11 @@
+{
+  "number": 15,
+  "slug": "15-p1-led-current-limit-as-a-setting",
+  "state": "completed",
+  "title": "The LED current limit as a setting",
+  "priority": "P1",
+  "addedAt": "2026-10-12T09:13:36+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Set WLED's limit on LED current from a tracked value with the firmware tool, 850 mA on the bench and switched off or raised for the installation.",
+  "completedAt": "2026-10-12T15:16:07+03:00"
+}

@@ -24,7 +24,7 @@ Run from the repository root.
 |---|---|---|
 | `make -C core` | Builds the library `core/build/libodrig_core.a` from every `core/src/*.cpp`, with every compiler warning treated as an error. | Apple's command-line developer tools: `make`, `c++` and `ar`. |
 | `make -C core test` | Builds the library and the test host `core/build/odrig_host`, then runs the suite of `tests/core/`. | The same, and Python 3.10 or later with no added package. |
-| `make -C core bench` | Builds `core/build/odrig_bench`, has the converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
+| `make -C core bench` | Builds `core/build/odrig_bench`, has the reference converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
 | `make -C core clean` | Removes `core/build/`. | |
 | `python core/build.py` | Builds the library without GNU Make, which is how Windows builds: `core/build/libodrig_core.a`, or `odrig_core.lib` with Microsoft's compiler. It builds again only what changed. | A C++ compiler: `g++` or `clang++`, on the path or unpacked under the folder `tools/`, or Microsoft's C++ build tools. Python 3.10 or later. |
 | `python core/build.py test` | Builds the library and the test host, then runs the suite of `tests/core/` with the Python that runs the script. | The same. |
@@ -39,7 +39,8 @@ make -C core test PYTHON="$PWD/.venv/bin/python"
 
 The suite is every `test_*.py` file in `tests/core/`, found by discovery. It drives the
 test host as a child process and compares what the core does with the reference decoder and
-the readers of the converter, [converter.md](converter.md), and with a reference player
+the readers of the reference converter,
+[reference-converter.md](reference-converter.md), and with a reference player
 written in Python, `ReferencePlayer` in `tests/core/support.py`. The test host is built with
 the address and undefined-behaviour sanitizers. The suite needs no hardware and no network
 connection.
@@ -76,11 +77,40 @@ Every function receives `ctx` as its first argument.
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
 | `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. Today the core logs one thing: the reason text when the show becomes invalid. |
+| `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
+| `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
+| `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
+| `rename` | `int rename(void *ctx, const char *from, const char *to)`: gives the file `from` the name `to`, in place of a file that has it. After a power cut during the call, `to` is its old file or the new one, whole. Returns 1, or -1. |
+| `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
+| `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
+| `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
-`show.json` twice each at startup. It never writes, creates or deletes a file, and it reads
-no clock.
+`show.json` twice each at startup, and reads no clock. With the storage functions it
+writes, renames and removes files of the folder, as [the files the core
+writes](#the-files-the-core-writes) says, and nothing outside it.
+
+The last seven members are the storage functions: three that write a file, `rename`,
+`remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
+
+- A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
+  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the three
+  names the core keeps for itself, `upload.part`, `show.part` and `pending.txt`.
+- The core has at most one file being written, gives `write` at most 1,500 bytes in one
+  call, and reads a file with `read_at` from offset 0 on, each call where the last ended.
+  It renames and removes no file that `open` holds or that is being written.
+- A host without storage that can be changed sets `write_open` to `NULL`. The core then
+  calls none of the seven but `space`. `space` may be `NULL` too; the command `space` is
+  then answered with `storage-error`. With `write_open` set, all seven are set.
+- The core calls them only inside `odrig_core_begin`, `odrig_core_command`,
+  `odrig_core_feed` and `odrig_core_poll`, never from inside another host function.
+- With `write_open` `NULL`, `remove` and `upload begin` are answered with `storage-error`,
+  the start removes nothing, and the four blocks that only a change of the show needs are
+  not asked for.
+- `read_at` reads the file of an upload back from storage while it is checked: one more
+  function than writing, renaming and removing, because `open`, `read` and `close` hold
+  the one file that plays.
 
 ### What the core offers
 
@@ -108,7 +138,7 @@ no clock.
 `ctx` is the `reply_ctx` of the call. The line and the reply are valid during the call only,
 and neither ends in a zero.
 
-`ODRIG_LINE_MAX` is 64, the longest command line in characters. `ODRIG_REPLY_MAX` is 192,
+`ODRIG_LINE_MAX` is 2048, the longest command line in characters. `ODRIG_REPLY_MAX` is 1024,
 the longest reply in bytes with its newline.
 
 ### Rules of use
@@ -172,27 +202,55 @@ board. The host sends them to the leg's pin as they are.
 The commands and their replies are those of [commands.md](commands.md). The core is the
 only place where a command is read; a transport only carries lines.
 
-`odrig_core_command` takes one line. It drops one newline at the end of the line and then
-one carriage return at its end, so the body of an HTTP request can be passed as it is. The
-line is split into words at every single space. Every line gets exactly one reply, an empty
-line too: one JSON object on one line, ended by a newline, without a zero after it.
+`odrig_core_command` takes one line of at most 2,048 characters. It drops one newline at
+the end of the line and then one carriage return at its end, so the body of an HTTP request
+can be passed as it is. The line is split into words at every single space; a command has
+five words at most, and a line with more is no valid command. Every line gets exactly one
+reply, an empty line too: one JSON object on one line of at most 1,024 bytes, ended by a
+newline, without a zero after it. The reply is written into the room the caller gives.
 
 `odrig_core_feed` is for a transport that delivers bytes, such as a serial port. Every
-newline ends a line. The core keeps an unfinished line from one call to the next, and of a
-line without end it keeps no more than it needs to tell that the line is too long. For each
-line it calls `on_reply` with the line as the command entry read it, without its line end
-and cut to 64 characters when it is longer, and with the reply.
+newline ends a line. The core keeps an unfinished line of up to 2,048 characters, and a
+carriage return after them, from one call to the next, and of a line without end it keeps
+no more than it needs to tell that the line is too long. For each line it calls `on_reply`
+with the line as the command entry read it, without its line end and cut to 2,048
+characters when it is longer, and with the reply.
 
-A line that is no valid command changes nothing and is answered with the first code that
-applies of `line-too-long`, `unknown-command`, `bad-argument`, `show-invalid` and
-`unknown-id`.
+The unfinished line and the reply of this entry are two blocks the core takes at startup,
+of 2,049 and of 1,024 bytes. When the host could supply neither or only one of them, the
+show is invalid with `out-of-memory`, `odrig_core_feed` takes no bytes and calls nothing,
+and `odrig_core_command` works as ever.
+
+A line that is no valid command is answered with the first code that applies, in the
+order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
+`bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
+`unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
+upload they are about.
 
 ## Startup
 
 `odrig_core_begin` reads `mapping.json`, then `show.json`, and then decodes every different
 `.odrg` file the show names, in the order in which the show first names them, from its
 first frame record to its last. For each file it checks the header, then the size against
-the mapping, then the body.
+the mapping, then the body. It notes the size of each file, which `list` reports, and the
+sum of its frames' durations.
+
+A show may have no items. It is valid, and nothing plays.
+
+With a host whose storage can be changed, the start also removes what an interrupted
+change left:
+
+1. Before anything is read, it removes `upload.part` and `show.part`.
+2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
+   it reads at most 512 bytes and takes every line that ends in a line feed and is a file
+   name under the naming rule of [show.md](show.md). Each such file that no item names is
+   removed, and then `pending.txt`. When a file could not be removed, `pending.txt` stays
+   for the next start; when it could not be read, nothing is removed.
+3. When the mapping or the show file could not be used, `pending.txt` is left alone.
+
+A folder with none of the three files is asked to remove two names that are not there and
+to open one that is not there, and for nothing else.
 
 A show that is wrong in any way is refused as a whole: the LEDs stay dark, `play` is
 answered with `show-invalid`, and `odrig_core_error` and `status` give the reason. The
@@ -207,33 +265,156 @@ sound, and 0 otherwise.
 A file can also fail while it plays: it is gone, cannot be read, or no longer follows the
 format. From that refresh on the show is invalid in the same way, until the next startup.
 
-The core keeps nothing from one startup to the next. Given the same files and the same
-calls with the same timestamps, it gives the same replies and the same LED data, byte for
-byte.
+The core keeps nothing from one startup to the next but the files of the folder. Given
+the same files, the same answers of the host and the same calls with the same timestamps,
+it gives the same replies, the same LED data and the same storage calls in the same
+order, byte for byte.
+
+## The files the core writes
+
+`remove` and `upload` change the show while the core runs: in storage first, then in its
+tables. The core keeps three names in the folder for itself:
+
+| Name | What it is |
+|---|---|
+| `upload.part` | The bytes of the open upload. |
+| `show.part` | The next `show.json`, until it is renamed. |
+| `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+
+There are four kinds of change. Each line is one call to the host; "write X" is
+`write_open`, one or more `write` of at most 1,500 bytes, and `write_close`.
+
+**A removal.** F is the removed item's file; lines 1, 4 and 5 are left out when the item is
+a cycle or another item names F.
+
+```
+1  write pending.txt: "F"
+2  write show.part: the show without the item
+3  rename show.part -> show.json                 <-
+4  remove F
+5  remove pending.txt
+```
+
+**An upload for a new item**, with the file name G:
+
+```
+1  write pending.txt: "G"
+2  rename upload.part -> G
+3  write show.part: the show with the item at its end
+4  rename show.part -> show.json                 <-
+5  remove pending.txt
+```
+
+**An upload that replaces an item's file by one of the same name G:**
+
+```
+1  rename upload.part -> G                       <-
+```
+
+`show.json` does not change.
+
+**An upload that replaces an item's file F by one of another name G.** F is left out of
+lines 1 and 5 when another item names it.
+
+```
+1  write pending.txt: "G", "F"
+2  rename upload.part -> G
+3  write show.part: the show with the item naming G
+4  rename show.part -> show.json                 <-
+5  remove F
+6  remove pending.txt
+```
+
+The show changes at the arrow: a power cut before it leaves the old show, one after it
+the new show, and the next start removes whatever else is in the folder. `show.json` is
+never written in place. The text of `show.json` is the one of [show.md](show.md),
+"show.json after a change", with the brightness the file had at startup.
+
+- **When a call fails before the arrow**, the reply is `storage-error`, the core removes
+  `show.part`, a G it had just renamed into place, and `pending.txt` again, and the
+  tables are as they were. An upload it happened to is discarded with its bytes.
+- **When a call fails after the arrow**, the change stands and the reply is
+  `{"ok":true}`: a file that could not be removed is named by `pending.txt` and is
+  removed at the next start.
+- **The tables** change after the arrow. In a removal the items after the removed one
+  move up, the entries of a removed cycle leave the entry table, and a file that no item
+  names any more leaves the file table; every position the core holds follows, so what
+  plays goes on undisturbed. A new item is written at the end of the item table and of
+  the file table. A replaced item's entry of the file table gets the new name, size and
+  duration; when another item named the old file too, the item gets an entry of its own.
+- **What plays.** When the removed item is the one that plays, playback stops, the file
+  that is open is closed, and the next refresh is dark. When the file of the animation
+  that plays is replaced, or of an animation the playing cycle lists, what plays starts
+  again from its first frame at the next refresh. Before a file is renamed onto a name
+  or removed, the player closes it when it has it open. Every other change leaves the LED
+  data as it would have been.
+- The item table and the file table have room for 32 items more than `show.json` lists at
+  startup, and for at least 128. A new item beyond that is refused with `no-space`.
+
+## Uploads and the check
+
+One upload can be open. It belongs to the core and not to an entry: its commands may
+come through `odrig_core_command` and `odrig_core_feed` in any mixture.
+
+- **`upload begin`** asks the host for its space and refuses a file for which
+  `bytes + bytes / 256 + 16,384` is more than the free bytes; then it begins the file
+  `upload.part`.
+- **`upload data`** checks the base64 whole, decodes it into the chunk buffer and gives
+  the bytes to the host in one `write`. With the last byte the file is closed.
+- **The check.** A file must be decoded whole before it joins the show. That is done
+  beside playback, with a second source, second decoders, a pixel buffer and a window of
+  their own, which read `upload.part` back with `read_at`, 512 bytes at a time. It runs
+  in steps inside `odrig_core_poll`, one step after the LED data of a refresh is
+  complete, and none after a refresh before which a grid time was skipped: when the host
+  is late, the check waits. The first step reads the header and compares the canvas with
+  the mapping's; each further step decodes one frame record, which is what playback does
+  for a refresh; the step after the last record asks for the end of the file and
+  compares the size and the CRC-32 of what was read back with what was received. A file
+  of F frame records is checked in F + 2 refreshes.
+- **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
+  file in place by the sequence of its kind, or reports what the check found:
+  `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
+  `size-mismatch`; `storage-error` when storage could not be read or gave back other
+  bytes.
+- **Discarding.** `upload cancel`, a wrong checksum, a failed check, a failed storage
+  call, and a show that becomes invalid discard the upload: `upload.part` is removed. So
+  does every call that carries a timestamp 60,000 ms or more after the last progress:
+  `upload begin`, an `upload data` that was taken, or a step of the check. The core
+  reads no clock for it.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to ten blocks sized
-from the mapping and the show. The figures are for the target file, `mapping/legs-20.json`,
-60 x 60 on twenty legs, with a show of 100 items: 80 animations with a file each and 20
-cycles of 10 entries. They are measured by the suite.
+The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
+blocks, in the order of the table: two of a fixed size for the byte entry, four for a host
+whose storage can be changed, and the others sized from the mapping and the show. No
+command, no upload and no check asks for memory. The figures are for the target file,
+`mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
+with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,112 |
+| The core object | fixed | 3,256 |
+| Line of the byte entry | 2,049 | 2,049 |
+| Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
 | The pixel of each LED | 2 for each LED | 7,200 |
 | LED data | 3 for each LED | 10,800 |
 | Strip check | 1 bit for each strip: each row of a row-leg file, each column of a column-leg file | 8 |
 | Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
-| Items | 16 for each item | 1,600 |
-| Cycle entries | 2 for each entry of a cycle | 400 |
-| Files | 48 for each animation item | 3,840 |
-| **Total** | | **70,768** |
+| Chunk buffer, with storage that can be changed | 1,500 | 1,500 |
+| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,440 |
+| The check: pixel buffer | as the player's | 10,800 |
+| The check: window | 32,768 | 32,768 |
+| Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
+| Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
+| Files | 48 for each of 132 | 6,336 |
+| **Total** | | **124,501** |
 
-That is 54 percent of the 131,072 bytes the core may use for this canvas. The example show
-on the two-leg mapping asks for 38,933 bytes. The size and the number of frames of an
+That is 95 percent of the 131,072 bytes the core may use for this canvas: the check of an
+uploaded file takes 46,008 of them. The example show on the two-leg mapping asks for
+87,986 bytes. A host without storage that can be changed is not asked for the chunk
+buffer and the three blocks of the check: 76,993 bytes for the target file. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 
@@ -273,6 +454,7 @@ repeated exactly.
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
 | `odrig_host reasons` | Prints every reason name the core can report, one on a line. |
 | `odrig_host guard alloc`, `guard new`, `guard read` | Does what the host must stop: asks the host for memory, or the program, as the core would after startup; or asks for 513 bytes of a file. |
+| `odrig_host guard write`, `guard write-none`, `guard close-none`, `guard two-files`, `guard name`, `guard rename-open`, `guard remove-open`, `guard read-at`, `guard read-at-offset` | Uses the storage functions as the core never may: gives `write` 1,501 bytes; calls `write`, or `write_close`, with no file being written; begins a second file while one is being written; names a file that is none of the core's; renames onto, or removes, the file `open` holds; asks `read_at` for 513 bytes, or for an offset that is not where its last call ended. |
 
 A batch on standard input is a row of pieces, each after its length as four bytes, least
 significant first. For `session --batch` a session is the number of its files as text, a
@@ -300,9 +482,25 @@ leg; and `ready`.
 | `--remove-after FILE N` | The file is gone once it has been opened N times. |
 | `--swap-after FILE N OTHER` | After N openings the name opens the content of the file `OTHER`. |
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
+| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 10,354,688, the size of the board's storage. |
+| `--no-storage` | The seven storage functions are `NULL`. |
+| `--only-space` | Of the seven only `space` is there: a host whose storage cannot be changed. |
+| `--space-unknown` | `space` returns -1. |
+| `--store-fails-at N` | The N-th storage call fails: it does nothing and returns -1. |
+| `--cut-at N` | The N-th storage call is not made; the program prints `power cut` and ends with status 75. |
+| `--cut-at N --cut-keeps K` | The same, but when that call is a `write`, its first K bytes are written first. |
+| `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
+| `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes at or after that offset. |
+| `--read-back-differs OFFSET` | `read_at` gives the byte at that offset with one bit changed. |
 
-The host hands out every file in pieces of changing sizes, none above 512 bytes. It checks
-the core as it goes and ends the program at once when a check fails:
+A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
+`space` and `read_at` are not counted and not traced. The storage functions work on the
+folder of a session, and for `session --batch` on the files held in memory. A file that
+was being written when the program ends stays with the bytes written so far.
+
+The host hands out every file in pieces of changing sizes, none above 512 bytes, through
+`read` and through `read_at`. It checks the core as it goes and ends the program at once
+when a check fails:
 
 | Status | Line printed | When |
 |---:|---|---|
@@ -310,5 +508,6 @@ the core as it goes and ends the program at once when a check fails:
 | 1 | a line that says what | An answer of the core contradicts another one: the legs and their count, a decoder that changes its answer after the end, a reply written into too little room. Also `guard` when nothing stopped it. |
 | 64 | a usage message, `bad line` or `bad batch` | The command line or the input was not understood. |
 | 70 | `allocation after startup` | The core asked the host for memory, or the program allocated with `new`, during a call after startup. |
-| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. |
-| 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 192 bytes. |
+| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or for an offset that is neither 0 nor where its last call for that file ended. |
+| 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |
+| 75 | `power cut` | The storage call that `--cut-at` names was reached. |

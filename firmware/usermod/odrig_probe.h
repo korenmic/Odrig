@@ -15,8 +15,16 @@ void started(uint32_t start_ms, const char *(*error)());
 // One pass of loop().
 void pass(uint64_t now_ms);
 
-// How long one request for a refresh took. Called by the task that makes the requests.
-void polled(uint32_t poll_us);
+// How long one request for a refresh took, and whether the core read a second file in
+// it, which it does for a step of the check of an uploaded file. Called by the task that
+// makes the requests.
+void polled(uint32_t poll_us, bool read_second);
+
+// The store trial, begun by the line `#store <bytes>`: whether it runs, and its next
+// step, which makes storage calls. The usermod calls the step in a pass of the loop in
+// which the pacing holds no line back, with the lock held as for a command.
+bool storing();
+void storeStep();
 
 // Around one send. After the show the time of the send is kept, the fill and the show
 // together, and the wire time begins: a timer looks every tenth of a millisecond whether
@@ -30,8 +38,9 @@ void beforeShow();
 void afterShow(uint64_t now_ms, uint32_t send_us);
 
 // One byte from the port. Bytes at the start of a line are held back for as long as they
-// are a beginning of `#probe` and a newline; the complete line is answered here, and every
-// other byte is handed to `pass`, in order.
+// are a beginning of `#probe` and a newline, or of `#store`, a space, up to ten digits and
+// a newline; the complete line is answered here, and every other byte is handed to
+// `pass`, in order.
 void feed(uint8_t byte, void (*pass)(uint8_t byte));
 
 }  // namespace OdrigProbe

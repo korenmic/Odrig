@@ -9,9 +9,8 @@ mapping file, `mapping/legs-20.json`. For the bench build name `mapping/legs-2.j
 
 An animation is kept as a source: a JSON frames file that lists every frame with its time
 in milliseconds and the colour of every place of the canvas. A source is made for one
-canvas, whose size is always taken from a mapping file. Refreshes are 20 milliseconds
-apart, so every frame gets a time that is a multiple of 20 milliseconds. There are two
-ways to get a source:
+canvas, whose size is taken from a mapping file. Refreshes are 20 milliseconds apart, so
+the time of every frame is a multiple of 20. There are two ways to get a source:
 
 - **A generator**: a short Python program works out the frames. This suits text, shapes
   and patterns, and the result is exact and small.
@@ -49,10 +48,9 @@ if __name__ == "__main__":
 `picture` makes a black picture and sets the places it is given: a place is (x, y), and a
 colour is three bytes, red, green and blue. `run` reads the mapping file, calls `frames`
 and writes the source. Saved as `odrig/generators/dot.py`, the module is started like the
-generators that are there, and its tests go into `tests/converter/test_generators.py`. The
-generators that are there write proof-of-concept animations: test content, not examples of
-finished work. `odrig/generators/dvd_bounce.py` is the shortest to read for how one is
-built. This writes its bouncing square for the target:
+other generators, and its tests go into `tests/converter/test_generators.py`. The others
+write proof-of-concept animations: test content, not examples of finished work. The shortest
+to read is `odrig/generators/dvd_bounce.py`. This writes its bouncing square for the target:
 
 ```sh
 mkdir -p build/try/sources
@@ -65,7 +63,7 @@ Put the video or the GIF under `build/`, where git does not see it. Its name end
 `.mp4`, `.mov` or `.gif`. The commands below take it from `build/try/clip.gif`:
 
 ```sh
-.venv/bin/python -m odrig import build/try/clip.gif build/try/sources/clip.json --mapping mapping/legs-20.json
+node converter/odrig.js import build/try/clip.gif build/try/sources/clip.json --mapping mapping/legs-20.json
 ```
 
 The picture is scaled to the canvas. `--fit` says what happens when its shape is not the
@@ -76,10 +74,14 @@ distorts it. `--start` and `--duration` take a part of the file: with
 video that was filmed upright on a phone has to be turned before it is imported.
 [converter.md](../docs/converter.md#import) has the rest.
 
+Import with this tool. The reference converter has an `import` too; it is the reference for
+tests and not the one to use, and the two need not judge a damaged file alike. See "Damaged
+media" in [reference-converter.md](../docs/reference-converter.md#command-line).
+
 ## Check a source
 
 ```sh
-.venv/bin/python -m odrig check build/try/sources/clip.json
+node converter/odrig.js check build/try/sources/clip.json
 ```
 
 For a GIF of one second with ten pictures this prints:
@@ -104,7 +106,7 @@ animations made above, the first of which plays from power-on, and packs it:
 
 ```sh
 printf '{"version": 1, "brightness": 128, "items": [{"id": 1, "file": "clip.odrg"}, {"id": 2, "file": "dvd.odrg"}], "start": 1}\n' > build/try/show.json
-.venv/bin/python -m odrig pack --show build/try/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show build/try/show.json --mapping mapping/legs-20.json \
     --sources build/try/sources --out build/try/show
 ```
 
@@ -121,13 +123,11 @@ canvas, and a folder that is not empty: remove `build/try/show` before you pack 
 Open the address it prints, as in getting started, and look for these:
 
 - **The picture is the right way up** and not mirrored.
-- **It covers the canvas as you meant.** With `fill` the edges of a picture of another
-  shape are cut off; with `fit` there are black bars.
+- **It covers the canvas as you meant**: `fill` cuts off edges, and `fit` leaves black bars.
 - **The colours.** The page lifts dark colours the way LEDs do, so judge them on the page
   and not in a video player.
 - **The join.** An animation starts again from its first frame when it ends.
-- **The header.** `core` and `page` stay near 50, and no red band appears. A red band
-  gives the reason a show is not valid.
+- **The header.** `core` and `page` stay near 50. A red band says why a show is not valid.
 
 Stop the emulator with Ctrl-C. It plays everything at 50 refreshes a second. The board
 does not: see [Dense animations on the board](#dense-animations-on-the-board).
@@ -147,7 +147,7 @@ It prints one line that begins with `reply 1000`, as in getting started. In it,
 | What | Where | Committed |
 |---|---|---|
 | A generator | `odrig/generators/`, its tests in `tests/converter/` | Yes. |
-| A source made by an import | `animations/NAME.json` | Yes, up to 50 MB; see the next section. |
+| A source made by an import | `animations/NAME.json` | Yes, always. Keep it to 50 MB or less; see the next section. |
 | A source a generator writes for the target | `build/`, written again whenever a show is packed | No. The generator is. |
 | A show file | `shows/NAME/show.json` | Yes. |
 | A mapping file | `mapping/` | Yes. It changes only when the LEDs are wired another way, which is the owner's to say. |
@@ -180,10 +180,9 @@ at 30, and at most 1.6 MB. The files that are played are far smaller: Hello worl
 demo show is 1,210 bytes, and the dense clip 1.4 MB.
 
 The large hosting services for git refuse a single file above 100 MB and warn above 50 MB.
-Keep every source at 50 MB or less, which is a minute of video at 25 pictures a second,
-and cut a longer piece into several animations with `--start` and `--duration`. Whether
-sources of such sizes are tracked at all is an [open question](../docs/decisions.md#open-questions)
-for the owner.
+Keep every source at 50 MB or less, a minute of video at 25 pictures a second, and cut a
+longer piece into several animations with `--start` and `--duration`. By the owner's ruling
+the JSON source is what is committed for every animation, whatever its size.
 
 ## Dense animations on the board
 

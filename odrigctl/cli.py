@@ -1,19 +1,32 @@
-"""The command line: the line that is sent, the printed reply and the exit statuses.
+"""The command line: the lines that are sent, the printed replies and the exit statuses.
 
-Exit status 0 means the reply has `"ok":true`, 1 that it has `"ok":false`, 2 that the
-command line was not understood, and 3 that the target could not be reached or did not
-answer in time.
+Exit status 0 means every reply has `"ok":true`, 1 that a reply has `"ok":false`, 2 that
+the command line was not understood or the file to upload cannot be read, and 3 that the
+target could not be reached or did not answer in time.
 """
 
 import argparse
-import json
+import os
 import sys
+import time
 
-from . import client
+from . import client, content
 
-# Each command and whether it takes its one argument.
-COMMANDS = {"play": "ID", "on": None, "off": None, "brightness": "N", "status": None}
+# Each command and the arguments it takes.
+COMMANDS = {
+    "play": ("ID",),
+    "on": (),
+    "off": (),
+    "brightness": ("N",),
+    "status": (),
+    "space": (),
+    "list": (),
+    "remove": ("ID",),
+    "upload": ("ID", "FILE"),
+}
 TIMEOUT_SECONDS = 2.0
+REPORT_SECONDS = 0.5
+COUNTS = ("no argument", "one argument", "two arguments")
 
 
 def _seconds(text):
@@ -37,47 +50,106 @@ def _lines_address(text):
 def parser():
     made = argparse.ArgumentParser(
         prog="python -m odrigctl",
-        description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply.",
-        epilog="Commands: play ID, on, off, brightness N, status. ID and N are sent as they are typed.",
+        description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
+                    "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it.",
+        epilog="Commands: play ID, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
     target.add_argument("--tcp", metavar="ADDRESS", type=_lines_address, help="the address of a target that takes lines over TCP: host:port")
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
-    made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for the reply (default: 2)")
-    made.add_argument("command", metavar="COMMAND", choices=sorted(COMMANDS), help="play, on, off, brightness or status")
-    made.add_argument("argument", metavar="ARGUMENT", nargs="?", help="the ID of play, or the N of brightness")
+    made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
+    made.add_argument("command", metavar="COMMAND", choices=list(COMMANDS), help=", ".join(COMMANDS))
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the N of brightness, the ID and the FILE of upload")
     return made
 
 
-def command_line(made, arguments):
-    """The line for a command, with its newline. The argument goes into it as typed."""
+def checked(made, arguments):
+    """The command and its arguments as they were typed. A command with another number of
+    arguments than it takes, or with a line end in one, ends the program as a usage error."""
     takes = COMMANDS[arguments.command]
-    if takes is None and arguments.argument is not None:
-        made.error(f"{arguments.command} takes no argument")
-    if takes is not None and arguments.argument is None:
-        made.error(f"{arguments.command} takes one argument: {takes}")
-    if arguments.argument is not None and "\n" in arguments.argument:
+    if len(arguments.arguments) != len(takes):
+        made.error(f"{arguments.command} takes {COUNTS[len(takes)]}" + (": " + " ".join(takes) if takes else ""))
+    if any("\n" in argument for argument in arguments.arguments):
         made.error("a command is one line")
-    words = [arguments.command] if arguments.argument is None else [arguments.command, arguments.argument]
-    return " ".join(words).encode("utf-8") + b"\n"
+    return [arguments.command, *arguments.arguments]
+
+
+def command_line(made, arguments):
+    """The line for a command that is one line, with its newline. The argument goes into
+    it as typed."""
+    return " ".join(checked(made, arguments)).encode("utf-8") + b"\n"
+
+
+class Progress:
+    """Writes how far an upload is: one line for each report, or one line written over
+    again when the stream is a terminal. A report is written when half a second has
+    passed since the one before, and for the last piece."""
+
+    def __init__(self, stream, clock=time.monotonic):
+        self.stream = stream
+        self.clock = clock
+        self.in_place = stream.isatty()
+        self.reported = clock()
+        self.width = 0
+
+    def sent(self, sent, total, seconds):
+        now = self.clock()
+        if sent < total and now - self.reported < REPORT_SECONDS:
+            return
+        self.reported = now
+        speed = round(sent / seconds) if seconds > 0 else 0
+        self._write(f"upload: {sent * 100 // total}% {sent}/{total} bytes {speed} B/s")
+
+    def checking(self):
+        self._write("upload: checking")
+
+    def _write(self, text):
+        if self.in_place:
+            self.stream.write("\r" + text.ljust(self.width))
+            self.width = len(text)
+        else:
+            self.stream.write(text + "\n")
+        self.stream.flush()
+
+    def close(self):
+        """Ends the line that was written over again."""
+        if self.in_place and self.width:
+            self.stream.write("\n")
+            self.stream.flush()
+            self.width = 0
+
+
+def _print(reply):
+    print(reply.decode("utf-8", "replace"))
 
 
 def main(argv=None):
     made = parser()
     arguments = made.parse_args(argv)
-    line = command_line(made, arguments)
+    words = checked(made, arguments)
+    data = None
+    if arguments.command == "upload":
+        try:
+            with open(words[2], "rb") as file:
+                data = file.read()
+        except OSError as error:
+            print(f"error: not-found: {words[2]}: {error.strerror or type(error).__name__}", file=sys.stderr)
+            return 2
     try:
-        if arguments.port is not None:
-            reply = client.serial_exchange(arguments.port, line, arguments.timeout)
-        elif arguments.tcp is not None:
-            reply = client.tcp_exchange(arguments.tcp, line, arguments.timeout)
-        else:
-            reply = client.http_exchange(arguments.http, line, arguments.timeout)
-            if not client.is_reply(reply):
-                raise client.Unreachable(f"{arguments.http}: the answer is not a reply")
+        with client.Session(port=arguments.port, tcp=arguments.tcp, http=arguments.http, timeout=arguments.timeout) as session:
+            if arguments.command == "list":
+                return 0 if content.list_all(session, _print) else 1
+            if arguments.command == "upload":
+                progress = Progress(sys.stderr)
+                try:
+                    reply = content.upload(session, words[1], os.path.basename(words[2]), data, progress.sent, progress.checking)
+                finally:
+                    progress.close()
+            else:
+                reply = session.exchange(" ".join(words).encode("utf-8") + b"\n")
     except client.Unreachable as unreachable:
         print(f"error: unreachable: {unreachable}", file=sys.stderr)
         return 3
-    print(reply.decode("utf-8", "replace"))
-    return 0 if json.loads(reply)["ok"] is True else 1
+    _print(reply)
+    return 0 if content.is_ok(reply) else 1

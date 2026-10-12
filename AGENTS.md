@@ -10,6 +10,11 @@ odrig is the LED animation system of an art installation: a small board drives a
 that make the animations, the player, an emulator that shows them without the board, and
 the program for the board. The pages for newcomers are in the folder `agent/`.
 
+The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`.
+The Python package `odrig/` was the converter before it. It is now the reference that
+tests compare the converter with, and it holds the generators. Convert and pack with the
+JavaScript tool only.
+
 ## Read first
 
 1. [agent/README.md](agent/README.md): what the project is and what its parts are.
@@ -25,6 +30,7 @@ the program for the board. The pages for newcomers are in the folder `agent/`.
 |---|---|
 | Make or change an animation or a show | [agent/animation-guide.md](agent/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
 | Change the converter | [docs/converter.md](docs/converter.md), [docs/format.md](docs/format.md), [docs/reasons.md](docs/reasons.md) |
+| Change the Python reference, a generator or the test vectors | [docs/reference-converter.md](docs/reference-converter.md), [docs/format.md](docs/format.md) |
 | Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
@@ -34,7 +40,8 @@ the program for the board. The pages for newcomers are in the folder `agent/`.
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
 for your subject; do not read it through. Planned work is in `project-seeds/`, one folder
 for each seed, and the specs made from the seeds are in `docs/specs/`. The tests are in
-`tests/`, one folder for each suite; the getting-started page has the command of each.
+`tests/`, one folder for each suite, and the converter's own are in `converter/tests/`;
+the getting-started page has the command of each.
 
 ## Rules you may not break
 
@@ -74,8 +81,8 @@ for each seed, and the specs made from the seeds are in `docs/specs/`. The tests
   you have a board": a brightness of 40 or less, one program at a time, the flash never
   erased, and the firmware built only as the tool builds it.
 
-What you make under `build/` and `.venv/` is yours to make and to remove, and never to
-commit.
+What you make under `build/`, `.venv/` and `converter/node_modules/` is yours to make and
+to remove, and never to commit.
 
 ## What needs the owner
 
@@ -88,13 +95,15 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 
 ## If you work on Windows
 
-The converter, the core's build, the emulator and the command tool work on Windows 10 and
-11, and their suites pass there. That was seed 11,
+The reference converter, the core's build, the emulator and the command tool work on
+Windows 10 and 11, and their suites pass there. That was seed 11,
 `project-seeds/11-p0-emulator-and-tools-on-windows/`.
 
 - The core is built there by `python core/build.py shared`, not by `make`.
 - Windows has no virtual serial port. The emulator takes command lines on a TCP port, and
   the command tool reaches it with `--tcp` or `--http`.
+- The converter's own suite, `npm test --prefix converter`, does not pass on Windows yet:
+  208 of its 499 tests fail there. Mending that is not part of seed 11.
 - The firmware tool and the board stay with the first computer.
 - Nothing is installed in the system. A compiler or another program that is fetched is
   unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.
@@ -107,16 +116,13 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **A converter in JavaScript**, seed 06. It is to become the converter people use, from
-  the command line and inside the apps. The Python tool stays as the reference that tests
-  compare it with. Today the Python tool is the converter.
-- **Four more commands**, seed 07: report the free storage, list what is installed,
-  remove an animation, and upload one.
-- **The board's Wi-Fi name and password**, seed 08, set from a tracked settings file.
-  Today the board's network has the defaults of WLED; see [docs/wifi.md](docs/wifi.md).
 - **An app for the operators, for Android**, seed 09. The first notes are in
-  [docs/android-app.md](docs/android-app.md).
+  [docs/android-app.md](docs/android-app.md). The converter's library is made to run
+  inside it. It has been run with Node.js and in Chrome, and never inside an app.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
+- **Playing at once at power-on**, seed 14: the start item plays at once, and the
+  installed animations are checked while it plays. Today the LEDs stay dark until every
+  animation has been checked.
 
 The state of every seed is in the `state.json` of its folder.
 

@@ -1,14 +1,17 @@
 # Reasons
 
-When the tool refuses an input it writes one line to standard error,
+When a converter refuses an input it writes one line to standard error,
 
 ```
 error: <reason>: <detail>
 ```
 
-and exits with status 1. The reason is a fixed name made of lower-case letters, digits and
-hyphens; every implementation that reads the same files uses the same names. The detail is
-free text for people and names the file concerned.
+and exits with status 1. This holds for both converters, the JavaScript tool of
+[converter.md](converter.md) and the Python reference of
+[reference-converter.md](reference-converter.md): they write this line and use the names
+of this page. The reason is a fixed name made of lower-case letters, digits and hyphens;
+every implementation that reads the same files uses the same names. The detail is free
+text for people and names the file concerned.
 
 When a file has more than one defect, the reason is that of the defect met first when the
 file is read from front to back.
@@ -103,7 +106,7 @@ reason that applies.
 |---|---|
 | `mapping-missing`, `mapping-malformed` | As under "Mapping files". |
 | `show-missing` | The show file does not exist. |
-| `show-malformed` | The show file breaks its format: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `brightness` is not 0 to 255; there is no item; an item is neither an animation item nor a cycle item; an `id` is not 1 to 65,535; a `file` name is outside the naming rule; `seconds` is not 1 to 65,535; or a `cycle` is empty. The detail says which. |
+| `show-malformed` | The show file breaks its format: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `brightness` is not 0 to 255; an item is neither an animation item nor a cycle item; an `id` is not 1 to 65,535; a `file` name is outside the naming rule; `seconds` is not 1 to 65,535; or a `cycle` is empty. The detail says which. |
 | `duplicate-id` | Two items have the same `id`. |
 | `undefined-id` | A cycle, or `start`, names an id that no item has. |
 | `nested-cycle` | A cycle names an item that is a cycle. |
@@ -124,7 +127,7 @@ cycle.
 | Reason | Condition |
 |---|---|
 | `unsupported-media` | The file name does not end in `.mp4`, `.mov` or `.gif`. |
-| `unreadable-media` | The file cannot be decoded, or it holds no picture. |
+| `unreadable-media` | The file cannot be decoded, or it holds no picture. This includes a video whose first video stream has no decoder, a video whose metadata cannot be read, and a GIF that is cut short. |
 | `bad-range` | The start is negative, the duration is not above 0, the start is not before the end of the media, or the start plus the duration is after the end of the media. |
 
 ## Generators

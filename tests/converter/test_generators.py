@@ -446,8 +446,8 @@ class Dense(unittest.TestCase):
                 self.assertEqual(decoded.palette_size, 0)
                 self.assertEqual(decoded.records, tuple(self.frames))
 
-    def test_the_encoded_sizes_are_those_of_the_converter_document(self):
-        text = (support.ROOT / "docs" / "converter.md").read_text(encoding="utf-8")
+    def test_the_encoded_sizes_are_those_of_the_document_of_the_reference_converter(self):
+        text = (support.ROOT / "docs" / "reference-converter.md").read_text(encoding="utf-8")
         self.assertIn("python -m odrig.generators.dense build/dense.json --mapping mapping/legs-20.json\n", text)
         self.assertEqual(len(self.encoded[False]), 1462236)
         self.assertIn("1,462,236 bytes uncompressed", text)

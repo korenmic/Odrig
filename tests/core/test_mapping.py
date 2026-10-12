@@ -426,7 +426,8 @@ class RefusedMappings(unittest.TestCase):
 
     def test_a_refused_mapping_asks_for_no_more_memory_than_its_checks_need(self):
         missing = support.start({})
-        self.assertEqual(missing.memory[1], 1)
+        # The core object, and the line and the reply of the byte entry.
+        self.assertEqual(missing.memory[1], 3)
         cut = support.start({"mapping.json": support.mapping_texts()["legs-20"][:-3]})
         self.assertEqual(cut.error, "mapping-malformed")
         self.assertEqual(cut.memory, missing.memory)

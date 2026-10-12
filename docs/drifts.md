@@ -5545,3 +5545,1849 @@ skipped, onboarding 75.
 **Resolution.** `odrigctl/winserial.py`; `core/build.py`: `stem`, `absolute` and
 `microsoft_environment`; `emulator/lineport.py`; `emulator/binding.py`: `load`;
 `tests/emulator/`, `tests/core/support.py`: `raw_deflate`.
+## Seed 06: Where the check of the Node.js version lives
+
+**Question.** The design has `converter/odrig.js` check the version of Node.js and then
+import `cli/main.js`, and has a test give the check a version. A test that imports
+`odrig.js` starts the tool, and an old Node.js that reads `cli/main.js` before the check
+runs stops at the first word it does not know, with its own message.
+
+**Answer.** The check is a function of a file of its own, `converter/cli/version.js`,
+which the design's layout does not list. It is written in the oldest form of the language
+that knows modules, and `odrig.js` imports nothing else before the check has run:
+`cli/main.js` is imported afterwards, with `import()`. The test calls the function with
+versions, and starts the tool once with a Node.js that is made to report version 18.
+
+**Resolution.** `converter/cli/version.js`, `converter/odrig.js`;
+`converter/tests/cli.test.js`, "an old version of Node.js is refused".
+
+## Seed 06: The status of an error that is not a rejection
+
+**Question.** Requirement 2 criterion 10 asks that an error that is no rejection ends the
+program with Node's own message and a status that is neither 0, 1 nor 2. Node.js ends a
+program with status 1 when an error is not caught, which is the status of a rejected
+input.
+
+**Answer.** `main` of `cli/main.js` throws such an error on, as the design says.
+`converter/odrig.js` writes the error as Node.js prints it, with the places it passed
+through, to standard error and ends with status 70.
+
+**Resolution.** `converter/odrig.js`; `converter/tests/cli.test.js`, "an error that is no
+rejection is thrown on".
+
+## Seed 06: Arguments that begin with a minus sign, and seconds the parser refuses
+
+**Question.** The design takes the argument after an option for its value "unless it
+begins with `-` and is not a minus sign followed by digits with an optional fraction".
+The `argparse` of Python 3.14, which runs the reference here, reads more arguments as
+values: every argument in which a minus sign is followed by a digit, or by a point and a
+digit, so `-1e3` and `-1.` as well; a minus sign alone; and an argument that holds a
+space. Requirement 2 criterion 9 asks for the status of the Python tool.
+
+**Answer.** The parser follows the `argparse` that is installed: an argument is a value,
+after an option and among the positional arguments, when it does not begin with a minus
+sign, when a digit or a point and a digit follow the minus sign, when it is the minus sign
+alone, or when it holds a space. Anything else that begins with a minus sign and is no
+option of the subcommand is an unknown option. An older Python reads `-1e3` after
+`--start` as an unknown option and ends with status 2, where the JavaScript tool reads the
+start and ends with status 1.
+
+The parser checks the form of `--start` and `--duration` and keeps their text; the
+subcommand turns the text into milliseconds with the library. Seconds may be written
+`1.` and `.5`, as Python reads them. An exponent beyond 9999, plus or minus, is not a
+number of seconds. The Python tool ends a command line with such an exponent above zero
+with a traceback of its `decimal` module, and reads one with such an exponent below zero
+as 0 seconds; nobody writes either.
+
+`-h` is read as `--help`, as the Python tool reads it. A `--` in front of the subcommand,
+which the Python tool passes over, is not: the first argument is the subcommand or
+`--help`.
+
+**Resolution.** `converter/cli/arguments.js`; `converter/tests/cli.test.js`, "the parser".
+
+## Seed 06: The Python program the suite compares with, in a checkout without `.venv`
+
+**Question.** Requirement 18 criterion 4 takes the Python tool from `.venv/bin/python` of
+the repository, or from the program the environment variable `ODRIG_PYTHON` names. The
+tasks of this seed were run in a second checkout of the repository, a git worktree, which
+has no `.venv` folder of its own. Which of the two is asked first?
+
+**Answer.** `.venv` of the repository when it is there, else the program `ODRIG_PYTHON`
+names. With neither, every test that needs the Python tool fails with one message that
+names both ways and the two commands that make `.venv`. The suite was run in the worktree
+with `ODRIG_PYTHON` set to `.venv/bin/python` of the main checkout, and the three Python
+suites with that same program started in the worktree's root, so that it loads the
+worktree's `odrig`. In the main checkout nothing needs to be set. The suite gives
+`PYTHONPATH` the repository root when it starts Python, so that both tools can be started
+in a temporary folder and name a file by the same relative path.
+
+**Resolution.** `converter/tests/support.js`, `pythonFrom`, `python` and `runPython`;
+`converter/tests/cli.test.js`, "the Python tool the suite compares with".
+
+## Seed 06: The queue records of a run in a worktree
+
+**Question.** The tasks were queued and run in a git worktree while another run used the
+queue of the main checkout. The queue file is not tracked.
+
+**Answer.** The worktree has its own `.codex/local-task-queue.md` and
+`.codex/tactic/session.json`. Its records are numbered from Q-201, so that they can be
+appended to the main checkout's queue, whose numbers are lower. The records have no
+`TaskId` and no `TaskIdPacked`, as the records of the seeds before, because the task-id
+script does not run on this Mac.
+
+**Resolution.** `.codex/local-task-queue.md` of the worktree, records Q-201 to Q-210.
+
+## Seed 06: When the reader of JSON finds a member named twice, and how deep Python reads
+
+**Question.** The design refuses a member name "that is already there". The Python tool
+finds a name given twice when the object ends, and a `NaN` when it reads it, so a text
+with two defects gets the detail of the one Python meets first. The design's test of
+depth compares both tools at 512 and 513 levels.
+
+**Answer.** The reader keeps the names and values of an object as they come and checks
+the names when the object ends, in the order of the text, so `{"a": 1, "a": NaN}` gets
+`NaN is not a JSON value` and `{"a": {"b": 1, "b": 2}, "a": 3}` names `b`, as in the
+Python tool. `NaN`, `Infinity` and `-Infinity` are refused where they stand.
+
+Python 3.14 on this Mac reads arrays nested 100,000 deep and refuses a million. A text of
+513 or 600 levels is `bad-json` in both tools here, because its top level is an array,
+with another detail in each; the test compares the reason for these and the whole line
+for texts of 512 levels and of a million.
+
+**Resolution.** `converter/lib/strictjson.js`; `converter/tests/strictjson.test.js`.
+
+## Seed 06: Six significant digits, where the rounding of JavaScript is not Python's
+
+**Question.** The design writes the end of the media in a `bad-range` detail with
+`toPrecision(6)` of the fraction as a `Number`. `toPrecision` takes a half at the last
+digit upward, and Python's `format(x, ".6g")` takes it to the even digit: 123456.5 is
+`123457` in JavaScript and `123456` in Python. A fraction of two numbers beyond 2 to the
+power 53 is also not turned into the nearest `Number` by dividing two `Number`s.
+
+**Answer.** `sixDigits` of `whole.js` does both by itself. It finds the floating-point
+number nearest to the fraction, halves to the even one, from the two `BigInt`s; it takes
+that number as the exact fraction it is and rounds it to six significant digits, halves to
+the even digit; and it writes the digits in the form of Python's `g`. The suite compares
+it with Python for 600 fractions from seeds, for halves at the sixth digit, and for
+fractions beside a half of the floating-point grid.
+
+**Resolution.** `converter/lib/whole.js`, `sixDigits`; `converter/tests/whole.test.js`.
+
+## Seed 06: What the tests ask of reference.py, and test files the design does not list
+
+**Question.** The design lists seven requests of `converter/tests/reference.py` and
+fifteen test files. The tests need more of the Python side than the list has.
+
+**Answer.** `reference.py` gets a request wherever a test needs a value only Python has;
+the requests are named in its `REQUESTS`. With the second task these are: `check`, which
+runs `check --format` of the Python tool on many files in one interpreter, each under the
+name `case.json` or `case.odrg` in an empty folder, because a new Python for each of some
+hundred texts would take most of the suite's time; `dumps`, the bytes of
+`odrig.jsonframes.dumps`; `sixdigits`, Python's `format(x, ".6g")`; and `milliseconds`,
+the seconds of the command line as the Python tool reads them. The tests of `whole.js`
+are in a file of their own, `converter/tests/whole.test.js`.
+
+**Resolution.** `converter/tests/reference.py`; `converter/tests/support.js`,
+`pythonChecks`.
+
+## Seed 06: A Gamma code too long for Python to print
+
+**Question.** The value of a Gamma code has as many bits as the code has zero bits in
+front, plus one, and the data of a record can hold a code of more than 200,000 bits. The
+reference names the length of the run, g - 1, in the detail of `run-past-end`. Python
+refuses to write a whole number of more than 4,300 digits as text: for a Gamma code of
+more than about 14,000 bits the Python tool ends with a traceback, `ValueError: Exceeds
+the limit (4300 digits) for integer string conversion`, and status 1.
+
+**Answer.** The JavaScript decoder reads a Gamma code of up to 30 bits as a `Number` and a
+longer one as a `BigInt`, and writes every digit. For a code of 14,000 bits and more it
+gives `error: run-past-end: ...` with the whole number, where the Python tool gives its
+traceback; the status is 1 in both. No encoder writes such a code: a run cannot be longer
+than N, which is at most 65,534.
+
+**Resolution.** `converter/lib/odrg.js`, `gamma` in `coded`;
+`converter/tests/decode.test.js`, "codes are read whole before they are judged, and
+padding is not looked at", which has codes of 40 and of 60 bits.
+
+## Seed 06: What the DEFLATE decoder says, and what the tests of the decoders compare
+
+**Question.** The design gives `inflateRaw` two reasons and leaves its details open, and
+lists what the tests of the two decoders hold without saying how many files.
+
+**Answer.** A stream that ends early is `truncated` with the sentence of the Python tool,
+`the file ends inside the DEFLATE stream`, so the ODRG decoder passes it on as it is. A
+stream that is not valid is `bad-deflate` with words of the decoder's own for each defect.
+
+`inflate.test.js` compares the verdict with zlib's for 126 streams zlib makes of nine
+inputs, at every level and with each of its strategies, each cut at every length and
+damaged in every byte where it has 400 bytes or fewer, for 6,000 streams both damaged and
+cut, for 3,000 inputs of noise, and for 27 streams with one defect each that the test
+writes out bit by bit. `decode.test.js` compares the whole error line with the Python
+tool's for 13,556 copies of the valid vectors: cut at every length, with a byte added,
+and with every byte changed twice, where a vector has 420 bytes or fewer, and at 420
+places from a seed where it has more. `reference.py` has the requests `inflate` and
+`deflate` for this. `summary` of `cli/main.js` gives the lines of `check` for bytes, so
+that these comparisons need no new program for each file.
+
+**Resolution.** `converter/lib/inflate.js`; `converter/tests/inflate.test.js`,
+`converter/tests/decode.test.js`; `converter/cli/main.js`, `summary`.
+
+## Seed 06: The compressor gives the bytes of zlib 1.2.12, and what is still asked of it
+
+**Question.** The design asks for zlib's method at level 9 and not for its bytes: the
+sketch made for it gave zlib's bytes for one body of six. How closely does the
+compressor of the library follow zlib, and what do the tests ask?
+
+**Answer.** `converter/lib/deflate.js` follows zlib step for step, also where a choice
+does not change what a decoder reads: position 0 of the input is never taken for the start
+of a match, as in zlib, where 0 stands for "none"; among two symbols that appear equally
+often the one whose tree is less deep is joined first; the code lengths are listed with
+zlib's rules for the repeat symbols 16, 17 and 18; and a comparison that runs past the
+end of the input meets zeros. The streams it writes for the six bodies of the design's
+table, for the dense 60 x 60 clip of ten seconds, and for 403 inputs made from seeds
+for this task, of up to 200,000 bytes, are the bytes zlib 1.2.12 writes at level 9 with
+its default memory level, which is how the Python tool calls it:
+
+| Body | Bytes | zlib 1.2.12, level 9 | `deflateRaw` |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 | 17,715 | 1,122 | 1,122 |
+| DVD bounce, 60 x 6 | 3,783 | 1,596 | 1,596 |
+| Dense, 60 x 6, 2 s | 34,462 | 32,826 | 32,826 |
+| Hello world, 60 x 60 | 19,356 | 1,194 | 1,194 |
+| DVD bounce, 60 x 60 | 2,324 | 1,036 | 1,036 |
+| Dense, 60 x 60, 1 s | 146,717 | 140,856 | 140,856 |
+| Dense, 60 x 60, 10 s | 1,462,220 | 1,383,750 | 1,383,750, in 0.05 s |
+
+The tests ask what Requirement 8 asks and no more: every stream is inflated by zlib and
+by the library to its input with nothing left over, two runs give the same bytes, and a
+stream is at most 5 percent larger than zlib's. They do not ask for zlib's bytes, because
+another build of zlib, such as the one some Pythons carry in place of zlib 1.2, writes
+other bytes; the test prints for each body whether the bytes are the same. One place
+where the bytes can differ from zlib 1.2.12 is known: within the last 258 bytes of an
+input longer than 65,274 bytes, zlib compares past the end of the input with bytes left
+over from 32,768 bytes earlier, where this compressor meets zeros, so among two matches
+that both reach the end of the input it can take another one.
+
+`reference.py` has the request `encode`, which gives the uncompressed and the compressed
+file of `odrig.odrg.encode` for an animation or for a generator of the Python tool and a
+mapping file; the body is the file without its 16-byte header. Its request `deflate`
+calls zlib with the default memory level, as the Python tool does.
+
+**Resolution.** `converter/lib/deflate.js`; `converter/tests/deflate.test.js`;
+`converter/tests/reference.py`, `encode` and `deflate`.
+
+## Seed 06: The files of the JavaScript encoder beside the Python tool's
+
+**Question.** Requirement 7 asks for identical uncompressed files and Requirement 8 for
+compressed files within 5 percent. What do the two tools write for the tracked animations
+and the dense clip?
+
+**Answer.** The same bytes in every case that was run, compressed as well, with zlib
+1.2.12 on the Python side:
+
+| Source | Uncompressed, both tools | Compressed, JavaScript | Compressed, Python |
+|---|---:|---:|---:|
+| Hello world, 60 x 6 (`animations/hello.json`) | 17,731 | 1,138 | 1,138 |
+| DVD bounce, 60 x 6 (`animations/dvd.json`) | 3,799 | 1,612 | 1,612 |
+| Hello world, 60 x 60 | 19,372 | 1,210 | 1,210 |
+| DVD bounce, 60 x 60 | 2,340 | 1,052 | 1,052 |
+| Dense, 60 x 60, 2 s | 299,683 | 285,360 | 285,360 |
+| Source of the vector `encoded.pal` | 202 | 184 | 184 |
+| Source of the vector `encoded.rgb` | 169 | 78 | 78 |
+
+The tests ask for identical uncompressed files and, for compressed ones, the same frame
+records from the reference decoder and from the library's own, and a size within 5
+percent; they print whether the compressed bytes are the same.
+
+**Resolution.** `converter/tests/encode.test.js`; `converter/tests/deflate.test.js`,
+"whole files, through the command line of both tools".
+
+## Seed 06: Details of the encoder that the design leaves open
+
+**Question.** The design names the functions of the encoder and not their shapes, and its
+count of frame records is "the sum over the frames of `ceil(ms / 65535)`", where `ms` can
+be a number of thirty digits.
+
+**Answer.** A palette is one `Uint8Array` of three bytes for each colour, or null.
+`hueOrder(r, g, b)` gives five whole numbers: the hue and the saturation each as a
+numerator and a denominator, and the largest channel; two colours are compared by
+cross-multiplying. The number of records of a frame is worked out without a division of
+floating-point numbers: with the remainder for a `Number`, and in `BigInt`s for a longer
+time, so `too-many-frames` names the count the Python tool names for a frame of 10 to the
+power 30 ms. `bestRecord` keeps the codes of the form it chose and writes the record from
+them; `codedRecord` writes one given form and refuses, as a mistake of the program and not
+as a rejection, a form whose data is longer than the pixel buffer, as the Python function
+does. `toBuffer` is offered beside the functions the task lists.
+
+`reference.py` has two more requests: `forms`, the 64 coded records of
+`odrig.odrg.coded_record` for a pair of pixel buffers with the record `best_record`
+chooses, and `decode`, the frame records of `odrig.odrg.decode` with the SHA-256 of each
+picture. The first lets a test compare every form of the search and not only the one that
+wins; the second gives the frame records of the reference decoder, which `decode` on the
+command line merges. `support.js` makes the 200 animations from seeds and has the
+generators of the Python tool write their sources into a temporary folder.
+
+**Resolution.** `converter/lib/odrg.js`; `converter/tests/reference.py`, `forms` and
+`decode`; `converter/tests/support.js`, `animationFrom` and `generated`.
+
+## Seed 06: The order of the first checks of pack, and what the library says of a source it was not given
+
+**Question.** The design has `pack` on the command line read the mapping file, read the
+show file, and then call `pack.begin`, which checks the mapping and then the show. The
+Python tool reads and checks the mapping file before it reads the show file: a mapping
+file that breaks a rule and a show file that is not there is `mapping-malformed` in the
+Python tool and would be `show-missing` in that order. The library also packs from bytes
+held in memory, where a source that is missing has no words of the operating system.
+
+**Answer.** `cli/folder.js` reads the mapping file, checks it with the library's reader,
+and only then reads the show file and calls `pack.begin`. The mapping is read twice; it is
+a few hundred bytes. `pack.pack` of the library gives `file-missing` for a source that is
+not among the bytes it was given, with the detail `X.json: the show names X.odrg and its
+source is not there`; on the command line the detail is the operating system's, as in the
+Python tool. An item of a show is `{id, file, cycle, seconds}` with null for what its kind
+does not have, as the Python reader has it. A folder and a name are joined as Python's
+`os.path.join` joins them, so an empty sources folder gives the name alone. The folders
+above the output folder are made one by one, the topmost first, as Python's `os.makedirs`
+makes them, so that a failure names the same path in both tools.
+
+**Resolution.** `converter/cli/folder.js`; `converter/lib/pack.js`, `converter/lib/show.js`;
+`converter/tests/pack.test.js`, "a mapping file that breaks a rule and a show file that is
+not there" and "the output folder".
+
+## Seed 06: How mapping files and shows are compared before import is there, and tables of command lines
+
+**Question.** The design reads every mapping file "by both tools through `import`", and
+`import` is added two tasks after the reader of mapping files. Its tables of shows and of
+mapping files have some hundred entries, each a command line for both tools.
+
+**Answer.** `mapping.test.js` compares the two readers themselves: `reference.py` gives
+what `odrig.mapping.loads` returns or rejects, for the tracked files, for the made-up
+files of `tests/core/support.py` and for 73 files of each kind that break a rule, and the
+library must give the same kind, canvas, legs and counts of LEDs, or the same reason and
+detail. It compares the two command lines through `pack`, the one subcommand that reads a
+mapping file at this point: a file that breaks a rule gives the same error line, and a
+file that is as the format says gives `size-mismatch` for a source of another canvas, whose
+detail names the canvas of the mapping. The task that adds `import` reads mapping files
+through `import` as well. `pack.test.js` compares the readers of show files in the same
+way.
+
+Where a table has many command lines, the Python side runs them in one Python, through
+the request `run` of `reference.py`, which calls the command line of the Python tool once
+for each, and the JavaScript side calls `main` of `cli/main.js` in the test's own program.
+A few entries of every table are run once more as programs of their own, and the three
+shows of Requirement 11, the output folder with paths from the folder the tool is started
+in, and the usage errors always are. A new Python for each of 300 command lines would take
+most of a minute.
+
+`reference.py` has the requests `mappings`, `read_mappings`, `read_shows` and `run` for
+this.
+
+**Resolution.** `converter/tests/mapping.test.js`, `converter/tests/pack.test.js`;
+`converter/tests/support.js`, `runPythonMany` and `runJsHere`.
+
+## Seed 06: A request to reference.py that never came back, and how the tests now ask
+
+**Question.** The design gives the Python side its input on standard input. In one run of
+the whole suite, the twelfth or so, a request of `inflate.test.js` with 6,000 streams did
+not come back: the Python program waited to read its standard input, and the test's
+Node.js 26.5 waited, inside the call that starts a program and waits for it, for the
+program to end. Neither moved for ten minutes; the suite has no time limit of its own. The
+Python program was ended by its process number, and the test then failed.
+
+**Answer.** The cause was not found: both sides were waiting on a pipe whose other end was
+open, which points at Node.js or the system and not at the tests. The requests no longer
+use a pipe for their data. `reference` of `support.js` writes the input into a file of a
+temporary folder and names it, and a second file for the answer, on the command line of
+`reference.py`, which reads the one and writes the other; the folder is removed after the
+call. Every program the tests start, both tools and `reference.py`, is started without a
+standard input and with a limit of ten minutes, after which it is ended and the test fails
+with a message, so a program that stalls can no longer hold the suite. The whole suite ran
+three times in a row after the change, 1,016 tests each time, in 22 seconds.
+
+This was seen once and is recorded so that a second sighting is recognised: if a test
+fails after ten minutes with "did not come to an end", it is this.
+
+**Resolution.** `converter/tests/support.js`, `reference`, `runJs` and `runPython`;
+`converter/tests/reference.py`, `main`.
+
+## Seed 06: What importFrames takes and when it asks, for whoever hands it frames
+
+**Question.** The design gives the shape of a source and of a frame. It leaves open what
+happens with a time that is a `Number` with a fraction, with a GIF frame without a delay,
+with a picture without pixels, and how many frames of a video are asked for when only a
+part is wanted. The app of seed 09 hands the library its frames and has to know.
+
+**Answer.** As the Python tool has it wherever the Python tool has the case:
+
+- A time, and a delay, is a `Number` that is a safe integer, a `BigInt`, or `[n, d]` of two
+  of these. A `Number` that is not whole, such as 33.3667, is refused as a mistake of the
+  caller, with a `RangeError` and not with a rejection: the caller gives the fraction it
+  has, for a timestamp in microseconds `[timestamp, 1000]`.
+- A frame of a video without a `time`, or with null, is `unreadable-media`, "a frame has
+  no presentation time". A frame of a GIF without a `delayMs`, or with null, counts as a
+  delay of 0, which is 100 ms, as in the Python tool when the file records none.
+- A frame of width or height 0 is `unreadable-media`, "a picture has no pixels", when it
+  is handed over, whether it is on screen at a tick or not. Its pixels are looked at only
+  when it is on screen at a tick.
+- A frame of a video is complete when the next one has come, because it is on screen until
+  then. So `importFrames` asks for one frame more than the part shows, and a fault of that
+  frame, a missing time or a time that goes backwards, is reported, as in the Python tool,
+  whose decoder runs one frame ahead in the same way. A frame of a GIF is complete by
+  itself.
+- When the part is covered, the iteration is left with `break`, so an iterator with a
+  `return` method has it called, once, and is awaited when it is asynchronous. A source
+  that is read to its end is not told to stop.
+- A start or a duration that is negative or 0 is refused before the first frame is asked
+  for.
+- `fit.place(source, w, h, fit)` is the whole fitting of one source picture, for a caller
+  that wants a still picture and no timeline.
+
+**Resolution.** `converter/lib/timeline.js`, `converter/lib/fit.js`;
+`converter/tests/timeline.test.js`, "importFrames takes frames from whoever has them".
+
+## Seed 06: How fitting and the timeline are compared with the Python tool without a media file
+
+**Question.** The task makes its frames in the tests and reads no media file, and the
+Python tool's timing rules for video and GIF are inside the functions that open a file
+with PyAV and Pillow. The design asks for a case on each side of 2 to the power 53.
+
+**Answer.** `reference.py` has four requests. `rects` is `odrig.media.source_rect`.
+`resample` lays a source picture over black and fits it, or fits a picture to a rectangle
+it is given. `ticks` is `odrig.media.tick_pictures` on frames that have times only, and
+reports which frame is at each tick, which frames were fitted and how many were asked
+for. `timeline` runs `odrig.media.import_media` itself, with stand-ins in place of
+`av.open` and `PIL.Image.open` that hand out made-up frames with a presentation time and
+a time base, or a delay: everything after the decoder is the Python tool's own code, and
+the test compares the JSON frames file byte for byte, the rejection with its detail, and
+the number of frames asked for, for 700 videos and GIFs from seeds.
+
+The border of the `Number` arithmetic is reached with a picture of 64 x 32,768 pixels
+stretched to a canvas of 64 columns: 511 times the area passes 2 to the power 53 between
+canvases of 32,832 and 32,833 rows. Both pictures are the Python tool's, the second
+computed in `BigInt`s. A smaller picture cannot reach the border with values other than
+black, because the area in the tool's units is 4 times the pixels of the canvas times the
+pixels of the rectangle. The limit of 2 to the power 63 is met with a rectangle far larger
+than its picture.
+
+The floor of `whole.js` decides more than the bar on the left that the task names: the
+last source pixel a slice covers is found with a ceiling, which is a floor of the negated
+value, so a floor that rounds toward zero drops the pixel in which a slice ends. With such
+a floor 38 tests fail, among them the one the task names.
+
+**Resolution.** `converter/tests/reference.py`, `rects`, `resample`, `ticks` and
+`timeline`; `converter/tests/fit.test.js`, `converter/tests/timeline.test.js`.
+
+## Seed 06: Python crashing while it decodes a video for a comparison
+
+**Question.** While the task that adds `import` was being done, macOS showed "Python quit
+unexpectedly" 22 times in two minutes. Every report is a fault of memory (SIGSEGV) in a
+Python whose parent is `node`, inside PyAV: `VideoStream.decode`, called from
+`Packet.decode` in the generator of `InputContainer`. What asked Python to do that, and is
+it the tests or the Python tool?
+
+**Answer.** It is the Python tool's own `import`, on a video it cannot decode, and a probe
+of this task gave it such videos. The probe was not part of the suite: to see whether the
+two tools judge a broken file alike (the design's assumption A5), it wrote 480 cut and
+damaged copies of four test videos and ran `python -m odrig import` on each, one program
+after the other. Nothing ran at the same moment, no container was closed early and no
+program was ended from outside.
+
+The cause: for a file that is cut inside its header, PyAV 17.1.0 lists a video stream for
+which it has no decoder: `container.streams.video[0].codec_context` is None.
+`odrig/media.py` takes the first video stream and calls `container.decode(stream)`
+(lines 207 and 211), and PyAV then follows the missing decoder without looking and ends
+the whole program. 21 of the 480 copies are of this kind, and 21 of the reports have this
+place; the other report is of the first run of the probe, in which one Python read all
+copies. It was seen again once, on purpose, in a program that ends quietly: the file is
+opened, has one stream of type video, its `codec_context` is None, and the first frame
+asked of `container.decode` ends Python with signal 11.
+
+To see it without a report on the screen, in the repository root:
+
+```
+.venv/bin/python -c "
+from tests.converter import media_fixtures as f
+f.write_video('build/whole.mp4', f.COLOURS)
+open('build/cut.mp4', 'wb').write(open('build/whole.mp4', 'rb').read()[:993])
+import av
+print(av.open('build/cut.mp4').streams.video[0].codec_context)"
+```
+
+prints `None` (the folder `build/` must be there; the whole file has 1,529 bytes with
+PyAV 17.1.0, and cuts at 993 to 1,070 bytes are of this kind). Then
+`.venv/bin/python -m odrig import build/cut.mp4 build/out.json --mapping mapping/legs-2.json`
+ends Python with the fault, and macOS shows its dialog. Whether a whole video in a codec
+that PyAV's FFmpeg does not have is of this kind too was not tried; it would have the same
+missing decoder.
+
+The same probe found two more ways in which the Python tool ends without its error line,
+with a traceback and status 1: a video whose metadata is not UTF-8 (3 of the 480 copies;
+`UnicodeDecodeError` from `av.open`, which is not one of PyAV's own errors), and a GIF that
+is cut short (298 of 970 cut and damaged copies of three GIFs; `IndexError` and
+`struct.error` from Pillow, which `odrig/media.py` does not catch).
+
+No file of `odrig/` changes in this seed (Requirement 18 criterion 8), so the Python tool
+is as it was: this needs the owner, as a seed of its own. The mending is small:
+`_video_frames` refuses a stream without a `codec_context` as `unreadable-media` and
+catches `UnicodeDecodeError`, and `_gif_frames` catches `IndexError` and `struct.error`.
+The JavaScript tool gives `unreadable-media` for all of these files.
+
+What changed on the side of the tests, so that no test can do this to whoever sits at the
+computer:
+
+- The suite never gives the Python tool a cut or damaged video as a program of its own.
+  Such files are imported by the JavaScript tool alone, which must end with a file or
+  with `unreadable-media`.
+- Where a test compares the two tools on a file that is no whole video, the Python side
+  goes through `reference.py`, which looks at the streams of a video before it runs
+  `import`, without decoding, and does not run it when the first video stream has no
+  decoder; the test then gets no status and the reason.
+- `reference.py` makes a fault of memory end it quietly, with the number of the signal as
+  its status, by naming the C function `_exit` as the handler of the signal. The test that
+  asked fails and says which signal it was.
+
+**Resolution.** `converter/tests/reference.py`, `_quiet_faults`, `_undecodable_video` and
+`_run`; `converter/tests/support.js`, `runPython` and `runPythonMany`;
+`converter/tests/import.test.js`, "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy". Open for the owner: the three
+faults of `odrig/media.py` named above.
+
+## Seed 06: What the install of the two packages needs and leaves, with npm 12
+
+**Question.** The design's assumption A1: the decoder program of `ffmpeg-static` 5.3.0
+installs under npm 12 on this Mac and runs. Its facts V1 to V4 were read on the registry
+and not tried.
+
+**Answer.** A1 holds with one addition, and one fact is other than read.
+
+- npm 12 runs no install script of a dependency unless `package.json` allows it. After
+  `npm install --prefix converter` the package was there without its program, and npm
+  said that the install script of `ffmpeg-static@5.3.0` was blocked.
+  `converter/package.json` therefore has, beside the design's members,
+  `"allowScripts": {"ffmpeg-static@5.3.0": true}`, written by
+  `npm install-scripts approve ffmpeg-static` and pinned to the version. With it,
+  `npm ci --prefix converter` fetches the program. The script was read first: it fetches
+  `ffmpeg-darwin-arm64.gz`, a README and a licence from the release `b6.1.1` of the
+  package's GitHub repository into the package's folder and makes the program executable,
+  as fact V2 says. An npm older than 12 does not know the member and runs the script
+  anyway.
+- The program of that release for macOS on Apple Silicon is ffmpeg 6.0, not 6.1.1: its
+  first line is `ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers`. It has
+  45,568,216 bytes and the SHA-256
+  `a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584`, which
+  `converter/ffmpeg.sha256` holds for `darwin-arm64`.
+- 21 packages are installed for the two that are named: `ffmpeg-static` needs four for its
+  install script, and those need others. `converter/node_modules/` has 45 MB.
+- Outside the project folder the install wrote two things, found by listing the home
+  folder, `~/Library/Caches`, `~/.npm` and `~/.cache` before and after:
+  `~/Library/Caches/ffmpeg-static-nodejs`, new, 6 files of 19,255,699 bytes, the package's
+  copy of what it fetched; and npm's own cache and log, `~/.npm/_cacache` and
+  `~/.npm/_logs`, which were there. Nothing new is in the home folder itself or in
+  `~/.cache`.
+- The tool does not ask the package for the path of its program: the package gives the
+  value of the environment variable `FFMPEG_BIN` in place of its own path when that is
+  set (fact V4), which could be an ffmpeg of the system. `cli/video.js` takes the program
+  at `converter/node_modules/ffmpeg-static/ffmpeg`, `ffmpeg.exe` on Windows, and nothing
+  else. When the package's folder or the program is not there, `import` of a video ends
+  with `decoder-missing`. `omggif` is loaded with `import()`.
+- `decoder-missing` is checked after the mapping file, the name of the media file and
+  that it is there, and before the start and the duration. Its detail names the package
+  and the command with the folder the tool is in, `npm ci --prefix <folder>`.
+
+**Resolution.** `converter/package.json`, `converter/package-lock.json`,
+`converter/ffmpeg.sha256`; `converter/cli/video.js`, `program`;
+`converter/tests/import.test.js`, "the packages" and "a tool without its packages".
+
+## Seed 06: The decoder program as found: assumptions A2 to A5
+
+**Question.** The design's assumptions about what ffmpeg writes and how it ends, to be
+verified by the task that adds `import`.
+
+**Answer.**
+
+- **A2 holds.** The filter `showinfo` of ffmpeg 6.0 writes
+  `config in time_base: 1/12800, frame_rate: 25/1` and for each frame a line with `n:`,
+  `pts:` and `s:<w>x<h>`, the `pts` in that time base, which is the stream's. Two
+  additions to the design's call: `-copyts`, without which ffmpeg counts the times from
+  the start of the file and not as the file records them, and `file:` in front of the
+  path, so that a name is never read as an address of another kind. After each frame line
+  comes a line on colour, and the scaler writes lines of its own; the reader passes over
+  both.
+- **A3 holds.** A mov with `qtrle` and transparency comes out with its alpha: the pixels
+  of the transparent half are `0 200 0 0`.
+- **A4 holds, with no difference at all.** 55 imports of 15 videos, with each fit and with
+  a part, give the bytes of the Python tool's file: mpeg4 in mp4 and mov, `qtrle`, H.264
+  with frames that are stored out of order, 25, 29.97 and 60 frames a second, frames with
+  gaps, a ramp of colours, a picture higher than wide, and sound beside the video. PyAV 17
+  carries FFmpeg 8 and the package ffmpeg 6.0.
+- **A5 holds; `-xerror` is not added.** A text file, an empty file and a file cut short
+  end ffmpeg with status 1, or with all the frames the file still has. A file without a
+  video stream makes it say `Stream map '0:v:0' matches no streams`, which the reader
+  reports with the Python tool's words, `the file has no video stream`. With `-xerror`
+  ffmpeg refused 43 of 480 cut and damaged copies of four videos that the Python tool
+  reads, against 16 that it reads and the Python tool refuses without it; so it is left
+  out.
+
+The two tools do not always judge a file that is damaged alike, and nothing in this seed
+makes them. Of the 480 copies of videos, 230 are refused by both and 203 give the same
+file; 21 cannot be given to the Python tool at all (see "Python crashing while it decodes
+a video for a comparison"); 16 are read by the JavaScript tool and refused by the Python
+tool; on 3 the Python tool ends with a traceback; and 7 are read by both with other
+pixels. Of 970 such copies of three GIFs, 501 are refused by both and 96 give the same
+file; 70 are refused by the JavaScript tool and read by Pillow: files cut inside a later
+frame, of which Pillow shows the frames before the cut, frames that reach beyond the
+screen, and blocks the package does not know; on 298 the Python tool ends with a
+traceback; 4 are read by both with other pixels, and 1 by the JavaScript tool alone. Both
+tools read a GIF under the name `.mp4`, as a video, and both refuse a video under the name
+`.gif`.
+
+The reader holds at most 64 MB of frames that the library has not asked for yet and makes
+the program wait meanwhile; the log is read all the time.
+
+**Resolution.** `converter/cli/video.js`; `converter/tests/import.test.js`.
+
+## Seed 06: GIF pictures as found (A6), and a damaged GIF that kept the package busy without end
+
+**Question.** The design's assumption A6: for the GIFs of the Python suite and for GIFs
+that stay out of Pillow's three corners, the pictures built from what `omggif` gives equal
+Pillow's. And what does the package do with a file that is damaged?
+
+**Answer.** A6 holds: 368 imports of 92 GIFs give the bytes of the Python tool's file. The
+GIFs are those of the Python suite, one with a transparent index on every frame, one whose
+later frames are smaller than the screen, one for each disposal from 0 to 3 with a
+transparent index and the disposal named on every frame, 40 GIFs from seeds as Pillow
+writes pictures of a few colours by itself, and 40 palette GIFs from seeds with a
+transparent index and one disposal for all frames.
+
+The package does not judge the codes of a frame's data. Three of 970 damaged copies kept
+it busy without end: a code that the table does not have yet makes its table point
+at itself. `cli/gif.js` therefore goes through the codes of a frame before the package
+draws it, as the package reads them, and refuses data with a code the table does not
+have, with a first code after a cleared table that is no colour, or that spells more or
+fewer pixels than the frame has. Data that passes cannot keep the package busy, because
+every entry of the table then points at an earlier one. The package still draws every
+pixel; the reader of the design, which watches for the package's warning, stays as a
+second look. The suite reads every cut and every changed byte of four GIFs, more than
+3,000 files, in a program of its own with a limit of two minutes,
+`converter/tests/gifs.js`.
+
+A frame without a palette, which the package would draw from the wrong bytes, is
+`unreadable-media` as well. A file that ends after its header and has no frame gives
+`the file holds no picture`. The delay of a frame is the file's hundredths of a second
+times 10.
+
+**Resolution.** `converter/cli/gif.js`, `codeFault` and `frames`;
+`converter/tests/import.test.js`, "the pictures of a GIF are built by the rules of the
+format as browsers apply them" and "a damaged or cut media file ends the import with a
+result or with unreadable-media, and never keeps it busy"; `converter/tests/gifs.js`.
+
+## Seed 06: The media of the import tests, and what is not verified of import
+
+**Question.** The task names the media of the import tests and leaves their making to the
+requests `gif` and `video` of `reference.py`.
+
+**Answer.** One request, `media`, writes them all into a temporary folder: the GIFs above
+and fifteen videos, with `tests/converter/media_fixtures.py` where the Python suite has
+the file and with PyAV directly for the others. A file that this build of PyAV cannot
+write is left out and named; on this Mac none was. The JavaScript side imports in the
+test's own program and the Python side in one Python, and five files are imported once
+more by both tools as programs of their own.
+
+Not verified: a rotation that a file records for display. The call has `-noautorotate`,
+and no test file with a rotation was made, because PyAV writes none in a simple way. Not
+verified either: a video of a real camera or phone, and anything on Windows or Linux.
+
+**Resolution.** `converter/tests/reference.py`, `media`; `converter/tests/import.test.js`.
+
+## Seed 06: The page of the Chrome test, as built
+
+**Question.** The design has `page.js` import `/lib/index.js`, and has the test compare
+the page's results with "what the same calls give in Node.js". A module that imports the
+library at its top cannot post an error when the import fails: the script then does not
+run at all, and the test would wait for its minute. And how are "the same calls" kept the
+same?
+
+**Answer.** `converter/tests/page/page.js` has one function, `work`, which is given the
+library and the bytes of the source and does everything that is compared: it reads Hello
+world, encodes it compressed and uncompressed, decodes both, imports three source pictures
+it fills by a fixed rule as a GIF with each fit and as a video, and fits each picture to
+three canvases with each fit. It uses nothing but the library and the language. In a page
+the file loads the library with `import()` inside a `try`, fetches the source, calls
+`work`, and posts the results, or the name and the message of the error; the test in
+Node.js imports the same file and calls the same `work` with the library it imported
+itself. The file imports nothing when it is loaded, and the page has the one script.
+Bytes travel as base64, which the file writes itself.
+
+The test asserts that the page was served every file of `converter/lib/`, so a module the
+page did not load cannot go unnoticed. Chrome gets three arguments beside the design's:
+`--use-mock-keychain` and `--password-store=basic`, so that a new profile does not ask
+macOS for the keychain, and `--disable-breakpad`. Chrome is ended by the process number
+the test started, and the profile folder is removed and checked to be gone.
+
+It ran with Google Chrome 154.0.8037.98 on this Mac, without a window; the page reports
+`HeadlessChrome/154.0.0.0`. Every result of the page equals Node's, and the two files
+equal what `node converter/odrig.js encode` writes.
+
+**Resolution.** `converter/tests/page/index.html`, `converter/tests/page/page.js`,
+`converter/tests/browser.test.js`.
+
+## Seed 06: The documents as written, and pages and tests the task does not list
+
+**Question.** The design's table "Documents" lists seven documents and two test files, and
+the task a third test file. Other pages pointed at sections of `docs/converter.md` that
+moved, another test of the Python suite read that page, and the emulator's suite ran the
+pack commands of its page with Python. What else changed, and what does a suite need now?
+
+**Answer.**
+
+- `docs/core.md`, `docs/format.md` and `docs/mapping.md` named `converter.md` for the
+  generators, for the Python that runs `odrig.mapdoc`, and for the readers the core's suite
+  compares with. They name `reference-converter.md` now, and the bench target of the core,
+  which starts the Python tool, is said to use the reference converter. Nothing else of
+  these pages changed.
+- `tests/converter/test_generators.py` read the sizes of the dense clip in
+  `docs/converter.md`. It reads them in `docs/reference-converter.md`, as Requirement 19
+  criterion 7 asks of every test of the Python suite that read the page.
+- The emulator's suite runs the commands of its page as they are written. Three of them
+  are now `node converter/odrig.js pack`, so that suite needs Node.js 20 or later as
+  `node`, and the page says so in its table of commands. Without it the test fails and
+  says what is missing. It is not skipped: a skipped test would leave the commands of the
+  page and its table of sizes unchecked. The sizes of that table are compared exactly now,
+  not within 2 percent, because the converter gives them on every computer.
+- `docs/firmware.md` says beside its pack command that it needs Node.js as `node`. The
+  firmware tool installs a Node.js 20 of its own into its work folder, for WLED's build;
+  that one is not on the path, and the tool is as it was.
+- Hello world and DVD bounce are called test content on both pages, as the owner sees
+  them: made to try the tools and the board, and not finished animations of the
+  installation.
+- `docs/converter.md` has what the design lists, and for the library also the calls with
+  what goes in and what comes out, because the app of seed 09 is written against them.
+  `docs/reference-converter.md` has, beside what the design lists, where the two tools are
+  known to differ, and the three known faults of the Python tool on damaged media, with a
+  pointer to the entry "Python crashing while it decodes a video for a comparison".
+- "Conversion" in `docs/decisions.md` says that the library has been run in Chrome and not
+  inside an app yet.
+
+**Resolution.** `docs/converter.md`, `docs/reference-converter.md`, `README.md`,
+`docs/emulator.md`, `docs/firmware.md`, `docs/reasons.md`, `docs/decisions.md`,
+`docs/core.md`, `docs/format.md`, `docs/mapping.md`; `converter/tests/docs.test.js`;
+`tests/converter/test_docs.py`, `tests/converter/test_generators.py`,
+`tests/emulator/test_docs.py`, `tests/firmware/test_docs.py`.
+
+## Seed 06: Which test checks which criterion, and the test that was missing
+
+**Question.** The last task asks to read every acceptance criterion of Requirements 1 to
+19 once more and to name, for each one a program can check, the test that checks it.
+
+**Answer.** The tests are those of `converter/tests/`, named here by their file without
+its ending and, where it helps, by the title of the test.
+
+| Requirement | Checked by |
+|---|---|
+| 1, the two parts | `library`: criteria 3, 4 and 5 by "the library is made of its own files only" and "index.js offers every module of the library"; criteria 1, 2, 6 and 7 by "the tool is the library and a command line part that is built on it", which was missing and is added; criterion 8 by `cli`, "an old version of Node.js is refused"; criterion 9 by `browser`. |
+| 2, the command line | `cli`: "the statuses", "the error line", "--help", "the parser", "the command line as a program", "reading and writing files"; criterion 8 also by `whole`, "fromDecimal reads a number from its digits", and `import`, "seconds on the command line are rounded ..."; criterion 11 by `encode` and `import`, "the same ... give the same ... on every run". |
+| 3, reasons and messages | `library`, "the reasons are those of the Python tool"; the comparisons of whole error lines in `strictjson`, `jsonframes`, `decode`, `mapping`, `pack`, `timeline` and `import`; criterion 5 by `cli`, "reading and writing files"; criterion 7 by `cli`, "--help" and "the parser". |
+| 4, strict JSON and JSON frames | `strictjson`, `jsonframes`; criterion 5 by "a file of 20 MB is read in under 10 seconds". |
+| 5, the ODRG decoder | `decode`. |
+| 6, a compressed body | `inflate`; criterion 4 by `decode`, with the vector `trailing-bytes.after-deflate`. |
+| 7, the encoder | `encode`. |
+| 8, compression | `deflate`; criterion 5 also by `browser`. |
+| 9, decode and check | `decode`, and `cli`, "check tells the format from the name, and --format overrides it". |
+| 10, mapping files | `mapping`, and `import`, "both command lines read a mapping file the same way, through import". |
+| 11, shows and pack | `pack`. |
+| 12, the timeline | `timeline`. |
+| 13, fitting | `fit`. |
+| 14, media on the command line | `import`; criterion 4 but for the rotation, see below. |
+| 15, frames from whoever has them | `timeline`, "importFrames takes frames from whoever has them"; criterion 6 by the added test of `library`. |
+| 16, the library in a page | `browser`. |
+| 17, dependencies | `import`, "the packages" and "a tool without its packages"; criterion 4 by `library`; criterion 6 by `docs`. |
+| 18, tests | criteria 2 and 5 by the added test of `library` and by `docs`; criterion 3 by the files named above; criterion 4 by `cli`, "the Python tool the suite compares with". |
+| 19, documentation | `docs`, and `tests/converter/test_docs.py`, `tests/emulator/test_docs.py` and `tests/firmware/test_docs.py`. |
+
+No program of the suite checks these:
+
+- Requirement 1 criterion 9 asks for the same result in a web view "for every function".
+  The page calls `jsonframes.loads` and `dumps`, `odrg.encode` and `decode`,
+  `timeline.importFrames` and `fit.place`, which pass through every file of the library
+  but not through every function by itself.
+- Requirement 14 criterion 4, that a rotation recorded for display is not applied: the
+  call has `-noautorotate`, and no test file with a rotation was made.
+- Requirement 16 criterion 5, the test reported as skipped where there is no Chrome: on
+  this Mac there is one, so the skipping was read and not seen.
+- Requirement 18 criterion 6, no network connection: nothing of the suite opens one but
+  the Chrome test, to `127.0.0.1`; no program proves it.
+- Requirement 18 criteria 7 and 8 are checked by running the other suites and by
+  `git diff` against the commit this seed started from, which shows no file of `odrig/`,
+  `core/`, `emulator/`, `odrigctl/` or `firmware/`.
+- Requirement 19 criterion 6: `docs` checks that the versions are named, not that they
+  are the ones that were used.
+
+**Resolution.** `converter/tests/library.test.js`, "the tool is the library and a command
+line part that is built on it".
+
+## Seed 06: The last check: what was run, and the suite of the firmware tool that was not
+
+**Question.** Requirement 18 criterion 7 names four suites that need no board, among them
+`python3 firmware/fw.py test`, and the last task runs them. The run that did the tasks of
+this seed was told not to start the firmware tool, because another run was working with
+the board through it.
+
+**Answer.** Run after the last change, all passing:
+
+| Command | Tests |
+|---|---:|
+| `npm test --prefix converter`, Node.js 26.5.0 | 1,286 |
+| The same suite with Node.js 20.18.0, started as `node --test` in `converter/` | 1,286 |
+| `.venv/bin/python -m unittest discover -s tests/converter -t .` | 616 |
+| `make -C core test` | 246 |
+| `python3 -m unittest discover -s tests/emulator -t .` | 328 |
+| `python3 -m unittest tests.firmware.test_docs` | 12 |
+
+The Node.js 20 is the one the firmware tool keeps in its work folder,
+`build/firmware/venv/bin/node` of the main checkout, started by itself. Of the firmware
+tool's suite only the last line was run: the one file of tests that reads
+`docs/firmware.md`, by itself and without the tool. The rest of that suite was not run. No
+file of `firmware/` changed in this seed, and no other test of that suite reads a file
+this seed changed, so nothing of it should differ. The state of the seed is set to
+completed with that one run open: whoever merges this seed runs
+`python3 firmware/fw.py test` when the board is free.
+
+The versions: macOS 26.5 (25F71) on Apple Silicon, npm 12.0.2, Chrome 154.0.8037.98,
+Python 3.14.6 with zlib 1.2.12, PyAV 17.1.0 and Pillow 12.3.0, and ffmpeg 6.0 as the
+decoder program. The suites ran in a second checkout of the repository, a git worktree,
+with the environment variable `ODRIG_PYTHON` naming the Python of the main checkout's
+`.venv`.
+
+**Resolution.** `docs/converter.md`, "What is verified";
+`project-seeds/06-p1-javascript-converter/state.json`.
+
+## Seed 06: The pages for newcomers and their tests, once both seeds were on `master`
+
+**Question.** Seed 06 and seed 10 were built side by side, each correct on its own branch.
+Merged, the pages for newcomers, `AGENTS.md` and the folder `agent/`, still gave the Python
+tool as the converter, and four tests failed: two of `tests/onboarding/test_entry.py`, one
+of `tests/onboarding/test_start.py` and one of `tests/converter/test_docs.py`. Which
+failure is the fault of a page and which of a test, and what do the tests of the pages
+need to check a command that starts `node` or `npm`?
+
+**Answer.**
+
+- **The pages were out of date and are brought to the repository as it is.** `import`,
+  `check` and `pack` are commands of `node converter/odrig.js`; the setup has Node.js 20 or
+  later and `npm ci --prefix converter`; the suites to run gain
+  `npm test --prefix converter`; the generators stay Python commands. Seed 06 is no longer
+  under "What is coming", and the entry file links `docs/reference-converter.md`. The
+  Python package has a name of its own in the vocabulary and among the parts of the
+  project, the reference converter.
+- **Two tests looked for a sentence in a document that no longer holds it, and now look
+  where it is.** No document changed for them. "is verified on macOS" was a sentence of the
+  Python tool's setup: `test_start.py` now reads what each tool's own page says, "Windows
+  and Linux are supported by construction and not verified: nothing has been run there."
+  in `docs/converter.md` and "It is verified on macOS with Python 3.14." in
+  `docs/reference-converter.md`. "from a mapping file of either kind, a row-leg file or a
+  column-leg file" and a command with `--mapping mapping/legs-20.json` belong to the
+  generators and moved with them: `tests/converter/test_docs.py` reads both under
+  "Generators" of `docs/reference-converter.md`, in a test of its own.
+  `docs/converter.md` lost nothing true: its section "import" still gives the canvas for
+  both kinds of mapping file and names the demo show of the target, and the test that
+  asserted that still does.
+- **The other tests of the pages follow the pages**: the parts of the project, the
+  commands of the setup, of the suites and of the demo show, the setup shown for Windows,
+  and the words of the vocabulary. The test that keeps what is planned in one place no
+  longer counts "JavaScript" and seed 06 as planned. A new test asserts that no command of
+  a page converts, checks or packs with the reference converter.
+- **A command that starts the converter is put before the converter's own parser.**
+  Node.js loads `converter/cli/version.js` and `converter/cli/arguments.js` and gives the
+  arguments to `parse`; nothing of the command is run. So `tests/onboarding` now needs
+  Node.js as `node`. Without it the test fails and says what is missing, as the suite of
+  the emulator does; it is not skipped. Of `npm` the test takes the two commands of the
+  pages and no other. The suite takes two seconds, not one.
+- **Both pages were at their limit of 200 lines.** The getting-started page gives the two
+  suites that need more in one block and shows the reply to `status` once, under "Check it
+  without a screen", not twice. The animation guide lost words and no statement.
+- **The walk-through follows the pages as rewritten.** The setup of the page now runs
+  `npm ci --prefix converter` in the copy, so the packages land in the copy's
+  `converter/node_modules`, inside the temporary folder. Five suites run, and that of the
+  converter is judged by its counts, `fail 0` and a `pass` above 0, since it has no last
+  line `OK`. npm and the package `ffmpeg-static` keep their caches in the user's account,
+  as pip does; the walk-through leaves that as it is for anyone who follows the page. The
+  caller's `ODRIG_PYTHON` is not passed on, so the suite of the converter compares with
+  the Python of the copy.
+- **The known fault.** The animation guide says that the `import` of the reference
+  converter can end Python itself on a damaged or cut video, which is the first of the
+  three faults of the entry "Seed 06: Python crashing while it decodes a video for a
+  comparison", and that a fix is planned. That it is planned was said with the task of
+  this change; no seed for it exists yet.
+- **Windows.** The pages say what can be tried there today, the converter, the reference
+  converter, the generators and their two suites, all written to run there and none run
+  there, and that everything else waits for seed 11, whose Required Behavior 8 also has
+  the suite of the converter run on Windows.
+
+Run in a worktree after the change, all passing: `tests/onboarding`, `tests/walkthrough`,
+`tests/converter`, `npm test --prefix converter`, `tests/emulator` and `make -C core test`.
+Not run: `python3 firmware/fw.py test`, which needs the work folder `build/firmware/` that
+a worktree does not have, and anything on Windows or Linux.
+
+**Resolution.** `AGENTS.md`, `agent/README.md`, `agent/vocabulary.md`,
+`agent/working-rules.md`, `agent/getting-started.md`, `agent/animation-guide.md`;
+`tests/onboarding/support.py`, `_converter`, `_node` and `_npm`, and the tests of that
+folder; `tests/walkthrough/test_fresh_copy.py`, `tests/walkthrough/support.py`;
+`tests/converter/test_docs.py`, "the document of the reference has the generators for both
+kinds and for the target".
+
+## Seed 13: The bytes of whole files, compared once and not pinned
+
+**Question.** The design asks for a test that a whole video and a whole GIF give the same
+JSON frames bytes as "a copy of the expected output kept from before the change". The exact
+pixel values of a decoded video depend on the build of the decoder, so bytes kept in the
+repository would fail on another computer for a reason that has nothing to do with this
+seed.
+
+**Answer.** The comparison was made once, by running the tool of the commit before the seed
+and the tool after task 3 on the same whole video and the same whole GIF: the two JSON
+frames files are byte-identical for each. No bytes are pinned in a test. The existing import
+tests, which recognise each frame by the nearest of the fixed colours, keep covering whole
+files.
+
+**Resolution.** Seed 13 `tasks.md`, task 3; the commit message of task 3 records the
+comparison.
+
+## Seed 13: Where the two tools differ on a damaged video
+
+**Question.** The JavaScript converter's suite again gives the Python tool every cut and
+damaged video it gives the JavaScript tool, 160 files. Do the two tools agree on them?
+
+**Answer.** On 159 of 160. Where both refuse a file they give the same reason,
+`unreadable-media`. One file is read by the JavaScript tool and refused by the Python tool:
+`alpha.mov` with the byte at 1137 changed by 245. The two tools decode with different builds
+of FFmpeg, and one recovers a picture where the other gives up. The file is named in the
+table `KNOWN_DIFFERENCES` of the test, and a difference that is not in the table fails the
+test. The Python tool ended every one of the 160 with status 0 or 1 and without a traceback,
+and no crash report was written.
+
+The made-up video of `converter/tests/reference.py` gained a `codec_context`, because the
+Python tool now reads it before decoding.
+
+**Resolution.** `converter/tests/import.test.js`, `KNOWN_DIFFERENCES` and the test of 80
+cuts and 80 changed bytes; `converter/tests/reference.py`, without `_undecodable_video`.
+
+## Seed 07: What seed 05 left, where this spec expected something else
+
+**Question.** The spec of seed 07 was written while seed 05 was being implemented, from
+the design of seed 05. Its tasks say: where the code differs, follow the code and record
+the difference. What differs?
+
+**Answer.** The code was read before the first task. The core, the emulator and the
+command tool are as the design's table "What this design relies on" has them. Four things
+differ, all on the board:
+
+- The request for a refresh has a task of its own, `odrig`, on the chip's other processor
+  core, and the core's lock is held for a whole request, 9 to 17 ms with a dense clip. The
+  design names this as its risk 6. So a step of the check will run on that task, and the
+  storage calls of a command on WLED's loop, for the port, and on the network task, for
+  HTTP. The spike of task 3 measures the pacing in that arrangement.
+- The port no longer feeds the core one byte at a time. It collects the bytes of a pass,
+  at most 272, and hands them on at the end of a line or when the buffer is full, each
+  hand-over under one hold of the lock. A line of 2,048 characters so reaches the core in
+  eight or more pieces, which the core's byte entry joins.
+- The owner has ruled, in seed 05, that any rate from 20 to 50 refreshes a second is fine
+  on the board for any content. The session that coordinates this run passed the ruling on
+  for this seed: where the seed and this spec ask for 25 or more during an upload and 49
+  or more afterwards, the board tests assert 20 or more in both places, and the measured
+  figures are written down as they are. Requirement 17 criteria 4 and 7 and Requirement 21
+  criterion 3 are read that way from here on.
+- This run works in a checkout of its own, beside the first one. The stock WLED files and
+  the factory backup exist in the first checkout only. The tool of this checkout builds in
+  its own `build/firmware/`; where a board test restores stock WLED, the stock files are
+  read from the first checkout through a link that is removed afterwards, and nothing of
+  that folder is copied or changed.
+
+The session of the board suite, `tests/board/support.py`, has one line that must be too
+long. It had 75 characters and gets 2,055 in the first task, with the limit, although the
+board suite runs again only in task 3, when the firmware with the longer line is on the
+board.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, tasks 3 and 7;
+`tests/board/support.py`, `SESSION`.
+
+## Seed 07: The byte entry without its two blocks, and where the blocks are taken
+
+**Question.** The line and the reply of the byte entry leave the core object and become
+two blocks taken at startup. The design does not say when, or what `odrig_core_feed` does
+when the host could not supply them. A reply of 1,024 bytes cannot stand on the stack of
+a function of the core, so without the blocks the entry has nowhere to put a line or a
+reply.
+
+**Answer.** The two blocks are the first the core asks for after its own object, before
+the mapping is read: commands arrive whatever the show is, also when there is none. When
+either is missing the show is invalid with `out-of-memory`, as for every later block,
+`odrig_core_feed` takes no bytes and calls nothing, and `odrig_core_command`, which writes
+into the caller's room, works as ever. So a host that could not give 3 KB answers over
+HTTP and not over its serial port, and `status` says why. The numbers of the blocks in
+the tests of a failing `alloc` move up by two.
+
+A line is split into up to five words; a line with more is `bad-argument` for every
+command, and `unknown-command` when its first word is no command, which comes first in
+the order of the codes.
+
+**Resolution.** `core/src/core.cpp`, `start`; `core/src/commands.cpp`, `Words` and
+`odrig_core_feed`; `docs/core.md`, "Command lines" and "Memory";
+`tests/core/test_memory.py`.
+
+## Seed 07: The length in a log entry of a line that was cut
+
+**Question.** A log entry of the emulator gets `length`, "the number of characters of the
+line as the core read it". Of a line of more than 2,048 characters the core hands back
+its first 2,048, and of a body of more than 4,096 bytes the emulator keeps 4,096.
+
+**Answer.** `length` is the length of the line the core read: 2,048 for every line that
+was cut, with `cut` true. The page shows such a line with its first 200 characters and
+`more than 2048 characters`, and a shorter long line with its first 200 and its real
+length.
+
+**Resolution.** `emulator/hub.py`, `Hub.log`; `emulator/web/app.js`; `docs/emulator.md`,
+"The page" and "The event stream".
+
+## Seed 07: Queue and session files in a checkout of its own
+
+**Question.** The run works in a checkout of its own. Where do the queue and the session
+state go, and how are the records numbered?
+
+**Answer.** Into `.codex/` of that checkout, which git ignores: the queue records Q-401
+to Q-409, one for each task of this spec, without task ids, because the script that makes
+them does not run on this Mac, and the session state in `.codex/tactic/session.json`. No
+branch is pushed: there is no remote.
+
+**Resolution.** `.codex/local-task-queue.md` and `.codex/tactic/session.json` of the
+checkout, untracked.
+
+## Seed 07: What the test host has beyond the design's list, and what it takes for misuse
+
+**Question.** The design lists six options for the test host and the misuses it stops. It
+asks for `space` to be tested "with a host that cannot tell", and for a host whose
+`write_open` is `NULL` while `space` answers, and has no option for either. It says each
+new check is "shown to stop the test host", and the core never does what the checks
+stop, so no session can show it. The header lets a host give up a file that is being
+written when `write_open` is called again, while Requirement 19 has the test host stop
+when the core "has two files being written".
+
+**Answer.** Two options more: `--space-unknown`, with which `space` returns -1, and
+`--only-space`, with which only `space` of the seven is there. `--no-storage` makes all
+seven `NULL`, as the design says. Nine invocations more, `odrig_host guard write`,
+`write-none`, `close-none`, `two-files`, `name`, `rename-open`, `remove-open`, `read-at`
+and `read-at-offset`, each of which uses the storage functions as the core never may and
+is stopped with `file misuse`. A second `write_open` while a file is being written is
+misuse for the test host: the core removes or closes a file before it begins another, and
+a host only has to cope with the other case. `read_at` may always start again at
+offset 0, which is how the core begins the check of every upload. The name check covers
+`open` too, in sessions.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host";
+`tests/core/test_content.py`, `StorageGuards`.
+
+## Seed 07: Where `space` and the reply live in the core, and what `storage-error` says for now
+
+**Question.** The design puts `space` into `content.cpp`, which its task list creates
+only in task 4, and leaves the `Reply` in `commands.cpp`, where `content.cpp` cannot
+reach it. `docs/commands.md` is to list only what exists, and the design's sentence for
+`storage-error` speaks of a show and of an upload.
+
+**Answer.** `content.cpp` begins in task 2 with `space`. The `Reply`, with `succeed` and
+`refuse`, moves to `commands.h`, so that `content.cpp` and later `upload.cpp` write
+replies with the same code. `storage.h` holds the three names the core keeps for itself
+and the question whether the host's storage can be changed. Until the commands that
+write exist, `docs/commands.md` gives `storage-error` as what `space` is answered with on
+a board that cannot tell its space, and the test of the command tool that compares the
+tool's commands with the document says that `space` is in the document and not yet in
+the tool.
+
+**Resolution.** `core/src/content.cpp`, `commands.h`, `storage.h`; `docs/commands.md`,
+"Error codes"; `tests/emulator/test_tool.py`,
+`test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The emulator's host: which names it takes, and a host object without storage
+
+**Question.** The emulator "refuses a name with a path separator" and uses a name "only
+when it is one the core may use". A test of seed 03 forbids the emulator to write out the
+name `show.json`, so it cannot list the core's names. The binding is also used with host
+objects that only read.
+
+**Answer.** `FolderHost` takes a name of 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
+and `.` that is not made of dots alone, and refuses every other: such a name has no
+separator and cannot leave the folder. The binding gives the core the seven storage
+functions when the host object has `write_open`, and seven null pointers otherwise.
+`FolderHost.close` stays what the core calls to close the open file; `release` closes
+every file the host holds, at the end of the program.
+
+**Resolution.** `emulator/host.py`; `emulator/binding.py`, `Core.__init__`;
+`docs/emulator.md`, "Starting".
+
+## Seed 07: The board cannot tell its space quickly, so the usermod keeps the number
+
+**Question.** The design assumed, as B5, that the file system tells its used bytes in
+under 100 ms with storage nearly full, and named what to do otherwise. The spike measured
+30 ms with the example show, 79 ms with one dense clip of 1.4 MB and 377 ms with 9 MB.
+The player waits for the same lock for that long.
+
+**Answer.** The design's other way is taken. The usermod asks the file system once,
+before the core starts, and keeps the number of used blocks up by what its storage
+functions write, replace and remove: no block for a file of 512 bytes or less, which the
+file system keeps beside the name, and for a longer file the blocks of 4,096 bytes that
+the file system needs for it, the pointers at the start of each block counted. `space`
+is answered from that number with no call to the file system, in every state of the
+board. The number is an account, not a measurement: it leaves out the blocks the file
+system takes for its own lists as a folder grows. The board test allows 16,384 bytes
+between the number kept and the number after a restart, and the spec has the core keep a
+reserve of that size when it judges whether an upload fits. Every start takes the number
+afresh.
+
+A client sees nothing else than the design describes: `free` in whole blocks. On the
+board `free` after an upload or a removal can differ by a few blocks from what the same
+command reports after the next start.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `askSpace`, `blocksOf` and
+`tellSpace`; `docs/firmware.md`, "What the firmware does", "Storage", and B5 in "Verified
+on the board"; `tests/firmware/test_usermod_files.py`; `tests/board/test_upload.py`,
+`test_the_space_is_told_without_a_storage_call_and_follows_what_is_written_and_removed`;
+`tests/board/test_measure.py`, `space_us`.
+
+## Seed 07: How the pacing counts, and the rates it was measured with
+
+**Question.** The design holds command lines after a storage call for the longer of 20 ms
+and twice the call's time. A command makes several storage calls in a row, and the spike
+found a write of 1,500 bytes slower than the design assumed: 31 ms in the mean and 152 ms
+at the longest, where the design expected a few milliseconds and some tens for one in
+three. The design asked for 25 refreshes a second or more during the writes, and for the
+writes to move to a task of their own if that failed.
+
+**Answer.** The times of the storage calls are added up until a hold has run out, and the
+hold is the longer of 20 ms and twice that sum, counted from the end of the last call. So
+a command that makes five calls is followed by one hold for all five. A read through
+`read_at` is not counted: the check of an upload reads inside the player's own request
+for a refresh. A command over HTTP waits in the network task before it takes the lock.
+
+With that pacing the board sent 34 to 46 refreshes in every second while a megabyte was
+written, and 50 in each of the ten seconds after. With the pacing taken out it sent 10 or
+11. The owner accepts every rate from 20 to 50 on the board, so the writes stay where
+they are, and the board tests assert 20 or more during an upload and after it, where the
+spec has 25 and 49. The figures measured are in `docs/firmware.md`.
+
+Not tried: writes while a dense 60 x 60 clip plays. A storage call stops the player for
+as long as it takes, and the player then decodes every frame that came due meanwhile in
+one request, so a rate below 20 in the second of a long call is possible there.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `Timed` and `holding`;
+`odrig_serial.cpp`, `poll`; `odrig_usermod.cpp`, `commandLine`; `docs/firmware.md`,
+"Storage calls are paced" and B3; `tests/board/test_upload.py`, `LOWEST`;
+`tests/firmware/test_usermod_files.py`, `Pacing`.
+
+## Seed 07: What the probe build gained for the spike
+
+**Question.** The design gives the probe build a `store` object in its report and says
+that the spike writes a megabyte through the usermod's storage functions "from a probe
+command". It does not say what that command is, or what `check_steps` counts before the
+core has a check.
+
+**Answer.** The probe build answers a second line, `#store <bytes>`, as it answers
+`#probe`: on the port only, at the start of a line, and without the core seeing it. It
+writes, renames, reads back and removes a file of its own in `/odrig`, `probe.part` and
+`probe.odrg`, a step in each pass of the loop that the pacing allows, and answers with
+one line of times. The firmware itself has no such line. A file named `probe.odrg` or
+`probe.part` in a show would be overwritten by the trial; no show of the repository has
+one. The report gains `space_us`, the time the file system took to tell its space at the
+start, beside `store`. `check_steps` counts the requests for a refresh during which a
+second file was read by anyone, so the trial's own read-back shows up in it; with the
+core's check it is the number of steps of the check.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`, `storeStep`, `fitOf` and `report`;
+`docs/firmware.md`, "The probe build"; `tests/board/test_upload.py`, `Spike`.
+
+## Seed 07: The board tests keep the port open and send one line at a time
+
+**Question.** The board tests sent each command through the command tool, which opens
+the port, waits and closes it for every line. The spike has to ask for a report once a
+second while a trial runs. The first run of the whole suite also failed in two tests
+after a test had written two lines of 2,048 characters in one piece: 4,098 bytes do not
+fit the port's queue of 4,096, and the rest of the second line stayed in the core's line
+until the next test's first command, which was then answered with `line-too-long`.
+
+**Answer.** `tests/board/support.py` gains `Port`, the port kept open for several
+exchanges, opened as the command tool opens it. It sends one newline when it opens and
+discards what arrives, so that a line a test before it left unfinished ends there. The
+tests send one line and wait for its reply before the next, as the command tool does;
+the design's B4 is one line in one piece, and that is what is tried.
+
+The board suite also needs the stock files of `firmware/wled-16.0.1/`, which exist in
+the main checkout only. In another checkout the suite's test of `restore-stock` has no
+files to compare with; for this seed's runs a link to the main checkout's folder stood
+in the worktree, untracked, and was removed afterwards.
+
+**Resolution.** `tests/board/support.py`, `Port`; `tests/board/test_upload.py`,
+`test_a_line_of_2048_characters_in_one_piece_is_read_and_one_of_2049_is_too_long`;
+`docs/firmware.md`, B4.
+
+## Seed 07: What the documents say of the show before the upload exists
+
+**Question.** Task 4 puts "the texts of the design" into `docs/show.md` and `busy` and
+`in-use` into `docs/commands.md`. Those texts speak of the upload: a new item, a file
+replaced, `busy` while an upload is open. The upload is task 5, and a document lists only
+what exists. The design's example of a written `show.json` also has a cycle that lists
+id 2 while no item has that id, which is not a valid show.
+
+**Answer.** With task 4 `docs/show.md` has the design's texts as far as they hold with
+`remove` alone: "Changing a show while it runs" speaks of `remove`, and the sentences on
+uploads, on a new item and on the room for one are added with task 5. `docs/commands.md`
+gets `list`, `remove` and `in-use`; `busy` comes with task 5, when something can be busy.
+The example of a written `show.json` is a valid show: items 1 and 2 and a cycle 4 that
+lists them, with `start`. Task 8 compares both pages with the design word for word.
+
+**Resolution.** `docs/show.md`, "Changing a show while it runs" and "show.json after a
+change"; `docs/commands.md`, "Storage and the installed items" and "Removing an item";
+`tests/core/test_docs.py`.
+
+## Seed 07: What a removal leaves when storage fails half-way
+
+**Question.** The design gives the sequence of a removal: `pending.txt` with the file's
+name, `show.part`, the rename onto `show.json`, the file removed, `pending.txt` removed.
+It says what a power cut leaves. It does not say what the core does when a call fails
+after the rename, or what the start does with a `pending.txt` whose file cannot be
+removed or that cannot be read.
+
+**Answer.** Up to the rename a failure undoes the command: `show.part` and `pending.txt`
+are removed, the show in memory is unchanged, and the reply is `storage-error`. From the
+rename on the command has succeeded, whatever follows: the show in storage is the new
+one, so the reply is `{"ok":true}`. If the file then cannot be removed, `pending.txt`
+stays, and the next start removes the file. At the start, `pending.txt` is removed only
+when every file it names is gone or is named by an item; if a removal fails or the file
+cannot be read, it stays for the start after. A line of `pending.txt` that is not a file
+name is skipped, and so is a last line without a line feed, which is what a power cut
+during the write leaves.
+
+**Resolution.** `core/src/storage.cpp`, `storage_remove_item` and
+`storage_settle_pending`; `docs/core.md`, "The files the core writes";
+`tests/core/test_powercut.py`, `Removal`; `tests/core/test_startup.py`, `Leftovers`.
+
+## Seed 07: The empty show in the converter, and the test of the tool's commands
+
+**Question.** Task 4 changes `odrig/show.py` for a show without items, "and
+`converter/lib/show.js` if it is there". It also adds commands to `docs/commands.md`
+that the command tool gets only in task 6, while a test of the tool holds the tool's
+commands and the document's to be the same.
+
+**Answer.** This branch has no `converter/` folder, so only the Python reader changes;
+the JavaScript converter of the main line needs the same change when the two are merged:
+a show with `"items":[]` is valid. The tool's test says, until task 6, which commands
+the document has that the tool does not send yet.
+
+**Resolution.** `odrig/show.py`; `tests/converter/test_show_pack.py`;
+`tests/emulator/test_tool.py`, `test_the_commands_are_those_of_the_commands_document`.
+
+## Seed 07: The check stands still while the player is late
+
+**Question.** The design gives the check of an uploaded file one step after a refresh
+that came in step: on the grid slot right after the one before. That keeps the check
+from taking time the player needs. It does not say what follows when no refresh is in
+step for a long time, which is the case when content plays at 25 refreshes a second or
+fewer: every refresh is then a slot late.
+
+**Answer.** It is built as designed, and what follows is this. A step of the check is
+what counts as progress of an upload in the checking state. With no step for 60 seconds
+the upload is discarded like any other on which nothing moved, and the next `upload end`
+is answered with `no-upload`. A client sees `busy` for up to a minute and then
+`no-upload`. At rates between 25 and 50 the check runs, slower the more refreshes are
+late: a step for every refresh that follows another without a gap.
+
+On the board this matters for a show whose content is dense enough to play below 50: the
+dense 60 x 60 clip plays at 28 to 37 compressed. An upload while such content plays is
+checked slowly, and at 25 or fewer not at all. `off`, or playing an item that keeps the
+rate at 50, lets the check run at full speed: one frame of the file for each refresh.
+The owner should see this before the event; a change, such as a step for every refresh
+when the last step is more than a second old, would change the design and is not made
+here.
+
+**Resolution.** `core/src/player.cpp`, `in_step`; `core/src/upload.cpp`, `upload_step`
+and `upload_touch`; `docs/core.md`, "Uploads and the check"; `tests/core/test_upload.py`,
+`TheCheck`.
+
+## Seed 07: The codes of a file that storage gave back wrong
+
+**Question.** The check reads the uploaded file back from storage. The design answers a
+file that is not valid with `bad-file` and storage that failed with `storage-error`. It
+does not say which of the two a file gets whose bytes, read back, are not the bytes that
+were received.
+
+**Answer.** The check decodes what it reads back and, at the end, compares the number of
+bytes and their CRC-32 with what was received. A read that fails is `storage-error`.
+Bytes that differ and still decode are `storage-error`, found at the end. Bytes that
+differ and do not decode are `bad-file` with the decoder's reason, because the decoder
+meets them first; `bad-file` is also the earlier of the two in the order of the codes.
+The upload is discarded in all three cases. The test host gets two options for these
+cases beyond the design's list: `--read-back-fails OFFSET`, from which on `read_at`
+answers -1, and `--read-back-differs OFFSET`, the place of one byte that `read_at` gives
+back with one bit changed.
+
+**Resolution.** `core/src/upload.cpp`, `upload_step` and `upload_end`;
+`tests/core/host/host.cpp`; `docs/core.md`, "The test host"; `tests/core/test_upload.py`.
+
+## Seed 07: What the reference player and the emulator needed for the upload
+
+**Question.** The reference player counts the check in refreshes, so it has to know
+after how many steps the core's decoder refuses a damaged file; the converter's decoder,
+which the reference player uses, refuses a file as a whole. The emulator tells the core
+the space of its folder from the sizes of the files, while Python keeps written bytes in
+a buffer of its own.
+
+**Answer.** For a file whose body is refused, a test tells the reference player how many
+frame records decode before the refused one, by the CRC-32 of the file; without that it
+takes the number the header names. The check then ends two steps later, as for a sound
+file: one step for the header and one for the end. The emulator's host opens the file it
+writes without a buffer, so that every piece is in the folder when the core has given
+it, and `space` during an upload counts it.
+
+**Resolution.** `tests/core/support.py`, `ReferencePlayer.sound_records`;
+`emulator/host.py`, `write_open`; `tests/emulator/test_content.py`, `Uploads`.
+
+## Seed 07: When the command tool writes a progress line
+
+**Question.** The design has the tool write progress "one line for each report", and
+calls `progress` after every acknowledged piece; Requirement 18.5 asks for a line "at
+least once a second, and a last time when the data is sent". Over USB a piece is
+acknowledged nine times a second, so a line for every piece is 900 lines for a file of
+1.4 MB when standard error is a file or a pipe.
+
+**Answer.** `odrigctl.content.upload` calls `progress` after every acknowledged piece, as
+designed, and the board tests use that. The command line writes a report when half a
+second has passed since the one before, and always for the last piece, so a small file
+gives one line with 100%. The speed in a line is whole bytes a second, rounded, and 0
+when no time has passed. On a terminal the one line is written over again and ended
+before the reply is printed.
+
+**Resolution.** `odrigctl/cli.py`, `Progress`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `ProgressLines`.
+
+## Seed 07: What the tool's session does with a reply that comes late
+
+**Question.** Through the port the replies carry no mark of the line they answer; the
+session takes the next reply for the answer. The design has the tool send an
+`upload data` line once more when no reply came in time. If the first reply was only
+late, two replies are then on their way for one piece, and the second would be taken for
+the answer of the next piece.
+
+**Answer.** Two rules in the session, for the port only. A line that arrived whole before
+a line is sent is no answer to it and is dropped; the beginning of a line that has not
+ended is kept and judged with its end. And after a second `upload data` line that was
+answered with anything but `bad-offset`, the tool drops what arrives in the next half
+second. A reply later than that still ends the upload with `bad-offset`, a cancel and
+status 1; the upload can be sent again. Over HTTP a late reply belongs to a request that
+was closed and is never seen.
+
+Only an `upload data` line is sent twice. Without a reply to `upload begin`, to
+`upload end` or to a line of another command the tool exits with status 3 and sends no
+cancel: it cannot reach the target. An upload left open so is discarded by the target
+after 60 seconds, and after a lost reply to `upload end` the file may be installed all
+the same; `list` tells.
+
+**Resolution.** `odrigctl/client.py`, `Session.exchange` and `Session.discard`;
+`odrigctl/content.py`, `upload`; `docs/emulator.md`, "The command tool";
+`tests/emulator/test_tool.py`, `LostReply` and `SessionOfExchanges`.
+
+## Seed 07: When the tool cancels an upload
+
+**Question.** Requirement 18.7 has the tool send `upload cancel` after a reply that is
+not ok "when an upload it opened may still be open". It does not say after which replies
+that is.
+
+**Answer.** After a refused `upload begin` the tool sends no cancel: it opened nothing,
+and with `busy` the open upload is another sender's. After a reply to a piece or to
+`upload end` that is not ok it sends `upload cancel`, unless the code is one after which
+the target holds no upload: `no-upload`, `bad-checksum`, `bad-file`, `storage-error` or
+`show-invalid`. So a cancel follows `bad-offset`, `bad-argument`, `incomplete`, and
+`busy` after 600 seconds. The reply to the cancel is not printed and does not change the
+status.
+
+Beside what the design names, `cli.checked` gives the command and its arguments after
+their number is checked, and every command, also the five of before, goes through a
+`Session`.
+
+**Resolution.** `odrigctl/content.py`, `GONE` and `_given_up`; `odrigctl/cli.py`;
+`tests/emulator/test_tool.py`, `UploadSteps` and
+`test_an_upload_that_is_refused_at_its_begin_cancels_nothing`.
+
+## Seed 07: An upload while dense content plays
+
+**Question.** The spec measures the rate during an upload with the bench show playing,
+which plays at 50 refreshes a second with room to spare. At the event the board plays
+60 x 60 content, and a dense clip already plays below 50. Nothing in the spec says what
+an upload does there.
+
+**Answer.** It was tried once, outside the suite, with the firmware and the dense
+60 x 60 clip playing compressed on the target file, 40 to 42 refreshes a second before
+the upload. Every upload succeeded. While the data of a file of 285,360 bytes arrived,
+`status` reported 16 to 27, below 20 in 13 of the 60 seconds, and the file arrived at
+4,714 bytes a second, where the bench show gives 12,583. Its check of 100 frames took 17
+seconds at 25 to 29 refreshes a second. In the second in which a file was put in place,
+`status` reported 6 or 7. So an upload while dense content plays can take the board
+below the 20 the owner accepts, for as long as the data arrives.
+
+Nothing is changed for it: the pacing is the design's, and a longer hold would make the
+upload slower still. What an operator can do today is to send `off`, or to play an item
+that is not dense, for the time of an upload; the app of seed 09 could do that by
+itself. Whether the board should do more, such as a longer hold while the rate is low,
+is the owner's to decide and would be a seed of its own.
+
+**Resolution.** `docs/firmware.md`, "Measurements on the board", "An upload over USB";
+no code.
+
+## Seed 07: What the board tests of the upload run on, and what they compare
+
+**Question.** Task 7 asks for one session on the board with the command tool, for the
+rate during an upload of a dense bench clip of 60 seconds with the probe's figures, for
+`read-show` to give "the folder as it was at the start", and for the replies to equal an
+emulator's "apart from `fps` and `free`".
+
+**Answer.** The session runs on the firmware, the image the board is left with, and
+the large upload on the probe build, whose report has the storage calls. Both assert 20
+refreshes a second or more where the spec has 25 and 49, by the owner's ruling. The
+session ends with three refusals, so that `in-use` and `unknown-id` are met on the board
+too. After it, the folder read back from the board has the files that were installed,
+with `show.json` as the core writes it: one line, the same show. It is byte for byte the
+folder the emulator has after the same session, and that is what the test compares, so a
+board that wrote a show file of its own kind would be seen. The suite's cache of what it
+installed is cleared whenever commands changed the show, so that the next test asks the
+board. The last step of the suite now also asks `list`, `status` and `space`, for the
+three items of the example show and nothing else.
+
+**Resolution.** `tests/board/test_upload.py`, `ContentCommands` and `DenseUpload`;
+`tests/board/support.py`, `content_session`, `measured_upload`, `changed_by_commands`
+and `read_back`; `tests/board/__init__.py`, `LeaveTheBoard`.
+
+## Seed 07: The test over the air, and how it was run without the air
+
+**Question.** Task 7 asks for "the same session over HTTP" in `tests/air/`, which no
+agent can run, and to run its session against the emulator. The session of the board
+test restarts the board, and a restart takes the board's network away from the computer
+that joined it.
+
+**Answer.** The test over the air sends the same session without the restart, once over
+HTTP and once through the port, and holds the replies to be the same, as the suite's
+other tests do. A second test uploads the dense bench clip of ten seconds over HTTP,
+asks `status` once a second, asserts 20 or more, and writes the speed to
+`build/firmware/out/upload-air.json`: the first figure for an upload over Wi-Fi will
+come from the owner's run. Both were run with an emulator in the place of the board's
+network: the suite was given the address of an emulator started on the dim example show,
+with the board on USB, so the HTTP half of each test spoke to the emulator and the port
+half to the board. Both passed so. That says the session and the comparison are sound;
+it says nothing of the board's web server with lines of 2,048 characters, which only the
+owner's check can show.
+
+**Resolution.** `tests/air/test_upload.py`; `docs/firmware.md`, "test-air" and step 7 of
+"The owner's checks".
+
+## Seed 07: The last check: what the documents were compared with, and the tests added
+
+**Question.** Task 8 compares `docs/commands.md` and `docs/show.md` with the design word
+for word, reads every acceptance criterion once more, and adds a test where a program can
+check a criterion and none did.
+
+**Answer.** `docs/commands.md` is the design's text, byte for byte. `docs/show.md` has
+the design's four texts word for word, apart from the example of a written `show.json`,
+which the design gives with a cycle that lists an id no item has; the page has a valid
+show there, as recorded with task 4. No other difference was found, so nothing else was
+settled.
+
+Six criteria had no test and got one:
+
+- 13.5, no array above 256 bytes in a function of the core: a scan of the sources,
+  beside the compiler's limit of 512 bytes for a frame and the assertion that holds the
+  core object to 4,096 bytes.
+- 15.1, no host looks into a line: the emulator's sources also hold none of the words
+  `list` and `upload` and none of the core's three file names; `space` and `remove` are
+  allowed in the binding alone, where they are members of the host record.
+- 16.4, the emulator's host refuses a name that is no file name of the folder: now also
+  for the five storage methods that take a name.
+- 20.5 and 21.2, `docs/firmware.md` has the storage functions, the pacing, the probe's
+  members and the measured upload.
+- 20.6, `docs/reasons.md` no longer lists a show without items as malformed.
+- 20.7, `docs/decisions.md` lists the commands and the two limits.
+
+What no program checks: 14.4 as far as it is the file system's own promise for a power
+cut during a rename, which no task tries on the board; 14.6, which holds because no host
+function calls the core, and is seen in the traces of the storage calls; and 21.5 and
+21.6, the owner's check.
+
+The first table of "Measurements on the board" was taken again with the firmware as it
+is now: the core asks for more memory at its start, so less of the chip's internal
+memory is free, and every start takes a little longer.
+
+**Resolution.** `tests/core/test_build.py`,
+`test_no_function_has_an_array_above_256_bytes`; `tests/emulator/test_scope.py`;
+`tests/emulator/test_binding.py`,
+`test_the_storage_methods_refuse_every_name_that_is_not_a_file_name_of_the_folder`;
+`tests/firmware/test_docs.py`,
+`test_it_says_what_the_firmware_writes_how_it_paces_and_what_an_upload_measured`;
+`tests/core/test_docs.py`, `Decisions` and
+`test_a_show_without_items_is_not_listed_as_malformed`; `docs/decisions.md`, "Commands"
+and the change log; `docs/firmware.md`, "Measurements on the board".
+
+## Seed 07: The owner's check is open
+
+**Question.** Task 9 is the upload over the board's Wi-Fi: a phone or a computer joined
+to the board's network. No agent joins that network, and this run was told not to join
+it and not to change a Wi-Fi setting.
+
+**Answer.** The task stays open, its checkbox unticked, and the seed stays `in_progress`.
+Under the task, `tasks.md` has what a program established over USB: the command tool
+uploads Hello world to the board, lists it, plays it and removes it, by hand and in the
+board suite with a restart in it, with the replies the emulator gives; and the test over
+the air passes with an emulator in the place of the board's network. What remains is
+step 7 of "The owner's checks" in `docs/firmware.md`, and
+`python3 firmware/fw.py test-air --http 4.3.2.1` with this Mac joined to the board's
+network. Two things only that run can show: that the board's web server carries a line
+of 2,048 characters, which is what an `upload data` line is, and the speed of an upload
+over Wi-Fi. When both pass, the owner sets the seed to `completed`.
+
+**Resolution.** `docs/specs/07-p1-content-commands/tasks.md`, task 9; `docs/firmware.md`,
+"The owner's checks", step 7; `project-seeds/07-p1-content-commands/state.json` is not
+changed.
+
+## Merging seed 07: a show without items, and the JavaScript converter
+
+**Question.** Seed 06 and seed 07 were done at the same time, each from a `master` that
+did not have the other. Seed 07 made a show without items valid and took the rule out of
+the Python reader. The JavaScript converter of seed 06 still refused such a show as
+`show-malformed`. After the merge the two tools disagreed, and eight tests of
+`npm test --prefix converter` failed. Is that a new seed, or part of the merge?
+
+**Answer.** Part of the merge. `master` is not pushed with a failing suite, and the rule
+is one line. The JavaScript reader accepts a show without items, the case moved from the
+broken shows of its suite to the whole ones, and `pack` is compared with the Python tool
+on such a show: the two JSON files and nothing else. Two pages that seed 07 wrote made
+the file of their upload example with the Python tool; they now use the converter, which
+writes the same 1,138 bytes. The pages for newcomers name nine commands, and the notes on
+the Android app no longer say that the list of items cannot be read.
+
+**Resolution.** `converter/lib/show.js`; `converter/tests/pack.test.js`, "a show without
+items on the bench canvas" and `WHOLE_SHOWS`; `docs/emulator.md` and `docs/firmware.md`,
+the upload examples; `tests/firmware/test_docs.py`; `agent/vocabulary.md`, "command";
+`tests/onboarding/test_vocabulary.py`,
+`test_the_entry_for_command_names_every_command_of_the_command_list`;
+`docs/android-app.md`.
+
+## The owner's ruling on the current limiter
+
+**Question.** The owner ruled on 2026-10-12: switch the limiter off if that does not
+burn the board and puts no hardware at risk. Does it?
+
+**Answer.** Not in the installation, and yes on the bench. With the LEDs fed from the
+power supply no LED current passes through the board, and the limiter protects nothing
+of it. On the bench one strip of 60 LEDs is fed from the board's 3.3 V pin; the rule of
+a brightness of 40 or less binds agents and not a command, and `brightness 255` on a
+white picture would ask that pin for about 3 A. There the limiter at 850 mA is the
+protection. So nothing was switched off on the board. The limit becomes a tracked
+setting, seed 15: 850 mA while a strip is fed from the board, and 0, which is off, or
+what the supply gives, once the LEDs have their own supply. The value for the
+installation is about power and is the owner's.
+
+**Resolution.** `project-seeds/15-p1-led-current-limit-as-a-setting/`; `AGENTS.md`,
+"What is coming".
+
+## Seed 12 spec: Where the standalone firmware gets the network and the limit
+
+**Question.** The seed says the network's name and password come from the same tracked
+settings file the WLED-based firmware uses, and the limit on LED current from a tracked
+value. The tracked files are on the computer. How do the values reach a firmware that has
+no settings interface: compiled in at build time, or read on the board?
+
+**Answer.** Read on the board, from the two files WLED reads: `ap.ssid`, `ap.chan` and
+`hw.led.maxpwr` of `/cfg.json`, and `ap.psk` of `/wsec.json`. The firmware tool writes
+them from the tracked files (seed 08, and seed 15 for the limit). So a board has one set
+of stored settings, both firmwares use it, a switch needs no rebuild, and no image holds
+the password. Compiled in, the two firmwares could disagree after a change, and the
+password would be in a file under `build/`.
+
+**Resolution.** `docs/specs/12-p2-standalone-firmware-as-a-fallback/design.md`, "The
+stored settings"; `requirements.md`, 4.1, 4.4 and 6.1.
+
+## Seed 12 spec: No network without stored settings
+
+**Question.** WLED hosts a network with its public default name and password when none
+are stored. What does the standalone firmware do then?
+
+**Answer.** It hosts none. A default would have to be compiled in, and the seed for the
+password exists because a known password lets anyone at the event send commands. The
+board still plays and answers over USB, and the probe report says that no access point
+is up. Seed 08's `set-wifi` is what puts the settings there.
+
+**Resolution.** `requirements.md`, 4.3 and 4.4; `design.md`, "The network and HTTP".
+
+## Seed 12 spec: What the two firmwares share
+
+**Question.** The seed asks only that the core's files are used unchanged. The usermod
+has 1,100 lines around the core. Written again, or shared?
+
+**Answer.** Three files are shared: the files, the port and the HTTP transport. They
+take one object each from WLED, and they are where the pacing of storage calls and the
+handling of a request body live, which seed 07 measured and tuned. They now reach their
+platform through `odrig_platform.h`, of which each build has its own. The outputs are
+written anew, because the usermod's are WLED's bus layer. The lock, the task and the
+loop, 120 lines, are written again in `main.cpp`: sharing them would put the usermod's
+start behind an interface for no other gain. The price is a change to three files of the
+firmware in use, and task 2 runs the whole board suite on it.
+
+**Resolution.** `design.md`, "The platform header" and "The program"; `tasks.md`, task 2.
+
+## Seed 12 spec: A probe build of its own, and which board tests run
+
+**Question.** The seed asks that the board tests the WLED-based firmware passes are run
+against the standalone one, except those that depend on WLED. Most of them read the
+probe report. And "twenty outputs each carry a full 180-LED signal" has to be shown
+without eyes.
+
+**Answer.** The standalone firmware gets a probe build with the members of the report
+that mean something without WLED, among them `pulses`, the rising edges the chip counts
+on a pin: 4,320 for 180 LEDs. The pulse counter moves out of the usermod's probe file
+and is shared. The board suite is run a second time with `test-board --standalone`; a
+test that needs WLED is marked and skipped there. Both runs leave the WLED-based
+firmware on the board.
+
+**Resolution.** `requirements.md`, 9 and 10; `design.md`, "The probe build" and "The
+board suite".
+
+## Seed 12 spec: The order with seeds 08 and 15
+
+**Question.** Is seed 12 blocked?
+
+**Answer.** Its spec is not. Its implementation waits for seed 08: the network's name
+and password are in the board's stored settings only after it, and without them the
+standalone firmware hosts no network, so its HTTP transport could not be tried. Seed 15
+is not needed: without it the limit is 850 with both firmwares. So the order is seed 08,
+then seed 12, and seed 15 at any point after seed 08.
+
+**Resolution.** `tasks.md`, the opening; `design.md`, "What this design relies on".
+
+## Seed 08: What a file system keeps of a file that was rewritten
+
+**Question.** A test of the edit looked for a password that had stood in `/cfg.json` in
+the bytes of the whole storage image afterwards, and found it. Is the edit wrong?
+
+**Answer.** No. The file no longer holds it: the file system writes a changed file into
+other blocks and does not erase the blocks it frees. So after a change of the password,
+the bytes of the old one can stay in storage, outside every file, until those blocks are
+used again, and in the storage images the work folder keeps. WLED serves files and not
+blocks, so nothing on the network gives them out; reading the flash over USB does. The
+test now reads the file. `docs/wifi.md` says this where it says what else holds the
+password.
+
+**Resolution.** `tests/firmware/test_wifi_storage.py`,
+`test_a_password_in_the_configuration_is_gone_afterwards`; `docs/wifi.md`, in task 6.
+
+## Seed 08: `write_storage` is given the making of the new image
+
+**Question.** The design gives `write_storage(on_port, region, before, after)` the new
+image. `install-show` has made its new image inside the block that restarts the board
+when something fails, so that a show that does not fit, `no-space`, leaves a board that
+runs again and not one that waits in its bootloader. With the new image made by the
+caller, each caller would have to repeat that.
+
+**Answer.** `write_storage(on_port, region, before, make)` gets a function that makes
+the new image from the one the board holds, and calls it inside the block. `install-show`
+passes `storage.with_show`, `set-wifi` passes `wifi.apply`. So a refusal of either, also
+`wled-settings-malformed`, restarts the board and writes nothing, and `install-show`
+behaves as it did: its tests pass unchanged.
+
+**Resolution.** `firmware/fwtool/cli.py`, `write_storage`, `_install_show` and
+`store_settings`; `tests/firmware/test_wifi_commands.py`,
+`test_settings_of_wled_that_are_no_object_are_refused_and_nothing_is_written`.
+
+## Seed 08: The stand-in for esptool confirms a kept image
+
+**Question.** In the command tests a second run on "another board" took the image the
+work folder kept from the run before, and a storage that should have been refused was
+never looked at. Why?
+
+**Answer.** The tool takes its newest kept image when the chip confirms that image's
+checksum, and the stand-in for esptool confirms every comparison unless it is told to
+fail one. That is right for a second run on the same board. Where a test means a board
+that holds something else, it tells the stand-in to fail the first comparison, and the
+tool reads storage again, as it does on a real board.
+
+**Resolution.** `tests/firmware/test_wifi_commands.py`, `OnASmallLayout.esptool` and the
+tests that pass `failing_verifies`.
+
+## Seed 08: Which test checks which criterion
+
+**Question.** Task 6 asks to read the acceptance criteria of Requirements 1 to 9 once more
+and to name, for each one a program can check, the test that checks it. Where is that
+written, and what was missing?
+
+**Answer.** Here. The files are in `tests/firmware/` unless a folder is named.
+
+| Criteria | Checked by |
+|---|---|
+| 1.1 to 1.4 | `test_wifi_settings.py`, `TheSettingsFile` |
+| 1.5, 1.6 | `test_wifi_commands.py`: `test_it_has_no_option_that_carries_a_name_or_a_password` of both commands, `test_without_the_option_the_settings_file_is_read` of both, `WhereThePasswordGoes` |
+| 2.1 to 2.4, 2.6 | `test_wifi_settings.py`, `Reading` |
+| 2.5 | `test_wifi_settings.py`, `ThroughTheCommands` |
+| 3.1 to 3.7, 3.10 | `test_wifi_commands.py`, `SetWifi` |
+| 3.8 | `test_wifi_commands.py`, `test_settings_that_do_not_fit_into_storage_are_no_space_and_nothing_is_written`; `test_wifi_storage.py`, `test_a_file_system_with_no_room_is_no_space` |
+| 3.9 | `test_wifi_commands.py`, `test_settings_of_wled_that_are_no_object_are_refused_and_nothing_is_written`; `test_wifi_storage.py` |
+| 4.1 to 4.6 | `test_wifi_storage.py` |
+| 4.7 | `test_usermod_files.py`, `test_the_radio_is_only_read_and_only_by_the_probe_build_for_its_report`; `test_patches.py`; the firmware's SHA-256, recorded in `docs/firmware.md` |
+| 4.8 | `test_wifi_commands.py`, `test_flash_makes_no_call_that_reads_or_writes_storage`; `test_flasher.py`, `RestoreStock` |
+| 5.1 to 5.4 | `test_wifi_commands.py`, `test_nothing_of_these_runs_shows_the_password` of both commands, `WhereThePasswordGoes` |
+| 5.2, 5.5 | `test_wifi_settings.py`, `test_no_detail_quotes_text_of_the_file`, `test_the_text_form_of_the_settings_does_not_hold_the_password` |
+| 5.6 | by reading: every comparison of a password is `assertTrue` or `assertFalse` on a result |
+| 6.1 to 6.4 | `test_wifi_commands.py`, `InstallFirmware`; `tests/board/test_wifi.py`, `FromScratch` |
+| 6.5, 9.6 | `test_docs.py`, `test_it_says_what_set_wifi_does_and_names_its_reasons`, `test_it_says_what_install_firmware_does_and_where_it_takes_the_place_of_flash`, `test_the_probe_report_has_the_access_points_name_and_protection` |
+| 7.1, 7.2, 7.4 | `tests/board/test_wifi.py`, `TheReport` and `TheSettings` |
+| 7.3 | `test_usermod_files.py`, the test of the radio and `test_the_usermod_names_no_wifi_function_of_wled` |
+| 7.5 | `test_wifi_commands.py`, `test_no_tool_and_no_test_changes_the_network_settings_of_this_computer` |
+| 8.1 to 8.4 | the three suites, each found by discovery |
+| 8.5, 8.6 | `tests/board/test_wifi.py`; `tests/board/__init__.py`, `LeaveTheBoard` |
+| 8.3 | `tests/air/test_wifi.py`, written and run by no agent |
+| 9.1 to 9.5 | `test_wifi_docs.py` |
+
+Six tests were missing and were added: the `no-space` of 3.8 through the command, the
+settings file read by `install-firmware` without the option, the three of
+`WhereThePasswordGoes`, and the suite's last step now asks storage for the settings.
+
+Not in the spec, because the pages for newcomers did not exist when it was written:
+`AGENTS.md` no longer lists the name and the password under what is coming.
+
+**Resolution.** `tests/firmware/test_wifi_commands.py`; `tests/firmware/test_wifi_docs.py`;
+`tests/air/test_wifi.py`; `AGENTS.md`, "What is coming"; `tests/onboarding/test_entry.py`.
+
+## Seed 08: The owner's check is open
+
+**Question.** Task 7 needs a phone or a computer joined to the board's network. No agent
+joins that network.
+
+**Answer.** The task stays open, its checkbox unticked, and the seed stays `in_progress`.
+Under the task, `tasks.md` has what a program established over USB: the board hosts
+`odrig` with WPA2, and its storage holds the name and the password of the settings file.
+What remains is "The owner's check" of `docs/wifi.md`, four steps. When they pass, the
+owner sets the seed to `completed`.
+
+**Resolution.** `docs/specs/08-p1-wifi-name-and-password/tasks.md`, task 7;
+`docs/wifi.md`, "The owner's check";
+`project-seeds/08-p1-wifi-name-and-password/state.json` is not changed.
+
+## Seed 15: Where the limit lives, and how a board is asked for it
+
+**Question.** The seed says that the limit lives in one tracked settings file and that the
+firmware tool reports the limit stored on the board. Which file, and which command?
+
+**Answer.** A file of its own, `firmware/limit.json`, with the one member `milliamps`. The
+settings file of seed 08 holds exactly a name and a password, and its reader refuses a
+third member; a limit is no Wi-Fi setting either. Reporting is a command of its own,
+`read-limit`, which reads storage and writes nothing, as `read-show` does. On a board
+whose `/cfg.json` holds no `hw.led.maxpwr` it says so and names WLED's own 850 mA.
+
+**Resolution.** `firmware/limit.json`; `firmware/fwtool/limit.py`;
+`docs/specs/15-p1-led-current-limit-as-a-setting/design.md`, "The commands".
+
+## Seed 15: `install-firmware` prints four lines
+
+**Question.** Seed 08 required `install-firmware` to print the three lines `set-wifi`
+prints. Seed 15 has it apply the limit too.
+
+**Answer.** It prints four: the name, `password: set`, the line of the limit, and the
+reply to `status`. It makes one storage image with both settings and writes once. Both
+files are read and checked before the board is touched, the settings file first.
+`--limit FILE` reads another limit file, as `--settings FILE` reads another settings
+file. The tests of seed 08 that held three lines hold four.
+
+**Resolution.** `firmware/fwtool/cli.py`, `store_settings` and `_install_firmware`;
+`tests/firmware/test_wifi_commands.py`; `tests/board/test_wifi.py`, `FromScratch`.
+
+## Seed 15: The probe build counted every send as dimmed with the limiter off
+
+**Question.** The seed's check on the board is that the probe report shows no dimmed
+send with a limit of 0. The report showed 49 to 67 in every second.
+
+**Answer.** The count was wrong, not the limiter. With a maximum of 0, WLED's limiter is
+not in use: it estimates nothing and dims nothing, as its source says and as `used_ma` 0
+showed. The probe build counted a send as dimmed when the estimate was at or above the
+limit, and 0 is at or above 0. It now counts only while WLED's maximum is above 0. The
+firmware has none of that code and its image is unchanged.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`, `limiterOn`;
+`tests/firmware/test_usermod_files.py`,
+`test_the_probe_build_counts_a_dimmed_send_only_while_the_limiter_is_on`;
+`tests/board/test_limit.py`.
+
+## Seed 15: A limit of 0 on the bench, for a minute
+
+**Question.** The bench strip is fed from the board's 3.3 V pin, and the limiter is what
+protects that pin from a high brightness. The board test switches the limiter off.
+
+**Answer.** For about a minute, with a show of brightness 40 installed and no command
+sent that changes the brightness, and it sets 850 again before it ends. At brightness 40
+the 60 LEDs of the strip cannot ask for more than they do in every other board test. A
+run that is stopped in between leaves 0 on the board: the suite's last step puts the
+limit of the limit file back, and so does `python3 firmware/fw.py set-limit`.
+
+**Resolution.** `tests/board/test_limit.py`; `tests/board/support.py`, `ensure_settings`;
+`tests/board/__init__.py`, the last step.
+
+## Seed 12: The RMT method is the library's own
+
+**Question.** The design gives four legs to "the RMT methods" of the LED library. WLED
+does not use those on this chip: it adds a driver of its own to the library, in its
+folder `lib/`, and uses that for its RMT outputs.
+
+**Answer.** The standalone firmware uses the library's own RMT method,
+`NeoEsp32RmtNWs2812xMethod`, with one channel for each of the four legs. WLED's driver is
+a file of WLED, and the standalone firmware compiles none. The trial program showed the
+library's method beside the sixteen-lane parallel one on the board: 4,320 pulses on each
+of the four pins in every send, 50 sends a second.
+
+**Resolution.** `firmware/standalone/src/main.cpp`; `docs/firmware.md`, "Verified on the
+board", S2.
+
+## Seed 12: The spike's findings
+
+**Question.** Task 1 was to settle six assumptions before anything else was written.
+Does a finding change the design?
+
+**Answer.** None does. Five hold as assumed, with numbers in `docs/firmware.md`; the
+sixth, that a source file of the usermod can be compiled into the standalone program, is
+task 2's. Two things were learned beside them: `--standalone` on `build` cannot be one of
+the exclusive options beside `--stock` and `--probe`, because it goes with `--probe`, so
+the tool refuses `--standalone --stock` itself, as a usage error before anything is set
+up; and the libraries of the standalone project are kept in that project's own folder
+under `build/firmware/standalone/`.
+
+**Resolution.** `firmware/fwtool/cli.py`, `parsed`; `tests/firmware/test_standalone.py`.
+
+## Seed 12: The WLED-based firmware after the platform header
+
+**Question.** Three sources of the usermod now include `odrig_platform.h` in place of
+`wled.h`. The design said the compiled code of the WLED-based firmware does not change.
+Its image has another SHA-256.
+
+**Answer.** The code did not change. The image before and the image after, built in the
+same work folder, differ in 65 bytes of 1,221,568: 32 bytes at `0xB0`, where the build
+keeps a hash of its own program file, and the checksum and the hash at the end of the
+image. The program file holds the names of the source files for a debugger, and one more
+header is named now. Every other byte is the same. The whole board suite was run on the
+new image all the same.
+
+**Resolution.** `docs/firmware.md`, "Verified on the board", S4;
+`firmware/usermod/wled/odrig_platform.h`; `tests/firmware/test_usermod_files.py`,
+`test_the_shared_sources_reach_their_platform_through_the_platform_header`.
+
+## Seed 12: The channel, a hidden name, and which member counts
+
+**Question.** The design gave the network channel 1 where the stored settings name none,
+and did not say what a hidden name or a member named twice does.
+
+**Answer.** The reader follows WLED, so that one set of stored settings gives one
+network whichever firmware runs. The channel is `ap.chan` when it is a whole number from
+1 to 13 and 6 otherwise: 6 is what WLED takes, not 1. The network hides its name when
+`ap.hide` is a whole number above 0, as WLED's does. Of a member that is named twice the
+first counts. A file that is not one JSON object counts as absent as a whole: the reader
+walks all of it before it takes anything.
+
+**Resolution.** `firmware/standalone/src/settings.h` and `settings.cpp`;
+`tests/firmware/test_standalone_settings.py`.

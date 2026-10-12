@@ -28,7 +28,7 @@ SCRIPT = (
     (3540, "play"),
     (3550, "on now"),
     (3560, ""),
-    (3570, "play " + "1" * 70),
+    (3570, "play " + "1" * 2050),
     (3580, "brightness 0"),
     (3700, "brightness 64"),
     (3995, "status"),
@@ -89,6 +89,38 @@ class Recording(unittest.TestCase):
     def assert_nothing_left(self):
         self.assertFalse(self.out.exists())
         self.assertEqual([path.name for path in self.work.iterdir() if path.name.endswith(".part")], [])
+
+    def test_a_script_that_uploads_acts_on_the_folder_and_gives_the_same_recording_from_the_same_folder(self):
+        clip = core_support.clip(9, 60, 6, (20,) * 10)
+        lines = core_support.upload_lines(9, "clip.odrg", clip, 100)
+        commands = [(100 + number, line) for number, line in enumerate(lines)]
+        commands += [(200, core_support.upload_end(clip)), (420, core_support.upload_end(clip)), (430, "play 9"), (440, "list"), (900, "remove 2"), (910, "status")]
+        recordings = []
+        for number in (1, 2):
+            folder = self.installed(support.files_of(self.example()))
+            recording, printed = self.record(folder, 2, commands, self.work / f"{number}.odrr")
+            files = support.files_of(folder)
+            self.assertEqual(files["clip.odrg"], clip)
+            self.assertEqual(sorted(files), ["clip.odrg", "dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
+            recordings.append(((self.work / f"{number}.odrr").read_bytes(), printed, files))
+        self.assertEqual(recordings[0], recordings[1])
+        printed = recordings[0][1]
+        self.assertIn('reply 200 {"ok":false,"error":"busy"}', printed)
+        self.assertIn('reply 420 {"ok":true}', printed)
+        self.assertIn('reply 900 {"ok":false,"error":"in-use"}', printed)
+        self.assertEqual(json.loads(printed[-1].split(" ", 2)[2])["playing"], 9)
+        refreshes, replies = support.reference(support.files_of(self.example()), tick_times(2), commands)
+        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assert_equals_reference(recfile.read(self.work / "1.odrr"), refreshes)
+
+    def test_the_storage_option_goes_with_record_mode(self):
+        folder = self.installed(support.files_of(self.example()))
+        commands = [(0, "space"), (10, "upload begin 9 clip.odrg 5000")]
+        script = self.work / "script.txt"
+        script.write_text(script_text(commands), encoding="utf-8")
+        result = support.run(folder, "--record", self.out, "--seconds", 1, "--script", script, "--storage", 30000)
+        self.assertEqual((result.status, result.err), (0, ""))
+        self.assertEqual(result.out.splitlines(), ['reply 0 {"ok":true,"free":13616,"total":30000,"animations":2}', 'reply 10 {"ok":false,"error":"no-space"}'])
 
     def test_60_seconds_of_the_example_show_equal_the_reference_at_every_tick(self):
         folder = self.example()

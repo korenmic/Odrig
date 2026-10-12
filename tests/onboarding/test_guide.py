@@ -86,6 +86,24 @@ class Guide(unittest.TestCase):
         for phrase in ("`fill`, the default", "`fit`", "`stretch`", "`--start`", "`--duration`", "`.mp4`, `.mov` or `.gif`", "`build/try/clip.gif`"):
             self.assertIn(phrase, imported)
 
+    def test_it_imports_checks_and_packs_with_the_converter_and_generates_with_python(self):
+        commands = dict((heading, command) for heading, command in support.page_commands(self.text) if not command.startswith(("mkdir", "printf")))
+        for heading, subcommand in (("An import", "import"), ("Check a source", "check"), ("Pack it into a show", "pack")):
+            with self.subTest(heading=heading):
+                self.assertTrue(commands[heading].startswith(f"{support.NODE} {support.CONVERTER} {subcommand} "), commands[heading])
+        self.assertTrue(commands["A generator"].startswith(".venv/bin/python -m odrig.generators."), commands["A generator"])
+
+    def test_it_says_which_tool_imports_and_that_the_two_may_judge_a_damaged_file_differently(self):
+        imported = flat(self.part("An import"))
+        for phrase in ("Import with this tool", "the reference for tests and not the one to use", "the two need not judge a damaged file alike",
+                       "[reference-converter.md](../docs/reference-converter.md#command-line)"):
+            self.assertIn(phrase, imported)
+        self.assertNotIn("crash", imported)
+        reference = flat(support.read("docs/reference-converter.md").split("\n## Command line\n")[1].split("\n## ")[0])
+        for phrase in ("**Damaged media.**", "Both refuse a file they cannot decode as `unreadable-media`", "a video whose first video stream has no decoder"):
+            self.assertIn(phrase, reference)
+        self.assertNotIn("fault of memory", reference)
+
     def test_it_says_what_to_look_for_and_that_the_emulator_does_not_show_the_boards_rate(self):
         looked = self.part("Look at it in the emulator")
         self.assertEqual(len(re.findall(r"(?m)^- \*\*", looked)), 5)
@@ -118,11 +136,11 @@ class Guide(unittest.TestCase):
                 animation = jsonframes.Animation(target.width, target.height, tuple(frames(target.width, target.height)))
                 self.assertEqual(rows[name], summary(animation, len(jsonframes.dumps(animation))))
 
-    def test_it_gives_the_limit_of_a_hosting_service_and_the_question_that_is_open(self):
+    def test_it_gives_the_limit_of_a_hosting_service_and_the_owners_ruling(self):
         sizes = flat(self.part("How large sources get"))
-        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "[open question](../docs/decisions.md#open-questions)", "1,210 bytes"):
+        for phrase in ("refuse a single file above 100 MB and warn above 50 MB", "Keep every source at 50 MB or less", "the JSON source is what is committed for every animation", "1,210 bytes"):
             self.assertIn(phrase, sizes)
-        self.assertIn("Whether large video-derived JSON sources are tracked as they are", flat(support.read("docs/decisions.md")))
+        self.assertIn("The JSON source is committed for every animation", flat(support.read("docs/decisions.md")))
         self.assertIn("| 1,210 |", support.read("docs/emulator.md"))
 
     def test_the_rates_of_a_dense_animation_are_those_the_firmware_document_records(self):

@@ -5,6 +5,7 @@ added package is needed.
 """
 
 import ctypes
+import os
 import time
 from ctypes import wintypes
 
@@ -89,6 +90,7 @@ def kernel32():
 def device(name):
     """The name Windows opens a port by. With the prefix every port is found, also those
     above COM9."""
+    name = os.fspath(name)
     return name if name.startswith(DEVICES) else DEVICES + name
 
 
@@ -151,6 +153,19 @@ class Port:
                 raise refused("the port cannot be read")
             if count.value:
                 yield buffer.raw[:count.value]
+
+    def arrived(self):
+        """What has arrived and was not given yet. A read waits a short time when nothing
+        has, so this takes that long."""
+        received = b""
+        buffer = ctypes.create_string_buffer(READ_SIZE)
+        count = DWORD(0)
+        while True:
+            if not self._kernel.ReadFile(self._handle, buffer, READ_SIZE, ctypes.byref(count), None):
+                raise refused("the port cannot be read")
+            if not count.value:
+                return received
+            received += buffer.raw[:count.value]
 
     def write(self, data, seconds):
         self._limits(max(1, int(seconds * 1000)))

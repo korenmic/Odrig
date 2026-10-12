@@ -48,7 +48,7 @@ Rules for every task:
   that are not part of this work. Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The settings file and its checks
+- [x] 1. The settings file and its checks
   - Create `firmware/wifi.json` as the design gives it, with the name `odrig` and the
     owner's password from the hand-over. Without a password in the hand-over the task is
     blocked: record that and stop. Do not make one up.
@@ -69,7 +69,7 @@ Rules for every task:
   - The board is not touched.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.6, 5.2, 5.5, 5.6
 
-- [ ] 2. Spike: the probe build reports the access point's name and protection
+- [x] 2. Spike: the probe build reports the access point's name and protection
   - Add `ap_name` and `ap_auth` to the report in `firmware/usermod/odrig_probe.cpp`, as the
     design gives them: read with `esp_wifi_get_config`, `null` while `ap` is 0, the name
     written as a valid JSON string.
@@ -94,7 +94,7 @@ Rules for every task:
     password it had.
   - Requirements: 4.7, 7.2, 7.3
 
-- [ ] 3. Editing WLED's stored settings in a storage image
+- [x] 3. Editing WLED's stored settings in a storage image
   - Add `apply`, `holds` and `name_in` to `firmware/fwtool/wifi.py`, with the reason
     `wled-settings-malformed`, as the design's "Editing WLED's stored settings" gives them.
   - Add to `tests/firmware/support.py` two sets of files for a storage image: the files the
@@ -108,7 +108,7 @@ Rules for every task:
   - The board is not touched.
   - Requirements: 3.8, 3.9, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
 
-- [ ] 4. `set-wifi`: the settings on the board
+- [x] 4. `set-wifi`: the settings on the board
   - In `firmware/fwtool/cli.py`, take the writing of a storage image out of
     `_install_show` into `write_storage`, as the design gives it, and add the subcommand
     `set-wifi` with `--port`, `--settings` and `--wait`. The tests of `install-show` pass
@@ -140,7 +140,7 @@ Rules for every task:
   - Requirements: 1.5, 1.6, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.10, 5.1, 5.3, 5.4,
     7.1, 7.4, 7.5, 8.1, 8.2, 8.5, 8.6, 9.4, 10.1, 10.2
 
-- [ ] 5. `install-firmware`: a board from scratch
+- [x] 5. `install-firmware`: a board from scratch
   - Add the subcommand `install-firmware` with `--port`, `--settings` and `--wait`, as the
     design gives it. `flash` and `restore-stock` are not changed.
   - `tests/firmware/test_wifi_commands.py`, the parts about `install-firmware`, and that
@@ -162,7 +162,7 @@ Rules for every task:
     password of the settings file.
   - Requirements: 2.5, 4.8, 5.1, 6.1, 6.2, 6.3, 6.4, 6.5, 8.1, 8.2
 
-- [ ] 6. Documentation, the test for the owner's run, and the final check by program
+- [x] 6. Documentation, the test for the owner's run, and the final check by program
   - Complete `docs/wifi.md` as Requirement 9 and the design's table list it: changing the
     name or the password, what else changes them, the owner's check as numbered steps with
     what must be seen, four devices at once as read in the source, and the list of what is
@@ -199,3 +199,18 @@ Rules for every task:
   - Set `"state": "completed"` and `completedAt` in
     `project-seeds/08-p1-wifi-name-and-password/state.json`.
   - Requirements: 7.1, 8.3, 10.3, 10.4
+  - Open. No agent joins the board's network, so this is left for the owner. What a
+    program established over USB on 2026-10-12, with the probe build:
+    - after `python3 firmware/fw.py set-wifi` the report had `ap` 1, `ap_name` `odrig` and
+      `ap_auth` 3, which is WPA2 with a password;
+    - storage read back from the board held the name and the password of
+      `firmware/wifi.json`, and was the image the tool wrote, byte for byte, also after
+      WLED had started on it;
+    - the show played as before, and `status` reported no error;
+    - `python3 firmware/fw.py install-firmware` put the same settings on a board whose
+      storage held another name and password;
+    - the board suite passes with these tests in it, 47 tests, three times in a row.
+  - What remains: steps 1 to 4 of "The owner's check" in `docs/wifi.md`, among them
+    `python3 firmware/fw.py test-air --http 4.3.2.1` with this Mac joined to `odrig`,
+    which also runs `tests/air/test_wifi.py` for the first time. Only that shows that a
+    device joins with the password. The seed stays `in_progress` until then.

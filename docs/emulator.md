@@ -21,7 +21,7 @@ Run from the repository root.
 | Command | What it does | What it needs |
 |---|---|---|
 | `make -C core shared` | Builds `core/build/libodrig_core.dylib`, the library the emulator loads, from every `core/src/*.cpp` with the flags of `make -C core`. | Apple's command-line developer tools: `make` and `c++`. |
-| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, and the JavaScript shell that is part of macOS. |
+| `python3 -m unittest discover -s tests/emulator -t .` | Builds the shared library and runs the suite of `tests/emulator/`. | The same, Python 3.10 or later with no added package, the JavaScript shell that is part of macOS, and Node.js 20 or later as `node`, for the test that runs the pack commands of this page. |
 
 On Windows the two commands are these. `python` there is the Python of the virtual
 environment, `.venv\Scripts\python`.
@@ -48,17 +48,18 @@ lines beside HTTP sends them through the [line port](#the-line-port) there.
 
 ## Two shows to run
 
-The emulator runs a packed show: the folder that `python -m odrig pack` writes, described in
-[converter.md](converter.md). Two shows are tracked. `python` on this page is any Python
-3.10 or later, `python3` on a Mac; nothing here needs the libraries of the converter's
-virtual environment. `pack` refuses an output folder that is not empty, so remove the
-folder before packing again.
+The emulator runs a packed show: the folder that `node converter/odrig.js pack` writes,
+described in [converter.md](converter.md). `pack` needs Node.js 20 or later and nothing
+else. Two shows are tracked. `python` on this page is any Python 3.10 or later, `python3`
+on a Mac; nothing here needs the libraries of the virtual environment of
+[reference-converter.md](reference-converter.md). `pack` refuses an output folder that is
+not empty, so remove the folder before packing again.
 
 **The example show**, for today's build of two legs, 60 x 6: Hello world and the bouncing
 square, alternating every 15 seconds. Its sources are tracked in `animations/`.
 
 ```
-python -m odrig pack --show shows/example/show.json --mapping mapping/legs-2.json \
+node converter/odrig.js pack --show shows/example/show.json --mapping mapping/legs-2.json \
     --sources animations --out build/example-show
 python -m emulator build/example-show
 ```
@@ -72,7 +73,7 @@ by the generators into `build/`, which git ignores:
 mkdir -p build/demo-20/sources
 python -m odrig.generators.hello_world build/demo-20/sources/hello.json --mapping mapping/legs-20.json
 python -m odrig.generators.dvd_bounce  build/demo-20/sources/dvd.json   --mapping mapping/legs-20.json
-python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show shows/demo-20/show.json --mapping mapping/legs-20.json \
     --sources build/demo-20/sources --out build/demo-20/show
 python -m emulator build/demo-20/show
 ```
@@ -87,12 +88,13 @@ from the top-left corner to the bottom-right one, and so passes over every leg.
 | `hello.odrg`, 5.1 s | 255 | 1,210 |
 | `dvd.odrg`, 20.9 s | 116 | 1,052 |
 
-The sizes are those the converter gives with zlib 1.2.12.
+The sizes are those the converter gives, on every computer. The generators are programs
+of the Python package of [reference-converter.md](reference-converter.md).
 
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -117,9 +119,26 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--tcp-port N` | The port of the [line port](#the-line-port) on 127.0.0.1; 0 takes any free port. | On a Mac there is no line port; on Windows it is 8601 |
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
+| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
 
-There is no option for a size and none for an address: the canvas is the one of
-`mapping.json` in the folder, and the address is always 127.0.0.1.
+There is no option for the size of the canvas and none for an address: the canvas is the
+one of `mapping.json` in the folder, and the address is always 127.0.0.1.
+
+**Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
+the folder it was started on, and on nothing else: a name with a path separator, or one
+that is not made of the characters the core uses for a file name, is refused. For
+`space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
+bytes, or the number given with `--storage`, and as the free space the total less the
+sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
+`remove` and `upload` change the folder as they change the board's storage: an upload is
+written into `upload.part` of the folder piece by piece and takes its name when
+`upload end` succeeds, `show.json` is written again through `show.part`, and a file no
+item names any more is deleted. To keep a show, run a copy of its folder. A folder the
+emulator was stopped on during an upload holds `upload.part` until the emulator is
+started on it again; `install-show` of the firmware tool refuses such a folder, as it
+refuses any file the show does not name. The emulator paces nothing: its file operations
+take microseconds, and the check of an uploaded file takes one frame of it for each
+refresh, as on the board.
 
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
@@ -206,8 +225,10 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
 | Any other path | Status 404. |
 
-- The body is the command line, with or without a final newline. Of a body longer than 128
-  bytes the first 128 are passed on, which the core answers with `line-too-long`.
+- The body is the command line, with or without a final newline. A body of up to 4,096
+  bytes reaches the core as it is; a line of more than 2,048 characters is answered by the
+  core with `line-too-long`. Of a body longer than 4,096 bytes the first 4,096 are passed
+  on, which the core answers in the same way.
 - The content type of the request is not looked at.
 - The path is `/odrig` exactly. What follows a `?` is ignored.
 - The response that carries a reply has the header `Access-Control-Allow-Origin: *`.
@@ -235,10 +256,12 @@ From top to bottom the page has:
   below, with a readout at its top right that names what the pointer is on:
   `leg 2, pin 2, LED 61 (1,2)`.
 - **The command log.** One line for each command that arrived, by the serial port or over
-  HTTP: the time it arrived, how it came, the line, and the reply. A line of more than 64
-  characters is shown with its first 64 and the mark `…`. A byte outside printable ASCII is
-  shown as `\xNN`. The log keeps the newest line in sight, and a page opened later shows
-  the last 500 entries the emulator kept.
+  HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
+  200 characters is shown with its first 200, the mark `…` and the number of characters it
+  has; for a line of more than 2,048 characters, which the core cuts, the mark says
+  `more than 2048 characters`. A byte outside printable ASCII is shown as `\xNN`. The log
+  keeps the newest line in sight, and a page opened later shows the last 500 entries the
+  emulator kept.
 
 In a light appearance of the system the header and the log are light. The drawing always
 stands on a dark stage, so the LEDs and the leg colours look the same either way.
@@ -537,7 +560,7 @@ event: hello
 data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
-data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","cut":false,"reply":"{\"ok\":true}"}
+data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
 data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
@@ -549,7 +572,7 @@ data: 123460 <base64 of the refresh>
 | Event | What it carries |
 |---|---|
 | `hello` | First on every connection. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
-| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the line as the core read it, and `reply` the reply without its newline. A line of more than 64 characters is given with its first 64 and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 
@@ -575,6 +598,10 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -586,6 +613,10 @@ python -m odrigctl --port build/emulator/serial on
 python -m odrigctl --port build/emulator/serial off
 python -m odrigctl --port build/emulator/serial brightness 40
 python -m odrigctl --port build/emulator/serial status
+python -m odrigctl --port build/emulator/serial space
+python -m odrigctl --port build/emulator/serial list
+python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial remove 9
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -597,6 +628,10 @@ python -m odrigctl --tcp 127.0.0.1:8601 on
 python -m odrigctl --tcp 127.0.0.1:8601 off
 python -m odrigctl --tcp 127.0.0.1:8601 brightness 40
 python -m odrigctl --tcp 127.0.0.1:8601 status
+python -m odrigctl --tcp 127.0.0.1:8601 space
+python -m odrigctl --tcp 127.0.0.1:8601 list
+python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
+python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -608,6 +643,10 @@ python -m odrigctl --http 127.0.0.1:8600 on
 python -m odrigctl --http 127.0.0.1:8600 off
 python -m odrigctl --http 127.0.0.1:8600 brightness 40
 python -m odrigctl --http 127.0.0.1:8600 status
+python -m odrigctl --http 127.0.0.1:8600 space
+python -m odrigctl --http 127.0.0.1:8600 list
+python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
+python -m odrigctl --http 127.0.0.1:8600 remove 9
 ```
 
 The tool prints the reply line to standard output:
@@ -618,15 +657,19 @@ The tool prints the reply line to standard output:
 
 | Status | Meaning |
 |---:|---|
-| 0 | The reply has `"ok":true`. |
-| 1 | The reply has `"ok":false`. It is printed all the same. |
-| 2 | The command line was not understood. |
+| 0 | The reply has `"ok":true`: for `list` every reply, and for `upload` the reply to `upload end`. |
+| 1 | A reply has `"ok":false`. It is printed all the same. An upload the tool had opened is cancelled first. |
+| 2 | The command line was not understood, or the file to upload cannot be read: then one line `error: not-found: <detail>` is written to standard error and nothing is sent. |
 | 3 | The target could not be reached, or no reply arrived within the time limit. One line `error: unreachable: <detail>` is written to standard error. |
 
-- The line sent is `play <ID>`, `on`, `off`, `brightness <N>` or `status`, followed by a
-  newline. ID and N are sent as they were typed and are not checked: `play abc` is sent and
-  the reply says `bad-argument`. Every judgement is the command front-end's.
-- `--timeout SECONDS` is how long the tool waits for the reply; 2 seconds without it.
+- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `space`, `list` or
+  `remove <ID>`, followed by a newline. ID and N are sent as they were typed and are not
+  checked: `play abc` is sent and the reply says `bad-argument`. Every judgement is the
+  command front-end's.
+- `list` prints the reply, and for as long as the reply names a `next` position it sends
+  `list <next>` and prints that reply too: a line of output for each part of a long show.
+  It stops at a reply that is not ok.
+- `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
   what arrives in the next 0.1 seconds, and sends the line. The reply is the first received
@@ -646,17 +689,67 @@ The tool prints the reply line to standard output:
   response with status 200 as the reply. Any other status counts as not reached.
 - The options may stand before or after the command.
 
-Another program can use the three exchanges directly: `odrigctl.client.serial_exchange(port,
-data, timeout)`, `odrigctl.client.tcp_exchange(address, data, timeout)` and
-`odrigctl.client.http_exchange(address, line, timeout)` return the reply or raise
-`Unreachable`. `serial_exchange` and `tcp_exchange` take a fourth argument, a function that
-says which received line is the answer, for a target whose answer is not a reply of
-[commands.md](commands.md).
+**`upload ID FILE`** sends an animation as the commands of [commands.md](commands.md),
+"Uploading an animation", describe it. The file is one the converter made for the canvas
+of the show, here Hello world for the bench file:
+
+```
+node converter/odrig.js encode animations/hello.json build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+upload: 100% 1138/1138 bytes 1206147 B/s
+upload: checking
+{"ok":true}
+```
+
+The emulator takes a small file in a thousandth of a second, which is the speed shown
+here; the board's is in [firmware.md](firmware.md).
+
+- The tool reads the whole file before it sends anything. It sends `upload begin <ID>
+  <name> <bytes>`, where the name is the last part of the path as it is, then the file in
+  pieces of the size the reply names, each as one `upload data` line, and then
+  `upload end` with the CRC-32 of the file. ID and the name are not checked by the tool.
+- Progress goes to standard error: the percentage, the bytes acknowledged and the total,
+  and the speed, which is the bytes acknowledged over the time since `upload begin` was
+  answered. A report is written when half a second has passed since the one before, and
+  for the last piece; a long upload gives lines such as
+  `upload: 45% 613500/1362000 bytes 21400 B/s`. When standard error is a terminal, one line
+  is written over again.
+- After the last piece the tool writes `upload: checking` once. While the reply to
+  `upload end` is `busy`, the target is checking the file, and the tool sends
+  `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
+  `upload cancel`, prints the last reply and exits with status 1.
+- Standard output gets the reply that ended the command: the `{"ok":true}` of
+  `upload end`, or the first reply that was not ok. After such a reply to a piece or to
+  `upload end` the tool sends `upload cancel`, unless the reply says that the upload is
+  gone. A refused `upload begin` is not followed by a cancel: the upload that is open
+  then is someone else's.
+- When no reply to an `upload data` line arrives in time, the tool sends the same line
+  once more. `bad-offset` for that second line means that the first one was taken, and the
+  tool goes on. Without a reply to the second line either, it exits with status 3. No
+  other line is sent twice.
+- Through a serial port the tool keeps the port open for the whole upload.
+
+Another program can use the exchanges directly. `odrigctl.client.serial_exchange(port,
+data, timeout)` and `odrigctl.client.http_exchange(address, line, timeout)` are one
+exchange each: they return the reply or raise `Unreachable`. `serial_exchange` takes a
+fourth argument, a function that says which received line is the answer, for a target
+whose answer is not a reply of [commands.md](commands.md).
+`odrigctl.client.tcp_exchange(address, data, timeout)` is the same exchange over TCP, with
+the address as `host:port`.
+`odrigctl.client.Session(port=..., http=..., timeout=...)` is several exchanges with one
+target: `exchange(line)` returns the reply to a line, and `close()` ends the session. Over
+the port it opens the port once, as `serial_exchange` does, and keeps it open, and with
+`tcp=...` in the place of `port=...` it does the same with a connection; a line that
+arrived whole before a line is sent is no answer to it and is dropped. Over HTTP every
+exchange is one request. `odrigctl.content.list_all(session, show)` and
+`odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
+take more than one exchange through a session; `progress(sent, total, seconds)` is called
+after every piece that was acknowledged.
 
 ## Record mode
 
 ```
-python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH]
+python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]
 ```
 
 Record mode runs the core on a virtual clock, without waiting for real time, and writes
@@ -675,11 +768,15 @@ python -m emulator build/example-show --record build/example.odrr --seconds 60
 | `--seconds S` | The length of the recording. It must be above 0. |
 | `--script FILE` | Timed command lines to give the core. Without it no command is given. |
 | `--core PATH` | Another shared library than `core/build/libodrig_core.dylib`. |
+| `--storage BYTES` | The size of the storage the core is told of, as in real time. |
 
 Recording the same folder with the same length and the same script twice gives the same
-bytes. The emulator gives the core nothing of its own in this mode: only the requests for
-a refresh and the commands of the script. The options `--port`, `--serial-link`,
-`--tcp-port` and `--verbose` belong to real time and do not go with `--record`.
+bytes. A script may hold the content commands of [commands.md](commands.md): they act on
+the folder as in real time, so the folder is changed afterwards, and "the same folder"
+means a folder with the same files as before the first recording. The emulator gives the
+core nothing of its own in this mode: only the requests for a refresh and the commands of
+the script. The options `--port`, `--serial-link`, `--tcp-port` and `--verbose` belong to
+real time and do not go with `--record`.
 
 ### The script
 
@@ -815,7 +912,7 @@ make -C core shared
 mkdir -p build/dense/sources
 python -m odrig.generators.dense build/dense/sources/dense.json --mapping mapping/legs-20.json --seconds 10
 printf '{"version": 1, "brightness": 255, "items": [{"id": 1, "file": "dense.odrg"}], "start": 1}\n' > build/dense/show.json
-python -m odrig pack --show build/dense/show.json --mapping mapping/legs-20.json \
+node converter/odrig.js pack --show build/dense/show.json --mapping mapping/legs-20.json \
     --sources build/dense/sources --out build/dense/show
 ```
 

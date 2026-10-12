@@ -50,8 +50,8 @@ the entry links to it.
 - **ODRG**: The format that is played: a compact binary file, ending in `.odrg`, made
   from a JSON frames file. It holds the same picture for every millisecond as its source.
   Its body is compressed or not, as whoever makes it chooses. See [format.md](../docs/format.md).
-- **generator**: A program that writes a source for the canvas of a mapping file. The
-  generators are in `odrig/generators/`.
+- **generator**: A Python program that writes a source for the canvas of a mapping file.
+  The generators are in `odrig/generators/`.
 - **show**: What can be played and what plays at power-on, written in a file named
   `show.json`. See [show.md](../docs/show.md).
 - **item**: One numbered entry of a show: one animation, or a list of animations to play
@@ -62,15 +62,22 @@ the entry links to it.
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show
   reads this folder and nothing else. A folder made this way is also called a packed show.
   See [show.md](../docs/show.md#installed-file-set).
-- **command**: One line of text sent to whatever is playing a show. There are five:
-  `play <id>`, `on`, `off`, `brightness <n>` and `status`. Each is answered by one line of
-  JSON. See [commands.md](../docs/commands.md).
+- **command**: One line of text sent to whatever is playing a show. There are nine:
+  `play <id>`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`, `remove <id>` and
+  `upload`, which sends a file as several lines. Each is answered by one line of JSON. See
+  [commands.md](../docs/commands.md).
 
 ## The programs
 
-- **converter**: The command-line tool `odrig`, started as `python -m odrig`. It turns a
-  video or a GIF into a source, a source into an ODRG file and back, checks a file, and
-  packs a show into an installed file set. See [converter.md](../docs/converter.md).
+- **converter**: The command-line tool in `converter/`, written in JavaScript and started
+  as `node converter/odrig.js`. It turns a video or a GIF into a source, a source into an
+  ODRG file and back, checks a file, and packs a show into an installed file set. Its
+  library, `converter/lib/`, also runs in a web page. See
+  [converter.md](../docs/converter.md).
+- **reference converter**: The Python package `odrig/`, started as `python -m odrig`. It
+  was the converter before and does the same work. It is kept so that tests can compare
+  the converter with it, and nobody converts with it any more. The generators are part of
+  it. See [reference-converter.md](../docs/reference-converter.md).
 - **core**: The C++ library in `core/` that plays an installed file set: it reads the
   files, keeps time, handles commands and gives the colour of every LED of every leg.
   Everything that must behave the same wherever a show plays is in the core. See

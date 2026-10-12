@@ -1,10 +1,11 @@
 #include "odrig_serial.h"
 
-#include "wled.h"
+#include "odrig_platform.h"
 
 #include "hal/usb_serial_jtag_ll.h"
 
 #include "odrig_core.h"
+#include "odrig_files.h"
 
 #ifdef ODRIG_PROBE
 #include "odrig_probe.h"
@@ -14,6 +15,10 @@ namespace {
 
 const int BYTES_PER_PASS = 256;
 const uint32_t ASK_AGAIN_MS = 2;
+// The port keeps what it received in a queue until a pass takes it. A line may have
+// 2,048 characters and arrive in one piece while a pass is held back, so the queue has
+// room for two of them.
+const size_t RECEIVE_QUEUE = 4096;
 
 int emptyBuffer = 0;
 uint32_t lastAsked = 0;
@@ -58,12 +63,14 @@ bool longLineWaits() {
 // build held back of a line that was not its own.
 uint8_t waiting[BYTES_PER_PASS + 16];
 size_t waitingBytes = 0;
+// A line has been handed on since the pacing was last asked.
+bool lineHandedOn = false;
 
 // Hands the waiting bytes on in one call and writes the reply they completed. The reply
-// is written after the player has returned.
+// is written after the player has returned. Its room is not on the stack.
 void handOn() {
   if (waitingBytes == 0) return;
-  char reply[ODRIG_REPLY_MAX];
+  static char reply[ODRIG_REPLY_MAX];
   const size_t length = feedNow != nullptr ? feedNow(waiting, waitingBytes, reply, sizeof(reply)) : 0;
   waitingBytes = 0;
   if (length > 0) OdrigSerial::write(reply, length);
@@ -72,10 +79,19 @@ void handOn() {
 // Takes one byte for the player. A line is handed on when it has ended.
 void pass(uint8_t byte) {
   waiting[waitingBytes++] = byte;
+  if (byte == '\n') lineHandedOn = true;
   if (byte == '\n' || waitingBytes == sizeof(waiting)) handOn();
 }
 
 }  // namespace
+
+// The port's interrupt puts what arrives into the queue, so it is kept out while the
+// queue is replaced.
+void OdrigSerial::begin() {
+  usb_serial_jtag_ll_disable_intr_mask(USB_SERIAL_JTAG_INTR_SERIAL_OUT_RECV_PKT);
+  Serial.setRxBufferSize(RECEIVE_QUEUE);
+  usb_serial_jtag_ll_ena_intr_mask(USB_SERIAL_JTAG_INTR_SERIAL_OUT_RECV_PKT);
+}
 
 void OdrigSerial::poll(Feed feed) {
   feedNow = feed;
@@ -84,6 +100,8 @@ void OdrigSerial::poll(Feed feed) {
 #ifdef ODRIG_PROBE
   if (longLineWaits()) return;
 #endif
+  // While the pacing holds lines back, what arrives stays in the port's queue.
+  if (OdrigFiles::holding()) return;
   for (int taken = 0; taken < BYTES_PER_PASS && Serial.available() > 0; taken++) {
     const int byte = Serial.read();
     if (byte < 0) break;
@@ -92,6 +110,10 @@ void OdrigSerial::poll(Feed feed) {
 #else
     pass((uint8_t)byte);
 #endif
+    if (lineHandedOn) {
+      lineHandedOn = false;
+      if (OdrigFiles::holding()) break;
+    }
   }
   handOn();
 }

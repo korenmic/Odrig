@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-#define ODRIG_LINE_MAX   64     /* longest command line, in characters */
-#define ODRIG_REPLY_MAX 192     /* longest reply, in bytes, with its newline */
+#define ODRIG_LINE_MAX  2048    /* longest command line, in characters */
+#define ODRIG_REPLY_MAX 1024    /* longest reply, in bytes, with its newline */
 
 typedef struct odrig_core odrig_core;
 
@@ -35,6 +35,41 @@ typedef struct odrig_host {
 
     /* Receives one line of diagnostic text, without a newline. May be NULL. */
     void (*log)(void *ctx, const char *text);
+
+    /* Storage that can be changed. A host without it sets write_open to NULL.
+       A name is 1 to 32 characters of a-z, 0-9, '-', '_' and '.'. */
+
+    /* Begins a new, empty file of this name, in place of one that has it. A file that was
+       being written is given up and removed. Returns 1, or -1 on failure. The core has at
+       most one file being written. */
+    int (*write_open)(void *ctx, const char *name);
+
+    /* Adds bytes to the file being written. length is 1 to 1500. Returns 1, or -1. */
+    int (*write)(void *ctx, const uint8_t *bytes, size_t length);
+
+    /* Ends the writing. When it has returned 1, the file is whole in storage and stays so
+       through a power cut. Returns 1, or -1 on failure. */
+    int (*write_close)(void *ctx);
+
+    /* Gives the file `from` the name `to`, in place of a file that has it. After a power
+       cut during the call, `to` is its old file or the new one, whole. Neither file is
+       open or being written when the core calls this. Returns 1, or -1. */
+    int (*rename)(void *ctx, const char *from, const char *to);
+
+    /* Removes the file of this name. A file being written under it is given up.
+       Returns 1 when it removed one, 0 when there was none, -1 on failure. */
+    int (*remove)(void *ctx, const char *name);
+
+    /* The free and the total bytes of the storage the files are in. A value above
+       4294967295 is given as that. Returns 1, or -1 when the host cannot tell. */
+    int (*space)(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes);
+
+    /* Reads a file apart from the one that open, read and close hold: up to capacity
+       bytes from this offset. Returns the number read, 0 at or after the end of the
+       file, -1 on failure and when there is no such file. capacity is at most 512.
+       The core reads a file with it from offset 0 on, each call where the last ended. */
+    int32_t (*read_at)(void *ctx, const char *name, uint32_t offset,
+                       uint8_t *buffer, size_t capacity);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

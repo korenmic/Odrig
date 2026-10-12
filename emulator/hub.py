@@ -11,6 +11,7 @@ import json
 import threading
 
 LOG_ENTRIES = 500
+LINE_SHOWN = 200
 
 
 def shown(line):
@@ -85,7 +86,8 @@ class Hub:
 
     def log(self, ms, transport, line, cut, reply):
         """Enters one command that arrived: its timestamp, how it came, the line as the
-        core read it, whether it was cut, and the reply."""
+        core read it, whether it was cut, and the reply. The entry keeps the first
+        characters of the line and its length."""
         now = datetime.datetime.now()
         with self._lock:
             self._seq += 1
@@ -94,7 +96,8 @@ class Hub:
                 "ms": ms,
                 "time": f"{now:%H:%M:%S}.{now.microsecond // 1000:03d}",
                 "transport": transport,
-                "line": shown(line),
+                "line": shown(line[:LINE_SHOWN]),
+                "length": len(line),
                 "cut": bool(cut),
                 "reply": reply.decode("ascii", "replace").rstrip("\n"),
             }

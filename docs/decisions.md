@@ -100,9 +100,15 @@ it stands now.
 
 - Converting media to JSON frames and to ODRG runs on phones and PCs, never on the board and
   never in the emulator.
-- There is to be one converter that runs from the command line without compiling and inside
-  the Capacitor and Tauri apps. It will be written in JavaScript, with the Python converter
-  kept as the independent check that tests compare it against.
+- There is one converter, made to run from the command line without compiling and inside
+  the Capacitor and Tauri apps. It is written in JavaScript and is the folder `converter/`:
+  a library that reads no file and runs as it is in Node.js and in a web page, and a
+  command line on top of it. See [converter.md](converter.md). The library has been run in
+  Chrome; it has not been run inside an app yet.
+- The Python converter is kept as the independent check: the suite of the JavaScript
+  converter runs both on the same inputs and compares. It also holds the generators of the
+  tracked animations and builds the test vectors. See
+  [reference-converter.md](reference-converter.md).
 
 ## Animation formats
 
@@ -114,6 +120,11 @@ it stands now.
 | GIF | Fallback of last resort: the working proof of concept on stock WLED. |
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
+
+The JSON source is committed for every animation, including those imported from video, and
+nothing else is committed in its place. A dense 60 x 60 clip is 16 MB of JSON per 10 seconds,
+and a hosting service refuses a single file above 100 MB, so a long piece is cut into several
+animations.
 
 Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
 
@@ -154,9 +165,18 @@ are in [format.md](format.md), "Measured sizes".
 - The board and the emulator accept exactly the same commands, handled by the same
   front-end code. There are no emulator-only commands.
 - A command exists only if something really uses it. Today those are: play an item by its
-  ID, switch on, switch off, set brightness, and report status.
-- Commands are plain text lines and every reply is one JSON line. See
-  [commands.md](commands.md).
+  ID, switch on, switch off, set brightness, and report status; and for the content:
+  report the free storage, list what is installed, remove an item, and upload an animation.
+- Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
+  characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
+- An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
+  base64 on one line each and each acknowledged, with a CRC-32 of the whole file at the
+  end. The board takes the file only after it has decoded all of it, while the show goes
+  on playing; then it can be played at once. One upload is open at a time, whichever
+  route its lines arrive by.
+- A removal and an upload change the show on the board and are kept across a restart. A
+  power cut at any moment leaves the show from before the command or the one after it.
+  A cycle is not made or changed by a command.
 - Commands travel over serial and over HTTP, on the board and on the emulator alike. A
   command-line tool sends them to either target by either route.
 - There is one list of commands for every route. A command is added to all routes or to
@@ -193,8 +213,6 @@ are in [format.md](format.md), "Measured sizes".
 
 ## Open questions
 
-- Whether large video-derived JSON sources are tracked as they are (the dense 60 x 60 clip
-  is 16 MB of JSON per 10 seconds).
 - Decode speed of the custom format on the board at 50 frames per second. Measured on the
   board on 2026-10-11, before the target became twenty upright legs, with the firmware of
   seed 04 and a dense 60 x 30 clip on ten row legs, 1,800 LEDs: the core's work for one
@@ -288,6 +306,46 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-12: A second firmware without WLED, hosting the same shared core on the same
   twenty outputs, is planned as a fallback for the event (seed 12). The WLED-based firmware
   stays the one in use.
+- 2026-10-12: Seed 06 wrote the JavaScript converter, `converter/`, and the documents now
+  present it as the converter: a library that also runs in a web page, with a DEFLATE
+  compressor of its own, so that a compressed file has the same bytes on every computer,
+  and a command line with `import`, `encode`, `decode`, `check` and `pack`. The Python tool
+  is the reference its suite compares with, and keeps the generators and the test vectors.
+  For everything the suite gives them the two tools write the same files. Verified on
+  macOS, with Node.js and in Chrome; not on Windows, on Linux or inside an app.
+- 2026-10-12: The owner ruled that the JSON source stays the one thing committed for every
+  animation, whatever its size; the question about large video-derived sources is closed.
+  The owner checks only real LEDs on the board, not pages or screens.
+- 2026-10-12: Seed 07 added the content commands, in the form the owner approved: `space`,
+  `list`, `remove` and `upload`, on every route, in the core, with lines of up to 2,048
+  characters and replies of up to 1,024 bytes. The firmware writes to the board's storage
+  for them, and the command tool sends them. Measured on the board over USB: a file of
+  868,712 bytes is uploaded at 12,674 bytes a second while the bench show plays at 36 to
+  44 refreshes a second, and its check takes as long as the animation lasts. With a dense
+  60 x 60 clip playing, an upload takes the rate to 16 to 27. The upload over the board's
+  Wi-Fi is the owner's check and is open.
+- 2026-10-12: The owner approved playing at once at power-on: the start item plays at
+  once and the installed animations are checked while it plays. It is seed 14 and is not
+  built yet.
+- 2026-10-12: The owner ruled to switch the current limiter off if that puts no hardware
+  at risk. It would on the bench, where a strip is fed from the board's 3.3 V pin, and
+  not in the installation. The limiter stays on today, and its maximum becomes a tracked
+  setting, seed 15, which can switch it off.
+- 2026-10-12: The owner asked whether ODRG could replace JSON frames as the committed
+  source, since it is lossless. Nothing changes: JSON frames stay the source. The idea is
+  noted here and is not planned.
+- 2026-10-12: The Python reference tool refuses a damaged video or GIF with
+  `unreadable-media` and no longer ends Python itself (seed 13).
+- 2026-10-12: Seed 08 gave the board's network its name and password. They are in the
+  tracked settings file `firmware/wifi.json`, and `set-wifi` and `install-firmware` of
+  the firmware tool put them into WLED's stored settings on a board. The bench board
+  hosts `odrig`, protected with WPA2, since that day; a program established it over USB.
+  That a phone joins with the password is the owner's check and is open.
+- 2026-10-12: Seed 15 made the limit on LED current a setting: `firmware/limit.json`
+  holds it, 850 mA, and `set-limit` and `install-firmware` put it on a board; `read-limit`
+  prints what a board holds. With 0 the limiter is off, which the probe build showed on
+  the board. The limit stays 850 while a strip is fed from the board's 3.3 V pin. The
+  value for the installation is the owner's to set.
 - 2026-10-12: The converter, the core's build, the emulator and the command tool work on
   Windows 10 and 11, and their suites pass there (seed 11). The core is built there by a
   script in Python, `core/build.py`, with GCC, Clang or Microsoft's compiler; macOS keeps

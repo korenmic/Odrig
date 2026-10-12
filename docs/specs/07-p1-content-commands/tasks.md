@@ -50,7 +50,7 @@ Rules for every task:
   Do not move, edit, delete or stage them.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. Lines of 2,048 characters and replies of 1,024 bytes
+- [x] 1. Lines of 2,048 characters and replies of 1,024 bytes
   - Set `"state": "in_progress"` in `project-seeds/07-p1-content-commands/state.json`.
   - `core/include/odrig_core.h`: the two limits. `core/src`: the line and the reply of the
     byte entry as two blocks taken at startup; the words of a line, up to five; `fits` in
@@ -70,7 +70,7 @@ Rules for every task:
     is, fails with `line-too-long` in the reply.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 9.6, 13.5, 16.5
 
-- [ ] 2. The host interface for storage, and `space`
+- [x] 2. The host interface for storage, and `space`
   - `core/include/odrig_core.h`: the seven members after `log`, as the design prints them.
     `core/src/storage.h`: the core's names. The command `space`.
   - `tests/core/host/host.cpp`: the seven functions on a folder and on the files of a
@@ -90,7 +90,7 @@ Rules for every task:
   - Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 14.1, 14.2, 14.3, 14.5, 14.6, 14.7, 16.2, 16.3,
     16.4
 
-- [ ] 3. Spike on the board: files written while the show plays
+- [x] 3. Spike on the board: files written while the show plays
   - `firmware/usermod/odrig_files.cpp`: the seven functions on `/odrig`, as the design's
     table gives them, with every storage call timed. `odrig_usermod.cpp`,
     `odrig_serial.cpp` and `odrig_http.cpp`: the pacing; the port's queue of 4,096 bytes;
@@ -121,7 +121,7 @@ Rules for every task:
   - The board is left with the firmware and the dim example show.
   - Requirements: 14.4, 17.1, 17.2, 17.3, 17.5, 17.6, 17.7, 17.8, 17.9
 
-- [ ] 4. A show that changes: `list`, `remove`, and what a power cut leaves
+- [x] 4. A show that changes: `list`, `remove`, and what a power cut leaves
   - `core/src/show.cpp`: tables with room; a show without items; `bytes` of every file;
     the brightness of the file kept. `core/src/content.cpp`: `list`, `remove`, the tables
     changed in place, `show.json` written. `core/src/storage.cpp`: the sequence of a
@@ -146,7 +146,7 @@ Rules for every task:
     4.6, 4.7, 4.8, 4.9, 4.10, 9.4, 9.5, 10.1, 10.4, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6,
     11.7, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 13.1, 13.2, 13.5, 16.1, 16.7
 
-- [ ] 5. The upload
+- [x] 5. The upload
   - `core/src/upload.cpp`: `upload begin`, `data`, `end` and `cancel`; base64; the
     CRC-32; the 60 seconds; the check with its second source, decoders, pixel buffer and
     window, taken at startup when the host has storage. `core/src/file_source.cpp`: a
@@ -174,7 +174,7 @@ Rules for every task:
     9.2, 9.3, 10.2, 10.3, 10.5, 10.6, 10.7, 13.3, 13.4, 13.6, 13.7, 15.1, 15.2, 15.3,
     16.6, 19.1, 19.2, 19.3, 19.4
 
-- [ ] 6. The command tool: `space`, `list`, `remove` and `upload`
+- [x] 6. The command tool: `space`, `list`, `remove` and `upload`
   - `odrigctl/client.py`: the session. `odrigctl/content.py`: `list_all` and `upload`.
     `odrigctl/cli.py`: the four commands, the progress lines, the statuses.
   - `docs/emulator.md`, "The command tool": the four commands with an example each over
@@ -189,7 +189,7 @@ Rules for every task:
     `busy`, the upload test fails with status 1 and the reply `busy`. Undo it.
   - Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8, 18.9, 18.10, 18.11, 19.5
 
-- [ ] 7. The board: every command over USB, and the measurements
+- [x] 7. The board: every command over USB, and the measurements
   - `build` and `build --probe` with the core as it is now; flash the firmware.
   - `tests/board/test_upload.py`, the rest: with the dim example show, the command tool
     over the port uploads an animation made for the bench canvas; `list` shows it; `play`
@@ -213,7 +213,7 @@ Rules for every task:
   - The board is left with the firmware and the dim example show.
   - Requirements: 15.2, 17.4, 17.8, 17.9, 19.6, 19.7, 19.8, 20.5, 21.1, 21.2, 21.3, 21.4
 
-- [ ] 8. The documents and the last check
+- [x] 8. The documents and the last check
   - Compare `docs/commands.md` and `docs/show.md` with the texts of the design, word for
     word, and settle every difference: in the document when the code is as the design
     says, in `docs/drifts.md` when a task found the design wrong.
@@ -243,4 +243,25 @@ Rules for every task:
     of every step, with the speed over Wi-Fi, in the commit message.
   - Set `"state": "completed"` and `completedAt` in
     `project-seeds/07-p1-content-commands/state.json`.
+  - Open: the owner has not done this check. What a program established over USB on
+    2026-10-12, with the firmware of task 7 on the board and the example show at
+    brightness 32:
+    - `python -m odrigctl --port /dev/cu.usbmodem101 upload 9 build/hello-bench.odrg`
+      wrote `upload: 100% 1138/1138 bytes 3907 B/s` and `upload: checking` and ended with
+      `{"ok":true}`, 6.1 seconds after it was started. `list` showed
+      `{"id":9,"file":"hello-bench.odrg","bytes":1138}` as the last item, `play 9` played
+      it by what `status` reported, `remove 9` removed it, and `play 3` brought the cycle
+      back.
+    - The same session is in the board suite, with the board's storage read back and the
+      board restarted in the middle of it; its replies are those of the emulator. The
+      whole suite passes, 37 tests.
+    - `tests/air/test_upload.py` passes with an emulator in the place of the board's
+      network and the board on USB.
+    - A file of 868,712 bytes is uploaded over USB at 12,674 bytes a second.
+    - Not established by any program: that the board's web server carries a line of
+      2,048 characters, which every `upload data` line of a full piece is; the speed of
+      an upload over Wi-Fi; and that WLED's pages still open with the 65,000 bytes of
+      internal memory that are free with the target file. The steps for the owner are
+      step 7 of "The owner's checks" in `docs/firmware.md`, and
+      `python3 firmware/fw.py test-air --http 4.3.2.1`.
   - Requirements: 21.5, 21.6

@@ -7,6 +7,8 @@
 #include "player.h"
 #include "reasons.h"
 #include "show.h"
+#include "storage.h"
+#include "upload.h"
 
 namespace odrig {
 
@@ -25,7 +27,7 @@ void append(Core &core, const char *text) {
 }
 
 // Decodes one file of the show from its first frame record to its last, and notes its
-// number of frames and its total duration. The header is checked first, then the size
+// size and its total duration. The header is checked first, then the size
 // against the mapping, then the body.
 void check_file(Core &core, FileInfo &info) {
     Reason reason = core.file.open(core.host, info.name);
@@ -51,18 +53,29 @@ void check_file(Core &core, FileInfo &info) {
     if (reason == kNone) {
         reason = core.decoder.finish();
     }
+    // A file that was read to its end was read whole.
+    const uint32_t bytes = core.file.taken;
     core.file.close();
     if (reason == kReadError) {
         core_fail(core, kReadError, info.name, kNone);
     } else if (reason != kNone) {
         core_fail(core, kFileMalformed, info.name, reason);
     } else {
-        info.frames = core.decoder.frames;
+        info.bytes = bytes;
         info.total_ms = total;
     }
 }
 
 void start(Core &core) {
+    storage_clear_parts(core);
+
+    core.line = static_cast<char *>(arena_take(core, ODRIG_LINE_MAX + 1));
+    core.feed_reply = static_cast<char *>(arena_take(core, ODRIG_REPLY_MAX));
+    if (core.line == nullptr || core.feed_reply == nullptr) {
+        core_fail(core, kOutOfMemory, nullptr, kNone);
+        return;
+    }
+
     Reason reason = read_mapping(core);
     if (reason != kNone) {
         core_fail(core, reason, reason == kReadError ? "mapping.json" : nullptr, kNone);
@@ -76,14 +89,27 @@ void start(Core &core) {
         core_fail(core, kOutOfMemory, nullptr, kNone);
         return;
     }
+    if (storage_changes(core)) {
+        // What only a change of the show needs: the chunk buffer, and for the check of an
+        // uploaded file a second set of decoders with a pixel buffer and a window.
+        core.chunk = static_cast<uint8_t *>(arena_take(core, kChunkSize));
+        core.checker = static_cast<Checker *>(arena_take(core, sizeof(Checker)));
+        core.check_pixels = static_cast<uint8_t *>(arena_take(core, rgb_picture < kLargestPicture ? rgb_picture : kLargestPicture));
+        core.check_window = static_cast<uint8_t *>(arena_take(core, kWindowSize));
+        if (core.chunk == nullptr || core.checker == nullptr || core.check_pixels == nullptr || core.check_window == nullptr) {
+            core_fail(core, kOutOfMemory, nullptr, kNone);
+            return;
+        }
+    }
 
     char id_text[kIdTextSize];
     reason = read_show(core, id_text);
     if (reason != kNone) {
         const char *about = id_text[0] != '\0' ? id_text : nullptr;
-        core_fail(core, reason, reason == kReadError ? "show.json" : about, kNone);
+        core_fail(core, reason, reason == kReadError ? kShowFile : about, kNone);
         return;
     }
+    storage_settle_pending(core);
 
     // The files are checked in the order in which the show first names them.
     for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
@@ -111,6 +137,8 @@ void core_fail(Core &core, Reason reason, const char *about, Reason detail) {
     if (core.host.log != nullptr) {
         core.host.log(core.host.ctx, core.error_text);
     }
+    // An invalid show takes no upload.
+    upload_discard(core);
 }
 
 }  // namespace odrig

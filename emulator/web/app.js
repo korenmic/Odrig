@@ -5,6 +5,7 @@
   "use strict";
 
   var LOG_ROWS = 500;
+  var LINE_SHOWN = 200;
 
   function byId(id) {
     return document.getElementById(id);
@@ -172,11 +173,13 @@
     chip.textContent = entry.transport;
     via.appendChild(chip);
     var line = cell(row, "line", entry.line);
-    if (entry.cut) {
+    if (entry.cut || entry.length > LINE_SHOWN) {
       var mark = document.createElement("span");
       mark.className = "cut";
-      mark.title = "The line was longer than 64 characters.";
-      mark.textContent = "\u2026";
+      if (entry.cut) {
+        mark.title = "The line was longer than 2,048 characters.";
+      }
+      mark.textContent = "\u2026 " + (entry.cut ? "more than " : "") + entry.length + " characters";
       line.appendChild(mark);
     }
     cell(row, "reply", entry.reply);
