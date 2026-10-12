@@ -900,7 +900,7 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    name no item of the show has, join the board's network with a computer, and send it:
 
    ```
-   python -m odrig encode animations/hello.json build/hello-bench.odrg
+   node converter/odrig.js encode animations/hello.json build/hello-bench.odrg
    python -m odrigctl --http 4.3.2.1 upload 9 build/hello-bench.odrg
    python -m odrigctl --http 4.3.2.1 list
    python -m odrigctl --http 4.3.2.1 play 9

@@ -126,7 +126,7 @@ class Firmware(unittest.TestCase):
         body = re.split(r"(?m)^\d+\. \*\*", checks)[7]
         (block,) = [re.sub(r"(?m)^   ", "", found) for found in re.findall(r"(?s)```\n(.*?)```", body)]
         lines = block.splitlines()
-        self.assertEqual(lines[0], "python -m odrig encode animations/hello.json build/hello-bench.odrg")
+        self.assertEqual(lines[0], "node converter/odrig.js encode animations/hello.json build/hello-bench.odrg")
         made = command_tool.parser()
         sent = [command_tool.checked(made, made.parse_args(shlex.split(line)[3:])) for line in lines[1:]]
         self.assertEqual(sent, [["upload", "9", "build/hello-bench.odrg"], ["list"], ["play", "9"], ["remove", "9"], ["play", "3"]])

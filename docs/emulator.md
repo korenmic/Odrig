@@ -620,7 +620,7 @@ The tool prints the reply line to standard output:
 of the show, here Hello world for the bench file:
 
 ```
-python -m odrig encode animations/hello.json build/hello-bench.odrg
+node converter/odrig.js encode animations/hello.json build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 upload: 100% 1138/1138 bytes 1206147 B/s
 upload: checking
