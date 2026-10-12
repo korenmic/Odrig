@@ -3,6 +3,7 @@ import ctypes
 import importlib.util
 import io
 import json
+import os
 import pathlib
 import re
 import struct
@@ -238,15 +239,82 @@ class Commands(unittest.TestCase):
         self.assertEqual(build.static_command(self.MICROSOFT, ["a.obj"]), (["lib", "/nologo", "/OUT:build/odrig_core.lib", "a.obj"], "build/odrig_core.lib"))
 
 
+def run_main(*argv):
+    """Runs one command line of the build script in this interpreter."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        try:
+            status = build.main(list(argv))
+        except SystemExit as stopped:
+            status = stopped.code
+    return status, out.getvalue(), err.getvalue()
+
+
+class OnlyWhatChanged(unittest.TestCase):
+    def test_a_file_is_made_again_when_it_is_missing_or_older_than_what_it_is_made_from(self):
+        made = tempfile.TemporaryDirectory()
+        self.addCleanup(made.cleanup)
+        folder = pathlib.Path(made.name)
+        for age, name in enumerate(("old.cpp", "made.o", "new.h")):
+            (folder / name).write_bytes(b"")
+            os.utime(folder / name, ns=(10**18 + age * 10**9, 10**18 + age * 10**9))
+        with mock.patch.object(build, "CORE", folder):
+            self.assertFalse(build.stale("made.o", ["old.cpp"]))
+            self.assertFalse(build.stale("made.o", []))
+            self.assertTrue(build.stale("made.o", ["old.cpp", "new.h"]))
+            self.assertTrue(build.stale("missing.o", ["old.cpp"]))
+
+    def test_an_object_depends_on_its_source_every_header_the_script_and_the_toolchain(self):
+        needed = build.needed_by("core.cpp")
+        self.assertEqual(needed[0], "src/core.cpp")
+        for name in ("include/odrig_core.h", "src/core_state.h", "src/reasons.h", "build.py", "build/toolchain.json"):
+            self.assertIn(name, needed)
+        self.assertNotIn("src/player.cpp", needed)
+
+    @unittest.skipIf(sys.platform == "darwin", "make builds the library on macOS")
+    def test_building_again_with_nothing_changed_runs_no_step(self):
+        self.assertEqual(run_main("shared"), (0, "", ""))
+
+    @unittest.skipIf(sys.platform == "darwin", "make builds the library on macOS")
+    def test_a_library_that_a_program_has_loaded_is_no_obstacle_when_nothing_changed(self):
+        binding.load(LIBRARY)
+        self.assertEqual(run_main("shared")[0], 0)
+
+    @unittest.skipUnless(sys.platform == "win32", "only Windows keeps a loaded library from being written")
+    def test_a_loaded_library_that_has_to_be_built_again_is_refused_with_what_to_do(self):
+        binding.load(LIBRARY)
+        with self.assertRaises(build.Failure) as caught:
+            build.writable(f"build/{LIBRARY.name}")
+        self.assertEqual(caught.exception.reason, "build-failed")
+        self.assertIn(f"core/build/{LIBRARY.name}", caught.exception.detail)
+        self.assertIn("stop the emulator", caught.exception.detail)
+
+    def test_a_library_that_is_not_there_yet_may_be_built_and_the_check_makes_no_file(self):
+        made = tempfile.TemporaryDirectory()
+        self.addCleanup(made.cleanup)
+        with mock.patch.object(build, "CORE", pathlib.Path(made.name)):
+            build.writable("build/odrig_core.dll")
+            build.writable("odrig_core.dll")
+        self.assertEqual(list(pathlib.Path(made.name).iterdir()), [])
+
+    def test_the_toolchain_is_written_down_again_only_when_it_is_another(self):
+        made = tempfile.TemporaryDirectory()
+        self.addCleanup(made.cleanup)
+        folder = pathlib.Path(made.name)
+        first = build.Toolchain("gnu", "g++", "gcc", "ar", "nm", None)
+        with mock.patch.object(build, "BUILD", folder):
+            build.record(first)
+            os.utime(folder / "toolchain.json", ns=(10**18, 10**18))
+            build.record(first)
+            self.assertEqual((folder / "toolchain.json").stat().st_mtime_ns, 10**18)
+            build.record(build.Toolchain("gnu", "clang++", "clang", "ar", "nm", None))
+            self.assertNotEqual((folder / "toolchain.json").stat().st_mtime_ns, 10**18)
+            self.assertEqual(json.loads((folder / "toolchain.json").read_text(encoding="utf-8"))["cxx"], "clang++")
+
+
 class TheCommandLine(unittest.TestCase):
     def run_main(self, *argv):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            try:
-                status = build.main(list(argv))
-            except SystemExit as stopped:
-                status = stopped.code
-        return status, out.getvalue(), err.getvalue()
+        return run_main(*argv)
 
     def test_without_a_compiler_it_ends_with_1_and_one_line(self):
         with mock.patch.object(build, "find", side_effect=build.Failure("no-compiler", build.INSTALL)):

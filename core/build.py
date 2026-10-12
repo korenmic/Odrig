@@ -248,13 +248,44 @@ def position_independent(toolchain, platform=sys.platform):
     return () if toolchain.kind == "msvc" or platform in ("win32", "darwin") else ("-fPIC",)
 
 
+def stale(made, needed):
+    """Whether a file has to be made again: it is not there, or it is older than one of the
+    files it is made from. The paths are as seen from `core/`."""
+    made = CORE / made
+    if not made.is_file():
+        return True
+    age = made.stat().st_mtime_ns
+    return any((CORE / path).stat().st_mtime_ns > age for path in needed)
+
+
+def needed_by(source):
+    """What the object of a source is made from: the source, every header, this script and
+    the toolchain that is written down."""
+    headers = sorted([f"src/{path.name}" for path in (CORE / "src").glob("*.h")] + [f"include/{path.name}" for path in (CORE / "include").glob("*.h")])
+    return [f"src/{source}", *headers, pathlib.Path(__file__).name, f"build/{RECORD}"]
+
+
+def written(file, text):
+    """Writes a text file, unless it holds that text already, so that what is made from it
+    is not made again for nothing."""
+    if not file.is_file() or file.read_bytes() != text.encode("utf-8"):
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(text, encoding="utf-8", newline="\n")
+
+
+def record(toolchain):
+    """Writes down the toolchain. A build with another one makes everything again."""
+    written(BUILD / RECORD, json.dumps({"kind": toolchain.kind, "cxx": toolchain.cxx, "cc": toolchain.cc, "ar": toolchain.ar, "nm": toolchain.nm}, indent=2) + "\n")
+
+
 def compiled(toolchain):
-    """Compiles every source of the core and gives the objects."""
+    """Compiles every source of the core whose object is not up to date, and gives the
+    objects."""
     (BUILD / "core").mkdir(parents=True, exist_ok=True)
-    (BUILD / RECORD).write_text(json.dumps({"kind": toolchain.kind, "cxx": toolchain.cxx, "cc": toolchain.cc, "ar": toolchain.ar, "nm": toolchain.nm}, indent=2) + "\n", encoding="utf-8", newline="\n")
-    steps = [compile_command(toolchain, source, position_independent(toolchain)) for source in sources()]
-    all_started([command for command, _ in steps], toolchain.env)
-    return [made for _, made in steps]
+    record(toolchain)
+    steps = [(source, *compile_command(toolchain, source, position_independent(toolchain))) for source in sources()]
+    all_started([command for source, command, made in steps if stale(made, needed_by(source))], toolchain.env)
+    return [made for _, _, made in steps]
 
 
 def static_command(toolchain, objects):
@@ -282,18 +313,37 @@ def shared_command(toolchain, objects, platform=sys.platform):
 def build_static(toolchain):
     objects = compiled(toolchain)
     command, made = static_command(toolchain, objects)
-    (CORE / made).unlink(missing_ok=True)
-    started(command, toolchain.env)
+    if stale(made, objects):
+        (CORE / made).unlink(missing_ok=True)
+        started(command, toolchain.env)
     return made
 
 
 def build_shared(toolchain):
+    """Builds the shared library, when it is not up to date. On Windows a library that a
+    running program has loaded cannot be written, so a build with nothing to do leaves it
+    alone."""
     objects = compiled(toolchain)
     command, made, definitions = shared_command(toolchain, objects)
     if definitions is not None:
-        (BUILD / "core" / "odrig_core.def").write_text(definitions, encoding="ascii", newline="\n")
-    started(command, toolchain.env)
+        written(BUILD / "core" / "odrig_core.def", definitions)
+        objects = [*objects, "build/core/odrig_core.def"]
+    if stale(made, objects):
+        writable(made)
+        started(command, toolchain.env)
     return made
+
+
+def writable(made):
+    """Refuses, with a reason a person can act on, to build a library that cannot be
+    written because a running program has it loaded."""
+    try:
+        with open(CORE / made, "r+b"):
+            pass
+    except PermissionError:
+        raise Failure(BUILD_FAILED, f"core/{made}: a running program has the library loaded; stop the emulator and build again") from None
+    except OSError:
+        pass
 
 
 def clean():

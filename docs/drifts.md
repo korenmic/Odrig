@@ -5292,3 +5292,20 @@ no option, no port number and no printed line. What are they?
 
 **Resolution.** `docs/specs/11-p0-emulator-and-tools-on-windows/`: `requirements.md`,
 `design.md` and `tasks.md`.
+
+## Seed 11: A library that a running emulator has loaded
+
+**Question.** The build script compiled and linked everything at every run. On Windows a
+DLL that a running program has loaded cannot be written, so the emulator suite, which
+builds the library when it starts, could not run while an emulator was open. What does the
+build script do?
+
+**Answer.** What `make` does: a file is made again only when it is missing or older than
+what it is made from. An object is made from its source, every header of the core, the
+build script and the toolchain written down in `core/build/toolchain.json`, which is
+rewritten only when another toolchain is used. So a build with nothing to do touches
+nothing, and the suite runs beside an open emulator. When a source did change and the
+library is loaded, the script ends with `build-failed` and says to stop the emulator.
+
+**Resolution.** `core/build.py`: `stale`, `needed_by`, `record` and `writable`.
+`tests/emulator/test_build_script.py`, the class `OnlyWhatChanged`.
