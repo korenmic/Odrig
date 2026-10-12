@@ -12,12 +12,18 @@ REPLY = b'{"ok":true}\n'
 class Kernel:
     """Stands in for `kernel32`: writes down every call, and is a port. A read gives the
     next piece of `before` until something has been written to the port, and the next
-    piece of `answers` from then on. A name in `refuses` makes that function fail."""
+    piece of `answers` from then on. A name in `refuses` makes that function fail, and
+    `found` is the flags of the settings the port is found with: DTR and RTS both driven
+    by the port unless told otherwise."""
 
     HANDLE = 0x1234
+    DTR_ON, DTR_HANDSHAKE, RTS_ON, RTS_HANDSHAKE, RTS_TOGGLE, CTS_FLOW = 0x0010, 0x0020, 0x1000, 0x2000, 0x3000, 0x0004
 
-    def __init__(self, before=(), answers=(), refuses=(), takes=None):
+    def __init__(self, before=(), answers=(), refuses=(), takes=None, found=0x0001 | 0x0010 | 0x1000, second_refused=False):
         self.calls = []
+        self.found = found
+        self.second_refused = second_refused
+        self.written_settings = []
         self.settings = None
         self.limits = []
         self.written = b""
@@ -30,23 +36,36 @@ class Kernel:
         self.calls.append(("CreateFileW", name, access, share, disposition))
         return winserial.INVALID_HANDLE if "CreateFileW" in self.refuses else self.HANDLE
 
-    def EscapeCommFunction(self, handle, function):
-        self.calls.append(("EscapeCommFunction", {winserial.CLRRTS: "lower RTS", winserial.CLRDTR: "lower DTR"}.get(function, function)))
-        return 0 if "EscapeCommFunction" in self.refuses else 1
-
     def GetCommState(self, handle, settings):
         self.calls.append(("GetCommState",))
         if "GetCommState" in self.refuses:
             return 0
         found = settings._obj
-        found.BaudRate, found.flags, found.ByteSize, found.Parity, found.StopBits = 1200, 0x3011, 7, 2, 2
+        found.BaudRate, found.flags, found.ByteSize, found.Parity, found.StopBits = 1200, self.found, 7, 2, 2
         return 1
 
     def SetCommState(self, handle, settings):
         given = settings._obj
         self.calls.append(("SetCommState",))
         self.settings = (given.DCBlength, given.BaudRate, given.flags, given.ByteSize, given.Parity, given.StopBits)
+        self.written_settings.append(self.settings)
+        if self.second_refused and len(self.written_settings) == 2:
+            return 0
         return 0 if "SetCommState" in self.refuses else 1
+
+    def lines(self):
+        """What each writing of the settings does to the two modem lines, in order: a line
+        the settings no longer leave to the port goes low."""
+        states = [self.found, *(written[2] for written in self.written_settings)]
+        lowered = []
+        for before, after in zip(states, states[1:]):
+            step = []
+            if before & 0x3000 and not after & 0x3000:
+                step.append("RTS")
+            if before & 0x0030 and not after & 0x0030:
+                step.append("DTR")
+            lowered.append(step)
+        return lowered
 
     def SetCommTimeouts(self, handle, limits):
         given = limits._obj
@@ -98,21 +117,43 @@ class Opening(unittest.TestCase):
         self.opened("COM12")
         self.assertEqual(self.kernel.named("CreateFileW")[0][1], "\\\\.\\COM12")
 
-    def test_rts_is_lowered_before_dtr_and_both_before_the_settings_are_written(self):
+    def test_rts_is_lowered_before_dtr_by_two_writings_of_the_settings(self):
         self.opened()
-        self.assertEqual([call[0] for call in self.kernel.calls], ["CreateFileW", "EscapeCommFunction", "EscapeCommFunction", "GetCommState", "SetCommState", "SetCommTimeouts"])
-        self.assertEqual(self.kernel.named("EscapeCommFunction"), [("EscapeCommFunction", "lower RTS"), ("EscapeCommFunction", "lower DTR")], "the modem lines are not lowered RTS first, DTR second")
+        self.assertEqual([call[0] for call in self.kernel.calls], ["CreateFileW", "GetCommState", "SetCommState", "SetCommState", "SetCommTimeouts"])
+        self.assertEqual(self.kernel.lines(), [["RTS"], ["DTR"]], "the modem lines are not lowered RTS first, DTR second")
 
-    def test_it_goes_on_when_both_requests_are_refused(self):
-        port = self.opened(refuses=("EscapeCommFunction",), before=[REPLY])
-        self.assertEqual(len(self.kernel.named("EscapeCommFunction")), 2)
+    def test_the_first_writing_takes_rts_from_the_port_and_leaves_dtr_as_it_was(self):
+        for found in (Kernel.DTR_ON | Kernel.RTS_ON, Kernel.DTR_ON | Kernel.RTS_HANDSHAKE | Kernel.CTS_FLOW, Kernel.DTR_HANDSHAKE | Kernel.RTS_TOGGLE, Kernel.DTR_ON):
+            with self.subTest(found=hex(found)):
+                self.opened(found=1 | found)
+                first, second = (written[2] for written in self.kernel.written_settings)
+                self.assertEqual(first & 0x3000, 0, "RTS is still the port's to drive")
+                self.assertEqual(first & 0x0030, found & 0x0030, "DTR changed with RTS")
+                self.assertEqual(first & 0x030C, 0, "flow control is still asked for")
+                self.assertEqual(second, winserial.BINARY)
+                for step in self.kernel.lines():
+                    self.assertNotEqual(step, ["RTS", "DTR"], "both lines change in one writing, in an order the system chooses")
+                self.assertNotIn(["DTR"], self.kernel.lines()[:1], "DTR goes low while RTS may still be high")
+
+    def test_a_port_whose_rts_was_left_to_a_handshake_gets_no_request_it_would_refuse(self):
+        port = self.opened(found=1 | Kernel.DTR_ON | Kernel.RTS_HANDSHAKE, before=[REPLY])
+        self.assertFalse(hasattr(self.kernel, "EscapeCommFunction"))
+        self.assertEqual(self.kernel.lines(), [["RTS"], ["DTR"]])
         self.assertEqual(b"".join(port.received(0.05)), REPLY)
+
+    def test_a_port_that_has_both_lines_low_already_changes_neither(self):
+        self.opened(found=winserial.BINARY)
+        self.assertEqual(self.kernel.lines(), [[], []])
 
     def test_the_settings_are_115200_baud_8_bits_no_parity_one_stop_bit(self):
         self.opened()
-        length, baud, flags, bits, parity, stop = self.kernel.settings
-        self.assertEqual((length, baud, bits, parity, stop), (ctypes.sizeof(winserial.DCB), 115200, 8, 0, 0))
-        self.assertEqual(ctypes.sizeof(winserial.DCB), 28)
+        for length, baud, flags, bits, parity, stop in self.kernel.written_settings:
+            self.assertEqual((length, baud, bits, parity, stop), (ctypes.sizeof(winserial.DCB), 115200, 8, 0, 0))
+
+    def test_the_two_structures_have_the_sizes_of_windows_on_every_system(self):
+        self.assertEqual((ctypes.sizeof(winserial.DCB), ctypes.sizeof(winserial.Timeouts)), (28, 20))
+        self.assertEqual((winserial.DCB.flags.offset, winserial.DCB.ByteSize.offset, winserial.DCB.wReserved1.offset), (8, 18, 26))
+        self.assertEqual((ctypes.sizeof(winserial.DWORD), ctypes.sizeof(winserial.WORD)), (4, 2))
 
     def test_the_settings_keep_dtr_and_rts_low_and_ask_for_no_flow_control(self):
         self.opened()
@@ -134,11 +175,11 @@ class Opening(unittest.TestCase):
         self.assertEqual([call[0] for call in kernel.calls], ["CreateFileW"])
 
     def test_a_name_that_is_no_serial_port_is_an_error_and_is_closed(self):
-        for refused in ("GetCommState", "SetCommState"):
+        for refusing in ({"refuses": ("GetCommState",)}, {"refuses": ("SetCommState",)}, {"second_refused": True}):
             with self.assertRaises(OSError) as caught:
-                winserial.Port("NUL", kernel := Kernel(refuses=(refused,)))
+                winserial.Port("NUL", kernel := Kernel(**refusing))
             self.assertTrue(caught.exception.strerror)
-            self.assertEqual(kernel.named("CloseHandle"), [("CloseHandle", Kernel.HANDLE)], refused)
+            self.assertEqual(kernel.named("CloseHandle"), [("CloseHandle", Kernel.HANDLE)], refusing)
 
     def test_closing_twice_closes_once(self):
         port = self.opened()
@@ -227,7 +268,7 @@ class TheSystemsOwn(unittest.TestCase):
     def test_the_functions_are_those_of_kernel32_with_handles_as_wide_as_a_pointer(self):
         library = winserial.kernel32()
         self.assertEqual(ctypes.sizeof(library.CreateFileW.restype), ctypes.sizeof(ctypes.c_void_p))
-        for name in ("EscapeCommFunction", "GetCommState", "SetCommState", "SetCommTimeouts", "ReadFile", "WriteFile", "CloseHandle"):
+        for name in ("GetCommState", "SetCommState", "SetCommTimeouts", "ReadFile", "WriteFile", "CloseHandle"):
             self.assertEqual(ctypes.sizeof(getattr(library, name).argtypes[0]), ctypes.sizeof(ctypes.c_void_p), name)
 
     def test_a_port_that_is_not_there_is_unreachable_and_says_why(self):

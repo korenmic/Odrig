@@ -8,12 +8,15 @@ import ctypes
 import time
 from ctypes import wintypes
 
+# The two number types of the structures below, with the sizes they have on Windows
+# whatever system reads this module.
+DWORD = ctypes.c_uint32
+WORD = ctypes.c_uint16
+
 GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
 OPEN_EXISTING = 3
 INVALID_HANDLE = ctypes.c_void_p(-1).value
-CLRRTS = 4
-CLRDTR = 6
 MAXDWORD = 0xFFFFFFFF
 
 DEVICES = "\\\\.\\"
@@ -21,9 +24,10 @@ BAUD = 115200
 DATA_BITS = 8
 NO_PARITY = 0
 ONE_STOP_BIT = 0
-# Of the flags of the settings only "binary" is set: no flow control, and DTR and RTS
-# left low when the port is opened.
+# The flags of the settings. Only "binary" stays set: no flow control, and DTR and RTS left
+# low when the port is opened. The two bits of DTR_CONTROL say what the port does with DTR.
 BINARY = 0x0001
+DTR_CONTROL = 0x0030
 READ_SIZE = 4096
 POLL_MILLISECONDS = 20
 
@@ -32,12 +36,12 @@ class DCB(ctypes.Structure):
     """The settings of a port, as `GetCommState` and `SetCommState` take them."""
 
     _fields_ = [
-        ("DCBlength", wintypes.DWORD),
-        ("BaudRate", wintypes.DWORD),
-        ("flags", wintypes.DWORD),
-        ("wReserved", wintypes.WORD),
-        ("XonLim", wintypes.WORD),
-        ("XoffLim", wintypes.WORD),
+        ("DCBlength", DWORD),
+        ("BaudRate", DWORD),
+        ("flags", DWORD),
+        ("wReserved", WORD),
+        ("XonLim", WORD),
+        ("XoffLim", WORD),
         ("ByteSize", ctypes.c_ubyte),
         ("Parity", ctypes.c_ubyte),
         ("StopBits", ctypes.c_ubyte),
@@ -46,7 +50,7 @@ class DCB(ctypes.Structure):
         ("ErrorChar", ctypes.c_char),
         ("EofChar", ctypes.c_char),
         ("EvtChar", ctypes.c_char),
-        ("wReserved1", wintypes.WORD),
+        ("wReserved1", WORD),
     ]
 
 
@@ -54,27 +58,26 @@ class Timeouts(ctypes.Structure):
     """`COMMTIMEOUTS`: how long a read and a write may take, in milliseconds."""
 
     _fields_ = [
-        ("ReadIntervalTimeout", wintypes.DWORD),
-        ("ReadTotalTimeoutMultiplier", wintypes.DWORD),
-        ("ReadTotalTimeoutConstant", wintypes.DWORD),
-        ("WriteTotalTimeoutMultiplier", wintypes.DWORD),
-        ("WriteTotalTimeoutConstant", wintypes.DWORD),
+        ("ReadIntervalTimeout", DWORD),
+        ("ReadTotalTimeoutMultiplier", DWORD),
+        ("ReadTotalTimeoutConstant", DWORD),
+        ("WriteTotalTimeoutMultiplier", DWORD),
+        ("WriteTotalTimeoutConstant", DWORD),
     ]
 
 
 def kernel32():
     """The functions of Windows this module calls, with their arguments declared."""
     library = ctypes.WinDLL("kernel32", use_last_error=True)
-    handle, count = wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)
+    handle, count = wintypes.HANDLE, ctypes.POINTER(DWORD)
     library.CreateFileW.restype = handle
-    library.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, handle]
+    library.CreateFileW.argtypes = [wintypes.LPCWSTR, DWORD, DWORD, ctypes.c_void_p, DWORD, DWORD, handle]
     for name, arguments in (
-        ("EscapeCommFunction", [handle, wintypes.DWORD]),
         ("GetCommState", [handle, ctypes.POINTER(DCB)]),
         ("SetCommState", [handle, ctypes.POINTER(DCB)]),
         ("SetCommTimeouts", [handle, ctypes.POINTER(Timeouts)]),
-        ("ReadFile", [handle, ctypes.c_void_p, wintypes.DWORD, count, ctypes.c_void_p]),
-        ("WriteFile", [handle, ctypes.c_void_p, wintypes.DWORD, count, ctypes.c_void_p]),
+        ("ReadFile", [handle, ctypes.c_void_p, DWORD, count, ctypes.c_void_p]),
+        ("WriteFile", [handle, ctypes.c_void_p, DWORD, count, ctypes.c_void_p]),
         ("CloseHandle", [handle]),
     ):
         function = getattr(library, name)
@@ -100,9 +103,11 @@ class Port:
     """An open serial port: 115200 baud, 8 data bits, no parity, one stop bit.
 
     The modem lines are lowered RTS first, DTR second: DTR low while RTS is still high is
-    the combination that resets the chip. The settings then written keep both low, so that
-    opening the port again raises neither. A port without modem lines refuses the two
-    requests, which is ignored.
+    the combination that resets the chip. Each is lowered by settings that take it out of
+    the port's hands and leave it low, written one after the other: first RTS, with DTR as
+    it was, then DTR. A request to lower a line directly would be refused where the port had
+    been left to drive that line by itself. The settings stay with the port, so that opening
+    it again raises neither line.
     """
 
     def __init__(self, name, kernel=None):
@@ -112,19 +117,18 @@ class Port:
             self._handle = None
             raise refused("the port cannot be opened")
         try:
-            for line in (CLRRTS, CLRDTR):
-                self._kernel.EscapeCommFunction(self._handle, line)
             settings = DCB()
             settings.DCBlength = ctypes.sizeof(DCB)
             if not self._kernel.GetCommState(self._handle, ctypes.byref(settings)):
                 raise refused("this is not a serial port")
             settings.BaudRate = BAUD
-            settings.flags = BINARY
             settings.ByteSize = DATA_BITS
             settings.Parity = NO_PARITY
             settings.StopBits = ONE_STOP_BIT
-            if not self._kernel.SetCommState(self._handle, ctypes.byref(settings)):
-                raise refused("the port does not take the settings")
+            for flags in (BINARY | (settings.flags & DTR_CONTROL), BINARY):
+                settings.flags = flags
+                if not self._kernel.SetCommState(self._handle, ctypes.byref(settings)):
+                    raise refused("the port does not take the settings")
             self._limits(0)
         except BaseException:
             self.close()
@@ -141,7 +145,7 @@ class Port:
         """What arrives within a length of time, in pieces as they come."""
         deadline = time.monotonic() + seconds
         buffer = ctypes.create_string_buffer(READ_SIZE)
-        count = wintypes.DWORD(0)
+        count = DWORD(0)
         while time.monotonic() < deadline:
             if not self._kernel.ReadFile(self._handle, buffer, READ_SIZE, ctypes.byref(count), None):
                 raise refused("the port cannot be read")
@@ -151,7 +155,7 @@ class Port:
     def write(self, data, seconds):
         self._limits(max(1, int(seconds * 1000)))
         deadline = time.monotonic() + seconds
-        count = wintypes.DWORD(0)
+        count = DWORD(0)
         while data:
             if not self._kernel.WriteFile(self._handle, data, len(data), ctypes.byref(count), None):
                 raise refused("the port cannot be written")
