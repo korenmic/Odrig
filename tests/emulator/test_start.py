@@ -195,7 +195,7 @@ class Start(unittest.TestCase):
 
     def test_no_option_names_a_size_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--core", "--verbose", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--record", "--seconds", "--script"})
 
 
 if __name__ == "__main__":

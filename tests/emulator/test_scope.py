@@ -39,7 +39,7 @@ def texts(tree):
 class Scope(unittest.TestCase):
     def test_the_packages_have_the_modules_this_test_reads(self):
         names = {path.name for path, _ in modules(EMULATOR)}
-        for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "recfile.py", "record.py", "serialport.py"):
+        for expected in ("__init__.py", "__main__.py", "app.py", "binding.py", "engine.py", "failure.py", "host.py", "httpd.py", "hub.py", "lineport.py", "recfile.py", "record.py", "serialport.py"):
             self.assertIn(expected, names)
         self.assertEqual(sorted(path.name for path, _ in modules(TOOL)), ["__init__.py", "__main__.py", "cli.py", "client.py"])
 
@@ -77,8 +77,10 @@ class Scope(unittest.TestCase):
         self.assertEqual(addresses, [("emulator/httpd.py", "127.0.0.1")])
         server = (EMULATOR / "httpd.py").read_text(encoding="utf-8")
         self.assertIn("super().__init__((ADDRESS, port), Handler)", server)
+        line_port = (EMULATOR / "lineport.py").read_text(encoding="utf-8")
+        self.assertIn("super().__init__((httpd.ADDRESS, port), Connection)", line_port)
         for path, tree in modules(EMULATOR):
-            if path.name != "httpd.py":
+            if path.name not in ("httpd.py", "lineport.py"):
                 self.assertEqual(imported(tree) & {"socket", "socketserver", "http", "asyncio"}, set(), path.name)
 
     def test_the_tool_has_no_word_for_the_emulator_or_the_board(self):

@@ -57,7 +57,7 @@ class EmulatorDocument(unittest.TestCase):
 
     def test_it_has_a_section_for_everything_the_requirements_list(self):
         headings = re.findall(r"(?m)^##+ (.+)$", self.text)
-        for heading in ("Commands", "Two shows to run", "Starting", "The serial port", "Commands over HTTP", "The page", "The LEDs view", "The mapping view",
+        for heading in ("Commands", "Two shows to run", "Starting", "The serial port", "The line port", "Commands over HTTP", "The page", "The LEDs view", "The mapping view",
                         "The event stream", "The command tool", "Record mode", "The script", "The record file", "Exit statuses", "The check list by eye"):
             self.assertIn(heading, headings)
         for target in re.findall(r"\]\(#([a-z-]+)\)", self.text):
@@ -77,10 +77,10 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose]", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose]", self.text)
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH]", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--core", "--verbose", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--record", "--seconds", "--script"})
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
         self.assertIn("page: http://127.0.0.1:8600/", self.text)
@@ -144,7 +144,7 @@ class EmulatorDocument(unittest.TestCase):
         text = section(self.text, "The event stream")
         events = dict(re.findall(r"event: ([a-z]+)\ndata: (.+)", text))
         self.assertEqual(sorted(events), ["frame", "hello", "log", "status"])
-        self.assertEqual(sorted(json.loads(events["hello"])), ["error", "legs", "page", "serial", "show", "t0"])
+        self.assertEqual(sorted(json.loads(events["hello"])), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
         self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "ok", "on", "playing"])

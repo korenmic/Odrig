@@ -75,7 +75,7 @@ The sizes are those the converter gives with zlib 1.2.12.
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--core PATH] [--verbose]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -97,7 +97,8 @@ removes the link to its port and exits with status 0.
 |---|---|---|
 | `--port N` | The port of the address on 127.0.0.1; 0 takes any free port. | 8600 |
 | `--serial-link PATH` | Where the link to the serial port is made. | `build/emulator/serial` under the repository root, whatever folder the command is run from |
-| `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root |
+| `--tcp-port N` | The port of the [line port](#the-line-port) on 127.0.0.1; 0 takes any free port. | On a Mac there is no line port; on Windows it is 8601 |
+| `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
 
 There is no option for a size and none for an address: the canvas is the one of
@@ -134,6 +135,40 @@ python -m odrigctl --port build/emulator/serial status
 A link left at the path by an earlier run is replaced. If the path holds anything that is
 not a symbolic link, the emulator refuses to start and leaves it untouched. Two emulators
 at once need two link paths and two page ports.
+
+## The line port
+
+Windows has no pseudo-terminal. There the emulator offers the line protocol of the serial
+port on a TCP port of 127.0.0.1 instead, the line port, and prints its address in place of
+the serial port's:
+
+```
+page: http://127.0.0.1:8600/
+tcp: 127.0.0.1:8601
+```
+
+On a Mac the serial port stays, and `--tcp-port N` opens the line port beside it; the
+emulator then prints `tcp:` as a third line. On Windows `--serial-link` ends the emulator
+with the reason `serial-unavailable`.
+
+```
+python -m odrigctl --tcp 127.0.0.1:8601 status
+```
+
+- A program connects, writes command lines and reads the replies. Every byte it writes
+  reaches the core's entry for bytes, unchanged and in order, and every reply to a line
+  those bytes finish is written back to the same connection. A line may arrive in pieces,
+  and several lines may arrive at once.
+- The port does not echo, and it adds, removes and changes no newline and no carriage
+  return.
+- A program may connect and leave any number of times, and several may be connected at
+  once. As with the serial port, one emulator reads one stream of lines: a line begun on
+  one connection and not ended is ended by the next bytes that arrive, on whichever
+  connection. A program sends whole lines.
+- A command that arrived this way has `tcp` as its transport in the log.
+- Stopping the emulator closes every connection.
+
+Two emulators at once need two line ports and two page ports.
 
 ## Commands over HTTP
 
@@ -482,7 +517,7 @@ event:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","cut":false,"reply":"{\"ok\":true}"}
@@ -496,7 +531,7 @@ data: 123460 <base64 of the refresh>
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial` or `http`, `line` the line as the core read it, and `reply` the reply without its newline. A line of more than 64 characters is given with its first 64 and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
@@ -607,8 +642,8 @@ python -m emulator build/example-show --record build/example.odrr --seconds 60
 
 Recording the same folder with the same length and the same script twice gives the same
 bytes. The emulator gives the core nothing of its own in this mode: only the requests for
-a refresh and the commands of the script. The options `--port`, `--serial-link` and
-`--verbose` belong to real time and do not go with `--record`.
+a refresh and the commands of the script. The options `--port`, `--serial-link`,
+`--tcp-port` and `--verbose` belong to real time and do not go with `--record`.
 
 ### The script
 

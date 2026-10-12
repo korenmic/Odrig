@@ -37,7 +37,7 @@ class Stream(unittest.TestCase):
         self.assertEqual(events[0].kind, "hello")
         self.assertEqual([event.kind for event in events].count("hello"), 1)
         hello = json.loads(events[0].data)
-        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0"])
+        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
         self.assertEqual(hello["legs"], [[1, 1, 180], [2, 2, 180]])
         self.assertIsNone(hello["error"])
         self.assertEqual(hello["page"], self.emulator.url)

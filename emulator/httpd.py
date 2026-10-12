@@ -11,6 +11,9 @@ import threading
 from . import failure
 
 ADDRESS = "127.0.0.1"
+# Lets a server take its port again right after an earlier one closed. Windows needs no
+# such leave, and there it would let a second server take a port that is in use.
+REUSE_ADDRESS = sys.platform != "win32"
 COMMAND_PATH = "/odrig"
 EVENTS_PATH = "/events"
 MAPPING_PATH = "/show/mapping.json"
@@ -179,6 +182,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
+    allow_reuse_address = REUSE_ADDRESS
 
     def __init__(self, port, engine, show_dir, hello):
         self.engine = engine

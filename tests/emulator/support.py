@@ -30,6 +30,14 @@ TWO_LEGS = ROOT / "mapping" / "legs-2.json"
 TARGET = ROOT / "mapping" / "legs-20.json"
 DEMO_SHOW = ROOT / "shows" / "demo-20" / "show.json"
 
+# Whether the emulator has its virtual serial port on this system, and the signal a test
+# ends an emulator with: where a child cannot be sent a termination signal, the break of
+# the console, which reaches a child in a process group of its own.
+HAS_SERIAL = app.HAS_SERIAL
+NO_SERIAL = "this system has no pseudo-terminal"
+STOP = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
+OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+
 
 @contextlib.contextmanager
 def packed(show, mapping, sources, compressed=True):
@@ -143,20 +151,28 @@ class Emulator:
     """The emulator in real time, as a child process on a free port.
 
     `lines` holds what it has printed to standard output so far, `port` the port of the
-    page address it named, and `serial` the path of its serial port. Without `serial_link`
-    the link to the port is made in a temporary folder.
+    page address it named, `serial` the path of its serial port and `tcp` the address of
+    its line port, each `None` when it has none. Without `serial_link` the link to the
+    serial port is made in a temporary folder. Where there is no serial port the line port
+    is opened on a free port; elsewhere `tcp_port` asks for it.
     """
 
     START_SECONDS = 15
 
-    def __init__(self, folder, *options, port=0, serial_link=None):
+    def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None):
         self._temporary = None
-        if serial_link is None:
-            self._temporary = tempfile.TemporaryDirectory()
-            serial_link = pathlib.Path(self._temporary.name, "serial")
+        command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port)]
+        if HAS_SERIAL:
+            if serial_link is None:
+                self._temporary = tempfile.TemporaryDirectory()
+                serial_link = pathlib.Path(self._temporary.name, "serial")
+            command += ["--serial-link", str(serial_link)]
+        elif tcp_port is None:
+            tcp_port = 0
+        if tcp_port is not None:
+            command += ["--tcp-port", str(tcp_port)]
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--serial-link", str(serial_link), *(str(option) for option in options)],
-            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            [*command, *(str(option) for option in options)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=OWN_GROUP,
         )
         self.lines = []
         self._errors = []
@@ -171,7 +187,8 @@ class Emulator:
         try:
             self.url = self._printed_line("page: ")
             self.port = int(self.url.rstrip("/").rsplit(":", 1)[1])
-            self.serial = self._printed_line("serial: ")
+            self.serial = self._printed_line("serial: ") if HAS_SERIAL else None
+            self.tcp = self._printed_line("tcp: ") if tcp_port is not None else None
         except BaseException:
             self.stop()
             raise
@@ -179,7 +196,7 @@ class Emulator:
     def _read(self, pipe, lines):
         for line in iter(pipe.readline, b""):
             with self._printed:
-                lines.append(line.decode("utf-8", "replace").rstrip("\n"))
+                lines.append(line.decode("utf-8", "replace").rstrip("\r\n"))
                 self._printed.notify_all()
         with self._printed:
             self._printed.notify_all()
@@ -223,7 +240,7 @@ class Emulator:
     def send_signal(self, number):
         self.process.send_signal(number)
 
-    def stop(self, number=signal.SIGTERM):
+    def stop(self, number=STOP):
         """Ends the emulator with a signal and gives its exit status and what it printed."""
         if self._result is None:
             if self.process.poll() is None:
@@ -339,6 +356,60 @@ class Serial:
     def __exit__(self, *_):
         self.close()
 
+
+class Lines:
+    """A program's end of a connection to a port that takes lines over TCP, named as
+    `host:port`."""
+
+    def __init__(self, address, seconds=5):
+        host, _, port = address.rpartition(":")
+        self.socket = socket.create_connection((host, int(port)), timeout=seconds)
+
+    def write(self, data):
+        self.socket.sendall(data)
+
+    def read_lines(self, count=1, seconds=5):
+        """What arrives until it holds `count` newlines, or until the time is over or the
+        other end closes."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while received.count(b"\n") < count:
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([self.socket], [], [], left)[0]:
+                break
+            piece = self.socket.recv(4096)
+            if not piece:
+                break
+            received += piece
+        return received
+
+    def read_for(self, seconds):
+        """Everything that arrives within a length of time."""
+        received = b""
+        deadline = time.monotonic() + seconds
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return received
+            if select.select([self.socket], [], [], left)[0]:
+                piece = self.socket.recv(4096)
+                if not piece:
+                    return received
+                received += piece
+
+    def ask(self, line, seconds=5):
+        """Sends one command line and gives its reply."""
+        self.write(line if isinstance(line, bytes) else line.encode("utf-8") + b"\n")
+        return self.read_lines(1, seconds)
+
+    def close(self):
+        self.socket.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
 
 Event = collections.namedtuple("Event", "kind data")
 

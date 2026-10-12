@@ -14,6 +14,7 @@
     <span class="name">odrig emulator</span>
     <span class="fact"><span class="key">show</span> <code id="show">-</code></span>
     <span class="fact"><span class="key">serial</span> <code id="serial">-</code></span>
+    <span class="fact" hidden><span class="key">tcp</span> <code id="tcp">-</code></span>
     <span class="link" id="link" data-state="waiting">connecting</span>
   </div>
   <div class="state">
@@ -40,7 +41,7 @@
     <thead><tr><th class="time">time</th><th class="via">via</th><th class="line">command</th><th class="reply">reply</th></tr></thead>
     <tbody id="entries"></tbody>
   </table>
-  <p class="empty" id="empty">No command has arrived yet. Send one through the serial port or as POST /odrig.</p>
+  <p class="empty" id="empty">No command has arrived yet. Send one through the serial port, the TCP port or as POST /odrig.</p>
 </section>
 <script src="board.js"></script>
 <script src="layout.js"></script>

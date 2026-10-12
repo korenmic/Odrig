@@ -44,7 +44,7 @@ Rules for every task:
     exports the seven functions and imports only libraries of Windows.
   - Requirements 1 and 6.1, and 2.2.
 
-- [ ] 2. The line port, and the emulator starting on Windows
+- [x] 2. The line port, and the emulator starting on Windows
   - Create `emulator/lineport.py`. `emulator/app.py` gets `--tcp-port`, opens the ports of
     the system as the design's table says, prints `tcp:`, and waits for a signal in short
     waits, with `SIGBREAK` where it exists.
