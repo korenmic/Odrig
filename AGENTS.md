@@ -117,8 +117,8 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 present, and do not build on them.
 
 - **An app for the operators, for Android**, in two parts. Seed 09 is command and
-  control: what plays, the list of animations, play, on and off. Its spec was written
-  for the whole app and is being written again. The first notes are in
+  control: what plays, the list of animations, play, on and off, and the brightness. Its
+  spec is written and none of its tasks is done. The first notes are in
   [docs/android-app.md](docs/android-app.md).
 - **Converting and uploading in the operators' app**, seed 17: its second part, after
   seed 09. The converter's library is made to run inside the app. It has been run with
