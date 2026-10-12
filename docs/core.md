@@ -72,8 +72,9 @@ Every function receives `ctx` as its first argument.
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
-`show.json` twice each at startup. It never writes, creates or deletes a file, and it reads
-no clock.
+`show.json` twice each at startup, and reads no clock. With the storage functions it
+writes, renames and removes files of the folder, as [the files the core
+writes](#the-files-the-core-writes) says, and nothing outside it.
 
 The last seven members are the storage functions: three that write a file, `rename`,
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
@@ -89,8 +90,9 @@ The last seven members are the storage functions: three that write a file, `rena
   then answered with `storage-error`. With `write_open` set, all seven are set.
 - The core calls them only inside `odrig_core_begin`, `odrig_core_command`,
   `odrig_core_feed` and `odrig_core_poll`, never from inside another host function.
-- Of the seven the core calls `space`, for the command of that name. No command writes a
-  file, so the other six are not called.
+- With `write_open` `NULL`, `remove` is answered with `storage-error`, the start removes
+  nothing, and the block that only a change of the show needs is not asked for.
+- `read_at` is not called yet: no command reads a second file.
 
 ### What the core offers
 
@@ -202,15 +204,32 @@ show is invalid with `out-of-memory`, `odrig_core_feed` takes no bytes and calls
 and `odrig_core_command` works as ever.
 
 A line that is no valid command changes nothing and is answered with the first code that
-applies of `line-too-long`, `unknown-command`, `bad-argument`, `show-invalid` and
-`unknown-id`.
+applies of `line-too-long`, `unknown-command`, `bad-argument`, `show-invalid`,
+`unknown-id`, `in-use` and `storage-error`.
 
 ## Startup
 
 `odrig_core_begin` reads `mapping.json`, then `show.json`, and then decodes every different
 `.odrg` file the show names, in the order in which the show first names them, from its
 first frame record to its last. For each file it checks the header, then the size against
-the mapping, then the body.
+the mapping, then the body. It notes the size of each file, which `list` reports, and the
+sum of its frames' durations.
+
+A show may have no items. It is valid, and nothing plays.
+
+With a host whose storage can be changed, the start also removes what an interrupted
+change left:
+
+1. Before anything is read, it removes `upload.part` and `show.part`.
+2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
+   it reads at most 512 bytes and takes every line that ends in a line feed and is a file
+   name under the naming rule of [show.md](show.md). Each such file that no item names is
+   removed, and then `pending.txt`. When a file could not be removed, `pending.txt` stays
+   for the next start; when it could not be read, nothing is removed.
+3. When the mapping or the show file could not be used, `pending.txt` is left alone.
+
+A folder with none of the three files is asked to remove two names that are not there and
+to open one that is not there, and for nothing else.
 
 A show that is wrong in any way is refused as a whole: the LEDs stay dark, `play` is
 answered with `show-invalid`, and `odrig_core_error` and `status` give the reason. The
@@ -225,21 +244,63 @@ sound, and 0 otherwise.
 A file can also fail while it plays: it is gone, cannot be read, or no longer follows the
 format. From that refresh on the show is invalid in the same way, until the next startup.
 
-The core keeps nothing from one startup to the next. Given the same files and the same
-calls with the same timestamps, it gives the same replies and the same LED data, byte for
-byte.
+The core keeps nothing from one startup to the next but the files of the folder. Given
+the same files, the same answers of the host and the same calls with the same timestamps,
+it gives the same replies, the same LED data and the same storage calls in the same
+order, byte for byte.
+
+## The files the core writes
+
+`remove` changes the show while the core runs: in storage first, then in its tables. The
+core keeps three names in the folder for itself:
+
+| Name | What it is |
+|---|---|
+| `upload.part` | The bytes of an upload. No command writes it yet; the start removes it. |
+| `show.part` | The next `show.json`, until it is renamed. |
+| `pending.txt` | The names of `.odrg` files that a change is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+
+A removal is these calls to the host, in this order. F is the removed item's file; lines
+1, 4 and 5 are left out when the item is a cycle or another item names F. "write X" is
+`write_open`, one or more `write` of at most 1,500 bytes, and `write_close`.
+
+```
+1  write pending.txt: "F"
+2  write show.part: the show without the item
+3  rename show.part -> show.json                 <-
+4  remove F
+5  remove pending.txt
+```
+
+The show changes at the arrow: a power cut before it leaves the old show, one after it
+the new show, and the next start removes whatever else is in the folder. `show.json` is
+never written in place. The text of `show.json` is the one of [show.md](show.md),
+"show.json after a change", with the brightness the file had at startup.
+
+- **When a call fails before the arrow**, the reply is `storage-error`, the core removes
+  `show.part` and `pending.txt` again, and the tables are as they were.
+- **When a call fails after the arrow**, the change stands and the reply is
+  `{"ok":true}`: a file that could not be removed is named by `pending.txt` and is
+  removed at the next start.
+- **The tables** change after the arrow: the items after the removed one move up, the
+  entries of a removed cycle leave the entry table, and a file that no item names any
+  more leaves the file table. Every position the core holds follows, so what plays goes
+  on undisturbed. When the removed item is the one that plays, playback stops, the file
+  that is open is closed, and the next refresh is dark.
+- The item table and the file table have room for 32 items more than `show.json` lists at
+  startup, and for at least 128.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to twelve blocks,
-in the order of the table: two of a fixed size for the byte entry, and the others sized
-from the mapping and the show. The figures are for the target file,
+The core asks the host for memory only inside `odrig_core_begin`, in up to thirteen
+blocks, in the order of the table: two of a fixed size for the byte entry, one for a host
+whose storage can be changed, and the others sized from the mapping and the show. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
 with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,120 |
+| The core object | fixed | 3,136 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -248,13 +309,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Strip check | 1 bit for each strip: each row of a row-leg file, each column of a column-leg file | 8 |
 | Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
-| Items | 16 for each item | 1,600 |
-| Cycle entries | 2 for each entry of a cycle | 400 |
-| Files | 48 for each animation item | 3,840 |
-| **Total** | | **73,849** |
+| Chunk buffer, with storage that can be changed | 1,500 | 1,500 |
+| Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
+| Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
+| Files | 48 for each of 132 | 6,336 |
+| **Total** | | **78,373** |
 
-That is 56 percent of the 131,072 bytes the core may use for this canvas. The example show
-on the two-leg mapping asks for 42,014 bytes. The size and the number of frames of an
+That is 60 percent of the 131,072 bytes the core may use for this canvas. The example show
+on the two-leg mapping asks for 51,578 bytes. A host without storage that can be changed
+is not asked for the chunk buffer. The size and the number of frames of an
 `.odrg` file change nothing: the core never holds a file or a frame record, only the
 512 bytes it last read.
 

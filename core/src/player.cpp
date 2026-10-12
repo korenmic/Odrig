@@ -146,6 +146,24 @@ void player_play(Core &core, uint32_t item) {
     core.shown = played.is_cycle ? core.entries[played.first] : item;
 }
 
+void player_item_leaves(Core &core, uint32_t item) {
+    if (core.playing == item) {
+        close_stream(core);
+        core.playing = kNothing;
+        core.shown = kNothing;
+        return;
+    }
+    if (core.playing != kNothing && core.playing > item) {
+        --core.playing;
+    }
+    if (core.shown != kNothing && core.shown > item) {
+        --core.shown;
+    }
+    if (core.stream_open && core.stream_item > item) {
+        --core.stream_item;
+    }
+}
+
 int player_poll(Core &core, uint64_t now_ms) {
     const uint64_t now = clock_touch(core, now_ms);
     if (core.leg_count == 0 || now < core.next_due) {

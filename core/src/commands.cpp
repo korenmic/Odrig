@@ -159,6 +159,26 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return content_space(core, reply);
     }
+    if (words.is(0, "list")) {
+        uint32_t from = 0;
+        if (words.count > 2 || (words.count == 2 && !number_word(words, 1, 0, 65535, &from))) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return content_list(core, from, reply);
+    }
+    if (words.is(0, "remove")) {
+        uint32_t id;
+        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return content_remove(core, id, reply);
+    }
     return refuse(reply, "unknown-command");
 }
 

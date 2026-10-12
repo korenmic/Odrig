@@ -5256,3 +5256,59 @@ in the worktree, untracked, and was removed afterwards.
 **Resolution.** `tests/board/support.py`, `Port`; `tests/board/test_upload.py`,
 `test_a_line_of_2048_characters_in_one_piece_is_read_and_one_of_2049_is_too_long`;
 `docs/firmware.md`, B4.
+
+## Seed 07: What the documents say of the show before the upload exists
+
+**Question.** Task 4 puts "the texts of the design" into `docs/show.md` and `busy` and
+`in-use` into `docs/commands.md`. Those texts speak of the upload: a new item, a file
+replaced, `busy` while an upload is open. The upload is task 5, and a document lists only
+what exists. The design's example of a written `show.json` also has a cycle that lists
+id 2 while no item has that id, which is not a valid show.
+
+**Answer.** With task 4 `docs/show.md` has the design's texts as far as they hold with
+`remove` alone: "Changing a show while it runs" speaks of `remove`, and the sentences on
+uploads, on a new item and on the room for one are added with task 5. `docs/commands.md`
+gets `list`, `remove` and `in-use`; `busy` comes with task 5, when something can be busy.
+The example of a written `show.json` is a valid show: items 1 and 2 and a cycle 4 that
+lists them, with `start`. Task 8 compares both pages with the design word for word.
+
+**Resolution.** `docs/show.md`, "Changing a show while it runs" and "show.json after a
+change"; `docs/commands.md`, "Storage and the installed items" and "Removing an item";
+`tests/core/test_docs.py`.
+
+## Seed 07: What a removal leaves when storage fails half-way
+
+**Question.** The design gives the sequence of a removal: `pending.txt` with the file's
+name, `show.part`, the rename onto `show.json`, the file removed, `pending.txt` removed.
+It says what a power cut leaves. It does not say what the core does when a call fails
+after the rename, or what the start does with a `pending.txt` whose file cannot be
+removed or that cannot be read.
+
+**Answer.** Up to the rename a failure undoes the command: `show.part` and `pending.txt`
+are removed, the show in memory is unchanged, and the reply is `storage-error`. From the
+rename on the command has succeeded, whatever follows: the show in storage is the new
+one, so the reply is `{"ok":true}`. If the file then cannot be removed, `pending.txt`
+stays, and the next start removes the file. At the start, `pending.txt` is removed only
+when every file it names is gone or is named by an item; if a removal fails or the file
+cannot be read, it stays for the start after. A line of `pending.txt` that is not a file
+name is skipped, and so is a last line without a line feed, which is what a power cut
+during the write leaves.
+
+**Resolution.** `core/src/storage.cpp`, `storage_remove_item` and
+`storage_settle_pending`; `docs/core.md`, "The files the core writes";
+`tests/core/test_powercut.py`, `Removal`; `tests/core/test_startup.py`, `Leftovers`.
+
+## Seed 07: The empty show in the converter, and the test of the tool's commands
+
+**Question.** Task 4 changes `odrig/show.py` for a show without items, "and
+`converter/lib/show.js` if it is there". It also adds commands to `docs/commands.md`
+that the command tool gets only in task 6, while a test of the tool holds the tool's
+commands and the document's to be the same.
+
+**Answer.** This branch has no `converter/` folder, so only the Python reader changes;
+the JavaScript converter of the main line needs the same change when the two are merged:
+a show with `"items":[]` is valid. The tool's test says, until task 6, which commands
+the document has that the tool does not send yet.
+
+**Resolution.** `odrig/show.py`; `tests/converter/test_show_pack.py`;
+`tests/emulator/test_tool.py`, `test_the_commands_are_those_of_the_commands_document`.

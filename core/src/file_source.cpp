@@ -5,6 +5,7 @@ namespace odrig {
 Reason FileSource::open(const odrig_host &from, const char *name) {
     close();
     host = &from;
+    taken = 0;
     int opened = host->open(host->ctx, name);
     if (opened == 1) {
         is_open = 1;
@@ -39,6 +40,7 @@ int FileSource::refill() {
         stopped = -kReadError;
         return stopped;
     }
+    taken += static_cast<uint32_t>(count);
     length = static_cast<uint16_t>(count);
     position = 1;
     return buffer[0];

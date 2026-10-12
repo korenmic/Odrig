@@ -32,6 +32,7 @@ struct FileSource {
     int refill();
 
     const odrig_host *host;
+    uint32_t taken;         // the bytes the host has handed out since the file was opened
     uint16_t position;
     uint16_t length;
     uint8_t is_open;

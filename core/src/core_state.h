@@ -34,10 +34,11 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` file the show names, with what the check at startup found in it.
+// One `.odrg` file the show names, with what its check found in it: its size in bytes
+// and the sum of the durations of its frames.
 struct FileInfo {
     char name[33];
-    uint32_t frames;
+    uint32_t bytes;
     uint64_t total_ms;
 };
 
@@ -65,16 +66,26 @@ struct Core {
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order
     uint8_t *led_data;      // for each LED, red, green and blue of the last refresh
 
-    // From the show file. `brightness` is the show's once its ids are checked.
+    // From the show file. The item table and the file table have room for
+    // `item_capacity` entries, more than the show has at startup, so that an item can be
+    // added while the core runs. `brightness` is the show's once its ids are checked, and
+    // what `brightness` commands made of it since; `show_brightness` stays the value of
+    // the file.
     ItemInfo *items;
     uint32_t item_count;
+    uint32_t item_capacity;
     uint16_t *entries;
     uint32_t entry_count;
     FileInfo *files;
     uint32_t file_count;
     uint8_t brightness;
+    uint8_t show_brightness;
     uint8_t has_start;
     uint32_t start_item;
+
+    // A block of kChunkSize bytes for a host whose storage can be changed: the text of a
+    // file the core writes, on its way to the host, and `pending.txt` as it is read.
+    uint8_t *chunk;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

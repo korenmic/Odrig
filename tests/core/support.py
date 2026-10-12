@@ -279,6 +279,19 @@ def start(files, script=(), options=(), status=0):
         return session(folder, script, options, status)
 
 
+def folder_files(folder):
+    """The files of a folder: the content of each by its name."""
+    return {path.name: path.read_bytes() for path in sorted(pathlib.Path(folder).iterdir()) if path.is_file()}
+
+
+def start_and_keep(files, script=(), options=(), status=0):
+    """Installs the files in a temporary folder and runs a session on it. Returns the run
+    and the files the folder holds afterwards."""
+    with installed(files) as folder:
+        run = session(folder, script, options, status)
+        return run, folder_files(folder)
+
+
 def start_each(file_sets, script=(), options=()):
     """A session for each set of files, all in one run of the test host, which holds the
     files in memory. The results are in the given order."""
@@ -438,12 +451,18 @@ class ReferencePlayer:
     """
 
     GRID = 20
+    PARTS = ("upload.part", "show.part")
+    PENDING = "pending.txt"
 
-    def __init__(self, files, storage=BOARD_STORAGE):
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True):
         """`files` maps the name of each installed file to its content. `storage` is the
-        total space the host reports, or None for a host that cannot tell its space."""
+        total space the host reports, or None for a host that cannot tell its space.
+        `changeable` says whether the host's storage can be changed."""
         self.storage = storage
+        self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
+        self.start = None       # the id of the `start` item of the show
+        self.show_brightness = 0    # the brightness of the show file
         self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
         self.items = {}         # the items of the show by id
         self.clips = {}         # the frames of each file by name
@@ -459,6 +478,9 @@ class ReferencePlayer:
         self.unfinished = b""   # the bytes of a transport since the last newline
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
+        if changeable:
+            for name in self.PARTS:
+                content.pop(name, None)
         try:
             start = self._check(content)
         except _Invalid as invalid:
@@ -483,8 +505,16 @@ class ReferencePlayer:
             listed = show.loads(files["show.json"])
         except errors.Rejection as rejection:
             raise _Invalid(show_refusal(rejection)) from None
-        self.brightness = listed.brightness
+        self.brightness = self.show_brightness = listed.brightness
         self.items = {item.id: item for item in listed.items}
+        self.start = listed.start
+        if self.changeable and self.PENDING in files:
+            # What an interrupted change left: a file named there that no item names.
+            named = show.files(listed)
+            for line in files.pop(self.PENDING)[:512].split(b"\n")[:-1]:
+                name = line.decode("latin-1")
+                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDING) and name not in named:
+                    files.pop(name, None)
 
         for name in show.files(listed):
             if name not in files:
@@ -553,8 +583,9 @@ class ReferencePlayer:
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
     LINE_MAX = 2048
-    COMMANDS = {b"play": 1, b"on": 0, b"off": 0, b"brightness": 1, b"status": 0, b"space": 0}
-    RANGES = {b"play": (1, 65535), b"brightness": (0, 255)}
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,)}
+    RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
+    REPLY_MAX = 1024
 
     def command(self, now, line):
         """One command line, given as bytes: carries it out and returns its reply."""
@@ -570,6 +601,8 @@ class ReferencePlayer:
             return self._status(now)
         if line == b"space":
             return self._space()
+        if line.split(b" ")[0] == b"list":
+            return self._list(int(line[5:]) if b" " in line else 0)
         return b'{"ok":true}\n'
 
     def _obey(self, line):
@@ -580,7 +613,7 @@ class ReferencePlayer:
         name, *arguments = line.split(b" ")
         if name not in self.COMMANDS:
             return "unknown-command"
-        if len(arguments) != self.COMMANDS[name]:
+        if len(arguments) not in self.COMMANDS[name]:
             return "bad-argument"
         value = None
         if arguments:
@@ -601,9 +634,75 @@ class ReferencePlayer:
         elif name == b"space":
             if self.storage is None:
                 return "storage-error"
+        elif name == b"list":
+            if self.error is not None:
+                return "show-invalid"
+        elif name == b"remove":
+            if self.error is not None:
+                return "show-invalid"
+            if value not in self.items:
+                return "unknown-id"
+            if any(value in (other.cycle or ()) for other in self.items.values()):
+                return "in-use"
+            if not self.changeable:
+                return "storage-error"
+            self._remove(value)
         elif name != b"status":
             self.on = name == b"on"
         return None
+
+    def _listed(self, item, with_entries=True):
+        """One item as `list` writes it."""
+        if item.cycle is None:
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file])}, separators=(",", ":"))
+        return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
+
+    def _list(self, first):
+        """The reply to `list`: every item from a position on that fits into the reply."""
+        items = list(self.items.values())
+        head = '{"ok":true,"items":['
+
+        def tail(position):
+            return '],"next":' + (str(position) if position < len(items) else "null") + "}\n"
+
+        text = head
+        position = first
+        while position < len(items):
+            entry = self._listed(items[position])
+            if items[position].cycle is not None and len(head) + len(entry) + len(tail(position + 1)) > self.REPLY_MAX:
+                entry = self._listed(items[position], with_entries=False)
+            comma = "," if position != first else ""
+            if len(text) + len(comma) + len(entry) + len(tail(position + 1)) > self.REPLY_MAX:
+                break
+            text += comma + entry
+            position += 1
+        return (text + tail(position)).encode("ascii")
+
+    def show_text(self):
+        """The show file as the core writes it."""
+        items = []
+        for item in self.items.values():
+            if item.cycle is None:
+                items.append({"id": item.id, "file": item.file})
+            else:
+                items.append({"id": item.id, "cycle": list(item.cycle), "seconds": item.seconds})
+        written = {"version": 1, "brightness": self.show_brightness, "items": items}
+        if self.start is not None:
+            written["start"] = self.start
+        return json.dumps(written, separators=(",", ":")).encode("ascii") + b"\n"
+
+    def _remove(self, number):
+        """Takes an item out of the show, and its file out of the folder when no other
+        item names it."""
+        item = self.items.pop(number)
+        if self.start == number:
+            self.start = None
+        if self.playing == number:
+            self.playing = self.shown = self.zero = None
+        if item.file is not None and all(other.file != item.file for other in self.items.values()):
+            self.files.pop(item.file, None)
+            self.clips.pop(item.file, None)
+        self.files["show.json"] = self.show_text()
 
     def _space(self):
         animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)

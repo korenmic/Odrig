@@ -110,6 +110,9 @@ that is not made of the characters the core uses for a file name, is refused. Fo
 `space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
 bytes, or the number given with `--storage`, and as the free space the total less the
 sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
+`remove` changes the folder as it changes the board's storage: `show.json` is written
+again and a file no item names any more is deleted. To keep a show, run a copy of its
+folder.
 
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still

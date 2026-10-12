@@ -177,7 +177,7 @@ class StateAfterStartup(Playback):
             (without("mapping.json"), (), "mapping-missing", 0),
             (with_show("{}") | {"mapping.json": "{}"}, (), "mapping-malformed", 0),
             (without("show.json"), (), "show-missing", 0),
-            (with_show('{"version": 1, "brightness": 99, "items": []}'), (), "show-malformed", 0),
+            (with_show('{"version": 1, "brightness": 99, "items": {}}'), (), "show-malformed", 0),
             (with_show(support.show_text(items + [items[0]], 99, 3)), (), "duplicate-id 1", 0),
             (with_show(support.show_text(items, 99, 8)), (), "undefined-id 8", 0),
             (with_show(support.show_text(items + [{"id": 4, "cycle": [3], "seconds": 1}], 99, 3)), (), "nested-cycle 4", 0),

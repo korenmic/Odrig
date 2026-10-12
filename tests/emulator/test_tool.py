@@ -253,9 +253,9 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "on", "off", "brightness <n>", "status", "space"])
+        self.assertEqual(documented, ["play <id>", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>"])
         sent_by_the_tool = [command for command in documented if command.split(" ")[0] in cli.COMMANDS]
-        self.assertEqual([command.split(" ")[0] for command in documented if command not in sent_by_the_tool], ["space"])
+        self.assertEqual([command.split(" ")[0] for command in documented if command not in sent_by_the_tool], ["space", "list", "remove"])
         self.assertEqual([name + (" <x>" if takes else "") for name, takes in cli.COMMANDS.items()], [command.replace("<id>", "<x>").replace("<n>", "<x>") for command in sent_by_the_tool])
 
     def test_the_line_is_the_command_and_its_argument_as_typed_and_a_newline(self):

@@ -121,7 +121,7 @@ Rules for every task:
   - The board is left with the firmware and the dim example show.
   - Requirements: 14.4, 17.1, 17.2, 17.3, 17.5, 17.6, 17.7, 17.8, 17.9
 
-- [ ] 4. A show that changes: `list`, `remove`, and what a power cut leaves
+- [x] 4. A show that changes: `list`, `remove`, and what a power cut leaves
   - `core/src/show.cpp`: tables with room; a show without items; `bytes` of every file;
     the brightness of the file kept. `core/src/content.cpp`: `list`, `remove`, the tables
     changed in place, `show.json` written. `core/src/storage.cpp`: the sequence of a

@@ -538,7 +538,8 @@ def judged_by_the_converter(data):
         listed = show.loads(data)
     except errors.Rejection as rejection:
         return support.show_refusal(rejection)
-    return f"file-missing {show.files(listed)[0]}"
+    names = show.files(listed)
+    return f"file-missing {names[0]}" if names else None
 
 
 class ShowTexts(unittest.TestCase):
@@ -553,9 +554,17 @@ class ShowTexts(unittest.TestCase):
         for (name, text), reported in zip(SHOW_TEXTS.items(), self.reported(list(SHOW_TEXTS.values()))):
             with self.subTest(text=name):
                 expected = judged_by_the_converter(as_bytes(text))
-                kinds.add(expected.split()[0])
+                kinds.add((expected or "valid").split()[0])
                 self.assertEqual(reported, expected)
-        self.assertEqual(kinds, {"show-malformed", "duplicate-id", "undefined-id", "nested-cycle", "file-missing"})
+        self.assertEqual(kinds, {"show-malformed", "duplicate-id", "undefined-id", "nested-cycle", "file-missing", "valid"})
+
+    def test_a_show_without_items_is_valid(self):
+        self.assertIsNone(judged_by_the_converter(as_bytes(SHOW_TEXTS["items is empty"])))
+        texts = ['{"version": 1, "brightness": 128, "items": []}', '{"items":[],"brightness":0,"version":1}', '{"version":1,"brightness":255,"items":[ ]}\n']
+        self.assertEqual(self.reported(texts), [None, None, None])
+        with_start = ['{"version": 1, "brightness": 128, "items": [], "start": 1}', '{"version": 1, "brightness": 128, "items": [], "start": 0}']
+        self.assertEqual(self.reported(with_start), ["undefined-id 1", "undefined-id 0"])
+        self.assertEqual([judged_by_the_converter(as_bytes(text)) for text in with_start], ["undefined-id 1", "undefined-id 0"])
 
     def test_the_texts_it_must_accept_are_accepted(self):
         for name in ("the plain text", "no start", "members in another order", "brightness -0", "a file name that is the ending", "a file name with an escaped letter", "seconds 65535"):
@@ -601,7 +610,8 @@ class ShowTexts(unittest.TestCase):
         for position, (copy, reported) in enumerate(zip(copies, self.reported(copies))):
             expected = judged_by_the_converter(copy.encode("utf-8"))
             self.assertEqual(reported, expected, f"copy {position}: {copy!r}")
-            kinds[expected.split()[0]] = kinds.get(expected.split()[0], 0) + 1
+            kind = (expected or "valid").split()[0]
+            kinds[kind] = kinds.get(kind, 0) + 1
         self.assertGreater(kinds["show-malformed"], 50)
         self.assertGreater(kinds["file-missing"], 5)
         self.assertGreater(len(kinds), 3)
