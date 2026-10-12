@@ -43,7 +43,7 @@ Rules for every task:
     test of 65,536 fails. Undo it.
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.6
 
-- [ ] 2. The limit in a storage image
+- [x] 2. The limit in a storage image
   - `firmware/fwtool/wledfiles.py`, with what `wifi.py` has for one of WLED's settings
     files; `wifi.py` uses it. The tests of seed 08 pass unchanged.
   - `limit.apply` and `limit.stored`.
