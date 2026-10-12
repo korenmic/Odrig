@@ -516,5 +516,38 @@ class InvalidVectors(unittest.TestCase):
         self.assertGreater(compared, 0)
 
 
+class TheBuilder(unittest.TestCase):
+    """The block of the fixed codes that the builder writes itself, where the zlib of this
+    Python does not make one when it is told to."""
+
+    BODIES = (b"", b"a", bytes(range(256)) * 9, b"hello hello hello", bytes([143, 144, 255, 0]) * 50)
+
+    def test_the_block_it_writes_is_one_last_block_of_the_fixed_codes(self):
+        for body in self.BODIES:
+            data = build_vectors.fixed_block(body)
+            self.assertEqual(data[0] & 7, 0b011, body[:8])
+            self.assertEqual((data[0] & 1, (data[0] >> 1) & 3), (1, build_vectors.FIXED_BLOCKS))
+
+    def test_zlib_inflates_the_block_to_what_went_in_and_nothing_is_left_over(self):
+        for body in self.BODIES:
+            inflater = zlib.decompressobj(wbits=-15)
+            self.assertEqual(inflater.decompress(build_vectors.fixed_block(body)), body, body[:8])
+            self.assertTrue(inflater.eof)
+            self.assertEqual(inflater.unused_data, b"")
+
+    def test_what_zlib_made_is_kept_when_it_is_such_a_block_and_replaced_when_it_is_not(self):
+        body = bytes(range(256)) * 4
+        own = build_vectors.fixed_block(body)
+        self.assertEqual(build_vectors.fixed_codes(lambda given: own)(body), own)
+        for other in (zlib.compress(body, 0, -15), b"\x05" + own[1:]):
+            self.assertNotEqual(other[0] & 7, 0b011)
+            self.assertEqual(build_vectors.fixed_codes(lambda given: other)(body), own)
+
+    def test_the_vector_named_for_the_fixed_codes_is_such_a_block_with_any_zlib(self):
+        made = {case.name: case for case in build_vectors.valid_cases()}
+        self.assertEqual(build_vectors.first_block(made["deflate-fixed"].odrg), (True, build_vectors.FIXED_BLOCKS))
+        self.assertEqual(odrg.decode(made["deflate-fixed"].odrg), odrg.decode((VALID / "deflate-fixed.odrg").read_bytes()))
+
+
 if __name__ == "__main__":
     unittest.main()

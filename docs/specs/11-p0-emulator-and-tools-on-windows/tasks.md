@@ -85,7 +85,7 @@ Rules for every task:
   - Run `python core/build.py test`; it passes on Windows.
   - Requirement 5.2.
 
-- [ ] 6. The converter suite on Windows
+- [x] 6. The converter suite on Windows
   - Settle each failure of `python -m unittest discover -s tests/converter -t .` on
     Windows as the design says, in the tests, and in the tool only where the tool writes
     other bytes on Windows.

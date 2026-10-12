@@ -5385,3 +5385,31 @@ GCC; with `--cxx cl`, 246 with 10 skipped.
 **Resolution.** `core/build.py`: `checks`, `build_host` and `test`. `tests/core/host/`.
 `tests/core/support.py`, `tests/core/test_build.py`, `tests/core/allowed_symbols.txt`.
 `docs/core.md`, the second paragraph.
+
+## Seed 11: The converter suite on Windows
+
+**Question.** On Windows 33 of the 618 tests of the converter suite failed. Is anything
+wrong in the converter?
+
+**Answer.** No: the converter writes every file as bytes and makes the same files on
+Windows. The three causes were in the tests.
+
+- Five places wrote a page as text, and Python then writes the line ending of the system:
+  `\r\n` on Windows. The tool reads bytes and found no marker that ended in `\n`. The tests
+  now write `\n`.
+- One test compared a path inside the package with `generators/dense.py`; on Windows the
+  path came with a backslash. It is compared in the form the documents write.
+- The builder of the test vectors has zlib make the body of `deflate-fixed.odrg` with the
+  strategy `Z_FIXED`. The Python 3.14 of Windows has zlib-ng, 1.3.1.zlib-ng here, which
+  answers that request with a stored block, so the builder gave up. The builder now keeps
+  what zlib made when that is one last block of the fixed codes, as with the zlib of macOS
+  and of Python 3.12, and otherwise writes such a block itself, every byte as a literal.
+  The tracked vector does not change. The file was never compared byte for byte with what
+  the builder makes, because the output of zlib depends on its version.
+
+The sizes the documents give for compressed files were measured with zlib 1.2.12 and are
+compared within 2 percent; with zlib-ng they still are within that.
+
+**Resolution.** `tests/converter/test_mapping_page.py`, `tests/converter/test_scope.py`,
+`tests/converter/build_vectors.py`: `fixed_block` and `fixed_codes`, and
+`tests/converter/test_vectors.py`, the class `TheBuilder`.
