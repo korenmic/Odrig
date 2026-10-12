@@ -7391,3 +7391,46 @@ walks all of it before it takes anything.
 
 **Resolution.** `firmware/standalone/src/settings.h` and `settings.cpp`;
 `tests/firmware/test_standalone_settings.py`.
+
+## Seed 11: Master moved under the pull request
+
+**Question.** While the pull request of seed 11 waited, `master` got the content commands
+(seed 07), the converter in JavaScript (seed 06) and three more seeds. What had to be done
+to the work on Windows, what does the converter's suite do on Windows, which the seed asks
+to be run there once the converter is in the repository, and what in the pull request was
+not about Windows?
+
+**Answer.**
+
+- The command tool had become a `Session`: several exchanges through one opening of a
+  port. The serial port of Windows and the connection over TCP are put into it. An open
+  port is the descriptor of `_open` where the system has `termios`, and an object elsewhere;
+  four small functions do with either what the tool did with a descriptor. A session takes
+  `tcp=` beside `port=` and `http=`, so `list` and `upload` work over TCP.
+- The new tests of the emulator suite and of the core suite took the same turn as the
+  earlier ones: the transport of the system in place of the serial port, and in the core's
+  test host the calls of Windows for renaming over a file, removing and listing a folder.
+- **The converter's own suite on Windows**, `npm test --prefix converter`, with Node.js
+  24.13 and Python 3.14: 499 tests, 288 pass, 208 fail, 3 are skipped. 73 of the failures
+  show the same error: the suite starts a helper in Python,
+  `converter/tests/reference.py`, which loads the C library of the system with
+  `ctypes.CDLL(None)`, and Windows has no such thing to load. The other failures were not
+  looked into. The commands of the converter that `docs/emulator.md` gives run on Windows:
+  the emulator suite runs them. Mending the converter's suite is not part of this seed and
+  was not begun: `docs/converter.md` still says that nothing has been run on Windows.
+- The system's error 10055, seen once before and left unexplained, came again while two
+  suites ran at the same time, as the reason an emulator could not take a port. It is the
+  system running short of ports or buffers under that load, not a fault of the emulator.
+- The owner ruled that the pull request holds the support of Windows only and that Linux
+  is not worked on. What the branch did for a system that is neither macOS nor Windows,
+  and a mend of two older tests for Python 3.10, were taken out and are kept on the branch
+  `beyond-windows`. The spec of this seed still names `libodrig_core.so` for other
+  systems: the code no longer does.
+
+On the Windows computer, on the merged branch: the reference converter's suite 638 tests,
+the core suite 364, with Microsoft's compiler 364 of which 10 are skipped, the emulator
+suite 523 of which 17 are skipped, the onboarding suite 81.
+
+**Resolution.** `odrigctl/client.py`: `Session`, `_ready`, `_take`, `_give`, `_had` and
+`_shut`; `tests/core/host/host.cpp`; `tests/emulator/support.py`: `BytePort`,
+`session_target`; `agent/getting-started.md` and `AGENTS.md`, the sections about Windows.

@@ -1106,3 +1106,12 @@ What is left on Windows:
   and 3.11 were not installed on that computer.
 - The two lists under [On Windows](#on-windows): what only the first computer can see, and
   what needs a board on a Windows computer.
+
+After `master` brought the content commands and the converter in JavaScript, on the merged
+branch and with Python 3.14: the reference converter's suite, 638 tests; the core suite,
+364, and with Microsoft's compiler 364 of which 10 are skipped; the suite of the emulator
+and the command tool, 523 of which 17 are skipped; the onboarding suite, 81. `space`,
+`list`, `remove` and `upload` are part of those suites and run over the line port. The
+converter's own suite, `npm test --prefix converter`, does not pass on Windows: of 499
+tests 288 pass and 208 fail, 73 of them with one error, where the suite starts a helper in
+Python that is written for macOS; the others were not looked into. That is not mended here.
