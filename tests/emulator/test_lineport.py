@@ -122,6 +122,24 @@ class ThePort(unittest.TestCase):
         self.assertTrue(support.refused(number))
         self.port.close()
 
+    def test_a_connection_that_comes_while_the_port_closes_is_not_taken(self):
+        self.assertIs(self.port.opened(first := socket.socket()), True)
+        self.addCleanup(first.close)
+        self.port.close()
+        late = socket.socket()
+        self.addCleanup(late.close)
+        self.assertIs(self.port.opened(late), False)
+        self.assertEqual(self.feed.received, [])
+
+    def test_bytes_that_arrive_once_the_port_closes_are_not_handed_on(self):
+        program = self.program()
+        self.assertEqual(program.ask("before"), b"<before>\n")
+        with self.port._lock:
+            self.port._closing = True
+        program.write(b"after\n")
+        self.assertEqual(program.read_for(0.3), b"")
+        self.assertEqual(self.feed.all(), b"before\n")
+
     def test_a_port_that_is_taken_is_address_in_use(self):
         with self.assertRaises(failure.Failure) as caught:
             lineport.Port(self.port.port, self.feed)

@@ -66,7 +66,9 @@ def load(library_path):
     """The library with every function of the header declared, or `core-not-built`."""
     path = os.fspath(library_path)
     try:
-        library = ctypes.CDLL(path)
+        # By its whole path: a library named without a folder is the one in the working
+        # folder, which not every system looks into for a bare name.
+        library = ctypes.CDLL(os.path.abspath(path))
         for name, (result, arguments) in FUNCTIONS.items():
             function = getattr(library, name)
             function.restype = result

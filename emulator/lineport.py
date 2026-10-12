@@ -17,13 +17,13 @@ class Connection(socketserver.BaseRequestHandler):
 
     def setup(self):
         self.request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self.server.opened(self.request)
+        self.taken = self.server.opened(self.request)
 
     def handle(self):
-        while True:
+        while self.taken:
             try:
                 data = self.request.recv(READ_SIZE)
-                if not data:
+                if not data or self.server.closing():
                     return
                 reply = self.server.feed(data)
                 if reply:
@@ -48,6 +48,7 @@ class Port(socketserver.ThreadingTCPServer):
     def __init__(self, port, feed):
         self.feed = feed
         self._connections = set()
+        self._closing = False
         self._lock = threading.Lock()
         try:
             super().__init__((httpd.ADDRESS, port), Connection)
@@ -64,8 +65,16 @@ class Port(socketserver.ThreadingTCPServer):
         return f"{httpd.ADDRESS}:{self.port}"
 
     def opened(self, connection):
+        """Takes a connection, unless the port is closing. Says whether it was taken."""
         with self._lock:
+            if self._closing:
+                return False
             self._connections.add(connection)
+            return True
+
+    def closing(self):
+        with self._lock:
+            return self._closing
 
     def closed(self, connection):
         with self._lock:
@@ -75,7 +84,10 @@ class Port(socketserver.ThreadingTCPServer):
         self._thread.start()
 
     def close(self):
-        """Stops taking connections and ends the ones that are open."""
+        """Stops taking connections and ends the ones that are open. From here on no
+        connection is taken and no byte is handed to `feed`."""
+        with self._lock:
+            self._closing = True
         if self._thread.is_alive():
             self.shutdown()
             self._thread.join()
