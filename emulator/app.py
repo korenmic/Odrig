@@ -16,7 +16,7 @@ import threading
 from . import binding, engine, failure, host, httpd, hub, record, serialport
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-LIBRARY = ROOT / "core" / "build" / "libodrig_core.dylib"
+LIBRARY = ROOT / "core" / "build" / binding.LIBRARY_NAME
 SERIAL_LINK = ROOT / "build" / "emulator" / "serial"
 PORT = 8600
 
@@ -47,7 +47,7 @@ def parser():
     made.add_argument("show_dir", metavar="SHOW_DIR", help="the folder that holds the installed show")
     made.add_argument("--port", metavar="N", type=_port, help=f"the port of the page on 127.0.0.1; 0 takes any free port (default: {PORT})")
     made.add_argument("--serial-link", metavar="PATH", help="where the link to the virtual serial port is made (default: build/emulator/serial)")
-    made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help="the core's shared library (default: core/build/libodrig_core.dylib)")
+    made.add_argument("--core", metavar="PATH", default=str(LIBRARY), help=f"the core's shared library (default: core/build/{binding.LIBRARY_NAME})")
     made.add_argument("--verbose", action="store_true", help="print the core's diagnostic lines to standard error")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")

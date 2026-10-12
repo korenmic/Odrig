@@ -6,6 +6,7 @@ This is the only module that knows the core is a C library. Everything else uses
 import collections
 import ctypes
 import os
+import sys
 from ctypes import CFUNCTYPE, POINTER, Structure, c_char, c_char_p, c_int, c_int32, c_size_t, c_uint8, c_uint16, c_uint32, c_uint64, c_void_p
 
 from . import failure
@@ -13,7 +14,17 @@ from . import failure
 LINE_MAX = 64
 REPLY_MAX = 192
 
-BUILD_COMMAND = "make -C core shared"
+
+def library_of(platform):
+    """`(file name, build command)` of the core's shared library on a system."""
+    if platform == "darwin":
+        return "libodrig_core.dylib", "make -C core shared"
+    if platform == "win32":
+        return "odrig_core.dll", "python core/build.py shared"
+    return "libodrig_core.so", "python core/build.py shared"
+
+
+LIBRARY_NAME, BUILD_COMMAND = library_of(sys.platform)
 
 ALLOC = CFUNCTYPE(c_void_p, c_void_p, c_size_t)
 OPEN = CFUNCTYPE(c_int, c_void_p, c_char_p)

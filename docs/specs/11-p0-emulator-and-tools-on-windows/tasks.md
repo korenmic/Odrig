@@ -30,7 +30,7 @@ Rules for every task:
   `scratch/`. Git ignores both, and nothing in them is staged.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The build script and the shared library of each system
+- [x] 1. The build script and the shared library of each system
   - Set the seed's state to `in_progress`.
   - `.gitignore` ignores `/tools/`. `.gitattributes` gets `* -text` as its first line.
   - Create `core/build.py` as the design gives it, with `shared`, `clean` and the static

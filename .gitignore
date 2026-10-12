@@ -5,4 +5,5 @@
 __pycache__/
 /.claude/
 /scratch/
+/tools/
 .DS_Store
