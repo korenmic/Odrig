@@ -5479,3 +5479,17 @@ and 3.11, a Mac and a board on a `COM` port are what is left, and each is listed
 
 **Resolution.** `docs/emulator.md`, "What has been checked on Windows" and "On Windows".
 `tests/emulator/support.py`, `CLOCK_STEP`, and `tests/emulator/test_tool.py`.
+## Seed 03: The check list by eye, closed without a person
+
+**Question.** The last task of seed 03 is a check list to be gone through by a person in
+Safari and in Chrome. It was gone through by program in Chrome and left open for the owner.
+The owner has said they will not check pages by eye; the only checks they do are of real
+LEDs on the board.
+
+**Answer.** The task is closed on the evidence there is: every step of the list passes in
+Chrome driven by program, with screenshots. Safari was never checked, and that is recorded
+here, not hidden. From now on a check that needs a person is asked of the owner only when it
+is about real LEDs on the board.
+
+**Resolution.** Seed 03 `tasks.md`, task 11, ticked; the seed's `state.json` set to
+`completed`.

@@ -205,7 +205,7 @@ Rules for every task:
   - Run `make -C core clean` and then the test command.
   - Requirements: 16.4, 16.5, 17.1, 17.2
 
-- [ ] 11. The check list by eye, in Safari and in Chrome
+- [x] 11. The check list by eye, in Safari and in Chrome
   - This task needs a person, or an agent with a tool that drives a real browser. Without
     one, leave the task open and say so in the hand-over.
   - Go through the check list of `docs/emulator.md` in current Safari and in current
