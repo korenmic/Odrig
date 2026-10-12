@@ -90,7 +90,7 @@ Rules for every task:
   - Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 14.1, 14.2, 14.3, 14.5, 14.6, 14.7, 16.2, 16.3,
     16.4
 
-- [ ] 3. Spike on the board: files written while the show plays
+- [x] 3. Spike on the board: files written while the show plays
   - `firmware/usermod/odrig_files.cpp`: the seven functions on `/odrig`, as the design's
     table gives them, with every storage call timed. `odrig_usermod.cpp`,
     `odrig_serial.cpp` and `odrig_http.cpp`: the pacing; the port's queue of 4,096 bytes;

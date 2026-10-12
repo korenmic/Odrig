@@ -371,8 +371,39 @@ carries.
 gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
 holds a whole file. The core's memory comes from the chip's internal memory, and from the
 external memory only when the internal memory has none. The time the core is given is the
-milliseconds since the chip started, from a 64-bit clock. The firmware never writes,
-creates or deletes a file in `/odrig`.
+milliseconds since the chip started, from a 64-bit clock.
+
+**Storage.** The usermod gives the core the seven storage functions of
+[core.md](core.md), on WLED's file system. Every path is `/odrig/<name>`, and a name is
+checked before it is used: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, and
+not dots alone. The firmware writes, renames and deletes a file only there, and only
+inside one of these functions: nothing of the firmware decides to write.
+
+| Function | On the board |
+|---|---|
+| `write_open` | A file that was being written is closed and removed. The named file is opened for writing, which empties one that has the name. One file is written at a time. |
+| `write` | The bytes go to the open file in one write. |
+| `write_close` | The file is closed, and it is whole when storage then holds as many bytes as were given. |
+| `rename` | The file system's rename. A file that has the new name is replaced by it. |
+| `remove` | The file is deleted; a name that has no file is told apart from a failure. |
+| `space` | The total size, and the free bytes in whole blocks of 4,096. |
+| `read_at` | A second file is read beside the one the player has open, and stays open from one call to the next while the calls go on where the last one ended. |
+
+The free space is not asked from the file system at every command: the file system walks
+its blocks for it, which takes 30 ms with a small show and 377 ms with 9 MB of files. The
+usermod asks once, before the core starts, and keeps the number of used blocks up from
+then on by the sizes of what it writes, replaces and removes: no block for a file of 512
+bytes or less, and for a longer file the blocks the file system needs for it, the
+pointers at the start of every block counted. `space` is answered from that number
+without a call to the file system. The number is taken again at every start.
+
+**Storage calls are paced.** A write to storage takes the file system up to a few hundred
+milliseconds, and the player waits for the same lock. So after storage calls that took a
+time d together, the board takes no command line for the longer of 20 ms and twice d,
+counted from the end of the last call: the port leaves what arrives in its queue, and a
+command over HTTP waits before it is handed to the core. Refreshes go on meanwhile. A
+sender needs no pause of its own: it sends the next line when it has the reply to the
+last one.
 
 **An invalid show** is the core's matter, as in the emulator: the LEDs stay dark, `status`
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
@@ -380,8 +411,11 @@ answered.
 
 **The port.** Every byte the board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
-nothing else. So the command tool of [emulator.md](emulator.md) works on the board as on
-the emulator:
+nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
+characters written in one piece arrives whole, also while the pacing holds lines back.
+Two such lines written together do not fit: a sender waits for the reply to a line before
+it sends the next. So the command tool of [emulator.md](emulator.md) works on the board
+as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
@@ -409,9 +443,11 @@ python -m odrigctl --http 4.3.2.1 status
 | A longer path, such as `/odrig/x` | Status 404. |
 | `POST /odrig` on a board whose core could not start | Status 503. |
 
-Of a body longer than 128 bytes the first 128 are passed on, which the core answers with
-`line-too-long`. What follows a `?` is ignored. WLED adds `Access-Control-Allow-Origin: *`
-to every response.
+Of a body longer than 4,096 bytes the first 4,096 are passed on, which the core answers
+with `line-too-long`. The body and the reply of a request are kept in memory of the
+request's own, which is given back with it, and not on the stack of the network task.
+What follows a `?` is ignored. WLED adds `Access-Control-Allow-Origin: *` to every
+response.
 
 **The content type of a request matters on the board.** WLED's web server takes a body
 apart as form fields, before any handler sees it, when the content type is
@@ -540,6 +576,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 {"probe":1,"start_ms":95,"heap":135736,"realtime":1,"loops":235,"sent":50,"gap_ms":20,
  "poll_us":578,"send_us":16525,"poll_total_us":28021,"send_total_us":816291,
  "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
+ "space_us":29110,
+ "store":{"calls":0,"longest_us":0,"total_us":0,"check_steps":0,"check_longest_us":0,"check_total_us":0},
  "ap":1,"error":null,
  "outputs":[{"leg":1,"pin":1,"count":180,"ok":true,"driver":"rmt","crc":"7b7d9750","pulses":4320}]}
 ```
@@ -556,6 +594,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. |
 | `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. |
 | `wire_us` | The shortest and the longest time, since the last `#probe`, from the end of a send until the parallel driver had finished its transfer and could take data again, in microseconds; `null` when no output is on the parallel driver or none was sent. A timer looks at the driver every tenth of a millisecond. An output of 180 LEDs is 570 bytes on the wire with its reset, 5.7 ms. |
+| `space_us` | The time the file system took to tell its size and its used bytes, when the usermod asked before the core started, in microseconds. |
+| `store` | The storage calls since the last `#probe`, reads aside: their number in `calls`, the longest in `longest_us` and their sum in `total_us`, in microseconds. And the requests for a refresh in which the core read a second file, which is how it checks an uploaded file: their number in `check_steps`, the longest in `check_longest_us` and their sum in `check_total_us`. |
 | `ap` | 1 while WLED's access point is up, else 0. |
 | `error` | The reason the show is invalid, as `status` reports it, or `null`. |
 | `outputs` | For each of WLED's outputs: the leg, the pin, the number of LEDs, whether it works, its driver, `rmt`, `parallel` or `none`, and the two members below. |
@@ -564,16 +604,38 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 
 A `#probe` that arrives between the copy of a refresh into the outputs and its show is
 answered right after the show, so that a report never describes colours that were not
-sent. The report of twenty outputs is a line of 2,300 characters; the port writes it in the
+sent. The report of twenty outputs is a line of 2,400 characters; the port writes it in the
 pieces it takes without waiting and reads no command until it is written.
 
 While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
 dims, the output gives back the dimmed colours as WLED restores them, which at the
 limiter's lowest level is 128 for a channel that stayed lit and 0 for one that did not.
 
+The probe build has a second line, `#store <bytes>`, the store trial: it tries the
+storage functions as the core would use them, without the core. It writes a small file
+`probe.odrg` into `/odrig`, writes `<bytes>` bytes into `probe.part` in pieces of 1,500,
+renames that onto `probe.odrg`, reads the file back through `read_at` in pieces of 512,
+and removes it; a step in each pass of the loop that the pacing allows, with the lock
+held. Then it answers with one line:
+
+```json
+{"store":1,"bytes":1000000,"ok":true,"failed":null,"written":1000000,"read":1000000,
+ "writes":667,"write_us":[131,31421,151866],"write_ms":71502,"bytes_per_second":13985,
+ "seed_us":109863,"open_us":13945,"close_us":13914,"rename_us":43065,
+ "reads":1955,"read_us":[10,226,13126],"remove_us":37723}
+```
+
+`ok` is true when every step succeeded and the bytes read back are the bytes written, so
+when the rename replaced the small file. `failed` names the step that did not: `seed`,
+`open`, `write`, `close`, `rename`, `read`, `read-back` or `delete`. `write_us` and
+`read_us` are the shortest, the mean and the longest time of one call, `write_ms` the
+time from the first write to the last with the pacing's waits in it, and
+`bytes_per_second` the bytes written over that time. The show plays on during the trial.
+
 The port holds bytes at the start of a line back for as long as they are a beginning of
-`#probe` and a newline. The complete line is answered by the usermod and does not reach the
-core; every other byte is passed on to the core, unchanged and in order.
+`#probe` and a newline, or of `#store`, a number and a newline. The complete line is
+answered by the usermod and does not reach the core; every other byte is passed on to the
+core, unchanged and in order.
 
 The probe build plays as the firmware does. Reading the outputs back takes time, so its
 own rate can be a refresh or two below the firmware's.
@@ -807,7 +869,9 @@ letters are those of the design's table "Assumed, to be verified by an early tas
 The first part, down to "Twenty outputs", is the record of seed 04. It was tried with the
 firmware of that seed, before the target became twenty upright legs: on the bench file,
 and on mappings of ten row legs on pins 1 to 10, with a dense 60 x 30 clip. From "Twenty
-outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60.
+outputs" on, the page has what seed 05 found for the target: twenty legs, 60 x 60. The
+last part, "Files written while the show plays", is what seed 07 tried for the commands
+that change the content.
 
 | # | Assumption | What was found |
 |---|---|---|
@@ -1085,3 +1149,30 @@ folder of the application that ran the commands. No `~/.platformio` and no `~/.b
 appeared, and `~/.npm` and `~/Library/Caches/pip` kept their times. The same lists from
 before and after the first build differed in that entry and in
 `~/Library/Preferences/com.apple.xpc.activity2.plist`, a file of macOS.
+
+**Files written while the show plays.** What the design of the content commands assumed,
+tried on 2026-10-12 with the probe build by `tests/board/test_upload.py`, with the store
+trial of [The probe build](#the-probe-build). The show was the dim example show on the
+bench file, two outputs of 180 LEDs. The letters are those of that design's table
+"Assumed, to be verified on the board". The test writes the trial's figures to
+`build/firmware/out/store.json`.
+
+| # | Assumption | What was found |
+|---|---|---|
+| B1 | A rename onto a name that has a file replaces it, when neither file is open. | It does: after the rename of a file of a megabyte onto a file of 16 bytes, the name gave the megabyte back, byte for byte. The rename took 43 ms. |
+| B2 | A file can be written, renamed and read with a second handle while the player has another file open and reads it. | It can. The show played through the whole trial, `overwritten` stayed 0, and `read-show` afterwards gave the installed files back unchanged. A read of 512 bytes through the second handle took 0.23 ms in the mean and 13 ms at the longest. |
+| B3 | A write of 1,500 bytes takes a few milliseconds, and one in three some tens. With the pacing, `status` reports 25 or more with the bench show playing. | The writes are slower than assumed: 0.13 ms at the shortest, 31 ms in the mean and 152 ms at the longest; about one in three takes 87 ms, when the file system erases a block. With the pacing the board sent 34 to 46 refreshes in every second of the megabyte's 72 seconds, and 50 in each of the ten seconds after it; the longest time between two sends in a second was 90 to 161 ms. With the pacing taken out, the same trial ran at 44,148 bytes a second and the board sent 10 or 11 refreshes a second. The owner accepts 20 to 50, so the pacing stays as designed, and the writes need no task of their own. |
+| B4 | A line of 2,048 characters written to the port in one piece arrives whole with a queue of 4,096 bytes. | It does, twenty times out of twenty, and a line of 2,049 characters was answered with `line-too-long` twenty times. Two lines of 2,048 characters in one write, 4,098 bytes, do not fit the queue: the end of the second is lost. The command tool sends a line after the reply to the one before, so it never does that. |
+| B5 | `usedBytes` takes under 100 ms with storage nearly full. | It does not: 30 ms with the example show, 79 ms with one dense clip of 1.4 MB, and 377 ms with 9 MB of clips. So the usermod asks once, before the core starts, and keeps the number up itself, as [What the firmware does](#what-the-firmware-does) describes under "Storage"; `space` then makes no call to the file system. After a megabyte was written, renamed and removed, the number kept and the number the file system told after a restart were within 16,384 bytes of each other, which is what the test allows. |
+| B6 | An upload over USB carries 10,000 bytes a second or more. | The storage side alone carries 13,985 bytes a second with the pacing: a megabyte in 72 seconds. The port is tried with the upload itself. |
+
+The other calls of the trial: opening a file for writing 14 ms, closing it 14 ms, removing
+the megabyte 38 ms, and writing the small file of 16 bytes, its open and its close with
+it, 36 ms in one run and 110 ms in another. With the example show 10,211,328 of the
+10,354,688 bytes of storage are free.
+
+Not tried: writes while a dense 60 x 60 clip plays. A storage call stops the player for as
+long as it takes, because both wait for the same lock, and the player then decodes every
+frame that came due meanwhile in one request. While `space` still asked the file system
+at every call, one call of 376 ms with the 9 MB show made `fps` in `status` fall to 3 for
+that second.

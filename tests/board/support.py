@@ -5,6 +5,7 @@ import collections
 import contextlib
 import io
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -445,3 +446,54 @@ def leg_bytes(recording, ms):
         found.append(tick.data[start:start + 3 * count])
         start += 3 * count
     return found
+
+
+class Port:
+    """The board's port, opened once and kept open, so that no line is lost between two
+    exchanges. Opening it does not reset the board."""
+
+    def __init__(self, port=PORT):
+        self.descriptor = client._open(port)
+        self.waiting = b""
+        time.sleep(client.SETTLE_SECONDS)
+        # A newline ends a line that an earlier program left unfinished; its reply is
+        # discarded with whatever else waits.
+        client._write(self.descriptor, b"\n", 1.0)
+        for _ in client._received(self.descriptor, 2 * client.DISCARD_SECONDS):
+            pass
+
+    def send(self, data, seconds=5.0):
+        """Writes bytes to the port in one piece."""
+        client._write(self.descriptor, data, seconds)
+
+    def lines(self, seconds):
+        """The lines that arrive within a length of time, each as it is complete."""
+        for piece in client._received(self.descriptor, seconds):
+            self.waiting += piece
+            while b"\n" in self.waiting:
+                line, self.waiting = self.waiting.split(b"\n", 1)
+                yield line.rstrip(b"\r")
+
+    def line(self, accept, seconds):
+        """The first line within a length of time that `accept` takes, or None."""
+        for line in self.lines(seconds):
+            if accept(line):
+                return line
+        return None
+
+    def ask(self, data, accept=client.is_reply, seconds=5.0):
+        """Sends bytes and gives the first line that `accept` takes, read as JSON."""
+        self.send(data)
+        line = self.line(accept, seconds)
+        if line is None:
+            raise AssertionError(f"no answer to {data[:40]!r} within {seconds:g} seconds")
+        return json.loads(line)
+
+    def close(self):
+        os.close(self.descriptor)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()

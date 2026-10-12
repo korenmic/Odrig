@@ -5152,3 +5152,107 @@ every file the host holds, at the end of the program.
 
 **Resolution.** `emulator/host.py`; `emulator/binding.py`, `Core.__init__`;
 `docs/emulator.md`, "Starting".
+
+## Seed 07: The board cannot tell its space quickly, so the usermod keeps the number
+
+**Question.** The design assumed, as B5, that the file system tells its used bytes in
+under 100 ms with storage nearly full, and named what to do otherwise. The spike measured
+30 ms with the example show, 79 ms with one dense clip of 1.4 MB and 377 ms with 9 MB.
+The player waits for the same lock for that long.
+
+**Answer.** The design's other way is taken. The usermod asks the file system once,
+before the core starts, and keeps the number of used blocks up by what its storage
+functions write, replace and remove: no block for a file of 512 bytes or less, which the
+file system keeps beside the name, and for a longer file the blocks of 4,096 bytes that
+the file system needs for it, the pointers at the start of each block counted. `space`
+is answered from that number with no call to the file system, in every state of the
+board. The number is an account, not a measurement: it leaves out the blocks the file
+system takes for its own lists as a folder grows. The board test allows 16,384 bytes
+between the number kept and the number after a restart, and the spec has the core keep a
+reserve of that size when it judges whether an upload fits. Every start takes the number
+afresh.
+
+A client sees nothing else than the design describes: `free` in whole blocks. On the
+board `free` after an upload or a removal can differ by a few blocks from what the same
+command reports after the next start.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `askSpace`, `blocksOf` and
+`tellSpace`; `docs/firmware.md`, "What the firmware does", "Storage", and B5 in "Verified
+on the board"; `tests/firmware/test_usermod_files.py`; `tests/board/test_upload.py`,
+`test_the_space_is_told_without_a_storage_call_and_follows_what_is_written_and_removed`;
+`tests/board/test_measure.py`, `space_us`.
+
+## Seed 07: How the pacing counts, and the rates it was measured with
+
+**Question.** The design holds command lines after a storage call for the longer of 20 ms
+and twice the call's time. A command makes several storage calls in a row, and the spike
+found a write of 1,500 bytes slower than the design assumed: 31 ms in the mean and 152 ms
+at the longest, where the design expected a few milliseconds and some tens for one in
+three. The design asked for 25 refreshes a second or more during the writes, and for the
+writes to move to a task of their own if that failed.
+
+**Answer.** The times of the storage calls are added up until a hold has run out, and the
+hold is the longer of 20 ms and twice that sum, counted from the end of the last call. So
+a command that makes five calls is followed by one hold for all five. A read through
+`read_at` is not counted: the check of an upload reads inside the player's own request
+for a refresh. A command over HTTP waits in the network task before it takes the lock.
+
+With that pacing the board sent 34 to 46 refreshes in every second while a megabyte was
+written, and 50 in each of the ten seconds after. With the pacing taken out it sent 10 or
+11. The owner accepts every rate from 20 to 50 on the board, so the writes stay where
+they are, and the board tests assert 20 or more during an upload and after it, where the
+spec has 25 and 49. The figures measured are in `docs/firmware.md`.
+
+Not tried: writes while a dense 60 x 60 clip plays. A storage call stops the player for
+as long as it takes, and the player then decodes every frame that came due meanwhile in
+one request, so a rate below 20 in the second of a long call is possible there.
+
+**Resolution.** `firmware/usermod/odrig_files.cpp`, `Timed` and `holding`;
+`odrig_serial.cpp`, `poll`; `odrig_usermod.cpp`, `commandLine`; `docs/firmware.md`,
+"Storage calls are paced" and B3; `tests/board/test_upload.py`, `LOWEST`;
+`tests/firmware/test_usermod_files.py`, `Pacing`.
+
+## Seed 07: What the probe build gained for the spike
+
+**Question.** The design gives the probe build a `store` object in its report and says
+that the spike writes a megabyte through the usermod's storage functions "from a probe
+command". It does not say what that command is, or what `check_steps` counts before the
+core has a check.
+
+**Answer.** The probe build answers a second line, `#store <bytes>`, as it answers
+`#probe`: on the port only, at the start of a line, and without the core seeing it. It
+writes, renames, reads back and removes a file of its own in `/odrig`, `probe.part` and
+`probe.odrg`, a step in each pass of the loop that the pacing allows, and answers with
+one line of times. The firmware itself has no such line. A file named `probe.odrg` or
+`probe.part` in a show would be overwritten by the trial; no show of the repository has
+one. The report gains `space_us`, the time the file system took to tell its space at the
+start, beside `store`. `check_steps` counts the requests for a refresh during which a
+second file was read by anyone, so the trial's own read-back shows up in it; with the
+core's check it is the number of steps of the check.
+
+**Resolution.** `firmware/usermod/odrig_probe.cpp`, `storeStep`, `fitOf` and `report`;
+`docs/firmware.md`, "The probe build"; `tests/board/test_upload.py`, `Spike`.
+
+## Seed 07: The board tests keep the port open and send one line at a time
+
+**Question.** The board tests sent each command through the command tool, which opens
+the port, waits and closes it for every line. The spike has to ask for a report once a
+second while a trial runs. The first run of the whole suite also failed in two tests
+after a test had written two lines of 2,048 characters in one piece: 4,098 bytes do not
+fit the port's queue of 4,096, and the rest of the second line stayed in the core's line
+until the next test's first command, which was then answered with `line-too-long`.
+
+**Answer.** `tests/board/support.py` gains `Port`, the port kept open for several
+exchanges, opened as the command tool opens it. It sends one newline when it opens and
+discards what arrives, so that a line a test before it left unfinished ends there. The
+tests send one line and wait for its reply before the next, as the command tool does;
+the design's B4 is one line in one piece, and that is what is tried.
+
+The board suite also needs the stock files of `firmware/wled-16.0.1/`, which exist in
+the main checkout only. In another checkout the suite's test of `restore-stock` has no
+files to compare with; for this seed's runs a link to the main checkout's folder stood
+in the worktree, untracked, and was removed afterwards.
+
+**Resolution.** `tests/board/support.py`, `Port`; `tests/board/test_upload.py`,
+`test_a_line_of_2048_characters_in_one_piece_is_read_and_one_of_2049_is_too_long`;
+`docs/firmware.md`, B4.
