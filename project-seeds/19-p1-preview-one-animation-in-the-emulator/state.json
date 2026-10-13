@@ -1,0 +1,10 @@
+{
+  "number": 19,
+  "slug": "19-p1-preview-one-animation-in-the-emulator",
+  "state": "remaining",
+  "title": "Preview one animation in the emulator",
+  "priority": "P1",
+  "addedAt": "2026-10-13T03:05:10+03:00",
+  "addedCommit": "pending-local",
+  "summary": "One command takes the path of one finished .odrg file, starts the emulator with that animation alone, opens the emulator's page and plays the animation until it is stopped; it holds no converter logic and writes no show itself."
+}
