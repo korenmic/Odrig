@@ -511,15 +511,16 @@ def listening(emulator):
     """Every address the process of an emulator listens on, as `address:port`, in order.
 
     Where there is no `lsof` the system's own list is read, in which the process is the one
-    that listens on the page address: on Windows the interpreter of a virtual environment
-    is the child of the program that was started."""
+    that listens on the port of the page, on this computer alone or on every address: on
+    Windows the interpreter of a virtual environment is the child of the program that was
+    started."""
     if shutil.which("lsof"):
         listed = subprocess.run(["lsof", "-nP", "-a", "-p", str(emulator.process.pid), "-iTCP", "-sTCP:LISTEN"], capture_output=True, text=True).stdout
         return sorted(re.findall(r"TCP (\S+) \(LISTEN\)", listed))
     script = "Get-NetTCPConnection -State Listen | ForEach-Object { '{0} {1} {2}' -f $_.LocalAddress, $_.LocalPort, $_.OwningProcess }"
     listed = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, check=True).stdout
     rows = [line.split() for line in listed.splitlines() if len(line.split()) == 3]
-    owners = {owner for address, port, owner in rows if (address, port) == ("127.0.0.1", str(emulator.port))}
+    owners = {owner for address, port, owner in rows if address in ("127.0.0.1", "0.0.0.0") and port == str(emulator.port)}
     return sorted(f"[{address}]:{port}" if ":" in address else f"{address}:{port}" for address, port, owner in rows if owner in owners)
 
 
