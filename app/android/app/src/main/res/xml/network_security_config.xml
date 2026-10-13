@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The target is an address the operator sets, the board's or a computer's on any
+     network, and it speaks plain HTTP. A rule for one address cannot cover that. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

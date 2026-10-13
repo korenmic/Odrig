@@ -118,7 +118,7 @@ Rules for every task:
     that unpacks without comparing, fails: the archive is unpacked.
   - Requirements: 1.1, 1.5, 13.1, 13.2, 13.3, 13.4, 13.5, 13.7
 
-- [ ] 7. The sender, the app's own Android files and the APK
+- [x] 7. The sender, the app's own Android files and the APK
   - `TargetPlugin.java`, `MainActivity.java`, `AndroidManifest.xml` and
     `network_security_config.xml`, as the design has them.
   - `python3 app/app.py build`; `tests/apk/test_apk.py` passes on the APK it made.

@@ -7669,3 +7669,31 @@ after the files, their sources and their sizes were named.
 `env.py` and `build.py`; `app/android/gradle/wrapper/gradle-wrapper.properties`;
 `docs/specs/09-p1-operators-app-for-android/design.md`, "The environment of every child
 process".
+
+## Seed 09: The sender and the checks of the APK
+
+**Question.** What did the task of the sender settle?
+
+**Answer.**
+
+- The sender is one class of 166 lines with two methods, `send` and `route`. It was
+  compiled into the APK by the tool's build. No test runs it: it needs a phone on a Wi-Fi
+  network, and the check on a phone is the owner's. What the suites do check is what its
+  source says and that it is in the package.
+- The APK with the sender has 4,137,137 bytes. Its three permissions are `INTERNET`,
+  `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`, none of which asks the operator a
+  question. A fourth one in the package is the app's own, declared by an AndroidX
+  library, as the design expected.
+- The suite of the APK reads the package with `aapt2` of the SDK in the work folder. It
+  compares the web code in the package byte for byte with `app/www/`, so an APK built
+  before a change of the web code fails it and says to build again. The note of the
+  build names the commit the build stood on; the suite asks that the commit exists and
+  not that it is the newest, because a build made before its own commit names the one
+  before.
+- The suites of the app are two, and the getting-started page names both. That page
+  holds 200 lines at most, so the sentences about the suites that need more were made
+  shorter.
+
+**Resolution.** `app/android/app/src/main/java/app/odrig/operators/TargetPlugin.java`;
+`tests/apk/test_apk.py`; `tests/app/test_android.py`; `agent/getting-started.md`,
+"Suites that need more".
