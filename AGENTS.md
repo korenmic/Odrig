@@ -123,6 +123,9 @@ present, and do not build on them.
 - **Converting and uploading in the operators' app**, seed 17: its second part, after
   seed 09. The converter's library is made to run inside the app. It has been run with
   Node.js and in Chrome, and never inside an app.
+- **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
+  package stops converting and stays as a small library that reads and writes the
+  project's files for tests and for the firmware tool. Today both can convert.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 - **Playing at once at power-on**, seed 14: the show plays at once, and the installed
   animations are checked while it plays. Today the LEDs stay dark until every

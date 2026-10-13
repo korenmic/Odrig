@@ -1,0 +1,10 @@
+{
+  "number": 18,
+  "slug": "18-p1-one-converter",
+  "state": "remaining",
+  "title": "One converter",
+  "priority": "P1",
+  "addedAt": "2026-10-13T03:02:18+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Leave one implementation of the converter, the JavaScript one: take the converting out of the Python package, make the JavaScript suite stand without it, and keep of Python a small library that reads and writes the project's files for tests and for the firmware tool."
+}
