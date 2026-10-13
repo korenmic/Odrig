@@ -105,6 +105,17 @@ No program on this Mac can show that a device joins the network. A person does, 
 4. With this Mac joined and the board on USB, run
    `python3 firmware/fw.py test-air --http 4.3.2.1`. Seen: the suite ends with `OK`.
 
+## A phone on a network without internet
+
+The board's network has no internet. A phone that joins it keeps its other traffic on
+mobile data, and may say that the network has no internet or offer to sign in to it: WLED
+answers every name with the board's own address while its access point is up. A request
+an app sends in the ordinary way would leave through mobile data and not reach the board.
+The operators' app therefore opens its requests on the Wi-Fi network itself;
+[android-app.md](android-app.md#the-phone-and-the-installations-network) says how, and
+what its target screen shows. Whether a phone stays on the network by itself, and what it
+asks, is part of the owner's check of the app and is not known yet.
+
 ## Who hosts the network
 
 **The board hosts. Phones and computers join it.**

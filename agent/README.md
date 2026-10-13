@@ -23,7 +23,9 @@ repository holds everything between a video or an idea and what the LEDs show:
 - the **command tool**, `odrigctl/`: Python. It sends commands, such as play or
   brightness, to the emulator or to the board;
 - the **firmware tool**, `firmware/`: Python. It builds the program for the board, puts
-  it there and installs a show.
+  it there and installs a show;
+- the **operators' app**, `app/`: JavaScript in an Android app. It shows on a phone what
+  the installation plays and steers it, with the same commands.
 
 Only the firmware tool needs the board, and the board stays with the first computer. Most
 work, and all work on animations, needs none.

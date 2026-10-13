@@ -7697,3 +7697,30 @@ process".
 **Resolution.** `app/android/app/src/main/java/app/odrig/operators/TargetPlugin.java`;
 `tests/apk/test_apk.py`; `tests/app/test_android.py`; `agent/getting-started.md`,
 "Suites that need more".
+
+## Seed 09: What the first part of the app has beyond its seed
+
+**Question.** The seed of the app's first part asks for the screens, the emulator's
+option, a build with one command, tests in Chrome and documents. What was built that it
+does not name?
+
+**Answer.** Each of these was in the design from the start, and none adds a command to
+the command list or changes what the installation does.
+
+- Two more commands of the tool: `serve`, which serves the web code to a browser on this
+  computer and is what the suite uses, and `install`, which puts the APK on a phone that
+  is connected by USB.
+- A second suite, `tests/apk/`, which reads a built APK.
+- The line of the target screen that says how the phone's requests travel, with the
+  sender's method `route` behind it, so that a failure on a phone can be read off the
+  screen. And `build.json`, the note of the commit an APK was built from.
+- `old.html`, the page for a web view that is too old.
+
+The pages for newcomers named the app as planned, and a test kept its words out of them.
+The first part exists now, so the pages name it, and the test keeps out the words of
+what is still planned: the PC version and the app's second part. The seed stays in
+progress: its last item, the check on a phone, is the owner's.
+
+**Resolution.** `app/apptool/cli.py`; `tests/apk/`; `app/www/screens/target.js`,
+`routeLine`; `app/apptool/stage.py`; `tests/onboarding/test_pages.py`, `PLANNED`;
+`docs/android-app.md`.

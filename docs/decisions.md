@@ -8,13 +8,18 @@ it stands now.
 - The workstreams are the ones listed in the [README](../README.md).
 - Hardware and power wiring are out of scope: operators handle them on site.
 - On-site control is over Wi-Fi, with an Android app for operators. The board hosts the Wi-Fi
-  network and phones join it. See [wifi.md](wifi.md) and the first notes on the app in
+  network and phones join it. See [wifi.md](wifi.md) and the app's page,
   [android-app.md](android-app.md).
 - Questions that come up while writing specs or implementing are answered without asking the
   owner, and each one is recorded with its answer and resolution in [drifts.md](drifts.md).
 - The operators' app is an Android APK built with Capacitor. A PC version built with Tauri,
   able to use serial as well as Wi-Fi, is intended later. Our own server on the board offers
   commands only and no web page.
+- The app is built in two parts. The first, command and control, exists: it shows what
+  plays, lists the animations, plays one, goes back to the playlist, switches the LEDs and
+  sets the brightness, with the commands every other client has. It sends each command on
+  the phone's Wi-Fi network, because the board's network has no internet. The second
+  part, converting and uploading on the phone, is planned.
 - The board's Wi-Fi network is named `odrig` and has a password known to the operators. The
   password may be kept in this repository.
 - The owner has accepted the Android SDK's licence terms, so the app's build may accept them
@@ -381,3 +386,12 @@ are in [format.md](format.md), "Measured sizes".
   installed together. The demo show for the target has no cycle. On the board the
   firmware built with this core passes the board suite, and the rates are inside what
   the owner accepts.
+- 2026-10-13: Seed 09 built the first part of the operators' app, command and control.
+  The web code in `app/www/` runs as it is in a browser and inside an Android app made
+  with Capacitor; one class of Java sends each command on the phone's Wi-Fi network.
+  `python3 app/app.py build` makes the debug APK, with a JDK, the Android SDK and Gradle
+  kept in the project folder; the owner said yes to those downloads. The emulator has the
+  option `--lan`, so that a phone reaches it. Two suites check the web code in Chrome and
+  the built APK. No program has run the app on a phone: that check is the owner's and is
+  open, and the seed stays open with it. The app has no cap on the brightness: the owner
+  ruled that none is needed.

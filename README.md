@@ -52,7 +52,7 @@ between canvas coordinates and physical LEDs in [docs/mapping.md](docs/mapping.m
 of rows and legs of columns, with the bench build of two legs and the target build of
 twenty upright legs, 60 x 60. What a show is is specified in [docs/show.md](docs/show.md),
 and the commands in [docs/commands.md](docs/commands.md). Wi-Fi is covered in [docs/wifi.md](docs/wifi.md) and
-the first notes on the operators' app in [docs/android-app.md](docs/android-app.md). Planned
+the operators' app, with how it is built and installed, in [docs/android-app.md](docs/android-app.md). Planned
 work is in [project-seeds/](project-seeds/).
 
 The converter, the JavaScript tool that turns media and JSON frames into the files the

@@ -101,6 +101,9 @@ the entry links to it.
 - **command tool**: The tool `odrigctl`, started as `python -m odrigctl`. It sends one
   command to the emulator or to the board, through a serial port or over HTTP, and prints
   the answer. See [emulator.md](../docs/emulator.md#the-command-tool).
+- **operators' app**: The Android app in `app/` with which operators see and steer, from
+  a phone, what the installation plays. It sends the same commands over HTTP. See
+  [android-app.md](../docs/android-app.md).
 
 ## How the work is organised
 

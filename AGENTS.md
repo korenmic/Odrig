@@ -33,6 +33,7 @@ JavaScript tool only.
 | Change the Python reference, a generator or the test vectors | [docs/reference-converter.md](docs/reference-converter.md), [docs/format.md](docs/format.md) |
 | Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
+| Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
 | Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
 | Find out what was decided, and why | [docs/decisions.md](docs/decisions.md), then [docs/drifts.md](docs/drifts.md) |
@@ -91,7 +92,8 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 - Every addition to the command list.
 - Anything that changes a decision in `docs/decisions.md`.
 - Anything about hardware or power.
-- A check that only a person can make: what the LEDs show, or what a phone gets.
+- A check that only a person can make: what the LEDs show, or what a phone gets. The
+  operators' app has such a check, in [docs/android-app.md](docs/android-app.md).
 
 ## If you work on Windows
 
@@ -116,13 +118,10 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **An app for the operators, for Android**, in two parts. Seed 09 is command and
-  control: what plays, the list of animations, play, on and off, and the brightness. Its
-  spec is written and none of its tasks is done. The first notes are in
-  [docs/android-app.md](docs/android-app.md).
-- **Converting and uploading in the operators' app**, seed 17: its second part, after
-  seed 09. The converter's library is made to run inside the app. It has been run with
-  Node.js and in Chrome, and never inside an app.
+- **Converting and uploading in the operators' app**, seed 17: the app's second part.
+  Its first part, command and control, is in `app/`; no program has run it on a phone,
+  which is the owner's check and is open. The converter's library is made to run inside
+  the app. It has been run with Node.js and in Chrome, and never inside an app.
 - **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
   package stops converting and stays as a small library that reads and writes the
   project's files for tests and for the firmware tool. Today both can convert.

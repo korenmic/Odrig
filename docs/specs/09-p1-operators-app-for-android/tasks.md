@@ -128,7 +128,7 @@ Rules for every task:
     the size and the SHA-256 of the APK.
   - Requirements: 10.1, 10.2, 10.3, 10.4, 11.7, 14.3
 
-- [ ] 8. The documents and the last run
+- [x] 8. The documents and the last run
   - `docs/android-app.md` as the design's "Documents" has it, with what tasks 2 and 6
     found and the check on a phone as numbered steps. `docs/wifi.md`, `docs/decisions.md`
     with a line in its change log, `AGENTS.md`, `README.md` and the pages of `agent/`.
