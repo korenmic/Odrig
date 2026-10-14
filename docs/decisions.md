@@ -405,3 +405,7 @@ are in [format.md](format.md), "Measured sizes".
   the converter packs a show without items, and the file is uploaded into it as an
   animation is uploaded to the board, so the core judges it. The preview converts
   nothing and writes no show file.
+- 2026-10-15: The firmware's prerequisites are tracked in
+  [firmware-prerequisites.md](firmware-prerequisites.md): what the firmware must do, where
+  each line comes from, stock WLED, a seed or the owner, how far it has come, the seeds
+  not finished, and the seeds proposed and not approved yet.

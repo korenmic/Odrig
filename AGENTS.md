@@ -35,7 +35,7 @@ JavaScript tool only.
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
-| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
+| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
 | Find out what was decided, and why | [docs/decisions.md](docs/decisions.md), then [docs/drifts.md](docs/drifts.md) |
 
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
