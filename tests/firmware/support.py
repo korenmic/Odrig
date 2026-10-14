@@ -146,15 +146,64 @@ class RecordedEsptool:
 
 
 @contextlib.contextmanager
-def no_board(esptool=None, answer="WLED 2606300", port="/dev/cu.test"):
+def no_board(esptool=None, answer="WLED 2606300", port="/dev/cu.test", talks=None):
     """Runs the tool without a board: esptool is the stand-in, the port is found, and
-    whatever must answer after a restart does."""
+    whatever must answer after a restart does. With `talks`, a `Talking` board, the tool
+    asks that board itself, line by line, and waits by its clock."""
     esptool = RecordedEsptool() if esptool is None else esptool
     if not hasattr(esptool, "waited"):
         esptool.waited = []
-    answers = {name: (lambda found, wait=0: esptool.waited.append(wait) or answer) for name in board.EXPECTED}
-    with mock.patch.object(flasher, "run_esptool", esptool), mock.patch.object(board, "find", lambda given=None: given or port), mock.patch.dict(board.EXPECTED, answers):
+    said = lambda found, wait=0: esptool.waited.append(wait) or answer
+    answers = {name: said for name in board.EXPECTED}
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(mock.patch.object(flasher, "run_esptool", esptool))
+        stack.enter_context(mock.patch.object(board, "find", lambda given=None: given or port))
+        if talks is None:
+            stack.enter_context(mock.patch.dict(board.EXPECTED, answers))
+            stack.enter_context(mock.patch.object(board, "settled", said))
+        else:
+            stack.enter_context(mock.patch.object(board.client, "serial_exchange", talks.exchange))
+            stack.enter_context(mock.patch.object(board, "time", talks))
         yield esptool
+
+
+VALID = '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}'
+BUSY = '{"ok":false,"error":"busy"}'
+LISTED = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138}],"next":null}'
+
+
+class Talking:
+    """A board that answers command lines, and the clock the tool waits by.
+
+    `replies` maps a command line to the replies it gets, one after the other and the
+    last of them from then on; a reply of None is no answer. `sent` holds the lines in
+    the order they came, and `slept` the pauses the tool made. An exchange takes
+    `exchange_seconds` of the clock, and a pause as long as it says."""
+
+    def __init__(self, replies, exchange_seconds=0.1):
+        self.replies = {line: list(given) for line, given in replies.items()}
+        self.exchange_seconds = exchange_seconds
+        self.sent = []
+        self.slept = []
+        self.now = 1000.0
+
+    def exchange(self, port, data, timeout, accept):
+        line = data.decode("ascii").rstrip("\n")
+        self.sent.append(line)
+        given = self.replies[line]
+        reply = given.pop(0) if len(given) > 1 else given[0]
+        if reply is None:
+            self.now += timeout
+            raise board.client.Unreachable(f"no reply within {timeout:g} seconds")
+        self.now += self.exchange_seconds
+        return reply.encode("utf-8")
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
 
 
 @contextlib.contextmanager

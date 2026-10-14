@@ -14,6 +14,7 @@ PORT_VARIABLE = "ODRIG_BOARD_PORT"
 PORT_PATTERN = "/dev/cu.usbmodem*"
 WAIT_SECONDS = 20.0
 EXCHANGE_SECONDS = 2.0
+LIST_EVERY_SECONDS = 0.5
 
 
 def find(port=None, environment=None, devices=None):
@@ -63,6 +64,36 @@ def ask(port, data, accept, wait=WAIT_SECONDS, what="an answer"):
 def status(port, wait=WAIT_SECONDS):
     """The firmware's reply to `status`, as a line of text."""
     return ask(port, b"status\n", client.is_reply, wait, "reply to status").decode("utf-8", "replace")
+
+
+def is_busy(reply):
+    """Whether a reply refuses its command with `busy`."""
+    try:
+        value = json.loads(reply)
+    except ValueError:
+        return False
+    return isinstance(value, dict) and value.get("error") == "busy"
+
+
+def settled(port, wait=WAIT_SECONDS):
+    """The firmware's reply to `status` once it has read every installed animation to its
+    end.
+
+    After a restart the firmware plays at once and reads the animations while it plays;
+    until it has, it answers `list` with `busy`, and a fault it finds in one of them
+    shows in `status` only then. So the board is first waited for, then asked for its
+    list every half second until that is no longer refused with `busy`, and then asked
+    for its status. `wait` is the time for all of it, counted from the first try."""
+    deadline = time.monotonic() + wait
+    status(port, wait)
+    while True:
+        left = max(deadline - time.monotonic(), 0.0)
+        reply = ask(port, b"list\n", client.is_reply, left, "reply to list")
+        if not is_busy(reply):
+            return status(port, max(deadline - time.monotonic(), EXCHANGE_SECONDS))
+        if time.monotonic() >= deadline:
+            raise Failure("check-not-done", f"the board was still reading its animations after {wait:g} seconds; give it longer with --wait")
+        time.sleep(LIST_EVERY_SECONDS)
 
 
 def handshake(port, wait=WAIT_SECONDS):

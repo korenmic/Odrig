@@ -75,7 +75,7 @@ Rules for every task:
     fails: the first reply comes after the files were decoded.
   - Requirements: 7.1, 7.3
 
-- [ ] 4. The firmware tool waits for the check
+- [x] 4. The firmware tool waits for the check
   - `firmware/fwtool/`: `install-show` and `install-firmware` wait until `list` is no
     `busy`, and read `status` again; `check-not-done`.
   - `tests/firmware/`: against the stand-in for a board: `busy` three times and then a

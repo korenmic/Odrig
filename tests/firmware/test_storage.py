@@ -203,6 +203,27 @@ class Commands(Temporary):
         self.assertEqual(result.out, answer + "\n")
         self.assertEqual(result.err, "")
 
+    def test_the_reply_printed_is_the_one_the_board_gives_once_it_has_read_its_animations(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY, support.BUSY, support.BUSY, support.LISTED]})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show)
+        self.assertEqual((result.status, result.out, result.err), (0, support.VALID + "\n", ""))
+        self.assertEqual(talks.sent, ["status", "list", "list", "list", "list", "status"])
+
+    def test_a_show_that_turns_invalid_while_the_board_reads_it_is_status_1(self):
+        invalid = '{"ok":true,"on":true,"brightness":128,"playing":null,"animation":null,"fps":50,"error":"file-malformed dvd.odrg truncated"}'
+        talks = support.Talking({"status": [support.VALID, invalid], "list": [support.BUSY, support.BUSY, '{"ok":false,"error":"show-invalid"}']})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show, "--no-check")
+        self.assertEqual((result.status, result.out, result.err), (1, invalid + "\n", ""))
+
+    def test_a_board_that_is_still_reading_when_the_time_is_over_is_check_not_done(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY]})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show, "--wait", "4")
+        self.assertEqual((result.status, result.out), (1, ""))
+        self.assertRegex(result.err, r"\Aerror: check-not-done: the board was still reading its animations after 4 seconds; give it longer with --wait\n\Z")
+
     def test_a_copy_of_storage_from_before_and_the_new_image_are_kept_in_the_work_folder(self):
         esptool = self.esptool()
         self.install(esptool)

@@ -65,7 +65,10 @@ class OnASmallLayout(unittest.TestCase):
     def run_command(self, command, esptool, *extra, answer=REPLY, status=None):
         with support.no_board(esptool, answer=answer):
             replaced = {} if status is None else {"status": status}
-            with mock.patch.dict(board.EXPECTED, replaced):
+            # The reply after the storage was written is the one of a board that has read
+            # its animations.
+            settled = board.settled if status is None else status
+            with mock.patch.dict(board.EXPECTED, replaced), mock.patch.object(board, "settled", settled):
                 result = support.run_main(command, "--settings", self.settings_file, *extra)
         self.results.append(result)
         return result

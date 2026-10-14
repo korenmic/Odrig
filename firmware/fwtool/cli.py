@@ -185,15 +185,16 @@ def _install_show(arguments):
     port = board.find(arguments.port)
     on_port, region, before_path = storage_of(port)
     write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
-    reply = board.EXPECTED["status"](port, arguments.wait)
+    reply = board.settled(port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
 
 
-def store_settings(port, wait, network=None, milliamps=None):
+def store_settings(port, wait, network=None, milliamps=None, settled=False):
     """Puts settings into WLED's stored settings on the board in one write: the name and
     the password of the network, the limit on LED current, or both. Restarts the board
-    and prints what was set and the board's reply to `status`."""
+    and prints what was set and the board's reply to `status`. With `settled` that reply
+    is the one the board gives once it has read every installed animation to its end."""
     from . import limit, wifi
 
     def make(image):
@@ -205,7 +206,7 @@ def store_settings(port, wait, network=None, milliamps=None):
 
     on_port, region, before_path = storage_of(port)
     write_storage(on_port, region, before_path.read_bytes(), make)
-    reply = board.EXPECTED["status"](port, wait)
+    reply = board.settled(port, wait) if settled else board.EXPECTED["status"](port, wait)
     if network is not None:
         print(f"name: {network.name}")
         print("password: set")
@@ -251,7 +252,7 @@ def _install_firmware(arguments):
     build.check_size(image)
     port = board.find(arguments.port)
     write_application(port, image, expect="status", wait=arguments.wait)
-    return store_settings(port, arguments.wait, network=network, milliamps=milliamps)
+    return store_settings(port, arguments.wait, network=network, milliamps=milliamps, settled=True)
 
 
 def _read_show(arguments):

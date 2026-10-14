@@ -128,6 +128,7 @@ with that environment's Python.
 | `layout-mismatch` | The board's partition table has no application partition at `0x10000` that the image fits in, or no data partition named `spiffs`. |
 | `esptool-failed` | esptool ended with an error, or was asked for an address outside the regions below. |
 | `no-reply` | The board did not answer within 20 seconds after its restart. |
+| `check-not-done` | The board answered, but was still reading its installed animations when the time of `--wait` was over. Nothing is wrong with what was written: the command gave up waiting. |
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
@@ -274,10 +275,18 @@ python3 firmware/fw.py install-show build/example-show
 ```
 
 Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
-of the board's storage, checks what was written, restarts the board and prints the board's
-reply to `status`. The status is 0 when the reply reports a valid show and 1 when it
-reports a reason. The tool waits 20 seconds for that reply, or as long as `--wait SECONDS`
-says: the core checks every file at start, which takes 38 seconds for 9 MB of animations.
+of the board's storage, checks what was written, restarts the board, waits until the
+board has read every installed animation to its end, and prints the board's reply to
+`status` then. The status is 0 when the reply reports a valid show and 1 when it reports
+a reason.
+
+The board plays right after its restart and reads the animations while it plays. Until
+it has read them all it answers `list` with `busy`, and a fault it finds in one of them
+shows in `status` only then. So the tool waits for the first reply to `status`, asks for
+the list every half second until it is no longer refused with `busy`, and then asks for
+the status it prints. All of that has 20 seconds, or as long as `--wait SECONDS` says. A
+board that is still reading when the time is over ends the command with
+`check-not-done`: the show is installed, and whether it is sound is not known yet.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
@@ -397,8 +406,10 @@ whose storage does not hold the network's name and password yet. It writes the b
 firmware to the board as `flash` does, waits for the firmware's reply to `status`, and
 then does what `set-wifi` and `set-limit` do, in one write: it puts the name and the
 password of the settings file and the limit of the limit file into storage, restarts the
-board again, and prints `name: <name>`, `password: set`, the line of the limit and the
-reply to `status`.
+board again, waits as `install-show` does until the board has read its installed
+animations, and prints `name: <name>`, `password: set`, the line of the limit and the
+reply to `status`. A reason in that reply does not fail this command: a board from
+scratch has no show yet.
 
 The settings file and the limit file are read and checked first, and then the image
 `build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
