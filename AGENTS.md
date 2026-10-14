@@ -128,6 +128,8 @@ present, and do not build on them.
 - **One command to preview one animation**, seed 19: the path of a finished `.odrg` file
   starts the emulator with that animation alone and opens its page. Today the folder of
   a show is made by hand first.
+- **Animations from a USB drive**, seed 20: a flash drive is plugged into the board, and
+  the board plays the animations in its folder `odrig`. Today nothing reads a drive.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 - **Playing at once at power-on**, seed 14: the show plays at once, and the installed
   animations are checked while it plays. Today the LEDs stay dark until every
