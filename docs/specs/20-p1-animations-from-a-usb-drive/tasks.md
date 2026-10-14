@@ -53,7 +53,7 @@ Rules for every task:
     emulator as it is, fails: the option is a usage error.
   - Requirements: 6.2, 8.1
 
-- [ ] 3. The app with a drive
+- [x] 3. The app with a drive
   - `tests/app/`: an emulator with a drive; its animations are rows and play.
     `docs/android-app.md`: the drive's animations on the show screen.
   - Requirements: 2.5, 2.6

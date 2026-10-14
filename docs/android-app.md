@@ -190,6 +190,14 @@ longer, see [firmware.md](firmware.md#measurements-on-the-board).
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, the show screen says `Cycle` with its id, and `Playlist from the start` leaves it.
 
+The animations of a USB drive plugged into the installation are buttons too, after the
+installed ones, each with its id from 60001 up and its file's name on the drive, and a
+press plays one as it plays an installed animation; see
+[show.md](show.md#animations-from-a-usb-drive). They come a moment after the drive is
+plugged in, once the installation has read them, and go about ten seconds after it is
+pulled out, when the app asks for the list again. The app has no code of its own for
+them.
+
 To point the app at an emulator, write the emulator's address on the target screen and
 press `Use`; `Board` puts `4.3.2.1` back. An address is a host name or an IPv4 address,
 alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulator, start
