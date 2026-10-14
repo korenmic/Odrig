@@ -85,10 +85,10 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan]\n", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]\n", self.text)
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]\n", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--record", "--seconds", "--script"})
         self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
@@ -178,7 +178,7 @@ class EmulatorDocument(unittest.TestCase):
         text = section(self.text, "The event stream")
         events = dict(re.findall(r"event: ([a-z]+)\ndata: (.+)", text))
         self.assertEqual(sorted(events), ["frame", "hello", "log", "status"])
-        self.assertEqual(sorted(json.loads(events["hello"])), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
+        self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
         self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "ok", "on", "playing"])

@@ -8060,3 +8060,18 @@ called, and the core plays as without them.
 
 **Resolution.** `core/src/core.cpp`, `start`; `tests/core/test_drive.py`; `docs/core.md`,
 "The host interface".
+
+## Seed 20: The emulator's drive and record mode
+
+**Question.** The design gives the emulator `--drive DIR`. Does record mode take it, and
+what does the page get?
+
+**Answer.** Record mode does not: `--drive` with `--record` is a usage error. The drive's
+folder is looked for once a second of the computer's clock, which record mode does not
+run on, so a recording with a drive would not come out the same twice. The page's
+`hello` has the member `drive` always, the folder of `--drive` or `null`, as it has
+`serial` and `tcp`, and the header shows it only when it is there.
+
+**Resolution.** `emulator/app.py`, `parse` and `serve`; `emulator/web/app.js`;
+`tests/emulator/test_drive.py`; `docs/emulator.md`, "A drive".
+

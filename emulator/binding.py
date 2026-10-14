@@ -98,8 +98,9 @@ class Core:
     The host object has the methods `open(name)`, `read(capacity)`, `close()` and
     `log(text)` of `host.FolderHost`. When it also has `write_open`, it has the seven
     storage methods of `host.FolderHost`, and the core gets storage that can be changed;
-    otherwise the core gets a host without storage. The core is used by one caller at a
-    time.
+    otherwise the core gets a host without storage. A host with storage whose `drive` is
+    not `None` has `drive_number()` and `drive_name(drive, place)`, and the core gets a
+    drive. The core is used by one caller at a time.
     """
 
     def __init__(self, library_path, host):
@@ -115,7 +116,10 @@ class Core:
             )
         else:
             self._functions += (WRITE_OPEN(), WRITE(), WRITE_CLOSE(), RENAME(), REMOVE(), SPACE(), READ_AT())
-        self._functions += (DRIVE(), DRIVE_NAME())
+        if hasattr(host, "write_open") and getattr(host, "drive", None) is not None:
+            self._functions += (DRIVE(self._drive), DRIVE_NAME(self._drive_name))
+        else:
+            self._functions += (DRIVE(), DRIVE_NAME())
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -181,6 +185,17 @@ class Core:
             return -1
         ctypes.memmove(buffer, data, len(data))
         return len(data)
+
+    def _drive(self, _ctx):
+        return self._host.drive_number()
+
+    def _drive_name(self, _ctx, drive, place, buffer, capacity):
+        name = self._host.drive_name(drive, place)
+        if name is None or capacity == 0:
+            return 0
+        data = os.fsencode(name)[:capacity - 1] + b"\0"
+        ctypes.memmove(buffer, data, len(data))
+        return 1
 
     def _collect(self, _ctx, line, line_length, reply, reply_length):
         answer = ctypes.string_at(reply, reply_length)

@@ -121,6 +121,7 @@
     byId("empty").hidden = false;
     byId("show").textContent = shortPath(hello.show);
     byId("show").title = hello.show;
+    port("drive", hello.drive, shortPath);
     port("serial", hello.serial, shortPath);
     port("tcp", hello.tcp, String);
     document.title = "odrig emulator \u2013 " + hello.show.split(/[\\/]/).pop();

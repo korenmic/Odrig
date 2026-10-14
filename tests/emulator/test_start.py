@@ -234,7 +234,7 @@ class Start(unittest.TestCase):
 
     def test_no_option_names_the_size_of_the_canvas_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--record", "--seconds", "--script"})
         self.assertIs(app.parse([str(self.work)]).lan, False)
         self.assertIs(app.parse([str(self.work), "--lan"]).lan, True)
 

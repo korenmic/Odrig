@@ -45,7 +45,7 @@ Rules for every task:
     items, against the core as it is, fails: the list has the show's items only.
   - Requirements: 1.2, 1.3, 2.1 to 2.8, 3.1 to 3.4, 4.1 to 4.3, 5.1, 6.1, 6.4
 
-- [ ] 2. The emulator
+- [x] 2. The emulator
   - `emulator/`: `--drive DIR`, the drive of its host, the binding's two members, the
     header of the page.
   - `tests/emulator/`: the tests of the design's list. `docs/emulator.md`.

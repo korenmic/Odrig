@@ -66,6 +66,7 @@ def parser():
     made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
                       help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
     made.add_argument("--lan", action="store_true", help="let other devices of the local network open the page and send commands over HTTP")
+    made.add_argument("--drive", metavar="DIR", help="a folder that stands for the top of a USB drive: its folder odrig appearing and going is the drive plugged in and pulled out")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -83,6 +84,8 @@ def parse(argv):
             made.error("record mode needs its length: --seconds S")
         if arguments.port is not None or arguments.serial_link is not None or arguments.tcp_port is not None or arguments.verbose or arguments.lan:
             made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port, --verbose and --lan do not go with --record")
+        if arguments.drive is not None:
+            made.error("record mode has no drive: --drive does not go with --record")
     return arguments
 
 
@@ -100,7 +103,8 @@ def serve(arguments, out):
     """Real time: starts the core, opens the ports and the page address, and runs until a
     signal. A step that fails undoes the ones before it."""
     link, tcp_port = ports(arguments)
-    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage)
+    drive = None if arguments.drive is None else host.Drive(arguments.drive)
+    files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage, drive=drive)
     port = None
     line_port = None
     server = None
@@ -115,6 +119,7 @@ def serve(arguments, out):
             line_port = lineport.Port(tcp_port, lambda data: running.feed(data, "tcp"))
         described = {
             "show": os.path.abspath(arguments.show_dir),
+            "drive": None if drive is None else os.path.abspath(drive.top),
             "serial": None if port is None else port.link,
             "tcp": None if line_port is None else line_port.address,
             "legs": [list(leg) for leg in core.legs],
@@ -124,7 +129,7 @@ def serve(arguments, out):
             print("warning: --lan: anyone on the local network can send commands to this emulator and open its page", file=sys.stderr, flush=True)
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
-            lambda: {"show": described["show"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
+            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
             lan=arguments.lan,
         )
 

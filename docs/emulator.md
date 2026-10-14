@@ -97,7 +97,7 @@ of the Python package of [reference-converter.md](reference-converter.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -124,6 +124,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
 | `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
+| `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
@@ -160,6 +161,33 @@ lists, removes or uploads does so after the first second.
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
 answered.
+
+### A drive
+
+With `--drive DIR` the emulator gives the core a USB drive of animations, as
+[show.md](show.md#animations-from-a-usb-drive) describes, and the folder `DIR` stands
+for its top:
+
+```
+python -m emulator build/demo-20/show --drive build/stick
+```
+
+- The emulator looks for the folder `DIR/odrig` once a second. When it appears, a drive
+  is plugged in: its list is made then, of the files whose names end in `.odrg`, in any
+  case, and do not begin with a dot, in the order of their names, at most 256. When the
+  folder goes, the drive is pulled out. A folder `DIR` that is not there yet is no
+  error: the drive is plugged in once `DIR/odrig` is.
+- The list is made when the folder appears and not again while it stays, as the files of
+  a drive do not change while it is plugged in. To take up files added to it, move the
+  folder `odrig` away for two seconds and back.
+- The core reads the drive's files after the installed ones, while the show plays. Each
+  sound one joins the playlist and `list` with an id from 60001 up once it has been read;
+  one that is not is left out, and with `--verbose` the reason is printed, as
+  `core: drive file broken.odrg left out: truncated`.
+- Nothing is written to `DIR`. `space` counts the folder of the show only.
+- The page's header names the folder `DIR` after `drive`.
+
+`--drive` does not go with `--record`: record mode has no drive.
 
 ## The serial port
 
@@ -635,7 +663,7 @@ event:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
@@ -649,7 +677,7 @@ data: 123460 <base64 of the refresh>
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `drive` is the folder of `--drive`, or `null` without it. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
