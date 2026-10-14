@@ -224,18 +224,21 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        uint32_t item = player_first_animation(core);
-        if (!all) {
-            item = 0;
-            while (item < core.item_count && core.items[item].id != id) {
-                ++item;
+        // An item of the show, else an animation of the drive.
+        uint32_t item = all ? player_first_in_playlist(core) : kNothing;
+        for (uint32_t position = 0; !all && item == kNothing && position < core.item_count; ++position) {
+            if (core.items[position].id == id) {
+                item = position;
             }
         }
-        if (item == core.item_count) {
+        if (!all && item == kNothing && core.drive != nullptr && drive_has_id(core, id)) {
+            item = kDriveBase + drive_place_of(core, id);
+        }
+        if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }
         // An animation is played as its turn of the playlist, which goes on after it.
-        if (core.items[item].is_cycle) {
+        if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
         } else {
             player_play_all(core, item);

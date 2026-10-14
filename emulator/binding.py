@@ -36,6 +36,8 @@ RENAME = CFUNCTYPE(c_int, c_void_p, c_char_p, c_char_p)
 REMOVE = CFUNCTYPE(c_int, c_void_p, c_char_p)
 SPACE = CFUNCTYPE(c_int, c_void_p, POINTER(c_uint32), POINTER(c_uint32))
 READ_AT = CFUNCTYPE(c_int32, c_void_p, c_char_p, c_uint32, POINTER(c_uint8), c_size_t)
+DRIVE = CFUNCTYPE(c_uint32, c_void_p)
+DRIVE_NAME = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, POINTER(c_char), c_size_t)
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -45,7 +47,7 @@ class HostRecord(Structure):
     _fields_ = [
         ("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG),
         ("write_open", WRITE_OPEN), ("write", WRITE), ("write_close", WRITE_CLOSE), ("rename", RENAME), ("remove", REMOVE),
-        ("space", SPACE), ("read_at", READ_AT),
+        ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME),
     ]
 
 
@@ -113,6 +115,7 @@ class Core:
             )
         else:
             self._functions += (WRITE_OPEN(), WRITE(), WRITE_CLOSE(), RENAME(), REMOVE(), SPACE(), READ_AT())
+        self._functions += (DRIVE(), DRIVE_NAME())
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)

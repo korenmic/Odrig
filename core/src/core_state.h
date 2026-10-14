@@ -86,6 +86,36 @@ struct Upload {
     uint64_t progress;      // the time something last moved
 };
 
+// What the core knows of the file at one place of a drive's list: its size and its
+// length once the check has read it whole, the id it got, and its state.
+struct DriveEntry {
+    uint64_t total_ms;
+    uint32_t bytes;
+    uint16_t id;
+    uint8_t state;
+};
+
+// The states of a drive's file: to be checked; an animation of the playlist; left out.
+const uint8_t kDriveToCheck = 0;
+const uint8_t kDriveInPlaylist = 1;
+const uint8_t kDriveLeftOut = 2;
+
+// The most files of a drive, the position in the playlist of the file at place 0, and the
+// first id a drive's animation can get.
+const uint32_t kDriveMost = 256;
+const uint32_t kDriveBase = 0x10000u;
+const uint32_t kDriveFirstId = 60001;
+// Room for the name the core gives the host for a drive's file, `drive/<place>`.
+const uint32_t kDriveNameSize = 16;
+// Room for the name of a drive's file as `list` writes it: a longer one is cut to 127 bytes.
+// Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
+const uint32_t kDriveListedName = 128;
+
+// Whether a position of the playlist is a drive's file.
+inline bool is_drive(uint32_t position) {
+    return position >= kDriveBase && position < kDriveBase + kDriveMost;
+}
+
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
 struct Core {
@@ -154,6 +184,15 @@ struct Core {
     uint8_t check_row;
     uint8_t check_idle;
 
+    // The drive, for a host that has one: an entry for each place of its list, the number
+    // of the drive the entries are of, 0 for none, how many places it has, and the place
+    // the check is at, with the name of its file, which the check reads by.
+    DriveEntry *drive;
+    uint32_t drive_number;
+    uint32_t drive_count;
+    uint32_t drive_check_at;
+    char drive_check_name[kDriveNameSize];
+
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
 
@@ -220,6 +259,30 @@ const uint32_t kCheckLeastRate = 30;
 
 // Whether the check after the start has read every file of the show to its end.
 bool check_complete(const Core &core);
+
+// Whether a file of the drive waits for the check, which may take it while no upload holds
+// the second decoders.
+bool drive_waits(const Core &core);
+
+// The name the core gives the host for the file at a place of the drive, into room for
+// kDriveNameSize characters.
+void drive_file_name(uint32_t place, char *name);
+
+// Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
+void drive_touch(Core &core);
+
+// A file of the drive is left out: its state says so, and the host's log says why.
+void drive_left_out(Core &core, uint32_t place, Reason reason);
+
+// An upload takes the second decoders: the check of a drive's file begins that file
+// again once the upload is over.
+void drive_check_yields(Core &core);
+
+// Whether an animation of the drive has this id.
+bool drive_has_id(const Core &core, uint32_t id);
+
+// The place of the drive's animation that has this id, or kDriveMost when none has.
+uint32_t drive_place_of(const Core &core, uint32_t id);
 
 // The check after the start at one refresh, after the LED data was made. `in_step` says
 // whether the refresh followed the one before it without a grid time left out, and

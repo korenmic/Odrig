@@ -24,7 +24,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `brightness <n>` | Sets brightness, 0 to 255. |
 | `status` | Reports the current state. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show. |
+| `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `remove <id>` | Removes an item from the show. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
@@ -51,7 +51,7 @@ A number in a command is written in decimal digits.
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Current brightness, 0 to 255. |
 | `playing` | What is being played: `"all"` for the playlist, the id of a cycle, or `null`. |
-| `animation` | The id of the animation item on the LEDs right now, or `null`. |
+| `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 
@@ -81,6 +81,16 @@ gives no items and `null`, and so does a show without items:
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
+The animations of a USB drive come after the items of the show, in the order of their
+file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340}`.
+Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
+name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
+character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
+`<from>` and `next` count both kinds. An animation of the drive is listed once the player
+has read it whole; while the drive is read, `list` answers without the ones still to be
+read, and is not refused with `busy` for them. [show.md](show.md#animations-from-a-usb-drive)
+says what the board does with a drive.
+
 After a start the show plays at once, and the player reads every installed animation to
 its end while it plays. Until it has, it does not know the sizes of the files, and
 `list` is refused with `busy`: ask again a moment later. `status` and `space` are
@@ -96,6 +106,7 @@ remove 2
 The item leaves the show, and the items after it move up.
 
 - An animation that a cycle lists is refused with `in-use`: remove the cycle first.
+- An animation of a USB drive is refused with `in-use`: the drive holds it.
 - If the item is the `start` item, the show has no `start` afterwards.
 - If the item is the animation whose turn it is in the playlist, the playlist goes on
   with the animation after it, from its first frame. If it was the only animation of the
@@ -135,7 +146,7 @@ whichever route its commands arrive by.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
 - It is refused with `busy` when an upload is open, and after a start until the player
   has read every installed animation to its end; with `in-use` when the id belongs to a
-  cycle, or another item already names `<file>`; and with `no-space` when the file would
+  cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
 **`upload data <offset> <base64>`** adds bytes. `<offset>` is the number of bytes sent
@@ -183,8 +194,8 @@ succeeds.
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
-| `unknown-id` | `play` or `remove` names an id that is not in `show.json`; `play all` was sent to a show without an animation. |
-| `in-use` | `remove` names an animation that a cycle lists; `upload begin` names the id of a cycle, or a file name another item has. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
+| `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |

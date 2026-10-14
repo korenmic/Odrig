@@ -32,7 +32,7 @@ Rules for every task:
   erased, the firmware built only as the tool builds it. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The core, the test host and the reference player
+- [x] 1. The core, the test host and the reference player
   - Set `"state": "in_progress"` in
     `project-seeds/20-p1-animations-from-a-usb-drive/state.json`.
   - `core/include/odrig_core.h`: the two members. `core/src/`: the drive's table, the

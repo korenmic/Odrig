@@ -7975,3 +7975,88 @@ and nothing changes.
 **Resolution.** `core/src/player.cpp`, `player_poll`; `core/src/core_state.h`,
 `kCheckLeastRate`; `tests/core/support.py`, `CHECK_LEAST_RATE`;
 `tests/core/test_power_on.py`, `TheCheck`; `docs/core.md`.
+
+## Seed 20: A drive's entry is 16 bytes
+
+**Question.** The design gives the drive's table twelve bytes an entry, 3,072 in all.
+Which size is it?
+
+**Answer.** Sixteen bytes an entry, 4,096 in all. The length of a drive's animation is
+kept as wide as that of an installed file, 64 bits, since a file's frame count is a
+32-bit number, and an entry with it is sixteen bytes. The target file then asks for
+128,701 bytes with a drive, 98 percent of the 131,072 it may use. The core object grew
+by 56 bytes for the drive's fields, the name the check reads by among them.
+
+**Resolution.** `core/src/core_state.h`, `DriveEntry`; `tests/core/test_drive.py`;
+`docs/core.md`, "Memory".
+
+## Seed 20: Names of a drive's files in a reply
+
+**Question.** The design writes a name as a JSON string with `"` and `\` escaped, a
+byte below 32 as `\u00XX` and every other byte as it is. A reply is one line of
+printable ASCII, and a name on a drive may be Hebrew, or longer than a reply holds.
+How is it written?
+
+**Answer.** In printable ASCII: a character of UTF-8 outside it as `\u` and its code,
+one above U+FFFF as two such units, DEL and a control byte by their value, and a byte that
+is not UTF-8 as U+FFFD. The JSON a client reads gives the name as the drive has it. The
+core asks the host for at most 127 bytes of a name, so that an item of the list always
+fits into a reply, even alone: a longer name is listed cut.
+
+**Resolution.** `core/src/commands.h`, `json_escaped`; `core/src/core_state.h`,
+`kDriveListedName`; `tests/core/test_drive.py`; `docs/commands.md`.
+
+## Seed 20: An upload and the drive's check
+
+**Question.** Requirement 4.2 has `upload end` answer `busy` while the drive's check
+holds the second decoders. Does it?
+
+**Answer.** It never has to. The drive's check gives the decoders up when `upload begin`
+is answered, and reads the file it was in again from its start once the upload is
+closed. An upload is then never kept waiting for a drive, and `upload end` answers `busy`
+only while its own file is checked, as without a drive. While an upload is open the
+drive's check waits, as the requirement says.
+
+**Resolution.** `core/src/core.cpp`, `drive_check_yields`; `tests/core/test_drive.py`,
+`TheCheckOfTheDrive`.
+
+## Seed 20: The test host's drive lines and faults
+
+**Question.** The design gives the script lines `drive plug <ms>` and `drive pull <ms>`,
+and `--drive-read-fails NAME OFFSET` makes a file of the drive fail. When does a line
+take effect, and which reading fails?
+
+**Answer.** The lines are `drive plug` and `drive pull`, without a time: the test host
+has no clock, and the core sees the change at its next refresh, which the next `poll`
+line asks for. `--drive-read-fails` makes `read` fail, the player's reading, and leaves
+`read_at` whole: a file whose reading fails in the check is left out as a damaged one
+is, which a damaged file tests already, and only so can a test reach a fault while the
+file plays. With `--check-first` the drive's files are read before the session too.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host".
+
+## Seed 20: The reference player has no drive
+
+**Question.** Task 1 gives the reference player of `tests/core/support.py` the drive.
+Is it given one?
+
+**Answer.** No. The tests of the drive assert what the core does directly: the order of
+the list, the ids, the turns, what a pull and a fault do, and the pictures, against
+those of the same file installed. A second model of the drive's check, with its pace
+among the steps of the installed check, would repeat the core's code rather than state
+what it must do, and every test of the reference player runs without a drive, where the
+core is unchanged.
+
+**Resolution.** `tests/core/test_drive.py`.
+
+## Seed 20: A drive needs storage that can be changed
+
+**Question.** A host whose storage cannot be changed has no second decoders. Can it have
+a drive?
+
+**Answer.** No. The drive's files are checked by the second decoders, which only a host
+with storage that can be changed is given. Such a host's `drive` and `drive_name` are not
+called, and the core plays as without them.
+
+**Resolution.** `core/src/core.cpp`, `start`; `tests/core/test_drive.py`; `docs/core.md`,
+"The host interface".

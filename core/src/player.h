@@ -37,6 +37,19 @@ void player_play_all(Core &core, uint32_t from);
 // The position of the first animation item, or the number of items when there is none.
 uint32_t player_first_animation(const Core &core);
 
+// The position of the first animation of the playlist: the first animation item, else the
+// first of the drive's animations, else kNothing.
+uint32_t player_first_in_playlist(const Core &core);
+
+// A file of the drive has joined the playlist. When nothing plays, the playlist starts
+// with it.
+void player_drive_joined(Core &core, uint32_t place);
+
+// The drive's animations changed: a drive was plugged in or pulled out, or a file of it
+// left the playlist. When the animation whose turn it is has gone, the playlist goes on
+// with the next one that is left, from its first frame, or nothing plays.
+void player_drive_changed(Core &core);
+
 // The file of the animation item at this position is about to be replaced under its
 // name: the player closes it when it has it open. It opens again at the next refresh.
 void player_releases_file(Core &core, uint32_t item);

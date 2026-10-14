@@ -14,7 +14,8 @@ object, takes its memory once at startup, and never calls itself.
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
 the [LED data](#led-data), [command lines](#command-lines), [startup](#startup),
-[memory](#memory), the [benchmark](#benchmark) and the [test host](#the-test-host).
+[a drive](#a-drive), [memory](#memory), the [benchmark](#benchmark) and the
+[test host](#the-test-host).
 
 ## Commands
 
@@ -76,7 +77,7 @@ Every function receives `ctx` as its first argument.
 | `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
-| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. Today the core logs one thing: the reason text when the show becomes invalid. |
+| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs two things: the reason text when the show becomes invalid, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
 | `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
@@ -84,6 +85,8 @@ Every function receives `ctx` as its first argument.
 | `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
+| `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
+| `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -111,6 +114,13 @@ The last seven members are the storage functions: three that write a file, `rena
 - `read_at` reads the file of an upload back from storage while it is checked: one more
   function than writing, renaming and removing, because `open`, `read` and `close` hold
   the one file that plays.
+
+The last two members are the drive. A host with a drive sets both, and has storage that
+can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
+drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
+the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash. A
+host that is given such a name for a drive that is gone answers as for a file that is not
+there.
 
 ### What the core offers
 
@@ -354,6 +364,43 @@ What a late refresh costs:
 The check and the player may have the same file open at the same time, each through its
 own source: the player with `open` and `read`, the check with `read_at`.
 
+## A drive
+
+A host with a drive gives the core animations that are not in the show: the files of the
+folder `odrig` of a USB flash drive. The host makes the drive's list, as its member
+`drive_name` says; the core keeps for each place of the list its state, its size, its
+length and its id, and asks the host for a name only when `list` writes it or a log line
+needs it.
+
+- At each refresh, before the LED data is made, the core asks `drive`. When the number
+  differs from the one it holds, it drops what it knew of the old drive and, for a number
+  other than 0, counts the new drive's files with `drive_name`, at most 256, and marks
+  them to be checked.
+- The check after the start goes on with the drive's files once the installed ones are
+  read, in the order of their places, at the same pace and through the same second
+  decoders. A file that is whole and made for the canvas joins the playlist as soon as its
+  check has ended. One that is not, or one for which no id is left, is left out, and the
+  host's log gets `drive file <name> left out: <reason>`. The drive's check does not make
+  any command answer `busy`. While an upload is open it waits, and the file it was in is
+  read again from its start afterwards.
+- A drive's animation gets the lowest id from 60001 up that no item of the show and no
+  animation of the drive before it has. The same files with the same show get the same
+  ids.
+- The playlist is the show's animations and then the drive's, in the order of their
+  places. A drive's animation has the turn of an animation without `repeat` and
+  `max_seconds`. When nothing plays and a drive's animation joins, the playlist plays
+  from it: a show without an animation of its own plays the drive's.
+- `play <id>` finds an id among the show's items and then among the drive's animations;
+  `status` names a drive's animation by its id. `list` lists the drive's animations
+  after the show's items, with the file's name on the drive written as a JSON string.
+  `remove` and `upload begin` of a drive's id are answered with `in-use`.
+- When the drive is pulled out, or another one is plugged in, its animations leave the
+  playlist and `list`. When one of them was playing, the playlist goes on with the next
+  animation that is left, from its first frame, or nothing plays.
+- A drive's file that cannot be opened or read, or that turns out not to be sound while it
+  plays, is left out from then on and logged in the same way. Its turn ends there, the
+  playlist goes on as after a pull, and the show stays valid.
+
 ## The files the core writes
 
 `remove` and `upload` change the show while the core runs: in storage first, then in its
@@ -465,7 +512,9 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   for a refresh; the step after the last record asks for the end of the file and
   compares the size and the CRC-32 of what was read back with what was received. A file
   of F frame records is checked in F + 2 refreshes. No upload is open while the check
-  after the start runs, so the two never need the second decoders at the same time.
+  after the start reads the installed files. The check of a drive's files gives the
+  second decoders up when an upload begins and takes them again once it is closed, so
+  the two never need them at the same time.
 - **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
   file in place by the sequence of its kind, or reports what the check found:
   `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
@@ -480,7 +529,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 ## Memory
 
 The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
-blocks, in the order of the table: two of a fixed size for the byte entry, four for a host
+blocks, seventeen with a drive, in the order of the table: two of a fixed size for the byte entry, four for a host
 whose storage can be changed, and the others sized from the mapping and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
@@ -488,7 +537,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,304 |
+| The core object | fixed | 3,360 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -504,13 +553,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,549** |
+| **Total** | | **124,605** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,034 bytes. A host
+46,008 of them. The example show on the two-leg mapping asks for 88,090 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,041 bytes for the target file. The size and the number of frames
+blocks of the check: 77,097 bytes for the target file. A host with a drive is asked for
+one block more, after the three of the check: the drive's table, 16 bytes for each of
+256 places, 4,096 bytes. With it the target file takes 128,701 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -568,6 +619,8 @@ leg; and `ready`.
 | `linehex <ms> <hex>` | `odrig_core_command` with exactly these bytes | `reply <json>` |
 | `bytes <ms> <hex>` | `odrig_core_feed` with these bytes | `fed <hex of the line>` and `reply <json>` for each line |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
+| `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one and the list of the folder as it is now. The core sees it at its next refresh. | nothing |
+| `drive pull` | With `--drive`: the drive is pulled out. | nothing |
 
 | Option of a session | What it does |
 |---|---|
@@ -590,6 +643,9 @@ leg; and `ready`.
 | `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
 | `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes of `upload.part` at or after that offset. |
 | `--read-back-differs OFFSET` | `read_at` gives the byte at that offset of `upload.part` with one bit changed. |
+| `--drive DIR` | The host has a drive, plugged in at the start: its list is the files of the folder `DIR/odrig` by the rules of `drive_name`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
+| `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
+| `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
 `space` and `read_at` are not counted and not traced. The storage functions work on the

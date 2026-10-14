@@ -65,8 +65,9 @@ power-on.
 
 ## The playlist
 
-The playlist is every animation item of the show, in the order of `show.json`. It is what
-a show plays by itself: each animation has its turn, then the next one, and after the
+The playlist is every animation item of the show, in the order of `show.json`, and after
+them the animations of a USB drive when one is plugged in, see [animations from a USB
+drive](#animations-from-a-usb-drive). It is what a show plays by itself: each animation has its turn, then the next one, and after the
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
@@ -100,6 +101,32 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
   over, and repeats forever. Each turn starts its animation from the first frame. While
   a cycle plays, the playlist does not.
 - `play all` plays the playlist from its first animation, whatever `start` names.
+
+## Animations from a USB drive
+
+The player can take animations from a USB flash drive, when the program it runs in gives
+it one; [core.md](core.md#a-drive) says how. The drive's animations are added to the
+show's; they do not take the place of any. Nothing is written to the drive, and no command changes it.
+
+- The drive's animations are the files of its folder `odrig` whose names end in `.odrg`,
+  in any case, and do not begin with a dot, in the order of their names, at most 256.
+  Folders inside `odrig` and other files are passed over.
+- The player reads each of them whole, after the installed animations, while the show
+  plays. A file that is sound and made for the canvas joins the playlist as soon as it
+  has been read, after the show's animations and the drive's before it. One that is not
+  is left out and named in the log with its reason; it does not make the show invalid.
+- Each has an id: the lowest from 60001 up that the show does not use and no animation of
+  the drive before it has. The same files with the same show get the same ids every time.
+- Its turn is that of an animation without `repeat` and `max_seconds`. `play <id>` plays
+  it, `status` names it, and `list` lists it after the show's items. `remove` and
+  `upload begin` of its id are refused with `in-use`.
+- A show without an animation of its own plays the drive's animations.
+- A drive plugged in while the show plays is taken up without a restart. A drive pulled
+  out is dropped: its animations leave the playlist and `list`. When one of them was
+  playing, the playlist goes on with the next animation that is left, from its first
+  frame, or nothing plays. A file that cannot be read while it plays is dropped in the
+  same way, and the show stays valid.
+- The drive's animations are not part of `show.json`, and `space` does not count them.
 
 ## Changing a show while it runs
 
