@@ -408,7 +408,8 @@ int player_poll(Core &core, uint64_t now_ms) {
         upload_step(core, now);
     }
     const bool was_valid = !core.invalid;
-    check_after_start(core, in_step);
+    const bool steady = second == 0 || player_fps(core, now) >= kCheckLeastRate;
+    check_after_start(core, in_step, now - grid <= kCheckOnTimeMs && steady);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
     }

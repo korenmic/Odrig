@@ -210,23 +210,28 @@ struct Core {
 // decides: when the show is invalid already, nothing changes.
 void core_fail(Core &core, Reason reason, const char *about, Reason detail);
 
-// The most steps the check after the start takes at one refresh, and the most refreshes in
-// a row at which it takes none.
+// The most steps the check after the start takes at one refresh, the most refreshes in a
+// row at which it takes none, how late after its grid time a refresh may be and still
+// count as on time, and the fewest refreshes the last whole second must have had for it.
 const uint8_t kCheckMostSteps = 16;
-const uint8_t kCheckLongestWait = 3;
+const uint8_t kCheckLongestWait = 9;
+const uint64_t kCheckOnTimeMs = 2;
+const uint32_t kCheckLeastRate = 30;
 
 // Whether the check after the start has read every file of the show to its end.
 bool check_complete(const Core &core);
 
 // The check after the start at one refresh, after the LED data was made. `in_step` says
-// whether the refresh followed the one before it without a grid time left out. Then the
-// check takes as many steps as refreshes of that kind have followed one another, at most
-// kCheckMostSteps: a step opens a file, decodes one frame record, or reads the end of a
-// file. At any other refresh the count begins again and the check takes no step, unless
-// it took none at the kCheckLongestWait refreshes before either: then it takes one, so
-// that a host that is always late still comes to the end of the check. A fault makes the
-// show invalid with the reason the start gives for it.
-void check_after_start(Core &core, bool in_step);
+// whether the refresh followed the one before it without a grid time left out, and
+// `on_time` whether it came no later than kCheckOnTimeMs after its grid time while the
+// last whole second had kCheckLeastRate refreshes or more, or in the first second. At a
+// refresh that is both, the check takes as many steps as refreshes of that kind have
+// followed one another, at most kCheckMostSteps: a step opens a file, decodes one frame
+// record, or reads the end of a file. At any other refresh the count begins again and
+// the check takes no step, unless it took none at the kCheckLongestWait refreshes before
+// either: then it takes one, so that a host that is always late still comes to the end of
+// the check. A fault makes the show invalid with the reason the start gives for it.
+void check_after_start(Core &core, bool in_step, bool on_time);
 
 }  // namespace odrig
 

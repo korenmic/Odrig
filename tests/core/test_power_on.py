@@ -70,9 +70,10 @@ class TheCheck(Playback):
         return busy + 1
 
     # The check takes no step at the first refresh and then, while each refresh follows the
-    # one before it without a gap, 1, 2, 3 and so on to 16 steps at a refresh. After a gap
-    # it takes none, or one when it took none at the three refreshes before either. A
-    # file of n frames takes n + 2 steps.
+    # one before it without a gap and on time, 1, 2, 3 and so on to 16 steps at a refresh.
+    # At a refresh that comes after a gap or more than 2 ms late it takes none, or one when
+    # it took none at the nine refreshes before either. A file of n frames takes n + 2
+    # steps.
 
     def test_a_file_of_ten_frames_is_read_at_the_sixth_refresh(self):
         # 12 steps: 0 + 1 + 2 + 3 + 4 = 10 after five refreshes, 15 after six.
@@ -97,8 +98,28 @@ class TheCheck(Playback):
         # a gap and takes none; those after it take 1, 2, 3 and 4: 13 at the eighth.
         self.assertEqual(self.listed_after(animations(a=frames(10)), (0, 20, 40, 100, 120, 140, 160, 180, 200)), 8)
 
-    def test_a_refresh_that_is_asked_for_late_inside_its_grid_time_is_no_gap(self):
-        self.assertEqual(self.listed_after(animations(a=frames(10)), (0, 39, 41, 79, 80, 119, 139)), 6)
+    def test_a_refresh_late_inside_its_grid_time_takes_no_step_and_the_count_begins_again(self):
+        # A file of one frame: 3 steps. None at the first refresh, nor at 39 ms, 19 ms
+        # late; one at 41 ms, on time; none at 79 ms; one at 80 ms; then none at the
+        # refreshes 19 ms late but the tenth of them, at 299 ms, the fifteenth refresh.
+        times = (0, 39, 41, 79, 80) + tuple(range(119, 400, 20))
+        self.assertEqual(self.listed_after(animations(a=frames(1)), times), 15)
+
+    def test_after_a_second_of_fewer_than_30_refreshes_it_takes_only_its_floor(self):
+        # 202 steps. The first second has 20 refreshes in a row, which take 184; in the
+        # next one the rate of the last second is too low, and the check takes one step in
+        # ten refreshes: 2 in the first 20 refreshes, 5 in all 50. In the third second the
+        # rate lets it go on with 1, 2, 3, 4 and 5 steps: the 75th refresh.
+        files = animations(a=frames(200))
+        script = []
+        for time in (*range(0, 400, 20), *range(1000, 1400, 20)):
+            script += [f"poll {T0 + time}", told(time, "list")]
+        given = replies(self.assert_as_the_reference(files, script, check_first=False))
+        self.assertEqual(set(given), {refused("busy")})
+        self.assertEqual(self.listed_after(files, (*range(0, 400, 20), *range(1000, 3000, 20))), 20 + 50 + 5)
+
+    def test_a_refresh_two_milliseconds_late_is_on_time(self):
+        self.assertEqual(self.listed_after(animations(a=frames(10)), (0, 22, 42, 62, 82, 102, 122)), 6)
 
     def test_after_every_gap_the_count_begins_with_one_step_again(self):
         # Two refreshes in a row, a gap, two in a row: the second of each pair takes one
@@ -106,10 +127,10 @@ class TheCheck(Playback):
         times = [60 * pair + late for pair in range(15) for late in (0, 20)]
         self.assertEqual(self.listed_after(animations(a=frames(10)), times), 24)
 
-    def test_refreshes_that_never_follow_one_another_take_a_step_at_every_fourth(self):
+    def test_refreshes_that_never_follow_one_another_take_a_step_at_every_tenth(self):
         # 12 steps, at the refreshes 4, 8 and so on: the last at the 48th.
-        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 4000, 40)), 48)
-        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 400000, 4000)), 48)
+        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 6000, 40)), 120)
+        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 600000, 4000)), 120)
 
     def test_a_show_without_a_file_has_nothing_to_check(self):
         files = show_of([], {})
@@ -185,7 +206,7 @@ class Busy(Playback):
 
 class Apart(Playback):
     """No refresh of these sessions follows another in step, so the check takes one step
-    at every fourth of them and comes to a file long after the player has: what the core
+    at every tenth of them and comes to a file long after the player has: what the core
     knows of a length when it needs it, it has mostly learned by playing."""
 
     def apart(self, files, script):
@@ -221,7 +242,7 @@ class Apart(Playback):
 
 class PlayedBeforeItsFileIsRead(Apart):
     def test_the_first_loop_is_played_while_list_is_still_busy(self):
-        # Seven refreshes: the check has taken one step of the six the first file needs.
+        # Seven refreshes: the check has taken no step of the six the first file needs.
         script = asked_at(range(0, 7000, 1000)) + [told(6000, "list")]
         printed = self.assert_as_the_reference(three(), script, check_first=False)
         self.assertEqual(printed[-1], f"reply {refused('busy')}")

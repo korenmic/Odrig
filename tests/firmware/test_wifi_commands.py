@@ -274,7 +274,7 @@ class InstallFirmware(OnASmallLayout):
         esptool = self.esptool()
         self.install(esptool)
         self.install(esptool, "--wait", "90")
-        self.assertEqual(esptool.waited, [20.0, 20.0, 90.0, 90.0])
+        self.assertEqual(esptool.waited, [300.0, 300.0, 90.0, 90.0])
 
     def test_without_the_option_the_settings_file_is_read(self):
         esptool = self.esptool()

@@ -7897,3 +7897,81 @@ was.
 
 **Resolution.** `preview/__init__.py`, `run` and `checked`;
 `tests/emulator/test_preview.py`.
+
+## Seed 14: A refresh that is in step but late
+
+**Question.** The board test of the seed played a dense 60 x 60 animation while the
+board read two more of them. Its rate fell to between 14 and 24 refreshes a second, and
+the reading took 205 seconds. Why, and what changes?
+
+**Answer.** On the board a dense frame takes most of a grid time to make, and a step of
+the check, decoding one dense frame record, about as long again. A refresh that came
+late within its grid time still counted as in step, so the count of the row went on
+growing: two steps, then three, made the refreshes after them later still, and the rate
+fell below what the owner accepts. A first change, one step at each refresh that is in
+step but late, was not enough: on the board a step of a dense record, which reads the
+file again besides decoding it, costs more than a grid time, and the rate stayed between
+13 and 23. So now a refresh takes steps only when it is in step and no more than 2 ms
+after its grid time; any other refresh takes none, apart from the one in four of the
+floor. Beside a light show the polls come on time and the check runs at up to sixteen
+steps a refresh, as before; beside a heavy one it takes a step now and then. The test
+host polls on its grid times, so the core's tests keep their figures; two new tests poll
+late within the grid.
+
+The figures of the board after the change are in the firmware page.
+
+**Resolution.** `core/src/core.cpp`, `check_after_start`; `core/src/player.cpp`,
+`player_poll`; `core/src/core_state.h`, `kCheckOnTimeMs`; `tests/core/support.py`,
+`CHECK_ON_TIME_MS`; `tests/core/test_power_on.py`, `TheCheck`; `docs/core.md`, "The
+check after the start".
+
+## Seed 14: How long the firmware tool waits for an install
+
+**Question.** `install-show` and `install-firmware` wait for the board to read its
+animations, within 20 seconds by default. Is that enough?
+
+**Answer.** No. On the board a storage full of dense animations is read for some minutes
+while one of them plays, and the default made such an install end with `check-not-done`.
+The default of these two commands is 300 seconds now. They go on as soon as the board has
+read its animations, so a small show costs no more than before. The other commands keep
+20 seconds.
+
+**Resolution.** `firmware/fwtool/board.py`, `SETTLE_SECONDS`; `firmware/fwtool/cli.py`;
+`docs/firmware.md`, `install-show` and `install-firmware`.
+
+## Seed 14: The floor of the check's pace on the board
+
+**Question.** The floor of the check's pace gives a host that is late for every refresh
+one step in four refreshes. Is that within what the owner accepts on the board?
+
+**Answer.** No. With a dense 60 x 60 animation playing, the board's refreshes are late
+nearly always, and a step of the check on another dense file costs it about 120 ms: the
+two files are read and decoded side by side. One step in four refreshes held the rate
+between 12 and 22 a second, below the 20 the owner accepts. The floor is one step in ten
+refreshes now, which costs about an eighth of a second in four. Beside a light animation
+the check keeps its pace, sixteen steps a refresh at the most, since the refreshes come on
+time. The price is the time the check takes while a dense animation plays: minutes for a
+storage of dense files, during which `list`, `remove` and `upload begin` answer `busy`.
+The firmware page has the figures.
+
+**Resolution.** `core/src/core_state.h`, `kCheckLongestWait`; `tests/core/support.py`,
+`CHECK_LONGEST_WAIT`; `tests/core/test_power_on.py`; `tests/core/test_body_faults.py`;
+`docs/core.md`.
+
+## Seed 14: The check gives way to a low rate
+
+**Question.** With the floor at one step in ten refreshes, the board's rate still fell
+below 20 a second while a dense animation played and the check read another. Why?
+
+**Answer.** On the board a refresh of a dense animation comes on time more often than the
+rate shows: the task that asks for refreshes waits for the outputs and then asks at once,
+often within 2 ms of the next grid time. So the check took its row of steps at those
+refreshes, each about 120 ms, and the rate fell. The check now also looks at the rate:
+it takes its steps only while the last whole second had 30 refreshes or more, or in the
+first second, which has no last one. Below that it takes the floor's one step in ten
+refreshes and no more, and the rate comes back. Beside a light animation the rate is 50
+and nothing changes.
+
+**Resolution.** `core/src/player.cpp`, `player_poll`; `core/src/core_state.h`,
+`kCheckLeastRate`; `tests/core/support.py`, `CHECK_LEAST_RATE`;
+`tests/core/test_power_on.py`, `TheCheck`; `docs/core.md`.

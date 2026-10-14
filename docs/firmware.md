@@ -285,9 +285,12 @@ The board plays right after its restart and reads the animations while it plays.
 it has read them all it answers `list` with `busy`, and a fault it finds in one of them
 shows in `status` only then. So the tool waits for the first reply to `status`, asks for
 the list every half second until it is no longer refused with `busy`, and then asks for
-the status it prints. All of that has 20 seconds, or as long as `--wait SECONDS` says. A
-board that is still reading when the time is over ends the command with
-`check-not-done`: the show is installed, and whether it is sound is not known yet.
+the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
+the board reads a storage full of dense animations for some minutes while one of them
+plays, and a small show within a few seconds; see
+[Measurements on the board](#measurements-on-the-board). A board that is still reading
+when the time is over ends the command with `check-not-done`: the show is installed, and
+whether it is sound is not known yet.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
@@ -416,8 +419,10 @@ The settings file and the limit file are read and checked first, and then the im
 `build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
 refused, the board has not been touched. `--settings FILE` reads another settings file,
 `--limit FILE` another limit file,
-and `--wait SECONDS` is the time the command waits for the board's reply after each of
-its two restarts, 20 seconds without it. The command takes 50 seconds on the bench board.
+and `--wait SECONDS` is the time the command waits after each of its two restarts, 300
+seconds without it; it goes on as soon as the board has answered, and after the second
+restart as soon as the board has read its animations. The command takes 50 seconds on
+the bench board.
 
 When the command fails after the firmware was written, the board runs the firmware with
 the name and the password its storage had. Running the command again, or `set-wifi`,
@@ -866,13 +871,18 @@ What the figures say:
   loop of an animation and at every turn of the playlist or of a cycle: 24 ms for a small
   file, and up to 70 ms with dense clips, when the frames that came due meanwhile are decoded in the same
   request.
-- **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 217 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
-  compressed and 4.3 s uncompressed, and 39 s for a storage filled with 9 MB of such
-  clips. For that time the LEDs are dark and the board answers nothing, on the port or on
-  the network; WLED opens its access point only afterwards. `install-show` and `flash`
-  wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
-  large show.
+- **The show plays at once after a restart.** The core reads the first 16 bytes of every
+  file at its start, and the rest while the show plays. Measured through the socket
+  marked COM: `status` answered 0.48 s after a restart with the demo show, 0.72 s with
+  two dense 60 x 60 clips, and 1.31 s with 9 MB of dense clips behind a small animation,
+  each time with the playlist playing; before, the board was dark and silent for 39 s
+  with 9 MB.
+- **Reading the files after the start** took 1.9 s for the demo show, at 47 or 48
+  refreshes a second. For the 9 MB behind a small animation it took 491 s: while the
+  small animation played its turn the rate was 36 to 48, and while a dense clip played
+  it was 20 to 33, 30.5 on average, because the check then gives way and reads one frame
+  record in ten refreshes. Until it has read everything, `list`, `remove` and
+  `upload begin` answer `busy`; `install-show` and `install-firmware` wait for it.
 - **`install-show`** takes 37 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. One dense
   clip takes a minute and 9 MB take three.

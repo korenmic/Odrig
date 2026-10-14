@@ -198,12 +198,12 @@ bool check_complete(const Core &core) {
     return core.check_done != 0;
 }
 
-void check_after_start(Core &core, bool in_step) {
+void check_after_start(Core &core, bool in_step, bool on_time) {
     if (core.invalid || check_complete(core)) {
         return;
     }
     uint8_t steps;
-    if (in_step) {
+    if (in_step && on_time) {
         if (core.check_row < kCheckMostSteps) {
             ++core.check_row;
         }

@@ -315,12 +315,14 @@ inside `odrig_core_poll`, after the LED data of a refresh is complete:
   core then knows the size of the file, which `list` reports, and the length of its loop.
 
 A file of F frame records takes F + 2 steps. At a refresh that follows the one before it
-without a grid time skipped, the check takes one step more than at the refresh before,
-up to 16 steps. At any other refresh the count begins again and the check takes no step,
-unless it took none at the three refreshes before either: then it takes one. So the
-check is fast beside a show that leaves the host time, gives way to one that does not,
-and still comes to its end with a host that is late for every refresh, at one step in
-four refreshes.
+without a grid time skipped, and comes no more than 2 ms after its grid time, while the
+last whole second had 30 refreshes or more, the check takes one step more than at the
+refresh before, up to 16 steps. At any other refresh,
+one after a gap or one later than that, the count begins again and the check takes no
+step, unless it took none at the nine refreshes before either: then it takes one. So
+the check is fast beside a show that leaves the host time, takes a step now and then
+beside one that does not, and still comes to its end with a host that is late for every
+refresh, at one step in ten refreshes.
 
 A fault the check finds makes the show invalid from that refresh on, with the text
 [reasons.md](reasons.md) has for it; that refresh is dark already. A file that cannot be
@@ -339,8 +341,9 @@ What a late refresh costs:
 
 - The check loses its pace. The late refresh takes no step, and the next ones take 1, 2,
   3 and so on again: a single gap costs the check up to 136 steps over the next 17
-  refreshes. A host that is late for every refresh gets one step in four refreshes, and
-  that refresh is later by the time one frame record takes to decode.
+  refreshes. A host that is late for every refresh gets one step in ten refreshes, and
+  that refresh is later by the time one frame record takes to read and decode: on the
+  board, beside a dense animation, about an eighth of a second.
 - The player, with lengths not known, decodes what lies between the last picture and
   this one, as it does with the lengths known. After a long time without a refresh it
   walks the turns that went by one by one, and decodes each animation among them once,

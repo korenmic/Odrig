@@ -141,13 +141,13 @@ class FoundByTheCheck(BodyFaults):
 
 class FoundByThePlayer(BodyFaults):
     """No refresh of these sessions follows another in step, so the check takes a step at
-    every fourth of them, and the first file of the show keeps it busy for longer than a
+    every tenth of them, and the first file of the show keeps it busy for longer than a
     session lasts: 402 steps. What is found here, the player finds."""
 
     LONG = 400
 
     def every_40_ms(self, last):
-        self.assertLess(last // 40 // 4, self.LONG)
+        self.assertLess(last // 40 // 10, self.LONG)
         script = [f"poll {T0 + time}" for time in range(0, last + 1, 40)]
         return script + [support.line(T0 + last, "status"), support.line(T0 + last, "list")]
 
@@ -218,11 +218,11 @@ class FoundByThePlayer(BodyFaults):
 class FoundByTheCheckOfALateHost(BodyFaults):
     def test_a_host_that_is_always_late_still_comes_to_the_fault(self):
         # The fault lies after the last frame, where the player never reads. The check
-        # takes its 6 and 12 steps at every fourth refresh: the last at the 72nd.
+        # takes its 6 and 12 steps at every tenth refresh: the last at the 180th.
         whole = support.clip(7, 3, 2, (20,) * 10, compressed=False)
         files = show_with(whole + b"\0", sound=4)
-        script = [f"poll {T0 + 40 * step}" for step in range(80)] + [support.line(T0 + 3200, "status"), support.line(T0 + 3200, "list")]
+        script = [f"poll {T0 + 40 * step}" for step in range(190)] + [support.line(T0 + 7600, "status"), support.line(T0 + 7600, "list")]
         printed, logs = self.session(files, script)
-        self.assertEqual(logs, [(40 * 71, "file-malformed faulty.odrg trailing-bytes")])
-        self.assert_dark_from(printed, 40 * 71)
+        self.assertEqual(logs, [(40 * 179, "file-malformed faulty.odrg trailing-bytes")])
+        self.assert_dark_from(printed, 40 * 179)
         self.assert_invalid(printed, "file-malformed faulty.odrg trailing-bytes")

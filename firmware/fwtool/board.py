@@ -13,6 +13,9 @@ from . import Failure
 PORT_VARIABLE = "ODRIG_BOARD_PORT"
 PORT_PATTERN = "/dev/cu.usbmodem*"
 WAIT_SECONDS = 20.0
+# How long an install waits after its restart for the board to read its animations, which
+# it does while it plays: some minutes for a storage full of dense ones.
+SETTLE_SECONDS = 300.0
 EXCHANGE_SECONDS = 2.0
 LIST_EVERY_SECONDS = 0.5
 

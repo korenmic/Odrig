@@ -832,7 +832,7 @@ public:
             // them, so that the session begins with every file read to its end.
             guard::InCore inside;
             while (!core_->state.invalid && !odrig::check_complete(core_->state)) {
-                odrig::check_after_start(core_->state, true);
+                odrig::check_after_start(core_->state, true, true);
             }
         }
         std::printf("core ok\n");

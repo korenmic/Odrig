@@ -774,12 +774,16 @@ class ReferencePlayer:
             if self.upload["steps"] == 0:
                 self.upload["state"] = "checked"
         # The check after the start takes as many steps as refreshes have followed one
-        # another without a gap, at most 16. After a gap it takes none, or one when it
-        # took none at the three refreshes before either. A fault it finds makes the
-        # show invalid from this refresh on.
+        # another without a gap and no more than 2 ms after their grid times, while the
+        # last whole second had 30 refreshes or more, at most 16. At any other refresh it
+        # takes none, or one when it took none at the nine refreshes before either. A
+        # fault it finds makes the show invalid from this refresh on.
         if self.error is None and self.checks:
-            self.check_row = min(self.check_row + 1, self.CHECK_MOST_STEPS) if in_step else 0
-            steps = self.check_row if in_step else int(self.check_idle >= self.CHECK_LONGEST_WAIT)
+            second = (now - self.t0) // 1000
+            steady = second == 0 or self.refreshes_in[second - 1] >= self.CHECK_LEAST_RATE
+            on_time = in_step and now - grid <= self.CHECK_ON_TIME_MS and steady
+            self.check_row = min(self.check_row + 1, self.CHECK_MOST_STEPS) if on_time else 0
+            steps = self.check_row if on_time else int(self.check_idle >= self.CHECK_LONGEST_WAIT)
             self.check_idle = 0 if steps else self.check_idle + 1
             for _ in range(steps):
                 check = self.checks[0]
@@ -797,7 +801,9 @@ class ReferencePlayer:
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
     CHECK_MOST_STEPS = 16
-    CHECK_LONGEST_WAIT = 3
+    CHECK_LONGEST_WAIT = 9
+    CHECK_ON_TIME_MS = 2
+    CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
     COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
