@@ -400,3 +400,8 @@ are in [format.md](format.md), "Measured sizes".
   app beside them. The app there is the web code of `app/www/` as the APK holds it,
   served by the emulator under `/app/` and aimed at that emulator. It runs only while
   the view is shown.
+- 2026-10-14: Seed 19 added `python -m preview FILE`: the emulator with one finished
+  animation alone. It is a program of its own beside the emulator and the command tool:
+  the converter packs a show without items, and the file is uploaded into it as an
+  animation is uploaded to the board, so the core judges it. The preview converts
+  nothing and writes no show file.

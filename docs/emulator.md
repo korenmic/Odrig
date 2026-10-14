@@ -9,7 +9,8 @@ decision about files, time and commands to it.
 This page covers the [commands](#commands) that build and test it, the
 [two shows](#two-shows-to-run) to run, [starting](#starting) it, its
 [serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
-[command tool](#the-command-tool), [the page](#the-page) with its three views, the
+[command tool](#the-command-tool), [previewing one animation](#previewing-one-animation),
+[the page](#the-page) with its three views, the
 [event stream](#the-event-stream), [record mode](#record-mode), the
 [exit statuses](#exit-statuses), what is [open after the work on Windows](#on-windows) and
 the [check list by eye](#the-check-list-by-eye).
@@ -822,6 +823,36 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 `odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
+
+## Previewing one animation
+
+```
+python -m preview FILE [--mapping FILE] [--no-browser] [--core PATH]
+```
+
+Shows one finished `.odrg` file in the emulator, alone, until Ctrl-C. The path may be
+absolute or relative, and the file may have any name: it is not changed. `preview` is a
+small program of its own, beside the emulator and the command tool, and holds no
+converter logic.
+
+1. The converter's `check` reads the file. A file it refuses ends the command with the
+   reason, `preview: <file> is refused: bad-magic` for example, before anything starts.
+2. The converter packs `shows/preview/show.json`, a show without items at brightness
+   255, with the mapping into `build/preview/<process id>/`. The mapping is
+   `mapping/legs-20.json`, the installation's 60 x 60, unless `--mapping` names another.
+3. The emulator starts on that folder, on port 8600, or on a free port when that is
+   taken: the command then says `preview: port 8600 is taken; the page is on <port>`.
+   It has a serial port and a line port of its own, so it runs beside another emulator.
+4. The file is uploaded as item 1, `preview.odrg`, as the operators' app will upload one
+   to the board: the core checks it whole. A file of another canvas ends the command with
+   `preview: <file> is 60 x 60, and the mapping <mapping> is 60 x 6`.
+5. `page: <address>` is printed and the page opens in the default browser, unless
+   `--no-browser` is given. The playlist is the one animation, in loops.
+
+Ctrl-C, or a termination, stops the emulator and removes the folder; the command then
+ends with 0. A refusal ends it with 1 and one line on standard error, with nothing left
+running. Without the core's library, or without Node.js, it says which step of
+[getting-started.md](../agent/getting-started.md) is missing and starts nothing.
 
 ## Record mode
 

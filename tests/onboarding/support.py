@@ -221,6 +221,9 @@ def _python(words):
             return None
         made = tool.parser()
         return understood(lambda given: tool.command_line(made, made.parse_args(given)), rest)
+    if module == "preview":
+        import preview
+        return understood(preview.parser().parse_args, rest) if rest else None
     if module == "unittest":
         if rest[:2] != ["discover", "-s"] or rest[3:] != ["-t", "."]:
             return "a suite is selected by discovery: -m unittest discover -s FOLDER -t ."

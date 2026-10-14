@@ -147,11 +147,11 @@ page: http://127.0.0.1:8600/
 serial: <the repository root>/build/emulator/serial
 ```
 
-Open the page's address in the browser. It draws all 3,600 LEDs, with the twenty legs in
-twenty colours. The words HELLO WORLD stand upright in the middle; after half a minute a
-small square runs along the diagonal, and the two take turns. The header shows what is
-playing and two counts of refreshes a second, `core` and `page`, both about 50. The tab
-`Mapping` shows the board and how every leg is wired to it.
+Open the page's address in the browser. It draws all 3,600 LEDs, twenty legs in twenty
+colours: HELLO WORLD upright, then a small square on the diagonal, in turns. The header
+shows what plays and two counts of refreshes a second, `core` and `page`, about 50 each.
+`Mapping` shows how every leg is wired to the board, `Controller` the operators' app.
+`.venv/bin/python -m preview build/demo-20/show/dvd.odrg` shows one file alone.
 
 Send it commands from a second terminal. The first two go through the emulator's serial
 port, the way the board takes them over USB, and the third over HTTP, the way the board
