@@ -142,7 +142,7 @@ Rules for every task:
   - The seed's state stays `in_progress`: its last item is the owner's.
   - Requirements: 14.4, 15.1, 15.2, 15.3
 
-- [ ] 10. The app in the emulator's page
+- [x] 10. The app in the emulator's page
   - `emulator/httpd.py`: the table of `app/www/` under `/app/`. `emulator/web/`: the
     third tab, the pane, the frame that is made and removed, the address kept for the
     app.

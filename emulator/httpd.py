@@ -1,5 +1,6 @@
-"""The HTTP server on the page address: the files of the page, commands as `POST /odrig`,
-the event stream for the page, and the mapping file of the show."""
+"""The HTTP server on the page address: the files of the page, the files of the operators'
+app for the page's controller view, commands as `POST /odrig`, the event stream for the
+page, and the mapping file of the show."""
 
 import http.server
 import os
@@ -29,6 +30,10 @@ KEEP_ALIVE_SECONDS = 15
 STREAM_SEND_BUFFER = 32768
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+# The web code of the operators' app, which the page shows in a frame, and the path its
+# files are asked for under.
+APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "www")
+APP_PATH = "/app/"
 INDEX = "index.html"
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -50,6 +55,23 @@ def page_files(folder=WEB):
             files["/" + name] = (place, content_type)
     if "/" + INDEX in files:
         files["/"] = files["/" + INDEX]
+    return files
+
+
+def app_files(folder=APP):
+    """The files of the operators' app by the path each is asked for, under `/app/`: its
+    place on disk and its content type. The table is made by walking the folder, so
+    nothing outside it can be asked for. A folder that is not there gives an empty table."""
+    files = {}
+    for base, folders, names in os.walk(folder):
+        folders.sort()
+        for name in sorted(names):
+            content_type = CONTENT_TYPES.get(os.path.splitext(name)[1])
+            if content_type is not None:
+                place = os.path.join(base, name)
+                files[APP_PATH + os.path.relpath(place, folder).replace(os.sep, "/")] = (place, content_type)
+    if APP_PATH + INDEX in files:
+        files[APP_PATH] = files[APP_PATH + INDEX]
     return files
 
 
@@ -208,7 +230,7 @@ class Server(http.server.ThreadingHTTPServer):
         self.engine = engine
         self.show_dir = os.fspath(show_dir)
         self.hello = hello
-        self.pages = page_files()
+        self.pages = {**page_files(), **app_files()}
         try:
             super().__init__((EVERY_ADDRESS if lan else ADDRESS, port), Handler)
         except OSError as error:

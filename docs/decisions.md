@@ -395,3 +395,8 @@ are in [format.md](format.md), "Measured sizes".
   the built APK. No program has run the app on a phone: that check is the owner's and is
   open, and the seed stays open with it. The app has no cap on the brightness: the owner
   ruled that none is needed.
+- 2026-10-14: The owner asked for the operators' app in the emulator's page, as a
+  refinement of seed 09. The page has a third view, `Controller`, with the LEDs and the
+  app beside them. The app there is the web code of `app/www/` as the APK holds it,
+  served by the emulator under `/app/` and aimed at that emulator. It runs only while
+  the view is shown.

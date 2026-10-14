@@ -137,8 +137,13 @@ python3 app/app.py serve
 
 Serves the web code on `http://127.0.0.1:8610/`, or on the port `--port` names, for a
 browser on this computer, and runs until it is stopped. With an emulator running beside
-it, write the emulator's address, `127.0.0.1:8600`, into the app's target screen. This is
-the quickest way to try a change of the web code.
+it, write the emulator's address, `127.0.0.1:8600`, into the app's target screen.
+
+The emulator shows the app by itself as well: its page has a view `Controller`, at
+`http://127.0.0.1:8600/#controller`, with the app beside the LEDs and aimed at that
+emulator. It serves the same files of `app/www/`, so a change of the web code shows
+there after a reload. This is the quickest way to try the app: see
+[emulator.md](emulator.md#the-controller-view).
 
 ## Installing on a phone
 

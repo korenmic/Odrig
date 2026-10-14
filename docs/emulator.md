@@ -9,7 +9,7 @@ decision about files, time and commands to it.
 This page covers the [commands](#commands) that build and test it, the
 [two shows](#two-shows-to-run) to run, [starting](#starting) it, its
 [serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
-[command tool](#the-command-tool), [the page](#the-page) with its two views, the
+[command tool](#the-command-tool), [the page](#the-page) with its three views, the
 [event stream](#the-event-stream), [record mode](#record-mode), the
 [exit statuses](#exit-statuses), what is [open after the work on Windows](#on-windows) and
 the [check list by eye](#the-check-list-by-eye).
@@ -285,8 +285,10 @@ warning: --lan: anyone on the local network can send commands to this emulator a
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
 plain files in `emulator/web/`, loads nothing from another host, and works without a
-network connection. The page only shows: it sends no command. Every change on it comes
-from the [event stream](#the-event-stream), so a command sent by any tool is seen at once.
+network connection. The page itself only shows: it sends no command. Every change on it
+comes from the [event stream](#the-event-stream), so a command sent by any tool is seen
+at once. Its third view holds the operators' app, which does send commands, as it does on
+a phone.
 
 From top to bottom the page has:
 
@@ -300,9 +302,9 @@ From top to bottom the page has:
   reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
   LEDs to draw, and the page says so.
-- **The drawing**, in two views chosen by the tabs `LEDs` and `Mapping`, both described
-  below, with a readout at its top right that names what the pointer is on:
-  `leg 2, pin 2, LED 61 (1,2)`.
+- **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
+  each described below, with a readout at its top right that names what the pointer is
+  on: `leg 2, pin 2, LED 61 (1,2)`.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
@@ -593,6 +595,33 @@ and 756 x 627 of a window of 756 x 900. For the target file, in pixels:
 | 756 x 627 | cells of 8, without the LED numbers | narrow, cells of 9, the drawing 696 x 1263 |
 | 1920 x 1000 | cells of 14, with the LED numbers | wide, cells of 12, the drawing 1255 x 990 |
 | 600 x 546 | cells of 8, without the LED numbers | narrow, cells of 7, the drawing 576 x 1143 |
+
+### The controller view
+
+The third tab, `Controller`, shows the LEDs as the LEDs view does and, beside them, the
+operators' app of [android-app.md](android-app.md). The address
+`http://127.0.0.1:8600/#controller` opens it directly. The app stands in a frame as wide
+as a phone, 390 points; in a window narrower than 760 points it lies under the LEDs.
+
+- **The same code.** What runs in the frame is the app's web code, the files of
+  `app/www/`, which the emulator serves under `/app/` as they are. The APK holds the same
+  files, so what a button does here is what it does on a phone. One thing differs: on a
+  phone a piece of Android code carries each line to the target, and here the browser
+  does.
+- **Its target is this emulator.** The page gives the app its own address before the app
+  starts, so the app answers at once and goes to its show screen. The app's target
+  screen shows that address, and takes another as it does on a phone.
+- **What it sends.** `status` once a second, `list` now and then, and a line for each
+  press: `play <id>`, `play all`, `on`, `off`, `brightness <n>`. The lines are in the
+  command log as lines over HTTP, and the LEDs beside the app show what they did.
+- **Only while it is shown.** The frame is made when the tab is chosen and removed when
+  another tab is: on the other two views the app does not run, and nothing is sent.
+
+With `--lan` the browser of a phone opens the same view at the address of the `lan:`
+line with `#controller` at its end.
+
+The emulator serves `app/www/` from the repository it runs in. Where that folder is not
+there, the frame is empty.
 
 ## The event stream
 

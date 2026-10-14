@@ -1,11 +1,15 @@
-/* The page: the event stream, the header, the reason band, the log, the two views, the
-   readout and the count of refreshes drawn. The page sends no command. */
+/* The page: the event stream, the header, the reason band, the log, the three views, the
+   readout and the count of refreshes drawn. The page sends no command: in the controller
+   view the operators' app runs in a frame, and the lines are the app's. */
 
 (function () {
   "use strict";
 
   var LOG_ROWS = 500;
   var LINE_SHOWN = 200;
+  var VIEWS = ["leds", "mapping", "controller"];
+  /* Where the operators' app keeps the address of its target. */
+  var APP_ADDRESS = "odrig.target";
 
   function byId(id) {
     return document.getElementById(id);
@@ -16,6 +20,7 @@
   var note = byId("note");
   var entries = byId("entries");
   var logBox = byId("log");
+  var pane = byId("controller");
 
   var hello = null;
   var mapping = null;
@@ -25,7 +30,14 @@
   var drawn = 0;
   var second = Math.floor(performance.now() / 1000);
   var statusError = null;
-  var view = location.hash === "#mapping" ? "mapping" : "leds";
+
+  /* The view the address of the page names: `#mapping`, `#controller`, or the LEDs. */
+  function named() {
+    var asked = VIEWS.indexOf(location.hash.slice(1));
+    return VIEWS[asked > 0 ? asked : 0];
+  }
+
+  var view = named();
 
   /* The count of refreshes drawn in the last full second. */
   function roll() {
@@ -237,13 +249,40 @@
     readout.textContent = "leg " + leg.leg + ", pin " + leg.pin + ", LED " + found.led + " (" + found.x + "," + found.y + ")";
   }
 
+  /* The operators' app runs in a frame while its view is shown and not otherwise: the
+     frame is made when the view is chosen and removed when it is left, and the app's
+     requests end with it. The app keeps the address of its target in the storage of
+     this origin, where it finds the address of this emulator. */
+  function controller(wanted) {
+    pane.hidden = !wanted;
+    if (!wanted) {
+      pane.textContent = "";
+      return;
+    }
+    if (pane.firstChild) {
+      return;
+    }
+    try {
+      localStorage.setItem(APP_ADDRESS, location.host);
+    } catch (error) {
+      /* Without storage the app begins with the board's address, and its target screen
+         takes another. */
+    }
+    var frame = document.createElement("iframe");
+    frame.title = "The operators' app";
+    frame.src = "app/";
+    pane.appendChild(frame);
+  }
+
   function show(name) {
     view = name;
-    byId("tab-leds").setAttribute("aria-pressed", String(name === "leds"));
-    byId("tab-mapping").setAttribute("aria-pressed", String(name === "mapping"));
-    if ((location.hash === "#mapping") !== (name === "mapping")) {
-      history.replaceState(null, "", name === "mapping" ? "#mapping" : location.pathname + location.search);
+    VIEWS.forEach(function (other) {
+      byId("tab-" + other).setAttribute("aria-pressed", String(other === name));
+    });
+    if (named() !== name) {
+      history.replaceState(null, "", name === "leds" ? location.pathname + location.search : "#" + name);
     }
+    controller(name === "controller");
     build();
   }
 
@@ -269,9 +308,10 @@
     }
     idle();
   });
-  byId("tab-leds").addEventListener("click", function () { show("leds"); });
-  byId("tab-mapping").addEventListener("click", function () { show("mapping"); });
-  window.addEventListener("hashchange", function () { show(location.hash === "#mapping" ? "mapping" : "leds"); });
+  VIEWS.forEach(function (name) {
+    byId("tab-" + name).addEventListener("click", function () { show(name); });
+  });
+  window.addEventListener("hashchange", function () { show(named()); });
   show(view);
   /* The drawing is made again whenever the stage changes its size. */
   var sizing = false;
