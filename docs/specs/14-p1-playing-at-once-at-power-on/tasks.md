@@ -36,7 +36,7 @@ Rules for every task:
 - Before a push, fetch: another contributor pushes to this repository.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The start opens the files, the show plays, and the bodies are checked after
+- [x] 1. The start opens the files, the show plays, and the bodies are checked after
   - Set `"state": "in_progress"` in
     `project-seeds/14-p1-playing-at-once-at-power-on/state.json`.
   - `core/src/`: the start as the design's section has it; the check after the start;

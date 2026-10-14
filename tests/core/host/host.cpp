@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include "core_state.h"
 #include "file_source.h"
 #include "guard.h"
 #include "inflate.h"
@@ -62,7 +63,7 @@ int usage() {
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
         "options of a session:\n"
-        "       --alloc-fails-at N  --dirty-memory  --trace-files\n"
+        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --check-first\n"
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
         "       --remove-after FILE N  --swap-after FILE N OTHER\n"
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
@@ -128,13 +129,15 @@ struct Options {
     bool dirty_memory = false;      // hand out memory filled with the byte 0xA5, not zeroed
     std::string read_fails_file;    // the file whose reading fails,
     long read_fails_offset = 0;     // the offset at which `read` returns -1,
-    long read_fails_after = 0;      // and the number of openings that are spared
+    long read_fails_after = 0;      // and the number of openings that are spared; with
+                                    // none spared, `read_at` fails at that offset too
     std::string remove_after_file;  // the file that is gone
     long remove_after = 0;          // once it has been opened this many times
     std::string swap_after_file;    // the file under whose name
     long swap_after = 0;            // after this many openings
     std::string swap_other;         // the content of this other file is served
     bool trace_files = false;       // print `open <name> <result>` for every `open`
+    bool trace_reads = false;       // print `read <name> <bytes>` for every `close`: what `read` gave of the file
     uint64_t storage = kBoardStorage;   // the total space `space` reports
     bool no_storage = false;        // the seven storage functions are null pointers
     bool only_space = false;        // of the seven, only `space` is there
@@ -143,9 +146,10 @@ struct Options {
     long cut_at = 0;                // the number of the storage call at which the power is cut
     long cut_keeps = 0;             // the bytes of that call that are written first, for a `write`
     bool trace_store = false;       // print `store <call> <arguments> <result>` for every storage call
-    long read_back_fails = -1;      // the offset from which `read_at` returns -1; none below 0
-    long read_back_differs = -1;    // the offset of the byte `read_at` gives with one bit changed
+    long read_back_fails = -1;      // of the uploaded file: the offset from which `read_at` returns -1; none below 0
+    long read_back_differs = -1;    // of the uploaded file: the offset of the byte `read_at` gives with one bit changed
     bool check_names = false;       // stop when the core names a file outside its names
+    bool check_first = false;       // let the check after the start end before the session
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -305,6 +309,9 @@ private:
             stop("file misuse", kFileMisuse);
         }
         host.is_open_ = false;
+        if (host.options_.trace_reads) {
+            std::printf("read %s %zu\n", host.open_name_.c_str(), host.offset_);
+        }
     }
 
     static void log(void *, const char *text) {
@@ -432,14 +439,24 @@ private:
         size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
-        const long fails = host.options_.read_back_fails;
+        const Options &options = host.options_;
+        const bool uploaded = std::strcmp(name, "upload.part") == 0;
+        if (name == options.read_fails_file && options.read_fails_after == 0) {
+            // As `read` does: no byte at or after the offset, and no end of the file there.
+            const size_t fails_at = static_cast<size_t>(options.read_fails_offset);
+            if (offset >= fails_at) {
+                return -1;
+            }
+            count = std::min(count, fails_at - offset);
+        }
+        const long fails = uploaded ? options.read_back_fails : -1;
         if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
             if (offset >= static_cast<size_t>(fails)) {
                 return -1;
             }
             count = static_cast<size_t>(fails) - offset;
         }
-        const long differs = host.options_.read_back_differs;
+        const long differs = uploaded ? options.read_back_differs : -1;
         if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
             content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
         }
@@ -634,6 +651,9 @@ private:
     enum From { kFromFolder, kFromFiles, kFromMemory };
 
     Options options_;
+
+public:
+    bool checks_first() const { return options_.check_first; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -806,6 +826,14 @@ public:
         if (core_ == nullptr) {
             std::printf("core null\n");
             return 0;
+        }
+        if (host_.checks_first()) {
+            // The check after the start takes its steps here, with no refresh between
+            // them, so that the session begins with every file read to its end.
+            guard::InCore inside;
+            while (!core_->state.invalid && !odrig::check_complete(core_->state)) {
+                odrig::check_after_start(core_->state, true);
+            }
         }
         std::printf("core ok\n");
         std::printf("memory %zu %zu\n", host_.bytes_given(), host_.blocks_given());
@@ -1188,6 +1216,12 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-files") {
                 options.trace_files = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-reads") {
+                options.trace_reads = true;
+                at += 1;
+            } else if (arguments[at] == "--check-first") {
+                options.check_first = true;
                 at += 1;
             } else if (arguments[at] == "--storage" && at + 1 < arguments.size() &&
                        storage_bytes(arguments[at + 1], &options.storage)) {

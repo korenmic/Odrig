@@ -7724,3 +7724,90 @@ progress: its last item, the check on a phone, is the owner's.
 **Resolution.** `app/apptool/cli.py`; `tests/apk/`; `app/www/screens/target.js`,
 `routeLine`; `app/apptool/stage.py`; `tests/onboarding/test_pages.py`, `PLANNED`;
 `docs/android-app.md`.
+
+## Seed 14: What the start reads of a file
+
+**Question.** The requirements say the start reads "the header only". The design says
+opening a file reads the palette as well, and calls that a difference. Which is it?
+
+**Answer.** The header only: the first 16 bytes. The core's decoder reads the palette
+with the first frame record, not when it is opened. So the code does what the
+requirements say, and the design's sentence about the palette is wrong. A fault in a
+palette is a fault in the body: the check after the start or the player finds it, not
+the start. Of the 34 invalid vectors, 10 are found by the start and 24 after it.
+
+**Resolution.** `core/src/core.cpp`, `open_file`; `tests/core/test_power_on.py`,
+`TheStart`; `docs/core.md`, "Startup".
+
+## Seed 14: How the old tests of the core meet the check after the start
+
+**Question.** About 150 tests of the core send `list`, `remove` or an upload right after
+the start, where the answer is `busy` now. The design gives each of them the refreshes
+the check needs first. Is that how it is done?
+
+**Answer.** No. The test host has a new option, `--check-first`: the check takes all its
+steps before the session begins, with no refresh between them. The helpers of the suite
+give that option unless a test asks for the core as it is after power-on, and the
+reference player has the same switch. Adding refreshes to 150 scripts would have changed
+the timestamps and the output of each, and with them what the tests say. The new tests,
+in `tests/core/test_power_on.py`, run without the option.
+
+Three more changes of the test host came with it. `--trace-reads` prints how many bytes
+of a file the core read before it closed it, which is how a test sees that the start
+decodes nothing. `--read-fails FILE OFFSET` now fails for `read_at` too, so a file that
+cannot be read is found by the check as it was found by the start.
+`--read-back-fails` and `--read-back-differs` now touch `upload.part` only: they are
+about what storage gives back of an upload, and the check after the start reads the
+installed files through the same function.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`, `CHECK_FIRST`;
+`docs/core.md`, "The test host".
+
+## Seed 14: How the reference player knows where a fault in a body lies
+
+**Question.** The reference player decodes a file at once and cannot say at which frame
+record a fault lies. The design has each test tell it the refresh at which the show
+turns invalid. Is that how it is done?
+
+**Answer.** No. For a file its own decoder refuses, the reference asks the core's
+decoder, outside any session, how many frame records come before the fault. From that
+number it counts the check's steps and knows the frames the player can still show, so
+every line of a session is compared, and no test has to give a refresh. The reference
+leans on the core for that one number; the tests of the invalid vectors pin it apart
+from any session.
+
+**Resolution.** `tests/core/support.py`, `found_in` and `_check`.
+
+## Seed 14: The design's `checked` mark of a file
+
+**Question.** The design gives every file a mark `checked`. Is it in the code?
+
+**Answer.** No. The core has one mark for the whole check, `check_done`. Nothing would
+read a mark of one file: `list`, `remove` and `upload begin` wait for the whole check,
+and the files of the show change only after it. Once it is complete it stays complete: a
+file an upload adds was read by the upload's own check.
+
+The player counts the records of a loop only while the length is not known. With the
+length known it decodes by time, as before, so a file that was swapped for a shorter one
+behind the core's back is still refused as `truncated`.
+
+**Resolution.** `core/src/core_state.h`, `check_done`; `core/src/player.cpp`,
+`first_loop_to` and `show_at`.
+
+## Seed 14: The emulator's tests, before the emulator's own task
+
+**Question.** The emulator plays with the same core, so from the first task on its tests
+get `busy` where they list, remove or upload right after a start. The tasks give those
+tests to the third task. What happens to them in the first?
+
+**Answer.** They are mended in the first, because every suite has to pass with every
+commit. The suite's `Emulator` asks for the list over HTTP until it is no longer
+refused, and only then hands the emulator to the test; a test that wants the emulator as
+it is after power-on says so. The emulator logs what it is asked, so the helper that
+reads the event stream leaves those first entries out. Two tests of record mode, where
+time is the script's, send their upload a second later, and the reference they are
+compared with reads its files at its refreshes, as the core does. The third task adds
+the emulator's new tests and its page.
+
+**Resolution.** `tests/emulator/support.py`, `Emulator.wait_for_the_check`,
+`EventStream` and `reference`; `tests/emulator/test_record.py`.

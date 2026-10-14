@@ -162,6 +162,12 @@ different from the mapping's.
 
 With an invalid show the LEDs stay dark, and the status command reports what is wrong.
 
+When it starts, the player reads the mapping, `show.json` and the header of every listed
+file, and then plays at once. What a file holds after its header it reads while the show
+plays. A fault it finds there makes the show invalid at that moment: the LEDs go dark,
+and the status command reports it from then on. A player whose storage cannot be changed
+reads every file to its end when it starts.
+
 Each of these has a fixed name, listed under "Shows" in [reasons.md](reasons.md). When a show
 is invalid in more than one way, the first in this order is reported: the mapping file, the
 format of `show.json`, an id used twice, an id that does not exist, a cycle that names a

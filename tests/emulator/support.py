@@ -119,9 +119,10 @@ def reference(files, ticks, commands=()):
     `(time, line)` in the order they are sent: each is given with its own time before the
     first tick that is not earlier, and after the last tick when none is. Returns
     `(refreshes, replies)`: for each tick `None` when no refresh was due, or each leg's
-    LED data in the order of the mapping file; and the reply to each command.
+    LED data in the order of the mapping file; and the reply to each command. The player
+    is as the core is after power-on: it reads the files to their ends at its refreshes.
     """
-    player = ReferencePlayer(files)
+    player = ReferencePlayer(files, check_first=False)
     waiting = collections.deque(commands)
     refreshes = []
     replies = []
@@ -158,6 +159,11 @@ def without_fps(reply):
 Response = collections.namedtuple("Response", "status headers body")
 
 
+# How many times each emulator was asked for its list while a test waited for it, by the
+# port of its page.
+_ASKED_FIRST = {}
+
+
 class Emulator:
     """The emulator in real time, as a child process on a free port.
 
@@ -167,11 +173,17 @@ class Emulator:
     serial port is made in a temporary folder. Where there is no serial port the line port
     is opened on a free port; elsewhere `tcp_port` asks for it. Started with the option
     `--lan`, `lan` holds what its `lan:` line says.
+
+    After its start the core reads every installed file to its end, and until it has it
+    answers `list` with `busy`. The emulator is handed to the test when that is over,
+    unless `checked` is false: then it is handed over as soon as it has started. The
+    waiting asks for the list over HTTP, and the emulator logs what it is asked: an
+    `EventStream` leaves those entries out.
     """
 
     START_SECONDS = 15
 
-    def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None):
+    def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None, checked=True):
         self._temporary = None
         command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port)]
         if HAS_SERIAL:
@@ -202,6 +214,7 @@ class Emulator:
             self.serial = self._printed_line("serial: ") if HAS_SERIAL else None
             self.tcp = self._printed_line("tcp: ") if tcp_port is not None else None
             self.lan = self._printed_line("lan: ") if "--lan" in options else None
+            _ASKED_FIRST[self.port] = self.wait_for_the_check() if checked else 0
         except BaseException:
             self.stop()
             raise
@@ -245,6 +258,18 @@ class Emulator:
         if answer.status != 200:
             raise AssertionError(f"POST /odrig gave status {answer.status}")
         return answer.body
+
+    def wait_for_the_check(self):
+        """Asks for the list until it is no longer refused with `busy`. Returns how many
+        times it asked."""
+        deadline = time.monotonic() + self.START_SECONDS
+        asked = 1
+        while json.loads(self.command("list")).get("error") == "busy":
+            if time.monotonic() > deadline:
+                raise AssertionError("the core did not come to the end of its files")
+            time.sleep(0.02)
+            asked += 1
+        return asked
 
     def status(self):
         """The status the core reports, as a value."""
@@ -589,10 +614,12 @@ class EventStream:
     """A page's end of the event stream, read only when a test asks.
 
     `receive_buffer` asks the system for a small buffer, so that a test which stops
-    reading is soon felt by the emulator.
+    reading is soon felt by the emulator. The log entries of what an `Emulator` was
+    asked before it was handed to the test, which the stream begins with, are left out.
     """
 
     def __init__(self, port, receive_buffer=None, path="/events"):
+        self._left_out = _ASKED_FIRST.get(port, 0)
         self.socket = socket.socket()
         if receive_buffer is not None:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, receive_buffer)
@@ -622,6 +649,9 @@ class EventStream:
             fields = dict(line.split(": ", 1) for line in lines)
             if set(fields) != {"event", "data"}:
                 raise AssertionError(f"an event with other fields than event and data: {block!r}")
+            if fields["event"] == "log" and self._left_out:
+                self._left_out -= 1
+                continue
             events.append(Event(fields["event"], fields["data"]))
         return events
 

@@ -26,6 +26,31 @@ void append(Core &core, const char *text) {
     core.error_text[length] = '\0';
 }
 
+// Makes the show invalid for a file that cannot be used.
+void fail_file(Core &core, const FileInfo &info, Reason reason) {
+    if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
+        core_fail(core, reason, info.name, kNone);
+    } else {
+        core_fail(core, kFileMalformed, info.name, reason);
+    }
+}
+
+// Opens one file of the show and the decoder on it, which reads the header, and compares
+// the canvas with the mapping's. The palette and the frame records are not read.
+void open_file(Core &core, const FileInfo &info) {
+    Reason reason = core.file.open(core.host, info.name);
+    if (reason == kNone) {
+        reason = core.decoder.open(&core.file, &core.inflate, core.window);
+        if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+            reason = kSizeMismatch;
+        }
+        core.file.close();
+    }
+    if (reason != kNone) {
+        fail_file(core, info, reason);
+    }
+}
+
 // Decodes one file of the show from its first frame record to its last, and notes its
 // size and its total duration. The header is checked first, then the size
 // against the mapping, then the body.
@@ -64,6 +89,49 @@ void check_file(Core &core, FileInfo &info) {
         info.bytes = bytes;
         info.total_ms = total;
     }
+}
+
+// One step of the check after the start, on the file it is at.
+void check_step(Core &core) {
+    FileInfo &info = core.files[core.check_at];
+    Checker &checker = *core.checker;
+    Reason reason;
+    if (!core.check_header_read) {
+        checker.file.open_at(core.host, info.name);
+        reason = checker.decoder.open(&checker.file, &checker.inflate, core.check_window);
+        if (reason == kNone && (checker.decoder.width != core.width || checker.decoder.height != core.height)) {
+            reason = kSizeMismatch;
+        }
+        if (reason == kNone) {
+            memset(core.check_pixels, 0, checker.decoder.n);
+            core.check_records_left = checker.decoder.frames;
+            core.check_total_ms = 0;
+            core.check_header_read = 1;
+            return;
+        }
+    } else if (core.check_records_left != 0) {
+        uint16_t duration = 0;
+        reason = checker.decoder.next(core.check_pixels, &duration);
+        core.check_total_ms += duration;
+        --core.check_records_left;
+        if (reason == kNone) {
+            return;
+        }
+    } else {
+        // After the last record nothing may follow. A file read to its end was read whole.
+        reason = checker.decoder.finish();
+        if (reason == kNone) {
+            info.bytes = checker.file.taken;
+            info.total_ms = core.check_total_ms;
+            checker.file.close();
+            core.check_header_read = 0;
+            ++core.check_at;
+            core.check_done = core.check_at == core.file_count;
+            return;
+        }
+    }
+    checker.file.close();
+    fail_file(core, info, reason);
 }
 
 void start(Core &core) {
@@ -111,13 +179,40 @@ void start(Core &core) {
     }
     storage_settle_pending(core);
 
-    // The files are checked in the order in which the show first names them.
+    // The files are opened in the order in which the show first names them. Their bodies
+    // are read while the show plays, by the second decoders. A host whose storage cannot
+    // be changed has none: for it every file is read to its end here.
     for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
-        check_file(core, core.files[index]);
+        if (core.checker == nullptr) {
+            check_file(core, core.files[index]);
+        } else {
+            open_file(core, core.files[index]);
+        }
     }
+    core.check_done = core.checker == nullptr || core.file_count == 0;
 }
 
 }  // namespace
+
+bool check_complete(const Core &core) {
+    return core.check_done != 0;
+}
+
+void check_after_start(Core &core, bool in_step) {
+    if (core.invalid || check_complete(core)) {
+        return;
+    }
+    if (!in_step) {
+        core.check_row = 0;
+        return;
+    }
+    if (core.check_row < kCheckMostSteps) {
+        ++core.check_row;
+    }
+    for (uint8_t step = 0; step < core.check_row && !core.invalid && !check_complete(core); ++step) {
+        check_step(core);
+    }
+}
 
 void core_fail(Core &core, Reason reason, const char *about, Reason detail) {
     if (core.invalid) {
@@ -137,8 +232,9 @@ void core_fail(Core &core, Reason reason, const char *about, Reason detail) {
     if (core.host.log != nullptr) {
         core.host.log(core.host.ctx, core.error_text);
     }
-    // An invalid show takes no upload.
+    // An invalid show takes no upload and plays nothing.
     upload_discard(core);
+    player_halt(core);
 }
 
 }  // namespace odrig

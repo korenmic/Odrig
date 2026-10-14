@@ -152,6 +152,18 @@ def decode_each(files):
     return results
 
 
+_FOUND = {}
+
+
+def found_in(data):
+    """What the core's ODRG decoder makes of one file outside a session, kept for the
+    files that were asked for before. The reference player takes from it where in a body
+    a fault lies: its own decoder reads a file at once and cannot say."""
+    if data not in _FOUND:
+        _FOUND[data] = decode_each([data])[0]
+    return _FOUND[data]
+
+
 # Row-leg mappings beyond the tracked one: a leg that starts on the left, legs of two and
 # of four rows, legs listed in another order than their numbers and their rows, one LED, and
 # ten legs of three rows of 60 from the top row down, leg N on pin N.
@@ -230,7 +242,7 @@ def installed(files):
         yield folder
 
 
-Run = collections.namedtuple("Run", "status core memory error legs logs opened stored lines")
+Run = collections.namedtuple("Run", "status core memory error legs logs opened taken stored lines")
 Run.__doc__ = """One run of `odrig_host session`.
 
 `core` is "ok" or "null". `memory` is `(bytes, blocks)`: what the core asked the host for
@@ -238,6 +250,8 @@ while it started. `error` is the reason the show is invalid after startup, or `N
 `legs` holds `(leg, pin, LED count)` for each leg. `logs` are the diagnostic texts the core
 gave the host while it started. `opened` holds `(name, result)` for each file the core asked
 the host to open while it started, when the session has the option `--trace-files`.
+`taken` holds `(name, bytes)` for each file the core closed while it started: how many of
+its bytes the core had read, when the session has the option `--trace-reads`.
 `stored` holds the storage calls the core made while it started, each as the text after
 `store `, when the session has the option `--trace-store`. `lines` is everything printed
 after startup.
@@ -260,8 +274,17 @@ def _script_bytes(script):
     return "".join(f"{line}\n" for line in script).encode("ascii")
 
 
-def session(folder, script=(), options=(), status=0):
-    """Starts the core on a folder with the test host and gives it the lines of a script."""
+# With this option the test host lets the check after the start end before the session.
+CHECK_FIRST = "--check-first"
+
+
+def session(folder, script=(), options=(), status=0, check_first=True):
+    """Starts the core on a folder with the test host and gives it the lines of a script.
+
+    The session begins with every file read to its end, as a core that has run for a
+    while has them, unless `check_first` is false: then it begins as the core does after
+    power-on, with the bodies of the files still to be checked."""
+    options = [*options, CHECK_FIRST] if check_first else options
     result = host("session", folder, *options, stdin=_script_bytes(script))
     if result.status != status or result.err:
         raise AssertionError(f"odrig_host session: status {result.status}, not {status}\n{result.out[-400:]}\n{result.err}")
@@ -276,6 +299,7 @@ def _run(status, printed):
     legs = []
     logs = []
     opened = []
+    taken = []
     stored = []
     position = 0
     for position, line in enumerate(printed):
@@ -285,6 +309,9 @@ def _run(status, printed):
         elif word == "open" and core is None:
             name, _, answer = rest.rpartition(" ")
             opened.append((name, int(answer)))
+        elif word == "read" and core is None:
+            name, _, count = rest.rpartition(" ")
+            taken.append((name, int(count)))
         elif word == "store" and core is None:
             stored.append(rest)
         elif word == "core":
@@ -300,13 +327,13 @@ def _run(status, printed):
     else:
         position = len(printed)
     lines = printed[position + 1:] if position < len(printed) and printed[position] == "ready" else printed[position:]
-    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), tuple(stored), lines)
+    return Run(status, core, memory, error, tuple(legs), tuple(logs), tuple(opened), tuple(taken), tuple(stored), lines)
 
 
-def start(files, script=(), options=(), status=0):
+def start(files, script=(), options=(), status=0, check_first=True):
     """Installs the files in a temporary folder and runs a session on it."""
     with installed(files) as folder:
-        return session(folder, script, options, status)
+        return session(folder, script, options, status, check_first)
 
 
 def folder_files(folder):
@@ -314,17 +341,19 @@ def folder_files(folder):
     return {path.name: path.read_bytes() for path in sorted(pathlib.Path(folder).iterdir()) if path.is_file()}
 
 
-def start_and_keep(files, script=(), options=(), status=0):
+def start_and_keep(files, script=(), options=(), status=0, check_first=True):
     """Installs the files in a temporary folder and runs a session on it. Returns the run
     and the files the folder holds afterwards."""
     with installed(files) as folder:
-        run = session(folder, script, options, status)
+        run = session(folder, script, options, status, check_first)
         return run, folder_files(folder)
 
 
-def start_each(file_sets, script=(), options=()):
+def start_each(file_sets, script=(), options=(), check_first=True):
     """A session for each set of files, all in one run of the test host, which holds the
-    files in memory. The results are in the given order."""
+    files in memory. The results are in the given order. `check_first` is as for one
+    session."""
+    options = [*options, CHECK_FIRST] if check_first else options
     pieces = []
     for files in file_sets:
         pieces.append(str(len(files)).encode("ascii"))
@@ -473,16 +502,22 @@ class _Invalid(Exception):
 
 
 class _Clip:
-    """The frames of one `.odrg` file, as the reference decoder gives them."""
+    """The frames of one `.odrg` file, as the reference decoder gives them.
 
-    def __init__(self, records):
+    Of a file with a fault in a frame record, the frames before that record, and in
+    `broken` the reason the record is refused for: whoever plays the file meets the fault
+    when the time comes to the end of those frames."""
+
+    def __init__(self, records, broken=None):
         self.pictures = [picture for _, picture in records]
         self.ends = list(itertools.accumulate(duration for duration, _ in records))
-        self.total = self.ends[-1]
+        self.total = self.ends[-1] if self.ends else 0
+        self.broken = broken
 
     def picture_at(self, elapsed):
-        """The frame whose time span contains this time, with the animation looping."""
-        return self.pictures[bisect.bisect_right(self.ends, elapsed % self.total)]
+        """The frame whose time span contains this time, with the animation looping. Of a
+        file with a fault, the time lies in the frames before the fault."""
+        return self.pictures[bisect.bisect_right(self.ends, elapsed if self.broken else elapsed % self.total)]
 
 
 class ReferencePlayer:
@@ -502,10 +537,12 @@ class ReferencePlayer:
     RESERVE = 16384
     BASE64 = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
-    def __init__(self, files, storage=BOARD_STORAGE, changeable=True):
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True):
         """`files` maps the name of each installed file to its content. `storage` is the
         total space the host reports, or None for a host that cannot tell its space.
-        `changeable` says whether the host's storage can be changed."""
+        `changeable` says whether the host's storage can be changed. With `check_first`
+        the check after the start has ended before the first call, as the test host's
+        option of that name has it; without, the player is as after power-on."""
         self.storage = storage
         self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
@@ -522,6 +559,11 @@ class ReferencePlayer:
         # that is refused, by the CRC-32 of the file. The check ends two steps later.
         # Without an entry the check is taken to end after every record the header names.
         self.sound_records = {}
+        # The check after the start: for each file whose body is still to be read, in the
+        # order of the checks, its name, the steps left, and the reason its body is
+        # refused for or None; and the refreshes in a row without a grid time left out.
+        self.checks = []
+        self.check_row = 0
         self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
         self.items = {}         # the items of the show by id
         self.clips = {}         # the frames of each file by name
@@ -552,6 +594,11 @@ class ReferencePlayer:
                 self._play(start)
             elif start is not None or self._animations():
                 self._play_all(start)
+            if check_first:
+                refused = [f"file-malformed {name} {reason}" for name, _, reason in self.checks if reason is not None]
+                self.checks = []
+                if refused:
+                    self._fail(refused[0])
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
@@ -597,11 +644,29 @@ class ReferencePlayer:
                     raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
             if struct.unpack_from("<HH", data, 6) != (canvas.width, canvas.height):
                 raise _Invalid(f"size-mismatch {name}")
-            try:
-                self.clips[name] = _Clip(odrg.decode(data).records)
-            except errors.Rejection as rejection:
-                raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
+            # The body is read after the start, while the show plays, by a check that
+            # takes one step for the file, one for each frame record and one for its end.
+            # A host whose storage cannot be changed has no second reader: there the
+            # body is read at the start.
+            steps, reason, clip = self._judge(data)
+            if reason is not None and not self.changeable:
+                raise _Invalid(f"file-malformed {name} {reason}")
+            if reason is not None:
+                # The frames before the fault can be played. A fault after the last
+                # frame record is met by the check alone.
+                sound = found_in(data).records
+                clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", data, 12)[0] else reason)
+            self.clips[name] = clip
+            if self.changeable:
+                self.checks.append([name, steps, reason])
         return listed.start
+
+    def _fail(self, reason):
+        """Makes the show invalid while it runs: nothing plays from here on."""
+        self.error = reason
+        self.playing = self.shown = self.zero = self.turn = None
+        if self.upload is not None:
+            self._discard()
 
     ALL = "all"
 
@@ -651,19 +716,39 @@ class ReferencePlayer:
             # The turn that this moment falls into. A turn begins where the one before it
             # ended, however late the refresh comes.
             order = self._animations()
-            while elapsed >= self._turn_ms(self.turn):
-                elapsed -= self._turn_ms(self.turn)
-                self.zero += self._turn_ms(self.turn)
+            while True:
+                item = self.items[self.turn]
+                clip = self.clips[item.file]
+                if clip.broken:
+                    # The frames before the fault are played as a first loop. The fault
+                    # is met when the time comes to their end; a longest time of the
+                    # turn that lies before it ends the turn first.
+                    longest = None if item.max_seconds is None else 1000 * item.max_seconds
+                    if clip.total <= (elapsed if longest is None else min(elapsed, longest)):
+                        self._fail(f"file-malformed {item.file} {clip.broken}")
+                        return None
+                    if longest is None or elapsed < longest:
+                        break
+                    turn = longest
+                else:
+                    turn = self._turn_ms(self.turn)
+                    if elapsed < turn:
+                        break
+                elapsed -= turn
+                self.zero += turn
                 self.turn = order[(order.index(self.turn) + 1) % len(order)]
-            item = self.items[self.turn]
         else:
             # Turn t of a cycle shows the animation at place t mod n, with its time
             # counted from the start of the turn.
             cycle = self.items[self.playing]
             turn, elapsed = divmod(elapsed, 1000 * cycle.seconds)
             item = self.items[cycle.cycle[turn % len(cycle.cycle)]]
+            clip = self.clips[item.file]
+            if clip.broken and clip.total <= elapsed:
+                self._fail(f"file-malformed {item.file} {clip.broken}")
+                return None
         self.shown = item.id
-        picture = self.clips[item.file].picture_at(elapsed)
+        picture = clip.picture_at(elapsed)
         return picture if self.on else None
 
     def poll(self, now):
@@ -687,11 +772,27 @@ class ReferencePlayer:
             self.upload["steps"] -= 1
             if self.upload["steps"] == 0:
                 self.upload["state"] = "checked"
+        # The check after the start takes as many steps as refreshes have followed one
+        # another without a gap, at most 16, and none after a gap. A fault it finds makes
+        # the show invalid from this refresh on.
+        if self.error is None and self.checks:
+            self.check_row = min(self.check_row + 1, self.CHECK_MOST_STEPS) if in_step else 0
+            for _ in range(self.check_row):
+                check = self.checks[0]
+                check[1] -= 1
+                if check[1] == 0:
+                    self.checks.pop(0)
+                    if check[2] is not None:
+                        self._fail(f"file-malformed {check[0]} {check[2]}")
+                        picture = None
+                    if self.error is not None or not self.checks:
+                        break
         if picture is None:
             return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
+    CHECK_MOST_STEPS = 16
     LINE_MAX = 2048
     COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
@@ -761,10 +862,12 @@ class ReferencePlayer:
         elif name == b"list":
             if self.error is not None:
                 return "show-invalid"
+            if self.checks:
+                return "busy"
         elif name == b"remove":
             if self.error is not None:
                 return "show-invalid"
-            if self.upload is not None:
+            if self.checks or self.upload is not None:
                 return "busy"
             if value not in self.items:
                 return "unknown-id"
@@ -815,7 +918,9 @@ class ReferencePlayer:
         try:
             records = odrg.decode(data).records
         except errors.Rejection as rejection:
-            sound = self.sound_records.get(zlib.crc32(data), struct.unpack_from("<I", data, 12)[0])
+            sound = self.sound_records.get(zlib.crc32(data))
+            if sound is None:
+                sound = len(found_in(data).records)
             return sound + 2, rejection.reason, None
         return len(records) + 2, None, _Clip(records)
 
@@ -830,7 +935,7 @@ class ReferencePlayer:
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
-            if self.upload is not None:
+            if self.checks or self.upload is not None:
                 return "busy"
             item = self.items.get(number)
             if item is not None and item.cycle is not None:

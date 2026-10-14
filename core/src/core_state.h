@@ -36,8 +36,9 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` file the show names, with what its check found in it: its size in bytes
-// and the sum of the durations of its frames.
+// One `.odrg` file the show names. `bytes` is its size, known once a check has read its
+// body to its end. `total_ms` is its length, the sum of the durations of its frames, and 0
+// while it is not known: a check finds it, and so does playing the file through once.
 struct FileInfo {
     char name[33];
     uint32_t bytes;
@@ -139,6 +140,18 @@ struct Core {
     uint8_t *check_pixels;
     uint8_t *check_window;
 
+    // The check after the start, which reads the body of every file with the second
+    // decoders while the show plays: whether it has read them all, which is for good; the
+    // position in the file table of the file it is at; of that file, whether its header
+    // was read, the records still to decode, and the sum of the durations so far; and how
+    // many refreshes in a row came without a grid time left out, counted to kCheckMostSteps.
+    uint32_t check_at;
+    uint32_t check_records_left;
+    uint64_t check_total_ms;
+    uint8_t check_done;
+    uint8_t check_header_read;
+    uint8_t check_row;
+
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
 
@@ -183,6 +196,7 @@ struct Core {
     uint64_t stream_turn;
     uint64_t stream_loop;
     uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
+    uint32_t stream_records;    // the frame records of the open file that were decoded
 
     FileSource file;
     Inflate inflate;
@@ -193,6 +207,20 @@ struct Core {
 // `<reason> <about> <detail>`, and passes the text to the host's log. The first failure
 // decides: when the show is invalid already, nothing changes.
 void core_fail(Core &core, Reason reason, const char *about, Reason detail);
+
+// The most steps the check after the start takes at one refresh.
+const uint8_t kCheckMostSteps = 16;
+
+// Whether the check after the start has read every file of the show to its end.
+bool check_complete(const Core &core);
+
+// The check after the start at one refresh, after the LED data was made. `in_step` says
+// whether the refresh followed the one before it without a grid time left out. Then the
+// check takes as many steps as refreshes of that kind have followed one another, at most
+// kCheckMostSteps: a step opens a file, decodes one frame record, or reads the end of a
+// file. At any other refresh it takes none, and the count begins again. A fault makes
+// the show invalid with the reason the start gives for it.
+void check_after_start(Core &core, bool in_step);
 
 }  // namespace odrig
 

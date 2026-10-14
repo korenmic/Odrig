@@ -81,6 +81,11 @@ gives no items and `null`, and so does a show without items:
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
+After a start the show plays at once, and the player reads every installed animation to
+its end while it plays. Until it has, it does not know the sizes of the files, and
+`list` is refused with `busy`: ask again a moment later. `status` and `space` are
+answered from the start.
+
 ## Removing an item
 
 ```
@@ -98,7 +103,8 @@ The item leaves the show, and the items after it move up.
 - If the item is the cycle that is playing, the playlist plays, from its first animation.
 - Anything else that plays goes on undisturbed.
 - The animation's file is deleted when no remaining item names it.
-- While an upload is open, `remove` is refused with `busy`.
+- While an upload is open, `remove` is refused with `busy`. So it is after a start,
+  until the player has read every installed animation to its end.
 
 ## Uploading an animation
 
@@ -127,9 +133,10 @@ whichever route its commands arrive by.
 - `<file>` is the name the file gets, under the naming rule of [show.md](show.md).
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
-- It is refused with `busy` when an upload is open; with `in-use` when the id belongs to
-  a cycle, or another item already names `<file>`; and with `no-space` when the file
-  would not fit into the free storage, or the show has no room for another item.
+- It is refused with `busy` when an upload is open, and after a start until the player
+  has read every installed animation to its end; with `in-use` when the id belongs to a
+  cycle, or another item already names `<file>`; and with `no-space` when the file would
+  not fit into the free storage, or the show has no room for another item.
 
 **`upload data <offset> <base64>`** adds bytes. `<offset>` is the number of bytes sent
 before these, and must equal the number received so far; otherwise the reply is
@@ -175,7 +182,7 @@ succeeds.
 | `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
+| `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is not in `show.json`; `play all` was sent to a show without an animation. |
 | `in-use` | `remove` names an animation that a cycle lists; `upload begin` names the id of a cycle, or a file name another item has. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |

@@ -36,11 +36,57 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     core.stream_turn = turn;
     core.stream_loop = loop;
     core.frame_end = 0;
+    core.stream_records = 0;
     return kNone;
 }
 
+// Decodes the first loop of an animation whose length is not known, up to a time since
+// the start of its turn. When every record was decoded and the time lies at their end or
+// beyond it, their durations add up to the length, and it is noted.
+Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t time) {
+    Reason reason = kNone;
+    if (!core.stream_open || core.stream_item != animation || core.stream_turn != turn || core.stream_loop != 0) {
+        reason = open_stream(core, animation, turn, 0);
+    }
+    while (reason == kNone && core.frame_end <= time && core.stream_records < core.decoder.frames) {
+        uint16_t duration = 0;
+        reason = core.decoder.next(core.pixels, &duration);
+        core.frame_end += duration;
+        ++core.stream_records;
+    }
+    if (reason == kNone && core.frame_end <= time) {
+        core.files[core.items[animation].first].total_ms = core.frame_end;
+    }
+    return reason;
+}
+
+// Brings the pixel buffer to the picture an animation shows at a time since the start of
+// its turn. While the length of the animation is not known, the time lies in its first
+// loop. Once it is known, the loop and the place in it are found by division.
+Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) {
+    const FileInfo &file = core.files[core.items[animation].first];
+    if (file.total_ms == 0) {
+        const Reason reason = first_loop_to(core, animation, turn, in_turn);
+        if (reason != kNone || file.total_ms == 0) {
+            return reason;
+        }
+    }
+    const uint64_t loop = in_turn / file.total_ms;
+    const uint64_t within = in_turn % file.total_ms;
+    Reason reason = kNone;
+    if (!core.stream_open || core.stream_item != animation || core.stream_turn != turn || core.stream_loop != loop) {
+        reason = open_stream(core, animation, turn, loop);
+    }
+    while (reason == kNone && core.frame_end <= within) {
+        uint16_t duration = 0;
+        reason = core.decoder.next(core.pixels, &duration);
+        core.frame_end += duration;
+    }
+    return reason;
+}
+
 // How long the turn of the animation item at this position lasts in the playlist, in
-// milliseconds.
+// milliseconds. The length of the animation is known.
 uint64_t turn_ms(const Core &core, uint32_t position) {
     const ItemInfo &item = core.items[position];
     const uint64_t loop = core.files[item.first].total_ms;
@@ -63,28 +109,66 @@ uint32_t next_animation(const Core &core, uint32_t position) {
 
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
 // that turn began. A turn begins where the one before it ended, however late the moment is.
-uint64_t playlist_turn(Core &core, uint64_t now) {
+//
+// Whether a turn has ended follows from the length of its animation. While that is not
+// known, the first loop is decoded up to the moment, or up to the longest time the turn
+// may last when the moment lies beyond it. When the loop ends on the way, the length is
+// known. When it does not, the animation is in its first loop and its turn goes on; or
+// the loop is longer than the longest time, and the turn ended there.
+Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     uint64_t elapsed = now - core.zero;
-    if (elapsed >= turn_ms(core, core.turn_item)) {
-        // Whole rounds of the playlist are taken off at once, so that a long time without
-        // a refresh costs one walk over the items.
-        uint64_t round = 0;
-        for (uint32_t position = 0; position < core.item_count; ++position) {
-            round += core.items[position].is_cycle ? 0 : turn_ms(core, position);
+    bool rounds_taken = false;
+    for (;;) {
+        const ItemInfo &item = core.items[core.turn_item];
+        const FileInfo &file = core.files[item.first];
+        uint64_t turn;
+        if (file.total_ms != 0) {
+            turn = turn_ms(core, core.turn_item);
+            if (elapsed < turn) {
+                *in_turn = elapsed;
+                return kNone;
+            }
+        } else {
+            const uint64_t longest = 1000ull * item.seconds;
+            const bool beyond = item.seconds != 0 && elapsed >= longest;
+            const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, beyond ? longest : elapsed);
+            if (reason != kNone) {
+                return reason;
+            }
+            if (file.total_ms != 0) {
+                continue;
+            }
+            if (!beyond) {
+                *in_turn = elapsed;
+                return kNone;
+            }
+            turn = longest;
         }
-        if (elapsed >= round) {
-            core.zero += elapsed / round * round;
-            elapsed %= round;
-            ++core.turn_number;
+        if (!rounds_taken) {
+            // Whole rounds of the playlist are taken off at once when the length of every
+            // animation is known, so that a long time without a refresh costs one walk
+            // over the items.
+            rounds_taken = true;
+            uint64_t round = 0;
+            bool all_known = true;
+            for (uint32_t position = 0; position < core.item_count && all_known; ++position) {
+                if (!core.items[position].is_cycle) {
+                    all_known = core.files[core.items[position].first].total_ms != 0;
+                    round += all_known ? turn_ms(core, position) : 0;
+                }
+            }
+            if (all_known && elapsed >= round) {
+                core.zero += elapsed / round * round;
+                elapsed %= round;
+                ++core.turn_number;
+                continue;
+            }
         }
-        for (uint64_t turn = turn_ms(core, core.turn_item); elapsed >= turn; turn = turn_ms(core, core.turn_item)) {
-            core.zero += turn;
-            elapsed -= turn;
-            core.turn_item = next_animation(core, core.turn_item);
-            ++core.turn_number;
-        }
+        core.zero += turn;
+        elapsed -= turn;
+        core.turn_item = next_animation(core, core.turn_item);
+        ++core.turn_number;
     }
-    return elapsed;
 }
 
 // Brings the pixel buffer to the picture of what is being played at a moment. False when
@@ -95,9 +179,10 @@ bool advance(Core &core, uint64_t now) {
     // of an animation is counted from the start of its turn.
     uint32_t animation;
     uint64_t turn;
-    uint64_t in_turn;
+    uint64_t in_turn = 0;
+    Reason reason = kNone;
     if (core.playing == kPlaylist) {
-        in_turn = playlist_turn(core, now);
+        reason = playlist_turn(core, now, &in_turn);
         animation = core.turn_item;
         turn = core.turn_number;
     } else {
@@ -107,23 +192,12 @@ bool advance(Core &core, uint64_t now) {
         in_turn = (now - core.zero) % turn_length;
         animation = core.entries[cycle.first + turn % cycle.count];
     }
-    const FileInfo &file = core.files[core.items[animation].first];
-    const uint64_t loop = in_turn / file.total_ms;
-    const uint64_t within = in_turn % file.total_ms;
-
-    Reason reason = kNone;
-    if (!core.stream_open || core.stream_item != animation || core.stream_turn != turn || core.stream_loop != loop) {
-        reason = open_stream(core, animation, turn, loop);
-    }
-    while (reason == kNone && core.frame_end <= within) {
-        uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
-        core.frame_end += duration;
+    if (reason == kNone) {
+        reason = show_at(core, animation, turn, in_turn);
     }
     if (reason != kNone) {
         // The file cannot be played: the show is invalid from this refresh on.
-        close_stream(core);
-        core.playing = kNothing;
+        const FileInfo &file = core.files[core.items[animation].first];
         if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
             core_fail(core, reason, file.name, kNone);
         } else {
@@ -206,6 +280,12 @@ void player_start(Core &core) {
     if (from != core.item_count) {
         player_play_all(core, from);
     }
+}
+
+void player_halt(Core &core) {
+    close_stream(core);
+    core.playing = kNothing;
+    core.shown = kNothing;
 }
 
 void player_play_cycle(Core &core, uint32_t item) {
@@ -322,9 +402,15 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     // The LED data is complete. The check of an uploaded file takes one step now, and
-    // none when the host was late for this refresh.
+    // none when the host was late for this refresh. The check after the start takes its
+    // steps; when it finds a fault, the show is invalid from this refresh on.
     if (in_step) {
         upload_step(core, now);
+    }
+    const bool was_valid = !core.invalid;
+    check_after_start(core, in_step);
+    if (was_valid && core.invalid) {
+        memset(core.led_data, 0, 3u * core.led_total);
     }
     return 1;
 }

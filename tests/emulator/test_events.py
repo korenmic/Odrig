@@ -19,7 +19,7 @@ def has(kind, count=1):
 class Stream(unittest.TestCase):
     def setUp(self):
         self.folder = support.entered(self, support.example_show())
-        self.emulator = support.entered(self, support.Emulator(self.folder))
+        self.emulator = support.entered(self, support.Emulator(self.folder, checked=False))
 
     def stream(self, **settings):
         return support.entered(self, support.EventStream(self.emulator.port, **settings))

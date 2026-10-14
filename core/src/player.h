@@ -19,6 +19,9 @@ uint64_t clock_touch(Core &core, uint64_t now_ms);
 // its `start` names or from its first one.
 void player_start(Core &core);
 
+// Stops playback and closes the file that is open for it: nothing plays.
+void player_halt(Core &core);
+
 // Plays the cycle at this position of the item table, from the first frame of the first
 // animation of its list. An animation item is not played by itself: it has its turn of
 // the playlist.
