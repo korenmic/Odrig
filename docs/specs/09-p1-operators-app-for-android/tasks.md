@@ -5,6 +5,10 @@ Seeds 07, 08 and 16 are implemented before these tasks start: the tasks use the 
 code differs from what this spec's design relies on, follow the code and record the
 difference in `docs/drifts.md`.
 
+Tasks 10 and 11 were added on 2026-10-14, when the owner asked for the app in the
+emulator's page and for commands on the board's second USB socket, as refinements of this
+seed. They stand before task 9, which stays the last: the owner's check.
+
 Tasks 2 to 5 need the Chrome that is installed, and nothing that is not in the
 repository. Task 6 needs the network, for npm, two archives, the SDK's packages and
 Gradle: about 740 MB into the project folder, and the one licence of the SDK accepted.
@@ -137,6 +141,30 @@ Rules for every task:
   - Run every suite that needs no board and no phone, and `tests/apk`.
   - The seed's state stays `in_progress`: its last item is the owner's.
   - Requirements: 14.4, 15.1, 15.2, 15.3
+
+- [ ] 10. The app in the emulator's page
+  - `emulator/httpd.py`: the table of `app/www/` under `/app/`. `emulator/web/`: the
+    third tab, the pane, the frame that is made and removed, the address kept for the
+    app.
+  - `tests/emulator/`: what is served under `/app/` and what is not; the view's markup
+    and script. `tests/app/`: Chrome on the emulator's page with `#controller` and
+    without.
+  - `docs/emulator.md` and `docs/android-app.md`. A line in the change log of
+    `docs/decisions.md`.
+  - `python3 app/app.py build`: the APK holds the web code of this commit.
+  - Prove it fails first: the test that asks the emulator for `/app/main.js`, against
+    the emulator as it is, fails: the answer is 404.
+  - Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6
+
+- [ ] 11. Commands on the board's second USB socket
+  - `firmware/usermod/odrig_uart.h` and `.cpp`, and their place in the usermod's setup
+    and loop. `firmware/fwtool/flasher.py`: the rate esptool is told.
+  - `tests/firmware/` and `tests/board/`, as the design has them. This task needs the
+    board; the rules of the board hold.
+  - `docs/firmware.md`.
+  - Prove it fails first: the board test that asks for `status` over the socket marked
+    COM, against the firmware that is on the board, fails: no reply.
+  - Requirements: 18.1, 18.2, 18.3, 18.4
 
 - [ ] 9. The check on a phone
   - The owner installs `build/app/odrig-debug.apk` and goes through "The check on a

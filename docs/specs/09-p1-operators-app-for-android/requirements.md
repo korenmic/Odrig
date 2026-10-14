@@ -222,6 +222,37 @@ everything it installs to be inside the project folder.
 2. The seed SHALL stay `in_progress` until the owner has done so. What the owner finds
    SHALL be recorded in the app's page.
 
+## Requirement 17: the app in the emulator's page
+
+Added on 2026-10-14. The owner asked for it as a refinement of what was agreed, not as a
+seed of its own: the emulator's page is to show the app as well, running the code the
+phone runs, so that the app is tried without a phone.
+
+1. The emulator's page SHALL have a third view, `Controller`, beside `LEDs` and
+   `Mapping`. It SHALL show the LEDs and, beside them, the operators' app.
+2. What runs in that view SHALL be the files of `app/www/` as they are, the files the
+   APK holds, served by the emulator. No copy of them SHALL be kept anywhere.
+3. The app in that view SHALL be aimed at the emulator that serves it, without an
+   address being written.
+4. WHILE another view is shown THEN the app SHALL NOT run, and SHALL send nothing.
+5. The address of the page with `#controller` at its end SHALL open the view.
+6. The emulator's own page SHALL send no command, as before: the lines come from the
+   app. Of the repository the emulator SHALL serve its page and `app/www/`, and nothing
+   else.
+
+## Requirement 18: commands on the board's second USB socket
+
+Added on 2026-10-14. The owner asked that the board take commands "via serial/usbc/wifi".
+The board has two USB sockets: the chip's own, which the firmware has listened on from
+the start, and one marked COM, which a bridge chip connects to the chip's UART.
+
+1. The firmware SHALL take command lines on the UART of the socket marked COM, at
+   115,200 bits a second, and SHALL write every reply there, as it does on the other
+   socket and over HTTP.
+2. A line that is arriving one way SHALL NOT be disturbed by a line on another way.
+3. The command tool and the firmware tool SHALL work with the board on either socket.
+4. No command SHALL be added, and no reply SHALL change.
+
 ## Left out on purpose
 
 - Converting, reading media and uploading: seed 17.
@@ -231,3 +262,5 @@ everything it installs to be inside the project folder.
   from the board's 3.3 V pin, the operator keeps it at 40 or less; the check on a phone
   says so.
 - An iPhone app and a PC app.
+- The phone talking to the board over a USB cable. The app reaches the board over Wi-Fi;
+  the board's USB sockets are for a computer.

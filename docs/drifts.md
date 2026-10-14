@@ -7850,3 +7850,26 @@ for the seed of uploading from the app to settle, and the owner is told.
 `kCheckLongestWait`; `tests/core/support.py`, `CHECK_LONGEST_WAIT`;
 `tests/core/test_power_on.py`, `TheCheck`; `tests/core/test_body_faults.py`,
 `FoundByTheCheckOfALateHost`; `docs/core.md`, "The check after the start".
+
+## Seed 09: Two tasks added after its tasks had begun
+
+**Question.** The scope of a seed is fixed once its tasks are being done, and a gap
+becomes a new seed. On 2026-10-14 the owner asked for two things that no seed has: the
+operators' app shown in the emulator's page, running the code the phone runs, and the
+board taking commands "via serial/usbc/wifi". Are they new seeds?
+
+**Answer.** No, by the owner's word: "nothing new and no new seeds or tasks, just a
+refinement on what we already agreed on", to be done within the seeds that are under
+way, with the missing guidance filled in. Both are about how the app and its commands
+reach a target, so they were added to the spec of seed 09 as Requirements 17 and 18, two
+sections of its design, and tasks 10 and 11, which stand before the owner's check on a
+phone. The board had been connected through its socket marked COM that day, where the
+firmware did not listen; that is what Requirement 18 mends.
+
+What was not added: the phone talking to the board over a USB cable, which the app has
+no code for, and the board reading animations from a USB drive, which is seed 20 and
+waits for the owner's answers on its hardware.
+
+**Resolution.** `docs/specs/09-p1-operators-app-for-android/requirements.md`,
+Requirements 17 and 18; `design.md`, "The app in the emulator's page" and "Commands on
+the board's second USB socket"; `tasks.md`, tasks 10 and 11.

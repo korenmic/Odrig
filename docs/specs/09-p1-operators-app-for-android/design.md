@@ -727,6 +727,72 @@ the files, their sources and their sizes.
 8. **A debug key that lives in the work folder.** A new work folder cannot update an
    installed app: the app is removed from the phone first.
 
+## The app in the emulator's page
+
+Added on 2026-10-14, for Requirement 17.
+
+**Serving.** `emulator/httpd.py` gets a second table beside the one of its own page:
+every file of `app/www/` with a known content type, found by walking that folder, under
+the path `/app/` and its place in the folder; `/app/` itself is the app's `index.html`.
+The folder is found from the emulator's own place in the repository. Where it is not
+there, the table is empty and the view says so. The files are read at each request, as
+the page's are, so an edit of the app shows after a reload.
+
+**The view.** `index.html` gets a third tab and, beside the stage, a pane with no frame
+in it. `app.js` knows three views. In `controller` the stage draws the LEDs as in
+`LEDs`, and the pane is shown with a frame made at that moment, whose address is
+`app/`. Leaving the view removes the frame: its document is gone, and with it the app
+and its requests. The pane is 390 points wide, the width of a phone; in a window
+narrower than 760 points it lies under the stage.
+
+**The address.** The app keeps its target's address in the browser's storage under the
+key `odrig.target` (`app/www/target.js`). The frame has the origin of the emulator's
+page, so the page writes its own host and port under that key before it makes the
+frame. The app then starts as on a phone that was given this address: it asks, is
+answered, and goes to its show screen. Nothing of the app changes, and in a browser it
+sends with `fetch` to `/odrig` of that address, which is the emulator itself.
+
+**What stays.** The emulator's page still sends no command. The lines of the app are in
+the page's log as lines over HTTP, like those of any other client.
+
+**Tests.** `tests/emulator/`: the files under `/app/` are the bytes of `app/www/` with
+their content types, and nothing else of the repository is served; the table of a
+folder that is not there; the markup and the script of the view. `tests/app/`: Chrome
+opens the emulator's page with `#controller`, and the emulator gets `status` and
+`list 0` over HTTP; with the plain address it gets none.
+
+**Documents.** `docs/emulator.md`, "The page"; `docs/android-app.md`, where the app is
+tried.
+
+## Commands on the board's second USB socket
+
+Added on 2026-10-14, for Requirement 18.
+
+The firmware's `Serial` is the chip's own USB unit. The UART that the socket marked COM
+carries is `Serial0`, on the pins 43 and 44, which no leg uses. A new part of the
+usermod, `odrig_uart`, opens it at 115,200 bits a second with a receive queue of 4,096
+bytes. At each pass of the loop it takes at most 256 bytes, keeps the line that is
+arriving in a buffer of its own, and hands a line that has ended to the core through
+`odrig_core_command`, the entry the web server uses; the reply is written to the UART.
+The core's byte entry stays with the chip's USB socket, so each way has its own line.
+Of a line longer than 2,048 characters one character more is kept, and the core refuses
+it as `line-too-long`. While the pacing of storage writes holds lines back, a line that
+has ended waits.
+
+The chip's loader and the system print to this UART when the board starts. A client
+drops every line that is no reply, as the command tool does already. The command tool
+opens a serial port at 115,200 bits a second and lowers its modem lines in the order
+that does not reset the chip, so it needs no change. esptool reaches the chip through
+either socket; through the bridge it is told a rate of 921,600 bits a second, which the
+other socket ignores.
+
+**Tests.** `tests/firmware/`: the new source keeps to the headers a usermod source may
+name; the flasher's rate. `tests/board/`: `status` and a refusal over the socket the
+board is on; with both sockets connected, a line on each.
+
+**Documents.** `docs/firmware.md`: the two sockets, the rate, what the UART prints at a
+start.
+
 ## What goes beyond the seed
 
 Each is recorded in `docs/drifts.md`:
