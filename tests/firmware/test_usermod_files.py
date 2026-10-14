@@ -67,6 +67,7 @@ class TheLibrary(unittest.TestCase):
         for expected in ("odrig_usermod.cpp", "odrig_files.h", "odrig_files.cpp", "odrig_leds.h", "odrig_leds.cpp", "odrig_serial.h", "odrig_serial.cpp", "odrig_http.h", "odrig_http.cpp", "odrig_probe.h", "odrig_probe.cpp"):
             self.assertIn(expected, names)
         self.assertNotIn("odrig_pattern.cpp", names)
+        self.assertLessEqual({"odrig_uart.h", "odrig_uart.cpp"}, names)
 
     def test_one_object_is_registered_as_a_usermod(self):
         registered = [(path.name, name) for path in SOURCES for name in re.findall(r"^REGISTER_USERMOD\((\w+)\);", text_of(path), re.M)]
@@ -264,6 +265,59 @@ class TheTask(unittest.TestCase):
         self.assertIn("if (byte == '\\n' || waitingBytes == sizeof(waiting)) handOn();", serial)
         self.assertRegex(serial, r"(?s)void OdrigSerial::poll\(Feed feed\) \{.*\n  handOn\(\);\n\}")
         self.assertEqual(serial.count("feedNow(waiting, waitingBytes, reply, sizeof(reply))"), 1)
+
+
+class TheUart(unittest.TestCase):
+    """The board's second USB socket carries the chip's UART through a bridge. The firmware
+    takes command lines there too."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.uart = text_of(USERMOD / "odrig_uart.cpp")
+        cls.usermod = text_of(USERMOD / "odrig_usermod.cpp")
+
+    def test_it_is_opened_at_115200_with_a_queue_of_4096_bytes_before_the_core_starts(self):
+        self.assertIn("const unsigned long BITS_PER_SECOND = 115200;", self.uart)
+        self.assertIn("const size_t RECEIVE_QUEUE = 4096;", self.uart)
+        begin = self.uart[self.uart.index("void OdrigUart::begin() {"):self.uart.index("void OdrigUart::poll(")]
+        self.assertLess(begin.index("Serial0.setRxBufferSize(RECEIVE_QUEUE);"), begin.index("Serial0.begin(BITS_PER_SECOND);"))
+        setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
+        self.assertLess(setup.index("OdrigUart::begin();"), setup.index("core = odrig_core_begin(&host);"))
+
+    def test_the_uart_is_named_in_its_own_source_only_and_the_other_port_is_not_named_there(self):
+        naming = {path.name for path in SOURCES if re.search(r"\bSerial0\b", text_of(path))}
+        self.assertEqual(naming, {"odrig_uart.cpp"})
+        self.assertNotRegex(self.uart, r"\bSerial\b")
+        self.assertNotRegex(self.uart, r"usb_serial_jtag")
+
+    def test_a_line_goes_to_the_core_by_the_entry_the_web_server_uses(self):
+        loop = self.usermod[self.usermod.index("void loop() override {"):self.usermod.index("void addToJsonInfo")]
+        self.assertEqual(loop.count("OdrigUart::poll(commandLine);"), 1)
+        self.assertLess(loop.index("OdrigSerial::poll(feedBytes);"), loop.index("OdrigUart::poll(commandLine);"))
+        self.assertNotRegex(self.uart, r"\bodrig_core_\w+\(")
+        self.assertEqual(self.uart.count("line(arriving, arrived, reply, sizeof(reply))"), 1)
+
+    def test_it_keeps_a_line_of_its_own_one_character_longer_than_a_line_may_be(self):
+        self.assertIn("char arriving[ODRIG_LINE_MAX + 1];", self.uart)
+        self.assertIn("} else if (arrived < sizeof(arriving)) {", self.uart)
+        self.assertIn("if (byte == '\\n') {\n      ended = true;", self.uart)
+
+    def test_a_line_that_has_ended_waits_while_lines_are_held_back(self):
+        poll = self.uart[self.uart.index("void OdrigUart::poll(Line line) {"):]
+        self.assertRegex(poll, r"if \(ended\) \{\n\s+if \(OdrigFiles::holding\(\)\) return;")
+        self.assertLess(poll.index("if (OdrigFiles::holding()) return;"), poll.index("line(arriving, arrived, reply, sizeof(reply))"))
+
+    def test_it_takes_256_bytes_in_one_pass_at_most_and_its_reply_is_not_on_the_stack(self):
+        self.assertIn("const int BYTES_PER_PASS = 256;", self.uart)
+        self.assertIn("for (int taken = 0; taken < BYTES_PER_PASS; taken++) {", self.uart)
+        self.assertIn("static char reply[ODRIG_REPLY_MAX];", self.uart)
+        self.assertNotRegex(self.uart.replace("static char reply[ODRIG_REPLY_MAX];", ""), r"\bchar\s+\w+\[[^\]]*(ODRIG_REPLY_MAX|1024)[^\]]*\]")
+
+    def test_no_pin_of_a_leg_is_one_of_the_uart(self):
+        # The UART is on the pins 43 and 44 of the chip.
+        from . import ROOT as root
+        target = json.loads((root / "mapping" / "legs-20.json").read_text(encoding="utf-8"))
+        self.assertEqual({43, 44} & {leg["pin"] for leg in target["legs"]}, set())
 
 
 class TheCore(unittest.TestCase):
@@ -503,7 +557,7 @@ class Pacing(unittest.TestCase):
 
     def test_the_pacing_is_asked_only_by_what_carries_lines(self):
         asking = {path.name: len(re.findall(r"OdrigFiles::holding\(\)", outside_probe_blocks(text_of(path)))) for path in SOURCES}
-        self.assertEqual({name: count for name, count in asking.items() if count}, {"odrig_files.cpp": 1, "odrig_serial.cpp": 2, "odrig_usermod.cpp": 1})
+        self.assertEqual({name: count for name, count in asking.items() if count}, {"odrig_files.cpp": 1, "odrig_serial.cpp": 2, "odrig_uart.cpp": 1, "odrig_usermod.cpp": 1})
 
     def test_no_source_holds_a_word_of_a_command(self):
         words = r'"(play|on|off|brightness|status|space|list|remove|upload|begin|data|end|cancel)[ "\\]'

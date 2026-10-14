@@ -146,7 +146,8 @@ with that environment's Python.
 
 **The port.** A command that talks to the board uses the port given with `--port`, else the
 one in the variable `ODRIG_BOARD_PORT`, else the only `/dev/cu.usbmodem*` device. With no
-such device, or with more than one, it stops with `no-board`.
+such device, or with more than one, it stops with `no-board`. Either of the board's two
+USB sockets does; see "The two USB sockets" under [What the firmware does](#what-the-firmware-does).
 
 ### setup
 
@@ -576,6 +577,23 @@ python -m odrigctl --port /dev/cu.usbmodem101 status
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
 serial, no answer to WLED's single-letter commands. The chip's own bootloader still prints
 a few lines at a reset; the command tool skips every line that is not a reply.
+
+**The two USB sockets.** The board has two. The chip's own USB unit is behind one; that is
+the port above, which a Mac names by its place, `/dev/cu.usbmodem101`. The other socket,
+marked COM, reaches the chip's UART, on its pins 43 and 44, through a bridge chip; a Mac
+names it by the bridge's serial number, as `/dev/cu.usbmodem5C831043631`. The firmware
+takes command lines on the UART as well, at 115,200 bits a second, and writes each reply
+there. It keeps the line that is arriving there apart from the one of the other socket,
+and hands it to the core as the web server hands a line, so a line on one way never
+disturbs a line on another; of a line of more than 2,048 characters it keeps one more,
+and the core refuses it as `line-too-long`. The command tool opens either socket at
+115,200 bits a second. The chip's loader prints its start-up lines on the UART, which the
+tool skips.
+
+esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
+which the bridge uses and the chip's own USB unit ignores. The suite of the board passes
+only with the board on the chip's own socket: stock WLED, which the suite flashes and
+restores, and the probe build answer there and not on the UART.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same

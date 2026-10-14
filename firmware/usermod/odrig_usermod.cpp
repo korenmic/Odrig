@@ -1,9 +1,10 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
 // memory, the time and the files of the installed show, carries bytes between the USB
-// serial port and the core and command lines between WLED's web server and the core, sets
-// WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED data
-// to the outputs, and reports its state in WLED's information. Every decision about files,
-// time, the layout and commands is the core's.
+// serial port and the core, and command lines between the board's UART and the core and
+// between WLED's web server and the core, sets WLED's outputs from the core's legs, keeps
+// WLED from the LEDs, sends the core's LED data to the outputs, and reports its state in
+// WLED's information. Every decision about files, time, the layout and commands is the
+// core's.
 #include "wled.h"
 
 #include "odrig_core.h"
@@ -11,6 +12,7 @@
 #include "odrig_http.h"
 #include "odrig_leds.h"
 #include "odrig_serial.h"
+#include "odrig_uart.h"
 
 #ifdef ODRIG_PROBE
 #include "odrig_probe.h"
@@ -52,9 +54,9 @@ size_t feedBytes(const uint8_t *bytes, size_t length, char *reply, size_t capaci
   return kept.length;
 }
 
-// One command line of the web server for the core. It runs on the network task; the lock
-// is what lets it call the core. While the pacing holds lines back, it waits before it
-// takes the lock.
+// One command line of the web server, or of the UART, for the core. The web server's
+// runs on the network task; the lock is what lets it call the core. While the pacing
+// holds lines back, it waits before it takes the lock.
 size_t commandLine(const char *line, size_t length, char *reply, size_t capacity) {
   if (core == nullptr) return 0;
   while (OdrigFiles::holding()) delay(1);
@@ -153,6 +155,7 @@ class OdrigUsermod : public Usermod {
   void setup() override {
     lock = xSemaphoreCreateMutex();
     OdrigSerial::begin();
+    OdrigUart::begin();
     const uint64_t before = OdrigFiles::nowMs();
     const odrig_host host = OdrigFiles::host();
     core = odrig_core_begin(&host);
@@ -180,6 +183,7 @@ class OdrigUsermod : public Usermod {
     // WLED answers the lookups of its captive portal only outside its live mode.
     if (apActive) dnsServer.processNextRequest();
     OdrigSerial::poll(feedBytes);
+    OdrigUart::poll(commandLine);
 #ifdef ODRIG_PROBE
     // A step of the store trial is made as a command's storage calls are: when the pacing
     // holds no line back, and with the lock held.

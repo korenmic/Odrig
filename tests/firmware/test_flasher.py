@@ -69,6 +69,14 @@ class Flash(Temporary):
         for call in esptool.calls:
             self.assertEqual(call[:4], ["--chip", "esp32s3", "--port", "/dev/cu.given"])
 
+    def test_every_call_names_the_rate_for_the_socket_that_has_one(self):
+        with support.no_board() as esptool:
+            support.run_main("flash", "--image", self.image())
+        self.assertGreaterEqual(len(esptool.calls), 3)
+        for call in esptool.calls:
+            self.assertEqual(call[call.index("--baud") + 1], "921600")
+            self.assertLess(call.index("--baud"), call.index("--after"))
+
     def test_the_image_is_written_as_it_is_and_the_board_restarted_after_it(self):
         with support.no_board() as esptool:
             support.run_main("flash", "--image", self.image())

@@ -156,7 +156,7 @@ Rules for every task:
     the emulator as it is, fails: the answer is 404.
   - Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6
 
-- [ ] 11. Commands on the board's second USB socket
+- [x] 11. Commands on the board's second USB socket
   - `firmware/usermod/odrig_uart.h` and `.cpp`, and their place in the usermod's setup
     and loop. `firmware/fwtool/flasher.py`: the rate esptool is told.
   - `tests/firmware/` and `tests/board/`, as the design has them. This task needs the
