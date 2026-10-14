@@ -154,6 +154,17 @@ class FixedMemory(unittest.TestCase):
         self.assertEqual(set(codes), {None, "unknown-id", "in-use"})
         self.assertEqual(run.memory, support.start(files).memory)
 
+    def test_the_check_after_the_start_and_playing_before_it_ask_for_no_memory(self):
+        # The test host stops a run in which the core asks for memory after its start.
+        files = hundred_items()
+        in_step = [f"poll {20 * step}" for step in range(40)] + [support.line(800, "status")]
+        apart = [f"poll {1000 * step}" for step in range(200)] + [support.line(200000, "status")]
+        for script in (in_step, apart):
+            run = support.start(files, script, check_first=False)
+            self.assertEqual(run.status, 0)
+            self.assertIn('"error":null', run.lines[-1])
+            self.assertEqual(run.memory, support.start(files).memory)
+
     def test_the_memory_does_not_depend_on_the_length_of_a_clip(self):
         sizes = {}
         memory = set()

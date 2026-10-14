@@ -53,7 +53,7 @@ Rules for every task:
   - Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.6, 2.7, 3.1, 3.2, 3.3, 3.6,
     4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.3
 
-- [ ] 2. Damaged bodies, late refreshes, a host that cannot change its storage, the memory
+- [x] 2. Damaged bodies, late refreshes, a host that cannot change its storage, the memory
   - `tests/core/`: every invalid vector whose fault is in a body, found by the check and
     found by the player, with the reason of today and the refresh inside its bounds; a
     late refresh and a long gap with lengths not known, in the playlist and in a cycle,

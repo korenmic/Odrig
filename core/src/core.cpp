@@ -202,14 +202,18 @@ void check_after_start(Core &core, bool in_step) {
     if (core.invalid || check_complete(core)) {
         return;
     }
-    if (!in_step) {
+    uint8_t steps;
+    if (in_step) {
+        if (core.check_row < kCheckMostSteps) {
+            ++core.check_row;
+        }
+        steps = core.check_row;
+    } else {
         core.check_row = 0;
-        return;
+        steps = core.check_idle >= kCheckLongestWait ? 1 : 0;
     }
-    if (core.check_row < kCheckMostSteps) {
-        ++core.check_row;
-    }
-    for (uint8_t step = 0; step < core.check_row && !core.invalid && !check_complete(core); ++step) {
+    core.check_idle = steps != 0 ? 0 : static_cast<uint8_t>(core.check_idle + 1);
+    for (uint8_t step = 0; step < steps && !core.invalid && !check_complete(core); ++step) {
         check_step(core);
     }
 }

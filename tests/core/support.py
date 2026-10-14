@@ -564,6 +564,7 @@ class ReferencePlayer:
         # refused for or None; and the refreshes in a row without a grid time left out.
         self.checks = []
         self.check_row = 0
+        self.check_idle = 0     # the refreshes in a row at which the check took no step
         self.legs = []          # (leg number, pin, the pixel place of each LED) for each leg
         self.items = {}         # the items of the show by id
         self.clips = {}         # the frames of each file by name
@@ -773,11 +774,14 @@ class ReferencePlayer:
             if self.upload["steps"] == 0:
                 self.upload["state"] = "checked"
         # The check after the start takes as many steps as refreshes have followed one
-        # another without a gap, at most 16, and none after a gap. A fault it finds makes
-        # the show invalid from this refresh on.
+        # another without a gap, at most 16. After a gap it takes none, or one when it
+        # took none at the three refreshes before either. A fault it finds makes the
+        # show invalid from this refresh on.
         if self.error is None and self.checks:
             self.check_row = min(self.check_row + 1, self.CHECK_MOST_STEPS) if in_step else 0
-            for _ in range(self.check_row):
+            steps = self.check_row if in_step else int(self.check_idle >= self.CHECK_LONGEST_WAIT)
+            self.check_idle = 0 if steps else self.check_idle + 1
+            for _ in range(steps):
                 check = self.checks[0]
                 check[1] -= 1
                 if check[1] == 0:
@@ -793,6 +797,7 @@ class ReferencePlayer:
         return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
 
     CHECK_MOST_STEPS = 16
+    CHECK_LONGEST_WAIT = 3
     LINE_MAX = 2048
     COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}

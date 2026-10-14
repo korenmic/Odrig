@@ -70,8 +70,9 @@ class TheCheck(Playback):
         return busy + 1
 
     # The check takes no step at the first refresh and then, while each refresh follows the
-    # one before it without a gap, 1, 2, 3 and so on to 16 steps at a refresh. A file of n
-    # frames takes n + 2 steps.
+    # one before it without a gap, 1, 2, 3 and so on to 16 steps at a refresh. After a gap
+    # it takes none, or one when it took none at the three refreshes before either. A
+    # file of n frames takes n + 2 steps.
 
     def test_a_file_of_ten_frames_is_read_at_the_sixth_refresh(self):
         # 12 steps: 0 + 1 + 2 + 3 + 4 = 10 after five refreshes, 15 after six.
@@ -99,12 +100,16 @@ class TheCheck(Playback):
     def test_a_refresh_that_is_asked_for_late_inside_its_grid_time_is_no_gap(self):
         self.assertEqual(self.listed_after(animations(a=frames(10)), (0, 39, 41, 79, 80, 119, 139)), 6)
 
-    def test_refreshes_that_never_follow_one_another_leave_the_check_where_it_is(self):
-        script = []
-        for time in range(0, 4000, 40):
-            script += [f"poll {T0 + time}", told(time, "list")]
-        given = replies(self.assert_as_the_reference(animations(a=frames(10)), script, check_first=False))
-        self.assertEqual(set(given), {refused("busy")})
+    def test_after_every_gap_the_count_begins_with_one_step_again(self):
+        # Two refreshes in a row, a gap, two in a row: the second of each pair takes one
+        # step. The twelfth step is taken at the 24th refresh.
+        times = [60 * pair + late for pair in range(15) for late in (0, 20)]
+        self.assertEqual(self.listed_after(animations(a=frames(10)), times), 24)
+
+    def test_refreshes_that_never_follow_one_another_take_a_step_at_every_fourth(self):
+        # 12 steps, at the refreshes 4, 8 and so on: the last at the 48th.
+        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 4000, 40)), 48)
+        self.assertEqual(self.listed_after(animations(a=frames(10)), range(0, 400000, 4000)), 48)
 
     def test_a_show_without_a_file_has_nothing_to_check(self):
         files = show_of([], {})
@@ -178,20 +183,18 @@ class Busy(Playback):
         self.assertEqual(self.asked(commands, files), [refused("show-invalid")] * 3)
 
 
-class PlayedBeforeItsFileIsRead(Playback):
-    """Refreshes that never follow one another in step leave the check where it is, so no
-    file of these sessions is read by it: what the core knows of a length, it learned by
-    playing."""
+class Apart(Playback):
+    """No refresh of these sessions follows another in step, so the check takes one step
+    at every fourth of them and comes to a file long after the player has: what the core
+    knows of a length when it needs it, it has mostly learned by playing."""
 
-    def unread(self, files, script):
+    def apart(self, files, script):
         """Runs a script on the core and on the reference player, with no file read at
-        the start, and compares every line. The check has not ended when the script has:
-        `list` is `busy`. And the lines are those of a core that has read every file."""
-        last = max(int(line.split()[1]) for line in script)
-        printed = self.assert_as_the_reference(files, [*script, support.line(last, "list")], check_first=False)
-        self.assertEqual(printed[-1], f"reply {refused('busy')}")
-        self.assertEqual(printed[:-1], support.start(files, script).lines)
-        return printed[:-1]
+        the start, and compares every line. The lines are those of a core that had read
+        every file before the script began."""
+        printed = self.assert_as_the_reference(files, script, check_first=False)
+        self.assertEqual(printed, support.start(files, script).lines)
+        return printed
 
     def animation_at(self, files, times, commands=()):
         """The animation `status` names at each of these times after power-on, with these
@@ -200,7 +203,7 @@ class PlayedBeforeItsFileIsRead(Playback):
         for time, command in commands:
             at = next(index for index, line in enumerate(script) if int(line.split()[1]) >= T0 + time)
             script.insert(at, told(time, command))
-        states = [json.loads(line[len("reply "):]) for line in self.unread(files, script) if line.startswith('reply {"ok":true,"on"')]
+        states = [json.loads(line[len("reply "):]) for line in self.apart(files, script) if line.startswith('reply {"ok":true,"on"')]
         self.assertEqual(len(states), len(times))
         return [state["animation"] for state in states]
 
@@ -214,6 +217,16 @@ class PlayedBeforeItsFileIsRead(Playback):
             else:
                 found.append([animation, step])
         return [tuple(turn) for turn in found[:-1]]
+
+
+class PlayedBeforeItsFileIsRead(Apart):
+    def test_the_first_loop_is_played_while_list_is_still_busy(self):
+        # Seven refreshes: the check has taken one step of the six the first file needs.
+        script = asked_at(range(0, 7000, 1000)) + [told(6000, "list")]
+        printed = self.assert_as_the_reference(three(), script, check_first=False)
+        self.assertEqual(printed[-1], f"reply {refused('busy')}")
+        states = [json.loads(line[len("reply "):]) for line in printed[:-1] if line.startswith("reply ")]
+        self.assertEqual([state["animation"] for state in states], [1] * 7)
 
     def test_the_playlist_gives_each_animation_its_turn(self):
         # Loops of 4, 10 and 45 seconds, and 30 seconds at least: 32, 30 and 45 seconds.
@@ -253,4 +266,86 @@ class PlayedBeforeItsFileIsRead(Playback):
     def test_every_picture_of_frames_of_twenty_milliseconds(self):
         files = animations(a=frames(30, 1), b=frames(90, 2), c=frames(200, 3))
         files["show.json"] = json.dumps({"version": 1, "brightness": 255, "min_seconds": 2, "items": [{"id": 1, "file": "a.odrg", "repeat": 3}, {"id": 2, "file": "b.odrg", "max_seconds": 1}, {"id": 3, "file": "c.odrg"}]})
-        self.unread(files, [f"poll {T0 + 40 * step}" for step in range(500)])
+        self.apart(files, [f"poll {T0 + 40 * step}" for step in range(500)])
+
+
+class LateRefreshes(Apart):
+    """Refreshes that come late, and long times without one, while no length is known."""
+
+    # Loops of 4, 10 and 45 seconds: turns of 32, 30 and 45 seconds, a round of 107.
+    @staticmethod
+    def turn_at(time, turns=((1, 32000), (2, 30000), (3, 45000))):
+        within = time % sum(length for _, length in turns)
+        for animation, length in turns:
+            if within < length:
+                return animation
+            within -= length
+        raise AssertionError("no turn holds that time")
+
+    def test_refreshes_at_odd_times_show_the_turn_of_their_time(self):
+        times = (0, 100, 3900, 4100, 7950, 8050, 31900, 32100, 33000, 61900, 62100, 62140, 106900, 107100, 139100, 150000)
+        self.assertEqual(self.animation_at(three(), times), [self.turn_at(time) for time in times])
+
+    def test_a_long_time_without_a_refresh_passes_over_turns_that_were_never_shown(self):
+        for gap in (40000, 70000, 110000, 500000, 3600000):
+            with self.subTest(gap=gap):
+                times = (0, gap, gap + 1000, gap + 50000)
+                self.assertEqual(self.animation_at(three(), times), [self.turn_at(time) for time in times])
+
+    def test_the_first_refresh_may_come_long_after_power_on(self):
+        # The time of what plays begins at the first refresh, not at power-on.
+        files = three()
+        script = [told(0, "status"), f"poll {T0 + 500000}", told(500000, "status"), f"poll {T0 + 531000}", told(531000, "status")]
+        states = [json.loads(line[len("reply "):]) for line in self.apart(files, script) if line.startswith("reply ")]
+        self.assertEqual([state["animation"] for state in states], [1, 1, 1])
+
+    def test_a_turn_with_max_seconds_that_was_passed_over_ended_at_that_time(self):
+        files = three(second={"max_seconds": 25}, third={"max_seconds": 7})
+        turns = ((1, 32000), (2, 25000), (3, 7000))
+        for gap in (33000, 58000, 63000, 65000, 1000000):
+            with self.subTest(gap=gap):
+                times = (0, gap, gap + 1000, gap + 30000)
+                self.assertEqual(self.animation_at(files, times), [self.turn_at(time, turns) for time in times])
+
+    def test_a_cycle_after_a_long_time_shows_the_turn_of_that_time(self):
+        files = with_a_cycle(three(), {"id": 8, "cycle": [1, 2, 3], "seconds": 13}, start=8)
+        times = (0, 12900, 13100, 100000, 100040, 1000000, 1012990)
+        self.assertEqual(self.animation_at(files, times), [(1, 2, 3)[time // 13000 % 3] for time in times])
+
+
+class AHostThatCannotChangeItsStorage(unittest.TestCase):
+    OPTIONS = ("--no-storage", "--only-space")
+
+    def test_the_start_reads_every_file_to_its_end(self):
+        files = support.example_show()
+        for option in self.OPTIONS:
+            with self.subTest(option=option):
+                run = support.start(files, options=[option, "--trace-reads"], check_first=False)
+                self.assertIsNone(run.error)
+                taken = dict(run.taken)
+                for name in ("hello.odrg", "dvd.odrg"):
+                    self.assertEqual(taken[name], len(files[name]), name)
+
+    def test_nothing_is_left_to_check_and_list_is_answered_at_once(self):
+        files = support.example_show()
+        script = [support.line(T0, "list"), support.line(T0, "remove 1"), support.line(T0, "upload begin 9 new.odrg 100")]
+        script += [f"poll {T0 + 20 * step}" for step in range(20)] + [support.line(T0 + 400, "list")]
+        for option in self.OPTIONS:
+            with self.subTest(option=option):
+                run = support.start(files, script, [option], check_first=False)
+                given = replies(run.lines)
+                listed = json.loads(given[0])
+                self.assertEqual([(item["file"], item["bytes"]) for item in listed["items"] if "file" in item], [("hello.odrg", len(files["hello.odrg"])), ("dvd.odrg", len(files["dvd.odrg"]))])
+                self.assertNotIn(refused("busy"), given)
+                self.assertEqual(given[-1], given[0])
+                self.assertEqual(run.lines, support.start(files, script, [option]).lines)
+
+    def test_a_fault_in_a_body_is_found_by_the_start(self):
+        whole = support.clip(7, 3, 2, (20,) * 10, compressed=False)
+        faulty = {"truncated": whole[:-3], "trailing-bytes": whole + b"\0"}
+        for reason, data in faulty.items():
+            files = show_of([{"id": 1, "file": "faulty.odrg"}], {"faulty.odrg": data})
+            self.assertIsNone(support.start(files, check_first=False).error, "with storage that can be changed, the start takes it")
+            for option in self.OPTIONS:
+                with self.subTest(option=option, reason=reason):
+                    self.assertEqual(support.start(files, options=[option], check_first=False).error, f"file-malformed faulty.odrg {reason}")

@@ -7811,3 +7811,42 @@ the emulator's new tests and its page.
 
 **Resolution.** `tests/emulator/support.py`, `Emulator.wait_for_the_check`,
 `EventStream` and `reference`; `tests/emulator/test_record.py`.
+
+## Seed 14: A file that is gone when the check comes to it
+
+**Question.** The design lists `file-missing` among the faults the check after the
+start can find. Can it?
+
+**Answer.** No. The check reads with `read_at`, which answers -1 for a file it cannot
+read and has no other answer for one that is not there. So a file that vanished between
+the start and the check is `read-error` with its name. The start still says
+`file-missing`: it opens every file with `open`, which tells the two apart.
+
+**Resolution.** `core/src/core.cpp`, `check_step`; `docs/core.md`, "The check after
+the start"; `tests/core/test_body_faults.py`.
+
+## Seed 14: A host that is late for every refresh
+
+**Question.** The requirements give the check after the start its steps at refreshes
+that follow one another without a gap, "and none at any other refresh". What becomes of
+the check on a board whose every refresh is late?
+
+**Answer.** It would never end. The board sends a dense 60 x 60 animation 24 to 33 times
+a second; below 25 every refresh leaves a grid time out, so the check would take no step
+for as long as such an animation plays, and `list`, `remove` and `upload begin` would
+stay `busy` with it. So the rule has a floor: a refresh after a gap takes no step,
+unless the three refreshes before it took none either; then it takes one. A host that is
+always late gets one step in four refreshes. The price is the time of one frame record
+at that refresh: for the dense animation about a twentieth of a second in four
+refreshes, which leaves the rate above 20 a second by the figures of the firmware page.
+The board test of the seed measures it.
+
+The check of an upload has the same rule without the floor, from seed 07, and is left as
+it is: an upload whose check does not move for a minute is discarded, as the commands
+page says. On a board that plays such an animation an upload can fail that way. That is
+for the seed of uploading from the app to settle, and the owner is told.
+
+**Resolution.** `core/src/core.cpp`, `check_after_start`; `core/src/core_state.h`,
+`kCheckLongestWait`; `tests/core/support.py`, `CHECK_LONGEST_WAIT`;
+`tests/core/test_power_on.py`, `TheCheck`; `tests/core/test_body_faults.py`,
+`FoundByTheCheckOfALateHost`; `docs/core.md`, "The check after the start".

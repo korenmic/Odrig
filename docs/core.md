@@ -316,15 +316,37 @@ inside `odrig_core_poll`, after the LED data of a refresh is complete:
 
 A file of F frame records takes F + 2 steps. At a refresh that follows the one before it
 without a grid time skipped, the check takes one step more than at the refresh before,
-up to 16 steps. At any other refresh it takes none, and begins again with one. So the
-check is fast beside a show that leaves the host time, and gives way to one that does
-not.
+up to 16 steps. At any other refresh the count begins again and the check takes no step,
+unless it took none at the three refreshes before either: then it takes one. So the
+check is fast beside a show that leaves the host time, gives way to one that does not,
+and still comes to its end with a host that is late for every refresh, at one step in
+four refreshes.
 
 A fault the check finds makes the show invalid from that refresh on, with the text
-[reasons.md](reasons.md) has for it; that refresh is dark already. Until the last file is
-read, `list`, `remove` and `upload begin` are answered with `busy`, and every other
-command works. Once the check is complete it stays so until the next start: a file that
-an upload adds was read by the upload's own check.
+[reasons.md](reasons.md) has for it; that refresh is dark already. A file that cannot be
+read back is `read-error`, whether it is damaged or gone: `read_at` has one answer for
+both. Until the last file is read, `list`, `remove` and `upload begin` are answered with
+`busy`, and every other command works. Once the check is complete it stays so until the
+next start: a file that an upload adds was read by the upload's own check.
+
+The player can come to a fault before the check does, in the animation that is playing.
+It shows the frames before the fault, and the show turns invalid at the refresh whose
+time lies at their end or after it. A turn that ends before that, by `max_seconds` or as
+a turn of a cycle, ends as ever, and the fault waits for the check. Bytes that follow the
+last frame record are found by the check alone: the player never reads that far.
+
+What a late refresh costs:
+
+- The check loses its pace. The late refresh takes no step, and the next ones take 1, 2,
+  3 and so on again: a single gap costs the check up to 136 steps over the next 17
+  refreshes. A host that is late for every refresh gets one step in four refreshes, and
+  that refresh is later by the time one frame record takes to decode.
+- The player, with lengths not known, decodes what lies between the last picture and
+  this one, as it does with the lengths known. After a long time without a refresh it
+  walks the turns that went by one by one, and decodes each animation among them once,
+  to the end of its loop or to its `max_seconds`. That is at most what the start used to
+  do for every file, and it is done once for a file: afterwards its length is known.
+- The memory is the same in every case. Nothing here asks the host for a block.
 
 The check and the player may have the same file open at the same time, each through its
 own source: the player with `open` and `read`, the check with `read_at`.

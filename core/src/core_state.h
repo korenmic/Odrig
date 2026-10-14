@@ -143,14 +143,16 @@ struct Core {
     // The check after the start, which reads the body of every file with the second
     // decoders while the show plays: whether it has read them all, which is for good; the
     // position in the file table of the file it is at; of that file, whether its header
-    // was read, the records still to decode, and the sum of the durations so far; and how
-    // many refreshes in a row came without a grid time left out, counted to kCheckMostSteps.
+    // was read, the records still to decode, and the sum of the durations so far; how
+    // many refreshes in a row came without a grid time left out, counted to
+    // kCheckMostSteps; and at how many refreshes in a row the check took no step.
     uint32_t check_at;
     uint32_t check_records_left;
     uint64_t check_total_ms;
     uint8_t check_done;
     uint8_t check_header_read;
     uint8_t check_row;
+    uint8_t check_idle;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -208,8 +210,10 @@ struct Core {
 // decides: when the show is invalid already, nothing changes.
 void core_fail(Core &core, Reason reason, const char *about, Reason detail);
 
-// The most steps the check after the start takes at one refresh.
+// The most steps the check after the start takes at one refresh, and the most refreshes in
+// a row at which it takes none.
 const uint8_t kCheckMostSteps = 16;
+const uint8_t kCheckLongestWait = 3;
 
 // Whether the check after the start has read every file of the show to its end.
 bool check_complete(const Core &core);
@@ -218,8 +222,10 @@ bool check_complete(const Core &core);
 // whether the refresh followed the one before it without a grid time left out. Then the
 // check takes as many steps as refreshes of that kind have followed one another, at most
 // kCheckMostSteps: a step opens a file, decodes one frame record, or reads the end of a
-// file. At any other refresh it takes none, and the count begins again. A fault makes
-// the show invalid with the reason the start gives for it.
+// file. At any other refresh the count begins again and the check takes no step, unless
+// it took none at the kCheckLongestWait refreshes before either: then it takes one, so
+// that a host that is always late still comes to the end of the check. A fault makes the
+// show invalid with the reason the start gives for it.
 void check_after_start(Core &core, bool in_step);
 
 }  // namespace odrig
