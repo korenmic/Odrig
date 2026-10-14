@@ -8075,3 +8075,56 @@ run on, so a recording with a drive would not come out the same twice. The page'
 **Resolution.** `emulator/app.py`, `parse` and `serve`; `emulator/web/app.js`;
 `tests/emulator/test_drive.py`; `docs/emulator.md`, "A drive".
 
+## Seed 20: The firmware before the trial with the adapter
+
+**Question.** Task 4, the trial of the USB host with the owner's adapter, comes before
+task 5, the firmware with the drive. May the firmware be written first?
+
+**Answer.** Yes. On 2026-10-14 the owner asked for the firmware with the drive to be built
+at once and said yes to the download of the driver's sources. The firmware is built by
+the tool and was flashed the same day through the chip's own socket. The tool's wait for
+the answer to `status` failed there, as it must: the socket went from the computer when
+the firmware switched it to host mode. Whether the firmware answers on the socket marked
+COM, whether a drive answers through the adapter, what the board's rate is while a file
+of the drive is read, and the board's tests with a drive wait for the board, the drive
+and the adapter; until then task 5's box stays empty.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`; `firmware/usb_host_msc/`;
+`docs/firmware.md`, "A USB drive".
+
+## Seed 20: The probe build keeps its serial port
+
+**Question.** The firmware switches the chip's own socket to host mode for a drive, and
+the socket is no serial port from then on. The board's suite talks to the probe build on
+that socket. Does the probe build host a drive?
+
+**Answer.** No. It keeps the socket a serial port, so the suite works as before. The
+firmware that plays a drive takes its commands, and its flashing, on the socket marked
+COM; the chip's own socket reaches its loader with the button BOOT held.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `setup`; `docs/firmware.md`.
+
+## Seed 20: Names on the board's drive
+
+**Question.** The core writes a name as the drive gives it. What does the board's file
+system give?
+
+**Answer.** The framework's FAT has long names and the code page 850 for them, and it is
+built so; it cannot be set without building the framework. A name of the letters `a`-`z`
+and `A`-`Z`, digits, `-`, `_` and `.` comes out as it is. A character the code page does
+not have, a Hebrew letter for one, comes out as `?`, and the file cannot be opened by
+that name: it is left out and logged. The firmware page tells how to name the files.
+
+**Resolution.** `docs/firmware.md`, "A USB drive".
+
+## Seed 20: How the board reads a drive's file
+
+**Question.** The core reads at most 512 bytes in one call. Does each call go to the
+drive?
+
+**Answer.** No. Each of the two files that are read has a buffer of 4,096 bytes in memory
+the USB unit reaches, so one request to the drive brings eight sectors, and the driver
+copies nothing on the way. The list's names, 256 of up to 255 bytes, are in the external
+memory.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `READ_BUFFER`.

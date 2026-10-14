@@ -1,6 +1,6 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
-// memory, the time and the files of the installed show, carries bytes between the USB
-// serial port and the core, and command lines between the board's UART and the core and
+// memory, the time, the files of the installed show and those of a USB drive on the
+// chip's own socket, carries bytes between the USB serial port and the core, and command lines between the board's UART and the core and
 // between WLED's web server and the core, sets WLED's outputs from the core's legs, keeps
 // WLED from the LEDs, sends the core's LED data to the outputs, and reports its state in
 // WLED's information. Every decision about files, time, the layout and commands is the
@@ -8,6 +8,7 @@
 #include "wled.h"
 
 #include "odrig_core.h"
+#include "odrig_drive.h"
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
@@ -157,7 +158,12 @@ class OdrigUsermod : public Usermod {
     OdrigSerial::begin();
     OdrigUart::begin();
     const uint64_t before = OdrigFiles::nowMs();
-    const odrig_host host = OdrigFiles::host();
+#ifndef ODRIG_PROBE
+    // The probe build keeps the chip's own socket a serial port, which the board's suite
+    // talks to it on.
+    OdrigDrive::begin();
+#endif
+    const odrig_host host = OdrigDrive::withDrive(OdrigFiles::host());
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE
@@ -223,8 +229,8 @@ class OdrigUsermod : public Usermod {
     refreshFilled = false;
   }
 
-  // WLED's information page: whether the show is valid, how many outputs work, and how
-  // long the core took to start.
+  // WLED's information page: whether the show is valid, how many outputs work, how long
+  // the core took to start, and what there is of a USB drive.
   void addToJsonInfo(JsonObject &root) override {
     JsonObject user = root["u"];
     if (user.isNull()) user = root.createNestedObject("u");
@@ -241,6 +247,7 @@ class OdrigUsermod : public Usermod {
     JsonArray start = user.createNestedArray(F("odrig start"));
     start.add(startMs);
     start.add(F(" ms"));
+    user.createNestedArray(F("odrig drive")).add(String(OdrigDrive::summary()));
   }
 
   void onUpdateBegin(bool begins) override { updating = begins; }

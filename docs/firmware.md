@@ -566,7 +566,10 @@ last one.
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
 answered.
 
-**The port.** Every byte the board receives on its USB serial port goes to the core,
+**The port.** The firmware switches the chip's own USB socket to host mode for a
+[USB drive](#a-usb-drive) at start, and from then on that socket is no serial port: the
+port of the commands is the socket marked COM, below. What follows holds for the firmware
+before the drive, and for the probe build. Every byte the board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
 characters written in one piece arrives whole, also while the pacing holds lines back.
@@ -596,9 +599,39 @@ and the core refuses it as `line-too-long`. The command tool opens either socket
 tool skips.
 
 esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
-which the bridge uses and the chip's own USB unit ignores. The suite of the board passes
-only with the board on the chip's own socket: stock WLED, which the suite flashes and
-restores, and the probe build answer there and not on the UART.
+which the bridge uses and the chip's own USB unit ignores. Once the firmware with the
+drive runs, the chip's own socket reaches the chip only in its loader's download mode,
+which the button BOOT held while the board is plugged in brings up; the socket marked COM
+flashes it as before. The suite of the board passes only with the board on the chip's own
+socket: stock WLED, which the suite flashes and restores, and the probe build answer there
+and not on the UART.
+
+**A USB drive.** The firmware plays the animations of a USB flash drive on the chip's own
+socket, after the installed ones, as [show.md](show.md#animations-from-a-usb-drive)
+describes. The USB host of ESP-IDF serves the socket, Espressif's driver of flash
+drives, `usb_host_msc` 1.1.1 in `firmware/usb_host_msc/`, reads the drive, and its file
+system is mounted at `/usb`. The drive is read and never written or formatted.
+
+- **Preparing a drive.** FAT32 or FAT16, with a folder `odrig` at its top that holds the
+  `.odrg` files, made for the board's canvas as the installed ones are. Names are kept
+  to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`: the firmware's file
+  system reads names in the code page 850, so Hebrew letters, for one, come out as `?`,
+  and such a file cannot be opened by its name and is left out. Folders inside
+  `odrig` and other files are passed over; at most 256 files are taken, the first in the
+  order of their names.
+- **The adapter and the sockets.** The chip's own socket gives a plugged device no power:
+  plugged in directly, a drive is not seen. Between that socket and the drive goes a
+  USB-C adapter or hub with a power input of its own, which is powered. The computer
+  reaches the board on the socket marked COM, for commands and for flashing.
+- **Plugging in and pulling out** work while the board runs. A drive is taken up when it
+  comes: mounted, its folder listed once, and its files read and added to the playlist
+  one by one while the show plays. When it goes, its animations leave the playlist.
+- WLED's information has `odrig drive`: `none`, the number of animation files of the
+  drive, `not readable` for a drive that did not mount, or `no USB host` when the host
+  did not start.
+- The list's names take 64 KB of the external memory, and the two files that are read
+  4 KB each of the internal memory. The rate while a file of the drive is read has not
+  been measured yet.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same

@@ -16,10 +16,12 @@ SHARED = ("odrig_files.cpp", "odrig_serial.cpp", "odrig_http.cpp")
 PLATFORM_HEADER = "odrig_platform.h"
 STANDALONE = FIRMWARE / "standalone"
 # The headers of the chip's own software that a source names: the USB unit behind the
-# port, which the port's driver does not let through; and, in the probe build, the pulse
+# port, which the port's driver does not let through; the USB host, the driver of flash
+# drives and the reading of a folder, for a drive; and, in the probe build, the pulse
 # counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
 ALLOWED_IN = {
     "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
+    "odrig_drive.cpp": {"dirent.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
     "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
 }
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}
@@ -184,7 +186,7 @@ class WebServer(unittest.TestCase):
 
     def test_the_information_has_the_three_entries(self):
         text = text_of(USERMOD / "odrig_usermod.cpp")
-        for entry in ("odrig show", "odrig outputs", "odrig start"):
+        for entry in ("odrig show", "odrig outputs", "odrig start", "odrig drive"):
             self.assertIn(f'F("{entry}")', text)
 
 
@@ -235,7 +237,7 @@ class TheTask(unittest.TestCase):
 
     def test_the_usermod_starts_one_task_in_its_own_file_only(self):
         starting = {path.name: len(re.findall(r"\bxTaskCreate\w*\(", text_of(path))) for path in SOURCES}
-        self.assertEqual({name: count for name, count in starting.items() if count}, {"odrig_usermod.cpp": 1})
+        self.assertEqual({name: count for name, count in starting.items() if count}, {"odrig_usermod.cpp": 1, "odrig_drive.cpp": 2})
         self.assertIn("xTaskCreatePinnedToCore(requestRefreshes, TASK_NAME, TASK_STACK, nullptr, TASK_PRIORITY, &requester, TASK_PROCESSOR);", self.usermod)
         for constant in ('const char TASK_NAME[] = "odrig";', "const uint32_t TASK_STACK = 8192;", "const UBaseType_t TASK_PRIORITY = 1;", "const BaseType_t TASK_PROCESSOR = 0;"):
             self.assertIn(constant, self.usermod)
