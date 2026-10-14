@@ -144,6 +144,18 @@ refuses any file the show does not name. The emulator paces nothing: its file op
 take microseconds, and the check of an uploaded file takes one frame of it for each
 refresh, as on the board.
 
+**After a start.** The show plays from the first refresh, however much is installed: the
+core reads only the first 16 bytes of every animation before it plays. It reads the
+animations to their ends while the show plays, as [core.md](core.md) describes under
+"The check after the start", and until it has, `list`, `remove` and `upload begin` are
+answered with `{"ok":false,"error":"busy"}`. A client asks again a moment later; every
+other command works at once. For the example show that is over within a second. A fault
+the core finds in an animation on the way makes the show invalid then: the LEDs go dark
+and `status` gives the reason. The emulator has no code of its own for any of this, and
+neither has the command tool, which prints `busy` as it prints every refusal and ends
+with status 1. In record mode the core reads at the pace of the ticks, so a script that
+lists, removes or uploads does so after the first second.
+
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
 answered.

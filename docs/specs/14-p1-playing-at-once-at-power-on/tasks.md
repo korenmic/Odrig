@@ -65,7 +65,7 @@ Rules for every task:
     never takes a step, fails: the show stays valid.
   - Requirements: 2.5, 3.4, 3.5, 5.1, 6.2
 
-- [ ] 3. The emulator and the command tool
+- [x] 3. The emulator and the command tool
   - `tests/emulator/`: `busy` and then the list over each transport; record mode; a show
     with dense animations of 60 seconds in all reports the playlist in the first second
     after its start. The tests that list, remove or upload right after a start wait for
