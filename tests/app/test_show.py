@@ -174,3 +174,43 @@ class OffTheScreen(Show):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class ATargetThatStillReads(unittest.TestCase):
+    """After its start a target plays at once and reads its animations while it plays.
+    Until it has, it answers `list` with `busy`."""
+
+    BUSY = {"status": support.PLAYING, "list": (200, '{"ok":false,"error":"busy"}\n')}
+
+    def test_the_list_is_asked_for_again_a_second_later_and_the_rows_come(self):
+        # The first four requests find the target reading: a status and a list, twice.
+        with support.StandIn(self.BUSY, self.BUSY, self.BUSY, self.BUSY, support.SOUND) as target:
+            found = support.run("reads", address=target.address, settings={"rows": 2})
+        before, after = found.seen["before"], found.seen["after"]
+        self.assertEqual((before["power"], before["playing"], before["rows"], before["none"], before["message"]), ("ON", "Playlist", [], None, None))
+        self.assertEqual([row["text"] for row in after["rows"]], ["1 one.odrg", "2 two.odrg"])
+        self.assertEqual((after["none"], after["silent"], after["message"]), (None, None, None))
+        self.assertLess(found.seen["ms"], 4000)
+        asked = [line for _, line in target.lines if line.startswith(b"list")]
+        self.assertGreaterEqual(len(asked), 3)
+        self.assertEqual(set(asked), {b"list 0"})
+
+    def test_an_emulator_that_has_just_started_shows_its_state_at_once_and_its_rows_when_it_has_read_them(self):
+        # Four dense animations of twenty seconds and more: the core reads them for five
+        # seconds at the least.
+        work = entered(self, tempfile.TemporaryDirectory())
+        files = {"mapping.json": MAPPING}
+        items = []
+        for number, seconds in enumerate((20, 21, 22, 23), start=1):
+            files[f"dense{number}.odrg"] = core_support.dense_clip(60, 6, seconds)
+            items.append({"id": number, "file": f"dense{number}.odrg"})
+        files["show.json"] = json.dumps({"version": 1, "brightness": 128, "items": items})
+        folder = emulator_support.installed(pathlib.Path(work, "show"), files)
+        emulator = entered(self, emulator_support.Emulator(folder, checked=False))
+        self.assertEqual(json.loads(emulator.command("list")).get("error"), "busy")
+        found = support.run("reads", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4})
+        before, after = found.seen["before"], found.seen["after"]
+        self.assertEqual((before["power"], before["playing"], before["rows"], before["message"]), ("ON", "Playlist", [], None))
+        self.assertEqual([row["text"] for row in after["rows"]], [f"{number} dense{number}.odrg" for number in (1, 2, 3, 4)])
+        self.assertIsNone(after["message"])

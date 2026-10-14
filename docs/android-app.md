@@ -22,7 +22,7 @@ command lines and no other, each as `POST /odrig` to the address that is set:
 | The operator | The line |
 |---|---|
 | Nothing: once a second while the app is on the screen | `status` |
-| Nothing: when the target first answers, every ten seconds, and when the list is out of date | `list 0`, and `list <next>` for a long show |
+| Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
 | Presses an animation | `play <id>` |
 | Presses `Playlist from the start` | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
@@ -172,6 +172,15 @@ another phone changes something, this one shows it within two seconds. While the
 installation does not answer, the values are dimmed and a line says for how long and why;
 the app goes on asking and recovers by itself. While the app is not on the screen of the
 phone it sends nothing, and the phone's screen stays on while the app is in front.
+
+Right after the installation was switched on, the show screen has the state at once:
+the installation plays from its first moment, and `On`, `Off`, the slider and `Playlist
+from the start` work. The buttons of the animations come a moment later. The
+installation reads what it has installed while it plays, and until it has, it answers
+the app's request for the list with `busy`. The app takes that for what it is: it shows
+no message, keeps what it knows, and asks again every second. With a few small
+animations that is over within two seconds; with the storage full of heavy ones it takes
+longer, see [firmware.md](firmware.md#measurements-on-the-board).
 
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, the show screen says `Cycle` with its id, and `Playlist from the start` leaves it.

@@ -6,6 +6,7 @@ import {Failure} from "./target.js";
 
 const STATUS_EVERY_MS = 1000;
 const LIST_EVERY_MS = 10000;
+const LIST_WHEN_BUSY_MS = 1000;
 
 // `link` is "checking" until the first request has ended, then "answers" or "no-answer",
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
@@ -100,7 +101,7 @@ async function askStatus() {
   changed();
 }
 
-function listAgainLater() {
+function listAgainLater(after = LIST_EVERY_MS) {
   clearTimeout(listTimer);
   listTimer = setTimeout(() => {
     listTimer = null;
@@ -108,7 +109,7 @@ function listAgainLater() {
       listDue = true;
       next();
     }
-  }, LIST_EVERY_MS);
+  }, after);
 }
 
 // Asks for one part of the list. The new list takes the place of the old one only when
@@ -135,15 +136,21 @@ async function askListPart() {
     if (asked !== target) {
       return;
     }
-    if (error instanceof commands.Refusal) {
+    if (error instanceof commands.Refusal && error.code === "busy") {
+      // The target has just started and still reads what it has installed. What is
+      // known of its list stays, and the list is asked for again soon.
+      heard();
+      listAgainLater(LIST_WHEN_BUSY_MS);
+    } else if (error instanceof commands.Refusal) {
       // The target answers and has no list to give: its show is invalid.
       heard();
       state.animations = null;
       state.cycles = [];
+      listAgainLater();
     } else {
       failed(error);
+      listAgainLater();
     }
-    listAgainLater();
   }
   changed();
 }

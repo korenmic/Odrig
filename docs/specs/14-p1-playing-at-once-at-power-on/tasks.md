@@ -85,7 +85,7 @@ Rules for every task:
     the tool as it is, fails: the tool reports the show as installed.
   - Requirements: 7.2
 
-- [ ] 5. The app takes `busy` for what it is
+- [x] 5. The app takes `busy` for what it is
   - `app/www/client.js`: a `busy` to `list` is no invalid show; the list is asked for
     again a second later.
   - `tests/app/`: a target that answers `busy` twice and then lists; the scenarios
