@@ -26,7 +26,7 @@ Rules for every task:
 - The command imports nothing of `odrig/` or `converter/`, and writes no show file.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The command
+- [x] 1. The command
   - Set `"state": "in_progress"` in
     `project-seeds/19-p1-preview-one-animation-in-the-emulator/state.json`.
   - `shows/preview/show.json`; `emulator/preview.py` as the design has it.

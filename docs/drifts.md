@@ -7873,3 +7873,27 @@ waits for the owner's answers on its hardware.
 **Resolution.** `docs/specs/09-p1-operators-app-for-android/requirements.md`,
 Requirements 17 and 18; `design.md`, "The app in the emulator's page" and "Commands on
 the board's second USB socket"; `tasks.md`, tasks 10 and 11.
+
+## Seed 19: What the preview names, and who refuses a file
+
+**Question.** The design of the preview names the steps of the getting-started page as
+"Build the core" and "What the computer needs", and lets the core refuse a file that is
+no ODRG file. Is that what the code does?
+
+**Answer.** Not quite. The page has no such headings: the core's library is built in "Set
+up", by `make -C core shared`, and Node.js is under "What you need". The preview names
+those, and the command that builds the library. And the converter's `check`, which the
+preview runs first to learn the canvas of the file, refuses a file that is no ODRG file,
+or a damaged one, before any emulator is started, with the reason the core would give:
+the two readers are kept to the same reasons by the stored vectors. The core judges what
+the converter takes, the canvas among it. So a refused file leaves nothing to stop.
+
+The spec puts the command into the emulator's package, as `python -m emulator.preview`.
+It is a package of its own, `preview/`, run as `python -m preview FILE`: the emulator's
+package may import nothing but the standard library and itself, and holds no command
+name, which its scope tests keep it to; the preview uploads with the command tool. So
+the preview stands between the two, as a client of both, and the emulator stays as it
+was.
+
+**Resolution.** `preview/__init__.py`, `run` and `checked`;
+`tests/emulator/test_preview.py`.
