@@ -263,6 +263,13 @@ press `Use`; `Board` puts `4.3.2.1` back. An address is a host name or an IPv4 a
 alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulator, start
 it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
 
+A long press marks text, and opens the phone's menu of copying and pasting, only in a
+field one types into: the address on the target screen, and `Start at` and `Length` on
+the storage screen. Anywhere else, on a word, a button, a list or an empty part of the
+screen, a long press marks nothing and opens nothing, and a tap works as before. In a
+browser a right click does the same: the browser's menu opens only in a field. A field
+that the app gets later is the same as these three.
+
 ## Messages
 
 Every failure is a sentence with its code in brackets at its end. A message stays until
@@ -381,7 +388,13 @@ installed; the phone with mobile data on.
     board on its own network. *Seen:* the progress with its speed, then
     `Uploaded as animation ...`; the animation is in both lists and plays on the
     emulator's page and on the LEDs when it is pressed.
-13. **Note** the phone's model, its Android version, the web view's version from the
+13. **A long press.** Hold a finger for a second on a line of the show screen, on the
+    button `On`, on an animation, on a row of `Storage`, on an empty part of the screen,
+    and then on the address of the target screen. *Seen:* outside the address no text
+    is marked and no menu opens; in the address a word is marked and the menu of
+    copying and pasting opens. The buttons still work by a tap. Note whether a long
+    press on a button pressed it too.
+14. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -420,6 +433,10 @@ By programs, on a Mac:
 - Uploading in Chrome: a GIF and an mp4 uploaded to the emulator, listed and played;
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
+- That a long press or a right click marks text and opens a menu only in a field one
+  types into, in Chrome: every element of the three screens, of a message and of the
+  question, fields and other elements made later, and the page for an old web view. A
+  browser's "select all" marks nothing.
 - That the web code sends the fourteen lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -434,9 +451,10 @@ By programs, on a Mac:
 - **The check on a phone**, all of it. No program has run the app on a phone, and no test
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without
-  internet, that the screen stays on, and that the back gesture goes from the target
-  screen to the show screen and from there out of the app. On 2026-10-15 the owner ran
-  the APK against the board on its own network and saw its state and its list.
+  internet, that the screen stays on, that the back gesture goes from the target screen
+  to the show screen and from there out of the app, and that a long press marks text and
+  opens its menu only in a field. On 2026-10-15 the owner ran the APK against the board
+  on its own network and saw its state and its list.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

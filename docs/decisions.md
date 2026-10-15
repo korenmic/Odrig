@@ -447,6 +447,12 @@ are in [format.md](format.md), "Measured sizes".
   open.
 - 2026-10-15: The owner asked that in the operators' app the menu of marking and copying
   text open only in a text or number field, and nowhere else; seed 25 is proposed for it.
+- 2026-10-15: Seed 25: in the operators' app a long press, or a right click in a
+  browser, marks text and opens its menu only in a field one types into, wherever the
+  app's page runs; anywhere else it marks nothing and opens nothing. The web code does
+  it alone, with one rule of its style sheet and one listener, which go by the kind of
+  an element, so a field added later is the same. Tested in Chrome and built into the
+  APK; the check on a phone is the owner's and is open.
 - 2026-10-16: The owner: every firmware of the project gets everything the WLED-based
   firmware adds to WLED, the fallback without WLED of seed 12 included; a fallback is not
   a firmware that only starts and plays. firmware-additions.md lists the additions, one

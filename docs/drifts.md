@@ -8371,6 +8371,32 @@ information names `odrig drive` too, which it had left out.
 
 **Resolution.** `firmware/usermod/odrig_usermod.cpp`, `addToJsonInfo`; `docs/firmware.md`.
 
+## Seed 25: The check that nothing depends on a long press
+
+**Question.** The app's suite checks that the web code listens to five events, `click`,
+`input`, `change`, `visibilitychange` and `popstate`, so that nothing of the app depends
+on hovering, a long press or a swipe. The listener that stops the menu of a long press is
+a listener of a sixth, `contextmenu`. Does the check still hold?
+
+**Answer.** It does, and it now says so: it takes `contextmenu` among the events, and
+checks that its one listener, at the start of the app, only stops the menu outside the
+fields and does nothing else. No action of the app is done by a long press.
+
+**Resolution.** `tests/app/test_look.py`, `Touch`; `app/www/main.js`.
+
+## Seed 25: Where a long press is tried on a phone
+
+**Question.** The step of the check on a phone holds a finger on buttons. Whether a long
+press on a button of Android's web view also presses it, once its menu is stopped, no
+program here can tell. Which buttons does the step use?
+
+**Answer.** `On`, which does no harm while the installation is on, and an animation,
+which plays it. The step asks only that no text be marked and no menu open there, and
+that the buttons still work by a tap, and to note whether a long press on a button
+pressed it too.
+
+**Resolution.** `docs/android-app.md`, "The check on a phone", step 13.
+
 ## The converter on Windows: its suite passes there
 
 **Question.** The converter's suite, `npm test --prefix converter`, did not pass on Windows.

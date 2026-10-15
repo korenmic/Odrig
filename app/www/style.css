@@ -12,6 +12,20 @@
   box-sizing: border-box;
 }
 
+/* Text can be marked, and a long press opens the menu of copying and pasting, only in a
+   field one types into. */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+:read-write {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 html,
 body {
   margin: 0;
