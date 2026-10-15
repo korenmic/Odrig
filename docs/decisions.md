@@ -413,3 +413,7 @@ are in [format.md](format.md), "Measured sizes".
   chip's own USB port no longer took a computer. The owner approved three seeds: 21, the
   chip's own port a computer's when one is plugged in as the board starts; 22, a stick
   through a hub, on newer USB software; 23, a log of the USB port on the serial port.
+- 2026-10-15: A show of 113 animations, 10.1 MB, did not fit into the board's storage;
+  107 of them were installed, the six smallest zoomed versions left out. The owner gave
+  up firmware updates over Wi-Fi so that the second firmware slot can hold animations,
+  and approved seed 24 for it: the storage grows to about 13.5 MB.
