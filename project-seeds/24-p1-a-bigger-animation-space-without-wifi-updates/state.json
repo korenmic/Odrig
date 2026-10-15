@@ -6,5 +6,5 @@
   "priority": "P1",
   "addedAt": "2026-10-15T04:05:00+03:00",
   "addedCommit": "pending-local",
-  "summary": "The board's storage for animations grows from 10.35 MB to about 13.5 MB by taking the second firmware slot, which only updates over Wi-Fi need; the firmware tool learns the new layout, keeps the board's settings and show through the move, and can put WLED's layout back."
+  "summary": "The board's storage for animations grows from 10.35 MB to about 13.5 MB by taking the second firmware slot, which only updates over Wi-Fi need; the firmware tool learns the new layout, keeps the board's settings through the move, the show being installed again by the owner, and can put WLED's layout back."
 }
