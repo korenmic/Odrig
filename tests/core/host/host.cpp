@@ -52,7 +52,7 @@ const int kBadReply = 72;
 const int kPowerCut = 75;
 
 // The storage of the board: the size of its partition and of a block of its file system.
-const uint64_t kBoardStorage = 10354688;
+const uint64_t kBoardStorage = 13500416;
 const uint64_t kStorageBlock = 4096;
 
 int usage() {

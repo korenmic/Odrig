@@ -58,8 +58,8 @@ class Space(Content):
         self.assertEqual(sorted(files), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
         self.assertTrue(all(len(content) <= BLOCK for content in files.values()))
         printed = self.run_both(files, [support.line(T0, "space")])
-        self.assertEqual(printed, ['reply {"ok":true,"free":10338304,"total":10354688,"animations":2}'])
-        self.assertEqual(BOARD - 4 * BLOCK, 10338304)
+        self.assertEqual(printed, ['reply {"ok":true,"free":13484032,"total":13500416,"animations":2}'])
+        self.assertEqual(BOARD - 4 * BLOCK, 13484032)
 
     def test_the_total_is_the_one_the_host_reports(self):
         files = support.example_show()
@@ -141,7 +141,7 @@ class Space(Content):
         with_storage = support.start(files, [support.line(T0, "space")])
         only_space = support.start(files, [support.line(T0, "space")], ["--only-space"])
         self.assertEqual(only_space.lines, with_storage.lines)
-        self.assertEqual(replies(only_space.lines), ['{"ok":true,"free":10338304,"total":10354688,"animations":2}'])
+        self.assertEqual(replies(only_space.lines), ['{"ok":true,"free":13484032,"total":13500416,"animations":2}'])
 
     def test_of_two_codes_that_apply_the_first_of_the_order_is_given(self):
         lines = {"space" + " " * 2044: "line-too-long", "spaces 1": "unknown-command", "space 1": "bad-argument", "space": "storage-error"}
@@ -151,7 +151,7 @@ class Space(Content):
     def test_space_through_the_byte_entry(self):
         printed = self.run_both(support.example_show(), [support.fed(T0, b"spa"), support.fed(T0 + 1, b"ce\r\nspace\n")])
         self.assertEqual(printed[0], f"fed {b'space'.hex()}")
-        self.assertEqual(replies(printed), ['{"ok":true,"free":10338304,"total":10354688,"animations":2}'] * 2)
+        self.assertEqual(replies(printed), ['{"ok":true,"free":13484032,"total":13500416,"animations":2}'] * 2)
 
     def test_space_changes_nothing_and_does_not_disturb_playback(self):
         files = playing(support.example_show(), 3)

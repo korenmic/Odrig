@@ -271,7 +271,7 @@ after startup.
 
 # The storage of the board and the block of its file system, which the test host and the
 # emulator report space by.
-BOARD_STORAGE = 10354688
+BOARD_STORAGE = 13500416
 STORAGE_BLOCK = 4096
 
 

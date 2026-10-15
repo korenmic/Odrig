@@ -89,7 +89,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]\n", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
         self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--record", "--seconds", "--script"})
-        self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |", self.text)
+        self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
         self.assertIn("page: http://127.0.0.1:8600/", self.text)

@@ -633,7 +633,7 @@ leg; and `ready`.
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
 | `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
 | `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
-| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 10,354,688, the size of the board's storage. |
+| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |
 | `--no-storage` | The seven storage functions are `NULL`. |
 | `--only-space` | Of the seven only `space` is there: a host whose storage cannot be changed. |
 | `--space-unknown` | `space` returns -1. |

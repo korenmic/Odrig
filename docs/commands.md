@@ -60,7 +60,7 @@ A number in a command is written in decimal digits.
 
 ```
 space
-{"ok":true,"free":8372224,"total":10354688,"animations":2}
+{"ok":true,"free":11517952,"total":13500416,"animations":2}
 ```
 
 `free` and `total` are bytes of the storage the show is in. `animations` is the number of

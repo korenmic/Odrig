@@ -6,7 +6,7 @@ import unittest
 
 from odrigctl import client
 
-from fwtool import board, paths
+from fwtool import board, partitions, paths
 
 from . import PORT, support
 
@@ -24,7 +24,8 @@ HELLO_NAME = support.HELLO_NAME
 DENSE_NAME = "dense-bench.odrg"
 DENSE_SECONDS = 60
 UPLOAD_RESULT = paths.OUT / "upload.json"
-BOARD_TOTAL = 10354688
+# The storage of the board on either of its layouts.
+BOARD_TOTALS = (partitions.storage(partitions.WLED).size, partitions.storage(partitions.BIGGER).size)
 TOO_LONG = {"ok": False, "error": "line-too-long"}
 UNKNOWN = {"ok": False, "error": "unknown-command"}
 
@@ -153,7 +154,8 @@ class Spike(unittest.TestCase):
             port.send(b"#store 100000\n")
             self.assertTrue(json.loads(port.line(is_store, 60.0))["ok"])
             after = space(port)
-        self.assertEqual((before["ok"], before["animations"], before["total"]), (True, 2, 10354688))
+        self.assertEqual((before["ok"], before["animations"]), (True, 2))
+        self.assertIn(before["total"], BOARD_TOTALS)
         self.assertEqual(again, before)
         self.assertEqual(report["store"]["calls"], 0)
         # The file system was asked once, at the start, and that took a while.
@@ -182,12 +184,13 @@ class Emulated:
     """An emulator on a folder, with the board's total storage, that can be started again
     on the same folder as a board is restarted."""
 
-    def __init__(self, folder):
+    def __init__(self, folder, total):
         self.folder = folder
+        self.total = total
         self.start()
 
     def start(self):
-        self._running = support.emulator(self.folder, "--storage", BOARD_TOTAL)
+        self._running = support.emulator(self.folder, "--storage", self.total)
         self.link = self._running.__enter__()
 
     def stop(self):
@@ -228,7 +231,8 @@ class ContentCommands(unittest.TestCase):
         self.assertEqual([item["id"] for item in before], [1, 2, 3])
         self.assertEqual(replies[3], (0, {"ok": True, "items": before + [new], "next": None}))
         self.assertEqual(replies[5][1], {"ok": True, "on": True, "brightness": support.DIM, "playing": "all", "animation": NEW_ITEM, "error": None})
-        self.assertEqual((replies[0][1]["animations"], replies[6][1]["animations"], replies[6][1]["total"]), (2, 3, BOARD_TOTAL))
+        self.assertEqual((replies[0][1]["animations"], replies[6][1]["animations"]), (2, 3))
+        self.assertIn(replies[6][1]["total"], BOARD_TOTALS)
         # After the restart the show still has the item, plays its start item, and plays
         # the new one in the playlist when it is told to. When the new one is removed in
         # its turn, the playlist goes on with the animation after it, which is the first.
@@ -247,7 +251,7 @@ class ContentCommands(unittest.TestCase):
         folder.mkdir()
         for name, data in self.installed.items():
             (folder / name).write_bytes(data)
-        emulated = Emulated(folder)
+        emulated = Emulated(folder, replies[6][1]["total"])
         try:
             in_the_emulator = support.content_session(lambda *words: support.command(emulated.link, *words), emulated.restart, self.hello)
         finally:

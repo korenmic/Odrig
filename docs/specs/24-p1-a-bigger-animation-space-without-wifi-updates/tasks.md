@@ -62,7 +62,7 @@ Rules for every task:
     does not exist.
   - Requirements: 1.3, 5.1 to 5.3
 
-- [ ] 4. The emulator's default storage
+- [x] 4. The emulator's default storage
   - `emulator/host.py`, `tests/core/host/host.cpp` and the tests that state the default;
     `tests/board/`: the total that `space` reports is the board's partition size.
     `docs/emulator.md`, `docs/core.md`, `docs/commands.md`.

@@ -9,7 +9,7 @@ LOG_LINES = 100
 
 # The storage of the board, which the emulator reports in place of the Mac's disk: the
 # size of the board's storage and the size of a block of its file system.
-STORAGE_BYTES = 10354688
+STORAGE_BYTES = 13500416
 STORAGE_BLOCK = 4096
 MOST_STORAGE = 4294967295
 

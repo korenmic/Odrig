@@ -122,7 +122,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--tcp-port N` | The port of the [line port](#the-line-port) on 127.0.0.1; 0 takes any free port. | On a Mac there is no line port; on Windows it is 8601 |
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
-| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
+| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 
@@ -132,16 +132,16 @@ with `--lan` on every address this computer has.
 
 **Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
 the folder it was started on, and on nothing else: a name with a path separator, or one
-that is not made of the characters the core uses for a file name, is refused. For
-`space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
-bytes, or the number given with `--storage`, and as the free space the total less the
-sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
-`remove` and `upload` change the folder as they change the board's storage: an upload is
-written into `upload.part` of the folder piece by piece and takes its name when
-`upload end` succeeds, `show.json` is written again through `show.part`, and a file no
-item names any more is deleted. To keep a show, run a copy of its folder. A folder the
-emulator was stopped on during an upload holds `upload.part` until the emulator is
-started on it again; `install-show` of the firmware tool refuses such a folder, as it
+that is not made of the characters the core uses for a file name, is refused. For `space`
+it reports the board's storage and not the Mac's disk: as the total 13,500,416 bytes, the
+board's storage on its bigger layout, or the number given with `--storage`, and as the
+free space the total less the sizes of the files of the folder, each rounded up to 4,096
+bytes, and not below 0. `remove` and `upload` change the folder as they change the board's
+storage: an upload is written into `upload.part` of the folder piece by piece and takes
+its name when `upload end` succeeds, `show.json` is written again through `show.part`, and
+a file no item names any more is deleted. To keep a show, run a copy of its folder. A
+folder the emulator was stopped on during an upload holds `upload.part` until the emulator
+is started on it again; `install-show` of the firmware tool refuses such a folder, as it
 refuses any file the show does not name. The emulator paces nothing: its file operations
 take microseconds, and the check of an uploaded file takes one frame of it for each
 refresh, as on the board.
