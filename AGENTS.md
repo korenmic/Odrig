@@ -130,8 +130,6 @@ present, and do not build on them.
   up firmware updates over Wi-Fi; the tool and the firmware have it, and no board has been
   moved to it yet.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **No text menu outside the app's fields**, seed 25: in the operators' app a long press
-  marks text and opens its menu only in a text or number field.
 - **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
   suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
   tested there.

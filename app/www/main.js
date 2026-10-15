@@ -38,6 +38,14 @@ function message(text) {
 byId("message-close").addEventListener("click", () => {
   byId("message").hidden = true;
 });
+
+// A long press or a right click opens a menu only in a field one types into, as the
+// style sheet lets text be marked only there. Nothing of the app is done by a long press.
+document.addEventListener("contextmenu", (event) => {
+  if (!(event.target instanceof Element && event.target.matches(":read-write"))) {
+    event.preventDefault();
+  }
+});
 // The page's history holds one entry of the app, its first screen, or two, with another
 // screen on top. So the back gesture goes from any other screen to the first, and from
 // the first it leaves the app.

@@ -447,9 +447,23 @@ are in [format.md](format.md), "Measured sizes".
   open.
 - 2026-10-15: The owner asked that in the operators' app the menu of marking and copying
   text open only in a text or number field, and nowhere else; seed 25 is proposed for it.
+- 2026-10-15: Seed 25: in the operators' app a long press, or a right click in a
+  browser, marks text and opens its menu only in a field one types into, wherever the
+  app's page runs; anywhere else it marks nothing and opens nothing. The web code does
+  it alone, with one rule of its style sheet and one listener, which go by the kind of
+  an element, so a field added later is the same. Tested in Chrome and built into the
+  APK; the check on a phone is the owner's and is open.
 - 2026-10-16: The owner: every firmware of the project gets everything the WLED-based
   firmware adds to WLED, the fallback without WLED of seed 12 included; a fallback is not
   a firmware that only starts and plays. firmware-additions.md lists the additions, one
   line each, with how each reaches another firmware and how far seed 12 has it. A seed
   that adds to the firmware adds its line there; seed 12's spec takes the lines that came
   after it before its open tasks go on.
+- 2026-10-16: The board's network came up as `WLED-AP`, and WLED's factory password did
+  not open it. Its storage showed why: WLED had renamed its settings file to
+  `/rst.cfg.json`, as it does after repeated crashes or when the file is broken and has no
+  backup, while the password file and the show stayed. So WLED used its factory name with
+  the project's password. The firmware of `master` was installed with `install-firmware`
+  over the socket marked COM, which put the name, the password and the limit back; the
+  show of 107 animations was untouched, with 77,824 bytes free. What crashed the board,
+  if it crashed, is not known.
