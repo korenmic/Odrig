@@ -3,8 +3,9 @@
 // answered to every request of the tests, recorded once while both existed. Each request,
 // a question to that package or a command line of its tool or of a generator, is kept
 // under a key made of what it asks: the request and its input, with the temporary folders
-// and the repository written as names, the files of those folders as they were before it,
-// and every other file its command line names. With it are kept its answer and the files
+// and the repository written as names and the parts of the paths below them joined by `/`
+// on every system, the files of those folders as they were before it, and every other file
+// its command line names. With it are kept its answer and the files
 // it made, wrote and removed. A run of more than 64 hexadecimal digits in an answer is kept
 // as a digest, the first 16 digits of its SHA-256 and its number of bytes, except in the
 // answers of `deflate`, which the tests go on to read. A file larger than 16 KB that a
@@ -67,6 +68,15 @@ function mapStrings(value, change) {
   return value;
 }
 
+// A path that starts with a name, up to a space, a quote or a colon.
+const NAMED_PATH = /<(?:tmp\d+|root)>[^\s"':]*/g;
+
+// A text with the parts of each path that starts with a name joined by `/`, as the answers
+// were stored, whatever the system joins them by.
+function slashed(text) {
+  return path.sep === "/" ? text : text.replace(NAMED_PATH, (found) => found.split(path.sep).join("/"));
+}
+
 // A value with each temporary folder written as <tmpN> and the repository as <root>.
 function named(value, folders) {
   return mapStrings(value, (text) => {
@@ -74,7 +84,7 @@ function named(value, folders) {
     folders.forEach((folder, i) => {
       made = made.split(folder).join(`<tmp${i}>`);
     });
-    return made.split(ROOT).join("<root>");
+    return slashed(made.split(ROOT).join("<root>"));
   });
 }
 
@@ -114,7 +124,8 @@ function snapshot(folders) {
       } catch {
         return;
       }
-      for (const entry of entries) {
+      // In the order of their names, which is the order macOS and Linux give them in.
+      for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
         const name = inner === "" ? entry.name : `${inner}/${entry.name}`;
         if (entry.isDirectory()) {
           found[`<tmp${i}>/${name}`] = "folder";
@@ -160,7 +171,7 @@ function outside(commands, folders) {
         continue;
       }
       const target = path.resolve(cwd, word);
-      if (folders.some((folder) => target === folder || target.startsWith(`${folder}/`))) {
+      if (folders.some((folder) => target === folder || target.startsWith(`${folder}${path.sep}`))) {
         continue;
       }
       const held = holding(target);
