@@ -135,6 +135,8 @@ present, and do not build on them.
 - **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
   suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
   tested there.
+- **The app clear of the phone's bars**, seed 27: on the phone the operators' app is
+  drawn under Android's top and bottom bars today; it will end where they begin.
 
 The state of every seed is in the `state.json` of its folder.
 
