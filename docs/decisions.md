@@ -445,3 +445,5 @@ are in [format.md](format.md), "Measured sizes".
   that works, and the emulator reports the bigger storage by default. Built and tested
   without the board; the move on the board, with the owner's show of 113 animations, is
   open.
+- 2026-10-15: The owner asked that in the operators' app the menu of marking and copying
+  text open only in a text or number field, and nowhere else; seed 25 is proposed for it.

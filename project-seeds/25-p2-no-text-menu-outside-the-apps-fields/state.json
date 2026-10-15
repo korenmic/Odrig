@@ -1,0 +1,10 @@
+{
+  "number": 25,
+  "slug": "25-p2-no-text-menu-outside-the-apps-fields",
+  "state": "remaining",
+  "title": "No text menu outside the app's fields",
+  "priority": "P2",
+  "addedAt": "2026-10-15T13:40:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "In the operators' app a long press or a right click opens the menu of marking and copying text only in a text or number field; on labels, buttons, lists and everything else it marks nothing and opens no menu."
+}
