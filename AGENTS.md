@@ -118,10 +118,6 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **Converting and uploading in the operators' app**, seed 17: the app's second part.
-  Its first part, command and control, is in `app/`; no program has run it on a phone,
-  which is the owner's check and is open. The converter's library is made to run inside
-  the app. It has been run with Node.js and in Chrome, and never inside an app.
 - **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
   package stops converting and stays as a small library that reads and writes the
   project's files for tests and for the firmware tool. Today both can convert.

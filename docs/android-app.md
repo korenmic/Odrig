@@ -369,7 +369,19 @@ installed; the phone with mobile data on.
    action. While one strip is fed from the board itself, as on the desk today, keep the
    brightness at 40 or less.
 9. **Mobile data off.** Switch mobile data off and repeat step 3. *Seen:* the same.
-10. **Note** the phone's model, its Android version, the web view's version from the
+10. **Removing.** With the emulator of step 2, open `Storage`, press `Remove` beside an
+    animation that no cycle plays, and `Remove it`. *Seen:* the app says it removed the
+    animation, the row is gone, and the free storage grew.
+11. **Converting.** On `Storage`, choose a short video filmed with the phone, held
+    sideways, and then a GIF; try each fit and a part of a few seconds, and press
+    `Make the animation`. *Seen:* the progress, the animation drawn in a loop as the
+    file looks, and its frames, length and size. Note how long a video of ten seconds
+    took.
+12. **Uploading.** Press `Upload`, to the emulator on the local network and then to the
+    board on its own network. *Seen:* the progress with its speed, then
+    `Uploaded as animation ...`; the animation is in both lists and plays on the
+    emulator's page and on the LEDs when it is pressed.
+13. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -396,17 +408,26 @@ Neither needs a phone.
 
 By programs, on a Mac:
 
-- Both screens and every action of the web code, in Chrome against the emulator: the
-  address, the status, the list for shows of up to 40 animations, `play`, `play all`,
-  `on`, `off`, the brightness with at most five commands a second, each message, and the
-  look at widths of 360 and 320 pixels.
-- That the web code sends the eight lines above and no other, and names no address but
-  `4.3.2.1`.
+- The three screens and every action of the web code, in Chrome against the emulator:
+  the address, the status, the list for shows of up to 40 animations, `play`,
+  `play all`, `on`, `off`, the brightness with at most five commands a second, the free
+  storage, a removal confirmed and one kept, each message, the look at widths of 360 and
+  320 pixels, and the back gesture across the three screens.
+- Converting in Chrome: a GIF with each fit and with a part gives the very file the
+  converter's command line makes of it, and an mp4 in H.264, whole and as a part, gives
+  its frames and lengths; stopping; a file that cannot be read; a target without a
+  canvas.
+- Uploading in Chrome: a GIF and an mp4 uploaded to the emulator, listed and played;
+  `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
+  a file that does not fit; `upload end` answered `busy`; every refusal.
+- That the web code sends the fourteen lines above and no other, and names no address
+  but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
   licence.
-- That the APK holds the web code, the sender, the three permissions `INTERNET`,
-  `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`, and the rule that allows plain HTTP.
+- That the APK holds the web code and the converter's library byte for byte, the sender,
+  the three permissions `INTERNET`, `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`,
+  and the rule that allows plain HTTP.
 
 ## What is open
 
@@ -414,9 +435,12 @@ By programs, on a Mac:
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without
   internet, that the screen stays on, and that the back gesture goes from the target
-  screen to the show screen and from there out of the app.
+  screen to the show screen and from there out of the app. On 2026-10-15 the owner ran
+  the APK against the board on its own network and saw its state and its list.
+- **Converting and uploading on a phone.** No phone has converted or uploaded an
+  animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
+  takes to convert, and how fast an upload goes over the board's network are open.
 - The build is verified on one system, macOS on Apple Silicon. `app/toolchain.json` has
   no entry for another.
 - `npm audit` names three advisories of moderate severity in a package that Capacitor's
   command line uses at build time. Nothing of it is in the APK.
-- The app's second part, converting and uploading on the phone, is planned.

@@ -67,7 +67,7 @@ the firmware keeps them.
 | 09, the operators' app | Task 9, the check on a phone. | No: the app |
 | 12, standalone firmware as a fallback | Tasks 6 to 12. | Yes |
 | 14, playing at once at power-on | Task 6, the board's whole suite, which needs a computer on the chip's own port, and task 7, the documents and the state. | Yes |
-| 17, converting and uploading in the app | Every task: the seed has no spec yet. | No: the app |
+| 17, converting and uploading in the app | Task 7, the owner's check on a phone. | No: the app |
 | 18, one converter | Every task. | No: the converter |
 | 19, previewing one animation | Task 3, the owner looks at one animation. | No: the emulator |
 | 20, animations from a USB drive | Task 4, the trial with an adapter that gives the stick power; the rest of task 5, the rate and the board's tests with a stick; task 6, the owner's look. | Yes |

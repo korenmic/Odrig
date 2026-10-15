@@ -88,7 +88,7 @@ Rules for every task:
   - `docs/android-app.md`: uploading, the lines, the messages.
   - Requirements: 4.1 to 4.6, 5.1, 5.2
 
-- [ ] 6. The APK and the documents
+- [x] 6. The APK and the documents
   - `python3 app/app.py build`; `tests/apk/` passes against the new APK.
   - `docs/android-app.md`: what is verified, what is open, and the steps of the check on
     a phone for converting, uploading and removing. `docs/decisions.md`: a line in the

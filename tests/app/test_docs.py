@@ -126,8 +126,8 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 11)))
-        self.assertEqual(check.count("*Seen:*"), 9)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 14)))
+        self.assertEqual(check.count("*Seen:*"), 12)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
                          "press `Board`", "Leave mobile data on", "Switch mobile data off"):
             self.assertIn(expected, flat(check))
@@ -137,7 +137,7 @@ class TheAppsPage(unittest.TestCase):
         for expected in ("in Chrome against the emulator", "write nothing outside the repository's folder", "`INTERNET`, `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`"):
             self.assertIn(expected, verified)
         still_open = flat(section(self.text, "What is open"))
-        for expected in ("No program has run the app on a phone, and no test runs the sender.", "macOS on Apple Silicon", "converting and uploading on the phone, is planned"):
+        for expected in ("No program has run the app on a phone, and no test runs the sender.", "macOS on Apple Silicon", "No phone has converted or uploaded an animation yet"):
             self.assertIn(expected, still_open)
 
     def test_every_link_of_the_page_leads_somewhere(self):

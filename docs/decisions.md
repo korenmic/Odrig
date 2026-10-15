@@ -108,8 +108,9 @@ it stands now.
 - There is one converter, made to run from the command line without compiling and inside
   the Capacitor and Tauri apps. It is written in JavaScript and is the folder `converter/`:
   a library that reads no file and runs as it is in Node.js and in a web page, and a
-  command line on top of it. See [converter.md](converter.md). The library has been run in
-  Chrome; it has not been run inside an app yet.
+  command line on top of it. See [converter.md](converter.md). The library runs inside the
+  operators' app's web code, in Chrome against the emulator; it has not been run inside
+  the APK on a phone yet.
 - The Python converter is kept as the independent check: the suite of the JavaScript
   converter runs both on the same inputs and compares. It also holds the generators of the
   tracked animations and builds the test vectors. See
@@ -417,3 +418,8 @@ are in [format.md](format.md), "Measured sizes".
   107 of them were installed, the six smallest zoomed versions left out. The owner gave
   up firmware updates over Wi-Fi so that the second firmware slot can hold animations,
   and approved seed 24 for it: the storage grows to about 13.5 MB.
+- 2026-10-15: Seed 17 gave the operators' app its second part: a storage screen with the
+  free storage, the sizes of the animations and their removal, and converting a video or
+  a GIF on the phone with the converter's library and uploading it. `status` reports the
+  canvas for it, as the owner approved on 2026-10-12. A GIF converted in the app is the
+  very file the command line makes; the check on a phone is the owner's and is open.

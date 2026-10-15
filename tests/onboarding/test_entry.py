@@ -138,7 +138,7 @@ class EntryFile(unittest.TestCase):
     def test_what_is_coming_names_every_seed_that_is_not_begun_and_no_seed_that_is_completed(self):
         coming = self.part("What is coming")
         named = {int(number) for number in re.findall(r"\bseed ([0-9]{2})\b", coming)}
-        self.assertLessEqual({12, 17}, named)
+        self.assertLessEqual({12}, named)
         self.assertGreaterEqual(len(seeds()), 10)
         for number, state in seeds():
             with self.subTest(seed=number, state=state):
@@ -147,8 +147,7 @@ class EntryFile(unittest.TestCase):
                 if state == "completed":
                     self.assertNotIn(number, named)
         self.assertIn("not in the repository yet", coming)
-        self.assertIn("It has been run with Node.js and in Chrome, and never inside an app.", coming)
-        self.assertIn("it has not been run inside an app yet", flat(support.read("docs/decisions.md")))
+        self.assertIn("it has not been run inside the APK on a phone yet", flat(support.read("docs/decisions.md")))
 
     def test_it_says_what_the_workflow_skills_are_and_that_they_are_not_needed(self):
         workflow = self.part("The owner's workflow")

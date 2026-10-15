@@ -1,5 +1,6 @@
 import hashlib
 import re
+import subprocess
 import unittest
 
 from . import support
@@ -82,8 +83,11 @@ class TheWebCode(unittest.TestCase):
     def test_nothing_of_the_converter_is_in_the_app(self):
         library = {hashlib.sha256(path.read_bytes()).hexdigest() for path in CONVERTER_LIBRARY.glob("*.js")}
         self.assertGreater(len(library), 5)
-        for path in sorted((support.ROOT / "app").rglob("*")):
-            if path.is_file() and "node_modules" not in path.parts:
+        # What git keeps of `app/`: the build's copies, which git ignores, are no part of it.
+        kept = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "app"], cwd=support.ROOT, capture_output=True, check=True).stdout
+        for name in sorted(filter(None, kept.decode("utf-8").split("\0"))):
+            path = support.ROOT / name
+            if path.is_file():
                 self.assertNotIn(hashlib.sha256(path.read_bytes()).hexdigest(), library, path)
         # The library is imported by the conversion alone.
         for name, text in scripts().items():
