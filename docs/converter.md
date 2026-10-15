@@ -15,12 +15,12 @@ It is written in JavaScript, lives in the folder `converter/`, and has two parts
 | [`check`](#check) | Says whether a JSON frames or ODRG file is valid and what it holds. |
 | [`pack`](#pack) | Builds the folder that is installed for a show. |
 
-A second converter, written in Python, is kept as the reference: the [tests](#tests) of
-this tool run both on the same inputs and compare what they give. The Python package also
+This is the one converter of the project. The Python package `odrig/` converted before it;
+what that package answered to the same inputs is stored with the [tests](#tests) of this
+tool, which compare with it. The package is now a library for the tests and the tools: it
 holds the generators that write the tracked animations, and builds the test vectors for
 other ODRG readers. All of that is on its own page,
-[reference-converter.md](reference-converter.md). To convert and to pack, use the tool of
-this page.
+[python-library.md](python-library.md).
 
 ## Setup
 
@@ -83,11 +83,12 @@ of an input: `decoder-missing`. `import` ends with status 1 and
 `error: decoder-missing: <detail>` when the package that reads the media file is not
 installed. The detail names the package and the command that installs it.
 
-The statuses, the reasons and the error line are those of the reference converter. The
-detail is the same as well, character for character, wherever the tools word it
-themselves. Where a detail holds the words of a library, each tool has its own: the place
-and the fault in a `bad-json` detail, the fault of the stream in a `bad-deflate` detail,
-and what the decoder says in an `unreadable-media` detail.
+The statuses, the reasons and the error line are those the Python package wrote when it
+converted, and the tests compare them with its stored answers. The detail is the same as
+well, character for character, wherever the two worded it themselves. Where a detail holds
+the words of a library, each had its own: the place and the fault in a `bad-json` detail,
+the fault of the stream in a `bad-deflate` detail, and what the decoder says in an
+`unreadable-media` detail.
 
 ## import
 
@@ -160,18 +161,18 @@ rectangle: disposal 0 and 1 leave it, 2 makes it transparent, and 3 gives it bac
 held before that frame was drawn. A pixel that has the frame's transparent index is left
 as it is.
 
-For the GIFs most programs write, these are the pictures the reference converter gets
-from its library, Pillow, and the two tools write the same file. In three corners Pillow
-has rules of its own, and the files differ: after a frame with disposal 2 that has no
-transparent index, Pillow paints the background colour where this tool makes the pixels
-transparent, and so black; for a frame that names no disposal, Pillow keeps the disposal
-of the frame before; and where the first frame does not cover the screen, Pillow paints
-the background colour.
+For the GIFs most programs write, these are the pictures the Python package got from its
+library, Pillow, when it converted, and the two wrote the same file. In three corners
+Pillow has rules of its own, and the files differed: after a frame with disposal 2 that
+has no transparent index, Pillow paints the background colour where this tool makes the
+pixels transparent, and so black; for a frame that names no disposal, Pillow keeps the
+disposal of the frame before; and where the first frame does not cover the screen, Pillow
+paints the background colour.
 
-**Videos.** The decoder program of this tool is ffmpeg 6.0, and the reference converter
-decodes with the FFmpeg 8 libraries of its own library. For the videos of the suite the
-two tools write the same file, byte for byte. Two decoders may give colours that differ
-by a little for another video, and the two tools need not judge a damaged file alike.
+**Videos.** The decoder program of this tool is ffmpeg 6.0; the Python package decoded with
+the FFmpeg 8 libraries of its own library. For the videos of the suite the two wrote the
+same file, byte for byte. Two decoders may give colours that differ by a little for another
+video, and the two need not judge a damaged file alike.
 
 `import` checks the mapping file first, then the name of the media file, then that it
 exists, then that the package that reads it is installed, then the start and the duration.
@@ -209,9 +210,9 @@ the library, and no file depends on a library of the computer.
 `animations/hello.json` and `animations/dvd.json`, the two tracked sources, are test
 content: Hello world and DVD bounce exist to try the tools and the board, and are not
 finished animations of the installation. Encoded, `hello.json` is 17,731 bytes
-uncompressed and 1,138 bytes compressed, and `dvd.json` 3,799 and 1,612 bytes. The
-reference converter writes the same uncompressed files, and with zlib 1.2.12 the same
-compressed files as well.
+uncompressed and 1,138 bytes compressed, and `dvd.json` 3,799 and 1,612 bytes. The Python
+package wrote the same uncompressed files, and with zlib 1.2.12 the same compressed files
+as well.
 
 A source that breaks the JSON frames format is rejected with its reason from "JSON frames
 files" in [reasons.md](reasons.md). A valid source that does not fit an ODRG file is
@@ -456,11 +457,11 @@ Everything on this page was run on one Mac, with:
 | npm | npm 12.0.2 |
 | Chrome | Chrome 154.0.8037.98 |
 | The decoder program | ffmpeg 6.0, the program `ffmpeg-static` 5.3.0 fetches for macOS on Apple Silicon |
-| The reference converter | Python 3.14.6 with zlib 1.2.12 |
+| The stored answers of the Python package | Made with Python 3.14.6 and zlib 1.2.12 |
 
-With these the suite passes. Wherever it gives the same whole input to both converters,
-they write the same file, byte for byte: compressed files and imported videos and GIFs
-included.
+With these the suite passes. Wherever it gives a whole input the Python package was given,
+this tool writes the file the package wrote, byte for byte: compressed files and imported
+videos and GIFs included.
 
 Windows and Linux are supported by construction and not verified: nothing has been run
 there. Not run either: a Node.js other than the two named, an npm older than 12, and a

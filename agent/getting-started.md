@@ -19,7 +19,7 @@ computer read [On Windows](#on-windows) first.
 
 ## On Windows
 
-The reference converter, the core's build, the emulator, the command tool and their suites
+The Python library, the core's build, the emulator, the command tool and their suites
 work on Windows 10 and 11. The converter's own suite, `npm test --prefix converter`, does
 not pass there yet. The firmware tool, the board and the walk-through suite stay with the
 first computer. A Windows computer needs git, Python 3.10 or later as `python`, Node.js 20
@@ -85,8 +85,8 @@ the network.
 
 | Suite | What it checks | Takes about |
 |---|---|---|
-| `converter/tests` | The converter: its results against those of the reference converter, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
-| `tests/converter` | The reference converter and the generators, and every tracked document against the tools. | 20 seconds |
+| `converter/tests` | The converter: its results against the stored answers of the Python package, which converted before it, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
+| `tests/converter` | The Python library and the generators, and every tracked document against the tools. | 20 seconds |
 | `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 40 seconds |
 | `tests/emulator` | The emulator and the command tool. | 2 minutes |
 | `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real. | 2 seconds |
@@ -193,6 +193,6 @@ The record file holds the colour of every LED at every refresh;
 - [animation-guide.md](animation-guide.md), to make an animation and try it here.
 - [working-rules.md](working-rules.md), before you change anything.
 - [converter.md](../docs/converter.md), [format.md](../docs/format.md) and [show.md](../docs/show.md) for the
-  tools and files used above, [reference-converter.md](../docs/reference-converter.md) for the generators, and
+  tools and files used above, [python-library.md](../docs/python-library.md) for the generators, and
   [mapping.md](../docs/mapping.md) for how the canvas is wired.
 - [decisions.md](../docs/decisions.md) for what has been decided and what is still open.

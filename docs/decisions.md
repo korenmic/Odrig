@@ -111,10 +111,11 @@ it stands now.
   command line on top of it. See [converter.md](converter.md). The library runs inside the
   operators' app's web code, in Chrome against the emulator; it has not been run inside
   the APK on a phone yet.
-- The Python converter is kept as the independent check: the suite of the JavaScript
-  converter runs both on the same inputs and compares. It also holds the generators of the
-  tracked animations and builds the test vectors. See
-  [reference-converter.md](reference-converter.md).
+- The JavaScript converter is the only converter. The Python package, which converted
+  before it, is a library for the tests and the tools: what it answered to the converter's
+  tests is stored with them, and the converter's suite compares with that. It also holds the
+  generators of the tracked animations and builds the test vectors. See
+  [python-library.md](python-library.md).
 
 ## Animation formats
 
@@ -423,3 +424,8 @@ are in [format.md](format.md), "Measured sizes".
   a GIF on the phone with the converter's library and uploading it. `status` reports the
   canvas for it, as the owner approved on 2026-10-12. A GIF converted in the app is the
   very file the command line makes; the check on a phone is the owner's and is open.
+- 2026-10-15: Seed 18 left one converter, the JavaScript tool. The Python package converts
+  nothing any more and is a library for the tests and the tools that holds the generators,
+  described in python-library.md. What it answered to the converter's tests when it still
+  converted is stored with them, 4.2 MB, so their suite starts no Python; the other suites
+  pack with the converter, and the setup installs no Python package.

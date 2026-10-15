@@ -74,9 +74,7 @@ distorts it. `--start` and `--duration` take a part of the file: with
 video that was filmed upright on a phone has to be turned before it is imported.
 [converter.md](../docs/converter.md#import) has the rest.
 
-Import with this tool. The reference converter has an `import` too; it is the reference for
-tests and not the one to use, and the two need not judge a damaged file alike. See "Damaged
-media" in [reference-converter.md](../docs/reference-converter.md#command-line).
+Import with this tool: it is the only one that imports.
 
 ## Check a source
 

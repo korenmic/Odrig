@@ -52,8 +52,8 @@ lines beside HTTP sends them through the [line port](#the-line-port) there.
 The emulator runs a packed show: the folder that `node converter/odrig.js pack` writes,
 described in [converter.md](converter.md). `pack` needs Node.js 20 or later and nothing
 else. Two shows are tracked. `python` on this page is any Python 3.10 or later, `python3`
-on a Mac; nothing here needs the libraries of the virtual environment of
-[reference-converter.md](reference-converter.md). `pack` refuses an output folder that is
+on a Mac; nothing here needs a library outside Python's own. `pack` refuses an output
+folder that is
 not empty, so remove the folder before packing again.
 
 **The example show**, for today's build of two legs, 60 x 6: Hello world and the bouncing
@@ -92,7 +92,7 @@ from the top-left corner to the bottom-right one, and so passes over every leg.
 | `dvd.odrg`, 20.9 s | 116 | 1,052 |
 
 The sizes are those the converter gives, on every computer. The generators are programs
-of the Python package of [reference-converter.md](reference-converter.md).
+of the Python library of [python-library.md](python-library.md).
 
 ## Starting
 
@@ -1264,7 +1264,7 @@ What is left on Windows:
   what needs a board on a Windows computer.
 
 After `master` brought the content commands and the converter in JavaScript, on the merged
-branch and with Python 3.14: the reference converter's suite, 638 tests; the core suite,
+branch and with Python 3.14: the suite of the Python package, 638 tests; the core suite,
 364, and with Microsoft's compiler 364 of which 10 are skipped; the suite of the emulator
 and the command tool, 523 of which 17 are skipped; the onboarding suite, 81. `space`,
 `list`, `remove` and `upload` are part of those suites and run over the line port. The

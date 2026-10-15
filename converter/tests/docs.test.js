@@ -164,7 +164,7 @@ test("docs/converter.md presents the JavaScript tool as the converter", async (t
     assert.ok(body.includes("`converter/tests/expected/`"));
     assert.equal(body.includes("ODRIG_PYTHON"), false);
     assert.ok(body.includes("ODRIG_CHROME"));
-    for (const name of ["docs/converter.md", "docs/reference-converter.md", "docs/emulator.md", "docs/firmware.md", "README.md"]) {
+    for (const name of ["docs/converter.md", "docs/python-library.md", "docs/emulator.md", "docs/firmware.md", "README.md"]) {
       assert.equal(/[a-z]+\.test\.js/.test(read(...name.split("/"))), false, `${name} lists a test file`);
     }
   });
@@ -182,27 +182,31 @@ test("docs/converter.md presents the JavaScript tool as the converter", async (t
   });
 });
 
-test("docs/reference-converter.md presents the Python tool as the reference", async (t) => {
-  const page = fs.existsSync(path.join(ROOT, "docs", "reference-converter.md")) ? read("docs", "reference-converter.md") : "";
+test("docs/python-library.md presents the Python package as a library for the tests and the tools", async (t) => {
+  const page = fs.existsSync(path.join(ROOT, "docs", "python-library.md")) ? read("docs", "python-library.md") : "";
 
-  await t.test("it says what the tool is for now", () => {
-    assert.notEqual(page, "", "there is no docs/reference-converter.md");
+  await t.test("it says what the package is for now, and that it converts nothing", () => {
+    assert.notEqual(page, "", "there is no docs/python-library.md");
     const opening = words(page.split("\n## ")[0]);
-    assert.match(opening, /reference/);
+    assert.match(opening, /a library for the tests and the tools/);
+    assert.match(opening, /It converts nothing/);
     assert.ok(opening.includes("[converter.md](converter.md)"));
+    assert.ok(opening.includes("`converter/tests/expected/`"));
   });
 
-  await t.test("it has the setup, the usage line of each subcommand, the generators, the test vectors, the tool that writes docs/mapping.md, and its use from Python", () => {
-    for (const heading of ["Setup", "Command line", "Generators", "Test vectors", "Tests", "From Python"]) {
-      assert.notEqual(section(page, heading), null, `docs/reference-converter.md has no section "## ${heading}"`);
+  await t.test("it has the setup, the generators, the test vectors, the tool that writes docs/mapping.md, and its use from Python, and no command that converts", () => {
+    for (const heading of ["Setup", "Generators", "Test vectors", "Tests", "From Python"]) {
+      assert.notEqual(section(page, heading), null, `docs/python-library.md has no section "## ${heading}"`);
     }
+    assert.equal(section(page, "Command line"), null);
     const lines = commands(page);
     for (const name of NAMES) {
-      assert.ok(lines.some((line) => line.startsWith(`python -m odrig ${name} `)), name);
+      assert.equal(lines.some((line) => line.startsWith(`python -m odrig ${name}`)), false, name);
     }
-    for (const line of ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "python -m unittest discover -s tests/converter -t .", "python -m tests.converter.build_vectors"]) {
+    for (const line of ["python3 -m venv .venv", "python -m unittest discover -s tests/converter -t .", "python -m tests.converter.build_vectors"]) {
       assert.ok(lines.includes(line), line);
     }
+    assert.equal(lines.some((line) => line.includes("pip install")), false);
     for (const name of ["hello_world", "dvd_bounce", "dense"]) {
       assert.ok(lines.some((line) => line.startsWith(`python -m odrig.generators.${name} `)), name);
     }
@@ -214,7 +218,7 @@ test("the other documents show the JavaScript tool where they convert or pack", 
   await t.test("README.md names both pages", () => {
     const text = read("README.md");
     assert.ok(text.includes("(docs/converter.md)"));
-    assert.ok(text.includes("(docs/reference-converter.md)"));
+    assert.ok(text.includes("(docs/python-library.md)"));
   });
 
   await t.test("docs/emulator.md and docs/firmware.md pack with the JavaScript tool, and generate with the Python programs", () => {
@@ -228,11 +232,10 @@ test("the other documents show the JavaScript tool where they convert or pack", 
     assert.equal(emulator.filter((line) => line.startsWith("python -m odrig.generators.")).length, 3);
   });
 
-  await t.test("docs/reasons.md says that both tools use its names", () => {
+  await t.test("docs/reasons.md says that the converter and the programs of the Python library use its names", () => {
     const opening = words(read("docs", "reasons.md").split("\n## ")[0]);
-    assert.match(opening, /both converters/);
     assert.ok(opening.includes("[converter.md](converter.md)"));
-    assert.ok(opening.includes("[reference-converter.md](reference-converter.md)"));
+    assert.ok(opening.includes("[python-library.md](python-library.md)"));
   });
 
   await t.test("docs/decisions.md states the converter as it is, with a line in its change log", () => {

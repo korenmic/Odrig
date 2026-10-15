@@ -93,16 +93,11 @@ class Guide(unittest.TestCase):
                 self.assertTrue(commands[heading].startswith(f"{support.NODE} {support.CONVERTER} {subcommand} "), commands[heading])
         self.assertTrue(commands["A generator"].startswith(".venv/bin/python -m odrig.generators."), commands["A generator"])
 
-    def test_it_says_which_tool_imports_and_that_the_two_may_judge_a_damaged_file_differently(self):
+    def test_it_says_which_tool_imports(self):
         imported = flat(self.part("An import"))
-        for phrase in ("Import with this tool", "the reference for tests and not the one to use", "the two need not judge a damaged file alike",
-                       "[reference-converter.md](../docs/reference-converter.md#command-line)"):
-            self.assertIn(phrase, imported)
+        self.assertIn("Import with this tool: it is the only one that imports.", imported)
         self.assertNotIn("crash", imported)
-        reference = flat(support.read("docs/reference-converter.md").split("\n## Command line\n")[1].split("\n## ")[0])
-        for phrase in ("**Damaged media.**", "Both refuse a file they cannot decode as `unreadable-media`", "a video whose first video stream has no decoder"):
-            self.assertIn(phrase, reference)
-        self.assertNotIn("fault of memory", reference)
+        self.assertNotIn("reference", imported)
 
     def test_it_says_what_to_look_for_and_that_the_emulator_does_not_show_the_boards_rate(self):
         looked = self.part("Look at it in the emulator")

@@ -72,14 +72,14 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_works_on_windows_what_stays_with_the_first_computer_and_what_to_install(self):
         windows = flat(self.part("On Windows"))
-        for phrase in ("The reference converter, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
+        for phrase in ("The Python library, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
                        f"The converter's own suite, `{CONVERTER_SUITE[1]}`, does not pass there yet.",
                        "The firmware tool, the board and the walk-through suite stay with the first computer.",
                        "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
                        "`g++` or `clang++` on the path, and Microsoft's C++ build tools", "the WinLibs build of MinGW-w64",
                        "into the folder `tools/` of the repository: nothing is installed"):
             self.assertIn(phrase, windows)
-        self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/reference-converter.md")))
+        self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/python-library.md")))
         self.assertEqual(support.subprocess.run(["git", "check-ignore", "-q", "tools/x"], cwd=support.ROOT).returncode, 0)
 
     def test_the_setup_on_windows_and_its_four_suites_are_commands_their_tools_understand(self):

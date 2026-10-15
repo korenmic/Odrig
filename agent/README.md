@@ -13,9 +13,9 @@ repository holds everything between a video or an idea and what the LEDs show:
 - the **converter**, `converter/`: JavaScript, run with Node.js. It turns a video or a GIF
   into a source that git tracks, a source into the file that is played, and a list of
   animations into a show;
-- the **reference converter**, `odrig/`: Python. It was the converter before and does the
-  same work. It is kept so that tests can compare the converter with it, and it holds the
-  generators, the programs that write animations. Nobody converts with it any more;
+- the **Python library**, `odrig/`: Python. It reads and writes the project's files for the
+  tests and the tools, and holds the generators, the programs that write animations. It was
+  the converter before, and converts nothing any more;
 - the **core**, `core/`: C++. It is the player, the one piece of code that runs both on the
   board and on a computer;
 - the **emulator**, `emulator/`: Python, on macOS and on Windows. It runs the core on a computer and

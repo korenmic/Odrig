@@ -26,7 +26,7 @@ HEADINGS = (
 BOOTSTRAP_HEADINGS = ("What the project is", "Read in this order", "What each file here is for", "Where everything else is")
 
 # The parts of the project, each with the folder that holds it.
-PARTS = {"converter": "converter/", "reference converter": "odrig/", "core": "core/", "emulator": "emulator/", "command tool": "odrigctl/", "firmware tool": "firmware/"}
+PARTS = {"converter": "converter/", "Python library": "odrig/", "core": "core/", "emulator": "emulator/", "command tool": "odrigctl/", "firmware tool": "firmware/"}
 
 # The pages of the folder in the order a newcomer reads them, and in the order the README
 # gives them to people.
@@ -78,15 +78,16 @@ class EntryFile(unittest.TestCase):
 
     def test_it_says_which_tool_is_the_converter_and_what_the_python_package_is_for(self):
         what = self.part("What this is")
-        for phrase in ("The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`", "The Python package `odrig/` was the converter before it",
-                       "the reference that tests compare the converter with", "it holds the generators", "Convert and pack with the JavaScript tool only"):
+        for phrase in ("The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`", "and the only one: convert and pack with it",
+                       "The Python package `odrig/` was the converter before it", "a library that reads and writes the project's files for the tests and the tools",
+                       "it holds the generators", "what it answered to the converter's tests is stored with them"):
             self.assertIn(phrase, what)
         self.assertTrue((support.ROOT / support.CONVERTER).is_file())
         self.assertTrue((support.ROOT / "odrig" / "generators").is_dir())
         by_task = support.section(self.text, "Then read, by task")
         rows = dict(re.findall(r"(?m)^\| (.+?) \| (.+) \|$", by_task))
         self.assertIn("[docs/converter.md](docs/converter.md)", rows["Change the converter"])
-        self.assertIn("[docs/reference-converter.md](docs/reference-converter.md)", rows["Change the Python reference, a generator or the test vectors"])
+        self.assertIn("[docs/python-library.md](docs/python-library.md)", rows["Change the Python library, a generator or the test vectors"])
         self.assertIn("`converter/tests/`", flat(by_task))
 
     def test_every_document_and_every_page_is_linked_and_the_other_places_are_named(self):
@@ -125,7 +126,7 @@ class EntryFile(unittest.TestCase):
 
     def test_it_says_what_works_on_windows_and_what_is_different_there(self):
         windows = " ".join(self.part("If you work on Windows").split())
-        for phrase in ("The reference converter, the core's build, the emulator and the command tool work on Windows 10 and 11, and their suites pass there.",
+        for phrase in ("The Python library, the core's build, the emulator and the command tool work on Windows 10 and 11, and their suites pass there.",
                        "The converter's own suite, `npm test --prefix converter`, does not pass on Windows yet", "Mending that is not part of seed 11.",
                        "That was seed 11", f"`{SEED_FOR_WINDOWS}`", "built there by `python core/build.py shared`, not by `make`",
                        "Windows has no virtual serial port", "with `--tcp` or `--http`", "The firmware tool and the board stay with the first computer.",

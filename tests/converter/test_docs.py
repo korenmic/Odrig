@@ -92,20 +92,22 @@ class ConverterDocument(unittest.TestCase):
         )
         self.assertIn(command, self.text)
 
-    def test_it_points_to_the_page_of_the_reference(self):
-        self.assertIn("(reference-converter.md)", self.text)
+    def test_it_points_to_the_page_of_the_python_library(self):
+        self.assertIn("(python-library.md)", self.text)
 
 
-class ReferenceDocument(unittest.TestCase):
-    """The page of the Python tool, the reference the JavaScript tool is compared with."""
+class LibraryDocument(unittest.TestCase):
+    """The page of the Python package: a library for the tests and the tools, which holds the
+    generators and converts nothing."""
 
     @classmethod
     def setUpClass(cls):
-        cls.text = (DOCS / "reference-converter.md").read_text(encoding="utf-8")
+        cls.text = (DOCS / "python-library.md").read_text(encoding="utf-8")
 
-    def test_it_says_that_the_tool_is_the_reference_and_points_to_the_converter(self):
+    def test_it_says_that_the_package_is_a_library_and_points_to_the_converter(self):
         opening = " ".join(self.text.split("\n## ")[0].split())
-        self.assertIn("reference", opening)
+        self.assertIn("a library for the tests and the tools", opening)
+        self.assertIn("It converts nothing", opening)
         self.assertIn("[converter.md](converter.md)", opening)
 
     def test_it_gives_the_test_command(self):
@@ -143,10 +145,10 @@ class ReferenceDocument(unittest.TestCase):
 
 
 class Readme(unittest.TestCase):
-    def test_it_points_to_the_converter_document_and_to_the_document_of_the_reference(self):
+    def test_it_points_to_the_converter_document_and_to_the_document_of_the_library(self):
         text = (support.ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("(docs/converter.md)", text)
-        self.assertIn("(docs/reference-converter.md)", text)
+        self.assertIn("(docs/python-library.md)", text)
 
 
 class TheTenLegFile(unittest.TestCase):
@@ -175,6 +177,29 @@ class TheTenLegFile(unittest.TestCase):
             if any(gone in name.encode("utf-8") or gone in content for gone in self.NAMES):
                 naming.append(name)
         self.assertEqual(len(naming), 0, "tracked files that name the ten-leg mapping or its demo show: " + ", ".join(naming))
+
+
+class OneConverter(unittest.TestCase):
+    """No page calls anything a reference converter, apart from the records of what was
+    done: the seeds, the specs, the drifts and the change log of the decisions."""
+
+    RECORDS = TheTenLegFile.RECORDS
+    DECISIONS = TheTenLegFile.DECISIONS
+    CHANGE_LOG = "\n## Change log\n"
+
+    def test_no_page_names_a_reference_converter(self):
+        listed = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=support.ROOT, capture_output=True, check=True).stdout
+        pages = sorted(name for name in listed.decode("utf-8").split("\0") if name and not name.startswith(self.RECORDS))
+        self.assertIn("docs/python-library.md", pages)
+        naming = []
+        for name in pages:
+            text = (support.ROOT / name).read_text(encoding="utf-8")
+            if name == self.DECISIONS:
+                text = text.split(self.CHANGE_LOG)[0]
+            if re.search(r"reference converter|reference-converter\.md", " ".join(text.split()), re.IGNORECASE):
+                naming.append(name)
+        self.assertEqual(naming, [])
+        self.assertFalse((DOCS / "reference-converter.md").exists())
 
 
 def paragraph(text, start):
@@ -382,8 +407,8 @@ class BothKindsOfLeg(unittest.TestCase):
                        "The show for the target build of twenty legs, 60 x 60, is the demo show `shows/demo-20/show.json`"):
             self.assertIn(phrase, text)
 
-    def test_the_document_of_the_reference_has_the_generators_for_both_kinds_and_for_the_target(self):
-        generators = said((DOCS / "reference-converter.md").read_text(encoding="utf-8").split("\n## Generators\n")[1].split("\n## ")[0])
+    def test_the_document_of_the_library_has_the_generators_for_both_kinds_and_for_the_target(self):
+        generators = said((DOCS / "python-library.md").read_text(encoding="utf-8").split("\n## Generators\n")[1].split("\n## ")[0])
         for phrase in ("from a mapping file of either kind, a row-leg file or a column-leg file", "--mapping mapping/legs-20.json"):
             self.assertIn(phrase, generators)
 

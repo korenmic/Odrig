@@ -10,10 +10,11 @@ odrig is the LED animation system of an art installation: a small board drives a
 that make the animations, the player, an emulator that shows them without the board, and
 the program for the board. The pages for newcomers are in the folder `agent/`.
 
-The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`.
-The Python package `odrig/` was the converter before it. It is now the reference that
-tests compare the converter with, and it holds the generators. Convert and pack with the
-JavaScript tool only.
+The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`,
+and the only one: convert and pack with it. The Python package `odrig/` was the converter
+before it. It is now a library that reads and writes the project's files for the tests and
+the tools, and it holds the generators; what it answered to the converter's tests is
+stored with them.
 
 ## Read first
 
@@ -30,7 +31,7 @@ JavaScript tool only.
 |---|---|
 | Make or change an animation or a show | [agent/animation-guide.md](agent/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
 | Change the converter | [docs/converter.md](docs/converter.md), [docs/format.md](docs/format.md), [docs/reasons.md](docs/reasons.md) |
-| Change the Python reference, a generator or the test vectors | [docs/reference-converter.md](docs/reference-converter.md), [docs/format.md](docs/format.md) |
+| Change the Python library, a generator or the test vectors | [docs/python-library.md](docs/python-library.md), [docs/format.md](docs/format.md) |
 | Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
@@ -97,8 +98,8 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 
 ## If you work on Windows
 
-The reference converter, the core's build, the emulator and the command tool work on
-Windows 10 and 11, and their suites pass there. That was seed 11,
+The Python library, the core's build, the emulator and the command tool work on Windows 10
+and 11, and their suites pass there. That was seed 11,
 `project-seeds/11-p0-emulator-and-tools-on-windows/`.
 
 - The core is built there by `python core/build.py shared`, not by `make`.
@@ -118,9 +119,6 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
-  package stops converting and stays as a small library that reads and writes the
-  project's files for tests and for the firmware tool. Today both can convert.
 - **Animations from a USB drive**, seed 20: the board plays the animations of a stick's
   folder `odrig`. The core, the emulator and the app do; the board has read no stick yet.
 - **One USB port for a computer or a stick**, seed 21: the chip's own port is a

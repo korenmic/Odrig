@@ -67,7 +67,7 @@ Rules for every task:
     `odrig/cli.py` exists.
   - Requirements: 1.1, 1.2, 1.3, 3.1, 3.4, 4.1, 4.2, 4.3, 5.1
 
-- [ ] 6. The documents and the seed's state
+- [x] 6. The documents and the seed's state
   - `docs/python-library.md` in place of `docs/reference-converter.md`, and every page
     that names the reference converter or its setup; `docs/decisions.md` with a line in
     its change log; `AGENTS.md`: the seed leaves "What is coming".

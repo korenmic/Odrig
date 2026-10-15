@@ -57,10 +57,10 @@ work is in [project-seeds/](project-seeds/).
 
 The converter, the JavaScript tool that turns media and JSON frames into the files the
 board plays, with its library that also runs in a web page, and how to set it up, use it
-and test it, is described in [docs/converter.md](docs/converter.md). The Python tool that
-came first is kept as the reference the converter is compared with; it also holds the
-generators of the tracked animations and builds the test vectors, and is described in
-[docs/reference-converter.md](docs/reference-converter.md).
+and test it, is described in [docs/converter.md](docs/converter.md). The Python package that came
+first is now a library for the tests and the tools: it reads and writes the project's
+files, holds the generators of the tracked animations and builds the test vectors, and is
+described in [docs/python-library.md](docs/python-library.md).
 
 The core, the C++ library that plays those files on the board and in the emulator, and how
 to build it, test it and host it, is described in [docs/core.md](docs/core.md).

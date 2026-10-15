@@ -1,7 +1,8 @@
 {
   "number": 18,
   "slug": "18-p1-one-converter",
-  "state": "in_progress",
+  "state": "completed",
+  "completedAt": "2026-10-15T11:31:00+03:00",
   "title": "One converter",
   "priority": "P1",
   "addedAt": "2026-10-13T03:02:18+03:00",
