@@ -8141,3 +8141,20 @@ be easy to mix up, for an operator's thumb and for the suite's driver, which pre
 button by its words.
 
 **Resolution.** `app/www/index.html`; `docs/android-app.md`; the design of seed 17.
+
+## Seed 17: A video's pictures are taken at the ticks
+
+**Question.** The design takes each frame of a video after a seek with
+`requestVideoFrameCallback`, whose `mediaTime` is the frame's own time. Does that work?
+
+**Answer.** Not reliably: a seek that lands on the frame already on the screen presents
+no new frame, and the callback does not come. A trial in Chrome showed that the picture
+drawn after `seeked` is the frame on the screen at the time sought. So the app seeks
+every 20 ms tick plus half a millisecond from the start of the part, and gives
+`importFrames` the picture with the time of its tick. Its timeline takes, at each tick,
+the picture on the screen then, which is what the command line takes from the frames'
+own times, and ticks with the same picture are joined into one frame as the command line
+joins them. A video of the suite gives the command line's frames and lengths, with and
+without a part.
+
+**Resolution.** `app/www/convert.js`; `tests/app/test_convert.py`; the design of seed 17.

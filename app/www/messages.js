@@ -43,6 +43,21 @@ const REFUSALS = {
   "storage-error": () => "The installation could not use its storage.",
 };
 
+// What the app says when an animation cannot be made from a file, by the reason: its own,
+// or one of the library that makes it, whose text is given as the detail.
+const CONVERSIONS = {
+  "no-canvas": () => "The installation has no usable mapping, so the app does not know the canvas to convert for.",
+  "no-gif-decoder": () => "This phone's web view cannot read GIF files. Update Android System WebView.",
+  "unreadable-media": () => "The phone cannot read this file as a video or a GIF.",
+  "bad-part": () => "Write the start and the length in seconds, like 2.5, and leave the length empty for the rest of the file.",
+  "bad-range": () => "The part does not lie inside the file. Make the start earlier or the length shorter.",
+};
+
+export function ofConversion(failure) {
+  const text = Object.prototype.hasOwnProperty.call(CONVERSIONS, failure.reason) ? CONVERSIONS[failure.reason]() : `The animation cannot be made: ${failure.detail}.`;
+  return `${text} (${failure.reason})`;
+}
+
 // The question before an animation is removed.
 export function ofRemoval(animation) {
   return `Remove animation ${animation.id} ${animation.file} from the installation?`;

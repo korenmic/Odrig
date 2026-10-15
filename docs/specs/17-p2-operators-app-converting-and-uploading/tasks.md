@@ -68,7 +68,7 @@ Rules for every task:
   - `docs/android-app.md`: the screen, removing, the lines the app sends, the messages.
   - Requirements: 2.1 to 2.5, 5.1, 5.2
 
-- [ ] 4. Converting
+- [x] 4. Converting
   - `app/www/convert.js`, the part of the storage screen that adds an animation, the
     preview, and the messages of converting.
   - `tests/app/support.py`: the media made with `.venv` and

@@ -17,7 +17,8 @@ The app has three screens, and a button for each at the bottom: `Show`, `Storage
 - **The storage screen** says how much of the installation's storage is free, as
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
   playlist, each with its id, its file name and its size in kilobytes, and a button
-  `Remove`. Cycles are not listed.
+  `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
+  a GIF of the phone.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
@@ -36,8 +37,7 @@ command lines and no other, each as `POST /odrig` to the address that is set:
 | Presses `Remove` and then `Remove it` | `remove <id>` |
 
 It adds no command, changes nothing of the installation's software, and shows only what a
-reply said. It does not convert a video or upload an animation yet: that part is being
-built.
+reply said. It does not upload an animation yet: that part is being built.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -207,6 +207,29 @@ list and the free storage are asked for again. An animation that a cycle plays, 
 USB stick holds, cannot be removed: the installation refuses it, and the app says why.
 The back gesture goes from the storage screen or the target screen to the show screen.
 
+To make an animation, press `Choose a video or a GIF` on the storage screen and pick a
+file; the phone shows its own picker. The app shows the file's name, and for a video its
+length. Then:
+
+1. Choose how the picture fits the canvas: `Fill`, at first, covers the whole canvas and
+   cuts off what does not fit at two sides; `Fit` shows all of the picture, with the rest
+   of the canvas black; `Stretch` stretches it to the canvas, as wide and as high as it
+   is. These are the fits of the converter, [converter.md](converter.md#import).
+2. Choose the part: `Start at` in seconds, 0 at first, and `Length` in seconds, empty for
+   the rest of the file. Up to three decimals, as `2.5`.
+3. Press `Make the animation`. The app says how far it has come, as
+   `Making the animation: 40%`, and `Stop` ends it. The rest of the app keeps working.
+4. The animation is drawn in a loop, for the canvas of the installation, with what it is:
+   `25 frames, 2.50 s, 31 KB`.
+
+The canvas is the one the installation reports in `status`, so the app converts for the
+installation it is pointed at. The phone's web view decodes the file: a GIF with its
+`ImageDecoder`, and a video by showing it frame by frame in a video element, one picture
+every 20 ms. The converter's library, the same that runs on a computer, fits the pictures
+and makes the file. A GIF gives the very file the converter's command line makes of it; a
+video gives the same frames, and colours that may differ by a little, as two decoders'
+colours do. A video is drawn at most 1,280 pixels wide or high before it is fitted.
+
 The animations of a USB drive plugged into the installation are buttons too, after the
 installed ones, each with its id from 60001 up and its file's name on the drive, and a
 press plays one as it plays an installed animation; see
@@ -244,6 +267,19 @@ Two more lines are not failures of a command. While the installation does not an
 show screen says `The installation has not answered for 12 seconds.`, with the number
 counting up. While its show is invalid, both screens say `The installed show is invalid:
 <reason>.`; [reasons.md](reasons.md) lists the reasons.
+
+When an animation cannot be made, the app says why:
+
+| Code | When | The sentence |
+|---|---|---|
+| `no-canvas` | The installation reports no canvas: it has no mapping it can use, or its software is older than the app. | The installation has no usable mapping, so the app does not know the canvas to convert for. |
+| `no-gif-decoder` | The phone's web view has no `ImageDecoder`. | This phone's web view cannot read GIF files. Update Android System WebView. |
+| `unreadable-media` | The web view cannot read the file as a video or a GIF. | The phone cannot read this file as a video or a GIF. |
+| `bad-part` | `Start at` or `Length` is no number of seconds. | Write the start and the length in seconds, like 2.5, and leave the length empty for the rest of the file. |
+| `bad-range` | The part does not lie inside the file. | The part does not lie inside the file. Make the start earlier or the length shorter. |
+
+Any other reason of the converter is said as `The animation cannot be made:` with the
+converter's own words and its reason in brackets.
 
 A removal that succeeded is said in the same place, without a code:
 `Removed animation <id> <file>.` The other error codes of [commands.md](commands.md)

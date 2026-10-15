@@ -114,13 +114,14 @@ microseconds, divided by 1,000. A web view without `ImageDecoder` gets the messa
 `no-gif-decoder`.
 
 **A video.** A muted `<video>` with the media as its source and `preload` `auto`. From
-the start of the part on, every 20 ms tick plus half a millisecond is sought; after each
-seek the frame on screen is taken with `requestVideoFrameCallback`, whose `mediaTime` is
-the frame's presentation time. A frame whose time was taken already is passed over, so
-the source holds each frame of the video once with its own time, given to `importFrames`
-as `[microseconds, 1000]`. The frame is drawn onto a canvas of the video's size, at most
-1,280 pixels on its longer side: a larger video is drawn smaller, by the web view. The
-seeking goes on until `importFrames` asks for no more, or the video ends.
+the start of the part on, every 20 ms tick plus half a millisecond is sought, and after
+`seeked` the picture on screen is drawn and given to `importFrames` with the time of its
+tick. The converter counts a video's time from its first frame, which is the start of
+the part here, so the part's start goes to `importFrames` as 0. Ticks that follow each
+other with the same picture are one frame afterwards, as the command line writes them.
+The frame is drawn onto a canvas of the video's size, at most 1,280 pixels on its longer
+side: a larger video is drawn smaller, by the web view. The seeking goes on until
+`importFrames` asks for no more, or the video ends.
 
 **The conversion.** `importFrames(source, {width, height}, {fit, startMs, durationMs})`
 with the canvas of `status`, then `odrg.encode(animation, {compressed: true})`. Progress

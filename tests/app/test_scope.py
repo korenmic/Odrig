@@ -84,8 +84,11 @@ class TheWebCode(unittest.TestCase):
         for path in sorted((support.ROOT / "app").rglob("*")):
             if path.is_file() and "node_modules" not in path.parts:
                 self.assertNotIn(hashlib.sha256(path.read_bytes()).hexdigest(), library, path)
+        # The library is imported by the conversion alone.
         for name, text in scripts().items():
-            self.assertNotRegex(text, r"\bconverter\b|odrg\.encode|importFrames", name)
+            if name != "convert.js":
+                self.assertNotRegex(text, r"\bconverter\b|odrg\.encode|importFrames", name)
+        self.assertRegex(scripts()["convert.js"], r'from "\./converter/index\.js";')
 
 
 if __name__ == "__main__":

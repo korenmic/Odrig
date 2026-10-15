@@ -170,6 +170,13 @@ class _Pages(webserver.Handler):
             else:
                 self.answer(200, webserver.TYPES[found.suffix], found.read_bytes())
             return
+        if path.startswith("/m/") and self.server.media is not None:
+            found = pathlib.Path(self.server.media, path[len("/m/"):])
+            if "/" in path[len("/m/"):] or found.suffix not in MEDIA_TYPES or not found.is_file():
+                self.answer(404)
+            else:
+                self.answer(200, MEDIA_TYPES[found.suffix], found.read_bytes())
+            return
         super().do_GET()
 
     def do_POST(self):
@@ -200,6 +207,44 @@ SOUND = {"status": PLAYING, "list": LISTED}
 
 Run = collections.namedtuple("Run", "seen elsewhere")
 
+# The media the suite converts, as a scenario fetches them.
+MEDIA_TYPES = {".gif": "image/gif", ".mp4": "video/mp4"}
+VENV_PYTHON = ROOT / ".venv" / "bin" / "python"
+CONVERTER_TOOL = ROOT / "converter" / "odrig.js"
+
+
+def make_media(folder):
+    """Writes the GIF and the mp4 the suite converts into a folder: `clip.gif` and
+    `clip.mp4`. The Python of `.venv` writes them, which has the packages for it."""
+    if not VENV_PYTHON.is_file():
+        raise AssertionError(f"there is no {VENV_PYTHON.relative_to(ROOT)}; the getting-started page sets it up")
+    done = subprocess.run([str(VENV_PYTHON), "-m", "tests.app.media", str(folder)], cwd=ROOT, capture_output=True, text=True)
+    if done.returncode != 0:
+        raise AssertionError(f"the media were not written: {done.stderr}")
+    return pathlib.Path(folder)
+
+
+Converted = collections.namedtuple("Converted", "frames ms odrg")
+
+
+def converted_by_the_command_line(media, mapping, fit="fill", start=None, length=None):
+    """What the converter's command line makes of a media file for the canvas of a mapping
+    file: the number of frames and their milliseconds in all, and the ODRG file."""
+    with tempfile.TemporaryDirectory() as work:
+        frames = pathlib.Path(work, "frames.json")
+        made = pathlib.Path(work, "made.odrg")
+        command = ["node", str(CONVERTER_TOOL), "import", str(media), str(frames), "--mapping", str(mapping), "--fit", fit]
+        if start is not None:
+            command += ["--start", start]
+        if length is not None:
+            command += ["--duration", length]
+        for step in (command, ["node", str(CONVERTER_TOOL), "encode", str(frames), str(made)]):
+            done = subprocess.run(step, cwd=ROOT, capture_output=True, text=True)
+            if done.returncode != 0:
+                raise AssertionError(f"{' '.join(step)}: {done.stderr}")
+        listed = json.loads(frames.read_text(encoding="utf-8"))["frames"]
+        return Converted(len(listed), sum(frame["ms"] for frame in listed), made.read_bytes())
+
 
 def commands_elsewhere(found):
     """The command lines a run sent to other computers than this one, each as
@@ -212,16 +257,18 @@ def commands_elsewhere(found):
     return sent
 
 
-def run(scenario, address=None, settings=None, steps=(), size=SIZE):
+def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None):
     """Runs one scenario of `page/scenarios/` against the web code in Chrome without a
     window, and gives what the scenario found and what the pages asked other computers
     for, each as `(method, address, body)`.
 
     `address` is the address the app is to use, kept before the app starts; without one
     the app starts as on a new phone. `settings` reach the scenario as they are. Each
-    time the scenario asks for a step, the next function of `steps` is called.
+    time the scenario asks for a step, the next function of `steps` is called. The files
+    of the folder `media` are served to the scenario under `/m/`.
     """
     server = webserver.Server(0, handler=_Pages)
+    server.media = media
     server.results = queue.Queue()
     server.steps = list(steps)
     server.elsewhere = []

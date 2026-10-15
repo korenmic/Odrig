@@ -35,6 +35,30 @@
 <h1>Installed</h1>
 <div id="installed"></div>
 <p id="installed-none" hidden>No animation is installed.</p>
+<h1>Add an animation</h1>
+<label id="choose" class="button" for="media">Choose a video or a GIF</label>
+<input id="media" type="file" accept="video/*,image/gif" hidden>
+<div id="chosen" hidden>
+<p id="media-name"></p>
+<p>Fit it to the canvas</p>
+<div class="three">
+<button id="fit-fill" type="button" aria-pressed="true">Fill</button>
+<button id="fit-fit" type="button" aria-pressed="false">Fit</button>
+<button id="fit-stretch" type="button" aria-pressed="false">Stretch</button>
+</div>
+<p id="fit-says" class="small"></p>
+<label for="start">Start at, in seconds</label>
+<input id="start" type="text" inputmode="decimal" autocomplete="off" value="0">
+<label for="length">Length in seconds, empty for the rest of the file</label>
+<input id="length" type="text" inputmode="decimal" autocomplete="off" value="">
+<button id="make" type="button">Make the animation</button>
+<p id="making" hidden></p>
+<button id="stop-making" type="button" hidden>Stop</button>
+<div id="made" hidden>
+<canvas id="preview"></canvas>
+<p id="made-facts"></p>
+</div>
+</div>
 </section>
 <section id="target">
 <h1>Target</h1>

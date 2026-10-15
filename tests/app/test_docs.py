@@ -91,8 +91,19 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "busy", "in-use", "storage-error"])
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "busy", "in-use", "storage-error",
+                                "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
+
+    def test_every_message_of_making_an_animation_is_on_the_page(self):
+        reasons = ["no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"]
+        found = support.run("texts", settings={"refusals": [], "failures": [], "conversions": [[reason, ""] for reason in reasons]}).seen
+        messages = section(self.text, "Messages")
+        said = flat(messages)
+        for reason in reasons:
+            self.assertIn(f"| `{reason}` |", messages)
+            self.assertIn(f"| {re.sub(r' [(][a-z-]+[)]$', '', found['conversions'][reason])} |", said)
+        self.assertIn("`The animation cannot be made:`", said)
 
     def test_every_line_of_how_requests_travel_is_explained(self):
         screen = (support.WWW / "screens" / "target.js").read_text(encoding="utf-8")

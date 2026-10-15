@@ -144,6 +144,12 @@ class Touch(unittest.TestCase):
             listened |= set(re.findall(r"""addEventListener\(\s*["']([a-z]+)["']""", text))
             self.assertNotRegex(text, r"\bon(mouse|touch|pointer|contextmenu)[a-z]*\s*=", path.name)
         self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate"})
+        # The media of a conversion tell when they are loaded or sought, and when they
+        # cannot be read.
+        conversion = (support.WWW / "convert.js").read_text(encoding="utf-8")
+        awaited = {name for names in re.findall(r"either\(\w+, \[([^\]]*)\]\)", conversion) for name in re.findall(r'"([a-z]+)"', names)}
+        self.assertEqual(awaited, {"loadedmetadata", "loadeddata", "seeked"})
+        self.assertIn('for (const name of [...names, "error"])', conversion)
 
 
 class Back(unittest.TestCase):
