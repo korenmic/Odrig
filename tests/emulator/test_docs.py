@@ -121,8 +121,12 @@ class EmulatorDocument(unittest.TestCase):
         sent = {"--port": set(), "--tcp": set(), "--http": set()}
         for line in given:
             arguments = made.parse_args(shlex.split(line)[3:])
+            if arguments.log:
+                self.assertEqual(cli.checked(made, arguments), [], line)
+                continue
             transport = "--port" if arguments.port is not None else "--tcp" if arguments.tcp is not None else "--http"
             sent[transport].add(cli.checked(made, arguments)[0])
+        self.assertIn("python -m odrigctl (--port NAME | --tcp ADDRESS) [--timeout SECONDS] --log\n", text)
         for transport in sent:
             self.assertEqual(sent[transport], set(cli.COMMANDS), transport)
         for command, takes in cli.COMMANDS.items():

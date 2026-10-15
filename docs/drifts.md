@@ -8196,3 +8196,19 @@ that cannot be opened for another reason than its absence gives
 
 **Resolution.** `firmware/usermod/odrig_log.h`, `odrig_log.cpp`, `odrig_uart.cpp`,
 `odrig_drive.cpp`; `docs/firmware.md`, "The log".
+
+## Seed 23: `--log` on Windows, and a closed connection
+
+**Question.** The design has the emulator's suite run `--log` against a target of its own
+and stop it, and says that the target's errors are those of a command. How is it stopped
+in a test on Windows, and what does a TCP target that closes the connection give?
+
+**Answer.** A test stops the tool as Ctrl-C does, with SIGINT, which Windows cannot send
+to another program: the two tests that stop it are skipped there, and the others run. A
+TCP target that closes the connection is status 3, `error: unreachable: <address>: the
+target closed the connection`, since nothing more can arrive; a serial port that goes
+away is status 3 as for a command. Without `--log` and without a command the usage error
+says `a command is needed, or --log`.
+
+**Resolution.** `odrigctl/cli.py`, `odrigctl/client.py`, `follow_log`;
+`tests/emulator/test_tool_log.py`; `docs/emulator.md`, "The command tool".

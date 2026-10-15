@@ -26,6 +26,9 @@ SETTLE_SECONDS = 0.2
 DISCARD_SECONDS = 0.1
 COMMAND_PATH = "/odrig"
 CONTENT_TYPE = "application/octet-stream"
+# The beginning of a line of a target's log, and how long the log is read in one go.
+LOG_MARK = b"#log "
+LOG_READ_SECONDS = 1.0
 
 
 class Unreachable(Exception):
@@ -108,10 +111,11 @@ class _Connection:
 
     def __init__(self, address, timeout):
         self._socket = socket.create_connection(tcp_address(address), timeout=timeout)
+        self.closed = False
 
     def received(self, seconds):
         """What arrives within a length of time, in pieces as they come. It ends early
-        when the other end closes."""
+        when the other end closes, and `closed` then says so."""
         deadline = time.monotonic() + seconds
         while True:
             left = deadline - time.monotonic()
@@ -123,6 +127,7 @@ class _Connection:
             except TimeoutError:
                 return
             if not piece:
+                self.closed = True
                 return
             yield piece
 
@@ -271,6 +276,34 @@ def tcp_exchange(address, data, timeout, accept=is_reply):
         return _exchanged(connection, address, data, timeout, accept)[0]
     finally:
         _shut(connection)
+
+
+def follow_log(given, port=None, tcp=None, timeout=2.0):
+    """Gives each line of a target's log to `given` as it arrives, without its line end:
+    every received line that begins with `#log `. It sends nothing and goes on until it is
+    interrupted, or until the target cannot be read any more, which is `Unreachable`.
+
+    The target is a serial port, opened as `serial_exchange` opens it, or an address that
+    takes lines over TCP.
+    """
+    name = port if tcp is None else tcp
+    opened = _ready(port) if tcp is None else _connected(tcp, timeout)
+    waiting = b""
+    try:
+        while True:
+            try:
+                for piece in _take(opened, LOG_READ_SECONDS):
+                    *lines, waiting = (waiting + piece).split(b"\n")
+                    for line in lines:
+                        line = line.rstrip(b"\r")
+                        if line.startswith(LOG_MARK):
+                            given(line)
+            except OSError as error:
+                raise _named(name, error) from None
+            if getattr(opened, "closed", False):
+                raise Unreachable(f"{name}: the target closed the connection")
+    finally:
+        _shut(opened)
 
 
 def http_exchange(address, line, timeout):

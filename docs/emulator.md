@@ -796,6 +796,25 @@ The tool prints the reply line to standard output:
   response with status 200 as the reply. Any other status counts as not reached.
 - The options may stand before or after the command.
 
+**`--log`** prints the lines of a target's log as they arrive, and sends nothing. It goes
+with `--port` or `--tcp` and no command. The board writes its log on the socket marked
+COM, as [firmware.md](firmware.md#the-log) describes; the emulator writes none.
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS) [--timeout SECONDS] --log
+python -m odrigctl --port /dev/cu.usbmodem5C831043631 --log
+#log 5.012 usb: no computer on the port within 5 s
+#log 5.020 usb: host started
+```
+
+- Every received line that begins with `#log ` is printed as it arrives, without its line
+  end; every other line, a reply or a line of the chip's loader, is passed over. The port
+  is opened as for a command, and the connection made as for one.
+- It goes on until it is stopped with Ctrl-C, which is status 0. A port that goes away,
+  or a TCP target that closes the connection, is status 3 with one line
+  `error: unreachable: <detail>`. `--log` with `--http` or with a command is status 2.
+- A command takes only a reply as its answer, whatever lines of the log come before it.
+
 **`upload ID FILE`** sends an animation as the commands of [commands.md](commands.md),
 "Uploading an animation", describe it. The file is one the converter made for the canvas
 of the show, here Hello world for the bench file:

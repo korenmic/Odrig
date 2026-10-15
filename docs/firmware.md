@@ -692,10 +692,12 @@ WLED's information shows it.
   commands, and a line never breaks into a reply. When lines come faster than the socket
   takes them, the oldest give way, and the next line written says how many:
   `#log 40.100 log: 7 lines dropped`.
-- **Reading it.** Any serial terminal on the socket marked COM at 115,200 bits a second,
-  eight data bits, no parity, one stop bit, such as
-  `screen /dev/cu.usbmodem5C831043631 115200`. The command tool takes only replies as
-  replies and passes over the log's lines.
+- **Reading it.** The command tool prints it, with
+  `python -m odrigctl --port /dev/cu.usbmodem5C831043631 --log`, until it is stopped with
+  Ctrl-C, as [emulator.md](emulator.md#the-command-tool) describes; so does any serial
+  terminal on the socket marked COM at 115,200 bits a second, eight data bits, no parity,
+  one stop bit. The tool's commands take only replies as replies and pass over the log's
+  lines, so a command may be sent while the log is read, from another terminal.
 - **Where it is not.** The log goes to the socket marked COM only: not to the chip's own
   socket, not over Wi-Fi, and not into the board's storage. It names nothing of the Wi-Fi
   settings. The probe build, which never starts the USB host, has the player's lines

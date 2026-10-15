@@ -40,7 +40,7 @@ Rules for every task:
     against the sources as they are, fails: `odrig_log.h` does not exist.
   - Requirements: 1.1 to 1.6, 2.1 to 2.4, 4.1
 
-- [ ] 2. The command tool shows the log
+- [x] 2. The command tool shows the log
   - `odrigctl/cli.py`: `--log`.
   - `tests/emulator/`: the tests of the design. `docs/emulator.md`.
   - Prove it fails first: the test that `--log` prints the log's lines, against the tool
