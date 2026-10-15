@@ -29,6 +29,13 @@
 <div id="animations"></div>
 <p id="none" hidden>No animation is installed.</p>
 </section>
+<section id="storage" hidden>
+<h1>Storage</h1>
+<p id="space">-</p>
+<h1>Installed</h1>
+<div id="installed"></div>
+<p id="installed-none" hidden>No animation is installed.</p>
+</section>
 <section id="target">
 <h1>Target</h1>
 <label for="address">Address of the installation</label>
@@ -49,8 +56,16 @@
 <p id="message-text"></p>
 <button id="message-close" type="button">OK</button>
 </div>
+<div id="confirm" hidden>
+<p id="confirm-text"></p>
+<div class="pair">
+<button id="confirm-yes" type="button">Remove it</button>
+<button id="confirm-no" type="button">Keep it</button>
+</div>
+</div>
 <nav>
 <button id="to-show" type="button">Show</button>
+<button id="to-storage" type="button">Storage</button>
 <button id="to-target" type="button">Target</button>
 </nav>
 <script type="module" src="main.js"></script>

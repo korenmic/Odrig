@@ -4,10 +4,14 @@
 import * as client from "./client.js";
 import * as messages from "./messages.js";
 import * as showScreen from "./screens/show.js";
+import * as storageScreen from "./screens/storage.js";
 import * as targetScreen from "./screens/target.js";
 
-const SCREENS = ["show", "target"];
+const SCREENS = ["show", "storage", "target"];
 let screen = "target";
+// The screen of the app's first entry of the page's history: the target screen until
+// the target has answered, the show screen from then on.
+let first = "target";
 // Whether the show screen was shown by itself after the target's first answer.
 let led = false;
 
@@ -34,20 +38,24 @@ function message(text) {
 byId("message-close").addEventListener("click", () => {
   byId("message").hidden = true;
 });
-// The page's history holds one entry of the app, its first screen, or two, with the
-// other screen on top. So the back gesture goes from the second screen to the first,
-// and from the first it leaves the app.
+// The page's history holds one entry of the app, its first screen, or two, with another
+// screen on top. So the back gesture goes from any other screen to the first, and from
+// the first it leaves the app.
 function onTop() {
   return window.history.state !== null && window.history.state.depth === 1;
 }
 
-// Goes to a screen as a press of its button does.
+// Goes to a screen as a press of its button does: to the first screen by going back, and
+// to another one on top of the first, in the place of the one on top.
 function go(name) {
   if (name === screen) {
     return;
   }
-  if (onTop()) {
+  if (onTop() && name === first) {
     window.history.back();
+  } else if (onTop()) {
+    window.history.replaceState({screen: name, depth: 1}, "");
+    show(name);
   } else {
     window.history.pushState({screen: name, depth: 1}, "");
     show(name);
@@ -60,12 +68,14 @@ window.addEventListener("popstate", (event) => {
   }
 });
 byId("to-show").addEventListener("click", () => go("show"));
+byId("to-storage").addEventListener("click", () => go("storage"));
 byId("to-target").addEventListener("click", () => go("target"));
 
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 showScreen.start();
+storageScreen.start({message});
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
   // The app begins on the target screen and goes to the show screen as soon as the
@@ -78,6 +88,7 @@ client.watch((state) => {
       window.history.back();
     } else if (screen === "target") {
       window.history.replaceState({screen: "show", depth: 0}, "");
+      first = "show";
       show("show");
     }
   }

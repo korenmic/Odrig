@@ -90,7 +90,8 @@ nav button[aria-current="true"] {
   border-color: var(--marked);
 }
 
-#message {
+#message,
+#confirm {
   position: fixed;
   left: 8px;
   right: 8px;
@@ -137,4 +138,24 @@ button[aria-pressed="true"] {
 input[type="range"] {
   padding: 0;
   accent-color: var(--marked);
+}
+
+#installed .row {
+  margin: 8px 0;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--edge);
+}
+
+#installed .id {
+  display: inline-block;
+  min-width: 3ch;
+  color: var(--lesser);
+}
+
+#installed .file {
+  overflow-wrap: anywhere;
+}
+
+#installed .size {
+  color: var(--lesser);
 }

@@ -6,17 +6,22 @@ built, installed and used, what it says when something fails, and what has been 
 
 ## What it is
 
-The app has two screens.
+The app has three screens, and a button for each at the bottom: `Show`, `Storage` and
+`Target`.
 
 - **The show screen** says what the installation does: `ON` or `OFF`, the brightness, what
   plays, the animation on the LEDs with its id and its file name, and the refreshes a
   second. Below that are two buttons, `On` and `Off`, a slider for the brightness, the
   button `Playlist from the start`, and one button for each installed animation, in the
   order of the playlist.
+- **The storage screen** says how much of the installation's storage is free, as
+  `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
+  playlist, each with its id, its file name and its size in kilobytes, and a button
+  `Remove`. Cycles are not listed.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
-The app is one more client of the commands of [commands.md](commands.md). It sends eight
+The app is one more client of the commands of [commands.md](commands.md). It sends ten
 command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
@@ -27,10 +32,12 @@ command lines and no other, each as `POST /odrig` to the address that is set:
 | Presses `Playlist from the start` | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
 | Moves the slider | `brightness <n>` |
+| Nothing: when the storage screen is shown, every ten seconds while it is, and after a removal | `space` |
+| Presses `Remove` and then `Remove it` | `remove <id>` |
 
 It adds no command, changes nothing of the installation's software, and shows only what a
-reply said. It does not convert a video, upload or remove an animation: that is the app's
-second part, which is planned and not built.
+reply said. It does not convert a video or upload an animation yet: that part is being
+built.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -193,6 +200,13 @@ longer, see [firmware.md](firmware.md#measurements-on-the-board).
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, the show screen says `Cycle` with its id, and `Playlist from the start` leaves it.
 
+To remove an animation, open the storage screen and press `Remove` beside it. The app
+asks `Remove animation <id> <file> from the installation?`; `Remove it` removes it, and
+`Keep it` sends nothing. Afterwards the app says `Removed animation <id> <file>.`, and the
+list and the free storage are asked for again. An animation that a cycle plays, or that a
+USB stick holds, cannot be removed: the installation refuses it, and the app says why.
+The back gesture goes from the storage screen or the target screen to the show screen.
+
 The animations of a USB drive plugged into the installation are buttons too, after the
 installed ones, each with its id from 60001 up and its file's name on the drive, and a
 press plays one as it plays an installed animation; see
@@ -221,6 +235,9 @@ it is dismissed with `OK` or another takes its place.
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
 | `unknown-id` | The animation that was pressed was removed meanwhile. The list is asked for again. | Animation `<id>` is not installed any more. |
 | `unknown-id` | `Playlist from the start` on a show without an animation. | No animation is installed. |
+| `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open. | The installation is busy. Try again in a moment. |
+| `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
+| `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -228,8 +245,9 @@ show screen says `The installation has not answered for 12 seconds.`, with the n
 counting up. While its show is invalid, both screens say `The installed show is invalid:
 <reason>.`; [reasons.md](reasons.md) lists the reasons.
 
-The other error codes of [commands.md](commands.md) belong to `remove`, `space` and
-`upload`, which the app does not send.
+A removal that succeeded is said in the same place, without a code:
+`Removed animation <id> <file>.` The other error codes of [commands.md](commands.md)
+belong to `upload`, which the app does not send yet.
 
 ## The phone and the installation's network
 

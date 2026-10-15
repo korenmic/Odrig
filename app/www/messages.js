@@ -23,8 +23,8 @@ export function ofSilence(seconds) {
 }
 
 // The error codes of the command list that no command of the app can get: they belong to
-// `remove`, `space` and `upload`, which the app does not send.
-export const NOT_FOR_THE_APP = ["no-upload", "incomplete", "bad-checksum", "busy", "in-use", "no-space", "bad-offset", "bad-file", "storage-error"];
+// `upload`, which the app does not send.
+export const NOT_FOR_THE_APP = ["no-upload", "incomplete", "bad-checksum", "no-space", "bad-offset", "bad-file"];
 
 const NOT_UNDERSTOOD = () => "The installation did not understand the app. Its software and this app do not match.";
 const REFUSED = () => "The installation refused the command.";
@@ -38,7 +38,20 @@ const REFUSALS = {
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
   "unknown-id": (line) => (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  busy: () => "The installation is busy. Try again in a moment.",
+  "in-use": (line) => `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
+  "storage-error": () => "The installation could not use its storage.",
 };
+
+// The question before an animation is removed.
+export function ofRemoval(animation) {
+  return `Remove animation ${animation.id} ${animation.file} from the installation?`;
+}
+
+// What the app says when an animation was removed. It is no failure and has no code.
+export function ofRemoved(animation) {
+  return `Removed animation ${animation.id} ${animation.file}.`;
+}
 
 // The message of a command the target refused. A code without a text of its own gets
 // the general sentence.

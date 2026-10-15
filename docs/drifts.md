@@ -8128,3 +8128,16 @@ copies nothing on the way. The list's names, 256 of up to 255 bytes, are in the 
 memory.
 
 **Resolution.** `firmware/usermod/odrig_drive.cpp`, `READ_BUFFER`.
+
+## Seed 17: The buttons of the question before a removal
+
+**Question.** The design gives the question before a removal the buttons `Remove` and
+`Keep`. Each row of the storage screen has a button `Remove` too. Which words do the
+question's buttons have?
+
+**Answer.** `Remove it` and `Keep it`. While the question is open the rows stay on the
+screen, and two buttons with the same words, one that asks and one that removes, would
+be easy to mix up, for an operator's thumb and for the suite's driver, which presses a
+button by its words.
+
+**Resolution.** `app/www/index.html`; `docs/android-app.md`; the design of seed 17.

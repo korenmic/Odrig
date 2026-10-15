@@ -58,7 +58,7 @@ Rules for every task:
     `/converter/index.js` gets 404 from the server as it is.
   - Requirements: 6.1, 6.2, 6.3
 
-- [ ] 3. The storage screen
+- [x] 3. The storage screen
   - `app/www/index.html`, `app/www/main.js`, `app/www/client.js`,
     `app/www/screens/storage.js`, `app/www/messages.js`, `app/www/style.css`: the third
     screen and button, the back gesture, `space`, the rows with their sizes, `remove`

@@ -72,14 +72,15 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_eight_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_ten_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
-        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>"])
-        self.assertIn("It sends eight command lines and no other", self.said)
+        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>"])
+        self.assertIn("It sends ten command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
-        refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None]]
+        refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
+                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["storage-error", "space", None]]
         failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
@@ -90,7 +91,8 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id"])
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "busy", "in-use", "storage-error"])
+        self.assertIn("`Removed animation <id> <file>.`", said)
 
     def test_every_line_of_how_requests_travel_is_explained(self):
         screen = (support.WWW / "screens" / "target.js").read_text(encoding="utf-8")

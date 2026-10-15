@@ -7,15 +7,16 @@ import {Failure} from "./target.js";
 const STATUS_EVERY_MS = 1000;
 const LIST_EVERY_MS = 10000;
 const LIST_WHEN_BUSY_MS = 1000;
+const SPACE_EVERY_MS = 10000;
 
 // `link` is "checking" until the first request has ended, then "answers" or "no-answer",
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
 // time of the newest reply of any kind, `since` the time the app began with this address,
 // and `answered` whether the target of this address has answered at least once.
 // `animations` is the animation items of the newest complete list, in the order of the
-// show, each as `{id, file}`, or null while there is none; `cycles` is the ids of its
-// cycles.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: []};
+// show, each as `{id, file, bytes}`, or null while there is none; `cycles` is the ids of
+// its cycles. `space` is the newest reply to `space` as `{free, total}`, or null.
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -36,8 +37,11 @@ let askedFor = null;
 // Whether a list has waited while a status was sent. It goes before the next status
 // then, so that a target that answers slowly does not keep the list away.
 let listWaited = false;
-// Whether the show screen is the one on the screen of the phone.
+// Whether the show screen, or the storage screen, is the one on the screen of the phone.
 let showScreen = false;
+let storageScreen = false;
+let spaceDue = false;
+let spaceTimer = null;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 
@@ -105,11 +109,48 @@ function listAgainLater(after = LIST_EVERY_MS) {
   clearTimeout(listTimer);
   listTimer = setTimeout(() => {
     listTimer = null;
-    if (showScreen) {
+    if (showScreen || storageScreen) {
       listDue = true;
       next();
     }
   }, after);
+}
+
+// The storage is asked for again after a while, while the storage screen is shown.
+function spaceAgainLater() {
+  clearTimeout(spaceTimer);
+  spaceTimer = setTimeout(() => {
+    spaceTimer = null;
+    if (storageScreen) {
+      spaceDue = true;
+      next();
+    }
+  }, SPACE_EVERY_MS);
+}
+
+async function askSpace() {
+  const asked = target;
+  try {
+    const reply = await commands.space();
+    if (asked !== target) {
+      return;
+    }
+    heard();
+    state.space = reply;
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      // The target answers and cannot tell its space.
+      heard();
+      state.space = null;
+    } else {
+      failed(error);
+    }
+  }
+  spaceAgainLater();
+  changed();
 }
 
 // Asks for one part of the list. The new list takes the place of the old one only when
@@ -155,7 +196,8 @@ async function askListPart() {
   changed();
 }
 
-// Sends what the operator asked for, once. A status is due at once after its reply.
+// Sends what the operator asked for, once. A status is due at once after its reply, and
+// after a removal the list and the space are due too.
 async function give(request) {
   const asked = target;
   try {
@@ -164,6 +206,10 @@ async function give(request) {
       return;
     }
     heard();
+    if (request.kind === "remove") {
+      listDue = true;
+      spaceDue = true;
+    }
   } catch (error) {
     if (asked !== target) {
       return;
@@ -186,8 +232,8 @@ async function give(request) {
 }
 
 // The request to send now, or null when nothing is due: what the operator asked for,
-// then a status that is due, then a list that is due or the next part of one. Nothing is
-// due while the app is not on the screen.
+// then a status that is due, then a list that is due or the next part of one, then the
+// space. Nothing is due while the app is not on the screen.
 function due() {
   if (document.hidden) {
     return null;
@@ -206,6 +252,10 @@ function due() {
     listDue = false;
     listWaited = false;
     return askListPart;
+  }
+  if (spaceDue) {
+    spaceDue = false;
+    return askSpace;
   }
   return null;
 }
@@ -238,6 +288,7 @@ export function begin() {
   state.answered = false;
   state.animations = null;
   state.cycles = [];
+  state.space = null;
   wanted.length = 0;
   statusDue = true;
   listDue = false;
@@ -246,19 +297,27 @@ export function begin() {
   askedFor = null;
   clearTimeout(listTimer);
   listTimer = null;
+  spaceDue = storageScreen;
+  clearTimeout(spaceTimer);
+  spaceTimer = null;
   changed();
   next();
 }
 
 // Says which screen is on the screen of the phone. The list is kept fresh while it is
-// the show screen.
+// the show screen or the storage screen, and the space while it is the storage screen.
 export function showing(name) {
-  const was = showScreen;
+  const was = showScreen || storageScreen;
+  const wasStorage = storageScreen;
   showScreen = name === "show";
-  if (showScreen && !was && state.answered && listTimer === null) {
+  storageScreen = name === "storage";
+  if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
     listDue = true;
-    next();
   }
+  if (storageScreen && !wasStorage) {
+    spaceDue = true;
+  }
+  next();
 }
 
 // Takes something the operator asked for. A brightness that still waits is replaced by a
@@ -271,6 +330,14 @@ function want(kind, carry) {
     wanted[waiting] = {kind, carry};
   }
   next();
+}
+
+// Removes an animation from the show. `done` is called when the target has removed it.
+export function remove(animation, done) {
+  want("remove", async () => {
+    await commands.remove(animation.id);
+    done(animation);
+  });
 }
 
 export function play(id) {

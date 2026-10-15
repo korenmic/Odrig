@@ -89,7 +89,7 @@ From the top:
 1. `Free 3.2 MB of 10.4 MB`, from `space`, megabytes of 1,000,000 bytes with one decimal.
 2. `Installed`, and a row for each animation of the list: `<id> <file> <size> KB` and a
    button `Remove`. A press opens a confirmation in the place of messages:
-   `Remove animation <id> <file> from the installation?` with `Remove` and `Keep`.
+   `Remove animation <id> <file> from the installation?` with `Remove it` and `Keep it`.
 3. `Add an animation`:
    - `Choose a video or a GIF`: a `<label>` that looks like a button, over an
      `<input type="file" accept="video/*,image/gif">`. The phone shows its own picker.
