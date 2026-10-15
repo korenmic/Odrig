@@ -49,7 +49,7 @@ Rules for every task:
   - Prove it fails first: as task 2, for `import.test.js`.
   - Requirements: 2.1
 
-- [ ] 4. The readers and the command line on stored files; no Python
+- [x] 4. The readers and the command line on stored files; no Python
   - `jsonframes`, `strictjson`, `mapping`, `pack` and `cli` read the stored files.
     `reference.py` and every helper of `support.js` that starts Python go. A test runs
     the suite's helpers with no Python on the path.

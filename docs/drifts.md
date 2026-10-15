@@ -8277,3 +8277,24 @@ mode for its own requests, since no kind of its own is left in it.
 
 **Resolution.** `converter/tests/stored.js`, `inStoredForm`; `fit.test.js`,
 `timeline.test.js`, `expected.test.js`.
+
+## Seed 18: The helpers without Python, and the maker of the stored answers
+
+**Question.** Task 4 removes `reference.py` and every helper of the tests' support that
+starts Python, and task 5 removes `tests/converter/make_expected.py`. The maker records by
+running the converter's suite in a mode in which those helpers ask Python. What becomes of
+the maker, and of the tests' names for what they compare with?
+
+**Answer.** The maker goes in task 4, with the helpers it needs: from then on the stored
+answers are the record, as the design says they are once the converting parts go, and
+nothing can make them again. The helpers that gave Python's answers give the stored ones
+under names that say so: `storedAnswer` for a request, `storedRun` for a command line of
+the Python tool, `runJsAndStored` for both tools, `storedChecks`, `storedRuns` and
+`storedGenerated`. The modes that asked Python go with them. The section "Tests" of
+`docs/converter.md` says where the answers are in the same task, since `ODRIG_PYTHON`,
+which it named, is gone; the rest of the pages follow in task 6. A test runs the helpers
+with only Node.js on the path, with every way of starting a program refused for a name
+that holds `python`.
+
+**Resolution.** `converter/tests/support.js`, `stored.js`, `expected.test.js`, the test
+files of the converter; `docs/converter.md`, "Tests".

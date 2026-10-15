@@ -1,24 +1,45 @@
 import assert from "node:assert/strict";
+import {spawnSync} from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import {pathToFileURL} from "node:url";
 import zlib from "node:zlib";
 
-import {ROOT} from "./support.js";
-import {EXPECTED, EXPECTED_FILES, STORED_KINDS, answered, expected, mode, sha256} from "./stored.js";
+import * as support from "./support.js";
+import {EXPECTED, EXPECTED_FILES, expected, sha256} from "./stored.js";
 
-// The kinds of request: those of reference.py, and the command lines of the Python tool
-// and of its generators.
-const REFERENCE = fs.readFileSync(path.join(ROOT, "converter", "tests", "reference.py"), "utf8");
-const KINDS = [...new Set([...REFERENCE.matchAll(/^def ([a-z_]+)\(arguments, /gm)].map((match) => match[1]).concat(["cli", "generators"]))].sort();
+const {ROOT} = support;
+const TESTS = path.join(ROOT, "converter", "tests");
+
+// The kinds of request whose answers are stored, and the helpers by which a test asks each.
+const KINDS = {
+  check: /\bstoredChecks\(/,
+  cli: /\b(storedRun|runJsAndStored)\(/,
+  decode: /\bstoredAnswer\("decode"/,
+  deflate: /\bstoredAnswer\("deflate"/,
+  dumps: /\bstoredAnswer\("dumps"/,
+  encode: /\bstoredAnswer\("encode"/,
+  forms: /\bstoredAnswer\("forms"/,
+  generators: /\bstoredGenerated\(/,
+  inflate: /\bstoredAnswer\("inflate"/,
+  mappings: /\bstoredAnswer\("mappings"/,
+  media: /\bstoredAnswer\("media"/,
+  milliseconds: /\bstoredAnswer\("milliseconds"/,
+  read_mappings: /\bstoredAnswer\("read_mappings"/,
+  read_shows: /\bstoredAnswer\("read_shows"/,
+  rects: /\bstoredAnswer\("rects"/,
+  resample: /\bstoredAnswer\("resample"/,
+  run: /\bstoredRuns\(/,
+  sixdigits: /\bstoredAnswer\("sixdigits"/,
+  ticks: /\bstoredAnswer\("ticks"/,
+  timeline: /\bstoredAnswer\("timeline"/,
+};
 const LARGEST = 8 * 1024 * 1024;
 
 function storedNames() {
   return fs.existsSync(EXPECTED) ? fs.readdirSync(EXPECTED).filter((name) => name !== "files").sort() : [];
-}
-
-function kindOf(name) {
-  return name.replace(/\.json(\.gz)?$/, "");
 }
 
 function sizeUnder(folder) {
@@ -36,12 +57,12 @@ test("the stored answers", async (t) => {
     for (const name of names) {
       assert.match(name, /^[a-z_]+\.json(\.gz)?$/, name);
     }
-    assert.deepEqual(names.map(kindOf), KINDS);
+    assert.deepEqual(names.map((name) => name.replace(/\.json(\.gz)?$/, "")), Object.keys(KINDS).sort());
   });
 
   await t.test("each is valid: every answer has its key, what it answered, and the files it made, wrote and removed", () => {
     const named = new Set();
-    for (const kind of KINDS) {
+    for (const kind of Object.keys(KINDS)) {
       const entries = expected(kind);
       assert.ok(Object.keys(entries).length > 0, kind);
       for (const [key, entry] of Object.entries(entries)) {
@@ -71,29 +92,59 @@ test("the stored answers", async (t) => {
     assert.ok(size <= LARGEST, `${size} bytes`);
   });
 
-  await t.test("a request of a kind that is not stored-only is checked against Python", () => {
-    for (const kind of KINDS) {
-      assert.equal(mode(kind), process.env.ODRIG_EXPECTED ?? (STORED_KINDS.has(kind) ? "stored" : "verify"), kind);
+  await t.test("every kind is asked for by a test", () => {
+    const sources = fs.readdirSync(TESTS).filter((name) => name.endsWith(".test.js")).map((name) => fs.readFileSync(path.join(TESTS, name), "utf8")).join("\n");
+    for (const [kind, asked] of Object.entries(KINDS)) {
+      assert.match(sources, asked, `no test asks for the stored answers of ${kind}`);
     }
   });
+});
 
-  await t.test("in that check, an answer of Python that is not the stored one is a failure, and so is a request with none", {skip: process.env.ODRIG_EXPECTED === "record"}, () => {
-    // The request for the mapping files asks nothing else, and names no file.
-    const ask = {argv: [], input: null};
-    const stored = expected("mappings")[sha256(JSON.stringify(["mappings", ask, {}, []]))];
-    assert.ok(stored !== undefined);
-    const given = process.env.ODRIG_EXPECTED;
-    process.env.ODRIG_EXPECTED = "verify";
-    try {
-      assert.deepEqual(answered("mappings", ask, [], () => stored.answer), stored.answer);
-      assert.throws(() => answered("mappings", ask, [], () => ({})), /differs from what Python answers/);
-      assert.throws(() => answered("mappings", {argv: ["nothing any test asks"], input: null}, [], () => ({})), /no stored answer/);
-    } finally {
-      if (given === undefined) {
-        delete process.env.ODRIG_EXPECTED;
-      } else {
-        process.env.ODRIG_EXPECTED = given;
-      }
+test("no test starts Python", async (t) => {
+  await t.test("the support of the tests has no helper that starts it, and names none", () => {
+    for (const name of ["python", "pythonFrom", "runPython", "runBoth", "reference", "generated", "pythonChecks", "runPythonMany", "REFERENCE"]) {
+      assert.equal(name in support, false, `support.js offers ${name}`);
     }
+    for (const name of ["support.js", "stored.js"]) {
+      assert.doesNotMatch(fs.readFileSync(path.join(TESTS, name), "utf8"), /\.venv|ODRIG_PYTHON|reference\.py|PYTHONPATH/, name);
+    }
+    assert.equal(fs.existsSync(path.join(TESTS, "reference.py")), false);
+  });
+
+  await t.test("the helpers give the stored answers with no Python on the path, and start no program named python", (inner) => {
+    const folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
+    inner.after(() => fs.rmSync(folder, {recursive: true, force: true}));
+    const only = path.join(folder, "bin");
+    fs.mkdirSync(only);
+    fs.symlinkSync(process.execPath, path.join(only, "node"));
+    const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
+    inner.after(() => fs.rmSync(work, {recursive: true, force: true}));
+    const program = `
+      import cp from "node:child_process";
+      import fs from "node:fs";
+      import {syncBuiltinESMExports} from "node:module";
+      for (const name of ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync"]) {
+        const original = cp[name];
+        cp[name] = (command, ...rest) => {
+          const words = [command, ...(Array.isArray(rest[0]) ? rest[0] : [])].map(String).join(" ");
+          if (/python/i.test(words)) {
+            throw new Error("a helper started Python: " + words);
+          }
+          return original(command, ...rest);
+        };
+      }
+      syncBuiltinESMExports();
+      const support = await import(${JSON.stringify(pathToFileURL(path.join(TESTS, "support.js")).href)});
+      const mappings = support.storedAnswer("mappings");
+      const help = support.storedRun(["--help"]);
+      const both = support.runJsAndStored(["--help"]);
+      const made = support.storedGenerated(${JSON.stringify(work)}, "hello_world", "mapping/legs-2.json");
+      process.stdout.write(JSON.stringify({mappings: Object.keys(mappings).length > 0, help: help.status, js: both.js.status, made: fs.existsSync(made)}));
+    `;
+    const environment = {...process.env, PATH: only};
+    delete environment.ODRIG_PYTHON;
+    const done = spawnSync(process.execPath, ["--input-type=module", "-e", program], {cwd: ROOT, encoding: "utf8", env: environment, timeout: 120000});
+    assert.equal(done.status, 0, done.stderr);
+    assert.deepEqual(JSON.parse(done.stdout), {mappings: true, help: 0, js: 0, made: true});
   });
 });

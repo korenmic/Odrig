@@ -161,7 +161,8 @@ test("docs/converter.md presents the JavaScript tool as the converter", async (t
     const body = section(page, "Tests");
     assert.notEqual(body, null);
     assert.ok(commands(body).includes("npm test --prefix converter"));
-    assert.ok(body.includes("ODRIG_PYTHON"));
+    assert.ok(body.includes("`converter/tests/expected/`"));
+    assert.equal(body.includes("ODRIG_PYTHON"), false);
     assert.ok(body.includes("ODRIG_CHROME"));
     for (const name of ["docs/converter.md", "docs/reference-converter.md", "docs/emulator.md", "docs/firmware.md", "README.md"]) {
       assert.equal(/[a-z]+\.test\.js/.test(read(...name.split("/"))), false, `${name} lists a test file`);

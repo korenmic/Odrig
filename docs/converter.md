@@ -430,12 +430,14 @@ Node.js. It finds the tests by itself: every file of `converter/tests/` whose na
 `.test.js` is run, so a new test file needs no change anywhere else. The suite needs no
 hardware, and no network connection once the packages are installed.
 
-The suite compares with the reference converter, so it needs that tool set up as
-[reference-converter.md](reference-converter.md), "Setup", describes: it takes the Python
-of `.venv/` in the repository, or, when there is none, the program that the environment
-variable `ODRIG_PYTHON` names. Without either, every test that compares fails with a
-message that says how to set it up. The suite builds the media files it imports while it
-runs; none is tracked.
+The suite compares with what the Python package, the converter before this one, wrote
+and answered for the same requests. Those answers are stored in
+`converter/tests/expected/`, one file for each kind of request, each answer under a key
+made of what the request asks; the suite needs no Python and starts none. A long run of
+bytes in an answer is stored as a digest, and the tests compare the digest of their own.
+The media files the import tests read are stored there as well. The stored answers are the
+record: a change of what the converter writes is a change of a stored answer, made on
+purpose.
 
 One test loads the library in Chrome, without a window and with a profile folder of its
 own that it removes, on a page it serves from `127.0.0.1`, and compares what the page

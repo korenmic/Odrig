@@ -1,5 +1,5 @@
-// What the tests share: where the repository is, how the two tools are run, temporary
-// folders, and data made from a seed.
+// What the tests share: where the repository is, how the tool is run, the stored answers
+// of the Python package, temporary folders, and data made from a seed.
 
 import {spawnSync} from "node:child_process";
 import crypto from "node:crypto";
@@ -17,35 +17,6 @@ export {EXPECTED, asStored, expected, inStoredForm, isDigest, storedLength} from
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CONVERTER = path.join(ROOT, "converter");
 export const TOOL = path.join(CONVERTER, "odrig.js");
-export const REFERENCE = path.join(CONVERTER, "tests", "reference.py");
-
-const VENV_PYTHON = path.join(ROOT, ".venv", ...(process.platform === "win32" ? ["Scripts", "python.exe"] : ["bin", "python"]));
-
-// The Python program that runs the reference: `venv`, the one in `.venv` of the repository,
-// when it is there, else the program `named`. With neither, the error says how to set one
-// up.
-export function pythonFrom(venv, named, exists) {
-  if (exists(venv)) {
-    return venv;
-  }
-  const given = named !== undefined && named !== "";
-  if (given && exists(named)) {
-    return named;
-  }
-  throw new Error(
-    `the Python tool is needed for this test: there is no ${venv}` +
-      (given ? ` and no ${named}, which ODRIG_PYTHON names` : "") +
-      ". Set it up in the repository root with `python3 -m venv .venv` and" +
-      " `.venv/bin/python -m pip install -r requirements.txt`, or set ODRIG_PYTHON to a" +
-      " Python that has the libraries of requirements.txt.",
-  );
-}
-
-// `.venv/bin/python` of the repository, or the program the environment variable
-// ODRIG_PYTHON names.
-export function python() {
-  return pythonFrom(VENV_PYTHON, process.env.ODRIG_PYTHON, fs.existsSync);
-}
 
 function finished(done, what) {
   if (done.error) {
@@ -54,21 +25,9 @@ function finished(done, what) {
   return {status: done.status, out: done.stdout, err: done.stderr};
 }
 
-function environment(more) {
-  const existing = process.env.PYTHONPATH;
-  return {
-    ...process.env,
-    PYTHONPATH: existing ? `${ROOT}${path.delimiter}${existing}` : ROOT,
-    PYTHONDONTWRITEBYTECODE: "1",
-    ...more,
-  };
-}
-
 const LARGEST_OUTPUT = 1 << 30;
 // How long a program the tests start may run before it is ended and the test fails.
 const LONGEST_RUN_MS = 600000;
-// reference.py ends quietly with the number of the signal when a library fails this way.
-const FAULTS = {4: "SIGILL", 6: "SIGABRT", 8: "SIGFPE", 10: "SIGBUS", 11: "SIGSEGV"};
 
 // Runs `node converter/odrig.js` with the arguments. The result is `{status, out, err}`,
 // the two streams as text. `options.cwd` is the folder it is started in, the repository
@@ -77,7 +36,7 @@ export function runJs(argv, options = {}) {
   const done = spawnSync(options.node ?? process.execPath, [options.tool ?? TOOL, ...argv.map(String)], {
     cwd: options.cwd ?? ROOT,
     encoding: "utf8",
-    env: environment(options.env),
+    env: {...process.env, ...options.env},
     maxBuffer: LARGEST_OUTPUT,
     stdio: ["ignore", "pipe", "pipe"],
     timeout: LONGEST_RUN_MS,
@@ -85,69 +44,29 @@ export function runJs(argv, options = {}) {
   return finished(done, "node");
 }
 
-// Runs `python -m odrig` with the arguments, in the same folder as `runJs`, or gives its
-// stored answer and writes the files it wrote. A video that is cut or damaged is never
-// given to the Python tool this way: PyAV can end Python with a fault of memory on such a
-// file. `runPythonMany` looks at a video first.
-export function runPython(argv, options = {}) {
+// What the Python tool, `python -m odrig`, did with the arguments in the same folder as
+// `runJs`: `{status, out, err}`, from its stored answer, with the files it wrote written
+// again.
+export function storedRun(argv, options = {}) {
   const words = argv.map(String);
   const cwd = options.cwd ?? ROOT;
   const module = options.module ?? "odrig";
   const kind = module === "odrig" ? "cli" : "generators";
-  const ask = {argv: words, module, cwd, env: options.env ?? null};
-  return answered(kind, ask, [{cwd, argv: words}], () => {
-    const done = spawnSync(python(), ["-m", module, ...words], {
-      cwd,
-      encoding: "utf8",
-      env: environment(options.env),
-      maxBuffer: LARGEST_OUTPUT,
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: LONGEST_RUN_MS,
-    });
-    return finished(done, "python");
-  });
+  return answered(kind, {argv: words, module, cwd, env: options.env ?? null}, [{cwd, argv: words}]);
 }
 
-// Runs both tools on the same arguments: `{js, python}`.
-export function runBoth(argv, options = {}) {
-  return {js: runJs(argv, options), python: runPython(argv, options)};
+// Runs the tool on the arguments and gives what the Python tool did with them:
+// `{js, python}`.
+export function runJsAndStored(argv, options = {}) {
+  return {js: runJs(argv, options), python: storedRun(argv, options)};
 }
 
-// Asks `tests/reference.py` for something only Python has, or gives its stored answer.
-// The input is a value that is written as JSON, and the result is the value its answer
-// spells.
-export function reference(request, argv = [], input = null) {
+// The stored answer of the Python package to a request: a question only it could answer,
+// such as what zlib makes of a stream. The input is the value the request gave, and the
+// result is the value of the answer.
+export function storedAnswer(request, argv = [], input = null) {
   const commands = request === "run" ? input.commands.map((words) => ({cwd: input.cwd, argv: words})) : [];
-  return answered(request, {argv: argv.map(String), input}, commands, () => askPython(request, argv, input));
-}
-
-// The question and the answer travel in files of a temporary folder: a pipe to a program
-// that is started and waited for in one call has been seen to stall on a large input.
-function askPython(request, argv, input) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-"));
-  try {
-    const asked = path.join(folder, "asked.json");
-    const answered = path.join(folder, "answered.json");
-    fs.writeFileSync(asked, JSON.stringify(input));
-    const done = spawnSync(python(), [REFERENCE, request, asked, answered, ...argv.map(String)], {
-      cwd: ROOT,
-      encoding: "utf8",
-      env: environment(),
-      maxBuffer: LARGEST_OUTPUT,
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: LONGEST_RUN_MS,
-    });
-    if (done.error) {
-      throw new Error(`reference.py ${request} did not come to an end: ${done.error.message}`);
-    }
-    if (done.status !== 0) {
-      const fault = FAULTS[done.status] === undefined ? "" : `, which is ${FAULTS[done.status]}: a library of Python met a fault of memory`;
-      throw new Error(`reference.py ${request} ended with status ${done.status}${fault}: ${done.stderr}`);
-    }
-    return JSON.parse(fs.readFileSync(answered, "utf8"));
-  } finally {
-    fs.rmSync(folder, {recursive: true, force: true});
-  }
+  return answered(request, {argv: argv.map(String), input}, commands);
 }
 
 // A new temporary folder that is removed when the test `t` is over.
@@ -222,10 +141,10 @@ export function utf8(text) {
   return new Uint8Array(Buffer.from(text, "utf8"));
 }
 
-// What `python -m odrig check --format <kind>` gives for each of the files, which are given
-// as bytes: `{status, out, err}`. The file is named case.json or case.odrg.
-export function pythonChecks(kind, files) {
-  return reference("check", [kind], files.map(hex)).map(([status, out, err]) => ({status, out, err}));
+// What `python -m odrig check --format <kind>` gave for each of the files, which are given
+// as bytes: `{status, out, err}`. The file was named case.json or case.odrg.
+export function storedChecks(kind, files) {
+  return storedAnswer("check", [kind], files.map(hex)).map(([status, out, err]) => ({status, out, err}));
 }
 
 // What the tool says of a file of a kind, "json" or "odrg", named case.json or case.odrg,
@@ -276,14 +195,15 @@ export function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-// The frame records of a decoded file as reference.py gives them for the Python decoder:
-// for each record its duration, its mode byte and the SHA-256 of the picture after it.
+// The frame records of a decoded file in the form of the stored answers of the Python
+// decoder: for each record its duration, its mode byte and the SHA-256 of the picture
+// after it.
 export function recordsOf(decoded) {
   return decoded.records.map((record, i) => [record.ms, decoded.modes[i], sha256(record.picture)]);
 }
 
-// An animation in the form reference.py reads: the bytes as hexadecimal text and the
-// durations as decimal text.
+// An animation in the form the requests to the Python package gave it: the bytes as
+// hexadecimal text and the durations as decimal text.
 export function forPython(animation, more = {}) {
   return {
     width: animation.width,
@@ -293,13 +213,14 @@ export function forPython(animation, more = {}) {
   };
 }
 
-// Has a generator of the Python tool write its animation for a mapping file into a folder,
-// and gives the path of the JSON frames file. `seconds` is the length of the dense clip.
-export function generated(folder, generator, mapping, seconds = null) {
+// Writes into a folder the animation a generator of the Python package wrote for a mapping
+// file, from its stored answer, and gives the path of the JSON frames file. `seconds` is
+// the length of the dense clip.
+export function storedGenerated(folder, generator, mapping, seconds = null) {
   const canvas = path.basename(mapping, ".json");
   const out = path.join(folder, `${generator}-${canvas}${seconds === null ? "" : `-${seconds}s`}.json`);
   const argv = [out, "--mapping", mapping, ...(seconds === null ? [] : ["--seconds", seconds])];
-  const done = runPython(argv, {module: `odrig.generators.${generator}`});
+  const done = storedRun(argv, {module: `odrig.generators.${generator}`});
   if (done.status !== 0) {
     throw new Error(`the generator ${generator} ended with status ${done.status}: ${done.err}`);
   }
@@ -367,11 +288,11 @@ export function animationFrom(seed, {largestWidth = 40, largestHeight = 30} = {}
   return {width, height, frames};
 }
 
-// Runs command lines of the Python tool one after the other in one Python, in the folder
-// `cwd`: for each `{status, out, err}`. It is the command line of `python -m odrig` without
-// a new program for each line.
-export function runPythonMany(commands, cwd = ROOT) {
-  const results = reference("run", [], {cwd, commands: commands.map((argv) => argv.map(String))});
+// What the Python tool did with command lines run one after the other in one Python, in
+// the folder `cwd`: for each `{status, out, err}`, from the stored answer, with the files
+// they wrote written again.
+export function storedRuns(commands, cwd = ROOT) {
+  const results = storedAnswer("run", [], {cwd, commands: commands.map((argv) => argv.map(String))});
   return results.map(([status, out, err]) => ({status, out, err}));
 }
 

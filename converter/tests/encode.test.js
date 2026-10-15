@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, jsonframes, odrg} from "../lib/index.js";
-import {ROOT, animationFrom, asStored, forPython, generated, hex, isDigest, numbers, reference, runBoth, runJs, runPython, storedLength, temporary, unhex, utf8} from "./support.js";
+import {ROOT, animationFrom, asStored, forPython, hex, isDigest, numbers, runJs, runJsAndStored, storedAnswer, storedGenerated, storedLength, storedRun, temporary, unhex, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -35,19 +35,19 @@ test("the uncompressed files of the two command lines are identical", async (t) 
   const sources = [
     ["Hello world, as tracked", "animations/hello.json"],
     ["DVD bounce, as tracked", "animations/dvd.json"],
-    ["Hello world on the bench canvas", generated(folder, "hello_world", BENCH)],
-    ["DVD bounce on the bench canvas", generated(folder, "dvd_bounce", BENCH)],
-    ["a dense clip of 2 seconds on the bench canvas", generated(folder, "dense", BENCH, 2)],
-    ["Hello world on 60 x 60", generated(folder, "hello_world", TARGET)],
-    ["DVD bounce on 60 x 60", generated(folder, "dvd_bounce", TARGET)],
-    ["a dense clip of 2 seconds on 60 x 60", generated(folder, "dense", TARGET, 2)],
+    ["Hello world on the bench canvas", storedGenerated(folder, "hello_world", BENCH)],
+    ["DVD bounce on the bench canvas", storedGenerated(folder, "dvd_bounce", BENCH)],
+    ["a dense clip of 2 seconds on the bench canvas", storedGenerated(folder, "dense", BENCH, 2)],
+    ["Hello world on 60 x 60", storedGenerated(folder, "hello_world", TARGET)],
+    ["DVD bounce on 60 x 60", storedGenerated(folder, "dvd_bounce", TARGET)],
+    ["a dense clip of 2 seconds on 60 x 60", storedGenerated(folder, "dense", TARGET, 2)],
   ];
   for (const [label, source] of sources) {
     await t.test(label, (inner) => {
       const ours = path.join(folder, "ours.odrg");
       const theirs = path.join(folder, "theirs.odrg");
       assert.deepEqual(runJs(["encode", source, ours, "--uncompressed"]), {status: 0, out: "", err: ""});
-      assert.deepEqual(runPython(["encode", source, theirs, "--uncompressed"]), {status: 0, out: "", err: ""});
+      assert.deepEqual(storedRun(["encode", source, theirs, "--uncompressed"]), {status: 0, out: "", err: ""});
       const written = fs.readFileSync(ours);
       sameBytes(written, fs.readFileSync(theirs), source);
       assert.equal(written[5], 0, "the file is not compressed");
@@ -63,7 +63,7 @@ test("the uncompressed files of the two command lines are identical", async (t) 
 
 test("the uncompressed files of 200 animations from seeds are identical", async (t) => {
   const animations = Array.from({length: 200}, (unused, i) => animationFrom(i + 1));
-  const theirs = reference("encode", [], animations.map((animation) => forPython(animation)));
+  const theirs = storedAnswer("encode", [], animations.map((animation) => forPython(animation)));
   const kinds = {palette: 0, rgb: 0, stored: 0, coded: 0, long: 0, merged: 0};
   const modes = new Set();
 
@@ -139,7 +139,7 @@ test("the palette", async (t) => {
     const colours = Array.from({length: from.pick([2, 5, 64, 255, 256])}, () => [...from.bytes(3)].map((channel) => (from.below(3) === 0 ? channel & 0xf0 : channel)));
     cases.push([`colours from seed ${i + 1}`, row(colours)]);
   }
-  const theirs = reference("encode", [], cases.map(([, animation]) => forPython(animation)));
+  const theirs = storedAnswer("encode", [], cases.map(([, animation]) => forPython(animation)));
 
   for (let i = 0; i < cases.length; i += 1) {
     const [label, animation] = cases[i];
@@ -163,7 +163,7 @@ test("the palette", async (t) => {
     assert.equal(with257[10] + 256 * with257[11], 0);
     assert.equal(odrg.paletteFor(row(colours).frames), null);
     assert.equal(odrg.paletteFor(row(colours.slice(0, 256)).frames).length, 768);
-    const both = reference("encode", [], [forPython(row(colours.slice(0, 256))), forPython(row(colours))]);
+    const both = storedAnswer("encode", [], [forPython(row(colours.slice(0, 256))), forPython(row(colours))]);
     sameBytes(with256, both[0].uncompressed, "256 colours");
     sameBytes(with257, both[1].uncompressed, "257 colours");
   });
@@ -217,7 +217,7 @@ test("the search for the smallest record", async (t) => {
   pairs.push(one(new Array(18).fill(9), [...new Array(17).fill(9), 10], 2, 3, "a run to the last byte, which changes"));
   pairs.push(one(new Array(18).fill(9), [10, ...new Array(17).fill(9)], 2, 3, "a change in the first byte and a run to the end"));
 
-  const theirs = reference("forms", [], pairs.map(({old, fresh, width, bpp}) => ({old: hex(old), new: hex(fresh), width, bpp})));
+  const theirs = storedAnswer("forms", [], pairs.map(({old, fresh, width, bpp}) => ({old: hex(old), new: hex(fresh), width, bpp})));
   let ties = 0;
   let storedCount = 0;
 
@@ -292,7 +292,7 @@ test("a frame longer than 65,535 ms becomes several records with the same pictur
   const times = [65535, 65536, 131070, 131071, 200000, 1000000];
   const animations = times.map((ms) => ({width: 2, height: 1, frames: [{ms: 5, picture: other}, {ms, picture}, {ms: 7, picture: other}]}));
   animations.push({width: 2, height: 1, frames: [{ms: 40000, picture}, {ms: 40000, picture}, {ms: 1, picture: other}]});
-  const theirs = reference("encode", [], animations.map((animation) => forPython(animation)));
+  const theirs = storedAnswer("encode", [], animations.map((animation) => forPython(animation)));
 
   for (let i = 0; i < animations.length; i += 1) {
     await t.test(i < times.length ? `${times[i]} ms` : "two frames of 40,000 ms with the same picture", () => {
@@ -330,7 +330,7 @@ test("sources that cannot be written as ODRG", async (t) => {
   for (const [label, file, reason] of cases) {
     await t.test(label, () => {
       for (const flags of [[], ["--uncompressed"]]) {
-        const {js, python} = runBoth(["encode", file, out, ...flags]);
+        const {js, python} = runJsAndStored(["encode", file, out, ...flags]);
         assert.equal(python.status, 1);
         assert.equal(python.err.split(": ")[1], reason);
         assert.deepEqual(js, python);
@@ -347,7 +347,7 @@ test("sources that cannot be written as ODRG", async (t) => {
       const ours = path.join(folder, "ours.odrg");
       const theirs = path.join(folder, "theirs.odrg");
       assert.deepEqual(runJs(["encode", file, ours, "--uncompressed"]), {status: 0, out: "", err: ""});
-      assert.deepEqual(runPython(["encode", file, theirs, "--uncompressed"]), {status: 0, out: "", err: ""});
+      assert.deepEqual(storedRun(["encode", file, theirs, "--uncompressed"]), {status: 0, out: "", err: ""});
       sameBytes(fs.readFileSync(ours), fs.readFileSync(theirs), `N of ${n}`);
       fs.rmSync(ours);
       fs.rmSync(theirs);
@@ -401,7 +401,7 @@ test("encode on the command line", async (t) => {
   ];
   for (const argv of lines) {
     await t.test(`odrig ${argv.join(" ")}`, () => {
-      const {js, python} = runBoth(argv, inFolder);
+      const {js, python} = runJsAndStored(argv, inFolder);
       assert.equal(js.status, python.status, `${js.err} / ${python.err}`);
       if (python.status === 1 && !/: line \d+, column \d+: /.test(python.err)) {
         assert.equal(js.err, python.err);

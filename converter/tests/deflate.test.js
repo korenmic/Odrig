@@ -5,7 +5,7 @@ import path from "node:path";
 import test, {after} from "node:test";
 
 import {deflate, inflate, jsonframes, odrg} from "../lib/index.js";
-import {asStored, generated, hex, numbers, recordsOf, reference, runJs, runPython, storedLength, temporary, utf8} from "./support.js";
+import {asStored, hex, numbers, recordsOf, runJs, storedAnswer, storedGenerated, storedLength, storedRun, temporary, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -36,9 +36,9 @@ after(() => {
 function bodies() {
   if (made === null) {
     folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
-    const files = reference("encode", [], SOURCES.map(([, source]) => source));
+    const files = storedAnswer("encode", [], SOURCES.map(([, source]) => source));
     made = SOURCES.map(([name, {generator, mapping, seconds}], i) => {
-      const animation = jsonframes.loads(new Uint8Array(fs.readFileSync(generated(folder, generator, mapping, seconds ?? null))));
+      const animation = jsonframes.loads(new Uint8Array(fs.readFileSync(storedGenerated(folder, generator, mapping, seconds ?? null))));
       const plain = odrg.encode(animation, {compressed: false});
       assert.deepEqual(asStored(plain, files[i].uncompressed), files[i].uncompressed, `${name}: the uncompressed file is the Python tool's`);
       const compressed = asStored(odrg.encode(animation), files[i].compressed);
@@ -129,7 +129,7 @@ test("every stream of the compressor is a stream zlib reads", async (t) => {
   const streams = list.map(([, bytes]) => deflate.deflateRaw(bytes));
 
   await t.test("zlib inflates each to its input, with nothing left over", () => {
-    const theirs = reference("inflate", [], streams.map(hex));
+    const theirs = storedAnswer("inflate", [], streams.map(hex));
     list.forEach(([label, bytes], i) => {
       assert.equal(theirs[i].reason, undefined, label);
       assert.equal(theirs[i].left, 0, label);
@@ -209,11 +209,11 @@ test("compressing a body as long as that of a dense 60 x 60 clip of 10 seconds t
 test("whole files, through the command line of both tools", async (t) => {
   const folder = temporary(t);
   const sources = [
-    ["Hello world on the bench canvas", generated(folder, "hello_world", BENCH)],
-    ["DVD bounce on the bench canvas", generated(folder, "dvd_bounce", BENCH)],
-    ["Hello world on 60 x 60", generated(folder, "hello_world", TARGET)],
-    ["DVD bounce on 60 x 60", generated(folder, "dvd_bounce", TARGET)],
-    ["a dense clip of 2 seconds on 60 x 60", generated(folder, "dense", TARGET, 2)],
+    ["Hello world on the bench canvas", storedGenerated(folder, "hello_world", BENCH)],
+    ["DVD bounce on the bench canvas", storedGenerated(folder, "dvd_bounce", BENCH)],
+    ["Hello world on 60 x 60", storedGenerated(folder, "hello_world", TARGET)],
+    ["DVD bounce on 60 x 60", storedGenerated(folder, "dvd_bounce", TARGET)],
+    ["a dense clip of 2 seconds on 60 x 60", storedGenerated(folder, "dense", TARGET, 2)],
     ["the source of the vector encoded.pal", "tests/vectors/valid/encoded.pal.json"],
     ["the source of the vector encoded.rgb", "tests/vectors/valid/encoded.rgb.json"],
   ];
@@ -226,8 +226,8 @@ test("whole files, through the command line of both tools", async (t) => {
       const theirPlain = path.join(folder, "their-plain.odrg");
       assert.deepEqual(runJs(["encode", source, ours]), quiet);
       assert.deepEqual(runJs(["encode", source, plain, "--uncompressed"]), quiet);
-      assert.deepEqual(runPython(["encode", source, theirs]), quiet);
-      assert.deepEqual(runPython(["encode", source, theirPlain, "--uncompressed"]), quiet);
+      assert.deepEqual(storedRun(["encode", source, theirs]), quiet);
+      assert.deepEqual(storedRun(["encode", source, theirPlain, "--uncompressed"]), quiet);
       const files = [ours, plain, theirs, theirPlain].map((file) => new Uint8Array(fs.readFileSync(file)));
       const [compressed, uncompressed, reference9, referencePlain] = files;
       assert.equal(compressed[5], 1, "the flags byte says compressed");
@@ -236,7 +236,7 @@ test("whole files, through the command line of both tools", async (t) => {
 
       // The reference decoder gives the same frame records for the compressed file as for
       // the uncompressed one, and so does the decoder of the library.
-      const decoded = reference("decode", [], files.map(hex));
+      const decoded = storedAnswer("decode", [], files.map(hex));
       assert.equal(decoded[0].compressed, true);
       assert.equal(decoded[1].compressed, false);
       assert.ok(decoded[1].records.length > 0);

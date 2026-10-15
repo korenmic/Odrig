@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {errors, jsonframes, timeline, whole} from "../lib/index.js";
-import {hex, inStoredForm, numbers, reference} from "./support.js";
+import {hex, inStoredForm, numbers, storedAnswer} from "./support.js";
 
 const {fraction} = whole;
 const FITS = ["fill", "fit", "stretch"];
@@ -14,8 +14,8 @@ function refusal(error) {
   return {reason: error.reason, detail: error.detail};
 }
 
-// What `tickPictures` gives for frames that have times only, in the form reference.py
-// gives for the Python function: the number of the frame at each tick, the frames that
+// What `tickPictures` gives for frames that have times only, in the form of the stored
+// answers of the Python function: the number of the frame at each tick, the frames that
 // were fitted, and how many frames were asked for.
 function ticksOf(frames, start, duration) {
   let asked = 0;
@@ -111,7 +111,7 @@ test("the ticks of frames with times are those of the Python tool", async (t) =>
     const duration = from.pick([null, null, 1, 20, 40, 100, 300, 1000]);
     cases.push({label: `frames from seed ${i + 1}`, frames, start, duration});
   }
-  const theirs = reference("ticks", [], cases.map(({frames, start, duration}) => forPython(frames, start, duration)));
+  const theirs = storedAnswer("ticks", [], cases.map(({frames, start, duration}) => forPython(frames, start, duration)));
   const reasons = new Map();
 
   await t.test(`${cases.length} parts of frames at six rates and of frames from seeds`, () => {
@@ -267,7 +267,7 @@ function casesForPython(cases) {
 
 test("importFrames gives the animation the Python tool imports from the same frames", async (t) => {
   const cases = Array.from({length: 700}, (unused, i) => importCase(5000 + i));
-  const theirs = reference("timeline", [], casesForPython(cases));
+  const theirs = storedAnswer("timeline", [], casesForPython(cases));
   const outcomes = new Map();
 
   await t.test("for 700 videos and GIFs from seeds", async () => {
