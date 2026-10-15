@@ -31,18 +31,16 @@ export function why(error, path = error.path) {
 // The code macOS and Linux give for a failure that Windows names otherwise. There a folder
 // that is read or written over is refused as if for want of permission, and a path below a
 // file as if nothing were there. The words are to be the same on every system, so the path
-// is looked at: a folder is a folder, and a path below a file is below a file.
+// is looked at: a folder is a folder, and a path below a file is below a file. What else
+// Windows refuses for want of permission it names EPERM, where macOS and Linux give EACCES.
 function asElsewhere(code, path) {
-  if (typeof path !== "string") {
-    return code;
-  }
-  if ((code === "EPERM" || code === "EACCES") && isFolder(path)) {
+  if (typeof path === "string" && (code === "EPERM" || code === "EACCES") && isFolder(path)) {
     return "EISDIR";
   }
-  if (code === "ENOENT" && belowAFile(path)) {
+  if (typeof path === "string" && code === "ENOENT" && belowAFile(path)) {
     return "ENOTDIR";
   }
-  return code;
+  return code === "EPERM" ? "EACCES" : code;
 }
 
 function isFolder(path) {
