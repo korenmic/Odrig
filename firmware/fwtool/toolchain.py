@@ -1,5 +1,6 @@
 """The tools in the work folder: the Python environment with PlatformIO, esptool,
-littlefs-python and Node.js. Every step is skipped when its result is there."""
+littlefs-python and Node.js, and the one of the newer USB software. Every step is skipped
+when its result is there."""
 
 import hashlib
 import subprocess
@@ -9,10 +10,11 @@ from . import Failure, env, paths, wled
 
 MINIMUM_PYTHON = (3, 10)
 STAMP = paths.VENV / "odrig-requirements.sha256"
+NEWER_STAMP = paths.NEWER_VENV / "odrig-requirements.sha256"
 
 
-def _run(what, command):
-    done = subprocess.run([str(part) for part in command], capture_output=True, text=True, env=env.child())
+def _run(what, command, newer=False):
+    done = subprocess.run([str(part) for part in command], capture_output=True, text=True, env=env.child(newer=newer))
     if done.returncode != 0:
         raise Failure("setup-failed", f"{what} failed with status {done.returncode}: {(done.stdout + done.stderr).strip()[-600:]}")
     return done.stdout
@@ -49,6 +51,23 @@ def python_environment():
             _run(f"pip install -r {path.name}", [paths.PYTHON, "-m", "pip", "install", "--disable-pip-version-check", "-r", path])
         STAMP.write_text(wanted + "\n")
         done.append("installed the Python packages")
+    return done
+
+
+def newer_environment():
+    """Makes sure the work folder has the newer USB software's Python environment with
+    every package of its requirement file. Returns the steps it had to do."""
+    done = []
+    if not paths.NEWER_PYTHON.exists():
+        paths.output(paths.NEWER).mkdir(parents=True, exist_ok=True)
+        _run("creating the newer software's Python environment", [sys.executable, "-m", "venv", paths.NEWER_VENV], newer=True)
+        done.append("created the newer software's Python environment")
+    wanted = hashlib.sha256(paths.NEWER_REQUIREMENTS.read_bytes()).hexdigest()
+    if not NEWER_STAMP.exists() or NEWER_STAMP.read_text().strip() != wanted:
+        command = [paths.NEWER_PYTHON, "-m", "pip", "install", "--disable-pip-version-check", "-r", paths.NEWER_REQUIREMENTS]
+        _run(f"pip install -r {paths.NEWER_REQUIREMENTS.name}", command, newer=True)
+        NEWER_STAMP.write_text(wanted + "\n")
+        done.append("installed the newer software's Python packages")
     return done
 
 

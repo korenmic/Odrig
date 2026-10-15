@@ -53,6 +53,40 @@ it:
 | The 67 packages of WLED's `package-lock.json`, which pack the web interface | The npm registry |
 | The Python packages `zopfli`, `wheel` and `tasmota-metrics`, which the platform installs into the tool's Python environment | PyPI |
 
+### The newer USB software
+
+`build --trial` builds the firmware on newer software of Espressif, whose USB host knows
+hubs: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform 55.03.312-1 and
+PlatformIO 6.2.0. It is the trial of the move to that software, and nothing of it is used
+by the other commands. It lives in `build/firmware/newer/`, so the build known good and its
+tools stay as they are. The first `build --trial` fetches it; nothing of it is on a computer
+before. The sizes are those the sources state, about 700 MB in all; a line *named by its
+manifest* is a small manifest that names the real download, which is given as its release
+offers it for a Mac with Apple's processor.
+
+| What | Version | From | Bytes |
+|---|---|---|---:|
+| PlatformIO, into `newer/venv`, with the packages of `firmware/requirements-newer.txt`, which pins the others at the versions WLED pins and takes them from pip's cache | 6.2.0 | `https://files.pythonhosted.org/packages/bf/98/6c5cc249129c72b076ca238a435c48b48568d866c12890e01ee50fb8f322/platformio-6.2.0-py3-none-any.whl` | 418,578 |
+| PlatformIO's own SCons | `tool-scons` 4.41101.0 | `https://dl.registry.platformio.org/download/platformio/tool/tool-scons/4.41101.0/tool-scons-4.41101.0.tar.gz` | 523,448 |
+| The platform | 55.03.312-1 | `https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip` | 2,128,229 |
+| Arduino-ESP32 | 3.3.12 | `https://github.com/espressif/arduino-esp32/releases/download/3.3.12/esp32-core-3.3.12.tar.xz` | 42,843,632 |
+| Arduino-ESP32's compiled libraries | 3.3.12 | `https://github.com/espressif/arduino-esp32/releases/download/3.3.12/esp32-core-3.3.12-libs.tar.xz` | 347,236,084 |
+| The installer of ESP-IDF's tools, `tool-esp_install` | 5.3.5 | `https://github.com/pioarduino/esp_install/releases/download/v5.3.5/esp_install-v5.3.5.zip` | 54,139 |
+| The compiler, `toolchain-xtensa-esp-elf`, named by its manifest | 14.2.0+20260121 | `https://github.com/pioarduino/registry/releases/download/0.0.1/xtensa-esp-elf-14.2.0_20260121.zip`, then `https://github.com/espressif/crosstool-NG/releases/download/esp-14.2.0_20260121/xtensa-esp-elf-14.2.0_20260121-aarch64-apple-darwin.tar.xz` | 1,601 and 170,666,656 |
+| The debugger, `tool-xtensa-esp-elf-gdb`, which the platform installs with the compiler; named by its manifest | 17.1_20260402 | `https://github.com/pioarduino/registry/releases/download/0.0.1/xtensa-esp-gdb-17.1_20260402.zip`, then `https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v17.1_20260402/xtensa-esp-elf-gdb-17.1_20260402-aarch64-apple-darwin24.5.tar.gz` | 1,550 and 46,924,973 |
+| esptool, `tool-esptoolpy`, named by its manifest | 5.4.0 | `https://github.com/pioarduino/registry/releases/download/0.0.1/esptoolpy-v5.4.0.zip`, then `https://github.com/espressif/esptool/releases/download/v5.4.0/esptool-v5.4.0-macos-arm64.tar.gz` | 989 and 62,531,864 |
+| PlatformIO's home page, which the platform installs at every build | `contrib-piohome` 3.4.4 | `https://github.com/pioarduino/registry/releases/download/0.0.1/contrib-piohome-3.4.4.tar.gz` | 922,895 |
+| The platform's own Python environment, `newer/pio/penv`: `uv` first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
+| Then, by `uv`, the newest that PyPI has of `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools` and `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
+| ESP-IDF's USB host library, taken into `firmware/usb_host/` of the repository | ESP-IDF v5.5.5, commit `ff1bac0aeecdd2b797b9c3a558c6bd03629bc013` | `https://github.com/espressif/esp-idf/tree/v5.5.5/components/usb`: ten sources, twelve headers, `Kconfig`, and ESP-IDF's `LICENSE` | about 678,000 |
+| Only when Espressif's driver of flash drives 1.1.1 does not build on the newer software: `usb_host_msc` | 1.1.4 | `https://components-file.espressif.com/components/espressif/usb_host_msc/1.1.4/espressif__usb_host_msc-v1.1.4.zip` | 36,826 |
+
+WLED's libraries are not fetched again: before the first trial build they are copied from
+`.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in WLED's folder. The platform takes the
+other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and CMake,
+Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the trial does
+not do.
+
 ## The work folder
 
 The work folder is `build/firmware/` under the repository root. Git ignores it, and removing
@@ -68,10 +102,17 @@ build/firmware/
   WLED/            WLED's source at the pinned commit
   out/             the built images
   storage/         storage images read from the board and written to it, the newest eight
+  newer/           the newer USB software of `build --trial`
+    venv/          its Python environment: PlatformIO 6.2.0, Node.js and npm
+    pio/           its PlatformIO folder: the platform, Arduino-ESP32, the compilers and
+                   the platform's own Python environment
+    pio-cache/     its build cache
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
-folder. `HOME` is left as it is.
+folder. `HOME` is left as it is. For `build --trial` the two folders of PlatformIO are
+`build/firmware/newer/pio` and `build/firmware/newer/pio-cache`, and `PATH` begins with
+`build/firmware/newer/venv/bin`; pip's and npm's caches are the same.
 
 | Variable | Value |
 |---|---|
@@ -91,7 +132,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
@@ -217,6 +258,22 @@ flash settings and the libraries are the ones WLED has for this board, and the p
 table is WLED's own file. WLED's files are not patched for it and none is compiled.
 `--standalone` does not go with `--stock`. The standalone firmware is being built; for
 now it is a trial program, see [Verified on the board](#verified-on-the-board).
+
+```
+python3 firmware/fw.py build --trial
+python3 firmware/fw.py build --trial --probe
+```
+
+`build --trial` builds the firmware on [the newer USB software](#the-newer-usb-software),
+for the trial of the move to it: the environment `odrig_trial`, which is `odrig` on the
+newer platform, and the image `odrig-trial.bin`; with `--probe`, the environment
+`odrig_trial_probe` and the image `odrig-trial-probe.bin`. The tool makes the newer
+software's Python environment first, when `build/firmware/newer/venv` is not there or
+`firmware/requirements-newer.txt` changed, and runs that environment's PlatformIO in
+WLED's folder, with WLED's files and the patches as for `build`. The trial's images never
+replace `odrig-firmware.bin` and `odrig-probe.bin`, and nothing of the build known good
+changes. `--trial` goes with neither `--stock` nor `--standalone`. `flash --image
+build/firmware/out/odrig-trial.bin` writes the trial build to the board.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -514,6 +571,16 @@ started. It also changes the installed show with the commands of
 image the work folder does not hold. Its last step leaves the board with the firmware and
 the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
 takes about 55 minutes. Without a board it stops with `no-board` and runs nothing.
+
+```
+ODRIG_BOARD_IMAGES=trial python3 firmware/fw.py test-board
+```
+
+With the variable `ODRIG_BOARD_IMAGES=trial` the suite runs on the trial build of the newer
+USB software: it flashes `odrig-trial.bin` and `odrig-trial-probe.bin` where it takes the
+firmware and the probe build, and builds them with `build --trial` when the work folder does
+not hold them. Its test of `install-firmware`, which writes `odrig-firmware.bin`, flashes the
+trial build after it, and the suite leaves the trial build on the board.
 
 ### test-air
 

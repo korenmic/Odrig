@@ -1,4 +1,5 @@
 import pathlib
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -174,7 +175,11 @@ class Override(TemporaryFolder):
         self.assertRegex(text, r"(?m)^\[env:odrig_probe\]\nextends = env:odrig$")
         self.assertRegex(text, r"(?m)^  -D ODRIG_PROBE$")
         self.assertIn('-D WLED_RELEASE_NAME=\\"odrig_ESP32-S3_16MB_opi\\"', text)
-        for setting in ("board", "platform", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
+        for name in ("odrig", "odrig_probe"):
+            environment = re.search(rf"(?ms)^\[env:{name}\]\n(.*?)(?=^\[|\Z)", text).group(1)
+            for setting in ("board", "platform", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
+                self.assertNotRegex(environment, rf"(?m)^{setting}\s*=", f"{name} {setting}")
+        for setting in ("board", "board_build.partitions", "board_build.flash_mode", "board_upload.flash_size"):
             self.assertNotRegex(text, rf"(?m)^{setting}\s*=", setting)
 
     def test_a_repository_path_with_a_space_is_refused(self):

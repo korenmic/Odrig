@@ -19,8 +19,17 @@ STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
 STORAGE = WORK / "storage"
 
+# The newer USB software, beside the build known good: its Python environment, PlatformIO's
+# folder with the platform, the framework and the compilers, and the build cache.
+NEWER = WORK / "newer"
+NEWER_VENV = NEWER / "venv"
+NEWER_PYTHON = NEWER_VENV / "bin" / "python"
+NEWER_PIO_CORE = NEWER / "pio"
+NEWER_PIO_CACHE = NEWER / "pio-cache"
+
 PATCHES = FIRMWARE / "patches"
 REQUIREMENTS = FIRMWARE / "requirements.txt"
+NEWER_REQUIREMENTS = FIRMWARE / "requirements-newer.txt"
 WIFI_SETTINGS = FIRMWARE / "wifi.json"
 LIMIT_SETTINGS = FIRMWARE / "limit.json"
 

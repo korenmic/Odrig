@@ -1,7 +1,9 @@
 ; The build environments of the firmware. `python3 firmware/fw.py build` writes this file
 ; into WLED's folder as platformio_override.ini, with the repository's path filled in.
 ; Everything not named here is inherited from WLED's own environment esp32s3dev_16MB_opi:
-; the board, the platform, the partition table and the flash settings.
+; the board, the platform, the partition table and the flash settings. The trial's two
+; environments take the platform of the newer USB software, which the newer software's
+; own PlatformIO builds, in build/firmware/newer/.
 
 [env:odrig]
 extends = env:esp32s3dev_16MB_opi
@@ -24,4 +26,14 @@ build_flags = ${common.build_flags} ${esp32s3.build_flags}
 [env:odrig_probe]
 extends = env:odrig
 build_flags = ${env:odrig.build_flags}
+  -D ODRIG_PROBE
+
+[env:odrig_trial]
+extends = env:odrig
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip
+platform_packages =
+
+[env:odrig_trial_probe]
+extends = env:odrig_trial
+build_flags = ${env:odrig_trial.build_flags}
   -D ODRIG_PROBE

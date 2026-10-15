@@ -36,7 +36,7 @@ Rules for every task:
   erased whole, the firmware built only as the tool builds it. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The tool builds a trial on the newer software
+- [x] 1. The tool builds a trial on the newer software
   - Set `"state": "in_progress"` in
     `project-seeds/22-p2-a-usb-stick-through-a-hub/state.json`.
   - `firmware/fwtool/paths.py`, `env.py`, `toolchain.py`, `build.py` and `cli.py`: the
