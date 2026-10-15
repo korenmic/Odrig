@@ -104,11 +104,17 @@ def write_application(port, image, extra=(), table=None, expect="status", wait=b
 
     Only the first application partition is written and the boot selection data cleared,
     so that the board starts that partition; `extra` adds the files of a full restore.
-    Without a table to go by, the board's own partition table is read and checked first.
+    Without a table to go by, the board's own partition table is read and checked first,
+    and its layout is printed.
     """
     on_port = flasher.Flasher(port)
     size = build.check_size(image)
-    partitions.check(on_port.read_table() if table is None else table, size)
+    if table is None:
+        table = on_port.read_table()
+        partitions.check(table, size)
+        print(partitions.layout_line(table))
+    else:
+        partitions.check(table, size)
     on_port.erase(flasher.BOOT_SELECTION)
     regions = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE] if extra else [])
     on_port.write([*extra, (flasher.APPLICATION.address, image)], regions, restart=True)
@@ -135,12 +141,16 @@ def _restore_stock(arguments):
     return 0
 
 
-def storage_of(port):
+def storage_of(port, say=True):
     """esptool on the port, the board's storage region, and a file that holds the storage as
-    it is now. The chip is left in its bootloader."""
+    it is now. The chip is left in its bootloader. With `say` the layout the board's table
+    has is printed."""
     from . import storage
     on_port = flasher.Flasher(port)
-    _, partition = partitions.check(on_port.read_table(), 0)
+    table = on_port.read_table()
+    _, partition = partitions.check(table, 0)
+    if say:
+        print(partitions.layout_line(table))
     region = flasher.storage_region(partition)
     return on_port, region, storage.from_board(on_port, region)
 
@@ -190,11 +200,12 @@ def _install_show(arguments):
     return 0 if storage.status_error(reply) is None else 1
 
 
-def store_settings(port, wait, network=None, milliamps=None, settled=False):
+def store_settings(port, wait, network=None, milliamps=None, settled=False, say=True):
     """Puts settings into WLED's stored settings on the board in one write: the name and
     the password of the network, the limit on LED current, or both. Restarts the board
     and prints what was set and the board's reply to `status`. With `settled` that reply
-    is the one the board gives once it has read every installed animation to its end."""
+    is the one the board gives once it has read every installed animation to its end.
+    With `say` the layout of the board's table is printed first."""
     from . import limit, wifi
 
     def make(image):
@@ -204,7 +215,7 @@ def store_settings(port, wait, network=None, milliamps=None, settled=False):
             image = limit.apply(image, milliamps)
         return image
 
-    on_port, region, before_path = storage_of(port)
+    on_port, region, before_path = storage_of(port, say)
     write_storage(on_port, region, before_path.read_bytes(), make)
     reply = board.settled(port, wait) if settled else board.EXPECTED["status"](port, wait)
     if network is not None:
@@ -252,7 +263,7 @@ def _install_firmware(arguments):
     build.check_size(image)
     port = board.find(arguments.port)
     write_application(port, image, expect="status", wait=arguments.wait)
-    return store_settings(port, arguments.wait, network=network, milliamps=milliamps, settled=True)
+    return store_settings(port, arguments.wait, network=network, milliamps=milliamps, settled=True, say=False)
 
 
 def _read_show(arguments):

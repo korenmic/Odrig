@@ -29,7 +29,7 @@ Rules for every task:
   built only as the tool builds it. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The tool knows the two layouts
+- [x] 1. The tool knows the two layouts
   - Set `"state": "in_progress"` in
     `project-seeds/24-p1-a-bigger-animation-space-without-wifi-updates/state.json`.
   - `firmware/fwtool/partitions.py`: `WLED`, `BIGGER`, `table`, `layout_of`.

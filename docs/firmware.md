@@ -144,6 +144,13 @@ with that environment's Python.
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
+**The layout.** A command that reads the board's partition table, `flash`,
+`install-firmware`, `install-show`, `set-wifi`, `set-limit`, `read-limit` and `read-show`,
+prints first which of the two layouts of [The regions of the flash](#the-regions-of-the-flash)
+it found, and the size of the storage there: `layout: WLED's, storage 10354688 bytes` or
+`layout: bigger, storage 13500416 bytes`. It works on either, and writes the storage where
+the table puts it.
+
 **The port.** A command that talks to the board uses the port given with `--port`, else the
 one in the variable `ODRIG_BOARD_PORT`, else the only `/dev/cu.usbmodem*` device. With no
 such device, or with more than one, it stops with `no-board`. Either of the board's two
@@ -1065,7 +1072,19 @@ touches these regions only:
 | Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
-partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
+partition at `0xFF0000` are never written.
+
+The tool knows a second layout, the bigger one, which gives the room of the second firmware
+slot to the storage. Its one firmware slot is a factory slot, for which an update over
+Wi-Fi finds no slot to write; the tool names a table by its firmware slots: with a second
+one it is WLED's layout, with one alone the bigger one.
+
+| Partition | Address | Size |
+|---|---|---|
+| `nvs`, `otadata` | `0x9000`, `0xE000` | `0x5000`, `0x2000`, as in WLED's |
+| `app0`, a factory slot | `0x10000` | `0x300000` |
+| `spiffs` | `0x310000` | `0xCE0000`, 13,500,416 bytes |
+| `coredump` | `0xFF0000` | `0x10000` | The whole flash is never erased, and no tool
 writes a fuse of the chip or starts a program that can. esptool is given an address only
 after the tool has checked it against this table.
 

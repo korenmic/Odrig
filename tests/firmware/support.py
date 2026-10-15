@@ -293,6 +293,21 @@ def small_layout(blocks=64):
     return tuple(entry if entry[0] != "spiffs" else ("spiffs", 1, 0x82, 0x610000, blocks * BLOCK_SIZE) for entry in LAYOUT)
 
 
+# The bigger layout: one firmware slot, of the kind factory, and the storage from 0x310000.
+BIGGER_LAYOUT = (
+    ("nvs", 1, 0x02, 0x9000, 0x5000),
+    ("otadata", 1, 0x00, 0xE000, 0x2000),
+    ("app0", 0, 0x00, 0x10000, 0x300000),
+    ("spiffs", 1, 0x82, 0x310000, 0xCE0000),
+    ("coredump", 1, 0x03, 0xFF0000, 0x10000),
+)
+
+
+def small_bigger_layout(blocks=64):
+    """The bigger layout with a storage partition of a few blocks, for images made in a test."""
+    return tuple(entry if entry[0] != "spiffs" else ("spiffs", 1, 0x82, 0x310000, blocks * BLOCK_SIZE) for entry in BIGGER_LAYOUT)
+
+
 @contextlib.contextmanager
 def example_show(brightness=None):
     """The example show, packed on the two-leg mapping into a temporary folder."""

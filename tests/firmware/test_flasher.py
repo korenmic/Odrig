@@ -55,7 +55,7 @@ class Flash(Temporary):
         self.assertEqual(esptool.call("read-flash")[:2], ["0x8000", "0xc00"])
         self.assertEqual(esptool.call("erase-region"), ["0xe000", "0x2000"])
         self.assertEqual(esptool.written(), [("0x10000", "odrig-firmware.bin")])
-        self.assertEqual(result.out, "WLED 2606300\n")
+        self.assertEqual(result.out, "layout: WLED's, storage 10354688 bytes\nWLED 2606300\n")
 
     def test_the_answer_is_waited_for_20_seconds_or_as_long_as_told(self):
         with support.no_board() as esptool:

@@ -13,6 +13,8 @@ from . import support
 
 STORAGE_AT = 0x610000
 REPLY = '{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null}'
+# The line with which a command says which layout it found: WLED's, with the small storage.
+LAYOUT_LINE = "layout: WLED's, storage 262144 bytes"
 
 # Settings made for these tests. The password is found nowhere else, so that a run can be
 # searched for it.
@@ -103,7 +105,7 @@ class SetWifi(OnASmallLayout):
         esptool = self.esptool()
         result = self.set_wifi(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"name: {NAME}\npassword: set\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\n{REPLY}\n")
         self.assertEqual(result.err, "")
         board_now = self.on_the_board(esptool)
         self.assertTrue(wifi.holds(board_now, self.settings))
@@ -150,7 +152,7 @@ class SetWifi(OnASmallLayout):
         second = self.esptool(self.on_the_board(first))
         result = self.set_wifi(second)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"name: {NAME}\npassword: set\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\n{REPLY}\n")
         self.assertEqual(second.commands(), ["read-flash", "verify-flash", "verify-flash"])
         self.assertEqual(second.wrote, [])
 
@@ -168,7 +170,7 @@ class SetWifi(OnASmallLayout):
         result = self.set_wifi(esptool, status=silent)
         self.assertEqual(result.status, 1)
         self.assertRegex(result.err, r"\Aerror: no-reply: [^\n]*\n\Z")
-        self.assertEqual(result.out, "")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\n")
         self.assertTrue(wifi.holds(self.on_the_board(esptool), self.settings))
         self.assertIn("after.bin", self.kept())
 
@@ -216,7 +218,7 @@ class SetWifi(OnASmallLayout):
         with support.no_board(esptool, answer=REPLY):
             result = support.run_main("set-wifi")
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out.splitlines()[:2], ["name: odrig", "password: set"])
+        self.assertEqual(result.out.splitlines()[:3], [LAYOUT_LINE, "name: odrig", "password: set"])
         self.assertTrue(wifi.holds(self.on_the_board(esptool), wifi.read()))
         self.assertFalse(wifi.read().password in result.out + result.err)
 
@@ -245,7 +247,7 @@ class InstallFirmware(OnASmallLayout):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"name: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\n")
         self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
         self.checked.assert_called_once_with(build.image_path("firmware"))
         program, data = [call for call in esptool.calls if "write-flash" in call]
@@ -281,7 +283,7 @@ class InstallFirmware(OnASmallLayout):
         with support.no_board(esptool, answer=REPLY), mock.patch.object(build, "checked_image", side_effect=lambda image: self.image):
             result = support.run_main("install-firmware")
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out.splitlines()[:2], ["name: odrig", "password: set"])
+        self.assertEqual(result.out.splitlines()[:3], [LAYOUT_LINE, "name: odrig", "password: set"])
         self.assertFalse(wifi.read().password in result.out + result.err)
 
     def test_a_refused_settings_file_makes_no_call_at_all(self):

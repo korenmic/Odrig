@@ -8323,3 +8323,20 @@ Python package no longer starts it as a program; the rest of the pages follow in
 **Resolution.** `odrig/`; `tests/core/support.py`; `core/Makefile`;
 `tests/walkthrough/make_gif.py`; `tests/app/media.py`; `agent/getting-started.md`,
 `agent/vocabulary.md`; `tests/onboarding/support.py`.
+
+## Seed 24: How a table is named
+
+**Question.** The design has `layout_of` name a table WLED's layout or the bigger one by its
+entries, and refuse any other. The tool has always taken any table with a firmware slot at
+`0x10000` and a storage named `spiffs`, and its suite runs on tables whose storage is a few
+blocks. What does it name?
+
+**Answer.** A table is named by its firmware slots: with a second one it is WLED's layout,
+with one alone the bigger one; the size the line gives is that of the table's storage. A
+table without a slot at `0x10000` that the image fits in, or without `spiffs`, is refused as
+before, with `layout-mismatch`. The move to the bigger layout, which writes where WLED's
+layout has its second slot, takes WLED's table only as it is, entry for entry.
+`install-firmware` prints the line once, before it writes the firmware.
+
+**Resolution.** `firmware/fwtool/partitions.py`, `layout_of`, `layout_line`;
+`firmware/fwtool/cli.py`.
