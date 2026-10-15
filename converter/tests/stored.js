@@ -5,7 +5,7 @@
 // under a key made of what it asks: the request and its input, with the temporary folders
 // and the repository written as names and the parts of the paths below them joined by `/`
 // on every system, the files of those folders as they were before it, and every other file
-// its command line names. With it are kept its answer and the files
+// its command line names, of a folder of the repository only the files git tracks. With it are kept its answer and the files
 // it made, wrote and removed. A run of more than 64 hexadecimal digits in an answer is kept
 // as a digest, the first 16 digits of its SHA-256 and its number of bytes, except in the
 // answers of `deflate`, which the tests go on to read. A file larger than 16 KB that a
@@ -14,6 +14,7 @@
 //
 // No test starts Python: a request gives the stored answer and writes the stored files.
 
+import {spawnSync} from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -175,6 +176,36 @@ function snapshot(folders) {
   return found;
 }
 
+let trackedPaths;
+
+// The files git tracks in the repository and the folders above them, as paths from the
+// repository with `/` between the parts, or null where git does not list them.
+function tracked() {
+  if (trackedPaths === undefined) {
+    const listed = spawnSync("git", ["ls-files", "-z"], {cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28});
+    trackedPaths = null;
+    if (listed.status === 0 && listed.stdout !== "") {
+      trackedPaths = new Set();
+      for (const file of listed.stdout.split("\0").filter((name) => name !== "")) {
+        const parts = file.split("/");
+        parts.forEach((unused, i) => trackedPaths.add(parts.slice(0, i + 1).join("/")));
+      }
+    }
+  }
+  return trackedPaths;
+}
+
+// Whether a file or a folder counts in what a folder holds: inside the repository only
+// what git tracks does, so that what one computer has beside the tracked files, such as a
+// .DS_Store of macOS, does not change a key.
+function counts(target) {
+  const inside = path.relative(ROOT, target);
+  if (inside === "" || inside.startsWith("..") || path.isAbsolute(inside) || tracked() === null) {
+    return true;
+  }
+  return tracked().has(inside.split(path.sep).join("/"));
+}
+
 // What a file or a folder outside the temporary folders holds, for the key.
 function holding(target) {
   let status;
@@ -191,7 +222,9 @@ function holding(target) {
   }
   const parts = [];
   for (const entry of fs.readdirSync(target).sort()) {
-    parts.push([entry, holding(path.join(target, entry))]);
+    if (counts(path.join(target, entry))) {
+      parts.push([entry, holding(path.join(target, entry))]);
+    }
   }
   return sha256(JSON.stringify(parts));
 }
