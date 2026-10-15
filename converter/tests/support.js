@@ -10,6 +10,9 @@ import {fileURLToPath} from "node:url";
 
 import {errorLine, main, summary} from "../cli/main.js";
 import {errors} from "../lib/index.js";
+import {answered} from "./stored.js";
+
+export {EXPECTED, asStored, expected, isDigest} from "./stored.js";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CONVERTER = path.join(ROOT, "converter");
@@ -82,19 +85,27 @@ export function runJs(argv, options = {}) {
   return finished(done, "node");
 }
 
-// Runs `python -m odrig` with the arguments, in the same folder as `runJs`. A video that is
-// cut or damaged is never given to the Python tool this way: PyAV can end Python with a
-// fault of memory on such a file. `runPythonMany` looks at a video first.
+// Runs `python -m odrig` with the arguments, in the same folder as `runJs`, or gives its
+// stored answer and writes the files it wrote. A video that is cut or damaged is never
+// given to the Python tool this way: PyAV can end Python with a fault of memory on such a
+// file. `runPythonMany` looks at a video first.
 export function runPython(argv, options = {}) {
-  const done = spawnSync(python(), ["-m", options.module ?? "odrig", ...argv.map(String)], {
-    cwd: options.cwd ?? ROOT,
-    encoding: "utf8",
-    env: environment(options.env),
-    maxBuffer: LARGEST_OUTPUT,
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: LONGEST_RUN_MS,
+  const words = argv.map(String);
+  const cwd = options.cwd ?? ROOT;
+  const module = options.module ?? "odrig";
+  const kind = module === "odrig" ? "cli" : "generators";
+  const ask = {argv: words, module, cwd, env: options.env ?? null};
+  return answered(kind, ask, [{cwd, argv: words}], () => {
+    const done = spawnSync(python(), ["-m", module, ...words], {
+      cwd,
+      encoding: "utf8",
+      env: environment(options.env),
+      maxBuffer: LARGEST_OUTPUT,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: LONGEST_RUN_MS,
+    });
+    return finished(done, "python");
   });
-  return finished(done, "python");
 }
 
 // Runs both tools on the same arguments: `{js, python}`.
@@ -102,11 +113,17 @@ export function runBoth(argv, options = {}) {
   return {js: runJs(argv, options), python: runPython(argv, options)};
 }
 
-// Asks `tests/reference.py` for something only Python has. The input is a value that is
-// written as JSON, and the result is the value its answer spells. Both travel in files of
-// a temporary folder: a pipe to a program that is started and waited for in one call has
-// been seen to stall on a large input.
+// Asks `tests/reference.py` for something only Python has, or gives its stored answer.
+// The input is a value that is written as JSON, and the result is the value its answer
+// spells.
 export function reference(request, argv = [], input = null) {
+  const commands = request === "run" ? input.commands.map((words) => ({cwd: input.cwd, argv: words})) : [];
+  return answered(request, {argv: argv.map(String), input}, commands, () => askPython(request, argv, input));
+}
+
+// The question and the answer travel in files of a temporary folder: a pipe to a program
+// that is started and waited for in one call has been seen to stall on a large input.
+function askPython(request, argv, input) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-"));
   try {
     const asked = path.join(folder, "asked.json");

@@ -8212,3 +8212,31 @@ says `a command is needed, or --log`.
 
 **Resolution.** `odrigctl/cli.py`, `odrigctl/client.py`, `follow_log`;
 `tests/emulator/test_tool_log.py`; `docs/emulator.md`, "The command tool".
+
+## Seed 18: How the answers of Python are stored
+
+**Question.** The design has `tests/converter/make_expected.py` compute, with the Python
+package, what the JavaScript suite compares with, in a compact form for each kind of
+request, and has the import tests read media files of `converter/tests/media/`. The inputs
+of most comparisons are made by the JavaScript tests themselves, from seeds. How is it done?
+
+**Answer.** The suite records them itself. Every request a test makes of Python, a
+request of `reference.py` or a command line of the Python tool or of a generator, goes
+through `converter/tests/stored.js`, which keeps it under a key made of what it asks: the
+request and its input, with the temporary folders and the repository written as names,
+the files of those folders as they were before it, and every other file its command line
+names. With it are kept its answer and the files it made, wrote and removed.
+`make_expected.py` runs the suite in the mode that records, and writes one file of answers
+for each kind of request, compressed when it is larger than 64 KB, and each written file
+larger than 16 KB apart in `files/`, compressed and named by its SHA-256. A run of more than
+64 hexadecimal digits in an answer is kept as a digest, the first 16 digits of its SHA-256
+and its number of bytes, except in the answers of `deflate`, the streams the inflater's
+tests go on to read. The media of the import tests are the files the `media` request
+wrote, kept as its answer, and the generators' animations are the files they wrote. All of
+it takes 4.2 MB. Without `ODRIG_EXPECTED` a request asks Python and checks that its answer
+and its files are the stored ones, so the suite as it runs checks every stored answer
+against what Python answers today; the kinds whose tests compare digests where the
+answers hold them take the stored answers without Python, kind by kind.
+
+**Resolution.** `converter/tests/stored.js`, `support.js`, `expected.test.js`;
+`tests/converter/make_expected.py`; `converter/tests/expected/`.

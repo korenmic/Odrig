@@ -27,7 +27,7 @@ Rules for every task:
   that makes it.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The stored files
+- [x] 1. The stored files
   - Set `"state": "in_progress"` in `project-seeds/18-p1-one-converter/state.json`.
   - `tests/converter/make_expected.py`; run it; `converter/tests/expected/` and
     `converter/tests/media/`. The two tests that forbid tracked media allow the folder.
