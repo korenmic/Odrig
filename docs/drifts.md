@@ -8424,3 +8424,99 @@ they did before.
 `allowAgain`; `converter/tests/import.test.js`, `expected.test.js`, `browser.test.js`,
 `cli.test.js`, `pack.test.js`; `converter/tests/expected/cli.json.gz` and `run.json.gz`;
 `converter/cli/files.js`, `why`; `AGENTS.md` and `agent/getting-started.md`, On Windows.
+
+## Seed 22: Which newer software, and where its hubs come from
+
+**Question.** The seed names a version of Espressif's software that knows hubs, ESP-IDF
+5.5 or later, and leaves open which one and how. Arduino-ESP32's libraries come compiled,
+and the configuration they are compiled with leaves the hub support of ESP-IDF's USB host
+off, as ESP-IDF does unless it is switched on. Which software, and how does the firmware
+get hubs?
+
+**Answer.** Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform
+55.03.312-1, its newest release that is not a test release, of 2026-09-22; it needs
+PlatformIO 6.2.0. The hubs come from ESP-IDF 5.5.5's own USB host library, taken into
+`firmware/usb_host/` and compiled with its hub support on, as the driver of flash drives
+was taken into `firmware/usb_host_msc/`. The support is ESP-IDF's driver of the hub class
+of the USB standard, and nothing of it names a hub. The other way, having the platform
+compile all of Arduino-ESP32's libraries again with ESP-IDF and the option on, fetches
+ESP-IDF itself, its Python packages and some thirty components besides what this way
+fetches, and its exact list is known only when it runs. The driver of flash drives stays
+1.1.1, which Espressif gives for ESP-IDF 4.4.1 and later; 1.1.4 is on the list of
+downloads only for the case that 1.1.1 does not build. Should the owner prefer the other
+way, the list changes before anything is fetched.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The newer
+software", "The USB host library with hubs" and "What the trial fetches".
+
+## Seed 22: The newer software beside the build known good
+
+**Question.** The trial build needs PlatformIO 6.2.0 and a platform of its own, where the
+firmware's build has the PlatformIO 6.1.17 that WLED pins; and stock WLED is still built
+on the older software after the move. How do the two live in one work folder?
+
+**Answer.** The newer software has a folder of its own, `build/firmware/newer/`, with its
+Python environment, its PlatformIO folder and its build cache; pip's and npm's caches are
+shared, since they only keep what was fetched. `build --trial` and `build --trial --probe`
+build on it, into images with names of their own, so the image known good is never
+replaced. After the move the firmware and its probe build take the newer folder, and
+`build --stock` keeps the older one. The PlatformIO of the newer folder is PlatformIO's own
+6.2.0, which the platform asks for; the platform installs pioarduino's PlatformIO into a
+Python environment of its own for itself.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The tool" and
+"The move".
+
+## Seed 22: What counts as WLED building on the newer software
+
+**Question.** The seed ends the trial when WLED does not build on the newer software. How
+much change of WLED's source does the trial allow before it says so?
+
+**Answer.** A change that WLED's source needs goes into a patch file of
+`firmware/patches/`, each change held to the newer software by `ESP_IDF_VERSION_MAJOR`, so
+that the build known good stays as it is. A change of WLED's drivers of the LEDs, the
+Wi-Fi or the storage, or a library that has no version for the newer software, ends the
+trial: that is no longer WLED 16.0.1 as it is, and the owner decides.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, 1.5;
+`design.md`, "The USB host library with hubs".
+
+## Seed 22: The board's suite on the trial build
+
+**Question.** The trial asks that the board's suite pass on the trial build. The suite
+flashes the firmware and the probe build under the names the tool keeps them by, which the
+trial does not replace. How does it run on the trial build?
+
+**Answer.** The trial has a probe build too, `build --trial --probe`, and the suite takes
+the trial's two images where it takes the firmware and the probe build when the variable
+`ODRIG_BOARD_IMAGES` is `trial`. No command of the tool is added for it, and both go at the
+move.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The tool" and
+"The trial on the board"; `tests/board/support.py`.
+
+## Seed 22: The log of a device that goes, and of a device on a hub
+
+**Question.** The seed asks for a line when a hub comes and when it goes. The log says
+`a device went` for any device, and its watcher keeps only the first device open, so it
+is told only of the first that goes.
+
+**Answer.** The watcher keeps up to eight devices open, each with its numbers and its
+kind, and the line of a device that goes names it as its line of coming did:
+`a device went: maker 1a40, product 0101, a hub`. On the newer software the line of a
+device that comes behind a hub ends with `, on port <n> of a hub`. Eight is more than a hub
+with a stick brings.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, Requirement
+3; `design.md`, "The log of what comes and goes".
+
+## Seed 22: Two sticks through one hub
+
+**Question.** Through a hub two sticks can be plugged in at once. The seed says nothing of
+it.
+
+**Answer.** One stick is read at a time, as the firmware does today: a second one that
+comes is passed over until the first goes. Reading two would change seed 20's list and
+its names, which is not this seed's work.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, 2.5.
