@@ -14,7 +14,8 @@ object, takes its memory once at startup, and never calls itself.
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
 the [LED data](#led-data), [command lines](#command-lines), [startup](#startup),
-[memory](#memory), the [benchmark](#benchmark) and the [test host](#the-test-host).
+[a drive](#a-drive), [memory](#memory), the [benchmark](#benchmark) and the
+[test host](#the-test-host).
 
 ## Commands
 
@@ -24,7 +25,7 @@ Run from the repository root.
 |---|---|---|
 | `make -C core` | Builds the library `core/build/libodrig_core.a` from every `core/src/*.cpp`, with every compiler warning treated as an error. | Apple's command-line developer tools: `make`, `c++` and `ar`. |
 | `make -C core test` | Builds the library and the test host `core/build/odrig_host`, then runs the suite of `tests/core/`. | The same, and Python 3.10 or later with no added package. |
-| `make -C core bench` | Builds `core/build/odrig_bench`, has the reference converter write the dense 60 x 60 clip of 10 seconds into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command. |
+| `make -C core bench` | Builds `core/build/odrig_bench`, has the dense generator write the dense 60 x 60 clip of 10 seconds and the converter encode it into `core/build/bench/`, compressed and uncompressed, and prints how long a frame takes to decode. | The same as the test command, and Node.js for the converter. |
 | `make -C core clean` | Removes `core/build/`. | |
 | `python core/build.py` | Builds the library without GNU Make, which is how Windows builds: `core/build/libodrig_core.a`, or `odrig_core.lib` with Microsoft's compiler. It builds again only what changed. | A C++ compiler: `g++` or `clang++`, on the path or unpacked under the folder `tools/`, or Microsoft's C++ build tools. Python 3.10 or later. |
 | `python core/build.py test` | Builds the library and the test host, then runs the suite of `tests/core/` with the Python that runs the script. | The same. |
@@ -38,9 +39,9 @@ make -C core test PYTHON="$PWD/.venv/bin/python"
 ```
 
 The suite is every `test_*.py` file in `tests/core/`, found by discovery. It drives the
-test host as a child process and compares what the core does with the reference decoder and
-the readers of the reference converter,
-[reference-converter.md](reference-converter.md), and with a reference player
+test host as a child process and compares what the core does with the decoder and the
+readers of the Python library, [python-library.md](python-library.md), and with a reference
+player
 written in Python, `ReferencePlayer` in `tests/core/support.py`. The test host is built with
 the address and undefined-behaviour sanitizers. The suite needs no hardware and no network
 connection.
@@ -76,7 +77,7 @@ Every function receives `ctx` as its first argument.
 | `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
-| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. Today the core logs one thing: the reason text when the show becomes invalid. |
+| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs two things: the reason text when the show becomes invalid, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
 | `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
@@ -84,6 +85,8 @@ Every function receives `ctx` as its first argument.
 | `remove` | `int remove(void *ctx, const char *name)`: removes the file of this name. A file being written under it is given up. Returns 1 when it removed one, 0 when there was none, -1 on a failure. |
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
+| `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
+| `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -111,6 +114,13 @@ The last seven members are the storage functions: three that write a file, `rena
 - `read_at` reads the file of an upload back from storage while it is checked: one more
   function than writing, renaming and removing, because `open`, `read` and `close` hold
   the one file that plays.
+
+The last two members are the drive. A host with a drive sets both, and has storage that
+can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
+drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
+the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash. A
+host that is given such a name for a drive that is gone answers as for a file that is not
+there.
 
 ### What the core offers
 
@@ -189,8 +199,20 @@ is at or above the length of the turn, the turn of the next animation begins exa
 where this one ended, however late the refresh is; whole rounds of the playlist are taken
 off first, by division, so a host that asked for no refresh for a long time costs one
 walk over the items. The length of a turn is worked out from the length of the
-animation's loop, which the check of the file found, and from `repeat`, `max_seconds` and
-`min_seconds`. Every turn opens its file anew.
+animation's loop and from `repeat`, `max_seconds` and `min_seconds`. Every turn opens its
+file anew.
+
+The length of a loop is the sum of the durations of its frames. The core knows it once a
+check has read the file to its end, or once the player has decoded the loop to its end,
+whichever comes first. Until then the animation is in its first loop: the player decodes
+its records up to the time of the refresh and counts them against the number of frames in
+the header, and when the last one ends at or before that time, their durations add up to
+the length. So a turn ends where it would end with the length known from the start. When
+an animation has a `max_seconds` and the time has reached it, the first loop is decoded
+up to that longest time and no further: either the loop ended on the way, or the turn
+ended there. Whole rounds are taken off by division only when every length is known.
+Otherwise the turns are walked one by one, and an animation whose turn went by without a
+refresh is decoded through once, which gives its length.
 
 `status` reports as `fps` the number of refreshes produced in the last whole second that
 ended before the command's timestamp, with seconds counted from the power-on moment.
@@ -242,11 +264,17 @@ upload they are about.
 
 ## Startup
 
-`odrig_core_begin` reads `mapping.json`, then `show.json`, and then decodes every different
-`.odrg` file the show names, in the order in which the show first names them, from its
-first frame record to its last. For each file it checks the header, then the size against
-the mapping, then the body. It notes the size of each file, which `list` reports, and the
-sum of its frames' durations.
+`odrig_core_begin` reads `mapping.json`, then `show.json`, and then opens every different
+`.odrg` file the show names, in the order in which the show first names them. Of each
+file it reads the header, the first 16 bytes, and compares the canvas with the mapping's.
+It decodes no frame record, so the time the start takes does not grow with the files. A
+file that is missing or cannot be read, a header that is not sound and another canvas
+make the show invalid there.
+
+The bodies of the files are read after the start, while the show plays: see "The check
+after the start". A host whose storage cannot be changed has no second decoders for
+that. With such a host the start decodes every file from its first frame record to its
+last, and nothing is left to check.
 
 A show may have no items. It is valid, and nothing plays.
 
@@ -275,13 +303,103 @@ After startup the LEDs are switched on. With a valid show, brightness is the val
 plays nothing. With an invalid show nothing is playing, and brightness is the value of
 `show.json` when that file and its ids are sound, and 0 otherwise.
 
-A file can also fail while it plays: it is gone, cannot be read, or no longer follows the
-format. From that refresh on the show is invalid in the same way, until the next startup.
+A file can also fail while it plays, and the check after the start can find a fault in a
+body: the file is gone, cannot be read, or does not follow the format. From that refresh
+on the show is invalid in the same way, until the next startup.
 
 The core keeps nothing from one startup to the next but the files of the folder. Given
 the same files, the same answers of the host and the same calls with the same timestamps,
 it gives the same replies, the same LED data and the same storage calls in the same
 order, byte for byte.
+
+## The check after the start
+
+With a host whose storage can be changed, the body of every file is read while the show
+plays, by the second source and the second decoders that also check an upload. The check
+goes through the files in the order in which the show first names them. It runs in steps
+inside `odrig_core_poll`, after the LED data of a refresh is complete:
+
+- the first step of a file opens it with `read_at` and reads its header again;
+- each further step decodes one frame record;
+- the step after the last record asks for the end of the file: nothing may follow. The
+  core then knows the size of the file, which `list` reports, and the length of its loop.
+
+A file of F frame records takes F + 2 steps. At a refresh that follows the one before it
+without a grid time skipped, and comes no more than 2 ms after its grid time, while the
+last whole second had 30 refreshes or more, the check takes one step more than at the
+refresh before, up to 16 steps. At any other refresh,
+one after a gap or one later than that, the count begins again and the check takes no
+step, unless it took none at the nine refreshes before either: then it takes one. So
+the check is fast beside a show that leaves the host time, takes a step now and then
+beside one that does not, and still comes to its end with a host that is late for every
+refresh, at one step in ten refreshes.
+
+A fault the check finds makes the show invalid from that refresh on, with the text
+[reasons.md](reasons.md) has for it; that refresh is dark already. A file that cannot be
+read back is `read-error`, whether it is damaged or gone: `read_at` has one answer for
+both. Until the last file is read, `list`, `remove` and `upload begin` are answered with
+`busy`, and every other command works. Once the check is complete it stays so until the
+next start: a file that an upload adds was read by the upload's own check.
+
+The player can come to a fault before the check does, in the animation that is playing.
+It shows the frames before the fault, and the show turns invalid at the refresh whose
+time lies at their end or after it. A turn that ends before that, by `max_seconds` or as
+a turn of a cycle, ends as ever, and the fault waits for the check. Bytes that follow the
+last frame record are found by the check alone: the player never reads that far.
+
+What a late refresh costs:
+
+- The check loses its pace. The late refresh takes no step, and the next ones take 1, 2,
+  3 and so on again: a single gap costs the check up to 136 steps over the next 17
+  refreshes. A host that is late for every refresh gets one step in ten refreshes, and
+  that refresh is later by the time one frame record takes to read and decode: on the
+  board, beside a dense animation, about an eighth of a second.
+- The player, with lengths not known, decodes what lies between the last picture and
+  this one, as it does with the lengths known. After a long time without a refresh it
+  walks the turns that went by one by one, and decodes each animation among them once,
+  to the end of its loop or to its `max_seconds`. That is at most what the start used to
+  do for every file, and it is done once for a file: afterwards its length is known.
+- The memory is the same in every case. Nothing here asks the host for a block.
+
+The check and the player may have the same file open at the same time, each through its
+own source: the player with `open` and `read`, the check with `read_at`.
+
+## A drive
+
+A host with a drive gives the core animations that are not in the show: the files of the
+folder `odrig` of a USB flash drive. The host makes the drive's list, as its member
+`drive_name` says; the core keeps for each place of the list its state, its size, its
+length and its id, and asks the host for a name only when `list` writes it or a log line
+needs it.
+
+- At each refresh, before the LED data is made, the core asks `drive`. When the number
+  differs from the one it holds, it drops what it knew of the old drive and, for a number
+  other than 0, counts the new drive's files with `drive_name`, at most 256, and marks
+  them to be checked.
+- The check after the start goes on with the drive's files once the installed ones are
+  read, in the order of their places, at the same pace and through the same second
+  decoders. A file that is whole and made for the canvas joins the playlist as soon as its
+  check has ended. One that is not, or one for which no id is left, is left out, and the
+  host's log gets `drive file <name> left out: <reason>`. The drive's check does not make
+  any command answer `busy`. While an upload is open it waits, and the file it was in is
+  read again from its start afterwards.
+- A drive's animation gets the lowest id from 60001 up that no item of the show and no
+  animation of the drive before it has. The same files with the same show get the same
+  ids.
+- The playlist is the show's animations and then the drive's, in the order of their
+  places. A drive's animation has the turn of an animation without `repeat` and
+  `max_seconds`. When nothing plays and a drive's animation joins, the playlist plays
+  from it: a show without an animation of its own plays the drive's.
+- `play <id>` finds an id among the show's items and then among the drive's animations;
+  `status` names a drive's animation by its id. `list` lists the drive's animations
+  after the show's items, with the file's name on the drive written as a JSON string.
+  `remove` and `upload begin` of a drive's id are answered with `in-use`.
+- When the drive is pulled out, or another one is plugged in, its animations leave the
+  playlist and `list`. When one of them was playing, the playlist goes on with the next
+  animation that is left, from its first frame, or nothing plays.
+- A drive's file that cannot be opened or read, or that turns out not to be sound while it
+  plays, is left out from then on and logged in the same way. Its turn ends there, the
+  playlist goes on as after a pull, and the show stays valid.
 
 ## The files the core writes
 
@@ -393,7 +511,10 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   the mapping's; each further step decodes one frame record, which is what playback does
   for a refresh; the step after the last record asks for the end of the file and
   compares the size and the CRC-32 of what was read back with what was received. A file
-  of F frame records is checked in F + 2 refreshes.
+  of F frame records is checked in F + 2 refreshes. No upload is open while the check
+  after the start reads the installed files. The check of a drive's files gives the
+  second decoders up when an upload begins and takes them again once it is closed, so
+  the two never need them at the same time.
 - **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
   file in place by the sequence of its kind, or reports what the check found:
   `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
@@ -408,7 +529,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 ## Memory
 
 The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
-blocks, in the order of the table: two of a fixed size for the byte entry, four for a host
+blocks, seventeen with a drive, in the order of the table: two of a fixed size for the byte entry, four for a host
 whose storage can be changed, and the others sized from the mapping and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
@@ -416,7 +537,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,272 |
+| The core object | fixed | 3,360 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -432,14 +553,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,517** |
+| **Total** | | **124,605** |
 
-That is 95 percent of the 131,072 bytes the core may use for this canvas: the check of an
-uploaded file takes 46,008 of them. The example show on the two-leg mapping asks for
-88,002 bytes. A host without storage that can be changed is not asked for the chunk
-buffer and the three blocks of the check: 77,009 bytes for the target file. The size and the number of frames of an
-`.odrg` file change nothing: the core never holds a file or a frame record, only the
-512 bytes it last read.
+That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
+decoders, which serve the check after the start and the check of an uploaded file, take
+46,008 of them. The example show on the two-leg mapping asks for 88,090 bytes. A host
+without storage that can be changed is not asked for the chunk buffer and the three
+blocks of the check: 77,097 bytes for the target file. A host with a drive is asked for
+one block more, after the three of the check: the drive's table, 16 bytes for each of
+256 places, 4,096 bytes. With it the target file takes 128,701 bytes, 98 percent. The size and the number of frames
+of an `.odrg` file change nothing: the core never holds a file or a frame record, only
+the 512 bytes it last read.
 
 When the host cannot supply the first block, `odrig_core_begin` returns `NULL`. When it
 cannot supply a later one, the show is invalid with `out-of-memory`.
@@ -495,17 +619,21 @@ leg; and `ready`.
 | `linehex <ms> <hex>` | `odrig_core_command` with exactly these bytes | `reply <json>` |
 | `bytes <ms> <hex>` | `odrig_core_feed` with these bytes | `fed <hex of the line>` and `reply <json>` for each line |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
+| `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one and the list of the folder as it is now. The core sees it at its next refresh. | nothing |
+| `drive pull` | With `--drive`: the drive is pulled out. | nothing |
 
 | Option of a session | What it does |
 |---|---|
 | `--alloc-fails-at N` | The N-th call of `alloc` returns `NULL`. |
 | `--dirty-memory` | Memory is handed out filled with the byte `0xA5`, not zeroed. |
-| `--read-fails FILE OFFSET` | `read` fails at that offset of that file. |
-| `--read-fails-after FILE OFFSET N` | The same, but the first N openings of the file are spared. |
+| `--read-fails FILE OFFSET` | Reading that file fails at that offset: `read` returns -1 there, and so does `read_at`. |
+| `--read-fails-after FILE OFFSET N` | `read` fails at that offset once the file has been opened N times. `read_at` is not touched. |
 | `--remove-after FILE N` | The file is gone once it has been opened N times. |
 | `--swap-after FILE N OTHER` | After N openings the name opens the content of the file `OTHER`. |
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
-| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 10,354,688, the size of the board's storage. |
+| `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
+| `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
+| `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |
 | `--no-storage` | The seven storage functions are `NULL`. |
 | `--only-space` | Of the seven only `space` is there: a host whose storage cannot be changed. |
 | `--space-unknown` | `space` returns -1. |
@@ -513,8 +641,11 @@ leg; and `ready`.
 | `--cut-at N` | The N-th storage call is not made; the program prints `power cut` and ends with status 75. |
 | `--cut-at N --cut-keeps K` | The same, but when that call is a `write`, its first K bytes are written first. |
 | `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
-| `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes at or after that offset. |
-| `--read-back-differs OFFSET` | `read_at` gives the byte at that offset with one bit changed. |
+| `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes of `upload.part` at or after that offset. |
+| `--read-back-differs OFFSET` | `read_at` gives the byte at that offset of `upload.part` with one bit changed. |
+| `--drive DIR` | The host has a drive, plugged in at the start: its list is the files of the folder `DIR/odrig` by the rules of `drive_name`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
+| `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
+| `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
 `space` and `read_at` are not counted and not traced. The storage functions work on the

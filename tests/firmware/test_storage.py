@@ -158,6 +158,10 @@ class ShowFolders(Temporary):
         self.assertEqual(sorted(files), ["dvd.odrg", "hello.odrg", "mapping.json", "notes.txt"])
 
 
+# The line with which a command says which layout it found: WLED's, with the small storage.
+LAYOUT_LINE = "layout: WLED's, storage 262144 bytes"
+
+
 class Commands(Temporary):
     def setUp(self):
         super().setUp()
@@ -185,23 +189,44 @@ class Commands(Temporary):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}\n')
+        self.assertEqual(result.out, f'{LAYOUT_LINE}\n{{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}}\n')
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), support.files_of(self.show))
         self.assertEqual(storage.other_files(self.on_the_board(esptool)), storage.other_files(self.old))
 
-    def test_the_reply_is_waited_for_20_seconds_or_as_long_as_told(self):
+    def test_the_reply_is_waited_for_300_seconds_or_as_long_as_told(self):
         esptool = self.esptool()
         self.install(esptool)
         self.install(esptool, "--wait", "240")
-        self.assertEqual(esptool.waited, [20.0, 240.0])
+        self.assertEqual(esptool.waited, [300.0, 240.0])
         self.assertEqual(self.install(esptool, "--wait", "0").status, 2)
 
     def test_a_reply_that_reports_a_reason_is_status_1(self):
         answer = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"show-missing"}'
         result = self.install(self.esptool(), "--no-check", answer=answer)
         self.assertEqual(result.status, 1)
-        self.assertEqual(result.out, answer + "\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\n{answer}\n")
         self.assertEqual(result.err, "")
+
+    def test_the_reply_printed_is_the_one_the_board_gives_once_it_has_read_its_animations(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY, support.BUSY, support.BUSY, support.LISTED]})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show)
+        self.assertEqual((result.status, result.out, result.err), (0, f"{LAYOUT_LINE}\n{support.VALID}\n", ""))
+        self.assertEqual(talks.sent, ["status", "list", "list", "list", "list", "status"])
+
+    def test_a_show_that_turns_invalid_while_the_board_reads_it_is_status_1(self):
+        invalid = '{"ok":true,"on":true,"brightness":128,"playing":null,"animation":null,"fps":50,"error":"file-malformed dvd.odrg truncated"}'
+        talks = support.Talking({"status": [support.VALID, invalid], "list": [support.BUSY, support.BUSY, '{"ok":false,"error":"show-invalid"}']})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show, "--no-check")
+        self.assertEqual((result.status, result.out, result.err), (1, f"{LAYOUT_LINE}\n{invalid}\n", ""))
+
+    def test_a_board_that_is_still_reading_when_the_time_is_over_is_check_not_done(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY]})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show, "--wait", "4")
+        self.assertEqual((result.status, result.out), (1, f"{LAYOUT_LINE}\n"))
+        self.assertRegex(result.err, r"\Aerror: check-not-done: the board was still reading its animations after 4 seconds; give it longer with --wait\n\Z")
 
     def test_a_copy_of_storage_from_before_and_the_new_image_are_kept_in_the_work_folder(self):
         esptool = self.esptool()

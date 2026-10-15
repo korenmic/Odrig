@@ -8,13 +8,18 @@ it stands now.
 - The workstreams are the ones listed in the [README](../README.md).
 - Hardware and power wiring are out of scope: operators handle them on site.
 - On-site control is over Wi-Fi, with an Android app for operators. The board hosts the Wi-Fi
-  network and phones join it. See [wifi.md](wifi.md) and the first notes on the app in
+  network and phones join it. See [wifi.md](wifi.md) and the app's page,
   [android-app.md](android-app.md).
 - Questions that come up while writing specs or implementing are answered without asking the
   owner, and each one is recorded with its answer and resolution in [drifts.md](drifts.md).
 - The operators' app is an Android APK built with Capacitor. A PC version built with Tauri,
   able to use serial as well as Wi-Fi, is intended later. Our own server on the board offers
   commands only and no web page.
+- The app is built in two parts. The first, command and control, exists: it shows what
+  plays, lists the animations, plays one, goes back to the playlist, switches the LEDs and
+  sets the brightness, with the commands every other client has. It sends each command on
+  the phone's Wi-Fi network, because the board's network has no internet. The second
+  part, converting and uploading on the phone, is planned.
 - The board's Wi-Fi network is named `odrig` and has a password known to the operators. The
   password may be kept in this repository.
 - The owner has accepted the Android SDK's licence terms, so the app's build may accept them
@@ -95,6 +100,12 @@ it stands now.
   with WLED's limiter dimming every LED, and side by side, on the chip's two processor
   cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
   on the board".
+- The firmware is updated over the USB cable with `firmware/fw.py`, and not over Wi-Fi: the
+  owner gave up updates over Wi-Fi on 2026-10-15, so that the board's second firmware slot
+  can hold animations. On the bigger layout of [firmware.md](firmware.md), "The regions of
+  the flash", the storage has 13,500,416 bytes in place of 10,354,688, and an update over
+  Wi-Fi is refused with its reason. `big-storage` moves a board to it and
+  `restore-stock --full` back; after either, the owner installs the show again.
 
 ## Conversion
 
@@ -103,12 +114,14 @@ it stands now.
 - There is one converter, made to run from the command line without compiling and inside
   the Capacitor and Tauri apps. It is written in JavaScript and is the folder `converter/`:
   a library that reads no file and runs as it is in Node.js and in a web page, and a
-  command line on top of it. See [converter.md](converter.md). The library has been run in
-  Chrome; it has not been run inside an app yet.
-- The Python converter is kept as the independent check: the suite of the JavaScript
-  converter runs both on the same inputs and compares. It also holds the generators of the
-  tracked animations and builds the test vectors. See
-  [reference-converter.md](reference-converter.md).
+  command line on top of it. See [converter.md](converter.md). The library runs inside the
+  operators' app's web code, in Chrome against the emulator; it has not been run inside
+  the APK on a phone yet.
+- The JavaScript converter is the only converter. The Python package, which converted
+  before it, is a library for the tests and the tools: what it answered to the converter's
+  tests is stored with them, and the converter's suite compares with that. It also holds the
+  generators of the tracked animations and builds the test vectors. See
+  [python-library.md](python-library.md).
 
 ## Animation formats
 
@@ -159,6 +172,9 @@ are in [format.md](format.md), "Measured sizes".
   predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
   canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
   changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.
+  On the bigger layout of [firmware.md](firmware.md), "The regions of the flash", the
+  storage has 13,500,416 bytes, which hold 97 seconds of the clip compressed, 92
+  uncompressed and 24 stored frame by frame.
 
 ## Commands
 
@@ -381,3 +397,51 @@ are in [format.md](format.md), "Measured sizes".
   installed together. The demo show for the target has no cycle. On the board the
   firmware built with this core passes the board suite, and the rates are inside what
   the owner accepts.
+- 2026-10-13: Seed 09 built the first part of the operators' app, command and control.
+  The web code in `app/www/` runs as it is in a browser and inside an Android app made
+  with Capacitor; one class of Java sends each command on the phone's Wi-Fi network.
+  `python3 app/app.py build` makes the debug APK, with a JDK, the Android SDK and Gradle
+  kept in the project folder; the owner said yes to those downloads. The emulator has the
+  option `--lan`, so that a phone reaches it. Two suites check the web code in Chrome and
+  the built APK. No program has run the app on a phone: that check is the owner's and is
+  open, and the seed stays open with it. The app has no cap on the brightness: the owner
+  ruled that none is needed.
+- 2026-10-14: The owner asked for the operators' app in the emulator's page, as a
+  refinement of seed 09. The page has a third view, `Controller`, with the LEDs and the
+  app beside them. The app there is the web code of `app/www/` as the APK holds it,
+  served by the emulator under `/app/` and aimed at that emulator. It runs only while
+  the view is shown.
+- 2026-10-14: Seed 19 added `python -m preview FILE`: the emulator with one finished
+  animation alone. It is a program of its own beside the emulator and the command tool:
+  the converter packs a show without items, and the file is uploaded into it as an
+  animation is uploaded to the board, so the core judges it. The preview converts
+  nothing and writes no show file.
+- 2026-10-15: The firmware's prerequisites are tracked in
+  [firmware-prerequisites.md](firmware-prerequisites.md): what the firmware must do, where
+  each line comes from, stock WLED, a seed or the owner, how far it has come, the seeds
+  not finished, and the seeds proposed and not approved yet.
+- 2026-10-15: No stick was read on the board, through a hub or a plain adapter, and the
+  chip's own USB port no longer took a computer. The owner approved three seeds: 21, the
+  chip's own port a computer's when one is plugged in as the board starts; 22, a stick
+  through a hub, on newer USB software; 23, a log of the USB port on the serial port.
+- 2026-10-15: A show of 113 animations, 10.1 MB, did not fit into the board's storage;
+  107 of them were installed, the six smallest zoomed versions left out. The owner gave
+  up firmware updates over Wi-Fi so that the second firmware slot can hold animations,
+  and approved seed 24 for it: the storage grows to about 13.5 MB.
+- 2026-10-15: Seed 17 gave the operators' app its second part: a storage screen with the
+  free storage, the sizes of the animations and their removal, and converting a video or
+  a GIF on the phone with the converter's library and uploading it. `status` reports the
+  canvas for it, as the owner approved on 2026-10-12. A GIF converted in the app is the
+  very file the command line makes; the check on a phone is the owner's and is open.
+- 2026-10-15: Seed 18 left one converter, the JavaScript tool. The Python package converts
+  nothing any more and is a library for the tests and the tools that holds the generators,
+  described in python-library.md. What it answered to the converter's tests when it still
+  converted is stored with them, 4.2 MB, so their suite starts no Python; the other suites
+  pack with the converter, and the setup installs no Python package.
+- 2026-10-15: Seed 24 gave the firmware tool the bigger layout: one firmware slot, a factory
+  slot, and 13,500,416 bytes of storage from 0x310000, which the tool names, moves a board
+  to with `big-storage` and back from with `restore-stock --full`, keeping the settings and
+  not the show. The firmware refuses an update over Wi-Fi on it with the reason and the way
+  that works, and the emulator reports the bigger storage by default. Built and tested
+  without the board; the move on the board, with the owner's show of 113 animations, is
+  open.

@@ -19,6 +19,10 @@ BOOT_SELECTION = Region("boot selection", 0xE000, 0x2000)
 APPLICATION = Region("first application", partitions.APPLICATION_ADDRESS, 0x300000)
 
 CHIP = "esp32s3"
+# The rate esptool is told. The board's socket marked COM reaches the chip through a
+# bridge to its UART, where the rate is what the transfer takes; the chip's own USB
+# socket has no rate and ignores it.
+BITS_PER_SECOND = 921600
 KEEP = ["--flash-mode", "keep", "--flash-freq", "keep", "--flash-size", "keep"]
 DETECT_SIZE = ["--flash-mode", "keep", "--flash-freq", "keep", "--flash-size", "detect"]
 NO_PROGRAM_CHECK = "--force"
@@ -51,7 +55,7 @@ class Flasher:
         self.run = run
 
     def _esptool(self, after, *arguments):
-        command = ["--chip", CHIP, "--port", str(self.port), "--after", after, *arguments]
+        command = ["--chip", CHIP, "--port", str(self.port), "--baud", str(BITS_PER_SECOND), "--after", after, *arguments]
         status, output = (self.run or run_esptool)(command)
         if status != 0:
             raise Failure("esptool-failed", f"esptool {arguments[0]} ended with status {status}: {output.strip()[-400:]}")

@@ -6,10 +6,10 @@ When a converter refuses an input it writes one line to standard error,
 error: <reason>: <detail>
 ```
 
-and exits with status 1. This holds for both converters, the JavaScript tool of
-[converter.md](converter.md) and the Python reference of
-[reference-converter.md](reference-converter.md): they write this line and use the names
-of this page. The reason is a fixed name made of lower-case letters, digits and hyphens;
+and exits with status 1. This holds for the converter of [converter.md](converter.md) and
+for the programs of the Python library of [python-library.md](python-library.md), its
+generators and its writer of the mapping page: they write this line and use the names of
+this page. The reason is a fixed name made of lower-case letters, digits and hyphens;
 every implementation that reads the same files uses the same names. The detail is free
 text for people and names the file concerned.
 

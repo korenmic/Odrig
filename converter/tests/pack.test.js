@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, jsonframes, odrg, pack, show} from "../lib/index.js";
-import {ROOT, filesUnder, hex, reference, runBoth, runJs, runJsHere, runPython, runPythonMany, temporary, utf8} from "./support.js";
+import {ROOT, filesUnder, hex, runJs, runJsAndStored, runJsHere, storedAnswer, storedRun, storedRuns, temporary, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -20,7 +20,7 @@ function equal(a, b) {
 // Has a generator of the Python tool write its animation for a mapping file under a name.
 function generate(generator, mapping, out, seconds = null) {
   const argv = [out, "--mapping", mapping, ...(seconds === null ? [] : ["--seconds", seconds])];
-  const done = runPython(argv, {module: `odrig.generators.${generator}`});
+  const done = storedRun(argv, {module: `odrig.generators.${generator}`});
   assert.equal(done.status, 0, done.err);
 }
 
@@ -65,7 +65,7 @@ test("pack builds the folder the Python tool builds", async (t) => {
         const theirs = path.join(folder, `theirs-${number}`);
         const argv = (out) => ["pack", "--show", given.show, "--mapping", given.mapping, "--sources", given.sources, "--out", out, ...flags];
         assert.deepEqual(runJs(argv(ours)), quiet);
-        assert.deepEqual(runPython(argv(theirs)), quiet);
+        assert.deepEqual(storedRun(argv(theirs)), quiet);
 
         const names = filesUnder(ours);
         assert.deepEqual(names, filesUnder(theirs));
@@ -81,7 +81,7 @@ test("pack builds the folder the Python tool builds", async (t) => {
           if (!compressed) {
             assert.ok(equal(mine, reference9), `${name} has the bytes of the Python tool`);
           } else {
-            const [a, b] = reference("decode", [], [hex(mine), hex(reference9)]);
+            const [a, b] = storedAnswer("decode", [], [hex(mine), hex(reference9)]);
             assert.ok(a.records.length > 0);
             assert.deepEqual(a, b, `${name} decodes to the frame records of the Python tool's file`);
             assert.ok(20 * mine.length <= 21 * reference9.length, `${name}: ${mine.length} bytes against ${reference9.length}`);
@@ -325,7 +325,7 @@ function bytesOf(file) {
   return utf8(typeof file === "string" ? file : JSON.stringify(file));
 }
 
-// What the library says of a show file, in the form reference.py gives for the Python
+// What the library says of a show file, in the form of the stored answers of the Python
 // reader.
 function readShow(bytes) {
   try {
@@ -340,7 +340,7 @@ function readShow(bytes) {
 }
 
 test("shows that break a rule get the rejection of the Python reader", async (t) => {
-  const theirs = reference("read_shows", [], BROKEN_SHOWS.map(([, file]) => hex(bytesOf(file))));
+  const theirs = storedAnswer("read_shows", [], BROKEN_SHOWS.map(([, file]) => hex(bytesOf(file))));
   const reasons = new Set();
   for (let i = 0; i < BROKEN_SHOWS.length; i += 1) {
     const [label, file] = BROKEN_SHOWS[i];
@@ -362,7 +362,7 @@ test("shows that break a rule get the rejection of the Python reader", async (t)
 });
 
 test("shows that are as the format says are read as the Python reader reads them", async (t) => {
-  const theirs = reference("read_shows", [], WHOLE_SHOWS.map(([, file]) => hex(bytesOf(file))));
+  const theirs = storedAnswer("read_shows", [], WHOLE_SHOWS.map(([, file]) => hex(bytesOf(file))));
   for (let i = 0; i < WHOLE_SHOWS.length; i += 1) {
     const [label, file] = WHOLE_SHOWS[i];
     await t.test(label, () => {
@@ -395,7 +395,7 @@ async function samePacks(cases, at) {
     const out = path.join(at.folder, `${side}-out-${i}`);
     return ["pack", "--show", given.show ?? at.show, "--mapping", given.mapping ?? at.mapping, "--sources", given.sources ?? at.sources, "--out", given.out ?? out, ...(given.flags ?? [])];
   });
-  const theirs = runPythonMany(commands("py"));
+  const theirs = storedRuns(commands("py"));
   const ours = [];
   for (const argv of commands("js")) {
     ours.push(await runJsHere(argv));
@@ -506,7 +506,7 @@ test("pack refuses what the Python tool refuses, with its error line", async (t)
     for (const [label, given] of [cases[0], cases[5], cases[10], cases[17]]) {
       const out = path.join(at.folder, "program-out");
       const argv = ["pack", "--show", given.show ?? at.show, "--mapping", given.mapping ?? at.mapping, "--sources", given.sources ?? at.sources, "--out", out];
-      const {js, python} = runBoth(argv);
+      const {js, python} = runJsAndStored(argv);
       assert.equal(js.status, 1, label);
       if (!/: bad-json: line \d+, column \d+: /.test(python.err)) {
         assert.deepEqual(js, python, label);
@@ -524,7 +524,7 @@ test("the output folder", async (t) => {
     const results = {};
     for (const side of ["js", "py"]) {
       const out = make(side);
-      results[side] = {out, result: side === "js" ? await runJsHere(argv(out, more)) : runPythonMany([argv(out, more)])[0]};
+      results[side] = {out, result: side === "js" ? await runJsHere(argv(out, more)) : storedRuns([argv(out, more)])[0]};
     }
     return results;
   };
@@ -564,28 +564,28 @@ test("the output folder", async (t) => {
 
   await t.test("a path that ends in a slash, and a path from the folder the tool is started in", () => {
     assert.deepEqual(runJs(argv(`${path.join(at.folder, "slash-js")}/`)), {status: 0, out: "", err: ""});
-    assert.deepEqual(runPython(argv(`${path.join(at.folder, "slash-py")}/`)), {status: 0, out: "", err: ""});
+    assert.deepEqual(storedRun(argv(`${path.join(at.folder, "slash-py")}/`)), {status: 0, out: "", err: ""});
     assert.deepEqual(filesUnder(path.join(at.folder, "slash-js")), packed);
     assert.deepEqual(filesUnder(path.join(at.folder, "slash-py")), packed);
     const inFolder = {cwd: at.folder};
     const relative = (out) => ["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "sources", "--out", out];
     assert.deepEqual(runJs(relative("rel-js/out"), inFolder), {status: 0, out: "", err: ""});
-    assert.deepEqual(runPython(relative("rel-py/out"), inFolder), {status: 0, out: "", err: ""});
+    assert.deepEqual(storedRun(relative("rel-py/out"), inFolder), {status: 0, out: "", err: ""});
     assert.deepEqual(filesUnder(path.join(at.folder, "rel-js", "out")), packed);
     assert.deepEqual(filesUnder(path.join(at.folder, "rel-py", "out")), packed);
     const missing = ["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "nowhere", "--out", "rel-out"];
-    const refused = runBoth(missing, inFolder);
+    const refused = runJsAndStored(missing, inFolder);
     assert.deepEqual(refused.js, refused.python);
     assert.equal(refused.js.err, `error: file-missing: nowhere${path.sep}a.json: No such file or directory\n`);
     for (const sources of ["sources/", "./sources", ""]) {
-      const dotted = runBoth(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", sources, "--out", "sources"], inFolder);
+      const dotted = runJsAndStored(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", sources, "--out", "sources"], inFolder);
       assert.deepEqual(dotted.js, dotted.python, sources);
       assert.equal(dotted.js.err, "error: output-not-empty: sources: the output folder is not empty\n");
     }
-    const joinedNames = runBoth(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "./nowhere/", "--out", "rel-out"], inFolder);
+    const joinedNames = runJsAndStored(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "./nowhere/", "--out", "rel-out"], inFolder);
     assert.deepEqual(joinedNames.js, joinedNames.python);
     assert.equal(joinedNames.js.err, "error: file-missing: ./nowhere/a.json: No such file or directory\n");
-    const empty = runBoth(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "", "--out", "rel-out"], inFolder);
+    const empty = runJsAndStored(["pack", "--show", "show.json", "--mapping", "legs.json", "--sources", "", "--out", "rel-out"], inFolder);
     assert.deepEqual(empty.js, empty.python);
     assert.equal(empty.js.err, "error: file-missing: a.json: No such file or directory\n");
     assert.equal(fs.existsSync(path.join(at.folder, "rel-out")), false);
@@ -737,7 +737,7 @@ test("pack on the command line", async (t) => {
     const argv = lines("js")[i];
     await t.test(`odrig ${argv.map((argument) => argument.replace(at.folder, "<folder>")).join(" ")}`, () => {
       const js = runJs(argv);
-      const python = runPython(lines("py")[i]);
+      const python = storedRun(lines("py")[i]);
       assert.equal(js.status, python.status, `${js.err} / ${python.err}`);
       if (python.status === 2) {
         assert.match(js.err, /^usage: node converter\/odrig\.js pack/);

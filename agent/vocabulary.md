@@ -80,10 +80,11 @@ the entry links to it.
   ODRG file and back, checks a file, and packs a show into an installed file set. Its
   library, `converter/lib/`, also runs in a web page. See
   [converter.md](../docs/converter.md).
-- **reference converter**: The Python package `odrig/`, started as `python -m odrig`. It
-  was the converter before and does the same work. It is kept so that tests can compare
-  the converter with it, and nobody converts with it any more. The generators are part of
-  it. See [reference-converter.md](../docs/reference-converter.md).
+- **Python library**: The Python package `odrig/`. It reads and writes the project's files,
+  JSON frames, ODRG files, mapping files and shows, for the tests and the tools, and holds
+  the generators. It converts nothing; it was the converter before, and what it answered to
+  the converter's tests is stored with them, so that they compare the converter with it.
+  See [python-library.md](../docs/python-library.md).
 - **core**: The C++ library in `core/` that plays an installed file set: it reads the
   files, keeps time, handles commands and gives the colour of every LED of every leg.
   Everything that must behave the same wherever a show plays is in the core. See
@@ -101,6 +102,9 @@ the entry links to it.
 - **command tool**: The tool `odrigctl`, started as `python -m odrigctl`. It sends one
   command to the emulator or to the board, through a serial port or over HTTP, and prints
   the answer. See [emulator.md](../docs/emulator.md#the-command-tool).
+- **operators' app**: The Android app in `app/` with which operators see and steer, from
+  a phone, what the installation plays. It sends the same commands over HTTP. See
+  [android-app.md](../docs/android-app.md).
 
 ## How the work is organised
 

@@ -76,7 +76,7 @@ class AgainstTheEmulator(unittest.TestCase):
                 self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
         result = support.run_tool(*self.target, "status")
         self.assertEqual((result.status, result.err), (0, ""))
-        self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None})
+        self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6})
         self.assertTrue(result.out.endswith("}\n"))
         self.assertEqual(result.out.count("\n"), 1)
 
@@ -234,7 +234,7 @@ class TheCommandLine(unittest.TestCase):
 
     def test_the_targets_are_a_serial_port_a_tcp_address_and_an_http_address(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log"})
 
     def test_the_line_is_the_same_whichever_way_it_travels(self):
         made = cli.parser()

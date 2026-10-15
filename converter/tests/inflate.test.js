@@ -4,9 +4,9 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, inflate} from "../lib/index.js";
-import {ROOT, hex, numbers, reference, unhex, utf8} from "./support.js";
+import {ROOT, asStored, hex, numbers, storedAnswer, unhex, utf8} from "./support.js";
 
-// What the library says of a stream, in the form of zlib's verdict from reference.py.
+// What the library says of a stream, in the form of zlib's stored verdicts.
 function verdict(stream) {
   try {
     const {data, used} = inflate.inflateRaw(stream);
@@ -19,11 +19,17 @@ function verdict(stream) {
   }
 }
 
+// A verdict of the library in the form of zlib's: its output as zlib's verdict has it,
+// whole or as a digest.
+function asTheirs(ours, theirs) {
+  return "data" in ours && "data" in theirs ? {...ours, data: asStored(ours.data, theirs.data)} : ours;
+}
+
 function sameVerdicts(streams, labels) {
-  const theirs = reference("inflate", [], streams.map(hex));
+  const theirs = storedAnswer("inflate", [], streams.map(hex));
   const counts = {whole: 0, "bad-deflate": 0, truncated: 0};
   streams.forEach((stream, i) => {
-    assert.deepEqual(verdict(stream), theirs[i], `${labels(i)}: ${hex(stream).slice(0, 200)}`);
+    assert.deepEqual(asTheirs(verdict(stream), theirs[i]), theirs[i], `${labels(i)}: ${hex(stream).slice(0, 200)}`);
     counts[theirs[i].reason ?? "whole"] += 1;
   });
   return counts;
@@ -69,7 +75,7 @@ function zlibStreams() {
       asked.push({name: `${name}, ${strategy}`, data, level: 6, strategy});
     }
   }
-  const streams = reference("deflate", [], asked.map(({data, level, strategy}) => ({data: hex(data), level, strategy})));
+  const streams = storedAnswer("deflate", [], asked.map(({data, level, strategy}) => ({data: hex(data), level, strategy})));
   return asked.map((entry, i) => ({...entry, stream: unhex(streams[i])}));
 }
 
@@ -147,9 +153,9 @@ test("the three vectors with a compressed body", async (t) => {
       assert.equal(file[5], 1, "the file is compressed");
       const stream = file.subarray(16);
       assert.equal((stream[0] >> 1) & 3, kind, "the kind of the first block");
-      const [theirs] = reference("inflate", [], [hex(stream)]);
+      const [theirs] = storedAnswer("inflate", [], [hex(stream)]);
       assert.equal(theirs.left, 0);
-      assert.deepEqual(verdict(stream), theirs);
+      assert.deepEqual(asTheirs(verdict(stream), theirs), theirs);
       const {data, used} = inflate.inflateRaw(stream);
       assert.ok(data instanceof Uint8Array);
       assert.equal(used, stream.length);
@@ -253,11 +259,11 @@ test("damaged and cut streams get the verdict of zlib", async (t) => {
 
 test("streams with one defect each, written by hand", async (t) => {
   const cases = broken();
-  const theirs = reference("inflate", [], cases.map(([, stream]) => hex(stream)));
+  const theirs = storedAnswer("inflate", [], cases.map(([, stream]) => hex(stream)));
   for (let i = 0; i < cases.length; i += 1) {
     const [label, stream] = cases[i];
     await t.test(label, () => {
-      assert.deepEqual(verdict(stream), theirs[i], hex(stream));
+      assert.deepEqual(asTheirs(verdict(stream), theirs[i]), theirs[i], hex(stream));
     });
   }
 

@@ -13,10 +13,11 @@ import tempfile
 import time
 
 from emulator import recfile
-from odrig import jsonframes, mapping as mapping_file, odrg, pack
+from odrig import jsonframes, mapping as mapping_file, odrg
 from odrig.generators import dense, dvd_bounce, hello_world
 from odrigctl import cli as command_tool
 from odrigctl import client, content
+from tests.core.support import pack_with_the_converter
 
 from fwtool import Failure, board, build, cli, flasher, limit, paths, storage, wifi
 
@@ -43,8 +44,8 @@ ANSWERS = {"firmware": "status", "probe": "probe", "stock": "wled"}
 # The kind of image the suite leaves on the board.
 LEFT_ON_THE_BOARD = "firmware"
 
-# How long the board is given to answer after a restart. The core checks every file at its
-# start, which takes most of a minute when storage is full of animations.
+# How long the board is given to answer after a restart and to read its animations to their
+# ends, which it does while it plays. Until it has, it answers `list` with `busy`.
 START_SECONDS = 90
 
 # Every command of docs/commands.md and every error code the command tool can cause on a
@@ -128,6 +129,7 @@ def flash(kind):
     if done.status != 0:
         raise AssertionError(f"flashing the {kind} image failed: {done.err}")
     _running = kind
+    wait_for_the_board()
     return done
 
 
@@ -261,8 +263,14 @@ def emulator(folder, *options):
 
 
 def reason_in_the_emulator(folder):
-    """The reason the emulator's `status` reports for a show folder, or None."""
+    """The reason the emulator's `status` reports for a show folder once its core has read
+    the animations to their ends, or None."""
     with emulator(folder) as link:
+        deadline = time.monotonic() + START_SECONDS
+        while command(link, "list")[1].get("error") == "busy":
+            if time.monotonic() > deadline:
+                raise AssertionError("the emulator did not come to the end of its animations")
+            time.sleep(0.1)
         return command(link, "status")[1]["error"]
 
 
@@ -275,7 +283,7 @@ def dim_show(show=EXAMPLE_SHOW, mapping=TWO_LEGS, sources=ANIMATIONS, brightness
         dimmed = pathlib.Path(folder, "show.json")
         dimmed.write_text(json.dumps(changed))
         out = pathlib.Path(folder, "show")
-        pack.pack(dimmed, mapping, sources, out, compressed=compressed)
+        pack_with_the_converter(dimmed, mapping, sources, out, compressed=compressed)
         yield out
 
 
@@ -314,7 +322,7 @@ def storage_image():
         return image.read_bytes()
     finally:
         on_the_port.restart()
-        wait_for_the_board()
+        wait_for_the_board(settled=False)
 
 
 def installed():
@@ -330,10 +338,14 @@ def read_back():
     return _installed
 
 
-def wait_for_the_board():
-    """Waits until the image the board runs answers again after a restart."""
+def wait_for_the_board(settled=True):
+    """Waits until the image the board runs answers again after a restart, and with
+    `settled` the firmware until it has read its animations, which `list`, `remove` and an
+    upload need."""
     kind = _running
-    if kind is not None:
+    if kind == "firmware" and settled:
+        board.settled(PORT, board.SETTLE_SECONDS)
+    elif kind is not None:
         board.EXPECTED[ANSWERS[kind]](PORT, START_SECONDS)
 
 

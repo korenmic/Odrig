@@ -1,12 +1,14 @@
 import hashlib
 import re
+import subprocess
 import unittest
 
 from . import support
 
 CONVERTER_LIBRARY = support.ROOT / "converter" / "lib"
 # The lines the app may send: the words of a command, with its number left open.
-LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>"}
+LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>", "space", "remove <n>",
+         "upload begin <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel"}
 
 
 def files():
@@ -23,16 +25,21 @@ class TheWebCode(unittest.TestCase):
         self.assertEqual({path.suffix for path in files()}, {".html", ".css", ".js"})
         for path in files():
             self.assertTrue(path.read_bytes().isascii(), path.name)
-        for name in ("package.json", "node_modules", "lib", "dist"):
+        for name in ("package.json", "node_modules", "lib", "dist", "converter"):
             self.assertFalse((support.WWW / name).exists(), name)
 
-    def test_a_script_imports_only_files_of_the_web_code(self):
+    def test_a_script_imports_only_files_of_the_web_code_and_the_converters_library(self):
         for name, text in scripts().items():
             for imported in re.findall(r"""(?:from|import)\s*\(?\s*["']([^"']+)["']""", text):
                 with self.subTest(script=name, imported=imported):
                     self.assertRegex(imported, r"\A\.\.?/")
                     found = (support.WWW / name).parent.joinpath(imported).resolve()
-                    self.assertTrue(found.is_file() and support.WWW in found.parents, imported)
+                    beside = found.relative_to(support.WWW.resolve()).parts if support.WWW.resolve() in found.parents else ()
+                    if beside[:1] == ("converter",):
+                        self.assertEqual(len(beside), 2, imported)
+                        self.assertTrue((CONVERTER_LIBRARY / beside[1]).is_file(), imported)
+                    else:
+                        self.assertTrue(found.is_file() and support.WWW in found.parents, imported)
 
     def test_only_the_file_of_the_target_knows_how_a_line_travels(self):
         for name, text in scripts().items():
@@ -76,11 +83,17 @@ class TheWebCode(unittest.TestCase):
     def test_nothing_of_the_converter_is_in_the_app(self):
         library = {hashlib.sha256(path.read_bytes()).hexdigest() for path in CONVERTER_LIBRARY.glob("*.js")}
         self.assertGreater(len(library), 5)
-        for path in sorted((support.ROOT / "app").rglob("*")):
-            if path.is_file() and "node_modules" not in path.parts:
+        # What git keeps of `app/`: the build's copies, which git ignores, are no part of it.
+        kept = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "app"], cwd=support.ROOT, capture_output=True, check=True).stdout
+        for name in sorted(filter(None, kept.decode("utf-8").split("\0"))):
+            path = support.ROOT / name
+            if path.is_file():
                 self.assertNotIn(hashlib.sha256(path.read_bytes()).hexdigest(), library, path)
+        # The library is imported by the conversion alone.
         for name, text in scripts().items():
-            self.assertNotRegex(text, r"\bconverter\b|odrg\.encode|importFrames", name)
+            if name != "convert.js":
+                self.assertNotRegex(text, r"\bconverter\b|odrg\.encode|importFrames", name)
+        self.assertRegex(scripts()["convert.js"], r'from "\./converter/index\.js";')
 
 
 if __name__ == "__main__":

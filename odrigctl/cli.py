@@ -2,7 +2,8 @@
 
 Exit status 0 means every reply has `"ok":true`, 1 that a reply has `"ok":false`, 2 that
 the command line was not understood or the file to upload cannot be read, and 3 that the
-target could not be reached or did not answer in time.
+target could not be reached or did not answer in time. With `--log` the tool prints the
+target's log until it is interrupted, which is exit status 0.
 """
 
 import argparse
@@ -51,7 +52,8 @@ def parser():
     made = argparse.ArgumentParser(
         prog="python -m odrigctl",
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
-                    "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it.",
+                    "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
+                    "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
         epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
@@ -59,14 +61,25 @@ def parser():
     target.add_argument("--tcp", metavar="ADDRESS", type=_lines_address, help="the address of a target that takes lines over TCP: host:port")
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
-    made.add_argument("command", metavar="COMMAND", choices=list(COMMANDS), help=", ".join(COMMANDS))
+    made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
+    made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
     made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the FILE of upload")
     return made
 
 
 def checked(made, arguments):
-    """The command and its arguments as they were typed. A command with another number of
-    arguments than it takes, or with a line end in one, ends the program as a usage error."""
+    """The command and its arguments as they were typed, or nothing with `--log`. A command
+    with another number of arguments than it takes, or with a line end in one, ends the
+    program as a usage error, and so do `--log` with a command or with `--http` and no
+    command without `--log`."""
+    if arguments.log:
+        if arguments.http is not None:
+            made.error("--log goes with --port or --tcp")
+        if arguments.command is not None:
+            made.error("--log takes no command")
+        return []
+    if arguments.command is None:
+        made.error("a command is needed, or --log")
     takes = COMMANDS[arguments.command]
     if len(arguments.arguments) != len(takes):
         made.error(f"{arguments.command} takes {COUNTS[len(takes)]}" + (": " + " ".join(takes) if takes else ""))
@@ -124,10 +137,22 @@ def _print(reply):
     print(reply.decode("utf-8", "replace"))
 
 
+def _print_log(line):
+    print(line.decode("utf-8", "replace"), flush=True)
+
+
 def main(argv=None):
     made = parser()
     arguments = made.parse_args(argv)
     words = checked(made, arguments)
+    if arguments.log:
+        try:
+            client.follow_log(_print_log, port=arguments.port, tcp=arguments.tcp, timeout=arguments.timeout)
+        except client.Unreachable as unreachable:
+            print(f"error: unreachable: {unreachable}", file=sys.stderr)
+            return 3
+        except KeyboardInterrupt:
+            return 0
     data = None
     if arguments.command == "upload":
         try:

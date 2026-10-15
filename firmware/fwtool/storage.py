@@ -20,18 +20,42 @@ SHOW_NAME = "show.json"
 MARK = b"littlefs"
 NO_SPACE = -28
 KEPT_IMAGES = 8
+# The block sizes a file system of the board can have, WLED's first.
+USUAL_BLOCK_SIZES = (4096, 512, 1024, 2048, 8192, 16384, 32768, 65536)
 PENDING = ".part"
 
 
 def geometry(image):
-    """The disk version, the block size and the number of blocks, from the superblock."""
-    at = image.find(MARK)
-    if at < 0 or at + 24 > len(image):
+    """The disk version, the block size and the number of blocks, from the superblock.
+
+    littlefs reads the figures from the newest commit of the superblock, given the block
+    size: the one a copy of the figures right after the superblock's mark names, else each
+    of the usual ones. A file system that has grown, or whose superblock has been written
+    again, keeps its figures elsewhere in its first block."""
+    if image.find(MARK) < 0:
         raise Failure("layout-mismatch", "storage holds no LittleFS file system")
-    version, block_size, block_count = struct.unpack_from("<III", image, at + 12)
-    if block_size == 0 or block_size * block_count != len(image):
-        raise Failure("layout-mismatch", f"the file system has {block_count} blocks of {block_size} bytes, and storage {len(image)} bytes")
-    return version, block_size, block_count
+    sizes = []
+    at = image.find(MARK)
+    while 0 <= at and at + 24 <= len(image):
+        _, block_size, _ = struct.unpack_from("<III", image, at + 12)
+        if block_size >= 128 and block_size & (block_size - 1) == 0 and block_size not in sizes:
+            sizes.append(block_size)
+        at = image.find(MARK, at + 1)
+    sizes += [size for size in USUAL_BLOCK_SIZES if size not in sizes]
+    for block_size in sizes:
+        if len(image) % block_size:
+            continue
+        system = LittleFS(block_size=block_size, block_count=0, mount=False)
+        system.context.buffer = bytearray(image)
+        try:
+            system.mount()
+        except LittleFSError:
+            continue
+        found = system.fs_stat()
+        if found.block_size * found.block_count != len(image):
+            raise Failure("layout-mismatch", f"the file system has {found.block_count} blocks of {found.block_size} bytes, and storage {len(image)} bytes")
+        return found.disk_version, found.block_size, found.block_count
+    raise Failure("layout-mismatch", "storage holds no LittleFS file system")
 
 
 def mount(image):
@@ -113,6 +137,42 @@ def with_show(image, files):
     difference = differing(other_files(made), other_files(image))
     if difference:
         raise Failure("verify-failed", f"a file outside {FOLDER} changed in the new image: {difference}")
+    return made
+
+
+def with_settings(image, size, room=None):
+    """A storage image of `size` bytes that holds the settings of `image`, every file of it
+    outside `/odrig`, and no show, in a file system of the disk version and the block size
+    of `image`. With `room`, everything the file system holds lies in its first `room`
+    bytes: it is made that large and then grown. The result is checked before it is
+    returned."""
+    version, block_size, _ = geometry(image)
+    settings = other_files(image)
+    blocks = size // block_size
+    system = LittleFS(block_size=block_size, block_count=(room or size) // block_size, disk_version=version, mount=False)
+    system.format()
+    system.mount()
+    try:
+        for path in sorted(settings):
+            folder = path.rsplit("/", 1)[0]
+            if folder:
+                system.makedirs(folder, exist_ok=True)
+            with system.open(path, "wb") as file:
+                file.write(settings[path])
+        if room is not None:
+            system.fs_grow(blocks)
+        system.unmount()
+    except LittleFSError as error:
+        raise Failure("verify-failed", f"the file system refused the settings: {error}") from None
+    made = bytes(system.context.buffer)
+    made += b"\xff" * (size - len(made))
+    if geometry(made) != (version, block_size, blocks):
+        raise Failure("verify-failed", "the new storage does not have the size it was made for")
+    difference = differing(other_files(made), settings)
+    if difference or show_of(made):
+        raise Failure("verify-failed", f"the new storage does not hold exactly the settings: {difference or FOLDER}")
+    if room is not None and made[room:] != b"\xff" * (size - room):
+        raise Failure("verify-failed", f"the new storage holds something beyond its first {room} bytes")
     return made
 
 

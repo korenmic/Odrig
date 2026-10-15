@@ -1,9 +1,10 @@
-"""The one way this tool refuses an input: a rejection with a named reason.
+"""The one way the library refuses an input: a rejection with a named reason.
 
 Every reason is a constant of this module. docs/reasons.md lists them with their conditions.
 """
 
 import contextlib
+import sys
 
 NOT_FOUND = "not-found"
 CANNOT_WRITE = "cannot-write"
@@ -72,3 +73,17 @@ def naming(path):
         yield
     except Rejection as rejection:
         raise Rejection(rejection.reason, f"{path}: {rejection.detail}") from None
+
+
+def status_of(action):
+    """Runs `action`, the work of a command line, and returns its exit status: 0, the code
+    it exits with, or 1 for a rejection, whose error line goes to standard error."""
+    try:
+        action()
+    except SystemExit as stop:
+        return stop.code
+    except Rejection as rejection:
+        detail = " ".join(rejection.detail.split())
+        print(f"error: {rejection.reason}: {detail}", file=sys.stderr)
+        return 1
+    return 0

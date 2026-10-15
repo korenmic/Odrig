@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {whole} from "../lib/index.js";
-import {numbers, reference} from "./support.js";
+import {numbers, storedAnswer} from "./support.js";
 
 const {fraction} = whole;
 const pair = (value) => [value.n, value.d];
@@ -166,7 +166,7 @@ test("fromDecimal reads a number from its digits", async (t) => {
       "3.14159", "59.9995", "59.9994", "86400", "0.001", "0.0009", "1e-3", "1e-4", "5e-4", "4e-4", "123456789.0005",
       "007", "1e+2", "0.1", "0.2", "0.3", "-.5", "-12.3456",
     ];
-    const theirs = reference("milliseconds", [], texts);
+    const theirs = storedAnswer("milliseconds", [], texts);
     texts.forEach((text, i) => {
       assert.equal(String(whole.rounded(whole.fromDecimal(text, 1000))), theirs[i], text);
     });
@@ -174,7 +174,7 @@ test("fromDecimal reads a number from its digits", async (t) => {
 });
 
 test("sixDigits writes a fraction as Python's format(x, '.6g')", async (t) => {
-  const ask = (pairs) => reference("sixdigits", [], pairs.map(([n, d]) => [String(n), String(d)]));
+  const ask = (pairs) => storedAnswer("sixdigits", [], pairs.map(([n, d]) => [String(n), String(d)]));
 
   await t.test("for values worked out by hand", () => {
     const cases = [

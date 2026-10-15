@@ -16,7 +16,7 @@ import pathlib
 import re
 import sys
 
-from . import cli, errors, files, mapping
+from . import errors, files, mapping
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -215,7 +215,7 @@ def main(argv=None):
         arguments = parser.parse_args(argv)
         write(arguments.page, arguments.mapping_dir, check=arguments.check)
 
-    return cli.status_of(action)
+    return errors.status_of(action)
 
 
 if __name__ == "__main__":

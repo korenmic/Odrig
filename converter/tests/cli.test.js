@@ -8,7 +8,7 @@ import * as files from "../cli/files.js";
 import {SUBCOMMANDS, errorLine, main} from "../cli/main.js";
 import {refusal} from "../cli/version.js";
 import {errors} from "../lib/index.js";
-import {ROOT, python, pythonFrom, runBoth, runJs, runPython, temporary} from "./support.js";
+import {ROOT, runJs, runJsAndStored, storedRun, temporary} from "./support.js";
 
 function streams() {
   const written = {out: "", err: ""};
@@ -344,7 +344,7 @@ test("the command line as a program", async (t) => {
 
   await t.test("it ends with the status of the Python tool", () => {
     for (const argv of [[], ["frobnicate"], ["--help"], ["-h"], ["--bogus"], ["frobnicate", "--help"]]) {
-      const {js, python} = runBoth(argv);
+      const {js, python} = runJsAndStored(argv);
       assert.equal(js.status, python.status, argv.join(" "));
       assert.equal(js.out === "", python.out === "", argv.join(" "));
       assert.equal(js.err === "", python.err === "", argv.join(" "));
@@ -410,7 +410,7 @@ test("reading and writing files", async (t) => {
   await t.test("read of a missing file has the words of the Python tool", () => {
     const folder = temporary(t);
     const missing = path.join(folder, "missing.json");
-    const python = runPython(["check", missing]);
+    const python = storedRun(["check", missing]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.read(missing)), python.err);
     assert.equal(python.err, `error: not-found: ${missing}: No such file or directory\n`);
@@ -419,7 +419,7 @@ test("reading and writing files", async (t) => {
 
   await t.test("read of a folder has the words of the Python tool", () => {
     const folder = temporary(t);
-    const python = runPython(["check", "--format", "json", folder]);
+    const python = storedRun(["check", "--format", "json", folder]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.read(folder)), python.err);
     assert.equal(python.err, `error: not-found: ${folder}: Is a directory\n`);
@@ -429,7 +429,7 @@ test("reading and writing files", async (t) => {
     const folder = temporary(t);
     fs.writeFileSync(path.join(folder, "file"), "x");
     const below = path.join(folder, "file", "a.json");
-    const python = runPython(["check", below]);
+    const python = storedRun(["check", below]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.read(below)), python.err);
     assert.equal(python.err, `error: not-found: ${below}: Not a directory\n`);
@@ -440,7 +440,7 @@ test("reading and writing files", async (t) => {
     const locked = path.join(folder, "locked.json");
     fs.writeFileSync(locked, "{}");
     fs.chmodSync(locked, 0o000);
-    const python = runPython(["check", locked]);
+    const python = storedRun(["check", locked]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.read(locked)), python.err);
     assert.equal(python.err, `error: not-found: ${locked}: Permission denied\n`);
@@ -459,7 +459,7 @@ test("reading and writing files", async (t) => {
   await t.test("write into a folder that does not exist has the words of the Python tool", () => {
     const folder = temporary(t);
     const out = path.join(folder, "none", "out.json");
-    const python = runPython(["decode", vector, out]);
+    const python = storedRun(["decode", vector, out]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.write(out, Uint8Array.of(1))), python.err);
     assert.equal(python.err, `error: cannot-write: ${out}: No such file or directory\n`);
@@ -470,7 +470,7 @@ test("reading and writing files", async (t) => {
     const folder = temporary(t);
     const out = path.join(folder, "taken");
     fs.mkdirSync(out);
-    const python = runPython(["decode", vector, out]);
+    const python = storedRun(["decode", vector, out]);
     assert.equal(python.status, 1);
     assert.deepEqual(fs.readdirSync(folder), ["taken"]);
     assert.equal(rejected(() => files.write(out, Uint8Array.of(1))), python.err);
@@ -487,7 +487,7 @@ test("reading and writing files", async (t) => {
     fs.writeFileSync(out, "before");
     fs.chmodSync(inner, 0o555);
     try {
-      const python = runPython(["decode", vector, out]);
+      const python = storedRun(["decode", vector, out]);
       assert.equal(python.status, 1);
       assert.equal(rejected(() => files.write(out, Uint8Array.of(1))), python.err);
       assert.equal(python.err, `error: cannot-write: ${out}: Permission denied\n`);
@@ -512,42 +512,11 @@ test("reading and writing files", async (t) => {
   });
 });
 
-test("the Python tool the suite compares with", async (t) => {
-  const venv = path.join(ROOT, ".venv", "bin", "python");
-
-  await t.test("it is .venv of the repository when that is there", () => {
-    assert.equal(pythonFrom(venv, undefined, () => true), venv);
-    assert.equal(pythonFrom(venv, "/elsewhere/python", () => true), venv);
-  });
-
-  await t.test("else it is the program ODRIG_PYTHON names", () => {
-    assert.equal(pythonFrom(venv, "/elsewhere/python", (file) => file === "/elsewhere/python"), "/elsewhere/python");
-  });
-
-  await t.test("with neither, the error says how to set it up", () => {
-    for (const named of [undefined, "", "/elsewhere/python"]) {
-      assert.throws(() => pythonFrom(venv, named, () => false), (error) => {
-        assert.ok(error.message.includes(venv));
-        assert.ok(error.message.includes("python3 -m venv .venv"));
-        assert.ok(error.message.includes("pip install -r requirements.txt"));
-        assert.ok(error.message.includes("ODRIG_PYTHON"));
-        assert.equal(error.message.includes("/elsewhere/python"), named === "/elsewhere/python");
-        return true;
-      });
-    }
-  });
-
-  await t.test("on this computer there is one, and it runs the reference", () => {
-    assert.ok(fs.existsSync(python()));
-    assert.equal(runPython(["--help"]).status, 0);
-  });
-});
-
 // Compares the two tools on one command line: the same status and standard output; the
 // same error line for a rejection; a usage message from both when it is not understood,
 // and a usage text from both for --help.
 function sameRun(argv, options = {}) {
-  const {js, python} = runBoth(argv, options);
+  const {js, python} = runJsAndStored(argv, options);
   const label = argv.join(" ");
   assert.equal(js.status, python.status, `${label}: ${js.err} / ${python.err}`);
   if (python.out.startsWith("usage: ")) {

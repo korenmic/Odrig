@@ -17,7 +17,7 @@ PRIVATE = {
 }
 
 # Words for what is planned and not yet in the repository.
-PLANNED = re.compile(r"Android|Capacitor|Tauri|\bseeds? 0?9\b")
+PLANNED = re.compile(r"Tauri|\bseeds? 17\b")
 WHERE_THE_PLANNED_IS_NAMED = (support.ENTRY, "What is coming")
 
 # A command that converts, checks or packs with the reference converter, which no page gives.
@@ -175,13 +175,11 @@ class TheChecks(unittest.TestCase):
             "node --version",
             "npm ci --prefix converter",
             "npm test --prefix converter",
-            ".venv/bin/python -m odrig pack --show shows/demo-20/show.json --mapping mapping/legs-20.json --sources build/s --out build/o",
             ".venv/bin/python -m emulator build/demo-20/show --record build/x.odrr --seconds 2",
             ".venv/bin/python -m odrigctl --port build/emulator/serial play 2",
             ".venv/bin/python -m odrig.generators.hello_world build/hello.json --mapping mapping/legs-20.json",
             "python3 -m unittest discover -s tests/onboarding -t .",
             "python3 -m venv .venv",
-            ".venv/bin/python -m pip install -r requirements.txt",
             "python3 firmware/fw.py test",
             "make -C core test",
             "make -C core shared",
@@ -191,7 +189,6 @@ class TheChecks(unittest.TestCase):
             "git merge --ff-only origin/master",
             "git push origin master",
             "printf '1000 status\\n' > build/ask.txt",
-            "python -m odrig",
         ):
             self.assertIsNone(support.refusal(command), command)
         for command, said in (
@@ -202,9 +199,10 @@ class TheChecks(unittest.TestCase):
             ("node build/x.js", "node starts the converter"),
             ("npm install", "npm is run as npm ci --prefix converter"),
             ("npm test", "npm is run as npm ci --prefix converter"),
-            (".venv/bin/python -m odrig check build/x.json --nope", "unrecognized arguments: --nope"),
-            (".venv/bin/python -m odrig pack --show shows/demo-20/show.json", "arguments are required"),
-            (".venv/bin/python -m odrig bake", "invalid choice"),
+            (".venv/bin/python -m odrig check build/x.json", "the converter is node converter/odrig.js"),
+            (".venv/bin/python -m odrig pack --show shows/demo-20/show.json", "the converter is node converter/odrig.js"),
+            ("python -m odrig", "the converter is node converter/odrig.js"),
+            (".venv/bin/python -m pip install -r requirements.txt", "nothing is installed into the Python environment"),
             (".venv/bin/python -m emulator build/show --seconds 2", "belong to record mode"),
             (".venv/bin/python -m odrigctl --port build/emulator/serial play", "takes one argument"),
             (".venv/bin/python -m odrig.generators.nothing build/x.json", "no module"),

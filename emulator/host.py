@@ -3,27 +3,96 @@
 import collections
 import os
 import sys
+import time
 
 LOG_LINES = 100
 
 # The storage of the board, which the emulator reports in place of the Mac's disk: the
 # size of the board's storage and the size of a block of its file system.
-STORAGE_BYTES = 10354688
+STORAGE_BYTES = 13500416
 STORAGE_BLOCK = 4096
 MOST_STORAGE = 4294967295
 
 LONGEST_NAME = 32
 NAME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_.")
 
+# The most files of a drive, how often the folder of a drive is looked for, and the
+# beginning of the name the core gives a file of the drive.
+DRIVE_MOST = 256
+DRIVE_LOOK_SECONDS = 1.0
+DRIVE_PREFIX = "drive/"
+
+
+def drive_list(folder):
+    """The names of the animation files of a drive's folder `odrig`: those that end in
+    `.odrg`, in any case, and do not begin with a dot, in the order of their bytes, the
+    first 256. Empty when the folder cannot be listed."""
+    try:
+        with os.scandir(folder) as entries:
+            names = [entry.name for entry in entries if entry.is_file()]
+    except OSError:
+        return []
+    kept = [name for name in names if name.lower().endswith(".odrg") and not name.startswith(".")]
+    return sorted(kept, key=os.fsencode)[:DRIVE_MOST]
+
+
+class Drive:
+    """A folder of the computer that stands for the top of a USB drive. Its folder `odrig`
+    appearing is a drive plugged in, with a number one higher than the last, and its going
+    is the drive pulled out. The folder is looked for at most once in DRIVE_LOOK_SECONDS
+    of the clock. Its list is made when it appears, and not again while it stays, as the
+    files of a drive do not change while it is plugged in."""
+
+    def __init__(self, top, clock=time.monotonic):
+        self.top = os.fspath(top)
+        self.folder = os.path.join(self.top, "odrig")
+        self.clock = clock
+        self.number = 0
+        self.names = []
+        self._plugged = 0
+        self._looked = None
+
+    def look(self):
+        """The number of the drive that is plugged in now, 0 for none."""
+        now = self.clock()
+        if self._looked is not None and now - self._looked < DRIVE_LOOK_SECONDS:
+            return self.number
+        self._looked = now
+        there = os.path.isdir(self.folder)
+        if there and self.number == 0:
+            self.names = drive_list(self.folder)
+            self._plugged += 1
+            self.number = self._plugged
+        elif not there and self.number != 0:
+            self.number = 0
+            self.names = []
+        return self.number
+
+    def name(self, drive, place):
+        """The name of the file at a place of that drive's list, or `None`."""
+        if drive == 0 or drive != self.number or place >= len(self.names):
+            return None
+        return self.names[place]
+
+    def path(self, name):
+        """The file a name `drive/<place>` stands for, or `None` when the drive that is
+        plugged in has none at that place."""
+        place = name[len(DRIVE_PREFIX):]
+        if not place.isascii() or not place.isdigit() or self.number == 0 or int(place) >= len(self.names):
+            return None
+        return os.path.join(self.folder, self.names[int(place)])
+
 
 class FolderHost:
     """What the core needs from its host besides memory: one open file, a place for its
-    diagnostic lines, and the storage functions on the folder."""
+    diagnostic lines, the storage functions on the folder, and a `Drive` or `None`."""
 
-    def __init__(self, folder, verbose=False, storage=STORAGE_BYTES):
+    def __init__(self, folder, verbose=False, storage=STORAGE_BYTES, drive=None):
         self.folder = os.fspath(folder)
         self.verbose = verbose
         self.storage = storage
+        self.drive = drive
+        self._drive_number = 0
         self.logged = collections.deque(maxlen=LOG_LINES)
         self._file = None
         self._written = None
@@ -34,6 +103,17 @@ class FolderHost:
     def open(self, name):
         """1 when the file is open, 0 when the folder has no file of that name, -1 otherwise."""
         self.close()
+        if self._of_the_drive(name):
+            path = self.drive.path(name)
+            if path is None:
+                return 0
+            try:
+                self._file = open(path, "rb")
+            except FileNotFoundError:
+                return 0
+            except OSError:
+                return -1
+            return 1
         if not name or "/" in name or "\\" in name or os.sep in name or (os.altsep and os.altsep in name):
             return -1
         try:
@@ -67,6 +147,23 @@ class FolderHost:
         self.close()
         self._drop_second()
         self._give_up()
+
+    def _of_the_drive(self, name):
+        return self.drive is not None and name.startswith(DRIVE_PREFIX)
+
+    def drive_number(self):
+        """The number of the drive that is plugged in now, 0 for none. A file of the drive
+        before it that `read_at` holds is closed: its name may stand for another file now."""
+        number = self.drive.look()
+        if number != self._drive_number:
+            self._drive_number = number
+            if self._second_name is not None and self._second_name.startswith(DRIVE_PREFIX):
+                self._drop_second()
+        return number
+
+    def drive_name(self, drive, place):
+        """The name of the file at a place of that drive's list, or `None`."""
+        return self.drive.name(drive, place)
 
     def log(self, text):
         self.logged.append(text)
@@ -194,7 +291,7 @@ class FolderHost:
     def read_at(self, name, offset, capacity):
         """Up to `capacity` bytes of a file from an offset, apart from the open file: none at
         or after its end, `None` on a failure and when there is no such file."""
-        path = self._path(name)
+        path = self.drive.path(name) if self._of_the_drive(name) else self._path(name)
         if path is None:
             return None
         try:

@@ -29,6 +29,15 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The canvas of the installed mapping, which the core has while it has legs.
+    if (core.leg_count != 0) {
+        reply.text(",\"width\":");
+        reply.number(core.width);
+        reply.text(",\"height\":");
+        reply.number(core.height);
+    } else {
+        reply.text(",\"width\":null,\"height\":null");
+    }
     reply.text("}\n");
     return reply.length;
 }
@@ -134,6 +143,10 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
+        if (!check_complete(core)) {
+            // The check after the start has the decoders the check of an upload needs.
+            return refuse(reply, "busy");
+        }
         return upload_begin(core, now, id, name, bytes, reply);
     }
     if (words.count >= 2 && words.is(1, "data")) {
@@ -220,18 +233,21 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        uint32_t item = player_first_animation(core);
-        if (!all) {
-            item = 0;
-            while (item < core.item_count && core.items[item].id != id) {
-                ++item;
+        // An item of the show, else an animation of the drive.
+        uint32_t item = all ? player_first_in_playlist(core) : kNothing;
+        for (uint32_t position = 0; !all && item == kNothing && position < core.item_count; ++position) {
+            if (core.items[position].id == id) {
+                item = position;
             }
         }
-        if (item == core.item_count) {
+        if (!all && item == kNothing && core.drive != nullptr && drive_has_id(core, id)) {
+            item = kDriveBase + drive_place_of(core, id);
+        }
+        if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }
         // An animation is played as its turn of the playlist, which goes on after it.
-        if (core.items[item].is_cycle) {
+        if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
         } else {
             player_play_all(core, item);
@@ -252,6 +268,10 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
+        if (!check_complete(core)) {
+            // The size of a file is known when the check after the start has read it.
+            return refuse(reply, "busy");
+        }
         return content_list(core, from, reply);
     }
     if (words.is(0, "remove")) {
@@ -261,6 +281,10 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
+        }
+        if (!check_complete(core)) {
+            // The check after the start reads the files the removal would take away.
+            return refuse(reply, "busy");
         }
         return content_remove(core, id, reply);
     }

@@ -398,15 +398,15 @@ class EveryCode(Uploads):
     def test_a_file_that_would_not_fit_is_no_space(self):
         files = small_show(ITEMS)
         used = 5 * BLOCK
-        cases = ((BOARD, 1, True), (BOARD, 10000000, True), (BOARD, 10278000, False), (used + 16384 + 1000 + 3, 1000, True), (used + 16384 + 1000 + 2, 1000, False),
+        cases = ((BOARD, 1, True), (BOARD, 13000000, True), (BOARD, 13412000, False), (used + 16384 + 1000 + 3, 1000, True), (used + 16384 + 1000 + 2, 1000, False),
                  (used + 16384 + 257 + 1, 257, True), (used + 16384 + 256 + 1, 256, True), (used + 16384 + 256, 256, False), (used, 1, False), (0, 1, False), (4294967295, 4294967295, False))
         for total, size, fits in cases:
             with self.subTest(total=total, size=size):
                 given = self.play(files, Script().line("space", f"upload begin 9 new.odrg {size}"), ["--storage", str(total)], total)
                 self.assertEqual(json.loads(given[0])["free"], max(0, total - used))
                 self.assertEqual(given[1], CHUNK if fits else refused("no-space"))
-        self.assertGreater(10278000 + 10278000 // 256 + 16384, BOARD - used)
-        self.assertLessEqual(10000000 + 10000000 // 256 + 16384, BOARD - used)
+        self.assertGreater(13412000 + 13412000 // 256 + 16384, BOARD - used)
+        self.assertLessEqual(13000000 + 13000000 // 256 + 16384, BOARD - used)
 
     def test_a_show_that_has_no_room_for_another_item_is_no_space_and_a_removal_makes_room(self):
         clip = support.clip(44, 60, 6, (20,))

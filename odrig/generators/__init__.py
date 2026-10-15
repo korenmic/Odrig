@@ -5,7 +5,7 @@ Each generator is started as `python -m odrig.generators.<name> OUT --mapping MA
 
 import argparse
 
-from .. import cli, errors, jsonframes, mapping
+from .. import errors, jsonframes, mapping
 
 
 def run(name, summary, frames, argv=None, configure=None):
@@ -23,7 +23,7 @@ def run(name, summary, frames, argv=None, configure=None):
             made = frames(canvas.width, canvas.height, arguments)
         jsonframes.write(arguments.output, jsonframes.Animation(canvas.width, canvas.height, tuple(made)))
 
-    return cli.status_of(action)
+    return errors.status_of(action)
 
 
 def picture(width, height, pixels):

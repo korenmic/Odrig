@@ -141,6 +141,10 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (!is_new && core.items[position].is_cycle) {
         return refuse(reply, "in-use");
     }
+    if (is_new && core.drive != nullptr && drive_has_id(core, id)) {
+        // The id is an animation of the drive's.
+        return refuse(reply, "in-use");
+    }
     // The file name is the item's own, or one that no item has.
     for (uint32_t other = 0; other < core.item_count; ++other) {
         const ItemInfo &item = core.items[other];
@@ -161,6 +165,8 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (!told || !storage_changes(core) || core.checker == nullptr || host.write_open(host.ctx, kUploadPart) != 1) {
         return refuse(reply, "storage-error");
     }
+    // The upload's check takes the second decoders from the check of a drive's file.
+    drive_check_yields(core);
     upload.state = kUploadReceiving;
     upload.id = static_cast<uint16_t>(id);
     uint32_t length = 0;

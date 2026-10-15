@@ -13,6 +13,7 @@
   <div class="facts">
     <span class="name">odrig emulator</span>
     <span class="fact"><span class="key">show</span> <code id="show">-</code></span>
+    <span class="fact" hidden><span class="key">drive</span> <code id="drive">-</code></span>
     <span class="fact"><span class="key">serial</span> <code id="serial">-</code></span>
     <span class="fact" hidden><span class="key">tcp</span> <code id="tcp">-</code></span>
     <span class="link" id="link" data-state="waiting">connecting</span>
@@ -30,12 +31,16 @@
 <nav class="tabs">
   <button type="button" class="tab" id="tab-leds" aria-pressed="true">LEDs</button>
   <button type="button" class="tab" id="tab-mapping" aria-pressed="false">Mapping</button>
+  <button type="button" class="tab" id="tab-controller" aria-pressed="false">Controller</button>
   <span class="readout" id="readout"></span>
 </nav>
-<main class="stage" id="stage">
-  <div class="drawing" id="drawing"></div>
-  <p class="note" id="note" hidden></p>
-</main>
+<div class="work">
+  <main class="stage" id="stage">
+    <div class="drawing" id="drawing"></div>
+    <p class="note" id="note" hidden></p>
+  </main>
+  <aside class="controller" id="controller" hidden></aside>
+</div>
 <section class="log" id="log">
   <table>
     <thead><tr><th class="time">time</th><th class="via">via</th><th class="line">command</th><th class="reply">reply</th></tr></thead>

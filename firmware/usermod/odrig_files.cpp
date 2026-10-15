@@ -302,6 +302,8 @@ odrig_host OdrigFiles::host() {
   made.remove = removeFile;
   made.space = tellSpace;
   made.read_at = readAt;
+  made.drive = nullptr;
+  made.drive_name = nullptr;
   return made;
 }
 

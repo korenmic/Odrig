@@ -46,6 +46,9 @@ def parser():
     flash.add_argument("--standalone", action="store_true", help="without --image, write the standalone firmware")
     flash.add_argument("--expect", choices=sorted(board.EXPECTED), default="status", help="what must answer afterwards: the firmware's status, WLED's handshake, or the probe build")
     flash.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's answer after its restart (default: 20)")
+    bigger = commands.add_parser("big-storage", help="move a board of WLED's layout to the bigger layout, keeping its settings and no show")
+    bigger.add_argument("--port", metavar="P", help="the board's USB serial port")
+    bigger.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
     restore = commands.add_parser("restore-stock", help="write the stock WLED image to the board")
     restore.add_argument("--port", metavar="P", help="the board's USB serial port")
     restore.add_argument("--full", action="store_true", help="also write the stock bootloader and partition table")
@@ -54,7 +57,7 @@ def parser():
     install.add_argument("dir", metavar="DIR", type=pathlib.Path, help="the folder of an installed file set")
     install.add_argument("--port", metavar="P", help="the board's USB serial port")
     install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
-    install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
+    install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after the restart for the board's reply and for it to read its animations (default: 300)")
     network = commands.add_parser("set-wifi", help="put the network's name and password from the settings file into the board's storage")
     network.add_argument("--port", metavar="P", help="the board's USB serial port")
     network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
@@ -69,7 +72,7 @@ def parser():
     scratch.add_argument("--port", metavar="P", help="the board's USB serial port")
     scratch.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
     scratch.add_argument("--limit", metavar="FILE", type=pathlib.Path, help="a limit file other than firmware/limit.json")
-    scratch.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after each restart (default: 20)")
+    scratch.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after each restart for the board's reply, and after the last for it to read its animations (default: 300)")
     read = commands.add_parser("read-show", help="copy the installed show from the board into a folder")
     read.add_argument("out", metavar="OUT", type=pathlib.Path, help="a folder that is new or empty")
     read.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -99,19 +102,26 @@ def _build(arguments):
     return 0
 
 
-def write_application(port, image, extra=(), table=None, expect="status", wait=board.WAIT_SECONDS):
+def write_application(port, image, extra=(), table=None, expect="status", wait=board.WAIT_SECONDS, regions=()):
     """Puts an application image on the board and waits for what must answer.
 
     Only the first application partition is written and the boot selection data cleared,
-    so that the board starts that partition; `extra` adds the files of a full restore.
-    Without a table to go by, the board's own partition table is read and checked first.
+    so that the board starts that partition; `extra` adds the files of a full restore, and
+    `regions` the regions beyond the bootloader and the table that they may lie in.
+    Without a table to go by, the board's own partition table is read and checked first,
+    and its layout is printed.
     """
     on_port = flasher.Flasher(port)
     size = build.check_size(image)
-    partitions.check(on_port.read_table() if table is None else table, size)
+    if table is None:
+        table = on_port.read_table()
+        partitions.check(table, size)
+        print(partitions.layout_line(table))
+    else:
+        partitions.check(table, size)
     on_port.erase(flasher.BOOT_SELECTION)
-    regions = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE] if extra else [])
-    on_port.write([*extra, (flasher.APPLICATION.address, image)], regions, restart=True)
+    allowed = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE, *regions] if extra else [])
+    on_port.write([*extra, (flasher.APPLICATION.address, image)], allowed, restart=True)
     return board.EXPECTED[expect](port, wait)
 
 
@@ -124,23 +134,106 @@ def _flash(arguments):
     return 0
 
 
+def wleds_storage(port, table):
+    """On a board of the bigger layout, a storage for the layout of `table`, WLED's, that
+    holds the board's settings and no show: the file and its region. The board's storage is
+    kept in the work folder first, and the layout and that file are printed. None on any
+    other board, also one whose table cannot be read."""
+    from . import storage
+    on_port = flasher.Flasher(port)
+    try:
+        found = partitions.parse(on_port.read_table())
+    except Failure as failure:
+        if failure.reason != "layout-mismatch":
+            raise
+        return None
+    if partitions.layout_of(found) != partitions.BIGGER_NAME:
+        return None
+    region = flasher.storage_region(partitions.storage(found))
+    print(f"layout: {partitions.BIGGER_NAME}, storage {region.size} bytes")
+    before = storage.from_board(on_port, region)
+    print(f"kept: {before}")
+    target = flasher.storage_region(partitions.storage(partitions.parse(table)))
+    return storage.pending(storage.with_settings(before.read_bytes(), target.size)), target
+
+
 def _restore_stock(arguments):
+    from . import storage
     files = stock.checked(arguments.stock_dir, arguments.full)
     port = board.find(arguments.port)
-    extra, table = (), None
+    extra, table, regions, made = (), None, (), None
     if arguments.full:
         extra = ((flasher.BOOTLOADER.address, files.bootloader), (flasher.TABLE.address, files.table))
         table = files.table.read_bytes()
-    print(write_application(port, files.application, extra, table, expect="wled"))
+        made = wleds_storage(port, table)
+        if made is not None:
+            extra += ((made[1].address, made[0]),)
+            regions = (made[1],)
+    try:
+        print(write_application(port, files.application, extra, table, expect="wled", regions=regions))
+    except Failure:
+        if made is not None:
+            storage.discard(made[0])
+        raise
+    if made is not None:
+        storage.keep(made[0], made[1].size)
     return 0
 
 
-def storage_of(port):
+def _big_storage(arguments):
+    """Moves a board of WLED's layout to the bigger one. The storage of the bigger layout,
+    which holds the board's settings, is made so that all it holds lies in the room of
+    WLED's second firmware slot, and is written there first; only then is the new table
+    written. Until that write the board has WLED's layout whole."""
+    import tempfile
+    from . import storage
+    port = board.find(arguments.port)
+    on_port = flasher.Flasher(port)
+    table = on_port.read_table()
+    partitions.check(table, 0)
+    print(partitions.layout_line(table))
+    found = partitions.parse(table)
+    if found == list(partitions.BIGGER):
+        on_port.restart()
+        print("nothing to do: the board has the bigger layout")
+        return 0
+    if found != list(partitions.WLED):
+        on_port.restart()
+        raise Failure("layout-mismatch", "the board's partition table is not WLED's own, entry for entry; only that one is moved")
+    old = flasher.storage_region(partitions.storage(found))
+    new = flasher.storage_region(partitions.storage(partitions.BIGGER))
+    before = storage.from_board(on_port, old)
+    print(f"kept: {before}")
+    room = old.address - new.address
+    made = storage.with_settings(before.read_bytes(), new.size, room=room)
+    with tempfile.TemporaryDirectory() as folder:
+        head = pathlib.Path(folder, "storage-head.bin")
+        head.write_bytes(made[:room])
+        bigger = pathlib.Path(folder, "table.bin")
+        bigger.write_bytes(partitions.table(partitions.BIGGER))
+        try:
+            on_port.write([(new.address, head)], [new], restart=False, data=True)
+            on_port.verify(new.address, head, [new], restart=False)
+            on_port.erase(flasher.BOOT_SELECTION)
+            on_port.write([(flasher.TABLE.address, bigger)], [flasher.TABLE], restart=False)
+            on_port.verify(flasher.TABLE.address, bigger, [flasher.TABLE], restart=True)
+        except Failure:
+            on_port.restart()
+            raise
+    print(board.EXPECTED["status"](port, arguments.wait))
+    return 0
+
+
+def storage_of(port, say=True):
     """esptool on the port, the board's storage region, and a file that holds the storage as
-    it is now. The chip is left in its bootloader."""
+    it is now. The chip is left in its bootloader. With `say` the layout the board's table
+    has is printed."""
     from . import storage
     on_port = flasher.Flasher(port)
-    _, partition = partitions.check(on_port.read_table(), 0)
+    table = on_port.read_table()
+    _, partition = partitions.check(table, 0)
+    if say:
+        print(partitions.layout_line(table))
     region = flasher.storage_region(partition)
     return on_port, region, storage.from_board(on_port, region)
 
@@ -185,15 +278,17 @@ def _install_show(arguments):
     port = board.find(arguments.port)
     on_port, region, before_path = storage_of(port)
     write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
-    reply = board.EXPECTED["status"](port, arguments.wait)
+    reply = board.settled(port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
 
 
-def store_settings(port, wait, network=None, milliamps=None):
+def store_settings(port, wait, network=None, milliamps=None, settled=False, say=True):
     """Puts settings into WLED's stored settings on the board in one write: the name and
     the password of the network, the limit on LED current, or both. Restarts the board
-    and prints what was set and the board's reply to `status`."""
+    and prints what was set and the board's reply to `status`. With `settled` that reply
+    is the one the board gives once it has read every installed animation to its end.
+    With `say` the layout of the board's table is printed first."""
     from . import limit, wifi
 
     def make(image):
@@ -203,9 +298,9 @@ def store_settings(port, wait, network=None, milliamps=None):
             image = limit.apply(image, milliamps)
         return image
 
-    on_port, region, before_path = storage_of(port)
+    on_port, region, before_path = storage_of(port, say)
     write_storage(on_port, region, before_path.read_bytes(), make)
-    reply = board.EXPECTED["status"](port, wait)
+    reply = board.settled(port, wait) if settled else board.EXPECTED["status"](port, wait)
     if network is not None:
         print(f"name: {network.name}")
         print("password: set")
@@ -251,7 +346,7 @@ def _install_firmware(arguments):
     build.check_size(image)
     port = board.find(arguments.port)
     write_application(port, image, expect="status", wait=arguments.wait)
-    return store_settings(port, arguments.wait, network=network, milliamps=milliamps)
+    return store_settings(port, arguments.wait, network=network, milliamps=milliamps, settled=True, say=False)
 
 
 def _read_show(arguments):
@@ -292,7 +387,7 @@ def _test_air(arguments):
 
 
 ACTIONS = {
-    "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
+    "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock, "big-storage": _big_storage,
     "install-show": _install_show, "set-wifi": _set_wifi, "set-limit": _set_limit, "read-limit": _read_limit,
     "install-firmware": _install_firmware, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,

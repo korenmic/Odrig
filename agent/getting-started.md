@@ -19,7 +19,7 @@ computer read [On Windows](#on-windows) first.
 
 ## On Windows
 
-The reference converter, the core's build, the emulator, the command tool and their suites
+The Python library, the core's build, the emulator, the command tool and their suites
 work on Windows 10 and 11. The converter's own suite, `npm test --prefix converter`, does
 not pass there yet. The firmware tool, the board and the walk-through suite stay with the
 first computer. A Windows computer needs git, Python 3.10 or later as `python`, Node.js 20
@@ -32,7 +32,6 @@ installed. The setup and the four suites that pass, in PowerShell:
 git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
 npm ci --prefix converter
 .venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
@@ -57,16 +56,15 @@ command of this repository is run from that folder, the repository root.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
 npm ci --prefix converter
 make -C core shared
 ```
 
-The first command makes a Python environment in the folder `.venv`. The second puts three
-libraries into it, numpy, Pillow and PyAV, with which the reference converter reads videos
-and GIFs. The third puts the converter's two packages for the same job into
-`converter/node_modules/`; one of them fetches a decoder program, an ffmpeg built for your
-computer. The fourth builds the core as the library the emulator loads,
+The first command makes a Python environment in the folder `.venv`; nothing is installed
+into it, since every Python program of the repository needs only Python's own library. The
+second puts the converter's two packages into `converter/node_modules/`; one of them
+fetches a decoder program, an ffmpeg built for your computer, with which the converter
+reads videos. The third builds the core as the library the emulator loads,
 `core/build/libodrig_core.dylib`. Git ignores these three folders. `.venv/bin/python` is
 the Python for every command of this repository. The other documents write it as `python`.
 
@@ -87,8 +85,8 @@ the network.
 
 | Suite | What it checks | Takes about |
 |---|---|---|
-| `converter/tests` | The converter: its results against those of the reference converter, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
-| `tests/converter` | The reference converter and the generators, and every tracked document against the tools. | 20 seconds |
+| `converter/tests` | The converter: its results against the stored answers of the Python package, which converted before it, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
+| `tests/converter` | The Python library and the generators, and every tracked document against the tools. | 20 seconds |
 | `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 40 seconds |
 | `tests/emulator` | The emulator and the command tool. | 2 minutes |
 | `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real. | 2 seconds |
@@ -98,16 +96,16 @@ the network.
 ```sh
 python3 firmware/fw.py test
 python3 -m unittest discover -s tests/app -t .
+python3 -m unittest discover -s tests/apk -t .
 .venv/bin/python -m unittest discover -s tests/walkthrough -t .
 ```
 
-The first is the suite of the firmware tool, `tests/firmware`, and needs no board. The first
-time that tool runs, it fetches WLED's source and its build tools into `build/firmware/`:
-about 260 MB, over the network. The second, `tests/app`, runs the web code of the operators'
-app, `app/www/`, in Chrome without a window against the emulator. The third,
-`tests/walkthrough`, follows this page and the animation guide in a fresh copy, which needs
-the network: it sets up a clone, runs the five suites above, packs the demo show and makes
-an animation, in seven minutes. Run it when you have changed either page.
+The first is the suite of the firmware tool, `tests/firmware`, and needs no board; its first
+run fetches WLED's source and build tools, about 260 MB, into `build/firmware/`. The second,
+`tests/app`, runs the web code of the operators' app, `app/www/`, in Chrome without a window
+against the emulator; the third, `tests/apk`, checks the app's package once it was built. The
+last, `tests/walkthrough`, follows this page and the animation guide in a fresh copy, over the
+network, and runs the five suites above: seven minutes. Run it when either page changed.
 
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
@@ -147,11 +145,11 @@ page: http://127.0.0.1:8600/
 serial: <the repository root>/build/emulator/serial
 ```
 
-Open the page's address in the browser. It draws all 3,600 LEDs, with the twenty legs in
-twenty colours. The words HELLO WORLD stand upright in the middle; after half a minute a
-small square runs along the diagonal, and the two take turns. The header shows what is
-playing and two counts of refreshes a second, `core` and `page`, both about 50. The tab
-`Mapping` shows the board and how every leg is wired to it.
+Open the page's address in the browser. It draws all 3,600 LEDs, twenty legs in twenty
+colours: HELLO WORLD upright, then a small square on the diagonal, in turns. The header
+shows what plays and two counts of refreshes a second, `core` and `page`, about 50 each.
+`Mapping` shows how every leg is wired to the board, `Controller` the operators' app.
+`.venv/bin/python -m preview build/demo-20/show/dvd.odrg` shows one file alone.
 
 Send it commands from a second terminal. The first two go through the emulator's serial
 port, the way the board takes them over USB, and the third over HTTP, the way the board
@@ -181,7 +179,7 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60}
 ```
 
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,
@@ -195,6 +193,6 @@ The record file holds the colour of every LED at every refresh;
 - [animation-guide.md](animation-guide.md), to make an animation and try it here.
 - [working-rules.md](working-rules.md), before you change anything.
 - [converter.md](../docs/converter.md), [format.md](../docs/format.md) and [show.md](../docs/show.md) for the
-  tools and files used above, [reference-converter.md](../docs/reference-converter.md) for the generators, and
+  tools and files used above, [python-library.md](../docs/python-library.md) for the generators, and
   [mapping.md](../docs/mapping.md) for how the canvas is wired.
 - [decisions.md](../docs/decisions.md) for what has been decided and what is still open.

@@ -200,7 +200,6 @@ def _python(words):
     the build script of the core."""
     from emulator import app
     from fwtool import cli as firmware
-    from odrig import cli as converter
     from odrigctl import cli as tool
 
     if words == ["--version"]:
@@ -213,7 +212,7 @@ def _python(words):
         return "it starts neither a module nor the firmware tool"
     module, rest = words[1], words[2:]
     if module == "odrig":
-        return understood(converter.build_parser().parse_args, rest) if rest else None
+        return "the Python package is a library and no program: the converter is node converter/odrig.js"
     if module == "emulator":
         return understood(app.parse, rest) if rest else None
     if module == "odrigctl":
@@ -221,6 +220,9 @@ def _python(words):
             return None
         made = tool.parser()
         return understood(lambda given: tool.command_line(made, made.parse_args(given)), rest)
+    if module == "preview":
+        import preview
+        return understood(preview.parser().parse_args, rest) if rest else None
     if module == "unittest":
         if rest[:2] != ["discover", "-s"] or rest[3:] != ["-t", "."]:
             return "a suite is selected by discovery: -m unittest discover -s FOLDER -t ."
@@ -228,7 +230,7 @@ def _python(words):
     if module == "venv":
         return None if rest == [".venv"] else "the environment is .venv"
     if module == "pip":
-        return None if rest == ["install", "-r", "requirements.txt"] else "pip installs the libraries of requirements.txt"
+        return "nothing is installed into the Python environment"
     if (ROOT / (module.replace(".", "/") + ".py")).is_file():
         return None
     return f"there is no module {module}"

@@ -61,6 +61,18 @@ function tools(frame) {
       }
       found[0].click();
     },
+    // Presses the button that has these words inside the element a selector finds.
+    pressIn(selector, words) {
+      const place = app.doc.querySelector(selector);
+      if (place === null) {
+        throw new Error(`nothing on the screen is ${selector}`);
+      }
+      const found = [...place.querySelectorAll("button")].filter((button) => displayed(button) && button.textContent.trim() === words);
+      if (found.length !== 1) {
+        throw new Error(`${found.length} buttons in ${selector} say "${words}"`);
+      }
+      found[0].click();
+    },
     // Writes a text into a field, as typing does.
     fill(id, text) {
       const field = app.byId(id);

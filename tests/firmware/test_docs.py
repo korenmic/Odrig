@@ -47,7 +47,7 @@ class Firmware(unittest.TestCase):
 
     def test_it_names_every_command_of_the_tool_with_a_section_and_an_example(self):
         commands = self.commands()
-        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "install-show", "set-wifi", "set-limit", "read-limit", "install-firmware", "read-show", "test", "test-board", "test-air"})
+        self.assertEqual(set(commands), {"setup", "build", "flash", "restore-stock", "big-storage", "install-show", "set-wifi", "set-limit", "read-limit", "install-firmware", "read-show", "test", "test-board", "test-air"})
         for name in commands:
             self.assertRegex(self.text, rf"(?m)^### {re.escape(name)}$", name)
             self.assertRegex(self.text, rf"(?m)^python3 firmware/fw\.py {re.escape(name)}\b", name)

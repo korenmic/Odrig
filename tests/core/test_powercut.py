@@ -55,7 +55,7 @@ class PowerCut(unittest.TestCase):
         on the folder. Returns the folder as the cut left it, the second run, and the
         folder after it."""
         with support.installed(files) as folder:
-            result = support.host("session", folder, "--cut-at", number, "--cut-keeps", keeps, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
+            result = support.host("session", folder, support.CHECK_FIRST, "--cut-at", number, "--cut-keeps", keeps, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
             self.assertEqual((result.status, result.err), (POWER_CUT, ""), result.out[-300:])
             self.assertTrue(result.out.endswith("power cut\n"))
             as_left = support.folder_files(folder)

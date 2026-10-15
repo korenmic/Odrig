@@ -1,16 +1,23 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
-// memory, the time and the files of the installed show, carries bytes between the USB
-// serial port and the core and command lines between WLED's web server and the core, sets
-// WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED data
-// to the outputs, and reports its state in WLED's information. Every decision about files,
-// time, the layout and commands is the core's.
+// memory, the time, the files of the installed show and those of a USB drive on the
+// chip's own socket, carries bytes between the USB serial port and the core, and command
+// lines between the board's UART and the core and between WLED's web server and the core,
+// sets WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED
+// data to the outputs, puts the lines the player logs into the log the UART writes, refuses
+// an update over Wi-Fi on a board without a second firmware slot, and reports its state in
+// WLED's information. Every decision about files, time, the layout
+// and commands is the core's.
 #include "wled.h"
 
 #include "odrig_core.h"
+#include "odrig_drive.h"
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
+#include "odrig_log.h"
 #include "odrig_serial.h"
+#include "odrig_uart.h"
+#include "odrig_update.h"
 
 #ifdef ODRIG_PROBE
 #include "odrig_probe.h"
@@ -52,9 +59,9 @@ size_t feedBytes(const uint8_t *bytes, size_t length, char *reply, size_t capaci
   return kept.length;
 }
 
-// One command line of the web server for the core. It runs on the network task; the lock
-// is what lets it call the core. While the pacing holds lines back, it waits before it
-// takes the lock.
+// One command line of the web server, or of the UART, for the core. The web server's
+// runs on the network task; the lock is what lets it call the core. While the pacing
+// holds lines back, it waits before it takes the lock.
 size_t commandLine(const char *line, size_t length, char *reply, size_t capacity) {
   if (core == nullptr) return 0;
   while (OdrigFiles::holding()) delay(1);
@@ -153,8 +160,14 @@ class OdrigUsermod : public Usermod {
   void setup() override {
     lock = xSemaphoreCreateMutex();
     OdrigSerial::begin();
+    OdrigUart::begin();
     const uint64_t before = OdrigFiles::nowMs();
-    const odrig_host host = OdrigFiles::host();
+#ifndef ODRIG_PROBE
+    // The probe build keeps the chip's own socket a serial port, which the board's suite
+    // talks to it on.
+    OdrigDrive::begin();
+#endif
+    const odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE
@@ -166,6 +179,7 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::hold();
     if (OdrigLeds::legs() == 0) OdrigLeds::dark();
     OdrigHttp::begin(commandLine);
+    OdrigUpdate::begin();
     if (core != nullptr) {
       xTaskCreatePinnedToCore(requestRefreshes, TASK_NAME, TASK_STACK, nullptr, TASK_PRIORITY, &requester, TASK_PROCESSOR);
     }
@@ -180,6 +194,7 @@ class OdrigUsermod : public Usermod {
     // WLED answers the lookups of its captive portal only outside its live mode.
     if (apActive) dnsServer.processNextRequest();
     OdrigSerial::poll(feedBytes);
+    OdrigUart::poll(commandLine);
 #ifdef ODRIG_PROBE
     // A step of the store trial is made as a command's storage calls are: when the pacing
     // holds no line back, and with the lock held.
@@ -219,8 +234,9 @@ class OdrigUsermod : public Usermod {
     refreshFilled = false;
   }
 
-  // WLED's information page: whether the show is valid, how many outputs work, and how
-  // long the core took to start.
+  // WLED's information page: whether the show is valid, how many outputs work, how long
+  // the core took to start, what there is of a USB drive, and whether an update over
+  // Wi-Fi is refused.
   void addToJsonInfo(JsonObject &root) override {
     JsonObject user = root["u"];
     if (user.isNull()) user = root.createNestedObject("u");
@@ -237,9 +253,29 @@ class OdrigUsermod : public Usermod {
     JsonArray start = user.createNestedArray(F("odrig start"));
     start.add(startMs);
     start.add(F(" ms"));
+    user.createNestedArray(F("odrig drive")).add(String(OdrigDrive::summary()));
+    user.createNestedArray(F("odrig update")).add(OdrigUpdate::refusing() ? F("refused: no second slot") : F("WLED's"));
   }
 
   void onUpdateBegin(bool begins) override { updating = begins; }
+
+  // The usermod's settings in WLED's settings file, which WLED's page "Usermods" shows and
+  // changes: how many seconds the chip's own USB socket is looked at for a computer as the
+  // board starts.
+  void addToConfig(JsonObject &root) override {
+    JsonObject own = root.createNestedObject(F("odrig"));
+    own[F("computer_wait_s")] = OdrigDrive::wait() / 1000;
+  }
+
+  // A setting that is missing or out of range leaves the default. It is answered as
+  // complete either way, so that WLED writes nothing to its settings file on its own.
+  bool readFromConfig(JsonObject &root) override {
+    JsonObject own = root[F("odrig")];
+    if (own.isNull() || !own[F("computer_wait_s")].is<int>()) return true;
+    const int seconds = own[F("computer_wait_s")].as<int>();
+    if (seconds >= 0 && seconds <= 60) OdrigDrive::setWait((uint32_t)seconds * 1000);
+    return true;
+  }
 
  private:
   uint32_t startMs = 0;

@@ -62,3 +62,67 @@ class Answers(unittest.TestCase):
             self.assertEqual(board.handshake("/dev/cu.test"), "WLED 2606300")
             self.assertEqual(board.probe("/dev/cu.test"), '{"probe":1}')
         self.assertEqual(sent, [("/dev/cu.test", b"status\n"), ("/dev/cu.test", b"v"), ("/dev/cu.test", b"#probe\n")])
+
+
+class Settled(unittest.TestCase):
+    """After a restart the firmware plays at once and reads its animations while it
+    plays. Until it has, it answers `list` with `busy`."""
+
+    def settled(self, talks, wait=20):
+        with mock.patch.object(board.client, "serial_exchange", talks.exchange), mock.patch.object(board, "time", talks):
+            return board.settled("/dev/cu.test", wait)
+
+    def test_the_list_is_asked_for_every_half_second_until_it_is_given_and_then_the_status(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY, support.BUSY, support.BUSY, support.LISTED]})
+        self.assertEqual(self.settled(talks), support.VALID)
+        self.assertEqual(talks.sent, ["status", "list", "list", "list", "list", "status"])
+        self.assertEqual(talks.slept, [0.5, 0.5, 0.5])
+
+    def test_a_board_that_has_nothing_to_read_is_asked_once(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.LISTED]})
+        self.assertEqual(self.settled(talks), support.VALID)
+        self.assertEqual(talks.sent, ["status", "list", "status"])
+        self.assertEqual(talks.slept, [])
+
+    def test_the_status_it_gives_is_the_one_from_after_the_wait(self):
+        invalid = '{"ok":true,"on":true,"brightness":128,"playing":null,"animation":null,"fps":50,"error":"file-malformed dvd.odrg truncated"}'
+        talks = support.Talking({"status": [support.VALID, invalid], "list": [support.BUSY, support.BUSY, '{"ok":false,"error":"show-invalid"}']})
+        self.assertEqual(self.settled(talks), invalid)
+        self.assertEqual(talks.sent, ["status", "list", "list", "list", "status"])
+
+    def test_a_show_that_is_invalid_from_the_start_is_not_waited_for(self):
+        invalid = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"mapping-missing"}'
+        talks = support.Talking({"status": [invalid], "list": ['{"ok":false,"error":"show-invalid"}']})
+        self.assertEqual(self.settled(talks), invalid)
+        self.assertEqual(talks.slept, [])
+
+    def test_a_board_that_is_still_busy_when_the_time_is_over_is_check_not_done(self):
+        talks = support.Talking({"status": [support.VALID], "list": [support.BUSY]})
+        with self.assertRaises(board.Failure) as caught:
+            self.settled(talks, wait=5)
+        self.assertEqual(caught.exception.reason, "check-not-done")
+        self.assertIn("5 seconds", caught.exception.detail)
+        self.assertIn("--wait", caught.exception.detail)
+        # The time is one for all of it: about five seconds of asking, at half a second
+        # and the time of an exchange each.
+        self.assertEqual(talks.sent[0], "status")
+        self.assertEqual(set(talks.sent[1:]), {"list"})
+        self.assertTrue(8 <= len(talks.sent) - 1 <= 10, talks.sent)
+        self.assertLess(talks.now - 1000.0, 6.0)
+
+    def test_a_board_that_does_not_answer_at_first_is_waited_for_within_the_same_time(self):
+        talks = support.Talking({"status": [None, None, support.VALID], "list": [support.BUSY, support.LISTED]})
+        self.assertEqual(self.settled(talks), support.VALID)
+        self.assertEqual(talks.sent, ["status", "status", "status", "list", "list", "status"])
+
+    def test_a_board_that_never_answers_is_no_reply(self):
+        talks = support.Talking({"status": [None]})
+        with self.assertRaises(board.Failure) as caught:
+            self.settled(talks, wait=3)
+        self.assertEqual(caught.exception.reason, "no-reply")
+
+    def test_only_a_refusal_with_busy_is_waited_for(self):
+        for reply in (support.BUSY,):
+            self.assertTrue(board.is_busy(reply))
+        for reply in (support.LISTED, support.VALID, '{"ok":false,"error":"show-invalid"}', "busy", "[]", ""):
+            self.assertFalse(board.is_busy(reply), reply)

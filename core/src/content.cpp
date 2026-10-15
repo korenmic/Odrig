@@ -50,9 +50,32 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
     return size;
 }
 
-// The bytes that end a reply of `list` whose first item left out is at this position.
-uint32_t list_tail_size(const Core &core, uint32_t next) {
-    return text_length(kListNext) + (next < core.item_count ? digits(next) : 4) + 2;
+// The bytes that end a reply of `list` whose first item left out is at this position, of
+// all that are listed.
+uint32_t list_tail_size(uint32_t next, uint32_t total) {
+    return text_length(kListNext) + (next < total ? digits(next) : 4) + 2;
+}
+
+// The number of the drive's animations in the playlist: they are listed after the items.
+uint32_t drive_listed(const Core &core) {
+    uint32_t count = 0;
+    for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
+        count += core.drive[place].state == kDriveInPlaylist ? 1 : 0;
+    }
+    return count;
+}
+
+// The place of the drive's animation that is listed at this place among them.
+uint32_t drive_listed_place(const Core &core, uint32_t listed) {
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        if (core.drive[place].state == kDriveInPlaylist) {
+            if (listed == 0) {
+                return place;
+            }
+            --listed;
+        }
+    }
+    return core.drive_count;
 }
 
 // The text of a file the core writes, gathered in the chunk buffer and given to the host
@@ -124,10 +147,39 @@ uint32_t content_space(const Core &core, Reply &reply) {
 
 uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
     reply.text(kListHead);
+    // The items of the show, then the drive's animations in the playlist.
+    const uint32_t total = core.item_count + drive_listed(core);
     uint32_t position = from;
-    for (; position < core.item_count; ++position) {
+    bool first = true;
+    for (; position < total; ++position) {
+        const uint32_t tail = list_tail_size(position + 1, total);
+        if (position >= core.item_count) {
+            const uint32_t place = drive_listed_place(core, position - core.item_count);
+            const DriveEntry &entry = core.drive[place];
+            char name[kDriveListedName];
+            if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {
+                // The drive went while the list was written: it is no more.
+                continue;
+            }
+            const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
+                                  text_length(kListBytes) + digits(entry.bytes) + 1;
+            if (!reply.fits(size + tail)) {
+                break;
+            }
+            if (!first) {
+                reply.text(",");
+            }
+            first = false;
+            reply.text(kListId);
+            reply.number(entry.id);
+            reply.text(kListFile);
+            reply.escaped(name);
+            reply.text(kListBytes);
+            reply.number(entry.bytes);
+            reply.text("}");
+            continue;
+        }
         const ItemInfo &item = core.items[position];
-        const uint32_t tail = list_tail_size(core, position + 1);
         // A cycle that would not fit into a reply even alone is listed without its entries.
         bool with_entries = true;
         uint32_t size = listed_size(core, item, true);
@@ -135,13 +187,14 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             with_entries = false;
             size = listed_size(core, item, false);
         }
-        const uint32_t comma = position != from ? 1 : 0;
+        const uint32_t comma = first ? 0 : 1;
         if (!reply.fits(comma + size + tail)) {
             break;
         }
         if (comma != 0) {
             reply.text(",");
         }
+        first = false;
         reply.text(kListId);
         reply.number(item.id);
         if (!item.is_cycle) {
@@ -164,7 +217,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
         reply.text("}");
     }
     reply.text(kListNext);
-    if (position < core.item_count) {
+    if (position < total) {
         reply.number(position);
     } else {
         reply.text("null");
@@ -182,7 +235,8 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
         ++position;
     }
     if (position == core.item_count) {
-        return refuse(reply, "unknown-id");
+        // An animation of the drive is the drive's: no command removes it.
+        return refuse(reply, core.drive != nullptr && drive_has_id(core, id) ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {

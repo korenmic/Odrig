@@ -496,10 +496,6 @@ class CommandLine(unittest.TestCase):
             self.assertEqual(result.status, 2)
             self.assertIn("usage: python -m odrig.mapdoc", result.err)
 
-    def test_it_is_no_subcommand_of_the_converter(self):
-        result = support.run("mapdoc")
-        self.assertEqual(result.status, 2)
-
 
 class StandardLibraryOnly(unittest.TestCase):
     def test_it_runs_where_no_third_party_library_is_installed(self):

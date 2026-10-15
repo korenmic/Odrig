@@ -1,0 +1,10 @@
+{
+  "number": 21,
+  "slug": "21-p1-one-usb-port-for-a-computer-or-a-stick",
+  "state": "in_progress",
+  "title": "One USB port for a computer or a stick",
+  "priority": "P1",
+  "addedAt": "2026-10-15T03:10:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "The chip's own USB port is a serial port to a computer when a computer is plugged into it as the board starts, and the port of a USB stick otherwise, so that the board talks to a computer on either of its USB ports again."
+}

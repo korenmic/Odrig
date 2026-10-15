@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {errors, jsonframes, timeline, whole} from "../lib/index.js";
-import {hex, numbers, reference} from "./support.js";
+import {hex, inStoredForm, numbers, storedAnswer} from "./support.js";
 
 const {fraction} = whole;
 const FITS = ["fill", "fit", "stretch"];
@@ -14,8 +14,8 @@ function refusal(error) {
   return {reason: error.reason, detail: error.detail};
 }
 
-// What `tickPictures` gives for frames that have times only, in the form reference.py
-// gives for the Python function: the number of the frame at each tick, the frames that
+// What `tickPictures` gives for frames that have times only, in the form of the stored
+// answers of the Python function: the number of the frame at each tick, the frames that
 // were fitted, and how many frames were asked for.
 function ticksOf(frames, start, duration) {
   let asked = 0;
@@ -111,13 +111,13 @@ test("the ticks of frames with times are those of the Python tool", async (t) =>
     const duration = from.pick([null, null, 1, 20, 40, 100, 300, 1000]);
     cases.push({label: `frames from seed ${i + 1}`, frames, start, duration});
   }
-  const theirs = reference("ticks", [], cases.map(({frames, start, duration}) => forPython(frames, start, duration)));
+  const theirs = storedAnswer("ticks", [], cases.map(({frames, start, duration}) => forPython(frames, start, duration)));
   const reasons = new Map();
 
   await t.test(`${cases.length} parts of frames at six rates and of frames from seeds`, () => {
     assert.ok(cases.length > 6000, String(cases.length));
     cases.forEach(({label, frames, start, duration}, i) => {
-      assert.deepEqual(ticksOf(frames, start, duration), theirs[i], label);
+      assert.deepEqual(inStoredForm(ticksOf(frames, start, duration), theirs[i]), theirs[i], label);
       const key = theirs[i].reason === undefined ? "ticks" : theirs[i].detail.replace(/-?\d+(\.\d+)?(e[+-]\d+)?/g, "N");
       reasons.set(key, (reasons.get(key) ?? 0) + 1);
     });
@@ -267,13 +267,13 @@ function casesForPython(cases) {
 
 test("importFrames gives the animation the Python tool imports from the same frames", async (t) => {
   const cases = Array.from({length: 700}, (unused, i) => importCase(5000 + i));
-  const theirs = reference("timeline", [], casesForPython(cases));
+  const theirs = storedAnswer("timeline", [], casesForPython(cases));
   const outcomes = new Map();
 
   await t.test("for 700 videos and GIFs from seeds", async () => {
     for (let i = 0; i < cases.length; i += 1) {
       const ours = await imported(cases[i]);
-      assert.deepEqual(ours, theirs[i], `seed ${5000 + i}: ${cases[i].kind}, ${cases[i].frames.length} frames, from ${cases[i].start} for ${cases[i].duration}, ${cases[i].fit}`);
+      assert.deepEqual(inStoredForm(ours, theirs[i]), theirs[i], `seed ${5000 + i}: ${cases[i].kind}, ${cases[i].frames.length} frames, from ${cases[i].start} for ${cases[i].duration}, ${cases[i].fit}`);
       const key = theirs[i].reason === undefined ? "imported" : theirs[i].detail.replace(/^clip\.[a-z0-9]+: /, "").replace(/-?\d+(\.\d+)?(e[+-]\d+)?/g, "N");
       outcomes.set(key, (outcomes.get(key) ?? 0) + 1);
     }

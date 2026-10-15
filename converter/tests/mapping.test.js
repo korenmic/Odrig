@@ -4,9 +4,9 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, mapping} from "../lib/index.js";
-import {ROOT, hex, reference, runBoth, runJsHere, runPythonMany, temporary, utf8} from "./support.js";
+import {ROOT, hex, runJsAndStored, runJsHere, storedAnswer, storedRuns, temporary, utf8} from "./support.js";
 
-// What the library says of a mapping file, in the form reference.py gives for the Python
+// What the library says of a mapping file, in the form of the stored answers of the Python
 // reader.
 function ours(bytes) {
   try {
@@ -169,9 +169,9 @@ function bytesOf(file) {
 }
 
 test("the tracked mapping files and the made-up ones of the core's suite", async (t) => {
-  const texts = reference("mappings");
+  const texts = storedAnswer("mappings");
   const names = Object.keys(texts).sort();
-  const theirs = reference("read_mappings", [], names.map((name) => hex(utf8(texts[name]))));
+  const theirs = storedAnswer("read_mappings", [], names.map((name) => hex(utf8(texts[name]))));
 
   await t.test("every file of mapping/ is among them, and files of both kinds", () => {
     const tracked = fs.readdirSync(path.join(ROOT, "mapping")).filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5));
@@ -208,7 +208,7 @@ test("the tracked mapping files and the made-up ones of the core's suite", async
 for (const [kind, names] of [["row-leg", ROW_NAMES], ["column-leg", COLUMN_NAMES]]) {
   test(`${kind} files that break a rule get the rejection of the Python reader`, async (t) => {
     const cases = broken(names);
-    const theirs = reference("read_mappings", [], cases.map(([, file]) => hex(bytesOf(file))));
+    const theirs = storedAnswer("read_mappings", [], cases.map(([, file]) => hex(bytesOf(file))));
     const details = new Set();
     for (let i = 0; i < cases.length; i += 1) {
       const [label, file] = cases[i];
@@ -225,7 +225,7 @@ for (const [kind, names] of [["row-leg", ROW_NAMES], ["column-leg", COLUMN_NAMES
 
   test(`${kind} files that are as the format says are read as the Python reader reads them`, async (t) => {
     const cases = whole(names);
-    const theirs = reference("read_mappings", [], cases.map(([, file]) => hex(bytesOf(file))));
+    const theirs = storedAnswer("read_mappings", [], cases.map(([, file]) => hex(bytesOf(file))));
     for (let i = 0; i < cases.length; i += 1) {
       const [label, file] = cases[i];
       await t.test(label, () => {
@@ -246,10 +246,10 @@ test("both command lines read a mapping file the same way", async (t) => {
   const show = path.join(folder, "show.json");
   fs.writeFileSync(show, '{"version": 1, "brightness": 1, "items": [{"id": 1, "file": "a.odrg"}]}');
   const out = path.join(folder, "out");
-  const packWith = (file) => runBoth(["pack", "--mapping", file, "--show", show, "--sources", sources, "--out", out]);
+  const packWith = (file) => runJsAndStored(["pack", "--mapping", file, "--show", show, "--sources", sources, "--out", out]);
 
   await t.test("a file of every kind that is as the format says: the same canvas", () => {
-    const texts = reference("mappings");
+    const texts = storedAnswer("mappings");
     const cases = [
       ...Object.entries(texts).map(([name, text]) => [name, text]),
       ...whole(ROW_NAMES).map(([label, file]) => [`rows: ${label}`, file]),
@@ -276,7 +276,7 @@ test("both command lines read a mapping file the same way", async (t) => {
       fs.writeFileSync(name, bytesOf(file));
       return ["pack", "--mapping", name, "--show", show, "--sources", sources, "--out", out];
     });
-    const theirs = runPythonMany(commands);
+    const theirs = storedRuns(commands);
     for (let i = 0; i < cases.length; i += 1) {
       const [label] = cases[i];
       const name = commands[i][2];

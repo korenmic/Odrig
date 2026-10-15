@@ -30,6 +30,7 @@ class TheTable(unittest.TestCase):
         cls.codes = codes_of_the_command_list()
         refusals = [[code, "play 2", "file-missing dvd.odrg"] for code in cls.codes]
         refusals += [["unknown-id", "play all", None], ["unknown-id", "play 65535", None], ["show-invalid", "play all", None], ["weird", "on", None], ["toString", "off", None]]
+        refusals += [["unknown-id", "remove 7", None], ["busy", "remove 7", None], ["in-use", "remove 7", None], ["storage-error", "space", None]]
         failures = [["bad-address", "x y"], ["no-wifi", "4.3.2.1"], ["no-answer", "4.3.2.1"], ["bad-reply", "192.168.1.23:8600"]]
         cls.found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
 
@@ -47,7 +48,7 @@ class TheTable(unittest.TestCase):
                 self.assertEqual(general, code in cannot_get, f"{code}: it needs a text of its own, or a place among the codes the app cannot get")
 
     def test_the_codes_the_app_cannot_get_are_those_of_the_commands_it_does_not_send(self):
-        self.assertEqual(self.found["notForTheApp"], ["no-upload", "incomplete", "bad-checksum", "busy", "in-use", "no-space", "bad-offset", "bad-file", "storage-error"])
+        self.assertEqual(self.found["notForTheApp"], [])
 
     def test_each_text_of_a_refusal(self):
         for code in ("line-too-long", "unknown-command", "bad-argument"):
@@ -57,6 +58,10 @@ class TheTable(unittest.TestCase):
         self.assertEqual(self.text("unknown-id"), "Animation 2 is not installed any more. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "play 65535", None), "Animation 65535 is not installed any more. (unknown-id)")
         self.assertEqual(self.text("unknown-id", "play all", None), "No animation is installed. (unknown-id)")
+        self.assertEqual(self.text("unknown-id", "remove 7", None), "Animation 7 is not installed any more. (unknown-id)")
+        self.assertEqual(self.text("busy", "remove 7", None), "The installation is busy. Try again in a moment. (busy)")
+        self.assertEqual(self.text("in-use", "remove 7", None), "Animation 7 cannot be removed: a cycle plays it, or it is on a USB stick. (in-use)")
+        self.assertEqual(self.text("storage-error", "space", None), "The installation could not use its storage. (storage-error)")
         # A code the app does not know, also one that is a word of the language.
         self.assertEqual(self.text("weird", "on", None), REFUSED.format("weird"))
         self.assertEqual(self.text("toString", "off", None), REFUSED.format("toString"))
@@ -107,12 +112,12 @@ class OnTheScreen(unittest.TestCase):
         self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: file-missing dvd.odrg.")
 
     def test_a_target_that_does_not_know_a_command_and_one_that_refuses_with_another_code(self):
-        old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("busy"), "on": OK}))
+        old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("weird"), "on": OK}))
         presses = [{"press": "Playlist from the start"}, {"press": "Off", "not": NOT_UNDERSTOOD.format("bad-argument")}, {"press": "On", "wait": 800}, {"dismiss": True}]
         found = support.run("refusals", address=old.address, settings={"rows": 2, "presses": presses[:2] + presses[3:]})
         self.assertEqual(found.seen[0]["message"], NOT_UNDERSTOOD.format("bad-argument"))
         # A second message takes the place of the first, and goes when it is dismissed.
-        self.assertEqual(found.seen[1]["message"], REFUSED.format("busy"))
+        self.assertEqual(found.seen[1]["message"], REFUSED.format("weird"))
         self.assertIsNone(found.seen[2]["message"])
         self.assertEqual([line for _, line in old.lines if line in (b"play all", b"off")], [b"play all", b"off"])
 

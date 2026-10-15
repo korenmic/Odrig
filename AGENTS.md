@@ -10,10 +10,11 @@ odrig is the LED animation system of an art installation: a small board drives a
 that make the animations, the player, an emulator that shows them without the board, and
 the program for the board. The pages for newcomers are in the folder `agent/`.
 
-The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`.
-The Python package `odrig/` was the converter before it. It is now the reference that
-tests compare the converter with, and it holds the generators. Convert and pack with the
-JavaScript tool only.
+The converter is the JavaScript tool in `converter/`, started as `node converter/odrig.js`,
+and the only one: convert and pack with it. The Python package `odrig/` was the converter
+before it. It is now a library that reads and writes the project's files for the tests and
+the tools, and it holds the generators; what it answered to the converter's tests is
+stored with them.
 
 ## Read first
 
@@ -30,11 +31,12 @@ JavaScript tool only.
 |---|---|
 | Make or change an animation or a show | [agent/animation-guide.md](agent/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
 | Change the converter | [docs/converter.md](docs/converter.md), [docs/format.md](docs/format.md), [docs/reasons.md](docs/reasons.md) |
-| Change the Python reference, a generator or the test vectors | [docs/reference-converter.md](docs/reference-converter.md), [docs/format.md](docs/format.md) |
+| Change the Python library, a generator or the test vectors | [docs/python-library.md](docs/python-library.md), [docs/format.md](docs/format.md) |
 | Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
+| Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
-| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
+| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
 | Find out what was decided, and why | [docs/decisions.md](docs/decisions.md), then [docs/drifts.md](docs/drifts.md) |
 
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
@@ -91,12 +93,13 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 - Every addition to the command list.
 - Anything that changes a decision in `docs/decisions.md`.
 - Anything about hardware or power.
-- A check that only a person can make: what the LEDs show, or what a phone gets.
+- A check that only a person can make: what the LEDs show, or what a phone gets. The
+  operators' app has such a check, in [docs/android-app.md](docs/android-app.md).
 
 ## If you work on Windows
 
-The reference converter, the core's build, the emulator and the command tool work on
-Windows 10 and 11, and their suites pass there. That was seed 11,
+The Python library, the core's build, the emulator and the command tool work on Windows 10
+and 11, and their suites pass there. That was seed 11,
 `project-seeds/11-p0-emulator-and-tools-on-windows/`.
 
 - The core is built there by `python core/build.py shared`, not by `make`.
@@ -116,23 +119,17 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **An app for the operators, for Android**, in two parts. Seed 09 is command and
-  control: what plays, the list of animations, play, on and off, and the brightness. Its
-  spec is written and none of its tasks is done. The first notes are in
-  [docs/android-app.md](docs/android-app.md).
-- **Converting and uploading in the operators' app**, seed 17: its second part, after
-  seed 09. The converter's library is made to run inside the app. It has been run with
-  Node.js and in Chrome, and never inside an app.
-- **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
-  package stops converting and stays as a small library that reads and writes the
-  project's files for tests and for the firmware tool. Today both can convert.
-- **One command to preview one animation**, seed 19: the path of a finished `.odrg` file
-  starts the emulator with that animation alone and opens its page. Today the folder of
-  a show is made by hand first.
+- **Animations from a USB drive**, seed 20: the board plays the animations of a stick's
+  folder `odrig`. The core, the emulator and the app do; the board has read no stick yet.
+- **One USB port for a computer or a stick**, seed 21: the chip's own port is a
+  computer's when one is plugged in as the board starts; built, not tried on the board.
+- **A USB stick through a hub**, seed 22: newer USB software that knows hubs. Today the
+  board reads no stick through a hub.
+- **A USB log on the serial port**, seed 23: what the board's own USB port sees.
+- **A bigger animation space**, seed 24: about 13.5 MB in place of 10.35 MB, by giving
+  up firmware updates over Wi-Fi; the tool and the firmware have it, and no board has been
+  moved to it yet.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **Playing at once at power-on**, seed 14: the show plays at once, and the installed
-  animations are checked while it plays. Today the LEDs stay dark until every
-  animation has been checked.
 
 The state of every seed is in the `state.json` of its folder.
 

@@ -10,21 +10,22 @@ import * as gif from "../cli/gif.js";
 import {ending, milliseconds} from "../cli/main.js";
 import * as video from "../cli/video.js";
 import {errors, jsonframes} from "../lib/index.js";
-import {CONVERTER, ROOT, libraryText, numbers, reference, runJs, runJsHere, runPython, runPythonMany, sha256, utf8} from "./support.js";
+import {CONVERTER, ROOT, libraryText, numbers, runJs, runJsHere, sha256, storedAnswer, storedRun, storedRuns, utf8} from "./support.js";
 
 const BENCH = path.join(ROOT, "mapping", "legs-2.json");
 const TARGET = path.join(ROOT, "mapping", "legs-20.json");
 const QUIET = {status: 0, out: "", err: ""};
 
-// A folder with the media of the tests, made once by reference.py with Pillow and PyAV: the
-// GIFs and the videos of the Python suite's import tests among them.
+// A folder with the media of the tests, which the Python package made with Pillow and PyAV
+// and which are stored with its answers: the GIFs and the videos of the Python suite's
+// import tests among them.
 let folder;
 let made;
 let outputs = 0;
 
 before(() => {
   folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
-  made = reference("media", [], {folder});
+  made = storedAnswer("media", [], {folder});
 });
 
 after(() => {
@@ -46,7 +47,7 @@ function fresh(side) {
 async function imports(cases) {
   const lines = cases.map(([name, options]) => ({name, options, js: fresh("js"), python: fresh("py")}));
   const argv = (line, side) => ["import", media(line.name), line[side], ...line.options];
-  const theirs = runPythonMany(lines.map((line) => argv(line, "python")));
+  const theirs = storedRuns(lines.map((line) => argv(line, "python")));
   const results = [];
   for (let i = 0; i < lines.length; i += 1) {
     const ours = await runJsHere(argv(lines[i], "js"));
@@ -244,7 +245,7 @@ test("import as a program", async (t) => {
       const ours = fresh("js");
       const theirs = fresh("py");
       assert.deepEqual(runJs(run(name, ours)), QUIET, name);
-      assert.deepEqual(runPython(run(name, theirs)), QUIET, name);
+      assert.deepEqual(storedRun(run(name, theirs)), QUIET, name);
       assert.ok(fs.readFileSync(ours).equals(fs.readFileSync(theirs)), name);
       assert.equal(fs.existsSync(`${ours}.part`), false);
     }
@@ -273,12 +274,12 @@ test("import as a program", async (t) => {
   await t.test("paths are taken from the folder the tool is started in", () => {
     const inFolder = {cwd: folder};
     const ours = runJs(["import", "clip.gif", "relative-js.json", "--mapping", BENCH], inFolder);
-    const theirs = runPython(["import", "clip.gif", "relative-py.json", "--mapping", BENCH], inFolder);
+    const theirs = storedRun(["import", "clip.gif", "relative-py.json", "--mapping", BENCH], inFolder);
     assert.deepEqual(ours, QUIET);
     assert.deepEqual(theirs, QUIET);
     assert.ok(fs.readFileSync(media("relative-js.json")).equals(fs.readFileSync(media("relative-py.json"))));
     const missing = ["import", "absent.gif", "x.json", "--mapping", BENCH];
-    assert.deepEqual(runJs(missing, inFolder), runPython(missing, inFolder));
+    assert.deepEqual(runJs(missing, inFolder), storedRun(missing, inFolder));
     assert.equal(runJs(missing, inFolder).err, "error: not-found: absent.gif: there is no such file\n");
   });
 
@@ -308,7 +309,7 @@ test("import as a program", async (t) => {
     const statuses = new Set();
     for (const argv of lines) {
       const ours = runJs(argv);
-      const theirs = runPython(argv);
+      const theirs = storedRun(argv);
       const label = argv.slice(1).map((word) => word.replace(folder, "<folder>").replace(ROOT, "<root>")).join(" ");
       assert.equal(ours.status, theirs.status, `${label}: ${ours.err} / ${theirs.err}`);
       if (theirs.status === 1) {
@@ -434,7 +435,7 @@ test("the checks of import run in the order of the Python tool", async (t) => {
 test("seconds on the command line are rounded to whole milliseconds as the Python tool rounds them", async (t) => {
   await t.test("for the texts of --start and --duration", () => {
     const texts = ["0", "0.04", ".04", "4e-2", "0.0405", "0.0395", "0.0404999", "+0.02", "1.", "0.0005", "0.0004", "-0.0005", "-0.0004", "12.3456", "1e3", "007.5"];
-    const theirs = reference("milliseconds", [], texts);
+    const theirs = storedAnswer("milliseconds", [], texts);
     texts.forEach((text, i) => {
       assert.equal(String(milliseconds(text)), theirs[i], text);
     });
@@ -458,7 +459,7 @@ test("seconds on the command line are rounded to whole milliseconds as the Pytho
 });
 
 test("both command lines read a mapping file the same way, through import", async (t) => {
-  const texts = reference("mappings");
+  const texts = storedAnswer("mappings");
   const names = Object.keys(texts).sort();
 
   await t.test("every mapping file that is as the format says gives the same canvas and the same file", async () => {
@@ -670,7 +671,7 @@ test("a damaged or cut media file ends the import with a result or with unreadab
     assert.ok(counts.written >= 20 && counts.refused >= 60, JSON.stringify(counts));
 
     // The Python tool reads the same files, each of them, and ends with a file or a reason.
-    const theirs = runPythonMany(files.map(({file}) => ["import", file, fresh("py"), "--mapping", BENCH]));
+    const theirs = storedRuns(files.map(({file}) => ["import", file, fresh("py"), "--mapping", BENCH]));
     const reason = (err) => (/^error: ([a-z-]+): /.exec(err) ?? [])[1];
     const different = [];
     files.forEach(({label}, i) => {

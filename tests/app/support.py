@@ -19,6 +19,7 @@ import urllib.parse
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 APP = ROOT / "app"
 WWW = APP / "www"
+CONVERTER_LIBRARY = ROOT / "converter" / "lib"
 PAGE = pathlib.Path(__file__).resolve().parent / "page"
 
 if str(APP) not in sys.path:
@@ -124,6 +125,8 @@ class StandIn:
             reply = self.replies[min(len(self.lines), len(self.replies)) - 1]
         if isinstance(reply, dict):
             reply = reply.get(line.split(b" ")[0].decode("ascii", "replace"), (200, '{"ok":false,"error":"unknown-command"}\n'))
+        if callable(reply):
+            reply = reply(line)
         return reply
 
     def left(self):
@@ -169,6 +172,13 @@ class _Pages(webserver.Handler):
             else:
                 self.answer(200, webserver.TYPES[found.suffix], found.read_bytes())
             return
+        if path.startswith("/m/") and self.server.media is not None:
+            found = pathlib.Path(self.server.media, path[len("/m/"):])
+            if "/" in path[len("/m/"):] or found.suffix not in MEDIA_TYPES or not found.is_file():
+                self.answer(404)
+            else:
+                self.answer(200, MEDIA_TYPES[found.suffix], found.read_bytes())
+            return
         super().do_GET()
 
     def do_POST(self):
@@ -199,6 +209,54 @@ SOUND = {"status": PLAYING, "list": LISTED}
 
 Run = collections.namedtuple("Run", "seen elsewhere")
 
+# The media the suite converts, as a scenario fetches them.
+MEDIA_TYPES = {".gif": "image/gif", ".mp4": "video/mp4"}
+CONVERTER_TOOL = ROOT / "converter" / "odrig.js"
+
+
+def make_media(folder):
+    """Writes the media the suite converts into a folder, as tests/app/media.py stores them:
+    `clip.gif`, `clip.mp4`, `long.mp4` and `broken.mp4`."""
+    done = subprocess.run([sys.executable, "-m", "tests.app.media", str(folder)], cwd=ROOT, capture_output=True, text=True)
+    if done.returncode != 0:
+        raise AssertionError(f"the media were not written: {done.stderr}")
+    return pathlib.Path(folder)
+
+
+Converted = collections.namedtuple("Converted", "frames ms odrg")
+
+
+def decoded_by_the_command_line(data):
+    """The frames of an ODRG file as the converter's command line decodes it: for each, its
+    milliseconds and the colour of each pixel as 0xRRGGBB."""
+    with tempfile.TemporaryDirectory() as work:
+        source = pathlib.Path(work, "file.odrg")
+        source.write_bytes(data)
+        frames = pathlib.Path(work, "frames.json")
+        done = subprocess.run(["node", str(CONVERTER_TOOL), "decode", str(source), str(frames)], cwd=ROOT, capture_output=True, text=True)
+        if done.returncode != 0:
+            raise AssertionError(f"decode: {done.stderr}")
+        return [(frame["ms"], frame["pixels"]) for frame in json.loads(frames.read_text(encoding="utf-8"))["frames"]]
+
+
+def converted_by_the_command_line(media, mapping, fit="fill", start=None, length=None):
+    """What the converter's command line makes of a media file for the canvas of a mapping
+    file: the number of frames and their milliseconds in all, and the ODRG file."""
+    with tempfile.TemporaryDirectory() as work:
+        frames = pathlib.Path(work, "frames.json")
+        made = pathlib.Path(work, "made.odrg")
+        command = ["node", str(CONVERTER_TOOL), "import", str(media), str(frames), "--mapping", str(mapping), "--fit", fit]
+        if start is not None:
+            command += ["--start", start]
+        if length is not None:
+            command += ["--duration", length]
+        for step in (command, ["node", str(CONVERTER_TOOL), "encode", str(frames), str(made)]):
+            done = subprocess.run(step, cwd=ROOT, capture_output=True, text=True)
+            if done.returncode != 0:
+                raise AssertionError(f"{' '.join(step)}: {done.stderr}")
+        listed = json.loads(frames.read_text(encoding="utf-8"))["frames"]
+        return Converted(len(listed), sum(frame["ms"] for frame in listed), made.read_bytes())
+
 
 def commands_elsewhere(found):
     """The command lines a run sent to other computers than this one, each as
@@ -211,16 +269,18 @@ def commands_elsewhere(found):
     return sent
 
 
-def run(scenario, address=None, settings=None, steps=(), size=SIZE):
+def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None):
     """Runs one scenario of `page/scenarios/` against the web code in Chrome without a
     window, and gives what the scenario found and what the pages asked other computers
     for, each as `(method, address, body)`.
 
     `address` is the address the app is to use, kept before the app starts; without one
     the app starts as on a new phone. `settings` reach the scenario as they are. Each
-    time the scenario asks for a step, the next function of `steps` is called.
+    time the scenario asks for a step, the next function of `steps` is called. The files
+    of the folder `media` are served to the scenario under `/m/`.
     """
     server = webserver.Server(0, handler=_Pages)
+    server.media = media
     server.results = queue.Queue()
     server.steps = list(steps)
     server.elsewhere = []

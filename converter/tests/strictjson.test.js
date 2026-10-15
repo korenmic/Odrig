@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {errors, strictjson} from "../lib/index.js";
-import {libraryJsonCheck, pythonChecks, sameVerdict, utf8} from "./support.js";
+import {libraryJsonCheck, sameVerdict, storedChecks, utf8} from "./support.js";
 
 const BACKSLASH = String.fromCharCode(0x5c);
 const ESCAPED = (hex) => `${BACKSLASH}u${hex}`;
@@ -163,7 +163,7 @@ function bytesOf(text) {
 }
 
 test("both tools say the same of every text", async (t) => {
-  const theirs = pythonChecks("json", TEXTS.map(([, text]) => bytesOf(text)));
+  const theirs = storedChecks("json", TEXTS.map(([, text]) => bytesOf(text)));
   for (let i = 0; i < TEXTS.length; i += 1) {
     const [label, text] = TEXTS[i];
     await t.test(label, () => {
@@ -181,7 +181,7 @@ test("both tools say the same of every text", async (t) => {
   });
 
   await t.test("the same reason where the two tools have another detail", () => {
-    const results = pythonChecks("json", REASON_ONLY.map(([, text]) => bytesOf(text)));
+    const results = storedChecks("json", REASON_ONLY.map(([, text]) => bytesOf(text)));
     REASON_ONLY.forEach(([label, text], i) => {
       const ours = libraryJsonCheck(bytesOf(text));
       assert.equal(ours.status, results[i].status, label);

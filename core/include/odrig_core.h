@@ -70,6 +70,21 @@ typedef struct odrig_host {
        The core reads a file with it from offset 0 on, each call where the last ended. */
     int32_t (*read_at)(void *ctx, const char *name, uint32_t offset,
                        uint8_t *buffer, size_t capacity);
+
+    /* A drive of animations. A host without one sets drive to NULL. The core names the file
+       at place p of the drive's list as `drive/p` to open and read_at; no name of the
+       installed file set has a slash. */
+
+    /* The number of the drive that is plugged in now: a number other than 0 that changes
+       each time a drive is plugged in, or 0 while none is. Called at refreshes. */
+    uint32_t (*drive)(void *ctx);
+
+    /* The name of the animation file at this place of the drive's list, as the drive has it,
+       into buffer with a 0 after it, cut to capacity - 1 bytes. The list is the files of the
+       drive's folder `odrig` whose names end in `.odrg`, in any case, and do not begin with
+       a dot, in the order of their names, the first 256. Returns 1, or 0 when that drive
+       has no file at that place or is not plugged in any more. */
+    int (*drive_name)(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

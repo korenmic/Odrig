@@ -10,6 +10,8 @@ from emulator import httpd
 from . import support
 
 WEB = support.ROOT / "emulator" / "web"
+APP = support.ROOT / "app" / "www"
+LIBRARY = support.ROOT / "converter" / "lib"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json"}
 
 
@@ -38,6 +40,12 @@ class Loaded(HTMLParser):
 
 def page_files():
     return sorted(path for path in WEB.iterdir() if path.is_file())
+
+
+def app_files():
+    """The files of the operators' app that have a content type, in its folder and in
+    the folders below it."""
+    return sorted(path for path in APP.rglob("*") if path.is_file() and path.suffix in CONTENT_TYPES)
 
 
 class Served(unittest.TestCase):
@@ -86,6 +94,101 @@ class Served(unittest.TestCase):
                          {"/": "text/html; charset=utf-8", "/index.html": "text/html; charset=utf-8", "/a.js": "text/javascript", "/b.css": "text/css", "/c.json": "application/json"})
         served = httpd.page_files()
         self.assertEqual(sorted(served), sorted(["/"] + ["/" + path.name for path in page_files()]))
+
+
+class TheApp(unittest.TestCase):
+    """The page's controller view shows the operators' app: the emulator serves the files
+    of `app/www/` under `/app/`."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.folder = support.entered(cls, support.example_show())
+        cls.emulator = support.entered(cls, support.Emulator(cls.folder, checked=False))
+
+    def test_every_file_of_the_apps_web_code_is_served_under_app_as_it_is(self):
+        files = app_files()
+        for expected in ("index.html", "style.css", "main.js", "client.js", "target.js", "screens/show.js", "screens/target.js"):
+            self.assertIn(APP / expected, files)
+        for path in files:
+            asked = "/app/" + path.relative_to(APP).as_posix()
+            with self.subTest(asked):
+                answer = self.emulator.request("GET", asked)
+                self.assertEqual(answer.status, 200)
+                self.assertEqual(answer.headers["content-type"], CONTENT_TYPES[path.suffix])
+                self.assertEqual(answer.headers["cache-control"], "no-store")
+                self.assertEqual(answer.body, path.read_bytes())
+
+    def test_the_converters_library_is_served_under_app_converter_as_it_is(self):
+        scripts = sorted(LIBRARY.glob("*.js"))
+        self.assertIn(LIBRARY / "index.js", scripts)
+        for path in scripts:
+            with self.subTest(path.name):
+                answer = self.emulator.request("GET", "/app/converter/" + path.name)
+                self.assertEqual((answer.status, answer.headers["content-type"], answer.body), (200, "text/javascript", path.read_bytes()))
+        for path in ("/app/converter", "/app/converter/", "/app/converter/nothing.js", "/app/converter/../main.js", "/converter/index.js", "/app/lib/index.js"):
+            self.assertEqual(self.emulator.request("GET", path).status, 404, path)
+
+    def test_the_address_app_gives_the_apps_index(self):
+        answer = self.emulator.request("GET", "/app/")
+        self.assertEqual((answer.status, answer.headers["content-type"]), (200, "text/html; charset=utf-8"))
+        self.assertEqual(answer.body, (APP / "index.html").read_bytes())
+        self.assertNotEqual(answer.body, self.emulator.request("GET", "/").body)
+
+    def test_nothing_else_of_the_repository_is_served(self):
+        for path in ("/app", "/app/app.py", "/app/package.json", "/app/capacitor.config.json", "/app/www/index.html", "/app/apptool/cli.py", "/app/android/build.gradle", "/app/screens",
+                     "/app/screens/", "/app/../app.py", "/app/../emulator/httpd.py", "/app/%2e%2e/app.py", "/app/..%2fapp.py", "/app/screens/../../app.py", "/app/MAIN.JS", "/app/main.js/",
+                     "/www/index.html", "/emulator/httpd.py", "/core/src/core.cpp", "/docs/emulator.md", "/AGENTS.md"):
+            self.assertEqual(self.emulator.request("GET", path).status, 404, path)
+        for method in ("POST", "PUT", "DELETE", "HEAD"):
+            self.assertEqual(self.emulator.request(method, "/app/main.js", body=None if method == "HEAD" else b"x").status, 404, method)
+
+    def test_the_table_is_made_by_walking_the_folder_and_holds_only_the_known_kinds(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for name in ("index.html", "a.js", "notes.txt", "sub/b.js", "sub/deep/c.css", "sub/d.py", "sub/e"):
+                place = pathlib.Path(folder, name)
+                place.parent.mkdir(parents=True, exist_ok=True)
+                place.write_bytes(b"x")
+            library = pathlib.Path(folder, "library")
+            library.mkdir()
+            for name in ("index.js", "notes.txt"):
+                pathlib.Path(library, name).write_bytes(b"y")
+            table = httpd.app_files(folder, library)
+            self.assertEqual(sorted(table), ["/app/", "/app/a.js", "/app/converter/index.js", "/app/index.html", "/app/library/index.js", "/app/sub/b.js", "/app/sub/deep/c.css"])
+            self.assertEqual(table["/app/"], table["/app/index.html"])
+            self.assertEqual(table["/app/sub/deep/c.css"], (str(pathlib.Path(folder, "sub", "deep", "c.css")), "text/css"))
+            self.assertEqual(httpd.app_files(pathlib.Path(folder, "absent"), pathlib.Path(folder, "absent")), {})
+        served = httpd.app_files()
+        self.assertEqual(sorted(served), sorted(["/app/"] + ["/app/" + path.relative_to(APP).as_posix() for path in app_files()] + ["/app/converter/" + path.name for path in LIBRARY.glob("*.js")]))
+
+
+class TheControllerView(unittest.TestCase):
+    def test_the_page_has_a_third_tab_and_a_pane_that_holds_no_frame(self):
+        index = (WEB / "index.html").read_text(encoding="utf-8")
+        tabs = re.findall(r'<button type="button" class="tab" id="tab-([a-z]+)" aria-pressed="(true|false)">([A-Za-z]+)</button>', index)
+        self.assertEqual(tabs, [("leds", "true", "LEDs"), ("mapping", "false", "Mapping"), ("controller", "false", "Controller")])
+        self.assertEqual(index.count('<aside class="controller" id="controller" hidden></aside>'), 1)
+        self.assertNotIn("<iframe", index)
+
+    def test_the_script_keeps_this_emulators_address_where_the_app_looks_for_its_target(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        key = re.search(r'^const KEY = "([^"]+)";$', (APP / "target.js").read_text(encoding="utf-8"), re.M).group(1)
+        self.assertEqual(app.count(f'var APP_ADDRESS = "{key}";'), 1)
+        self.assertEqual(app.count("localStorage.setItem(APP_ADDRESS, location.host);"), 1)
+
+    def test_the_frame_is_made_for_the_view_and_removed_when_the_view_is_left(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        made = app[app.index("function controller(wanted) {"):app.index("function show(name) {")]
+        steps = [made.index(step) for step in ("pane.hidden = !wanted;", 'pane.textContent = "";', "localStorage.setItem(APP_ADDRESS, location.host);",
+                                               'var frame = document.createElement("iframe");', 'frame.src = "app/";', "pane.appendChild(frame);")]
+        self.assertEqual(steps, sorted(steps))
+        shown = app[app.index("function show(name) {"):app.index("var link = byId(")]
+        self.assertEqual(shown.count('controller(name === "controller");'), 1)
+        self.assertEqual(app.count('createElement("iframe")'), 1)
+
+    def test_the_address_of_the_page_names_the_view(self):
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        self.assertEqual(app.count('var VIEWS = ["leds", "mapping", "controller"];'), 1)
+        self.assertEqual(app.count('window.addEventListener("hashchange", function () { show(named()); });'), 1)
 
 
 class Files(unittest.TestCase):

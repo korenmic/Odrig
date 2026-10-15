@@ -39,8 +39,8 @@ def apart(first, second):
 
 
 class Look(unittest.TestCase):
-    """The two screens and a message, measured at the width of a phone and at a narrow
-    one, with a show whose file names are as long as a name can be."""
+    """The three screens, a message and a question, measured at the width of a phone and
+    at a narrow one, with a show whose file names are as long as a name can be."""
 
     @classmethod
     def setUpClass(cls):
@@ -74,30 +74,34 @@ class Look(unittest.TestCase):
 
     def test_every_control_is_8_pixels_from_the_next(self):
         for where, size, screen in self.each():
-            for group in ("screen", "nav", "message"):
+            for group in ("screen", "nav", "message", "question"):
                 controls = [control for control in screen["controls"] if control["group"] == group]
                 for position, first in enumerate(controls):
                     for second in controls[position + 1:]:
                         self.assertGreaterEqual(apart(first, second), 8 - 0.01, f"{where}: {first['what']} and {second['what']}")
 
-    def test_the_two_screen_buttons_lie_along_the_bottom_edge_each_half_the_width(self):
+    def test_the_three_screen_buttons_lie_along_the_bottom_edge_each_a_third_of_the_width(self):
         for where, size, screen in self.each():
             buttons = [control for control in screen["controls"] if control["group"] == "nav"]
-            self.assertEqual([button["what"] for button in buttons], ["to-show", "to-target"], where)
+            self.assertEqual([button["what"] for button in buttons], ["to-show", "to-storage", "to-target"], where)
             widths = [button["right"] - button["left"] for button in buttons]
             self.assertAlmostEqual(widths[0], widths[1], delta=1, msg=where)
-            self.assertGreater(sum(widths), size[0] - 30, where)
+            self.assertAlmostEqual(widths[1], widths[2], delta=1, msg=where)
+            # The edges and the gaps take 8 pixels each.
+            self.assertAlmostEqual(sum(widths), size[0] - 4 * 8, delta=1, msg=where)
             self.assertAlmostEqual(screen["nav"]["bottom"], screen["height"], delta=1, msg=where)
             # The last control of a long screen can be moved clear of them.
             self.assertGreaterEqual(screen["spaceBelow"], screen["nav"]["bottom"] - screen["nav"]["top"] + 8, where)
 
-    def test_a_message_lies_above_the_screen_buttons(self):
+    def test_a_message_and_a_question_lie_above_the_screen_buttons(self):
         for size, screens in self.measured.items():
             self.assertIsNone(screens["show"]["message"])
-            message, nav = screens["withMessage"]["message"], screens["withMessage"]["nav"]
-            self.assertGreaterEqual(nav["top"] - message["bottom"], 8 - 0.01, size)
-            self.assertGreaterEqual(message["left"], 8 - 0.01, size)
-            self.assertLessEqual(message["right"], size[0] - 8 + 0.01, size)
+            self.assertIsNone(screens["storage"]["question"])
+            for name, what in (("withMessage", "message"), ("withQuestion", "question")):
+                placed, nav = screens[name][what], screens[name]["nav"]
+                self.assertGreaterEqual(nav["top"] - placed["bottom"], 8 - 0.01, (size, what))
+                self.assertGreaterEqual(placed["left"], 8 - 0.01, (size, what))
+                self.assertLessEqual(placed["right"], size[0] - 8 + 0.01, (size, what))
 
     def test_the_background_is_black_and_no_area_is_bright(self):
         for where, size, screen in self.each():
@@ -117,7 +121,7 @@ class Look(unittest.TestCase):
     def test_the_sizes_of_the_letters(self):
         for where, size, screen in self.each():
             sizes = {text["what"]: text["size"] for text in screen["texts"]}
-            self.assertEqual({size for what, size in sizes.items() if what in ("to-show", "to-target", "use", "board", "on", "off", "play-all")}, {20}, where)
+            self.assertEqual({size for what, size in sizes.items() if what in ("to-show", "to-storage", "to-target", "use", "board", "on", "off", "play-all", "confirm-yes", "confirm-no")}, {20}, where)
             self.assertGreaterEqual(min(sizes.values()), 14, where)
         show = {text["what"]: text["size"] for text in self.measured[(360, 740)]["show"]["texts"]}
         self.assertEqual((show["power"], show["brightness"], show["playing"]), (28, 18, 18))
@@ -140,6 +144,12 @@ class Touch(unittest.TestCase):
             listened |= set(re.findall(r"""addEventListener\(\s*["']([a-z]+)["']""", text))
             self.assertNotRegex(text, r"\bon(mouse|touch|pointer|contextmenu)[a-z]*\s*=", path.name)
         self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate"})
+        # The media of a conversion tell when they are loaded or sought, and when they
+        # cannot be read.
+        conversion = (support.WWW / "convert.js").read_text(encoding="utf-8")
+        awaited = {name for names in re.findall(r"either\(\w+, \[([^\]]*)\]\)", conversion) for name in re.findall(r'"([a-z]+)"', names)}
+        self.assertEqual(awaited, {"loadedmetadata", "loadeddata", "seeked"})
+        self.assertIn('for (const name of [...names, "error"])', conversion)
 
 
 class Back(unittest.TestCase):
@@ -155,6 +165,11 @@ class Back(unittest.TestCase):
         # The button `Show` goes back as the gesture does: no entries pile up.
         for look in found["toggled"]:
             self.assertEqual((look["shown"], look["state"], look["entries"]), ("show", {"screen": "show", "depth": 0}, entries + 1))
+        # The storage screen lies on top of the show screen as the target screen does,
+        # and one takes the other's place there: back goes to the show screen.
+        self.assertEqual((found["storage"]["shown"], found["storage"]["state"], found["storage"]["entries"]), ("storage", {"screen": "storage", "depth": 1}, entries + 1))
+        self.assertEqual((found["across"]["shown"], found["across"]["state"], found["across"]["entries"]), ("target", {"screen": "target", "depth": 1}, entries + 1))
+        self.assertEqual((found["home"]["shown"], found["home"]["state"]), ("show", {"screen": "show", "depth": 0}))
 
     def test_while_the_target_has_not_answered_the_target_screen_is_the_apps_first_entry(self):
         found = support.run("back", address=f"127.0.0.1:{support.free_port()}", settings={"answers": False}).seen

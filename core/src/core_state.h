@@ -36,8 +36,9 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` file the show names, with what its check found in it: its size in bytes
-// and the sum of the durations of its frames.
+// One `.odrg` file the show names. `bytes` is its size, known once a check has read its
+// body to its end. `total_ms` is its length, the sum of the durations of its frames, and 0
+// while it is not known: a check finds it, and so does playing the file through once.
 struct FileInfo {
     char name[33];
     uint32_t bytes;
@@ -84,6 +85,36 @@ struct Upload {
     uint64_t total_ms;      // the sum of the durations of the records decoded
     uint64_t progress;      // the time something last moved
 };
+
+// What the core knows of the file at one place of a drive's list: its size and its
+// length once the check has read it whole, the id it got, and its state.
+struct DriveEntry {
+    uint64_t total_ms;
+    uint32_t bytes;
+    uint16_t id;
+    uint8_t state;
+};
+
+// The states of a drive's file: to be checked; an animation of the playlist; left out.
+const uint8_t kDriveToCheck = 0;
+const uint8_t kDriveInPlaylist = 1;
+const uint8_t kDriveLeftOut = 2;
+
+// The most files of a drive, the position in the playlist of the file at place 0, and the
+// first id a drive's animation can get.
+const uint32_t kDriveMost = 256;
+const uint32_t kDriveBase = 0x10000u;
+const uint32_t kDriveFirstId = 60001;
+// Room for the name the core gives the host for a drive's file, `drive/<place>`.
+const uint32_t kDriveNameSize = 16;
+// Room for the name of a drive's file as `list` writes it: a longer one is cut to 127 bytes.
+// Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
+const uint32_t kDriveListedName = 128;
+
+// Whether a position of the playlist is a drive's file.
+inline bool is_drive(uint32_t position) {
+    return position >= kDriveBase && position < kDriveBase + kDriveMost;
+}
 
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
@@ -139,6 +170,29 @@ struct Core {
     uint8_t *check_pixels;
     uint8_t *check_window;
 
+    // The check after the start, which reads the body of every file with the second
+    // decoders while the show plays: whether it has read them all, which is for good; the
+    // position in the file table of the file it is at; of that file, whether its header
+    // was read, the records still to decode, and the sum of the durations so far; how
+    // many refreshes in a row came without a grid time left out, counted to
+    // kCheckMostSteps; and at how many refreshes in a row the check took no step.
+    uint32_t check_at;
+    uint32_t check_records_left;
+    uint64_t check_total_ms;
+    uint8_t check_done;
+    uint8_t check_header_read;
+    uint8_t check_row;
+    uint8_t check_idle;
+
+    // The drive, for a host that has one: an entry for each place of its list, the number
+    // of the drive the entries are of, 0 for none, how many places it has, and the place
+    // the check is at, with the name of its file, which the check reads by.
+    DriveEntry *drive;
+    uint32_t drive_number;
+    uint32_t drive_count;
+    uint32_t drive_check_at;
+    char drive_check_name[kDriveNameSize];
+
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
 
@@ -183,6 +237,7 @@ struct Core {
     uint64_t stream_turn;
     uint64_t stream_loop;
     uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
+    uint32_t stream_records;    // the frame records of the open file that were decoded
 
     FileSource file;
     Inflate inflate;
@@ -193,6 +248,53 @@ struct Core {
 // `<reason> <about> <detail>`, and passes the text to the host's log. The first failure
 // decides: when the show is invalid already, nothing changes.
 void core_fail(Core &core, Reason reason, const char *about, Reason detail);
+
+// The most steps the check after the start takes at one refresh, the most refreshes in a
+// row at which it takes none, how late after its grid time a refresh may be and still
+// count as on time, and the fewest refreshes the last whole second must have had for it.
+const uint8_t kCheckMostSteps = 16;
+const uint8_t kCheckLongestWait = 9;
+const uint64_t kCheckOnTimeMs = 2;
+const uint32_t kCheckLeastRate = 30;
+
+// Whether the check after the start has read every file of the show to its end.
+bool check_complete(const Core &core);
+
+// Whether a file of the drive waits for the check, which may take it while no upload holds
+// the second decoders.
+bool drive_waits(const Core &core);
+
+// The name the core gives the host for the file at a place of the drive, into room for
+// kDriveNameSize characters.
+void drive_file_name(uint32_t place, char *name);
+
+// Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
+void drive_touch(Core &core);
+
+// A file of the drive is left out: its state says so, and the host's log says why.
+void drive_left_out(Core &core, uint32_t place, Reason reason);
+
+// An upload takes the second decoders: the check of a drive's file begins that file
+// again once the upload is over.
+void drive_check_yields(Core &core);
+
+// Whether an animation of the drive has this id.
+bool drive_has_id(const Core &core, uint32_t id);
+
+// The place of the drive's animation that has this id, or kDriveMost when none has.
+uint32_t drive_place_of(const Core &core, uint32_t id);
+
+// The check after the start at one refresh, after the LED data was made. `in_step` says
+// whether the refresh followed the one before it without a grid time left out, and
+// `on_time` whether it came no later than kCheckOnTimeMs after its grid time while the
+// last whole second had kCheckLeastRate refreshes or more, or in the first second. At a
+// refresh that is both, the check takes as many steps as refreshes of that kind have
+// followed one another, at most kCheckMostSteps: a step opens a file, decodes one frame
+// record, or reads the end of a file. At any other refresh the count begins again and
+// the check takes no step, unless it took none at the kCheckLongestWait refreshes before
+// either: then it takes one, so that a host that is always late still comes to the end of
+// the check. A fault makes the show invalid with the reason the start gives for it.
+void check_after_start(Core &core, bool in_step, bool on_time);
 
 }  // namespace odrig
 

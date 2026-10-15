@@ -12,5 +12,9 @@ export default async function (app) {
   for (const [kind, detail] of app.settings.failures) {
     failures[kind] = messages.ofFailure({kind, detail});
   }
-  return {notForTheApp: messages.NOT_FOR_THE_APP, refusals, failures, silence: [0, 1, 2, 75].map((seconds) => messages.ofSilence(seconds))};
+  const conversions = {};
+  for (const [reason, detail] of app.settings.conversions || []) {
+    conversions[reason] = messages.ofConversion({reason, detail});
+  }
+  return {notForTheApp: messages.NOT_FOR_THE_APP, refusals, failures, conversions, silence: [0, 1, 2, 75].map((seconds) => messages.ofSilence(seconds))};
 }

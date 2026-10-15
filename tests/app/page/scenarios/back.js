@@ -26,5 +26,14 @@ export default async function (app) {
     await app.until(() => app.shown() === "show", "the show screen");
     toggled.push(look());
   }
-  return {began, first, second, back, toggled};
+  app.press("Storage");
+  await app.until(() => app.shown() === "storage", "the storage screen");
+  const storage = look();
+  app.press("Target");
+  await app.until(() => app.shown() === "target", "the target screen after the storage screen");
+  const across = look();
+  view.history.back();
+  await app.until(() => app.shown() === "show", "the show screen after back from the target screen");
+  const home = look();
+  return {began, first, second, back, toggled, storage, across, home};
 }

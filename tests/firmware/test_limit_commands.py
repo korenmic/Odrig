@@ -5,7 +5,7 @@ from unittest import mock
 from fwtool import Failure, board, build, limit, storage, wifi
 
 from . import support
-from .test_wifi_commands import NAME, PASSWORD, REPLY, STORAGE_AT, OnASmallLayout, applied, options_of
+from .test_wifi_commands import LAYOUT_LINE, NAME, PASSWORD, REPLY, STORAGE_AT, OnASmallLayout, applied, options_of
 
 
 class WithALimitFile(OnASmallLayout):
@@ -33,7 +33,7 @@ class SetLimit(WithALimitFile):
         esptool = self.esptool()
         result = self.set_limit(esptool, 0)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"limit: off\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: off\n{REPLY}\n")
         self.assertEqual(result.err, "")
         board_now = self.on_the_board(esptool)
         self.assertEqual(limit.stored(board_now), 0)
@@ -42,7 +42,7 @@ class SetLimit(WithALimitFile):
     def test_a_limit_above_0_is_printed_in_milliamps(self):
         esptool = self.esptool()
         result = self.set_limit(esptool, 36000)
-        self.assertEqual(result.out, f"limit: 36000 mA\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: 36000 mA\n{REPLY}\n")
         self.assertEqual(limit.stored(self.on_the_board(esptool)), 36000)
 
     def test_it_writes_once_as_data_inside_storage_and_compares_the_partition(self):
@@ -61,7 +61,7 @@ class SetLimit(WithALimitFile):
         esptool = self.esptool()
         result = self.set_limit(esptool, 850)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"limit: 850 mA\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: 850 mA\n{REPLY}\n")
         self.assertEqual(esptool.wrote, [])
         self.assertNotIn("write-flash", esptool.commands())
         self.assertEqual(esptool.commands()[-1], "verify-flash")
@@ -99,7 +99,7 @@ class SetLimit(WithALimitFile):
         esptool = self.esptool(limit.apply(self.old, 0))
         result = self.run_limit("set-limit", esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out.splitlines()[0], "limit: 850 mA")
+        self.assertEqual(result.out.splitlines()[:2], [LAYOUT_LINE, "limit: 850 mA"])
         self.assertEqual(limit.stored(applied(limit.apply(self.old, 0), esptool.wrote)), 850)
 
     def test_its_options(self):
@@ -114,19 +114,19 @@ class ReadLimit(WithALimitFile):
     def test_it_prints_the_limit_the_board_holds(self):
         esptool, result = self.read_limit(self.old)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, "limit: 850 mA\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: 850 mA\n")
         self.assertEqual(result.err, "")
 
     def test_a_limit_of_0_is_off(self):
-        self.assertEqual(self.read_limit(limit.apply(self.old, 0))[1].out, "limit: off\n")
+        self.assertEqual(self.read_limit(limit.apply(self.old, 0))[1].out, f"{LAYOUT_LINE}\nlimit: off\n")
 
     def test_a_board_without_the_member_uses_wleds_own(self):
         for content in (b'{"def":{"on":true}}', b'{"hw":{"led":{"fps":50}}}', b"not JSON"):
             with self.subTest(content=content):
-                self.assertEqual(self.read_limit(support.storage_image({"/cfg.json": content}))[1].out, "limit: not stored; WLED uses 850 mA\n")
+                self.assertEqual(self.read_limit(support.storage_image({"/cfg.json": content}))[1].out, f"{LAYOUT_LINE}\nlimit: not stored; WLED uses 850 mA\n")
                 for path in (self.work / "storage").iterdir():
                     path.unlink()
-        self.assertEqual(self.read_limit(support.storage_image({"/odrig/show.json": b"a show"}))[1].out, "limit: not stored; WLED uses 850 mA\n")
+        self.assertEqual(self.read_limit(support.storage_image({"/odrig/show.json": b"a show"}))[1].out, f"{LAYOUT_LINE}\nlimit: not stored; WLED uses 850 mA\n")
 
     def test_it_reads_the_table_and_storage_restarts_the_board_and_writes_nothing(self):
         esptool, _ = self.read_limit(self.old)
@@ -150,7 +150,7 @@ class InstallFirmware(WithALimitFile):
         esptool = self.esptool()
         result = self.install(esptool, 0)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"name: {NAME}\npassword: set\nlimit: off\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: off\n{REPLY}\n")
         self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
         in_storage = [(address, content) for address, content in esptool.wrote if address >= STORAGE_AT]
         board_now = applied(self.old, in_storage)

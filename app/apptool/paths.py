@@ -5,6 +5,10 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 APP = ROOT / "app"
 WWW = APP / "www"
+# The converter's library, which the web code imports from `converter/` beside its own
+# files: served from here, and copied into the package by the build.
+CONVERTER_LIB = ROOT / "converter" / "lib"
+LIBRARY_FOLDER = "converter"
 TOOLCHAIN = APP / "toolchain.json"
 PACKAGE = APP / "package.json"
 LOCK = APP / "package-lock.json"

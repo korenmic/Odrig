@@ -29,6 +29,7 @@ SUITES = {
     "onboarding": (".venv/bin/python -m unittest discover -s tests/onboarding -t .", True),
     "firmware": ("python3 firmware/fw.py test", False),
     "app": ("python3 -m unittest discover -s tests/app -t .", False),
+    "apk": ("python3 -m unittest discover -s tests/apk -t .", False),
     "walkthrough": (".venv/bin/python -m unittest discover -s tests/walkthrough -t .", False),
     "board": ("python3 firmware/fw.py test-board", False),
     "air": ("python3 firmware/fw.py test-air", False),
@@ -71,14 +72,14 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_works_on_windows_what_stays_with_the_first_computer_and_what_to_install(self):
         windows = flat(self.part("On Windows"))
-        for phrase in ("The reference converter, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
+        for phrase in ("The Python library, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
                        f"The converter's own suite, `{CONVERTER_SUITE[1]}`, does not pass there yet.",
                        "The firmware tool, the board and the walk-through suite stay with the first computer.",
                        "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
                        "`g++` or `clang++` on the path, and Microsoft's C++ build tools", "the WinLibs build of MinGW-w64",
                        "into the folder `tools/` of the repository: nothing is installed"):
             self.assertIn(phrase, windows)
-        self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/reference-converter.md")))
+        self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/python-library.md")))
         self.assertEqual(support.subprocess.run(["git", "check-ignore", "-q", "tools/x"], cwd=support.ROOT).returncode, 0)
 
     def test_the_setup_on_windows_and_its_four_suites_are_commands_their_tools_understand(self):
@@ -89,7 +90,6 @@ class GettingStarted(unittest.TestCase):
             CLONE,
             "cd Odrig",
             "python -m venv .venv",
-            f"{python} -m pip install -r requirements.txt",
             "npm ci --prefix converter",
             f"{python} core/build.py shared",
             f"{python} -m unittest discover -s tests/converter -t .",
@@ -137,13 +137,12 @@ class GettingStarted(unittest.TestCase):
             self.assertIn(here, used, "the page no longer uses what the table translates")
 
     def test_the_setup_is_the_clone_the_environment_the_libraries_the_packages_and_the_shared_library(self):
-        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "npm ci --prefix converter", "make -C core shared"])
-        pinned = re.findall(r"(?m)^([a-z]+)==", (support.ROOT / "requirements.txt").read_text(encoding="utf-8"))
-        self.assertEqual(sorted(set(pinned)), ["av", "numpy", "pillow"])
+        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", "npm ci --prefix converter", "make -C core shared"])
+        self.assertFalse((support.ROOT / "requirements.txt").exists())
         package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(package["dependencies"]), ["ffmpeg-static", "omggif"])
         setup = flat(self.part("Set up"))
-        for phrase in (f"`{CLONE}`", "numpy, Pillow and PyAV", "with which the reference converter reads videos and GIFs", "the converter's two packages for the same job",
+        for phrase in (f"`{CLONE}`", "nothing is installed into it", "needs only Python's own library", "the converter's two packages",
                        "`converter/node_modules/`", "fetches a decoder program", "`core/build/libodrig_core.dylib`", "Git ignores these three folders",
                        "`.venv/bin/python` is the Python for every command", "write it as `python`"):
             self.assertIn(phrase, setup)

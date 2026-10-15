@@ -202,7 +202,7 @@ test("the tool is the library and a command line part that is built on it", asyn
     const tracked = listed.stdout.split("\0").filter((name) => name !== "");
     const ours = tracked.filter((name) => name.startsWith("converter/"));
     assert.ok(ours.includes("converter/package-lock.json"));
-    const known = /^converter\/(package\.json|package-lock\.json|ffmpeg\.sha256|odrig\.js|(cli|lib|tests)\/[a-z]+\.js|tests\/[a-z]+\.test\.js|tests\/reference\.py|tests\/page\/(index\.html|page\.js))$/;
+    const known = /^converter\/(package\.json|package-lock\.json|ffmpeg\.sha256|odrig\.js|(cli|lib|tests)\/[a-z]+\.js|tests\/[a-z]+\.test\.js|tests\/page\/(index\.html|page\.js)|tests\/expected\/[a-z_]+\.json(\.gz)?|tests\/expected\/files\/[0-9a-f]{64}\.gz)$/;
     assert.deepEqual(ours.filter((name) => !known.test(name)), []);
     assert.deepEqual(tracked.filter((name) => /\.(mp4|mov|gif)$/i.test(name)), []);
   });

@@ -34,7 +34,9 @@ class LeaveTheBoard(unittest.TestCase):
         self.assertTrue(wifi.holds(image, wifi.read()), "storage does not hold the name and the password of the settings file")
         self.assertEqual(limit.stored(image), limit.read())
         # The show is the bench show and nothing else: the three items of the example
-        # show, at a brightness the wired strip allows, playing from its start.
+        # show, at a brightness the wired strip allows, playing from its start. Reading
+        # storage restarted the board, which reads its animations before it lists them.
+        board.settled(PORT, board.SETTLE_SECONDS)
         _, listed = support.command(PORT, "list")
         self.assertEqual([(item["id"], item.get("file")) for item in listed["items"]], [(1, "hello.odrg"), (2, "dvd.odrg"), (3, None)])
         _, status = support.command(PORT, "status")

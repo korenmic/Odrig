@@ -1,6 +1,6 @@
-// The measures of everything on the two screens, and of a message.
+// The measures of everything on the three screens, of a message and of a question.
 
-import {shown} from "../reading.js";
+import {shown, storage} from "../reading.js";
 
 function displayed(element) {
   return element.getClientRects().length > 0;
@@ -26,7 +26,7 @@ function measure(app) {
   };
   const controls = [...doc.querySelectorAll("button, input")].filter(displayed).map((element) => ({
     what: element.id || element.textContent.trim(),
-    group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : "screen",
+    group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" : "screen",
     ...box(element),
   }));
   const texts = [...doc.querySelectorAll("p, label, h1, button, input, span")]
@@ -36,6 +36,7 @@ function measure(app) {
       return {what: element.id || element.textContent.trim().slice(0, 30), colour: style.color, behind: behind(view, element), size: parseFloat(style.fontSize), family: style.fontFamily};
     });
   const message = doc.getElementById("message");
+  const question = doc.getElementById("confirm");
   return {
     controls,
     texts,
@@ -45,6 +46,7 @@ function measure(app) {
     spaceBelow: parseFloat(view.getComputedStyle(doc.querySelector("main")).paddingBottom),
     nav: box(doc.querySelector("nav")),
     message: displayed(message) ? box(message) : null,
+    question: displayed(question) ? box(question) : null,
     height: view.innerHeight,
   };
 }
@@ -52,6 +54,13 @@ function measure(app) {
 export default async function (app) {
   await shown(app, app.settings.rows);
   const show = measure(app);
+  app.press("Storage");
+  await app.until(() => app.shown() === "storage" && app.text("space") !== "-" && storage(app).rows.length === app.settings.rows, "the storage screen with its rows");
+  const storageScreen = measure(app);
+  app.pressIn(`#installed > .row`, "Remove");
+  await app.until(() => app.text("confirm-text") !== null, "the question");
+  const withQuestion = measure(app);
+  app.press("Keep it");
   app.press("Target");
   await app.until(() => app.shown() === "target", "the target screen");
   const target = measure(app);
@@ -59,5 +68,5 @@ export default async function (app) {
   app.press("Use");
   await app.until(() => app.text("message-text") !== null, "a message");
   const withMessage = measure(app);
-  return {show, target, withMessage};
+  return {show, storage: storageScreen, withQuestion, target, withMessage};
 }

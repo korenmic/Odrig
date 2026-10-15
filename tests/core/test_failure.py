@@ -63,7 +63,7 @@ class FailureWhilePlaying(unittest.TestCase):
         self.assertIn(last + 20, shown)
         before, played, after = replies[-3:]
         fps = 50 if last >= 1000 else 0
-        expected = {"ok": True, "on": True, "brightness": 255, "playing": None, "animation": None, "fps": fps, "error": text}
+        expected = {"ok": True, "on": True, "brightness": 255, "playing": None, "animation": None, "fps": fps, "error": text, "width": 60, "height": 6}
         self.assertEqual(json.loads(before), expected)
         self.assertEqual(played, '{"ok":false,"error":"show-invalid"}')
         self.assertEqual(json.loads(after), expected)
@@ -180,7 +180,10 @@ class FailureWhilePlaying(unittest.TestCase):
         replies = [line[len("reply "):] for line in run.lines if line.startswith("reply ")]
         self.assertEqual(replies[0], '{"ok":true}')
         self.assertEqual(replies[1], '{"ok":true}')
-        self.assertEqual(json.loads(replies[2]), {"ok": True, "on": False, "brightness": 9, "playing": None, "animation": None, "fps": 50, "error": "file-missing hello.odrg"})
+        self.assertEqual(
+            json.loads(replies[2]),
+            {"ok": True, "on": False, "brightness": 9, "playing": None, "animation": None, "fps": 50, "error": "file-missing hello.odrg", "width": 60, "height": 6},
+        )
         self.assertIs(json.loads(replies[4])["on"], True)
 
 

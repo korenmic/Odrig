@@ -225,16 +225,16 @@ class Start(unittest.TestCase):
         self.assertEqual(app.LIBRARY, support.LIBRARY)
         arguments = app.parse([str(self.work)])
         self.assertEqual((arguments.port, arguments.serial_link, arguments.core, arguments.verbose, arguments.record), (None, None, str(support.LIBRARY), False, None))
-        self.assertEqual(arguments.storage, 10354688)
+        self.assertEqual(arguments.storage, 13500416)
 
     def test_the_storage_option_takes_a_whole_number_of_bytes_in_real_time_and_in_record_mode(self):
-        for text, value in (("0", 0), ("1", 1), ("10354688", 10354688), ("4294967295", 4294967295)):
+        for text, value in (("0", 0), ("1", 1), ("13500416", 13500416), ("4294967295", 4294967295)):
             self.assertEqual(app.parse([str(self.work), "--storage", text]).storage, value)
             self.assertEqual(app.parse([str(self.work), "--record", "out.odrr", "--seconds", "1", "--storage", text]).storage, value)
 
     def test_no_option_names_the_size_of_the_canvas_or_an_address(self):
         options = {option for action in app.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--record", "--seconds", "--script"})
         self.assertIs(app.parse([str(self.work)]).lan, False)
         self.assertIs(app.parse([str(self.work), "--lan"]).lan, True)
 

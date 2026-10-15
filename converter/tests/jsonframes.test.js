@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {jsonframes} from "../lib/index.js";
-import {ROOT, hex, libraryJsonCheck, numbers, pythonChecks, reference, sameVerdict, utf8} from "./support.js";
+import {ROOT, asStored, hex, libraryJsonCheck, numbers, sameVerdict, storedAnswer, storedChecks, utf8} from "./support.js";
 
 // A JSON frames file of 2 x 1 with two frames, with its parts given as texts.
 function file({
@@ -103,7 +103,7 @@ const WHOLE = [
 ];
 
 test("every rule of the format, broken once, gets the error line of the Python tool", async (t) => {
-  const theirs = pythonChecks("json", BROKEN.map(([, text]) => utf8(text)));
+  const theirs = storedChecks("json", BROKEN.map(([, text]) => utf8(text)));
   const reasons = new Set();
   for (let i = 0; i < BROKEN.length; i += 1) {
     const [label, text] = BROKEN[i];
@@ -122,7 +122,7 @@ test("every rule of the format, broken once, gets the error line of the Python t
 });
 
 test("a file that is as the format says is read as the Python tool reads it", async (t) => {
-  const theirs = pythonChecks("json", WHOLE.map(([, text]) => utf8(text)));
+  const theirs = storedChecks("json", WHOLE.map(([, text]) => utf8(text)));
   for (let i = 0; i < WHOLE.length; i += 1) {
     const [label, text] = WHOLE[i];
     await t.test(label, () => {
@@ -209,13 +209,13 @@ test("dumps writes the bytes of the Python tool", async (t) => {
   await t.test("for 120 animations from seeds, merged and as given", () => {
     const animations = Array.from({length: 120}, (unused, seed) => animationFrom(seed + 1));
     const asked = [...animations.map((animation) => forPython(animation, true)), ...animations.map((animation) => forPython(animation, false))];
-    const theirs = reference("dumps", [], asked);
+    const theirs = storedAnswer("dumps", [], asked);
     let merges = 0;
     animations.forEach((animation, i) => {
       const merged = jsonframes.dumps(animation);
       const given = jsonframes.dumps(animation, {merge: false});
-      assert.equal(hex(merged), theirs[i], `seed ${i + 1}, merged`);
-      assert.equal(hex(given), theirs[animations.length + i], `seed ${i + 1}, as given`);
+      assert.deepEqual(asStored(merged, theirs[i]), theirs[i], `seed ${i + 1}, merged`);
+      assert.deepEqual(asStored(given, theirs[animations.length + i]), theirs[animations.length + i], `seed ${i + 1}, as given`);
       merges += hex(merged) === hex(given) ? 0 : 1;
     });
     assert.ok(merges >= 20, `${merges} of the animations have frames to merge`);

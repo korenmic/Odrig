@@ -32,7 +32,7 @@ class Space(unittest.TestCase):
     def test_space_gives_the_reply_of_the_reference_over_serial_and_over_http(self):
         emulator = self.started()
         expected = ReferencePlayer(support.files_of(self.folder)).command(0, b"space")
-        self.assertEqual(expected, b'{"ok":true,"free":10338304,"total":10354688,"animations":2}\n')
+        self.assertEqual(expected, b'{"ok":true,"free":13484032,"total":13500416,"animations":2}\n')
         for route, ask in ROUTES.items():
             self.assertEqual(ask(emulator, "space"), expected, route)
             self.assertEqual(ask(emulator, "space 1"), b'{"ok":false,"error":"bad-argument"}\n', route)

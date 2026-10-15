@@ -54,7 +54,7 @@ class DemoShow(unittest.TestCase):
             dvd_bounce.main([str(cls.sources / "dvd.json"), "--mapping", str(support.TARGET)]),
         ]
         cls.folder = cls.work / "show"
-        cls.packed = support.run_module("pack", "--show", SHOW, "--mapping", support.TARGET, "--sources", cls.sources, "--out", cls.folder, module="odrig")
+        cls.packed = support.run_converter("pack", "--show", SHOW, "--mapping", support.TARGET, "--sources", cls.sources, "--out", cls.folder)
         cls.canvas = mapping.read(support.TARGET)
         cls.recorded = support.run(cls.folder, "--record", cls.work / "demo.odrr", "--seconds", SECONDS)
         cls.recording = recfile.read(cls.work / "demo.odrr")

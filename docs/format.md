@@ -273,8 +273,8 @@ different bytes.
 
 The last row was measured with the converter of this repository, with zlib 1.2.12: it is
 the clip the generator `dense` writes for the target file `mapping/legs-20.json`, see
-[reference-converter.md](reference-converter.md), "Generators". The reference decoder gives
-back every frame of both files, and the suite of the core plays the clip on the target file
+[python-library.md](python-library.md), "Generators". The decoder of the Python library
+gives back every frame of both files, and the suite of the core plays the clip on the target file
 and compares every LED of every refresh with the reference.
 
 Decoding has been run and timed on the board: see [firmware.md](firmware.md), "Measurements
@@ -287,4 +287,6 @@ compressed and 61 to 70 seconds uncompressed: the first figure of each pair is w
 been shown to fit, the second what the whole partition would hold. A picture that nothing
 predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
 canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
-changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.
+changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes. On the bigger layout of [firmware.md](firmware.md), "The regions of the flash", the storage
+has 13,500,416 bytes, which hold 97 seconds of the clip compressed, 92 uncompressed and 24
+stored frame by frame.

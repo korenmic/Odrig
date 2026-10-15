@@ -14,6 +14,7 @@
 #endif
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -25,6 +26,7 @@
 #include <string>
 #include <vector>
 
+#include "core_state.h"
 #include "file_source.h"
 #include "guard.h"
 #include "inflate.h"
@@ -50,7 +52,7 @@ const int kBadReply = 72;
 const int kPowerCut = 75;
 
 // The storage of the board: the size of its partition and of a block of its file system.
-const uint64_t kBoardStorage = 10354688;
+const uint64_t kBoardStorage = 13500416;
 const uint64_t kStorageBlock = 4096;
 
 int usage() {
@@ -62,12 +64,13 @@ int usage() {
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
         "options of a session:\n"
-        "       --alloc-fails-at N  --dirty-memory  --trace-files\n"
+        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --check-first\n"
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
         "       --remove-after FILE N  --swap-after FILE N OTHER\n"
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
-        "       --read-back-fails OFFSET  --read-back-differs OFFSET\n",
+        "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET\n",
         stderr);
     return kUsage;
 }
@@ -128,13 +131,15 @@ struct Options {
     bool dirty_memory = false;      // hand out memory filled with the byte 0xA5, not zeroed
     std::string read_fails_file;    // the file whose reading fails,
     long read_fails_offset = 0;     // the offset at which `read` returns -1,
-    long read_fails_after = 0;      // and the number of openings that are spared
+    long read_fails_after = 0;      // and the number of openings that are spared; with
+                                    // none spared, `read_at` fails at that offset too
     std::string remove_after_file;  // the file that is gone
     long remove_after = 0;          // once it has been opened this many times
     std::string swap_after_file;    // the file under whose name
     long swap_after = 0;            // after this many openings
     std::string swap_other;         // the content of this other file is served
     bool trace_files = false;       // print `open <name> <result>` for every `open`
+    bool trace_reads = false;       // print `read <name> <bytes>` for every `close`: what `read` gave of the file
     uint64_t storage = kBoardStorage;   // the total space `space` reports
     bool no_storage = false;        // the seven storage functions are null pointers
     bool only_space = false;        // of the seven, only `space` is there
@@ -143,9 +148,14 @@ struct Options {
     long cut_at = 0;                // the number of the storage call at which the power is cut
     long cut_keeps = 0;             // the bytes of that call that are written first, for a `write`
     bool trace_store = false;       // print `store <call> <arguments> <result>` for every storage call
-    long read_back_fails = -1;      // the offset from which `read_at` returns -1; none below 0
-    long read_back_differs = -1;    // the offset of the byte `read_at` gives with one bit changed
+    long read_back_fails = -1;      // of the uploaded file: the offset from which `read_at` returns -1; none below 0
+    long read_back_differs = -1;    // of the uploaded file: the offset of the byte `read_at` gives with one bit changed
     bool check_names = false;       // stop when the core names a file outside its names
+    bool check_first = false;       // let the check after the start end before the session
+    std::string drive;              // the folder that stands for the top of a drive; none when empty
+    bool drive_pulled = false;      // the drive is not plugged in at the start
+    std::string drive_read_fails_file;  // the file of the drive whose reading with `read`
+    long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -200,7 +210,61 @@ public:
         functions.remove = changes ? remove : nullptr;
         functions.space = from_ != kFromMemory && !options_.no_storage ? space : nullptr;
         functions.read_at = changes ? read_at : nullptr;
+        const bool drive = changes && !options_.drive.empty();
+        functions.drive = drive ? drive_number : nullptr;
+        functions.drive_name = drive ? drive_name : nullptr;
+        if (drive && !options_.drive_pulled) {
+            plug();
+        }
         return functions;
+    }
+
+    // The drive: plugged in, with a new number and the list of its folder `odrig` as it is
+    // now, or pulled out.
+    void plug() {
+        drive_names_.clear();
+        const std::string folder = options_.drive + "/odrig";
+#ifdef _WIN32
+        std::error_code failed;
+        for (const auto &entry : std::filesystem::directory_iterator(folder, failed)) {
+            if (entry.is_regular_file(failed)) {
+                drive_names_.push_back(entry.path().filename().string());
+            }
+        }
+#else
+        if (DIR *opened = opendir(folder.c_str())) {
+            while (const dirent *entry = readdir(opened)) {
+                struct stat status;
+                if (stat((folder + "/" + entry->d_name).c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
+                    drive_names_.push_back(entry->d_name);
+                }
+            }
+            closedir(opened);
+        }
+#endif
+        // Files whose names end in `.odrg`, in any case, and do not begin with a dot, in the
+        // order of their names, the first 256.
+        std::vector<std::string> kept;
+        for (const std::string &name : drive_names_) {
+            std::string ending = name.size() >= 5 ? name.substr(name.size() - 5) : "";
+            for (char &letter : ending) {
+                letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
+            }
+            if (name[0] != '.' && ending == ".odrg") {
+                kept.push_back(name);
+            }
+        }
+        std::sort(kept.begin(), kept.end());
+        if (kept.size() > 256) {
+            kept.resize(256);
+        }
+        drive_names_ = kept;
+        drive_number_ = ++drives_plugged_;
+    }
+
+    void pull() {
+        drive_number_ = 0;
+        drive_names_.clear();
     }
 
     size_t bytes_given() const { return bytes_given_; }
@@ -232,6 +296,60 @@ private:
         return block;
     }
 
+    static uint32_t drive_number(void *ctx) {
+        guard::InHost lowered;
+        return static_cast<Host *>(ctx)->drive_number_;
+    }
+
+    static int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (buffer == nullptr || capacity == 0) {
+            stop("file misuse", kFileMisuse);
+        }
+        if (drive == 0 || drive != host.drive_number_ || place >= host.drive_names_.size()) {
+            return 0;
+        }
+        const std::string &name = host.drive_names_[place];
+        const size_t length = std::min(name.size(), capacity - 1);
+        std::memcpy(buffer, name.data(), length);
+        buffer[length] = '\0';
+        return 1;
+    }
+
+    // The file of the drive a name `drive/<place>` stands for, or an empty text when the
+    // drive has no file at that place.
+    std::string drive_file(const char *name) const {
+        const char *place = name + 6;
+        size_t at = 0;
+        for (const char *digit = place; *digit != '\0'; ++digit) {
+            at = at * 10 + static_cast<size_t>(*digit - '0');
+        }
+        return drive_number_ != 0 && at < drive_names_.size() ? drive_names_[at] : "";
+    }
+
+    // Reads a file of the drive whole. False when there is none.
+    bool drive_content(const char *name, std::string *content) const {
+        const std::string file = drive_file(name);
+        if (file.empty()) {
+            return false;
+        }
+        std::FILE *opened = std::fopen((options_.drive + "/odrig/" + file).c_str(), "rb");
+        if (opened == nullptr) {
+            return false;
+        }
+        content->clear();
+        char buffer[65536];
+        size_t count;
+        while ((count = std::fread(buffer, 1, sizeof buffer, opened)) > 0) {
+            content->append(buffer, count);
+        }
+        std::fclose(opened);
+        return true;
+    }
+
+    static bool of_the_drive(const char *name) { return std::strncmp(name, "drive/", 6) == 0; }
+
     static int open(void *ctx, const char *name) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
@@ -239,6 +357,18 @@ private:
             stop("file misuse", kFileMisuse);
         }
         host.check_name(name);
+        if (of_the_drive(name)) {
+            if (!host.drive_content(name, &host.content_)) {
+                return 0;
+            }
+            host.is_open_ = true;
+            host.open_name_ = name;
+            host.read_fails_now_ = !host.options_.drive_read_fails_file.empty() && host.drive_file(name) == host.options_.drive_read_fails_file;
+            host.fails_at_ = static_cast<size_t>(host.options_.drive_read_fails_offset);
+            host.offset_ = 0;
+            host.reads_ = 0;
+            return 1;
+        }
         // What the name stands for now: nothing once the file is removed, another file
         // once it is swapped.
         const Options &options = host.options_;
@@ -272,6 +402,7 @@ private:
         host.is_open_ = true;
         host.open_name_ = name;
         host.read_fails_now_ = name == options.read_fails_file && openings > options.read_fails_after;
+        host.fails_at_ = static_cast<size_t>(options.read_fails_offset);
         host.offset_ = 0;
         host.reads_ = 0;
         return 1;
@@ -287,7 +418,7 @@ private:
         count = std::min(count, capacity);
         count = std::min(count, host.content_.size() - host.offset_);
         if (host.read_fails_now_) {
-            size_t fails_at = static_cast<size_t>(host.options_.read_fails_offset);
+            const size_t fails_at = host.fails_at_;
             if (host.offset_ >= fails_at) {
                 return -1;
             }
@@ -305,6 +436,9 @@ private:
             stop("file misuse", kFileMisuse);
         }
         host.is_open_ = false;
+        if (host.options_.trace_reads) {
+            std::printf("read %s %zu\n", host.open_name_.c_str(), host.offset_);
+        }
     }
 
     static void log(void *, const char *text) {
@@ -426,20 +560,30 @@ private:
             stop("file misuse", kFileMisuse);
         }
         std::string content;
-        if (!host.whole_file(name, &content)) {
+        if (of_the_drive(name) ? !host.drive_content(name, &content) : !host.whole_file(name, &content)) {
             return -1;
         }
         size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
-        const long fails = host.options_.read_back_fails;
+        const Options &options = host.options_;
+        const bool uploaded = std::strcmp(name, "upload.part") == 0;
+        if (name == options.read_fails_file && options.read_fails_after == 0) {
+            // As `read` does: no byte at or after the offset, and no end of the file there.
+            const size_t fails_at = static_cast<size_t>(options.read_fails_offset);
+            if (offset >= fails_at) {
+                return -1;
+            }
+            count = std::min(count, fails_at - offset);
+        }
+        const long fails = uploaded ? options.read_back_fails : -1;
         if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
             if (offset >= static_cast<size_t>(fails)) {
                 return -1;
             }
             count = static_cast<size_t>(fails) - offset;
         }
-        const long differs = host.options_.read_back_differs;
+        const long differs = uploaded ? options.read_back_differs : -1;
         if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
             content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
         }
@@ -457,6 +601,10 @@ private:
             return;
         }
         const std::string given = name;
+        if (!options_.drive.empty() && of_the_drive(name) && given.size() > 6 &&
+            given.find_first_not_of("0123456789", 6) == std::string::npos) {
+            return;
+        }
         bool sound = !given.empty() && given.size() <= 32 &&
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
         const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
@@ -634,6 +782,10 @@ private:
     enum From { kFromFolder, kFromFiles, kFromMemory };
 
     Options options_;
+
+public:
+    bool checks_first() const { return options_.check_first; }
+    bool has_drive() const { return !options_.drive.empty(); }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -643,6 +795,10 @@ private:
     std::string open_name_;
     std::map<std::string, long> openings_;
     bool read_fails_now_ = false;
+    size_t fails_at_ = 0;
+    uint32_t drive_number_ = 0;
+    uint32_t drives_plugged_ = 0;
+    std::vector<std::string> drive_names_;
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
@@ -807,6 +963,17 @@ public:
             std::printf("core null\n");
             return 0;
         }
+        if (host_.checks_first()) {
+            // The check after the start takes its steps here, with no refresh between
+            // them, so that the session begins with every file read to its end, those of
+            // a drive that is plugged in too.
+            guard::InCore inside;
+            odrig::drive_touch(core_->state);
+            while (!core_->state.invalid &&
+                   (!odrig::check_complete(core_->state) || odrig::drive_waits(core_->state))) {
+                odrig::check_after_start(core_->state, true, true);
+            }
+        }
         std::printf("core ok\n");
         std::printf("memory %zu %zu\n", host_.bytes_given(), host_.blocks_given());
         print_error();
@@ -846,6 +1013,17 @@ private:
     bool obey(const std::string &line) {
         if (line == "error") {
             print_error();
+            return true;
+        }
+        if (line == "drive plug" || line == "drive pull") {
+            if (!host_.has_drive()) {
+                return false;
+            }
+            if (line == "drive plug") {
+                host_.plug();
+            } else {
+                host_.pull();
+            }
             return true;
         }
         size_t space = line.find(' ');
@@ -1174,6 +1352,16 @@ int main(int argc, char **argv) {
                        whole_number(arguments[at + 3], &options.read_fails_after)) {
                 options.read_fails_file = arguments[at + 1];
                 at += 4;
+            } else if (arguments[at] == "--drive" && at + 1 < arguments.size()) {
+                options.drive = arguments[at + 1];
+                at += 2;
+            } else if (arguments[at] == "--drive-pulled") {
+                options.drive_pulled = true;
+                at += 1;
+            } else if (arguments[at] == "--drive-read-fails" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.drive_read_fails_offset)) {
+                options.drive_read_fails_file = arguments[at + 1];
+                at += 3;
             } else if (arguments[at] == "--remove-after" && at + 2 < arguments.size() &&
                        whole_number(arguments[at + 2], &options.remove_after)) {
                 options.remove_after_file = arguments[at + 1];
@@ -1188,6 +1376,12 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-files") {
                 options.trace_files = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-reads") {
+                options.trace_reads = true;
+                at += 1;
+            } else if (arguments[at] == "--check-first") {
+                options.check_first = true;
                 at += 1;
             } else if (arguments[at] == "--storage" && at + 1 < arguments.size() &&
                        storage_bytes(arguments[at + 1], &options.storage)) {

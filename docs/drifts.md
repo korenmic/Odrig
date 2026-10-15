@@ -7669,3 +7669,704 @@ after the files, their sources and their sizes were named.
 `env.py` and `build.py`; `app/android/gradle/wrapper/gradle-wrapper.properties`;
 `docs/specs/09-p1-operators-app-for-android/design.md`, "The environment of every child
 process".
+
+## Seed 09: The sender and the checks of the APK
+
+**Question.** What did the task of the sender settle?
+
+**Answer.**
+
+- The sender is one class of 166 lines with two methods, `send` and `route`. It was
+  compiled into the APK by the tool's build. No test runs it: it needs a phone on a Wi-Fi
+  network, and the check on a phone is the owner's. What the suites do check is what its
+  source says and that it is in the package.
+- The APK with the sender has 4,137,137 bytes. Its three permissions are `INTERNET`,
+  `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`, none of which asks the operator a
+  question. A fourth one in the package is the app's own, declared by an AndroidX
+  library, as the design expected.
+- The suite of the APK reads the package with `aapt2` of the SDK in the work folder. It
+  compares the web code in the package byte for byte with `app/www/`, so an APK built
+  before a change of the web code fails it and says to build again. The note of the
+  build names the commit the build stood on; the suite asks that the commit exists and
+  not that it is the newest, because a build made before its own commit names the one
+  before.
+- The suites of the app are two, and the getting-started page names both. That page
+  holds 200 lines at most, so the sentences about the suites that need more were made
+  shorter.
+
+**Resolution.** `app/android/app/src/main/java/app/odrig/operators/TargetPlugin.java`;
+`tests/apk/test_apk.py`; `tests/app/test_android.py`; `agent/getting-started.md`,
+"Suites that need more".
+
+## Seed 09: What the first part of the app has beyond its seed
+
+**Question.** The seed of the app's first part asks for the screens, the emulator's
+option, a build with one command, tests in Chrome and documents. What was built that it
+does not name?
+
+**Answer.** Each of these was in the design from the start, and none adds a command to
+the command list or changes what the installation does.
+
+- Two more commands of the tool: `serve`, which serves the web code to a browser on this
+  computer and is what the suite uses, and `install`, which puts the APK on a phone that
+  is connected by USB.
+- A second suite, `tests/apk/`, which reads a built APK.
+- The line of the target screen that says how the phone's requests travel, with the
+  sender's method `route` behind it, so that a failure on a phone can be read off the
+  screen. And `build.json`, the note of the commit an APK was built from.
+- `old.html`, the page for a web view that is too old.
+
+The pages for newcomers named the app as planned, and a test kept its words out of them.
+The first part exists now, so the pages name it, and the test keeps out the words of
+what is still planned: the PC version and the app's second part. The seed stays in
+progress: its last item, the check on a phone, is the owner's.
+
+**Resolution.** `app/apptool/cli.py`; `tests/apk/`; `app/www/screens/target.js`,
+`routeLine`; `app/apptool/stage.py`; `tests/onboarding/test_pages.py`, `PLANNED`;
+`docs/android-app.md`.
+
+## Seed 14: What the start reads of a file
+
+**Question.** The requirements say the start reads "the header only". The design says
+opening a file reads the palette as well, and calls that a difference. Which is it?
+
+**Answer.** The header only: the first 16 bytes. The core's decoder reads the palette
+with the first frame record, not when it is opened. So the code does what the
+requirements say, and the design's sentence about the palette is wrong. A fault in a
+palette is a fault in the body: the check after the start or the player finds it, not
+the start. Of the 34 invalid vectors, 10 are found by the start and 24 after it.
+
+**Resolution.** `core/src/core.cpp`, `open_file`; `tests/core/test_power_on.py`,
+`TheStart`; `docs/core.md`, "Startup".
+
+## Seed 14: How the old tests of the core meet the check after the start
+
+**Question.** About 150 tests of the core send `list`, `remove` or an upload right after
+the start, where the answer is `busy` now. The design gives each of them the refreshes
+the check needs first. Is that how it is done?
+
+**Answer.** No. The test host has a new option, `--check-first`: the check takes all its
+steps before the session begins, with no refresh between them. The helpers of the suite
+give that option unless a test asks for the core as it is after power-on, and the
+reference player has the same switch. Adding refreshes to 150 scripts would have changed
+the timestamps and the output of each, and with them what the tests say. The new tests,
+in `tests/core/test_power_on.py`, run without the option.
+
+Three more changes of the test host came with it. `--trace-reads` prints how many bytes
+of a file the core read before it closed it, which is how a test sees that the start
+decodes nothing. `--read-fails FILE OFFSET` now fails for `read_at` too, so a file that
+cannot be read is found by the check as it was found by the start.
+`--read-back-fails` and `--read-back-differs` now touch `upload.part` only: they are
+about what storage gives back of an upload, and the check after the start reads the
+installed files through the same function.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`, `CHECK_FIRST`;
+`docs/core.md`, "The test host".
+
+## Seed 14: How the reference player knows where a fault in a body lies
+
+**Question.** The reference player decodes a file at once and cannot say at which frame
+record a fault lies. The design has each test tell it the refresh at which the show
+turns invalid. Is that how it is done?
+
+**Answer.** No. For a file its own decoder refuses, the reference asks the core's
+decoder, outside any session, how many frame records come before the fault. From that
+number it counts the check's steps and knows the frames the player can still show, so
+every line of a session is compared, and no test has to give a refresh. The reference
+leans on the core for that one number; the tests of the invalid vectors pin it apart
+from any session.
+
+**Resolution.** `tests/core/support.py`, `found_in` and `_check`.
+
+## Seed 14: The design's `checked` mark of a file
+
+**Question.** The design gives every file a mark `checked`. Is it in the code?
+
+**Answer.** No. The core has one mark for the whole check, `check_done`. Nothing would
+read a mark of one file: `list`, `remove` and `upload begin` wait for the whole check,
+and the files of the show change only after it. Once it is complete it stays complete: a
+file an upload adds was read by the upload's own check.
+
+The player counts the records of a loop only while the length is not known. With the
+length known it decodes by time, as before, so a file that was swapped for a shorter one
+behind the core's back is still refused as `truncated`.
+
+**Resolution.** `core/src/core_state.h`, `check_done`; `core/src/player.cpp`,
+`first_loop_to` and `show_at`.
+
+## Seed 14: The emulator's tests, before the emulator's own task
+
+**Question.** The emulator plays with the same core, so from the first task on its tests
+get `busy` where they list, remove or upload right after a start. The tasks give those
+tests to the third task. What happens to them in the first?
+
+**Answer.** They are mended in the first, because every suite has to pass with every
+commit. The suite's `Emulator` asks for the list over HTTP until it is no longer
+refused, and only then hands the emulator to the test; a test that wants the emulator as
+it is after power-on says so. The emulator logs what it is asked, so the helper that
+reads the event stream leaves those first entries out. Two tests of record mode, where
+time is the script's, send their upload a second later, and the reference they are
+compared with reads its files at its refreshes, as the core does. The third task adds
+the emulator's new tests and its page.
+
+**Resolution.** `tests/emulator/support.py`, `Emulator.wait_for_the_check`,
+`EventStream` and `reference`; `tests/emulator/test_record.py`.
+
+## Seed 14: A file that is gone when the check comes to it
+
+**Question.** The design lists `file-missing` among the faults the check after the
+start can find. Can it?
+
+**Answer.** No. The check reads with `read_at`, which answers -1 for a file it cannot
+read and has no other answer for one that is not there. So a file that vanished between
+the start and the check is `read-error` with its name. The start still says
+`file-missing`: it opens every file with `open`, which tells the two apart.
+
+**Resolution.** `core/src/core.cpp`, `check_step`; `docs/core.md`, "The check after
+the start"; `tests/core/test_body_faults.py`.
+
+## Seed 14: A host that is late for every refresh
+
+**Question.** The requirements give the check after the start its steps at refreshes
+that follow one another without a gap, "and none at any other refresh". What becomes of
+the check on a board whose every refresh is late?
+
+**Answer.** It would never end. The board sends a dense 60 x 60 animation 24 to 33 times
+a second; below 25 every refresh leaves a grid time out, so the check would take no step
+for as long as such an animation plays, and `list`, `remove` and `upload begin` would
+stay `busy` with it. So the rule has a floor: a refresh after a gap takes no step,
+unless the three refreshes before it took none either; then it takes one. A host that is
+always late gets one step in four refreshes. The price is the time of one frame record
+at that refresh: for the dense animation about a twentieth of a second in four
+refreshes, which leaves the rate above 20 a second by the figures of the firmware page.
+The board test of the seed measures it.
+
+The check of an upload has the same rule without the floor, from seed 07, and is left as
+it is: an upload whose check does not move for a minute is discarded, as the commands
+page says. On a board that plays such an animation an upload can fail that way. That is
+for the seed of uploading from the app to settle, and the owner is told.
+
+**Resolution.** `core/src/core.cpp`, `check_after_start`; `core/src/core_state.h`,
+`kCheckLongestWait`; `tests/core/support.py`, `CHECK_LONGEST_WAIT`;
+`tests/core/test_power_on.py`, `TheCheck`; `tests/core/test_body_faults.py`,
+`FoundByTheCheckOfALateHost`; `docs/core.md`, "The check after the start".
+
+## Seed 09: Two tasks added after its tasks had begun
+
+**Question.** The scope of a seed is fixed once its tasks are being done, and a gap
+becomes a new seed. On 2026-10-14 the owner asked for two things that no seed has: the
+operators' app shown in the emulator's page, running the code the phone runs, and the
+board taking commands "via serial/usbc/wifi". Are they new seeds?
+
+**Answer.** No, by the owner's word: "nothing new and no new seeds or tasks, just a
+refinement on what we already agreed on", to be done within the seeds that are under
+way, with the missing guidance filled in. Both are about how the app and its commands
+reach a target, so they were added to the spec of seed 09 as Requirements 17 and 18, two
+sections of its design, and tasks 10 and 11, which stand before the owner's check on a
+phone. The board had been connected through its socket marked COM that day, where the
+firmware did not listen; that is what Requirement 18 mends.
+
+What was not added: the phone talking to the board over a USB cable, which the app has
+no code for, and the board reading animations from a USB drive, which is seed 20 and
+waits for the owner's answers on its hardware.
+
+**Resolution.** `docs/specs/09-p1-operators-app-for-android/requirements.md`,
+Requirements 17 and 18; `design.md`, "The app in the emulator's page" and "Commands on
+the board's second USB socket"; `tasks.md`, tasks 10 and 11.
+
+## Seed 19: What the preview names, and who refuses a file
+
+**Question.** The design of the preview names the steps of the getting-started page as
+"Build the core" and "What the computer needs", and lets the core refuse a file that is
+no ODRG file. Is that what the code does?
+
+**Answer.** Not quite. The page has no such headings: the core's library is built in "Set
+up", by `make -C core shared`, and Node.js is under "What you need". The preview names
+those, and the command that builds the library. And the converter's `check`, which the
+preview runs first to learn the canvas of the file, refuses a file that is no ODRG file,
+or a damaged one, before any emulator is started, with the reason the core would give:
+the two readers are kept to the same reasons by the stored vectors. The core judges what
+the converter takes, the canvas among it. So a refused file leaves nothing to stop.
+
+The spec puts the command into the emulator's package, as `python -m emulator.preview`.
+It is a package of its own, `preview/`, run as `python -m preview FILE`: the emulator's
+package may import nothing but the standard library and itself, and holds no command
+name, which its scope tests keep it to; the preview uploads with the command tool. So
+the preview stands between the two, as a client of both, and the emulator stays as it
+was.
+
+**Resolution.** `preview/__init__.py`, `run` and `checked`;
+`tests/emulator/test_preview.py`.
+
+## Seed 14: A refresh that is in step but late
+
+**Question.** The board test of the seed played a dense 60 x 60 animation while the
+board read two more of them. Its rate fell to between 14 and 24 refreshes a second, and
+the reading took 205 seconds. Why, and what changes?
+
+**Answer.** On the board a dense frame takes most of a grid time to make, and a step of
+the check, decoding one dense frame record, about as long again. A refresh that came
+late within its grid time still counted as in step, so the count of the row went on
+growing: two steps, then three, made the refreshes after them later still, and the rate
+fell below what the owner accepts. A first change, one step at each refresh that is in
+step but late, was not enough: on the board a step of a dense record, which reads the
+file again besides decoding it, costs more than a grid time, and the rate stayed between
+13 and 23. So now a refresh takes steps only when it is in step and no more than 2 ms
+after its grid time; any other refresh takes none, apart from the one in four of the
+floor. Beside a light show the polls come on time and the check runs at up to sixteen
+steps a refresh, as before; beside a heavy one it takes a step now and then. The test
+host polls on its grid times, so the core's tests keep their figures; two new tests poll
+late within the grid.
+
+The figures of the board after the change are in the firmware page.
+
+**Resolution.** `core/src/core.cpp`, `check_after_start`; `core/src/player.cpp`,
+`player_poll`; `core/src/core_state.h`, `kCheckOnTimeMs`; `tests/core/support.py`,
+`CHECK_ON_TIME_MS`; `tests/core/test_power_on.py`, `TheCheck`; `docs/core.md`, "The
+check after the start".
+
+## Seed 14: How long the firmware tool waits for an install
+
+**Question.** `install-show` and `install-firmware` wait for the board to read its
+animations, within 20 seconds by default. Is that enough?
+
+**Answer.** No. On the board a storage full of dense animations is read for some minutes
+while one of them plays, and the default made such an install end with `check-not-done`.
+The default of these two commands is 300 seconds now. They go on as soon as the board has
+read its animations, so a small show costs no more than before. The other commands keep
+20 seconds.
+
+**Resolution.** `firmware/fwtool/board.py`, `SETTLE_SECONDS`; `firmware/fwtool/cli.py`;
+`docs/firmware.md`, `install-show` and `install-firmware`.
+
+## Seed 14: The floor of the check's pace on the board
+
+**Question.** The floor of the check's pace gives a host that is late for every refresh
+one step in four refreshes. Is that within what the owner accepts on the board?
+
+**Answer.** No. With a dense 60 x 60 animation playing, the board's refreshes are late
+nearly always, and a step of the check on another dense file costs it about 120 ms: the
+two files are read and decoded side by side. One step in four refreshes held the rate
+between 12 and 22 a second, below the 20 the owner accepts. The floor is one step in ten
+refreshes now, which costs about an eighth of a second in four. Beside a light animation
+the check keeps its pace, sixteen steps a refresh at the most, since the refreshes come on
+time. The price is the time the check takes while a dense animation plays: minutes for a
+storage of dense files, during which `list`, `remove` and `upload begin` answer `busy`.
+The firmware page has the figures.
+
+**Resolution.** `core/src/core_state.h`, `kCheckLongestWait`; `tests/core/support.py`,
+`CHECK_LONGEST_WAIT`; `tests/core/test_power_on.py`; `tests/core/test_body_faults.py`;
+`docs/core.md`.
+
+## Seed 14: The check gives way to a low rate
+
+**Question.** With the floor at one step in ten refreshes, the board's rate still fell
+below 20 a second while a dense animation played and the check read another. Why?
+
+**Answer.** On the board a refresh of a dense animation comes on time more often than the
+rate shows: the task that asks for refreshes waits for the outputs and then asks at once,
+often within 2 ms of the next grid time. So the check took its row of steps at those
+refreshes, each about 120 ms, and the rate fell. The check now also looks at the rate:
+it takes its steps only while the last whole second had 30 refreshes or more, or in the
+first second, which has no last one. Below that it takes the floor's one step in ten
+refreshes and no more, and the rate comes back. Beside a light animation the rate is 50
+and nothing changes.
+
+**Resolution.** `core/src/player.cpp`, `player_poll`; `core/src/core_state.h`,
+`kCheckLeastRate`; `tests/core/support.py`, `CHECK_LEAST_RATE`;
+`tests/core/test_power_on.py`, `TheCheck`; `docs/core.md`.
+
+## Seed 20: A drive's entry is 16 bytes
+
+**Question.** The design gives the drive's table twelve bytes an entry, 3,072 in all.
+Which size is it?
+
+**Answer.** Sixteen bytes an entry, 4,096 in all. The length of a drive's animation is
+kept as wide as that of an installed file, 64 bits, since a file's frame count is a
+32-bit number, and an entry with it is sixteen bytes. The target file then asks for
+128,701 bytes with a drive, 98 percent of the 131,072 it may use. The core object grew
+by 56 bytes for the drive's fields, the name the check reads by among them.
+
+**Resolution.** `core/src/core_state.h`, `DriveEntry`; `tests/core/test_drive.py`;
+`docs/core.md`, "Memory".
+
+## Seed 20: Names of a drive's files in a reply
+
+**Question.** The design writes a name as a JSON string with `"` and `\` escaped, a
+byte below 32 as `\u00XX` and every other byte as it is. A reply is one line of
+printable ASCII, and a name on a drive may be Hebrew, or longer than a reply holds.
+How is it written?
+
+**Answer.** In printable ASCII: a character of UTF-8 outside it as `\u` and its code,
+one above U+FFFF as two such units, DEL and a control byte by their value, and a byte that
+is not UTF-8 as U+FFFD. The JSON a client reads gives the name as the drive has it. The
+core asks the host for at most 127 bytes of a name, so that an item of the list always
+fits into a reply, even alone: a longer name is listed cut.
+
+**Resolution.** `core/src/commands.h`, `json_escaped`; `core/src/core_state.h`,
+`kDriveListedName`; `tests/core/test_drive.py`; `docs/commands.md`.
+
+## Seed 20: An upload and the drive's check
+
+**Question.** Requirement 4.2 has `upload end` answer `busy` while the drive's check
+holds the second decoders. Does it?
+
+**Answer.** It never has to. The drive's check gives the decoders up when `upload begin`
+is answered, and reads the file it was in again from its start once the upload is
+closed. An upload is then never kept waiting for a drive, and `upload end` answers `busy`
+only while its own file is checked, as without a drive. While an upload is open the
+drive's check waits, as the requirement says.
+
+**Resolution.** `core/src/core.cpp`, `drive_check_yields`; `tests/core/test_drive.py`,
+`TheCheckOfTheDrive`.
+
+## Seed 20: The test host's drive lines and faults
+
+**Question.** The design gives the script lines `drive plug <ms>` and `drive pull <ms>`,
+and `--drive-read-fails NAME OFFSET` makes a file of the drive fail. When does a line
+take effect, and which reading fails?
+
+**Answer.** The lines are `drive plug` and `drive pull`, without a time: the test host
+has no clock, and the core sees the change at its next refresh, which the next `poll`
+line asks for. `--drive-read-fails` makes `read` fail, the player's reading, and leaves
+`read_at` whole: a file whose reading fails in the check is left out as a damaged one
+is, which a damaged file tests already, and only so can a test reach a fault while the
+file plays. With `--check-first` the drive's files are read before the session too.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host".
+
+## Seed 20: The reference player has no drive
+
+**Question.** Task 1 gives the reference player of `tests/core/support.py` the drive.
+Is it given one?
+
+**Answer.** No. The tests of the drive assert what the core does directly: the order of
+the list, the ids, the turns, what a pull and a fault do, and the pictures, against
+those of the same file installed. A second model of the drive's check, with its pace
+among the steps of the installed check, would repeat the core's code rather than state
+what it must do, and every test of the reference player runs without a drive, where the
+core is unchanged.
+
+**Resolution.** `tests/core/test_drive.py`.
+
+## Seed 20: A drive needs storage that can be changed
+
+**Question.** A host whose storage cannot be changed has no second decoders. Can it have
+a drive?
+
+**Answer.** No. The drive's files are checked by the second decoders, which only a host
+with storage that can be changed is given. Such a host's `drive` and `drive_name` are not
+called, and the core plays as without them.
+
+**Resolution.** `core/src/core.cpp`, `start`; `tests/core/test_drive.py`; `docs/core.md`,
+"The host interface".
+
+## Seed 20: The emulator's drive and record mode
+
+**Question.** The design gives the emulator `--drive DIR`. Does record mode take it, and
+what does the page get?
+
+**Answer.** Record mode does not: `--drive` with `--record` is a usage error. The drive's
+folder is looked for once a second of the computer's clock, which record mode does not
+run on, so a recording with a drive would not come out the same twice. The page's
+`hello` has the member `drive` always, the folder of `--drive` or `null`, as it has
+`serial` and `tcp`, and the header shows it only when it is there.
+
+**Resolution.** `emulator/app.py`, `parse` and `serve`; `emulator/web/app.js`;
+`tests/emulator/test_drive.py`; `docs/emulator.md`, "A drive".
+
+## Seed 20: The firmware before the trial with the adapter
+
+**Question.** Task 4, the trial of the USB host with the owner's adapter, comes before
+task 5, the firmware with the drive. May the firmware be written first?
+
+**Answer.** Yes. On 2026-10-14 the owner asked for the firmware with the drive to be built
+at once and said yes to the download of the driver's sources. The firmware is built by
+the tool and was flashed the same day through the chip's own socket. The tool's wait for
+the answer to `status` failed there, as it must: the socket went from the computer when
+the firmware switched it to host mode. Whether the firmware answers on the socket marked
+COM, whether a drive answers through the adapter, what the board's rate is while a file
+of the drive is read, and the board's tests with a drive wait for the board, the drive
+and the adapter; until then task 5's box stays empty.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`; `firmware/usb_host_msc/`;
+`docs/firmware.md`, "A USB drive".
+
+## Seed 20: The probe build keeps its serial port
+
+**Question.** The firmware switches the chip's own socket to host mode for a drive, and
+the socket is no serial port from then on. The board's suite talks to the probe build on
+that socket. Does the probe build host a drive?
+
+**Answer.** No. It keeps the socket a serial port, so the suite works as before. The
+firmware that plays a drive takes its commands, and its flashing, on the socket marked
+COM; the chip's own socket reaches its loader with the button BOOT held.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `setup`; `docs/firmware.md`.
+
+## Seed 20: Names on the board's drive
+
+**Question.** The core writes a name as the drive gives it. What does the board's file
+system give?
+
+**Answer.** The framework's FAT has long names and the code page 850 for them, and it is
+built so; it cannot be set without building the framework. A name of the letters `a`-`z`
+and `A`-`Z`, digits, `-`, `_` and `.` comes out as it is. A character the code page does
+not have, a Hebrew letter for one, comes out as `?`, and the file cannot be opened by
+that name: it is left out and logged. The firmware page tells how to name the files.
+
+**Resolution.** `docs/firmware.md`, "A USB drive".
+
+## Seed 20: How the board reads a drive's file
+
+**Question.** The core reads at most 512 bytes in one call. Does each call go to the
+drive?
+
+**Answer.** No. Each of the two files that are read has a buffer of 4,096 bytes in memory
+the USB unit reaches, so one request to the drive brings eight sectors, and the driver
+copies nothing on the way. The list's names, 256 of up to 255 bytes, are in the external
+memory.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `READ_BUFFER`.
+
+## Seed 17: The buttons of the question before a removal
+
+**Question.** The design gives the question before a removal the buttons `Remove` and
+`Keep`. Each row of the storage screen has a button `Remove` too. Which words do the
+question's buttons have?
+
+**Answer.** `Remove it` and `Keep it`. While the question is open the rows stay on the
+screen, and two buttons with the same words, one that asks and one that removes, would
+be easy to mix up, for an operator's thumb and for the suite's driver, which presses a
+button by its words.
+
+**Resolution.** `app/www/index.html`; `docs/android-app.md`; the design of seed 17.
+
+## Seed 17: A video's pictures are taken at the ticks
+
+**Question.** The design takes each frame of a video after a seek with
+`requestVideoFrameCallback`, whose `mediaTime` is the frame's own time. Does that work?
+
+**Answer.** Not reliably: a seek that lands on the frame already on the screen presents
+no new frame, and the callback does not come. A trial in Chrome showed that the picture
+drawn after `seeked` is the frame on the screen at the time sought. So the app seeks
+every 20 ms tick plus half a millisecond from the start of the part, and gives
+`importFrames` the picture with the time of its tick. Its timeline takes, at each tick,
+the picture on the screen then, which is what the command line takes from the frames'
+own times, and ticks with the same picture are joined into one frame as the command line
+joins them. A video of the suite gives the command line's frames and lengths, with and
+without a part.
+
+**Resolution.** `app/www/convert.js`; `tests/app/test_convert.py`; the design of seed 17.
+
+## Seed 21: How the board sees a computer, and its setting
+
+**Question.** The design looks for a computer with the raw start-of-frame bit of the
+chip's unit for serial and JTAG, and has `readFromConfig` answer whether the setting was
+there. Is that how it is done?
+
+**Answer.** The frame index of the unit is read instead of the raw bit: the serial driver
+of the framework handles the unit's interrupts and may clear the bit before the task
+reads it, while the index of the last start-of-frame packet changes each millisecond a
+computer is there and only then. `readFromConfig` answers that the settings are complete
+whether the member is there or not: an answer of incomplete would make WLED write its
+settings file at the start, and the firmware writes nothing on its own. WLED's page shows
+the wait from `addToConfig`, and keeps it in `/cfg.json` when the owner saves the page.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `computerThere`;
+`firmware/usermod/odrig_usermod.cpp`; `docs/firmware.md`, "A USB drive".
+
+## Seed 23: How the log is taken, and how the watcher sees a device go
+
+**Question.** The design gives `take` only the room of the line, has the UART write a
+line when `availableForWrite` takes it, and has the second client of the USB host close
+a device once it has read what it is. Is that how it is done?
+
+**Answer.** `take` gets a third number, the most the UART takes now, so that it hands
+over a line only when the whole line fits, and a line that does not fit stays first. The
+UART gets a queue of 2,048 bytes for what it writes: without one, `availableForWrite` is
+the 128 bytes of the UART's own queue, less than a line may be, and a reply blocked until
+its last byte was in that queue. A line is written when the queue has room for it and 32
+bytes more, since the driver keeps a short header beside each write. The USB host library
+tells only the clients that opened a device that it went, so the watcher keeps the
+device it described open until then, and closes it at `a device went`; it is served in
+the host's task, between the library's events, every 20 ms at most. A folder `odrig`
+that cannot be opened for another reason than its absence gives
+`stick not opened: a fault in reading the folder odrig`.
+
+**Resolution.** `firmware/usermod/odrig_log.h`, `odrig_log.cpp`, `odrig_uart.cpp`,
+`odrig_drive.cpp`; `docs/firmware.md`, "The log".
+
+## Seed 23: `--log` on Windows, and a closed connection
+
+**Question.** The design has the emulator's suite run `--log` against a target of its own
+and stop it, and says that the target's errors are those of a command. How is it stopped
+in a test on Windows, and what does a TCP target that closes the connection give?
+
+**Answer.** A test stops the tool as Ctrl-C does, with SIGINT, which Windows cannot send
+to another program: the two tests that stop it are skipped there, and the others run. A
+TCP target that closes the connection is status 3, `error: unreachable: <address>: the
+target closed the connection`, since nothing more can arrive; a serial port that goes
+away is status 3 as for a command. Without `--log` and without a command the usage error
+says `a command is needed, or --log`.
+
+**Resolution.** `odrigctl/cli.py`, `odrigctl/client.py`, `follow_log`;
+`tests/emulator/test_tool_log.py`; `docs/emulator.md`, "The command tool".
+
+## Seed 18: How the answers of Python are stored
+
+**Question.** The design has `tests/converter/make_expected.py` compute, with the Python
+package, what the JavaScript suite compares with, in a compact form for each kind of
+request, and has the import tests read media files of `converter/tests/media/`. The inputs
+of most comparisons are made by the JavaScript tests themselves, from seeds. How is it done?
+
+**Answer.** The suite records them itself. Every request a test makes of Python, a
+request of `reference.py` or a command line of the Python tool or of a generator, goes
+through `converter/tests/stored.js`, which keeps it under a key made of what it asks: the
+request and its input, with the temporary folders and the repository written as names,
+the files of those folders as they were before it, and every other file its command line
+names. With it are kept its answer and the files it made, wrote and removed.
+`make_expected.py` runs the suite in the mode that records, and writes one file of answers
+for each kind of request, compressed when it is larger than 64 KB, and each written file
+larger than 16 KB apart in `files/`, compressed and named by its SHA-256. A run of more than
+64 hexadecimal digits in an answer is kept as a digest, the first 16 digits of its SHA-256
+and its number of bytes, except in the answers of `deflate`, the streams the inflater's
+tests go on to read. The media of the import tests are the files the `media` request
+wrote, kept as its answer, and the generators' animations are the files they wrote. All of
+it takes 4.2 MB. Without `ODRIG_EXPECTED` a request asks Python and checks that its answer
+and its files are the stored ones, so the suite as it runs checks every stored answer
+against what Python answers today; the kinds whose tests compare digests where the
+answers hold them take the stored answers without Python, kind by kind.
+
+**Resolution.** `converter/tests/stored.js`, `support.js`, `expected.test.js`;
+`tests/converter/make_expected.py`; `converter/tests/expected/`.
+
+## Seed 18: The compressor's bodies without Python
+
+**Question.** The compressor's tests measured it on bodies the Python tool encoded from
+its generators, among them a dense 60 x 60 clip of 1 second and one of 10 seconds, whose
+time they also took. Without Python the bodies have to come from stored files, and the
+generator's file of the clip of 10 seconds alone would take some 7 MB. What do they use?
+
+**Answer.** The six bodies are those of the generators' files that the other tests store
+already: Hello world, DVD bounce and the dense clip of 2 seconds, on 60 x 6 and on 60 x 60.
+The encoder writes each, and its uncompressed file is checked against the Python tool's;
+zlib's length is that of the Python tool's compressed file. The time is taken on the body of
+the dense 60 x 60 clip of 2 seconds five times over, 5.4 MB: its repeats lie farther apart
+than the compressor looks back for a match, so it has the work of a clip of 10 seconds, and
+its stream is at most 5 percent larger than five of zlib's. The tests of the encoder, the
+decoder, the compressor and the inflater, and the checks of the vectors, take the stored
+answers without Python: the kinds `check`, `cli`, `decode`, `deflate`, `encode`, `forms`,
+`generators` and `inflate`.
+
+**Resolution.** `converter/tests/deflate.test.js`, `encode.test.js`, `inflate.test.js`,
+`stored.js`.
+
+## Seed 18: The import's tests without Python
+
+**Question.** The tests of the fit, the timeline, the import and the arithmetic of whole
+numbers compare pictures and animations with what Python answers. Where the stored answer
+keeps a picture as a digest, how is a difference shown?
+
+**Answer.** A test puts what it made into the form of the stored answer, each run of
+hexadecimal digits where the answer has a digest as the digest of its own bytes, and
+compares the two; a difference names the case, no longer the pixel. The kinds `mappings`,
+`media`, `milliseconds`, `rects`, `resample`, `run`, `sixdigits`, `ticks` and `timeline`
+take their stored answers without Python. The test of the check against Python sets that
+mode for its own requests, since no kind of its own is left in it.
+
+**Resolution.** `converter/tests/stored.js`, `inStoredForm`; `fit.test.js`,
+`timeline.test.js`, `expected.test.js`.
+
+## Seed 18: The helpers without Python, and the maker of the stored answers
+
+**Question.** Task 4 removes `reference.py` and every helper of the tests' support that
+starts Python, and task 5 removes `tests/converter/make_expected.py`. The maker records by
+running the converter's suite in a mode in which those helpers ask Python. What becomes of
+the maker, and of the tests' names for what they compare with?
+
+**Answer.** The maker goes in task 4, with the helpers it needs: from then on the stored
+answers are the record, as the design says they are once the converting parts go, and
+nothing can make them again. The helpers that gave Python's answers give the stored ones
+under names that say so: `storedAnswer` for a request, `storedRun` for a command line of
+the Python tool, `runJsAndStored` for both tools, `storedChecks`, `storedRuns` and
+`storedGenerated`. The modes that asked Python go with them. The section "Tests" of
+`docs/converter.md` says where the answers are in the same task, since `ODRIG_PYTHON`,
+which it named, is gone; the rest of the pages follow in task 6. A test runs the helpers
+with only Node.js on the path, with every way of starting a program refused for a name
+that holds `python`.
+
+**Resolution.** `converter/tests/support.js`, `stored.js`, `expected.test.js`, the test
+files of the converter; `docs/converter.md`, "Tests".
+
+## Seed 18: What replaces the parts of the Python package that go
+
+**Question.** With `cli`, `__main__`, `media` and `pack` gone, the suites that packed
+shows with `pack.pack`, the media that the walk-through and the app's suite drew with
+Pillow and PyAV, and the pages and checks that named `python -m odrig` or installed
+`requirements.txt` need another way. Which?
+
+**Answer.** One helper packs for the suites of the core, the emulator, the firmware tool and
+the board: `pack_with_the_converter` of `tests/core/support.py`, which runs
+`node converter/odrig.js pack` and which the other supports import; the emulator's test of
+the demo show runs the converter's `pack` itself, as its page does. The core's benchmark
+encodes its clip with the converter, and the uncompressed clip is the same file as
+before. The GIF of the walk-through and the media of the app's suite are stored in the
+programs that wrote them, as their bytes, since no media file is tracked in the
+repository; the files they write are those Pillow and PyAV made before. The helper that
+gives a command line its exit status moves to `errors` as `status_of`. The Python tests
+of the removed modules go, and those of the show reader stay in `test_show.py`. The setup
+of the getting-started page makes `.venv` and installs nothing into it, and the check of
+the pages' commands refuses `python -m odrig` and `pip`. The vocabulary's entry of the
+Python package no longer starts it as a program; the rest of the pages follow in task 6.
+
+**Resolution.** `odrig/`; `tests/core/support.py`; `core/Makefile`;
+`tests/walkthrough/make_gif.py`; `tests/app/media.py`; `agent/getting-started.md`,
+`agent/vocabulary.md`; `tests/onboarding/support.py`.
+
+## Seed 24: How a table is named
+
+**Question.** The design has `layout_of` name a table WLED's layout or the bigger one by its
+entries, and refuse any other. The tool has always taken any table with a firmware slot at
+`0x10000` and a storage named `spiffs`, and its suite runs on tables whose storage is a few
+blocks. What does it name?
+
+**Answer.** A table is named by its firmware slots: with a second one it is WLED's layout,
+with one alone the bigger one; the size the line gives is that of the table's storage. A
+table without a slot at `0x10000` that the image fits in, or without `spiffs`, is refused as
+before, with `layout-mismatch`. The move to the bigger layout, which writes where WLED's
+layout has its second slot, takes WLED's table only as it is, entry for entry.
+`install-firmware` prints the line once, before it writes the firmware.
+
+**Resolution.** `firmware/fwtool/partitions.py`, `layout_of`, `layout_line`;
+`firmware/fwtool/cli.py`.
+
+## Seed 24: Reading the size of a grown file system, and the way back's read
+
+**Question.** The tool reads the disk version, the block size and the number of blocks of
+the storage from the figures that follow the superblock's mark. The storage that
+`big-storage` makes is grown from 3 MB to 13.5 MB, and littlefs keeps the grown figures in
+a later commit of its first block, where they no longer follow the mark; after a show is
+installed into it, no copy of the figures follows the mark at all. And `restore-stock
+--full` never read the board before. How are they done?
+
+**Answer.** The tool asks littlefs: it mounts the image with the block size of a copy of
+the figures that follows the mark, or else with each of the usual block sizes, 4,096 first,
+and takes the figures littlefs reads from the newest commit of the superblock. A test
+installs a show into the storage the move leaves and reads it back. `restore-stock --full`
+now reads the board's partition table first, to know whether WLED's storage has to be
+written; a table it cannot read is a board that gets the stock files as before.
+
+**Resolution.** `firmware/fwtool/storage.py`, `geometry`, `with_settings`;
+`firmware/fwtool/cli.py`, `_big_storage`, `wleds_storage`.
+
+## Seed 24: What WLED's information says of an update over Wi-Fi
+
+**Question.** The design has the firmware refuse an update over Wi-Fi on a board without a
+second slot. How does the owner see on the board which way it goes, before trying one?
+
+**Answer.** WLED's information has an entry `odrig update`: `refused: no second slot` where
+the refusal is registered, `WLED's` where WLED's own update works. The page's table of the
+information names `odrig drive` too, which it had left out.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `addToJsonInfo`; `docs/firmware.md`.

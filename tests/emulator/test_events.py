@@ -19,7 +19,7 @@ def has(kind, count=1):
 class Stream(unittest.TestCase):
     def setUp(self):
         self.folder = support.entered(self, support.example_show())
-        self.emulator = support.entered(self, support.Emulator(self.folder))
+        self.emulator = support.entered(self, support.Emulator(self.folder, checked=False))
 
     def stream(self, **settings):
         return support.entered(self, support.EventStream(self.emulator.port, **settings))
@@ -37,7 +37,7 @@ class Stream(unittest.TestCase):
         self.assertEqual(events[0].kind, "hello")
         self.assertEqual([event.kind for event in events].count("hello"), 1)
         hello = json.loads(events[0].data)
-        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
+        self.assertEqual(sorted(hello), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         self.assertEqual(hello["legs"], [[1, 1, 180], [2, 2, 180]])
         self.assertIsNone(hello["error"])
         self.assertEqual(hello["page"], self.emulator.url)
@@ -128,7 +128,7 @@ class Stream(unittest.TestCase):
             for event in stream.read_until(has("status"), 2):
                 if event.kind == "status":
                     arrivals.append(time.monotonic())
-                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null\}\Z')
+                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6\}\Z')
         self.assertGreaterEqual(len(arrivals), 3)
         self.assertLess(max(later - earlier for earlier, later in zip(arrivals, arrivals[1:])), 1.2)
 

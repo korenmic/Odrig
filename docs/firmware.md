@@ -93,6 +93,7 @@ python3 firmware/fw.py setup
 python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
+python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
@@ -128,6 +129,7 @@ with that environment's Python.
 | `layout-mismatch` | The board's partition table has no application partition at `0x10000` that the image fits in, or no data partition named `spiffs`. |
 | `esptool-failed` | esptool ended with an error, or was asked for an address outside the regions below. |
 | `no-reply` | The board did not answer within 20 seconds after its restart. |
+| `check-not-done` | The board answered, but was still reading its installed animations when the time of `--wait` was over. Nothing is wrong with what was written: the command gave up waiting. |
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
@@ -143,9 +145,17 @@ with that environment's Python.
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 
+**The layout.** A command that reads the board's partition table, `flash`,
+`install-firmware`, `install-show`, `set-wifi`, `set-limit`, `read-limit` and `read-show`,
+prints first which of the two layouts of [The regions of the flash](#the-regions-of-the-flash)
+it found, and the size of the storage there: `layout: WLED's, storage 10354688 bytes` or
+`layout: bigger, storage 13500416 bytes`. It works on either, and writes the storage where
+the table puts it.
+
 **The port.** A command that talks to the board uses the port given with `--port`, else the
 one in the variable `ODRIG_BOARD_PORT`, else the only `/dev/cu.usbmodem*` device. With no
-such device, or with more than one, it stops with `no-board`.
+such device, or with more than one, it stops with `no-board`. Either of the board's two
+USB sockets does; see "The two USB sockets" under [What the firmware does](#what-the-firmware-does).
 
 ### setup
 
@@ -264,6 +274,45 @@ and not in the board's. The bootloader is written with the flash size esptool fi
 chip in its header, 16 MB on this board; every other file goes to the flash as it is.
 
 Storage is not written, so WLED's settings and the show it played before are still there.
+On a board of the bigger layout, `--full` puts WLED's layout back, and a storage of WLED's
+size has to come with it: the tool reads the board's storage, keeps it in
+`build/firmware/storage/` and prints `kept: <path>`, makes a storage of 10,354,688 bytes
+that holds the board's settings, every file outside `/odrig`, and no show, and writes it at
+`0x610000` in the same esptool call. The show is not kept; it may not fit, and installing it
+again is the owner's.
+
+### big-storage
+
+```
+python3 firmware/fw.py big-storage
+```
+
+Moves a board of WLED's layout to the bigger one of
+[The regions of the flash](#the-regions-of-the-flash), keeping the board's settings, and
+prints the layout it found, `kept: <path>`, and the board's reply to `status`. The show is
+not kept: the board starts with `/odrig` empty, and the show is installed again with
+`install-show`.
+
+1. It reads the partition table. On a board of the bigger layout it prints
+   `nothing to do: the board has the bigger layout`, writes nothing and ends with 0. A
+   table that is not WLED's own, entry for entry, is `layout-mismatch`.
+2. It reads the board's storage as `install-show` does, keeps it in
+   `build/firmware/storage/`, and prints its path.
+3. It makes the new storage of 13,500,416 bytes: a file system of the disk version of the
+   old one, made at 3,145,728 bytes, the room of WLED's second firmware slot, with the
+   settings in it, and then grown to its whole size. All it holds lies in those first
+   3 MB, and the tool checks that, the settings and that there is no `/odrig`.
+4. It writes those first 3 MB at `0x310000`, as data, and has the chip compare them. The
+   board still has WLED's layout whole: nothing of it lies there.
+5. It erases the boot selection, writes the bigger layout's table at `0x8000`, has the
+   chip compare it and restarts the board. Beyond its first 3 MB the new storage holds
+   what was WLED's storage; the file system knows those blocks as free and erases a block
+   before it writes one.
+6. It waits 20 seconds, or as long as `--wait SECONDS` says, for the reply to `status`.
+
+When step 4 fails, the board has its old layout and its old storage. Step 5 writes one
+sector; when it fails, `restore-stock --full` brings the board back, and `set-wifi` and
+`set-limit`, or the kept image, its settings.
 
 ### install-show
 
@@ -274,10 +323,21 @@ python3 firmware/fw.py install-show build/example-show
 ```
 
 Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
-of the board's storage, checks what was written, restarts the board and prints the board's
-reply to `status`. The status is 0 when the reply reports a valid show and 1 when it
-reports a reason. The tool waits 20 seconds for that reply, or as long as `--wait SECONDS`
-says: the core checks every file at start, which takes 38 seconds for 9 MB of animations.
+of the board's storage, checks what was written, restarts the board, waits until the
+board has read every installed animation to its end, and prints the board's reply to
+`status` then. The status is 0 when the reply reports a valid show and 1 when it reports
+a reason.
+
+The board plays right after its restart and reads the animations while it plays. Until
+it has read them all it answers `list` with `busy`, and a fault it finds in one of them
+shows in `status` only then. So the tool waits for the first reply to `status`, asks for
+the list every half second until it is no longer refused with `busy`, and then asks for
+the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
+the board reads a storage full of dense animations for some minutes while one of them
+plays, and a small show within a few seconds; see
+[Measurements on the board](#measurements-on-the-board). A board that is still reading
+when the time is over ends the command with `check-not-done`: the show is installed, and
+whether it is sound is not known yet.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
@@ -397,15 +457,19 @@ whose storage does not hold the network's name and password yet. It writes the b
 firmware to the board as `flash` does, waits for the firmware's reply to `status`, and
 then does what `set-wifi` and `set-limit` do, in one write: it puts the name and the
 password of the settings file and the limit of the limit file into storage, restarts the
-board again, and prints `name: <name>`, `password: set`, the line of the limit and the
-reply to `status`.
+board again, waits as `install-show` does until the board has read its installed
+animations, and prints `name: <name>`, `password: set`, the line of the limit and the
+reply to `status`. A reason in that reply does not fail this command: a board from
+scratch has no show yet.
 
 The settings file and the limit file are read and checked first, and then the image
 `build/firmware/out/odrig-firmware.bin` and the SHA-256 beside it. When one of them is
 refused, the board has not been touched. `--settings FILE` reads another settings file,
 `--limit FILE` another limit file,
-and `--wait SECONDS` is the time the command waits for the board's reply after each of
-its two restarts, 20 seconds without it. The command takes 50 seconds on the bench board.
+and `--wait SECONDS` is the time the command waits after each of its two restarts, 300
+seconds without it; it goes on as soon as the board has answered, and after the second
+restart as soon as the board has read its animations. The command takes 50 seconds on
+the bench board.
 
 When the command fails after the firmware was written, the board runs the firmware with
 the name and the password its storage had. Running the command again, or `set-wifi`,
@@ -549,7 +613,10 @@ last one.
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
 answered.
 
-**The port.** Every byte the board receives on its USB serial port goes to the core,
+**The port.** As the board starts, the chip's own USB socket stays this serial port when
+a computer is plugged into it, and otherwise becomes the socket of a
+[USB drive](#a-usb-drive); the probe build keeps it a serial port always. Every byte the
+board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
 characters written in one piece arrives whole, also while the pacing holds lines back.
@@ -559,12 +626,129 @@ as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
-{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null}
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
 ```
 
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
 serial, no answer to WLED's single-letter commands. The chip's own bootloader still prints
 a few lines at a reset; the command tool skips every line that is not a reply.
+
+**The two USB sockets.** The board has two. The chip's own USB unit is behind one; that is
+the port above, which a Mac names by its place, `/dev/cu.usbmodem101`. The other socket,
+marked COM, reaches the chip's UART, on its pins 43 and 44, through a bridge chip; a Mac
+names it by the bridge's serial number, as `/dev/cu.usbmodem5C831043631`. The firmware
+takes command lines on the UART as well, at 115,200 bits a second, and writes each reply
+there, and between the replies the lines of [the log](#the-log). It keeps the line that is arriving there apart from the one of the other socket,
+and hands it to the core as the web server hands a line, so a line on one way never
+disturbs a line on another; of a line of more than 2,048 characters it keeps one more,
+and the core refuses it as `line-too-long`. The command tool opens either socket at
+115,200 bits a second. The chip's loader prints its start-up lines on the UART, which the
+tool skips.
+
+esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
+which the bridge uses and the chip's own USB unit ignores. When the chip's own socket has
+become a drive's, it reaches the chip only in its loader's download mode, which the
+button BOOT held while the board is plugged in brings up; the socket marked COM flashes
+it as before. The suite of the board passes only with the board on the chip's own
+socket: stock WLED, which the suite flashes and restores, and the probe build answer there
+and not on the UART.
+
+**A USB drive.** The firmware plays the animations of a USB flash drive on the chip's own
+socket, after the installed ones, as [show.md](show.md#animations-from-a-usb-drive)
+describes.
+
+- **A computer or a drive.** As the board starts, the firmware looks at the chip's own
+  socket for 5 seconds. A computer plugged into it sends a start-of-frame packet each
+  millisecond to the board, and when one comes the socket stays a serial port, for
+  commands and flashing, until the next start; WLED's information then says
+  `odrig drive: computer`. When none comes, the socket becomes the drive's for as long
+  as the board runs, and a drive may be plugged in and pulled out at any time. The LEDs
+  do not wait for the choice: the show plays from the start. So, to use the socket for a
+  computer, plug the computer in before the board gets power, or press its reset button
+  afterwards; for a drive, start the board without a computer on that socket.
+- **The wait** is 5 seconds, `COMPUTER_WAIT_MS` of `firmware/usermod/odrig_drive.cpp`,
+  unless WLED's settings say otherwise: the page "Usermods" of WLED's settings shows it
+  as `computer_wait_s` under `odrig`, from 0 to 60 seconds, kept in `/cfg.json` of the
+  board's storage. A value outside that range leaves 5. A change takes effect at the next
+  start, and 0 gives the socket to a drive at once.
+- **The USB host** of ESP-IDF serves the socket, Espressif's driver of flash drives,
+  `usb_host_msc` 1.1.1 in `firmware/usb_host_msc/`, reads the drive, and its file system
+  is mounted at `/usb`. The drive is read and never written or formatted.
+
+- **Preparing a drive.** FAT32 or FAT16, with a folder `odrig` at its top that holds the
+  `.odrg` files, made for the board's canvas as the installed ones are. Names are kept
+  to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`: the firmware's file
+  system reads names in the code page 850, so Hebrew letters, for one, come out as `?`,
+  and such a file cannot be opened by its name and is left out. Folders inside
+  `odrig` and other files are passed over; at most 256 files are taken, the first in the
+  order of their names.
+- **The adapter and the sockets.** The chip's own socket gives a plugged device no power:
+  plugged in directly, a drive is not seen. Between that socket and the drive goes a
+  USB-C adapter or hub with a power input of its own, which is powered. The computer
+  reaches the board on the socket marked COM, for commands and for flashing.
+- **Plugging in and pulling out** work while the board runs. A drive is taken up when it
+  comes: mounted, its folder listed once, and its files read and added to the playlist
+  one by one while the show plays. When it goes, its animations leave the playlist.
+- WLED's information has `odrig drive`: `looking for a computer` during the wait,
+  `computer`, `none`, the number of animation files of the drive, `not readable` for a
+  drive that did not mount, or `no USB host` when the host did not start.
+- The list's names take 64 KB of the external memory, and the two files that are read
+  4 KB each of the internal memory. The rate while a file of the drive is read has not
+  been measured yet.
+
+### The log
+
+The firmware writes a log on the socket marked COM, between the replies to commands: a
+line for every event of the chip's own socket, and every line the player logs. A line is
+one line of printable ASCII: `#log`, the seconds since the start with three decimals, the
+kind of the line, and its text.
+
+```
+#log 5.012 usb: no computer on the port within 5 s
+#log 5.020 usb: host started
+#log 31.407 usb: a device came: maker 0781, product 5581, a stick
+#log 31.902 usb: stick opened: 12 animation files in odrig
+#log 32.115 player: drive file clip.odrg left out: size-mismatch
+#log 58.230 usb: a device went
+```
+
+The lines of the kind `usb`:
+
+- After the look for a computer: `a computer is on the port, which stays a serial port`,
+  or `no computer on the port within 5 s`, with the wait of the settings.
+- The USB host: `host started`, or `host did not start: <error>`, with the error of
+  ESP-IDF.
+- A device: `a device came: maker <four hex digits>, product <four hex digits>, <kind>`,
+  where the kind is that of its first interface, or of the device when it has none:
+  `a hub` for the class 9, `a stick` for the class 8, `another device (class <n>)` for any
+  other; `a device came that could not be opened (<error>)`; and `a device went`. The
+  maker's and the product's numbers are those of the device's descriptor.
+- A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
+  `stick not opened: no file system it reads (<error>)`,
+  `stick not opened: a fault in reading (<error>)`, or
+  `stick not opened: a fault in reading the folder odrig`.
+
+The lines of the kind `player` are what the player logs: a file of a drive that is left
+out, `drive file <name> left out: <reason>`, and the reason the show became invalid, as
+WLED's information shows it.
+
+- **Never in the way.** A line is added from any task without waiting, into a queue of 32
+  lines of up to 160 bytes; a longer text is cut, and every byte outside printable ASCII
+  is written as `?`. The UART's code writes a waiting line only when the UART's queue of
+  2,048 bytes takes it whole at once, so the log holds back neither the LEDs nor the
+  commands, and a line never breaks into a reply. When lines come faster than the socket
+  takes them, the oldest give way, and the next line written says how many:
+  `#log 40.100 log: 7 lines dropped`.
+- **Reading it.** The command tool prints it, with
+  `python -m odrigctl --port /dev/cu.usbmodem5C831043631 --log`, until it is stopped with
+  Ctrl-C, as [emulator.md](emulator.md#the-command-tool) describes; so does any serial
+  terminal on the socket marked COM at 115,200 bits a second, eight data bits, no parity,
+  one stop bit. The tool's commands take only replies as replies and pass over the log's
+  lines, so a command may be sent while the log is read, from another terminal.
+- **Where it is not.** The log goes to the socket marked COM only: not to the chip's own
+  socket, not over Wi-Fi, and not into the board's storage. It names nothing of the Wi-Fi
+  settings. The probe build, which never starts the USB host, has the player's lines
+  only.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same
@@ -609,7 +793,7 @@ through its own interface keep working; while WLED writes a new firmware, the us
 no file and sends nothing to the LEDs.
 
 **WLED's information** (`/json/info`, and the Info page of its interface) reports the
-access point as active in `wifi.ap`, the release name `odrig_ESP32-S3_16MB_opi`, and three
+access point as active in `wifi.ap`, the release name `odrig_ESP32-S3_16MB_opi`, and the
 entries of the usermod:
 
 | Entry | Value |
@@ -617,6 +801,20 @@ entries of the usermod:
 | `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
 | `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
 | `odrig start` | The milliseconds the core took to start. |
+| `odrig drive` | What there is of a USB drive, as [A USB drive](#a-usb-drive) says. |
+| `odrig update` | `refused: no second slot` on a board of the bigger layout, where an update over Wi-Fi is refused; `WLED's` on WLED's layout, where WLED's own update works. |
+
+**An update over Wi-Fi.** On a board of the bigger layout of
+[The regions of the flash](#the-regions-of-the-flash) there is no second firmware slot, and
+the firmware is updated over the USB cable only. An update sent to WLED's page, its own
+form or `POST /update`, is answered with WLED's message page, status 501, `Update refused`
+and *This board has no second firmware slot: that room holds animations. Its firmware is
+updated over the USB cable with python3 firmware/fw.py flash.* Nothing is written, the
+LEDs go on playing, and the upload is thrown away as it arrives. The layout itself keeps
+any other update from writing: its one slot is a factory slot, for which the update
+library finds no slot to write, so WLED's own update, and ArduinoOTA when it is on, fail
+before they write. On WLED's layout the firmware registers nothing, and WLED's update works
+as it does in stock WLED.
 
 **The outputs** are set from the mapping file. When the core has started with a valid
 mapping, the usermod replaces WLED's outputs with one output for each leg, in the order of
@@ -703,9 +901,9 @@ lock to know them.
 | The outputs are the mapping's. WLED's LED output settings are replaced by them when WLED's LED settings are saved. | The web interface, the JSON interface and WebSocket. |
 | WLED's switch, its brightness slider and its live override do not change the LEDs. | The current limiter and its maximum in WLED's LED settings. |
 | The USB serial port speaks only [commands.md](commands.md): WLED's serial handling, Adalight, TPM2, Improv and JSON over serial, is switched off. | The file system and every file of WLED on it. |
-| WLED's information shows the three `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface. |
+| WLED's information shows the `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface, on WLED's layout. |
 | The audio usermod of the stock build is not included. | Buttons, relay and infrared settings. |
-| The web server also answers `POST /odrig`. | Every page and address WLED serves. |
+| The web server also answers `POST /odrig`, and on the bigger layout it answers `POST /update` with the refusal. | Every other page and address WLED serves. |
 
 One patch changes files of WLED, `firmware/patches/010-sixteen-parallel-outputs.patch`,
 which `build` and `build --probe` apply and `build --stock` does not. Stock WLED drives
@@ -837,13 +1035,18 @@ What the figures say:
   loop of an animation and at every turn of the playlist or of a cycle: 24 ms for a small
   file, and up to 70 ms with dense clips, when the frames that came due meanwhile are decoded in the same
   request.
-- **The start takes as long as the files are large.** The core checks every file at start
-  by decoding it: 217 ms for the demo show, 6.1 s for one dense 60 x 60 clip of 10 seconds
-  compressed and 4.3 s uncompressed, and 39 s for a storage filled with 9 MB of such
-  clips. For that time the LEDs are dark and the board answers nothing, on the port or on
-  the network; WLED opens its access point only afterwards. `install-show` and `flash`
-  wait 20 seconds for the board's answer; `--wait SECONDS` makes them wait longer for a
-  large show.
+- **The show plays at once after a restart.** The core reads the first 16 bytes of every
+  file at its start, and the rest while the show plays. Measured through the socket
+  marked COM: `status` answered 0.48 s after a restart with the demo show, 0.72 s with
+  two dense 60 x 60 clips, and 1.31 s with 9 MB of dense clips behind a small animation,
+  each time with the playlist playing; before, the board was dark and silent for 39 s
+  with 9 MB.
+- **Reading the files after the start** took 1.9 s for the demo show, at 47 or 48
+  refreshes a second. For the 9 MB behind a small animation it took 491 s: while the
+  small animation played its turn the rate was 36 to 48, and while a dense clip played
+  it was 20 to 33, 30.5 on average, because the check then gives way and reads one frame
+  record in ten refreshes. Until it has read everything, `list`, `remove` and
+  `upload begin` answer `busy`; `install-show` and `install-firmware` wait for it.
 - **`install-show`** takes 37 seconds for a small show: twice 17 seconds for the chip to
   work out the checksum of storage, before and after, and the write between. One dense
   clip takes a minute and 9 MB take three.
@@ -917,7 +1120,7 @@ touches these regions only:
 | Region | Address | Size | Written by |
 |---|---|---|---|
 | Bootloader | `0x0` | up to `0x8000` | `restore-stock --full` only |
-| Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
+| Partition table | `0x8000` | `0x1000` | `restore-stock --full` and `big-storage` only |
 | Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash`, `install-firmware` and `restore-stock` |
 | First application (`app0`) | `0x10000` | `0x300000` | `flash`, `install-firmware`, `restore-stock` |
 | Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only |
@@ -927,11 +1130,39 @@ partition at `0xFF0000` are never written. The whole flash is never erased, and 
 writes a fuse of the chip or starts a program that can. esptool is given an address only
 after the tool has checked it against this table.
 
+The tool knows a second layout, the bigger one, which gives the room of the second firmware
+slot to the storage. Its one firmware slot is a factory slot, for which an update over
+Wi-Fi finds no slot to write; the tool names a table by its firmware slots: with a second
+one it is WLED's layout, with one alone the bigger one.
+
+| Partition | Address | Size |
+|---|---|---|
+| `nvs`, `otadata` | `0x9000`, `0xE000` | `0x5000`, `0x2000`, as in WLED's |
+| `app0`, a factory slot | `0x10000` | `0x300000` |
+| `spiffs` | `0x310000` | `0xCE0000`, 13,500,416 bytes; its first 3 MB written by `big-storage`, and changed blocks by the commands that write storage |
+| `coredump` | `0xFF0000` | `0x10000` |
+
+On a board of WLED's layout `restore-stock --full` writes no storage. On one of the bigger
+layout it writes WLED's storage whole, holding the board's settings, as it puts WLED's
+layout back.
+
+**Why the bigger layout.** On 2026-10-15 the owner's show of 113 animations for the 60 x 60
+canvas, 10.1 MB of files, did not fit WLED's storage: the file system keeps every file in
+blocks of 4,096 bytes with records of its own, and was short by about 0.2 MB, so six of the
+smallest animations were left out. The firmware is updated over the USB cable with this tool
+only, and the second firmware slot is needed only by an update over Wi-Fi; the owner gave
+those up, and the bigger layout gives the slot's 3,145,728 bytes to the storage. What is
+given up: an update over Wi-Fi, which the firmware refuses with its reason, as "An update
+over Wi-Fi" under [What the firmware does](#what-the-firmware-does) says. A board is moved
+with `big-storage` and back with `restore-stock --full`; after either, the show is
+installed again.
+
 ## Rolling back
 
 `python3 firmware/fw.py restore-stock` brings back stock WLED 16.0.1, with its settings and
 its show as they were. `--full` also brings back the stock bootloader and partition table,
-for a board whose first 64 KB were changed by something else.
+for a board whose first 64 KB were changed by something else, and WLED's layout for a board
+of the bigger one, with its settings and without its show; `big-storage` moves it again.
 
 The last resort is the factory backup of the board: one image of the whole 16 MB flash with
 its own checksum file, kept beside this repository. No tool reads or writes it. It is

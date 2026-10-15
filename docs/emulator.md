@@ -9,7 +9,8 @@ decision about files, time and commands to it.
 This page covers the [commands](#commands) that build and test it, the
 [two shows](#two-shows-to-run) to run, [starting](#starting) it, its
 [serial port](#the-serial-port), [commands over HTTP](#commands-over-http), the
-[command tool](#the-command-tool), [the page](#the-page) with its two views, the
+[command tool](#the-command-tool), [previewing one animation](#previewing-one-animation),
+[the page](#the-page) with its three views, the
 [event stream](#the-event-stream), [record mode](#record-mode), the
 [exit statuses](#exit-statuses), what is [open after the work on Windows](#on-windows) and
 the [check list by eye](#the-check-list-by-eye).
@@ -51,8 +52,8 @@ lines beside HTTP sends them through the [line port](#the-line-port) there.
 The emulator runs a packed show: the folder that `node converter/odrig.js pack` writes,
 described in [converter.md](converter.md). `pack` needs Node.js 20 or later and nothing
 else. Two shows are tracked. `python` on this page is any Python 3.10 or later, `python3`
-on a Mac; nothing here needs the libraries of the virtual environment of
-[reference-converter.md](reference-converter.md). `pack` refuses an output folder that is
+on a Mac; nothing here needs a library outside Python's own. `pack` refuses an output
+folder that is
 not empty, so remove the folder before packing again.
 
 **The example show**, for today's build of two legs, 60 x 6: Hello world and the bouncing
@@ -91,12 +92,12 @@ from the top-left corner to the bottom-right one, and so passes over every leg.
 | `dvd.odrg`, 20.9 s | 116 | 1,052 |
 
 The sizes are those the converter gives, on every computer. The generators are programs
-of the Python package of [reference-converter.md](reference-converter.md).
+of the Python library of [python-library.md](python-library.md).
 
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -121,8 +122,9 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--tcp-port N` | The port of the [line port](#the-line-port) on 127.0.0.1; 0 takes any free port. | On a Mac there is no line port; on Windows it is 8601 |
 | `--core PATH` | The core's shared library. | `core/build/libodrig_core.dylib` under the repository root; on Windows `core/build/odrig_core.dll` |
 | `--verbose` | Prints the core's diagnostic lines to standard error, each after `core: `. | They are kept, not printed. |
-| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 10,354,688, the size of the board's storage |
+| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
+| `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
@@ -130,23 +132,62 @@ with `--lan` on every address this computer has.
 
 **Storage.** The emulator gives the core the storage functions of [core.md](core.md) on
 the folder it was started on, and on nothing else: a name with a path separator, or one
-that is not made of the characters the core uses for a file name, is refused. For
-`space` it reports the board's storage and not the Mac's disk: as the total 10,354,688
-bytes, or the number given with `--storage`, and as the free space the total less the
-sizes of the files of the folder, each rounded up to 4,096 bytes, and not below 0.
-`remove` and `upload` change the folder as they change the board's storage: an upload is
-written into `upload.part` of the folder piece by piece and takes its name when
-`upload end` succeeds, `show.json` is written again through `show.part`, and a file no
-item names any more is deleted. To keep a show, run a copy of its folder. A folder the
-emulator was stopped on during an upload holds `upload.part` until the emulator is
-started on it again; `install-show` of the firmware tool refuses such a folder, as it
+that is not made of the characters the core uses for a file name, is refused. For `space`
+it reports the board's storage and not the Mac's disk: as the total 13,500,416 bytes, the
+board's storage on its bigger layout, or the number given with `--storage`, and as the
+free space the total less the sizes of the files of the folder, each rounded up to 4,096
+bytes, and not below 0. `remove` and `upload` change the folder as they change the board's
+storage: an upload is written into `upload.part` of the folder piece by piece and takes
+its name when `upload end` succeeds, `show.json` is written again through `show.part`, and
+a file no item names any more is deleted. To keep a show, run a copy of its folder. A
+folder the emulator was stopped on during an upload holds `upload.part` until the emulator
+is started on it again; `install-show` of the firmware tool refuses such a folder, as it
 refuses any file the show does not name. The emulator paces nothing: its file operations
 take microseconds, and the check of an uploaded file takes one frame of it for each
 refresh, as on the board.
 
+**After a start.** The show plays from the first refresh, however much is installed: the
+core reads only the first 16 bytes of every animation before it plays. It reads the
+animations to their ends while the show plays, as [core.md](core.md) describes under
+"The check after the start", and until it has, `list`, `remove` and `upload begin` are
+answered with `{"ok":false,"error":"busy"}`. A client asks again a moment later; every
+other command works at once. For the example show that is over within a second. A fault
+the core finds in an animation on the way makes the show invalid then: the LEDs go dark
+and `status` gives the reason. The emulator has no code of its own for any of this, and
+neither has the command tool, which prints `busy` as it prints every refusal and ends
+with status 1. In record mode the core reads at the pace of the ticks, so a script that
+lists, removes or uploads does so after the first second.
+
 Any folder starts the emulator. Whether it holds a valid show is the core's judgement: with
 an invalid show the LEDs stay dark, `status` gives the reason and every command is still
 answered.
+
+### A drive
+
+With `--drive DIR` the emulator gives the core a USB drive of animations, as
+[show.md](show.md#animations-from-a-usb-drive) describes, and the folder `DIR` stands
+for its top:
+
+```
+python -m emulator build/demo-20/show --drive build/stick
+```
+
+- The emulator looks for the folder `DIR/odrig` once a second. When it appears, a drive
+  is plugged in: its list is made then, of the files whose names end in `.odrg`, in any
+  case, and do not begin with a dot, in the order of their names, at most 256. When the
+  folder goes, the drive is pulled out. A folder `DIR` that is not there yet is no
+  error: the drive is plugged in once `DIR/odrig` is.
+- The list is made when the folder appears and not again while it stays, as the files of
+  a drive do not change while it is plugged in. To take up files added to it, move the
+  folder `odrig` away for two seconds and back.
+- The core reads the drive's files after the installed ones, while the show plays. Each
+  sound one joins the playlist and `list` with an id from 60001 up once it has been read;
+  one that is not is left out, and with `--verbose` the reason is printed, as
+  `core: drive file broken.odrg left out: truncated`.
+- Nothing is written to `DIR`. `space` counts the folder of the show only.
+- The page's header names the folder `DIR` after `drive`.
+
+`--drive` does not go with `--record`: record mode has no drive.
 
 ## The serial port
 
@@ -273,8 +314,10 @@ warning: --lan: anyone on the local network can send commands to this emulator a
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
 plain files in `emulator/web/`, loads nothing from another host, and works without a
-network connection. The page only shows: it sends no command. Every change on it comes
-from the [event stream](#the-event-stream), so a command sent by any tool is seen at once.
+network connection. The page itself only shows: it sends no command. Every change on it
+comes from the [event stream](#the-event-stream), so a command sent by any tool is seen
+at once. Its third view holds the operators' app, which does send commands, as it does on
+a phone.
 
 From top to bottom the page has:
 
@@ -288,9 +331,9 @@ From top to bottom the page has:
   reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
   LEDs to draw, and the page says so.
-- **The drawing**, in two views chosen by the tabs `LEDs` and `Mapping`, both described
-  below, with a readout at its top right that names what the pointer is on:
-  `leg 2, pin 2, LED 61 (1,2)`.
+- **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
+  each described below, with a readout at its top right that names what the pointer is
+  on: `leg 2, pin 2, LED 61 (1,2)`.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
@@ -582,6 +625,34 @@ and 756 x 627 of a window of 756 x 900. For the target file, in pixels:
 | 1920 x 1000 | cells of 14, with the LED numbers | wide, cells of 12, the drawing 1255 x 990 |
 | 600 x 546 | cells of 8, without the LED numbers | narrow, cells of 7, the drawing 576 x 1143 |
 
+### The controller view
+
+The third tab, `Controller`, shows the LEDs as the LEDs view does and, beside them, the
+operators' app of [android-app.md](android-app.md). The address
+`http://127.0.0.1:8600/#controller` opens it directly. The app stands in a frame as wide
+as a phone, 390 points; in a window narrower than 760 points it lies under the LEDs.
+
+- **The same code.** What runs in the frame is the app's web code, the files of
+  `app/www/`, which the emulator serves under `/app/` as they are, with the scripts of
+  the converter's library, `converter/lib/`, under `/app/converter/`. The APK holds the
+  same files, so what a button does here is what it does on a phone. One thing differs: on a
+  phone a piece of Android code carries each line to the target, and here the browser
+  does.
+- **Its target is this emulator.** The page gives the app its own address before the app
+  starts, so the app answers at once and goes to its show screen. The app's target
+  screen shows that address, and takes another as it does on a phone.
+- **What it sends.** `status` once a second, `list` now and then, and a line for each
+  press: `play <id>`, `play all`, `on`, `off`, `brightness <n>`. The lines are in the
+  command log as lines over HTTP, and the LEDs beside the app show what they did.
+- **Only while it is shown.** The frame is made when the tab is chosen and removed when
+  another tab is: on the other two views the app does not run, and nothing is sent.
+
+With `--lan` the browser of a phone opens the same view at the address of the `lan:`
+line with `#controller` at its end.
+
+The emulator serves `app/www/` from the repository it runs in. Where that folder is not
+there, the frame is empty.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
@@ -593,13 +664,13 @@ event:
 
 ```
 event: hello
-data: {"show":"/abs/path/of/show","page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
+data: {"show":"/abs/path/of/show","drive":null,"page":"http://127.0.0.1:8600/","serial":"/abs/path/build/emulator/serial","tcp":null,"legs":[[1,1,180],[2,2,180]],"t0":3,"error":null}
 
 event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
-data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
 
 event: frame
 data: 123460 <base64 of the refresh>
@@ -607,7 +678,7 @@ data: 123460 <base64 of the refresh>
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `drive` is the folder of `--drive`, or `null` without it. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
@@ -688,7 +759,7 @@ python -m odrigctl --http 127.0.0.1:8600 remove 9
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6}
 ```
 
 | Status | Meaning |
@@ -724,6 +795,25 @@ The tool prints the reply line to standard output:
   as the body and the content type `application/octet-stream`, and takes the body of a
   response with status 200 as the reply. Any other status counts as not reached.
 - The options may stand before or after the command.
+
+**`--log`** prints the lines of a target's log as they arrive, and sends nothing. It goes
+with `--port` or `--tcp` and no command. The board writes its log on the socket marked
+COM, as [firmware.md](firmware.md#the-log) describes; the emulator writes none.
+
+```
+python -m odrigctl (--port NAME | --tcp ADDRESS) [--timeout SECONDS] --log
+python -m odrigctl --port /dev/cu.usbmodem5C831043631 --log
+#log 5.012 usb: no computer on the port within 5 s
+#log 5.020 usb: host started
+```
+
+- Every received line that begins with `#log ` is printed as it arrives, without its line
+  end; every other line, a reply or a line of the chip's loader, is passed over. The port
+  is opened as for a command, and the connection made as for one.
+- It goes on until it is stopped with Ctrl-C, which is status 0. A port that goes away,
+  or a TCP target that closes the connection, is status 3 with one line
+  `error: unreachable: <detail>`. `--log` with `--http` or with a command is status 2.
+- A command takes only a reply as its answer, whatever lines of the log come before it.
 
 **`upload ID FILE`** sends an animation as the commands of [commands.md](commands.md),
 "Uploading an animation", describe it. The file is one the converter made for the canvas
@@ -782,6 +872,36 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
 
+## Previewing one animation
+
+```
+python -m preview FILE [--mapping FILE] [--no-browser] [--core PATH]
+```
+
+Shows one finished `.odrg` file in the emulator, alone, until Ctrl-C. The path may be
+absolute or relative, and the file may have any name: it is not changed. `preview` is a
+small program of its own, beside the emulator and the command tool, and holds no
+converter logic.
+
+1. The converter's `check` reads the file. A file it refuses ends the command with the
+   reason, `preview: <file> is refused: bad-magic` for example, before anything starts.
+2. The converter packs `shows/preview/show.json`, a show without items at brightness
+   255, with the mapping into `build/preview/<process id>/`. The mapping is
+   `mapping/legs-20.json`, the installation's 60 x 60, unless `--mapping` names another.
+3. The emulator starts on that folder, on port 8600, or on a free port when that is
+   taken: the command then says `preview: port 8600 is taken; the page is on <port>`.
+   It has a serial port and a line port of its own, so it runs beside another emulator.
+4. The file is uploaded as item 1, `preview.odrg`, as the operators' app will upload one
+   to the board: the core checks it whole. A file of another canvas ends the command with
+   `preview: <file> is 60 x 60, and the mapping <mapping> is 60 x 6`.
+5. `page: <address>` is printed and the page opens in the default browser, unless
+   `--no-browser` is given. The playlist is the one animation, in loops.
+
+Ctrl-C, or a termination, stops the emulator and removes the folder; the command then
+ends with 0. A refusal ends it with 1 and one line on standard error, with nothing left
+running. Without the core's library, or without Node.js, it says which step of
+[getting-started.md](../agent/getting-started.md) is missing and starts nothing.
+
 ## Record mode
 
 ```
@@ -838,7 +958,7 @@ after it. For each command the emulator prints one line to standard output, `rep
 time and the reply:
 
 ```
-reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
+reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
 ```
 
 The whole script is checked before the core starts. A script that breaks a rule is refused
@@ -1144,7 +1264,7 @@ What is left on Windows:
   what needs a board on a Windows computer.
 
 After `master` brought the content commands and the converter in JavaScript, on the merged
-branch and with Python 3.14: the reference converter's suite, 638 tests; the core suite,
+branch and with Python 3.14: the suite of the Python package, 638 tests; the core suite,
 364, and with Microsoft's compiler 364 of which 10 are skipped; the suite of the emulator
 and the command tool, 523 of which 17 are skipped; the onboarding suite, 81. `space`,
 `list`, `remove` and `upload` are part of those suites and run over the line port. The

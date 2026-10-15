@@ -35,6 +35,21 @@ export function controls(app) {
   };
 }
 
+// What the storage screen says: the space, and the rows with the id and the words of
+// each, or null for a line that is not shown.
+export function storage(app) {
+  return {
+    space: app.text("space"),
+    rows: [...app.doc.querySelectorAll("#installed > .row")].map((row) => ({
+      id: Number(row.dataset.id),
+      text: row.querySelector("p").innerText.replace(/\s+/g, " ").trim(),
+      buttons: [...row.querySelectorAll("button")].map((button) => button.textContent.trim()),
+    })),
+    none: app.text("installed-none"),
+    dimmed: app.byId("installed").classList.contains("stale"),
+  };
+}
+
 // Waits for the show screen with a status and with the rows a test expects.
 export async function shown(app, count) {
   await app.until(() => app.shown() === "show", "the show screen is shown");

@@ -239,7 +239,7 @@ class TheEmulator(unittest.TestCase):
     def test_hello_carries_the_address_of_the_line_port(self):
         with support.EventStream(self.emulator.port) as stream:
             hello = json.loads(stream.read_until(lambda events: bool(events))[0].data)
-        self.assertEqual(sorted(hello), ["error", "legs", "page", "serial", "show", "t0", "tcp"])
+        self.assertEqual(sorted(hello), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         self.assertEqual(hello["tcp"], self.emulator.tcp)
         self.assertEqual(hello["serial"], self.emulator.serial)
         self.assertEqual(hello["serial"] is None, not support.HAS_SERIAL)

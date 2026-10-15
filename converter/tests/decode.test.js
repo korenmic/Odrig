@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, jsonframes, odrg} from "../lib/index.js";
-import {ROOT, hex, libraryCheck, libraryText, numbers, pythonChecks, runBoth, runJs, runPython, sameVerdict, temporary} from "./support.js";
+import {ROOT, hex, libraryCheck, libraryText, numbers, runJs, runJsAndStored, sameVerdict, storedChecks, storedRun, temporary} from "./support.js";
 
 const VALID = path.join(ROOT, "tests", "vectors", "valid");
 const INVALID = path.join(ROOT, "tests", "vectors", "invalid");
@@ -60,7 +60,7 @@ test("every valid vector is decoded to the frames of its JSON file, record by re
 });
 
 test("every invalid vector is rejected with the reason its name gives", async (t) => {
-  const theirs = pythonChecks("odrg", invalidNames.map((name) => bytesOf(INVALID, name)));
+  const theirs = storedChecks("odrg", invalidNames.map((name) => bytesOf(INVALID, name)));
   for (let i = 0; i < invalidNames.length; i += 1) {
     const name = invalidNames[i];
     await t.test(name, () => {
@@ -88,7 +88,7 @@ test("every invalid vector is rejected with the reason its name gives", async (t
 test("check on the command line prints what the Python tool prints", async (t) => {
   for (const name of validNames) {
     await t.test(name, () => {
-      const {js, python} = runBoth(["check", `tests/vectors/valid/${name}`]);
+      const {js, python} = runJsAndStored(["check", `tests/vectors/valid/${name}`]);
       assert.equal(python.status, 0);
       assert.match(python.out, /^format: odrg\ncanvas: \d+x\d+\nframes: \d+\nduration_ms: \d+\ncolours: \d+\nfile_bytes: \d+\npalette: \d+\ncompressed: (yes|no)\n$/);
       assert.deepEqual(js, python);
@@ -97,7 +97,7 @@ test("check on the command line prints what the Python tool prints", async (t) =
   for (const name of validNames) {
     const source = name.replace(/\.odrg$/, ".json");
     await t.test(source, () => {
-      const {js, python} = runBoth(["check", `tests/vectors/valid/${source}`]);
+      const {js, python} = runJsAndStored(["check", `tests/vectors/valid/${source}`]);
       assert.equal(python.status, 0);
       assert.match(python.out, /^format: json-frames\ncanvas: \d+x\d+\nframes: \d+\nduration_ms: \d+\ncolours: \d+\nfile_bytes: \d+\n$/);
       assert.deepEqual(js, python);
@@ -105,7 +105,7 @@ test("check on the command line prints what the Python tool prints", async (t) =
   }
   for (const name of invalidNames) {
     await t.test(name, () => {
-      const {js, python} = runBoth(["check", `tests/vectors/invalid/${name}`]);
+      const {js, python} = runJsAndStored(["check", `tests/vectors/invalid/${name}`]);
       assert.equal(python.status, 1);
       assert.equal(python.err.split(": ")[1], name.split(".")[0]);
       sameLines(js, python, name);
@@ -120,7 +120,7 @@ test("decode on the command line writes what the Python tool writes", async (t) 
       const ours = path.join(folder, `${name}.js.json`);
       const theirs = path.join(folder, `${name}.py.json`);
       const js = runJs(["decode", `tests/vectors/valid/${name}`, ours]);
-      const python = runPython(["decode", `tests/vectors/valid/${name}`, theirs]);
+      const python = storedRun(["decode", `tests/vectors/valid/${name}`, theirs]);
       assert.deepEqual(js, {status: 0, out: "", err: ""}, name);
       assert.deepEqual(python, {status: 0, out: "", err: ""}, name);
       assert.ok(fs.readFileSync(ours).equals(fs.readFileSync(theirs)), name);
@@ -132,7 +132,7 @@ test("decode on the command line writes what the Python tool writes", async (t) 
   await t.test("records with the same picture are written as one frame", () => {
     const folder = temporary(t);
     const out = path.join(folder, "durations.json");
-    assert.equal(runBoth(["decode", "tests/vectors/valid/durations.odrg", out]).js.status, 0);
+    assert.equal(runJsAndStored(["decode", "tests/vectors/valid/durations.odrg", out]).js.status, 0);
     const decoded = odrg.decode(bytesOf(VALID, "durations.odrg"));
     const written = jsonframes.loads(new Uint8Array(fs.readFileSync(out)));
     assert.ok(written.frames.length < decoded.records.length);
@@ -144,7 +144,7 @@ test("decode on the command line writes what the Python tool writes", async (t) 
     const folder = temporary(t);
     for (const name of invalidNames) {
       const out = path.join(folder, "out.json");
-      const {js, python} = runBoth(["decode", `tests/vectors/invalid/${name}`, out]);
+      const {js, python} = runJsAndStored(["decode", `tests/vectors/invalid/${name}`, out]);
       assert.equal(python.status, 1, name);
       sameLines(js, python, name);
       assert.deepEqual(fs.readdirSync(folder), [], name);
@@ -155,7 +155,7 @@ test("decode on the command line writes what the Python tool writes", async (t) 
     const folder = temporary(t);
     const out = path.join(folder, "out.json");
     fs.writeFileSync(out, "before");
-    const {js, python} = runBoth(["decode", "tests/vectors/invalid/bad-magic.odrg", out]);
+    const {js, python} = runJsAndStored(["decode", "tests/vectors/invalid/bad-magic.odrg", out]);
     assert.deepEqual(js, python);
     assert.equal(js.status, 1);
     assert.equal(fs.readFileSync(out, "utf8"), "before");
@@ -164,10 +164,10 @@ test("decode on the command line writes what the Python tool writes", async (t) 
 
   await t.test("a missing input, and an output that cannot be written", () => {
     const folder = temporary(t);
-    const missing = runBoth(["decode", path.join(folder, "none.odrg"), path.join(folder, "out.json")]);
+    const missing = runJsAndStored(["decode", path.join(folder, "none.odrg"), path.join(folder, "out.json")]);
     assert.deepEqual(missing.js, missing.python);
     assert.equal(missing.js.err, `error: not-found: ${path.join(folder, "none.odrg")}: No such file or directory\n`);
-    const unwritable = runBoth(["decode", "tests/vectors/valid/pal-1.odrg", path.join(folder, "none", "out.json")]);
+    const unwritable = runJsAndStored(["decode", "tests/vectors/valid/pal-1.odrg", path.join(folder, "none", "out.json")]);
     assert.deepEqual(unwritable.js, unwritable.python);
     assert.equal(unwritable.js.status, 1);
     assert.deepEqual(fs.readdirSync(folder), []);
@@ -204,7 +204,7 @@ test("damaged and cut copies of valid files get the verdict of the reference", a
   for (const name of validNames) {
     cases.push(...copies(name, bytesOf(VALID, name), from, 420));
   }
-  const theirs = pythonChecks("odrg", cases.map((entry) => entry.bytes));
+  const theirs = storedChecks("odrg", cases.map((entry) => entry.bytes));
   const reasons = new Map();
 
   await t.test(`${cases.length} copies`, () => {
@@ -249,7 +249,7 @@ test("a file with more than one defect gets the reason of the first check", asyn
     ["sixteen bytes that are not ODRG", new Uint8Array(16), "bad-magic"],
     ["the largest frame count", with_([[12, 0xff], [13, 0xff], [14, 0xff], [15, 0xff]]), "truncated"],
   ];
-  const theirs = pythonChecks("odrg", cases.map(([, bytes]) => bytes));
+  const theirs = storedChecks("odrg", cases.map(([, bytes]) => bytes));
   for (let i = 0; i < cases.length; i += 1) {
     const [label, bytes, reason] = cases[i];
     await t.test(label, () => {
@@ -285,7 +285,7 @@ test("codes are read whole before they are judged, and padding is not looked at"
     ["a run to the end and fifteen bits of padding", file(0x38, [0b00001000, 0b10000000, 0])],
     ["a palette index of 2", file(0x30, [0b11110000, 0, 0])],
   ];
-  const theirs = pythonChecks("odrg", cases.map(([, bytes]) => bytes));
+  const theirs = storedChecks("odrg", cases.map(([, bytes]) => bytes));
   for (let i = 0; i < cases.length; i += 1) {
     const [label, bytes] = cases[i];
     await t.test(label, () => {
@@ -329,7 +329,7 @@ test("encode followed by decode gives back a merged source byte for byte", async
       assert.equal(fs.readFileSync(back, "utf8"), Buffer.from(jsonframes.dumps(animation)).toString("utf8"));
       const written = jsonframes.loads(new Uint8Array(fs.readFileSync(back)));
       assert.deepEqual(written.frames.map((frame) => frame.ms), [50, 5, 140000]);
-      const again = runPython(["decode", there, path.join(folder, "python.json")]);
+      const again = storedRun(["decode", there, path.join(folder, "python.json")]);
       assert.deepEqual(again, quiet);
       assert.ok(fs.readFileSync(path.join(folder, "python.json")).equals(fs.readFileSync(back)));
     }

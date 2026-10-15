@@ -66,10 +66,11 @@ def refreshes(lines):
 
 
 class Playback(unittest.TestCase):
-    def assert_as_the_reference(self, files, script, options=()):
-        """Runs a script on the core and on the reference player and compares every line."""
-        printed = support.start(files, script, options).lines
-        expected = support.ReferencePlayer(files).run(script)
+    def assert_as_the_reference(self, files, script, options=(), check_first=True):
+        """Runs a script on the core and on the reference player and compares every line.
+        `check_first` is as for a session."""
+        printed = support.start(files, script, options, check_first=check_first).lines
+        expected = support.ReferencePlayer(files, check_first=check_first).run(script)
         self.assertEqual(len(printed), len(expected))
         for number, (line, wanted) in enumerate(zip(printed, expected)):
             if line != wanted:
