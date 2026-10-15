@@ -32,7 +32,7 @@ Rules for every task:
 - A page changes in the commit that changes the code it describes.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The web code
+- [x] 1. The web code
   - Set `"state": "in_progress"` in
     `project-seeds/25-p2-no-text-menu-outside-the-apps-fields/state.json`.
   - `app/www/style.css`, `app/www/main.js`, `app/www/old.html`: the rules and the

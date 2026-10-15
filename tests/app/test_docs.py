@@ -126,16 +126,18 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 14)))
-        self.assertEqual(check.count("*Seen:*"), 12)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 15)))
+        self.assertEqual(check.count("*Seen:*"), 13)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
-                         "press `Board`", "Leave mobile data on", "Switch mobile data off"):
+                         "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked"):
             self.assertIn(expected, flat(check))
 
     def test_it_says_what_is_verified_and_what_is_open(self):
         verified = flat(section(self.text, "What is verified"))
-        for expected in ("in Chrome against the emulator", "write nothing outside the repository's folder", "`INTERNET`, `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`"):
+        for expected in ("in Chrome against the emulator", "write nothing outside the repository's folder", "`INTERNET`, `ACCESS_NETWORK_STATE` and `CHANGE_NETWORK_STATE`",
+                         "a long press or a right click marks text and opens a menu only in a field one types into"):
             self.assertIn(expected, verified)
+        self.assertIn("A long press marks text, and opens the phone's menu of copying and pasting, only in a field one types into", flat(section(self.text, "Using it")))
         still_open = flat(section(self.text, "What is open"))
         for expected in ("No program has run the app on a phone, and no test runs the sender.", "macOS on Apple Silicon", "No phone has converted or uploaded an animation yet"):
             self.assertIn(expected, still_open)
