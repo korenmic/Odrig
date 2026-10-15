@@ -633,8 +633,9 @@ operators' app of [android-app.md](android-app.md). The address
 as a phone, 390 points; in a window narrower than 760 points it lies under the LEDs.
 
 - **The same code.** What runs in the frame is the app's web code, the files of
-  `app/www/`, which the emulator serves under `/app/` as they are. The APK holds the same
-  files, so what a button does here is what it does on a phone. One thing differs: on a
+  `app/www/`, which the emulator serves under `/app/` as they are, with the scripts of
+  the converter's library, `converter/lib/`, under `/app/converter/`. The APK holds the
+  same files, so what a button does here is what it does on a phone. One thing differs: on a
   phone a piece of Android code carries each line to the target, and here the browser
   does.
 - **Its target is this emulator.** The page gives the app its own address before the app

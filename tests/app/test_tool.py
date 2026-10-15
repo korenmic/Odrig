@@ -50,6 +50,18 @@ class Serve(unittest.TestCase):
                 self.assertEqual((status, body), (200, path.read_bytes()))
                 self.assertEqual((headers["Content-Type"], headers["Cache-Control"]), (types[path.suffix], "no-store"))
 
+    def test_the_converters_library_is_given_beside_the_web_code_as_it_is(self):
+        library = sorted(path for path in support.CONVERTER_LIBRARY.iterdir() if path.is_file())
+        self.assertIn(support.CONVERTER_LIBRARY / "index.js", library)
+        for path in library:
+            with self.subTest(path=path.name):
+                status, headers, body = get(self.server.port, "/converter/" + path.name)
+                self.assertEqual((status, body), (200, path.read_bytes()))
+                self.assertEqual((headers["Content-Type"], headers["Cache-Control"]), ("text/javascript; charset=utf-8", "no-store"))
+        for path in ("/converter", "/converter/", "/converter/nothing.js", "/converter/../index.html", "/converter/lib/index.js", "/lib/index.js", "/converter/index.html"):
+            with self.subTest(path=path):
+                self.assertEqual(get(self.server.port, path)[0], 404)
+
     def test_the_address_alone_gives_the_page(self):
         status, headers, body = get(self.server.port, "/")
         self.assertEqual((status, headers["Content-Type"], body), (200, "text/html; charset=utf-8", (support.WWW / "index.html").read_bytes()))
@@ -371,7 +383,10 @@ class TheStagedFolder(unittest.TestCase):
         source = {path.relative_to(support.WWW).as_posix(): path.read_bytes() for path in support.WWW.rglob("*") if path.is_file()}
         staged = {path.relative_to(made).as_posix(): path.read_bytes() for path in made.rglob("*") if path.is_file()}
         note = json.loads(staged.pop("build.json"))
-        self.assertEqual(staged, source)
+        library = {f"converter/{path.name}": path.read_bytes() for path in support.CONVERTER_LIBRARY.glob("*.js")}
+        self.assertGreater(len(library), 5)
+        self.assertEqual(staged, source | library)
+        self.assertFalse(set(source) & set(library))
         self.assertEqual(sorted(note), ["changed", "commit"])
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=support.ROOT, capture_output=True, text=True).stdout.strip()
         self.assertEqual((note["commit"], type(note["changed"])), (head, bool))

@@ -19,6 +19,7 @@ import urllib.parse
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 APP = ROOT / "app"
 WWW = APP / "www"
+CONVERTER_LIBRARY = ROOT / "converter" / "lib"
 PAGE = pathlib.Path(__file__).resolve().parent / "page"
 
 if str(APP) not in sys.path:

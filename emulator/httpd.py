@@ -34,6 +34,9 @@ WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 # files are asked for under.
 APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "www")
 APP_PATH = "/app/"
+# The converter's library, which the app imports from `converter/` beside its own files.
+LIBRARY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "converter", "lib")
+LIBRARY_PATH = APP_PATH + "converter/"
 INDEX = "index.html"
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -58,11 +61,17 @@ def page_files(folder=WEB):
     return files
 
 
-def app_files(folder=APP):
+def app_files(folder=APP, library=LIBRARY):
     """The files of the operators' app by the path each is asked for, under `/app/`: its
-    place on disk and its content type. The table is made by walking the folder, so
-    nothing outside it can be asked for. A folder that is not there gives an empty table."""
+    place on disk and its content type, and under `/app/converter/` the scripts of the
+    converter's library. The table is made by walking the folders, so nothing outside
+    them can be asked for. A folder that is not there gives no file."""
     files = {}
+    if os.path.isdir(library):
+        for name in sorted(os.listdir(library)):
+            place = os.path.join(library, name)
+            if name.endswith(".js") and os.path.isfile(place):
+                files[LIBRARY_PATH + name] = (place, CONTENT_TYPES[".js"])
     for base, folders, names in os.walk(folder):
         folders.sort()
         for name in sorted(names):

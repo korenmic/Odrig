@@ -11,6 +11,7 @@ from . import support
 
 WEB = support.ROOT / "emulator" / "web"
 APP = support.ROOT / "app" / "www"
+LIBRARY = support.ROOT / "converter" / "lib"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json"}
 
 
@@ -117,6 +118,16 @@ class TheApp(unittest.TestCase):
                 self.assertEqual(answer.headers["cache-control"], "no-store")
                 self.assertEqual(answer.body, path.read_bytes())
 
+    def test_the_converters_library_is_served_under_app_converter_as_it_is(self):
+        scripts = sorted(LIBRARY.glob("*.js"))
+        self.assertIn(LIBRARY / "index.js", scripts)
+        for path in scripts:
+            with self.subTest(path.name):
+                answer = self.emulator.request("GET", "/app/converter/" + path.name)
+                self.assertEqual((answer.status, answer.headers["content-type"], answer.body), (200, "text/javascript", path.read_bytes()))
+        for path in ("/app/converter", "/app/converter/", "/app/converter/nothing.js", "/app/converter/../main.js", "/converter/index.js", "/app/lib/index.js"):
+            self.assertEqual(self.emulator.request("GET", path).status, 404, path)
+
     def test_the_address_app_gives_the_apps_index(self):
         answer = self.emulator.request("GET", "/app/")
         self.assertEqual((answer.status, answer.headers["content-type"]), (200, "text/html; charset=utf-8"))
@@ -137,13 +148,17 @@ class TheApp(unittest.TestCase):
                 place = pathlib.Path(folder, name)
                 place.parent.mkdir(parents=True, exist_ok=True)
                 place.write_bytes(b"x")
-            table = httpd.app_files(folder)
-            self.assertEqual(sorted(table), ["/app/", "/app/a.js", "/app/index.html", "/app/sub/b.js", "/app/sub/deep/c.css"])
+            library = pathlib.Path(folder, "library")
+            library.mkdir()
+            for name in ("index.js", "notes.txt"):
+                pathlib.Path(library, name).write_bytes(b"y")
+            table = httpd.app_files(folder, library)
+            self.assertEqual(sorted(table), ["/app/", "/app/a.js", "/app/converter/index.js", "/app/index.html", "/app/library/index.js", "/app/sub/b.js", "/app/sub/deep/c.css"])
             self.assertEqual(table["/app/"], table["/app/index.html"])
             self.assertEqual(table["/app/sub/deep/c.css"], (str(pathlib.Path(folder, "sub", "deep", "c.css")), "text/css"))
-            self.assertEqual(httpd.app_files(pathlib.Path(folder, "absent")), {})
+            self.assertEqual(httpd.app_files(pathlib.Path(folder, "absent"), pathlib.Path(folder, "absent")), {})
         served = httpd.app_files()
-        self.assertEqual(sorted(served), sorted(["/app/"] + ["/app/" + path.relative_to(APP).as_posix() for path in app_files()]))
+        self.assertEqual(sorted(served), sorted(["/app/"] + ["/app/" + path.relative_to(APP).as_posix() for path in app_files()] + ["/app/converter/" + path.name for path in LIBRARY.glob("*.js")]))
 
 
 class TheControllerView(unittest.TestCase):

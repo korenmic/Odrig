@@ -13,6 +13,7 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WWW = ROOT / "app" / "www"
+LIBRARY = ROOT / "converter" / "lib"
 WORK = ROOT / "build" / "app"
 APK = WORK / "odrig-debug.apk"
 IDENTIFIER = "app.odrig.operators"
@@ -63,12 +64,13 @@ class TheApk(unittest.TestCase):
         self.assertRegex(config, r"E: base-config \(line=\d+\)\s+A: cleartextTrafficPermitted=true")
         self.assertNotIn("domain-config", config)
 
-    def test_the_web_code_is_in_it_byte_for_byte_and_nothing_else(self):
+    def test_the_web_code_and_the_converters_library_are_in_it_byte_for_byte_and_nothing_else(self):
         source = {path.relative_to(WWW).as_posix(): path.read_bytes() for path in WWW.rglob("*") if path.is_file()}
+        source |= {f"converter/{path.name}": path.read_bytes() for path in LIBRARY.glob("*.js")}
         packed = {name[len(PUBLIC):]: self.packed.read(name) for name in self.names if name.startswith(PUBLIC) and not name.endswith("/")}
         self.assertEqual(set(packed) - ADDED, set(source))
         for name, data in source.items():
-            self.assertEqual(packed[name], data, f"{name} in the APK is not the one of app/www: build again")
+            self.assertEqual(packed[name], data, f"{name} in the APK is not the one of app/www or converter/lib: build again")
         self.assertLessEqual(ADDED, set(packed))
         self.assertEqual((packed["cordova.js"], packed["cordova_plugins.js"]), (b"", b""))
 

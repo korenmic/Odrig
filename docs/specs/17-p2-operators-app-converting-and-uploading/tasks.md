@@ -47,7 +47,7 @@ Rules for every task:
     as it is, fails: the reply has no `width`.
   - Requirements: 1.1 to 1.3, 6.4
 
-- [ ] 2. The converter's library beside the web code
+- [x] 2. The converter's library beside the web code
   - `app/apptool/webserver.py`, `app/apptool/stage.py`, `emulator/httpd.py`: the library
     under `converter/`, from `converter/lib/`.
   - `tests/app/`: `serve` and the suite's server give each file of the library; the staged

@@ -23,16 +23,21 @@ class TheWebCode(unittest.TestCase):
         self.assertEqual({path.suffix for path in files()}, {".html", ".css", ".js"})
         for path in files():
             self.assertTrue(path.read_bytes().isascii(), path.name)
-        for name in ("package.json", "node_modules", "lib", "dist"):
+        for name in ("package.json", "node_modules", "lib", "dist", "converter"):
             self.assertFalse((support.WWW / name).exists(), name)
 
-    def test_a_script_imports_only_files_of_the_web_code(self):
+    def test_a_script_imports_only_files_of_the_web_code_and_the_converters_library(self):
         for name, text in scripts().items():
             for imported in re.findall(r"""(?:from|import)\s*\(?\s*["']([^"']+)["']""", text):
                 with self.subTest(script=name, imported=imported):
                     self.assertRegex(imported, r"\A\.\.?/")
                     found = (support.WWW / name).parent.joinpath(imported).resolve()
-                    self.assertTrue(found.is_file() and support.WWW in found.parents, imported)
+                    beside = found.relative_to(support.WWW.resolve()).parts if support.WWW.resolve() in found.parents else ()
+                    if beside[:1] == ("converter",):
+                        self.assertEqual(len(beside), 2, imported)
+                        self.assertTrue((CONVERTER_LIBRARY / beside[1]).is_file(), imported)
+                    else:
+                        self.assertTrue(found.is_file() and support.WWW in found.parents, imported)
 
     def test_only_the_file_of_the_target_knows_how_a_line_travels(self):
         for name, text in scripts().items():

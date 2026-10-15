@@ -33,6 +33,15 @@ def file_of(folder, path):
     return found if found.is_file() else None
 
 
+def file_of_the_app(folder, path, library=paths.CONVERTER_LIB):
+    """The file a request path names: one of the web code of a folder, or under
+    `/converter/` one of the converter's library."""
+    beside = "/" + paths.LIBRARY_FOLDER + "/"
+    if path.startswith(beside):
+        return file_of(library, path[len(beside) - 1:])
+    return file_of(folder, path)
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -49,7 +58,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        found = file_of(self.server.folder, self.path.split("?", 1)[0])
+        found = file_of_the_app(self.server.folder, self.path.split("?", 1)[0])
         if found is None:
             self.answer(404)
         else:
@@ -57,7 +66,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 class Server(http.server.ThreadingHTTPServer):
-    """Hands out the files of the web code, each with its content type, and nothing else."""
+    """Hands out the files of the web code and of the converter's library beside it, each
+    with its content type, and nothing else."""
 
     daemon_threads = True
     allow_reuse_address = True
