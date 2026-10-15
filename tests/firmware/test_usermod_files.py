@@ -17,11 +17,11 @@ PLATFORM_HEADER = "odrig_platform.h"
 STANDALONE = FIRMWARE / "standalone"
 # The headers of the chip's own software that a source names: the USB unit behind the
 # port, which the port's driver does not let through; the USB host, the driver of flash
-# drives and the reading of a folder, for a drive; and, in the probe build, the pulse
+# drives, the reading of a folder and the frame index of the USB unit, for a drive; and, in the probe build, the pulse
 # counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
 ALLOWED_IN = {
     "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
-    "odrig_drive.cpp": {"dirent.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
+    "odrig_drive.cpp": {"dirent.h", "soc/usb_serial_jtag_struct.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
     "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
 }
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}

@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 
+#include "soc/usb_serial_jtag_struct.h"
 #include "usb/msc_host.h"
 #include "usb/msc_host_vfs.h"
 #include "usb/usb_host.h"
@@ -37,7 +38,15 @@ const UBaseType_t DRIVE_PRIORITY = 1;
 const BaseType_t DRIVE_PROCESSOR = 1;
 const UBaseType_t EVENTS = 4;
 
-enum State : uint8_t { NO_HOST, NO_DRIVE, NOT_READ, MOUNTED };
+// How long the drive's task looks for a computer on the port before it takes the port
+// for a stick, unless the settings say otherwise, the most the settings may say, and how
+// often it looks.
+const uint32_t COMPUTER_WAIT_MS = 5000;
+const uint32_t MOST_WAIT_MS = 60000;
+const uint32_t LOOK_EVERY_MS = 10;
+uint32_t waitMs = COMPUTER_WAIT_MS;
+
+enum State : uint8_t { NO_HOST, LOOKING, COMPUTER, NO_DRIVE, NOT_READ, MOUNTED };
 volatile State state = NO_HOST;
 char summaryText[24] = "no USB host";
 
@@ -217,6 +226,10 @@ uint32_t listFolder() {
 void setSummary() {
   if (state == NO_HOST) {
     strcpy(summaryText, "no USB host");
+  } else if (state == LOOKING) {
+    strcpy(summaryText, "looking for a computer");
+  } else if (state == COMPUTER) {
+    strcpy(summaryText, "computer");
   } else if (state == NO_DRIVE) {
     strcpy(summaryText, "none");
   } else if (state == NOT_READ) {
@@ -279,7 +292,53 @@ void hostEvents(void *) {
   }
 }
 
+// Whether a computer shows itself on the port within the wait: a USB host sends a
+// start-of-frame packet each millisecond to the device it serves, and the chip's unit for
+// serial and JTAG keeps the frame index of the last one.
+bool computerThere() {
+  if (waitMs == 0) return false;
+  const uint32_t first = USB_SERIAL_JTAG.fram_num.sof_frame_index;
+  for (uint32_t waited = 0; waited < waitMs; waited += LOOK_EVERY_MS) {
+    vTaskDelay(pdMS_TO_TICKS(LOOK_EVERY_MS));
+    if (USB_SERIAL_JTAG.fram_num.sof_frame_index != first) return true;
+  }
+  return false;
+}
+
+// Switches the port to host mode and starts the driver of flash drives. Whether it could.
+bool startHost() {
+  usb_host_config_t host = {};
+  host.skip_phy_setup = false;
+  host.intr_flags = ESP_INTR_FLAG_LEVEL1;
+  if (usb_host_install(&host) != ESP_OK) return false;
+  xTaskCreatePinnedToCore(hostEvents, "odrig-usb", HOST_STACK, nullptr, HOST_PRIORITY, nullptr, DRIVE_PROCESSOR);
+  msc_host_driver_config_t driver = {};
+  driver.create_backround_task = true;
+  driver.task_priority = DRIVER_PRIORITY;
+  driver.stack_size = DRIVER_STACK;
+  driver.core_id = DRIVE_PROCESSOR;
+  driver.callback = driverEvent;
+  driver.callback_arg = nullptr;
+  return msc_host_install(&driver) == ESP_OK;
+}
+
+// The drive's task: it looks for a computer first, and leaves the port to one that is
+// there. Otherwise it takes the port for a stick and takes up and drops drives.
 void driveEvents(void *) {
+  if (computerThere()) {
+    state = COMPUTER;
+    setSummary();
+    vTaskDelete(nullptr);
+    return;
+  }
+  if (!startHost()) {
+    state = NO_HOST;
+    setSummary();
+    vTaskDelete(nullptr);
+    return;
+  }
+  state = NO_DRIVE;
+  setSummary();
   msc_host_event_t event;
   for (;;) {
     if (xQueueReceive(events, &event, portMAX_DELAY) != pdTRUE) continue;
@@ -300,23 +359,14 @@ void OdrigDrive::begin() {
   playedBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
   secondBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
   if (guard == nullptr || events == nullptr || names == nullptr || playedBuffer == nullptr || secondBuffer == nullptr) return;
-  usb_host_config_t host = {};
-  host.skip_phy_setup = false;
-  host.intr_flags = ESP_INTR_FLAG_LEVEL1;
-  if (usb_host_install(&host) != ESP_OK) return;
-  xTaskCreatePinnedToCore(hostEvents, "odrig-usb", HOST_STACK, nullptr, HOST_PRIORITY, nullptr, DRIVE_PROCESSOR);
-  msc_host_driver_config_t driver = {};
-  driver.create_backround_task = true;
-  driver.task_priority = DRIVER_PRIORITY;
-  driver.stack_size = DRIVER_STACK;
-  driver.core_id = DRIVE_PROCESSOR;
-  driver.callback = driverEvent;
-  driver.callback_arg = nullptr;
-  if (msc_host_install(&driver) != ESP_OK) return;
-  xTaskCreatePinnedToCore(driveEvents, "odrig-drive", DRIVE_STACK, nullptr, DRIVE_PRIORITY, nullptr, DRIVE_PROCESSOR);
-  state = NO_DRIVE;
+  state = LOOKING;
   setSummary();
+  xTaskCreatePinnedToCore(driveEvents, "odrig-drive", DRIVE_STACK, nullptr, DRIVE_PRIORITY, nullptr, DRIVE_PROCESSOR);
 }
+
+void OdrigDrive::setWait(uint32_t ms) { waitMs = ms <= MOST_WAIT_MS ? ms : COMPUTER_WAIT_MS; }
+
+uint32_t OdrigDrive::wait() { return waitMs; }
 
 odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   odrig_host made = given;

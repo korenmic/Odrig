@@ -8158,3 +8158,20 @@ joins them. A video of the suite gives the command line's frames and lengths, wi
 without a part.
 
 **Resolution.** `app/www/convert.js`; `tests/app/test_convert.py`; the design of seed 17.
+
+## Seed 21: How the board sees a computer, and its setting
+
+**Question.** The design looks for a computer with the raw start-of-frame bit of the
+chip's unit for serial and JTAG, and has `readFromConfig` answer whether the setting was
+there. Is that how it is done?
+
+**Answer.** The frame index of the unit is read instead of the raw bit: the serial driver
+of the framework handles the unit's interrupts and may clear the bit before the task
+reads it, while the index of the last start-of-frame packet changes each millisecond a
+computer is there and only then. `readFromConfig` answers that the settings are complete
+whether the member is there or not: an answer of incomplete would make WLED write its
+settings file at the start, and the firmware writes nothing on its own. WLED's page shows
+the wait from `addToConfig`, and keeps it in `/cfg.json` when the owner saves the page.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `computerThere`;
+`firmware/usermod/odrig_usermod.cpp`; `docs/firmware.md`, "A USB drive".

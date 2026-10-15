@@ -10,17 +10,25 @@
 
 namespace OdrigDrive {
 
-// Starts the USB host on the chip's own socket and the tasks that take a drive up and
-// drop it. From here on that socket is no serial port to a computer.
+// Starts the drive's task. It looks for a computer on the chip's own socket for the
+// wait, and leaves the socket a serial port when one is there. Otherwise it starts the USB
+// host on the socket and takes drives up and drops them; from then on the socket is no
+// serial port to a computer until the next start.
 void begin();
+
+// The wait, in milliseconds: from 0 to 60,000, and 5,000 for any other value. It is set
+// before `begin()`.
+void setWait(uint32_t ms);
+uint32_t wait();
 
 // The host functions of the core with a drive: `drive` and `drive_name`, and `open`,
 // `read`, `close` and `read_at`, which take a name `drive/<place>` to the file at that
 // place of the drive's list and every other name to the functions of `files`.
 odrig_host withDrive(const odrig_host &files);
 
-// What there is of a drive now, for WLED's information: no USB host, no drive, a drive
-// that could not be read, or the number of animation files of the drive.
+// What the socket is now, for WLED's information: looking for a computer, a computer's,
+// or what there is of a drive: no USB host, no drive, a drive that could not be read, or
+// the number of animation files of the drive.
 const char *summary();
 
 }  // namespace OdrigDrive

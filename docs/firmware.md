@@ -566,10 +566,10 @@ last one.
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
 answered.
 
-**The port.** The firmware switches the chip's own USB socket to host mode for a
-[USB drive](#a-usb-drive) at start, and from then on that socket is no serial port: the
-port of the commands is the socket marked COM, below. What follows holds for the firmware
-before the drive, and for the probe build. Every byte the board receives on its USB serial port goes to the core,
+**The port.** As the board starts, the chip's own USB socket stays this serial port when
+a computer is plugged into it, and otherwise becomes the socket of a
+[USB drive](#a-usb-drive); the probe build keeps it a serial port always. Every byte the
+board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
 characters written in one piece arrives whole, also while the pacing holds lines back.
@@ -599,16 +599,31 @@ and the core refuses it as `line-too-long`. The command tool opens either socket
 tool skips.
 
 esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
-which the bridge uses and the chip's own USB unit ignores. Once the firmware with the
-drive runs, the chip's own socket reaches the chip only in its loader's download mode,
-which the button BOOT held while the board is plugged in brings up; the socket marked COM
-flashes it as before. The suite of the board passes only with the board on the chip's own
+which the bridge uses and the chip's own USB unit ignores. When the chip's own socket has
+become a drive's, it reaches the chip only in its loader's download mode, which the
+button BOOT held while the board is plugged in brings up; the socket marked COM flashes
+it as before. The suite of the board passes only with the board on the chip's own
 socket: stock WLED, which the suite flashes and restores, and the probe build answer there
 and not on the UART.
 
 **A USB drive.** The firmware plays the animations of a USB flash drive on the chip's own
 socket, after the installed ones, as [show.md](show.md#animations-from-a-usb-drive)
-describes. The USB host of ESP-IDF serves the socket, Espressif's driver of flash
+describes.
+
+- **A computer or a drive.** As the board starts, the firmware looks at the chip's own
+  socket for 5 seconds. A computer plugged into it sends a start-of-frame packet each
+  millisecond to the board, and when one comes the socket stays a serial port, for
+  commands and flashing, until the next start; WLED's information then says
+  `odrig drive: computer`. When none comes, the socket becomes the drive's for as long
+  as the board runs, and a drive may be plugged in and pulled out at any time. The LEDs
+  do not wait for the choice: the show plays from the start. So, to use the socket for a
+  computer, plug the computer in before the board gets power, or press its reset button
+  afterwards; for a drive, start the board without a computer on that socket.
+- **The wait** is 5 seconds, `COMPUTER_WAIT_MS` of `firmware/usermod/odrig_drive.cpp`,
+  unless WLED's settings say otherwise: the page "Usermods" of WLED's settings shows it
+  as `computer_wait_s` under `odrig`, from 0 to 60 seconds, kept in `/cfg.json` of the
+  board's storage. A value outside that range leaves 5. A change takes effect at the next
+  start, and 0 gives the socket to a drive at once. The USB host of ESP-IDF serves the socket, Espressif's driver of flash
 drives, `usb_host_msc` 1.1.1 in `firmware/usb_host_msc/`, reads the drive, and its file
 system is mounted at `/usb`. The drive is read and never written or formatted.
 
@@ -626,9 +641,9 @@ system is mounted at `/usb`. The drive is read and never written or formatted.
 - **Plugging in and pulling out** work while the board runs. A drive is taken up when it
   comes: mounted, its folder listed once, and its files read and added to the playlist
   one by one while the show plays. When it goes, its animations leave the playlist.
-- WLED's information has `odrig drive`: `none`, the number of animation files of the
-  drive, `not readable` for a drive that did not mount, or `no USB host` when the host
-  did not start.
+- WLED's information has `odrig drive`: `looking for a computer` during the wait,
+  `computer`, `none`, the number of animation files of the drive, `not readable` for a
+  drive that did not mount, or `no USB host` when the host did not start.
 - The list's names take 64 KB of the external memory, and the two files that are read
   4 KB each of the internal memory. The rate while a file of the drive is read has not
   been measured yet.

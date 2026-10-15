@@ -28,7 +28,7 @@ Rules for every task:
   erased, the firmware built only as the tool builds it. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The firmware looks for a computer before it takes the port
+- [x] 1. The firmware looks for a computer before it takes the port
   - Set `"state": "in_progress"` in
     `project-seeds/21-p1-one-usb-port-for-a-computer-or-a-stick/state.json`.
   - `firmware/usermod/odrig_drive.cpp`, `odrig_drive.h`, `odrig_usermod.cpp`: the wait,

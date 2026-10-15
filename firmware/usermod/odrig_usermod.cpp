@@ -252,6 +252,24 @@ class OdrigUsermod : public Usermod {
 
   void onUpdateBegin(bool begins) override { updating = begins; }
 
+  // The usermod's settings in WLED's settings file, which WLED's page "Usermods" shows and
+  // changes: how many seconds the chip's own USB socket is looked at for a computer as the
+  // board starts.
+  void addToConfig(JsonObject &root) override {
+    JsonObject own = root.createNestedObject(F("odrig"));
+    own[F("computer_wait_s")] = OdrigDrive::wait() / 1000;
+  }
+
+  // A setting that is missing or out of range leaves the default. It is answered as
+  // complete either way, so that WLED writes nothing to its settings file on its own.
+  bool readFromConfig(JsonObject &root) override {
+    JsonObject own = root[F("odrig")];
+    if (own.isNull() || !own[F("computer_wait_s")].is<int>()) return true;
+    const int seconds = own[F("computer_wait_s")].as<int>();
+    if (seconds >= 0 && seconds <= 60) OdrigDrive::setWait((uint32_t)seconds * 1000);
+    return true;
+  }
+
  private:
   uint32_t startMs = 0;
   bool refreshFilled = false;

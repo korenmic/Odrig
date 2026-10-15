@@ -124,7 +124,7 @@ present, and do not build on them.
 - **Animations from a USB drive**, seed 20: the board plays the animations of a stick's
   folder `odrig`. The core, the emulator and the app do; the board has read no stick yet.
 - **One USB port for a computer or a stick**, seed 21: the chip's own port is a
-  computer's when one is plugged in as the board starts. Today it is always the stick's.
+  computer's when one is plugged in as the board starts; built, not tried on the board.
 - **A USB stick through a hub**, seed 22: newer USB software that knows hubs. Today the
   board reads no stick through a hub.
 - **A USB log on the serial port**, seed 23: what the board's own USB port sees.

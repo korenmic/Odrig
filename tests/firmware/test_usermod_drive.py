@@ -60,6 +60,31 @@ class TheDrive(unittest.TestCase):
         for member, function in (("drive", "driveNumber"), ("drive_name", "driveName"), ("read_at", "readPart")):
             self.assertIn(f"made.{member} = {function};", self.drive)
 
+    def test_the_drives_task_looks_for_a_computer_before_it_installs_the_usb_host(self):
+        begin = self.drive[self.drive.index("void OdrigDrive::begin() {"):]
+        begin = begin[:begin.index("\n}\n")]
+        self.assertNotIn("usb_host_install", begin)
+        self.assertIn("xTaskCreatePinnedToCore(driveEvents", begin)
+        task = self.drive[self.drive.index("void driveEvents(void *) {"):]
+        task = task[:task.index("\n}\n")]
+        self.assertLess(task.index("computerThere()"), task.index("startHost()"))
+        look = self.drive[self.drive.index("bool computerThere() {"):]
+        look = look[:look.index("\n}\n")]
+        self.assertIn("USB_SERIAL_JTAG.fram_num.sof_frame_index", look)
+        self.assertIn("if (waitMs == 0) return false;", look)
+
+    def test_the_wait_is_5_seconds_unless_the_settings_say_from_0_to_60(self):
+        self.assertIn("const uint32_t COMPUTER_WAIT_MS = 5000;", self.drive)
+        self.assertIn("const uint32_t MOST_WAIT_MS = 60000;", self.drive)
+        self.assertIn('"computer_wait_s"', self.usermod)
+        read = self.usermod[self.usermod.index("bool readFromConfig(JsonObject &root) override {"):]
+        read = read[:read.index("\n  }\n")]
+        self.assertIn("OdrigDrive::setWait(", read)
+        self.assertIn("seconds <= 60", read)
+        setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
+        self.assertIn("OdrigDrive::begin();", setup)
+        self.assertIn('strcpy(summaryText, "computer");', self.drive)
+
     def test_the_driver_is_a_library_of_the_build_with_its_licence(self):
         library = json.loads(text_of(DRIVER / "library.json"))
         self.assertEqual((library["name"], library["version"]), ("usb_host_msc", "1.1.1"))
