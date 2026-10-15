@@ -3,7 +3,8 @@
 The firmware is WLED 16.0.1 for the ESP32-S3, built from WLED's own source with one usermod
 added that hosts the core of [core.md](core.md). One tool, `firmware/fw.py`, sets up the
 tools the build needs, fetches WLED, builds, flashes, restores stock WLED and installs a
-show into the board's storage.
+show into the board's storage. [firmware-additions.md](firmware-additions.md) lists what
+the firmware adds to WLED, every line of which every firmware of the project gets.
 
 This page covers [what the tool needs](#what-the-tool-needs), [the work folder](#the-work-folder),
 the [commands](#commands) of the tool, [from nothing to a playing board](#from-nothing-to-a-playing-board),

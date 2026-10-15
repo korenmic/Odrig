@@ -447,3 +447,9 @@ are in [format.md](format.md), "Measured sizes".
   open.
 - 2026-10-15: The owner asked that in the operators' app the menu of marking and copying
   text open only in a text or number field, and nowhere else; seed 25 is proposed for it.
+- 2026-10-16: The owner: every firmware of the project gets everything the WLED-based
+  firmware adds to WLED, the fallback without WLED of seed 12 included; a fallback is not
+  a firmware that only starts and plays. firmware-additions.md lists the additions, one
+  line each, with how each reaches another firmware and how far seed 12 has it. A seed
+  that adds to the firmware adds its line there; seed 12's spec takes the lines that came
+  after it before its open tasks go on.
