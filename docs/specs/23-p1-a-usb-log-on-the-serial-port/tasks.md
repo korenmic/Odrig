@@ -28,7 +28,7 @@ Rules for every task:
   erased, the firmware built only as the tool builds it. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The log in the firmware
+- [x] 1. The log in the firmware
   - Set `"state": "in_progress"` in
     `project-seeds/23-p1-a-usb-log-on-the-serial-port/state.json`.
   - `firmware/usermod/odrig_log.h`, `odrig_log.cpp`; `odrig_uart.cpp` writes it;

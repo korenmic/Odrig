@@ -1,10 +1,11 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
 // memory, the time, the files of the installed show and those of a USB drive on the
-// chip's own socket, carries bytes between the USB serial port and the core, and command lines between the board's UART and the core and
-// between WLED's web server and the core, sets WLED's outputs from the core's legs, keeps
-// WLED from the LEDs, sends the core's LED data to the outputs, and reports its state in
-// WLED's information. Every decision about files, time, the layout and commands is the
-// core's.
+// chip's own socket, carries bytes between the USB serial port and the core, and command
+// lines between the board's UART and the core and between WLED's web server and the core,
+// sets WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED
+// data to the outputs, puts the lines the player logs into the log the UART writes, and
+// reports its state in WLED's information. Every decision about files, time, the layout
+// and commands is the core's.
 #include "wled.h"
 
 #include "odrig_core.h"
@@ -12,6 +13,7 @@
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
+#include "odrig_log.h"
 #include "odrig_serial.h"
 #include "odrig_uart.h"
 
@@ -163,7 +165,7 @@ class OdrigUsermod : public Usermod {
     // talks to it on.
     OdrigDrive::begin();
 #endif
-    const odrig_host host = OdrigDrive::withDrive(OdrigFiles::host());
+    const odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE

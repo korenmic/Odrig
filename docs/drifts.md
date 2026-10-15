@@ -8175,3 +8175,24 @@ the wait from `addToConfig`, and keeps it in `/cfg.json` when the owner saves th
 
 **Resolution.** `firmware/usermod/odrig_drive.cpp`, `computerThere`;
 `firmware/usermod/odrig_usermod.cpp`; `docs/firmware.md`, "A USB drive".
+
+## Seed 23: How the log is taken, and how the watcher sees a device go
+
+**Question.** The design gives `take` only the room of the line, has the UART write a
+line when `availableForWrite` takes it, and has the second client of the USB host close
+a device once it has read what it is. Is that how it is done?
+
+**Answer.** `take` gets a third number, the most the UART takes now, so that it hands
+over a line only when the whole line fits, and a line that does not fit stays first. The
+UART gets a queue of 2,048 bytes for what it writes: without one, `availableForWrite` is
+the 128 bytes of the UART's own queue, less than a line may be, and a reply blocked until
+its last byte was in that queue. A line is written when the queue has room for it and 32
+bytes more, since the driver keeps a short header beside each write. The USB host library
+tells only the clients that opened a device that it went, so the watcher keeps the
+device it described open until then, and closes it at `a device went`; it is served in
+the host's task, between the library's events, every 20 ms at most. A folder `odrig`
+that cannot be opened for another reason than its absence gives
+`stick not opened: a fault in reading the folder odrig`.
+
+**Resolution.** `firmware/usermod/odrig_log.h`, `odrig_log.cpp`, `odrig_uart.cpp`,
+`odrig_drive.cpp`; `docs/firmware.md`, "The log".

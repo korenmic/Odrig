@@ -214,6 +214,12 @@ replies are the same on every transport.
 | Board | The USB serial port. | HTTP over Wi-Fi, on the board's web server. |
 | Emulator | A virtual serial port on a Mac. On Windows, and on a Mac when asked, the same lines on a TCP port of 127.0.0.1. | HTTP on the emulator's page address. |
 
+**Lines that are no reply.** On the board's serial ports, a line that begins with `#` is
+no reply: the firmware writes its log there between replies, as
+[firmware.md](firmware.md#the-log) describes, and the chip's loader prints lines at a
+start. A reply is a line that is a JSON object with `ok`; a client passes over every
+other line.
+
 **HTTP.** A command is sent as `POST /odrig` with the command line as the request body, with
 or without the final newline. The response body is the reply line, with content type
 `application/json`. The response status is 200 whenever the line reached the command

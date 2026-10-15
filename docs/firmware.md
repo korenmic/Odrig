@@ -591,7 +591,7 @@ the port above, which a Mac names by its place, `/dev/cu.usbmodem101`. The other
 marked COM, reaches the chip's UART, on its pins 43 and 44, through a bridge chip; a Mac
 names it by the bridge's serial number, as `/dev/cu.usbmodem5C831043631`. The firmware
 takes command lines on the UART as well, at 115,200 bits a second, and writes each reply
-there. It keeps the line that is arriving there apart from the one of the other socket,
+there, and between the replies the lines of [the log](#the-log). It keeps the line that is arriving there apart from the one of the other socket,
 and hands it to the core as the web server hands a line, so a line on one way never
 disturbs a line on another; of a line of more than 2,048 characters it keeps one more,
 and the core refuses it as `line-too-long`. The command tool opens either socket at
@@ -623,9 +623,10 @@ describes.
   unless WLED's settings say otherwise: the page "Usermods" of WLED's settings shows it
   as `computer_wait_s` under `odrig`, from 0 to 60 seconds, kept in `/cfg.json` of the
   board's storage. A value outside that range leaves 5. A change takes effect at the next
-  start, and 0 gives the socket to a drive at once. The USB host of ESP-IDF serves the socket, Espressif's driver of flash
-drives, `usb_host_msc` 1.1.1 in `firmware/usb_host_msc/`, reads the drive, and its file
-system is mounted at `/usb`. The drive is read and never written or formatted.
+  start, and 0 gives the socket to a drive at once.
+- **The USB host** of ESP-IDF serves the socket, Espressif's driver of flash drives,
+  `usb_host_msc` 1.1.1 in `firmware/usb_host_msc/`, reads the drive, and its file system
+  is mounted at `/usb`. The drive is read and never written or formatted.
 
 - **Preparing a drive.** FAT32 or FAT16, with a folder `odrig` at its top that holds the
   `.odrg` files, made for the board's canvas as the installed ones are. Names are kept
@@ -647,6 +648,58 @@ system is mounted at `/usb`. The drive is read and never written or formatted.
 - The list's names take 64 KB of the external memory, and the two files that are read
   4 KB each of the internal memory. The rate while a file of the drive is read has not
   been measured yet.
+
+### The log
+
+The firmware writes a log on the socket marked COM, between the replies to commands: a
+line for every event of the chip's own socket, and every line the player logs. A line is
+one line of printable ASCII: `#log`, the seconds since the start with three decimals, the
+kind of the line, and its text.
+
+```
+#log 5.012 usb: no computer on the port within 5 s
+#log 5.020 usb: host started
+#log 31.407 usb: a device came: maker 0781, product 5581, a stick
+#log 31.902 usb: stick opened: 12 animation files in odrig
+#log 32.115 player: drive file clip.odrg left out: size-mismatch
+#log 58.230 usb: a device went
+```
+
+The lines of the kind `usb`:
+
+- After the look for a computer: `a computer is on the port, which stays a serial port`,
+  or `no computer on the port within 5 s`, with the wait of the settings.
+- The USB host: `host started`, or `host did not start: <error>`, with the error of
+  ESP-IDF.
+- A device: `a device came: maker <four hex digits>, product <four hex digits>, <kind>`,
+  where the kind is that of its first interface, or of the device when it has none:
+  `a hub` for the class 9, `a stick` for the class 8, `another device (class <n>)` for any
+  other; `a device came that could not be opened (<error>)`; and `a device went`. The
+  maker's and the product's numbers are those of the device's descriptor.
+- A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
+  `stick not opened: no file system it reads (<error>)`,
+  `stick not opened: a fault in reading (<error>)`, or
+  `stick not opened: a fault in reading the folder odrig`.
+
+The lines of the kind `player` are what the player logs: a file of a drive that is left
+out, `drive file <name> left out: <reason>`, and the reason the show became invalid, as
+WLED's information shows it.
+
+- **Never in the way.** A line is added from any task without waiting, into a queue of 32
+  lines of up to 160 bytes; a longer text is cut, and every byte outside printable ASCII
+  is written as `?`. The UART's code writes a waiting line only when the UART's queue of
+  2,048 bytes takes it whole at once, so the log holds back neither the LEDs nor the
+  commands, and a line never breaks into a reply. When lines come faster than the socket
+  takes them, the oldest give way, and the next line written says how many:
+  `#log 40.100 log: 7 lines dropped`.
+- **Reading it.** Any serial terminal on the socket marked COM at 115,200 bits a second,
+  eight data bits, no parity, one stop bit, such as
+  `screen /dev/cu.usbmodem5C831043631 115200`. The command tool takes only replies as
+  replies and passes over the log's lines.
+- **Where it is not.** The log goes to the socket marked COM only: not to the chip's own
+  socket, not over Wi-Fi, and not into the board's storage. It names nothing of the Wi-Fi
+  settings. The probe build, which never starts the USB host, has the player's lines
+  only.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same
