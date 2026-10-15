@@ -1146,6 +1146,17 @@ On a board of WLED's layout `restore-stock --full` writes no storage. On one of 
 layout it writes WLED's storage whole, holding the board's settings, as it puts WLED's
 layout back.
 
+**Why the bigger layout.** On 2026-10-15 the owner's show of 113 animations for the 60 x 60
+canvas, 10.1 MB of files, did not fit WLED's storage: the file system keeps every file in
+blocks of 4,096 bytes with records of its own, and was short by about 0.2 MB, so six of the
+smallest animations were left out. The firmware is updated over the USB cable with this tool
+only, and the second firmware slot is needed only by an update over Wi-Fi; the owner gave
+those up, and the bigger layout gives the slot's 3,145,728 bytes to the storage. What is
+given up: an update over Wi-Fi, which the firmware refuses with its reason, as "An update
+over Wi-Fi" under [What the firmware does](#what-the-firmware-does) says. A board is moved
+with `big-storage` and back with `restore-stock --full`; after either, the show is
+installed again.
+
 ## Rolling back
 
 `python3 firmware/fw.py restore-stock` brings back stock WLED 16.0.1, with its settings and

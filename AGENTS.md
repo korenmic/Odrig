@@ -127,7 +127,8 @@ present, and do not build on them.
   board reads no stick through a hub.
 - **A USB log on the serial port**, seed 23: what the board's own USB port sees.
 - **A bigger animation space**, seed 24: about 13.5 MB in place of 10.35 MB, by giving
-  up firmware updates over Wi-Fi.
+  up firmware updates over Wi-Fi; the tool and the firmware have it, and no board has been
+  moved to it yet.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 
 The state of every seed is in the `state.json` of its folder.

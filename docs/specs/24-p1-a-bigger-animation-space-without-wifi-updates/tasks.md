@@ -70,7 +70,7 @@ Rules for every task:
     bytes, against the emulator as it is, fails: it is 10,354,688.
   - Requirements: 3.3, 6.1
 
-- [ ] 5. The documents
+- [x] 5. The documents
   - `docs/firmware.md`: why the layout, what was given up, how a board is moved and moved
     back. `docs/decisions.md`: "What fits" and a line in its change log.
     `docs/format.md`, "What fits". `docs/firmware-prerequisites.md`.

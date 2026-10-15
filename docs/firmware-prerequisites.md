@@ -83,7 +83,7 @@ Their folders are in `project-seeds/`; none has a spec yet.
 | 21, one USB port for a computer or a stick | The chip's own USB port is a computer's port when a computer is plugged into it as the board starts, and the stick's port otherwise. | 12, 15 |
 | 22, a USB stick through a hub | The firmware's USB software moves to Espressif's newer software, which reads a stick through a hub. Not certain: as far as is known, WLED does not run on that software officially yet. | 9, 16 |
 | 23, a USB log on the serial port | A log on the serial chip's port that stays in the firmware: what the board's USB port sees, a hub or a stick, and why a stick is not read. | 9 |
-| 24, a bigger animation space without Wi-Fi updates | The storage grows from 10.35 MB to about 13.5 MB by taking the second firmware slot; the firmware is then updated over the USB cable only. | 8 |
+| 24, a bigger animation space without Wi-Fi updates | The storage grows from 10.35 MB to about 13.5 MB by taking the second firmware slot; the firmware is then updated over the USB cable only. Built and tested without the board (`92c6781` to `fefcc9d`); the move on the board and the owner's show of 113 animations are open. | 8 |
 
 Without a seed, an OTG adapter with a power socket and only one USB-A socket would let the
 firmware as it is read a stick: the owner buys one, and seed 20's task 4 tries it.

@@ -100,6 +100,12 @@ it stands now.
   with WLED's limiter dimming every LED, and side by side, on the chip's two processor
   cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
   on the board".
+- The firmware is updated over the USB cable with `firmware/fw.py`, and not over Wi-Fi: the
+  owner gave up updates over Wi-Fi on 2026-10-15, so that the board's second firmware slot
+  can hold animations. On the bigger layout of [firmware.md](firmware.md), "The regions of
+  the flash", the storage has 13,500,416 bytes in place of 10,354,688, and an update over
+  Wi-Fi is refused with its reason. `big-storage` moves a board to it and
+  `restore-stock --full` back; after either, the owner installs the show again.
 
 ## Conversion
 
@@ -166,6 +172,9 @@ are in [format.md](format.md), "Measured sizes".
   predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
   canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
   changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.
+  On the bigger layout of [firmware.md](firmware.md), "The regions of the flash", the
+  storage has 13,500,416 bytes, which hold 97 seconds of the clip compressed, 92
+  uncompressed and 24 stored frame by frame.
 
 ## Commands
 
@@ -429,3 +438,10 @@ are in [format.md](format.md), "Measured sizes".
   described in python-library.md. What it answered to the converter's tests when it still
   converted is stored with them, 4.2 MB, so their suite starts no Python; the other suites
   pack with the converter, and the setup installs no Python package.
+- 2026-10-15: Seed 24 gave the firmware tool the bigger layout: one firmware slot, a factory
+  slot, and 13,500,416 bytes of storage from 0x310000, which the tool names, moves a board
+  to with `big-storage` and back from with `restore-stock --full`, keeping the settings and
+  not the show. The firmware refuses an update over Wi-Fi on it with the reason and the way
+  that works, and the emulator reports the bigger storage by default. Built and tested
+  without the board; the move on the board, with the owner's show of 113 animations, is
+  open.

@@ -287,4 +287,6 @@ compressed and 61 to 70 seconds uncompressed: the first figure of each pair is w
 been shown to fit, the second what the whole partition would hold. A picture that nothing
 predicts is written as a stored frame record, 10,805 bytes for each 20 ms on a 60 x 60
 canvas, which makes 16 to 19 seconds of content stored frame by frame. Content that
-changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes.
+changes less takes less: the two animations of the demo show are 1,210 and 1,052 bytes. On the bigger layout of [firmware.md](firmware.md), "The regions of the flash", the storage
+has 13,500,416 bytes, which hold 97 seconds of the clip compressed, 92 uncompressed and 24
+stored frame by frame.
