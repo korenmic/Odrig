@@ -9,7 +9,7 @@ import * as files from "../cli/files.js";
 import {SUBCOMMANDS, errorLine, main} from "../cli/main.js";
 import {refusal} from "../cli/version.js";
 import {errors} from "../lib/index.js";
-import {ROOT, runJs, runJsAndStored, storedRun, temporary} from "./support.js";
+import {RIGHTS_HOLD, ROOT, allowAgain, forbid, runJs, runJsAndStored, storedRun, temporary} from "./support.js";
 
 function streams() {
   const written = {out: "", err: ""};
@@ -436,11 +436,11 @@ test("reading and writing files", async (t) => {
     assert.equal(python.err, `error: not-found: ${below}: Not a directory\n`);
   });
 
-  await t.test("read of a file that may not be read has the words of the Python tool", {skip: process.platform === "win32" || process.getuid() === 0}, () => {
+  await t.test("read of a file that may not be read has the words of the Python tool", {skip: !RIGHTS_HOLD}, () => {
     const folder = temporary(t);
     const locked = path.join(folder, "locked.json");
     fs.writeFileSync(locked, "{}");
-    fs.chmodSync(locked, 0o000);
+    forbid(locked, "read");
     const python = storedRun(["check", locked]);
     assert.equal(python.status, 1);
     assert.equal(rejected(() => files.read(locked)), python.err);
@@ -480,13 +480,13 @@ test("reading and writing files", async (t) => {
     assert.deepEqual(fs.readdirSync(out), []);
   });
 
-  await t.test("write that fails leaves an existing file as it was", {skip: process.platform === "win32" || process.getuid() === 0}, () => {
+  await t.test("write that fails leaves an existing file as it was", {skip: !RIGHTS_HOLD}, () => {
     const folder = temporary(t);
     const inner = path.join(folder, "inner");
     fs.mkdirSync(inner);
     const out = path.join(inner, "out.json");
     fs.writeFileSync(out, "before");
-    fs.chmodSync(inner, 0o555);
+    forbid(inner, "write");
     try {
       const python = storedRun(["decode", vector, out]);
       assert.equal(python.status, 1);
@@ -495,7 +495,7 @@ test("reading and writing files", async (t) => {
       assert.equal(fs.readFileSync(out, "utf8"), "before");
       assert.deepEqual(fs.readdirSync(inner), ["out.json"]);
     } finally {
-      fs.chmodSync(inner, 0o755);
+      allowAgain(inner);
     }
   });
 

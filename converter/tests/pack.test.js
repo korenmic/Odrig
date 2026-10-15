@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, jsonframes, odrg, pack, show} from "../lib/index.js";
-import {ROOT, filesUnder, hex, runJs, runJsAndStored, runJsHere, storedAnswer, storedRun, storedRuns, temporary, utf8} from "./support.js";
+import {RIGHTS_HOLD, ROOT, allowAgain, filesUnder, forbid, hex, runJs, runJsAndStored, runJsHere, storedAnswer, storedRun, storedRuns, temporary, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -697,13 +697,13 @@ test("the output folder", async (t) => {
     assert.deepEqual(fs.readdirSync(`${taken.js.out}.part`), ["theirs.txt"], "a part folder the tool did not make is not removed");
   });
 
-  await t.test("a folder that may not be written into is cannot-write", {skip: process.platform === "win32" || process.getuid() === 0}, async () => {
+  await t.test("a folder that may not be written into is cannot-write", {skip: !RIGHTS_HOLD}, async () => {
     const locked = [];
     try {
       const results = await both((side) => {
         const parent = path.join(at.folder, `${side}-locked`);
         fs.mkdirSync(parent);
-        fs.chmodSync(parent, 0o555);
+        forbid(parent, "write");
         locked.push(parent);
         return path.join(parent, "out");
       });
@@ -712,7 +712,7 @@ test("the output folder", async (t) => {
       assert.deepEqual(fs.readdirSync(path.dirname(results.js.out)), []);
     } finally {
       for (const parent of locked) {
-        fs.chmodSync(parent, 0o755);
+        allowAgain(parent);
       }
     }
   });

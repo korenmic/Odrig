@@ -136,12 +136,13 @@ function unnamed(value, folders, words = []) {
 }
 
 // The SHA-256 of a file's content, with the temporary folders and the repository in it
-// written as names, or "unreadable" for a file that may not be read.
+// written as names, or "unreadable" for a file that may not be read: refused with EACCES on
+// macOS and Linux, and with EPERM on Windows.
 function contentOf(file, folders) {
   try {
     return sha256(Buffer.from(named(fs.readFileSync(file).toString("latin1"), folders), "latin1"));
   } catch (error) {
-    if (error.code === "EACCES") {
+    if (error.code === "EACCES" || error.code === "EPERM") {
       return "unreadable";
     }
     throw error;
