@@ -71,6 +71,7 @@ the firmware keeps them.
 | 18, one converter | Every task. | No: the converter |
 | 19, previewing one animation | Task 3, the owner looks at one animation. | No: the emulator |
 | 20, animations from a USB drive | Task 4, the trial with an adapter that gives the stick power; the rest of task 5, the rate and the board's tests with a stick; task 6, the owner's look. | Yes |
+| 25, no text menu outside the app's fields | Task 3, the owner's check on a phone. | No: the app |
 
 ## Seeds not begun
 

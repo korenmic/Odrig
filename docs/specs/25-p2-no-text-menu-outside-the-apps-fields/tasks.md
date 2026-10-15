@@ -45,7 +45,7 @@ Rules for every task:
     against the web code as it is, fails: a label's `user-select` is `auto`.
   - Requirements: 1.1 to 1.4, 2.1 to 2.3, 3.1, 3.2, 4.1, 4.2, 5.1, 5.3
 
-- [ ] 2. The APK and the documents
+- [x] 2. The APK and the documents
   - `python3 app/app.py build`; `python3 -m unittest discover -s tests/apk -t .` passes
     against the new APK. Its size and SHA-256 go into the commit message.
   - `docs/decisions.md`: a line in the change log. `AGENTS.md`: the seed leaves "What is
