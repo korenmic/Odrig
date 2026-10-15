@@ -2,12 +2,14 @@
 
 import {Failure, address, send} from "./target.js";
 
-// The target answered a command with `"ok":false`. `code` is its error code.
+// The target answered a command with `"ok":false`. `code` is its error code, and
+// `reason` the reason of `bad-file`, or null.
 export class Refusal extends Error {
-  constructor(code, line) {
+  constructor(code, line, reason = null) {
     super(`${code}: ${line}`);
     this.code = code;
     this.line = line;
+    this.reason = reason;
   }
 }
 
@@ -25,7 +27,7 @@ async function carriedOut(line) {
     if (typeof reply.error !== "string") {
       throw new Failure("bad-reply", address());
     }
-    throw new Refusal(reply.error, line);
+    throw new Refusal(reply.error, line, typeof reply.reason === "string" ? reply.reason : null);
   }
   return reply;
 }
@@ -102,6 +104,36 @@ export async function space() {
 // Removes the item with this id from the show.
 export async function remove(id) {
   await carriedOut(`remove ${id}`);
+}
+
+// Opens the upload of a file of some bytes as the item with this id. Gives the most bytes
+// one `upload data` may carry.
+export async function uploadBegin(id, file, bytes) {
+  const reply = await carriedOut(`upload begin ${id} ${file} ${bytes}`);
+  if (!whole(reply.chunk, 1, MOST_BYTES)) {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.chunk;
+}
+
+// Adds a piece of the file, given in base64, at the number of bytes sent before it.
+// Gives the number of bytes received so far.
+export async function uploadData(offset, base64) {
+  const reply = await carriedOut(`upload data ${offset} ${base64}`);
+  if (!whole(reply.received, 0, MOST_BYTES)) {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.received;
+}
+
+// Closes the upload with the CRC-32 of the whole file, eight hexadecimal digits.
+export async function uploadEnd(crc) {
+  await carriedOut(`upload end ${crc}`);
+}
+
+// Gives up the open upload.
+export async function uploadCancel() {
+  await carriedOut("upload cancel");
 }
 
 // Plays the playlist from the animation with this id, or the cycle with this id.

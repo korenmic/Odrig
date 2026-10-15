@@ -42,6 +42,8 @@ let showScreen = false;
 let storageScreen = false;
 let spaceDue = false;
 let spaceTimer = null;
+// The upload under way, a job of `upload.js`, or null.
+let job = null;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 
@@ -231,9 +233,40 @@ async function give(request) {
   changed();
 }
 
+// Sends the next line of the upload under way. A refusal or a failure ends the upload;
+// when it has ended, the list and the space are asked for again.
+async function sendJobLine(running, line) {
+  const asked = target;
+  try {
+    await line();
+    if (asked !== target) {
+      return;
+    }
+    heard();
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+    } else {
+      failed(error);
+    }
+    running.failed(error);
+  }
+  if (running.over()) {
+    job = null;
+    listDue = true;
+    spaceDue = true;
+    statusDue = true;
+  }
+  changed();
+}
+
 // The request to send now, or null when nothing is due: what the operator asked for,
-// then a status that is due, then a list that is due or the next part of one, then the
-// space. Nothing is due while the app is not on the screen.
+// then a status that is due, then the next line of an upload, then a list that is due or
+// the next part of one, then the space. Nothing is due while the app is not on the
+// screen.
 function due() {
   if (document.hidden) {
     return null;
@@ -247,6 +280,16 @@ function due() {
     statusDue = false;
     listWaited = listWaits;
     return askStatus;
+  }
+  if (job !== null) {
+    const running = job;
+    const line = running.next();
+    if (line !== null) {
+      return () => sendJobLine(running, line);
+    }
+    if (running.over()) {
+      job = null;
+    }
   }
   if (listWaits) {
     listDue = false;
@@ -277,9 +320,14 @@ async function next() {
   }
 }
 
-// Begins with the address in use: forgets what an earlier target said, and asks.
+// Begins with the address in use: forgets what an earlier target said, and asks. An
+// upload to the earlier target ends.
 export function begin() {
   target += 1;
+  if (job !== null) {
+    job.failed(new Error("the address changed"));
+    job = null;
+  }
   state.link = "checking";
   state.failure = null;
   state.status = null;
@@ -329,6 +377,18 @@ function want(kind, carry) {
   } else {
     wanted[waiting] = {kind, carry};
   }
+  next();
+}
+
+// Uploads with a job of `upload.js`, line by line between the requests of the app. It
+// goes on only while the app is on the screen.
+export function upload(made) {
+  job = made;
+  next();
+}
+
+// Asks for the next request again, as a job does when it has a line again.
+export function wake() {
   next();
 }
 

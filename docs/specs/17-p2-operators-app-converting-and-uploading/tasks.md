@@ -79,7 +79,7 @@ Rules for every task:
   - `docs/android-app.md`: converting.
   - Requirements: 3.1 to 3.7, 5.1
 
-- [ ] 5. Uploading
+- [x] 5. Uploading
   - `app/www/upload.js`, `app/www/crc32.js`, the client's job, the upload's part of the
     storage screen, and its messages.
   - `tests/app/`: uploading the GIF and the mp4 to the emulator and playing each from the

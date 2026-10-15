@@ -22,15 +22,21 @@ export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
 }
 
-// The error codes of the command list that no command of the app can get: they belong to
-// `upload`, which the app does not send.
-export const NOT_FOR_THE_APP = ["no-upload", "incomplete", "bad-checksum", "no-space", "bad-offset", "bad-file"];
+// The error codes of the command list that no command of the app can get.
+export const NOT_FOR_THE_APP = [];
 
 const NOT_UNDERSTOOD = () => "The installation did not understand the app. Its software and this app do not match.";
 const REFUSED = () => "The installation refused the command.";
+const NOT_WHOLE = () => "The upload did not arrive whole. Upload again.";
+
+// A size in kilobytes of 1,000 bytes, rounded up.
+function kilobytes(bytes) {
+  return String(Math.ceil(bytes / 1000));
+}
 
 // The text for each error code a command of the app can get, from the line that was
-// refused and from the reason of an invalid show, when the target has said one.
+// refused, from the reason of an invalid show, when the target has said one, and from the
+// refusal itself.
 const REFUSALS = {
   "line-too-long": NOT_UNDERSTOOD,
   "unknown-command": NOT_UNDERSTOOD,
@@ -39,9 +45,30 @@ const REFUSALS = {
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
   "unknown-id": (line) => (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
   busy: () => "The installation is busy. Try again in a moment.",
-  "in-use": (line) => `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
+  "in-use": (line) =>
+    line.startsWith("upload ")
+      ? "That name or id is in use on the installation. The list is asked for again; upload again."
+      : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
   "storage-error": () => "The installation could not use its storage.",
+  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
+  "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,
+  "bad-checksum": NOT_WHOLE,
+  incomplete: NOT_WHOLE,
+  "bad-offset": NOT_WHOLE,
+  "no-upload": () => "The installation dropped the upload, after the app was away for a minute or more. Upload again.",
 };
+
+// What the app says of an animation that does not fit into the free storage. The free
+// bytes are null when the app does not know them.
+export function ofNoSpace(bytes, free) {
+  const room = free === null ? "more than the installation has free" : `and the installation has ${kilobytes(free)} KB free`;
+  return `The animation needs ${kilobytes(bytes)} KB, ${room}. (no-space)`;
+}
+
+// What the app says when an upload succeeded. It is no failure and has no code.
+export function ofUploaded(id, file) {
+  return `Uploaded as animation ${id} ${file}. It plays in the playlist.`;
+}
 
 // What the app says when an animation cannot be made from a file, by the reason: its own,
 // or one of the library that makes it, whose text is given as the detail.
@@ -72,5 +99,5 @@ export function ofRemoved(animation) {
 // the general sentence.
 export function ofRefusal(refusal, reason = null) {
   const text = Object.prototype.hasOwnProperty.call(REFUSALS, refusal.code) ? REFUSALS[refusal.code] : REFUSED;
-  return `${text(refusal.line, reason)} (${refusal.code})`;
+  return `${text(refusal.line, reason, refusal)} (${refusal.code})`;
 }

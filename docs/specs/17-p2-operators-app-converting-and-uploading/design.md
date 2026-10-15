@@ -167,9 +167,9 @@ Every message is a sentence and its code in brackets, in `messages.js`:
 | `unreadable-media` | The web view or the converter cannot read the media. | The phone cannot read this file as a video or a GIF. |
 | `bad-range` | The part is not inside the media. | The part does not lie inside the file: start at `<start>` s and length `<length>` s. |
 | other converter reasons | `canvas-too-large`, `too-many-frames` and the like. | The animation cannot be made: `<reason>`. |
-| `no-space` | Before the upload, or the target's refusal. | The animation needs `<size>` KB and the installation has `<free>` KB free. |
+| `no-space` | Before the upload, or the target's refusal. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
 | `busy` | The target reads its animations, or another upload is open. | The installation is busy. Try again in a moment. |
-| `in-use` | `remove` of an animation a cycle lists or that a USB stick holds; `upload begin` of a name or id in use. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. / That name or id is in use; the list is asked for again. |
+| `in-use` | `remove` of an animation a cycle lists or that a USB stick holds; `upload begin` of a name or id in use. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. / That name or id is in use on the installation. The list is asked for again; upload again. |
 | `unknown-id` | `remove` of an animation removed meanwhile. | Animation `<id>` is not installed any more. |
 | `bad-file` | `upload end`. | The installation refused the file: `<reason>`. |
 | `bad-checksum`, `incomplete`, `bad-offset` | The upload lost bytes on the way. | The upload did not arrive whole. Upload again. |

@@ -6,7 +6,8 @@ from . import support
 
 CONVERTER_LIBRARY = support.ROOT / "converter" / "lib"
 # The lines the app may send: the words of a command, with its number left open.
-LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>", "space", "remove <n>"}
+LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>", "space", "remove <n>",
+         "upload begin <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel"}
 
 
 def files():

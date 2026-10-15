@@ -48,7 +48,7 @@ class TheTable(unittest.TestCase):
                 self.assertEqual(general, code in cannot_get, f"{code}: it needs a text of its own, or a place among the codes the app cannot get")
 
     def test_the_codes_the_app_cannot_get_are_those_of_the_commands_it_does_not_send(self):
-        self.assertEqual(self.found["notForTheApp"], ["no-upload", "incomplete", "bad-checksum", "no-space", "bad-offset", "bad-file"])
+        self.assertEqual(self.found["notForTheApp"], [])
 
     def test_each_text_of_a_refusal(self):
         for code in ("line-too-long", "unknown-command", "bad-argument"):

@@ -125,6 +125,8 @@ class StandIn:
             reply = self.replies[min(len(self.lines), len(self.replies)) - 1]
         if isinstance(reply, dict):
             reply = reply.get(line.split(b" ")[0].decode("ascii", "replace"), (200, '{"ok":false,"error":"unknown-command"}\n'))
+        if callable(reply):
+            reply = reply(line)
         return reply
 
     def left(self):
@@ -225,6 +227,19 @@ def make_media(folder):
 
 
 Converted = collections.namedtuple("Converted", "frames ms odrg")
+
+
+def decoded_by_the_command_line(data):
+    """The frames of an ODRG file as the converter's command line decodes it: for each, its
+    milliseconds and the colour of each pixel as 0xRRGGBB."""
+    with tempfile.TemporaryDirectory() as work:
+        source = pathlib.Path(work, "file.odrg")
+        source.write_bytes(data)
+        frames = pathlib.Path(work, "frames.json")
+        done = subprocess.run(["node", str(CONVERTER_TOOL), "decode", str(source), str(frames)], cwd=ROOT, capture_output=True, text=True)
+        if done.returncode != 0:
+            raise AssertionError(f"decode: {done.stderr}")
+        return [(frame["ms"], frame["pixels"]) for frame in json.loads(frames.read_text(encoding="utf-8"))["frames"]]
 
 
 def converted_by_the_command_line(media, mapping, fit="fill", start=None, length=None):

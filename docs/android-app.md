@@ -18,12 +18,12 @@ The app has three screens, and a button for each at the bottom: `Show`, `Storage
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
   playlist, each with its id, its file name and its size in kilobytes, and a button
   `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
-  a GIF of the phone.
+  a GIF of the phone, and uploads it.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
-The app is one more client of the commands of [commands.md](commands.md). It sends ten
-command lines and no other, each as `POST /odrig` to the address that is set:
+The app is one more client of the commands of [commands.md](commands.md). It sends
+fourteen command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -35,9 +35,11 @@ command lines and no other, each as `POST /odrig` to the address that is set:
 | Moves the slider | `brightness <n>` |
 | Nothing: when the storage screen is shown, every ten seconds while it is, and after a removal | `space` |
 | Presses `Remove` and then `Remove it` | `remove <id>` |
+| Presses `Upload` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
+| Presses `Cancel` while it uploads | `upload cancel` |
 
 It adds no command, changes nothing of the installation's software, and shows only what a
-reply said. It does not upload an animation yet: that part is being built.
+reply said.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -230,6 +232,24 @@ and makes the file. A GIF gives the very file the converter's command line makes
 video gives the same frames, and colours that may differ by a little, as two decoders'
 colours do. A video is drawn at most 1,280 pixels wide or high before it is fitted.
 
+`Upload` sends the animation to the installation as a new item:
+
+- Its id is the lowest from 1 up that no item has. Its file name is the name of the
+  file it was made from, without its ending, in lower case, every character other than
+  `a`-`z`, `0`-`9`, `-` and `_` turned into `-`, with `.odrg`, at most 32 characters,
+  and `-2`, `-3` and so on when the name is taken: `Sunset Beach.mp4` becomes
+  `sunset-beach.odrg`.
+- First the app compares its size with the free storage; one that does not fit is not
+  sent.
+- While it sends, the app says `Sending: 45%, 12 KB a second`, and `Cancel` stops it.
+  The app's status keeps coming meanwhile. While the app is not on the screen of the
+  phone it sends nothing, and when it is back the upload goes on; when the installation
+  dropped it meanwhile, after a minute, the app says so.
+- The installation checks the whole file before it takes it, which takes about a
+  fiftieth of a second for each frame. Then the app says
+  `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is in the
+  list of both screens, has its turn in the playlist, and plays when it is pressed.
+
 The animations of a USB drive plugged into the installation are buttons too, after the
 installed ones, each with its id from 60001 up and its file's name on the drive, and a
 press plays one as it plays an installed animation; see
@@ -261,6 +281,11 @@ it is dismissed with `OK` or another takes its place.
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
+| `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
+| `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
+| `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
+| `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
+| `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -281,9 +306,9 @@ When an animation cannot be made, the app says why:
 Any other reason of the converter is said as `The animation cannot be made:` with the
 converter's own words and its reason in brackets.
 
-A removal that succeeded is said in the same place, without a code:
-`Removed animation <id> <file>.` The other error codes of [commands.md](commands.md)
-belong to `upload`, which the app does not send yet.
+A removal and an upload that succeeded are said in the same place, without a code:
+`Removed animation <id> <file>.` and `Uploaded as animation <id> <file>. It plays in the
+playlist.`
 
 ## The phone and the installation's network
 

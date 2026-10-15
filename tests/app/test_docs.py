@@ -72,15 +72,17 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_ten_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_fourteen_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
-        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>"])
-        self.assertIn("It sends ten command lines and no other", self.said)
+        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>",
+                                 "upload begin <id> <file> <bytes>", "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
+        self.assertIn("It sends fourteen command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
-                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["storage-error", "space", None]]
+                    ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["storage-error", "space", None],
+                    ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None]]
         failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
@@ -92,8 +94,12 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
         self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "busy", "in-use", "storage-error",
+                                "in-use", "no-space", "no-upload", "bad-checksum", "bad-file",
                                 "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
+        self.assertIn("`Uploaded as animation <id> <file>. It plays in the playlist.`", said)
+        self.assertIn("| The installation refused the file: `<reason>`. |", said)
+        self.assertIn("| The animation needs `<size>` KB, and the installation has `<free>` KB free. |", said)
 
     def test_every_message_of_making_an_animation_is_on_the_page(self):
         reasons = ["no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"]

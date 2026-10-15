@@ -3,8 +3,11 @@
 // video or a GIF.
 
 import * as client from "../client.js";
+import {Refusal} from "../commands.js";
 import {NotConverted, Stopped, convert, isGif, stopper, videoLength} from "../convert.js";
 import * as messages from "../messages.js";
+import {fileName, fits, freeId, uploading} from "../upload.js";
+import {Failure} from "../target.js";
 
 // What each way of fitting a picture to the canvas does, in words.
 const FITS = {
@@ -24,6 +27,8 @@ let fit = "fill";
 let running = null;
 let made = null;
 let previewTimer = null;
+// The upload under way, or null.
+let sending = null;
 
 function byId(id) {
   return document.getElementById(id);
@@ -157,9 +162,66 @@ function showMade() {
 }
 
 function forget() {
+  if (sending !== null) {
+    return;
+  }
   stopPreview();
   made = null;
   byId("made").hidden = true;
+  byId("uploading").hidden = true;
+}
+
+// Uploads the animation that was made, as a new item with the lowest free id and a file
+// name made from the media's name.
+function upload(message) {
+  if (made === null || sending !== null) {
+    return;
+  }
+  const state = client.state;
+  const bytes = made.bytes;
+  if (state.space !== null && !fits(bytes.length, state.space.free)) {
+    message(messages.ofNoSpace(bytes.length, state.space.free));
+    return;
+  }
+  const listed = state.animations === null ? [] : state.animations;
+  const id = freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
+  const file = fileName(made.file.name, new Set(listed.map((animation) => animation.file)));
+  const shown = byId("uploading");
+  shown.hidden = false;
+  shown.textContent = "Sending: 0%";
+  byId("upload").hidden = true;
+  byId("cancel-upload").hidden = false;
+  sending = uploading(
+    {id, file, bytes},
+    {
+      report(part, speed) {
+        shown.textContent = `Sending: ${Math.floor(part * 100)}%, ${Math.round(speed / 1000)} KB a second`;
+      },
+      end(how) {
+        sending = null;
+        byId("upload").hidden = false;
+        byId("cancel-upload").hidden = true;
+        if (how.done) {
+          shown.hidden = true;
+          message(messages.ofUploaded(id, file));
+        } else if (how.cancelled) {
+          shown.textContent = "Cancelled.";
+        } else {
+          shown.hidden = true;
+          const error = how.error;
+          if (error instanceof Refusal && error.code === "no-space") {
+            message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
+          } else if (error instanceof Refusal) {
+            message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
+          } else if (error instanceof Failure) {
+            message(messages.ofFailure(error));
+          }
+        }
+      },
+      wake: client.wake,
+    },
+  );
+  client.upload(sending);
 }
 
 function choose(file) {
@@ -242,6 +304,12 @@ export function start({message}) {
   }
   chooseFit("fill");
   byId("make").addEventListener("click", () => make(message));
+  byId("upload").addEventListener("click", () => upload(message));
+  byId("cancel-upload").addEventListener("click", () => {
+    if (sending !== null) {
+      sending.cancel();
+    }
+  });
   byId("stop-making").addEventListener("click", () => {
     if (running !== null) {
       running.stop();
