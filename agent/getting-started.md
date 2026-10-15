@@ -20,19 +20,20 @@ computer read [On Windows](#on-windows) first.
 ## On Windows
 
 The Python library, the core's build, the emulator, the command tool and their suites
-work on Windows 10 and 11. The converter's own suite, `npm test --prefix converter`, does
-not pass there yet. The firmware tool, the board and the walk-through suite stay with the
+work on Windows 10 and 11. The converter's own suite, `npm test --prefix converter`,
+passes there too. The firmware tool, the board and the walk-through suite stay with the
 first computer. A Windows computer needs git, Python 3.10 or later as `python`, Node.js 20
 or later, and a C++ compiler. The build finds `g++` or `clang++` on the path, and
 Microsoft's C++ build tools. With none of them, unpack a GCC for Windows, such as the
 WinLibs build of MinGW-w64, into the folder `tools/` of the repository: nothing is
-installed. The setup and the four suites that pass, in PowerShell:
+installed. The setup and the suites, in PowerShell:
 
 ```text
 git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
 npm ci --prefix converter
+npm test --prefix converter
 .venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
 .venv\Scripts\python core/build.py test
