@@ -8261,3 +8261,19 @@ answers without Python: the kinds `check`, `cli`, `decode`, `deflate`, `encode`,
 
 **Resolution.** `converter/tests/deflate.test.js`, `encode.test.js`, `inflate.test.js`,
 `stored.js`.
+
+## Seed 18: The import's tests without Python
+
+**Question.** The tests of the fit, the timeline, the import and the arithmetic of whole
+numbers compare pictures and animations with what Python answers. Where the stored answer
+keeps a picture as a digest, how is a difference shown?
+
+**Answer.** A test puts what it made into the form of the stored answer, each run of
+hexadecimal digits where the answer has a digest as the digest of its own bytes, and
+compares the two; a difference names the case, no longer the pixel. The kinds `mappings`,
+`media`, `milliseconds`, `rects`, `resample`, `run`, `sixdigits`, `ticks` and `timeline`
+take their stored answers without Python. The test of the check against Python sets that
+mode for its own requests, since no kind of its own is left in it.
+
+**Resolution.** `converter/tests/stored.js`, `inStoredForm`; `fit.test.js`,
+`timeline.test.js`, `expected.test.js`.

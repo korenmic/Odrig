@@ -25,7 +25,10 @@ export const EXPECTED = path.join(ROOT, "converter", "tests", "expected");
 export const EXPECTED_FILES = path.join(EXPECTED, "files");
 
 // The kinds whose stored answers the tests take without asking Python.
-export const STORED_KINDS = new Set(["check", "cli", "decode", "deflate", "encode", "forms", "generators", "inflate"]);
+export const STORED_KINDS = new Set([
+  "check", "cli", "decode", "deflate", "encode", "forms", "generators", "inflate",
+  "mappings", "media", "milliseconds", "rects", "resample", "run", "sixdigits", "ticks", "timeline",
+]);
 // The kinds whose answers are kept whole: the tests go on to work with them.
 export const KEPT_WHOLE = new Set(["deflate"]);
 
@@ -225,6 +228,21 @@ export function storedLength(stored) {
 export function asStored(ours, stored) {
   const digits = typeof ours === "string" ? ours : Buffer.from(ours).toString("hex");
   return isDigest(stored) ? digestOf(Buffer.from(digits, "hex")) : digits;
+}
+
+// A value the tests made, in the form of a stored answer: each run of hexadecimal digits
+// where the stored answer has a digest, as a digest, and everything else as it is.
+export function inStoredForm(ours, stored) {
+  if (isDigest(stored)) {
+    return typeof ours === "string" ? asStored(ours, stored) : ours;
+  }
+  if (Array.isArray(ours) && Array.isArray(stored)) {
+    return ours.map((inner, i) => inStoredForm(inner, stored[i]));
+  }
+  if (ours !== null && stored !== null && typeof ours === "object" && typeof stored === "object" && !Array.isArray(ours) && !Array.isArray(stored)) {
+    return Object.fromEntries(Object.entries(ours).map(([name, inner]) => [name, inStoredForm(inner, stored[name])]));
+  }
+  return ours;
 }
 
 const stores = {};

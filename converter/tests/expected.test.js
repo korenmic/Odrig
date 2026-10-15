@@ -77,13 +77,23 @@ test("the stored answers", async (t) => {
     }
   });
 
-  await t.test("in that check, an answer of Python that is not the stored one is a failure, and so is a request with none", {skip: mode("mappings") !== "verify"}, () => {
+  await t.test("in that check, an answer of Python that is not the stored one is a failure, and so is a request with none", {skip: process.env.ODRIG_EXPECTED === "record"}, () => {
     // The request for the mapping files asks nothing else, and names no file.
     const ask = {argv: [], input: null};
     const stored = expected("mappings")[sha256(JSON.stringify(["mappings", ask, {}, []]))];
     assert.ok(stored !== undefined);
-    assert.deepEqual(answered("mappings", ask, [], () => stored.answer), stored.answer);
-    assert.throws(() => answered("mappings", ask, [], () => ({})), /differs from what Python answers/);
-    assert.throws(() => answered("mappings", {argv: ["nothing any test asks"], input: null}, [], () => ({})), /no stored answer/);
+    const given = process.env.ODRIG_EXPECTED;
+    process.env.ODRIG_EXPECTED = "verify";
+    try {
+      assert.deepEqual(answered("mappings", ask, [], () => stored.answer), stored.answer);
+      assert.throws(() => answered("mappings", ask, [], () => ({})), /differs from what Python answers/);
+      assert.throws(() => answered("mappings", {argv: ["nothing any test asks"], input: null}, [], () => ({})), /no stored answer/);
+    } finally {
+      if (given === undefined) {
+        delete process.env.ODRIG_EXPECTED;
+      } else {
+        process.env.ODRIG_EXPECTED = given;
+      }
+    }
   });
 });

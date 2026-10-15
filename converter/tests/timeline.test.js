@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {errors, jsonframes, timeline, whole} from "../lib/index.js";
-import {hex, numbers, reference} from "./support.js";
+import {hex, inStoredForm, numbers, reference} from "./support.js";
 
 const {fraction} = whole;
 const FITS = ["fill", "fit", "stretch"];
@@ -117,7 +117,7 @@ test("the ticks of frames with times are those of the Python tool", async (t) =>
   await t.test(`${cases.length} parts of frames at six rates and of frames from seeds`, () => {
     assert.ok(cases.length > 6000, String(cases.length));
     cases.forEach(({label, frames, start, duration}, i) => {
-      assert.deepEqual(ticksOf(frames, start, duration), theirs[i], label);
+      assert.deepEqual(inStoredForm(ticksOf(frames, start, duration), theirs[i]), theirs[i], label);
       const key = theirs[i].reason === undefined ? "ticks" : theirs[i].detail.replace(/-?\d+(\.\d+)?(e[+-]\d+)?/g, "N");
       reasons.set(key, (reasons.get(key) ?? 0) + 1);
     });
@@ -273,7 +273,7 @@ test("importFrames gives the animation the Python tool imports from the same fra
   await t.test("for 700 videos and GIFs from seeds", async () => {
     for (let i = 0; i < cases.length; i += 1) {
       const ours = await imported(cases[i]);
-      assert.deepEqual(ours, theirs[i], `seed ${5000 + i}: ${cases[i].kind}, ${cases[i].frames.length} frames, from ${cases[i].start} for ${cases[i].duration}, ${cases[i].fit}`);
+      assert.deepEqual(inStoredForm(ours, theirs[i]), theirs[i], `seed ${5000 + i}: ${cases[i].kind}, ${cases[i].frames.length} frames, from ${cases[i].start} for ${cases[i].duration}, ${cases[i].fit}`);
       const key = theirs[i].reason === undefined ? "imported" : theirs[i].detail.replace(/^clip\.[a-z0-9]+: /, "").replace(/-?\d+(\.\d+)?(e[+-]\d+)?/g, "N");
       outcomes.set(key, (outcomes.get(key) ?? 0) + 1);
     }

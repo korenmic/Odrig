@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {errors, fit, whole} from "../lib/index.js";
-import {hex, numbers, reference} from "./support.js";
+import {asStored, hex, inStoredForm, numbers, reference} from "./support.js";
 
 const {fraction} = whole;
 const FITS = ["fill", "fit", "stretch"];
@@ -194,7 +194,7 @@ test("300 source pictures from seeds get the canvas pictures of the Python tool,
   await t.test("byte for byte", () => {
     cases.forEach(({source, w, h}, i) => {
       FITS.forEach((name, j) => {
-        assert.equal(placed(source, w, h, name), theirs[i][j], `picture ${i + 1}: ${source.width} x ${source.height} on ${w} x ${h}, ${name}`);
+        assert.deepEqual(inStoredForm(placed(source, w, h, name), theirs[i][j]), theirs[i][j], `picture ${i + 1}: ${source.width} x ${source.height} on ${w} x ${h}, ${name}`);
       });
     });
   });
@@ -223,14 +223,7 @@ test("fit, with a source narrower than the canvas shape, has the bars of the Pyt
   const theirs = reference("resample", [], cases.map(({source, w, h}) => ({columns: source.width, rows: source.height, rgba: hex(source.rgba), fits: ["fit"], w, h})));
   cases.forEach(({source, w, h}, i) => {
     const ours = fit.place(source, w, h, "fit");
-    const expected = Buffer.from(theirs[i][0], "hex");
-    for (let at = 0; at < expected.length; at += 1) {
-      if (ours[at] !== expected[at]) {
-        const pixel = Math.floor(at / 3);
-        assert.fail(`${source.width} x ${source.height} on ${w} x ${h}: column ${(pixel % w) + 1} of row ${Math.floor(pixel / w) + 1} has ${ours[at]} where the Python tool has ${expected[at]}`);
-      }
-    }
-    assert.equal(ours.length, expected.length);
+    assert.deepEqual(asStored(ours, theirs[i][0]), theirs[i][0], `${source.width} x ${source.height} on ${w} x ${h}`);
     const left = fit.sourceRect(source.width, source.height, w, h, "fit").left;
     assert.ok(left.n < 0n, "the rectangle begins left of the picture");
   });
@@ -272,7 +265,7 @@ test("a rectangle that reaches beyond the picture, or lies beside it", async (t)
     const {label, rect, w, h} = cases[i];
     await t.test(label, () => {
       const [left, top, width, height] = rect.map(asFraction);
-      assert.equal(resampled(rgb, columns, rows, {left, top, width, height}, w, h), theirs[i]);
+      assert.deepEqual(inStoredForm(resampled(rgb, columns, rows, {left, top, width, height}, w, h), theirs[i]), theirs[i]);
     });
   }
   await t.test("a rectangle beside the picture is all black, and one inside it is not", () => {
@@ -325,7 +318,7 @@ test("the border of the whole-number arithmetic", async (t) => {
     const theirs = reference("resample", [], [below, above].map((h) => ({columns: 64, rows, rgba: hex(source.rgba), fits: ["stretch"], w: 64, h})));
     [below, above].forEach((h, i) => {
       const ours = fit.place(source, 64, h, "stretch");
-      assert.ok(Buffer.from(ours).equals(Buffer.from(theirs[i][0], "hex")), `a canvas of 64 x ${h}`);
+      assert.deepEqual(asStored(ours, theirs[i][0]), theirs[i][0], `a canvas of 64 x ${h}`);
       assert.ok(new Set(ours).size > 100);
     });
   });

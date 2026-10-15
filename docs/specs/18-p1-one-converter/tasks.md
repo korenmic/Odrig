@@ -44,7 +44,7 @@ Rules for every task:
     before this task and passes after it.
   - Requirements: 2.1, 3.3
 
-- [ ] 3. The import on stored files
+- [x] 3. The import on stored files
   - `fit`, `timeline`, `import` and `whole` read the stored files and the stored media.
   - Prove it fails first: as task 2, for `import.test.js`.
   - Requirements: 2.1
