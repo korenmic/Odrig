@@ -52,9 +52,9 @@ and any field of the same kind that comes later.
 2. A new APK is built, and the owner checks it on a phone: a long press on a label and on
    a button opens nothing, and one in the address field marks text and opens the menu.
 
-## Open Questions
+## The Owner's Answers
 
-1. The same web code also runs as a page in a browser: the emulator serves it under
-   `/app/`, and the app's suite runs it in Chrome. Does the rule hold there too, or only
-   inside the APK? Recommended: everywhere the app's page runs, since it is one page and
-   the rule is part of it.
+On 2026-10-15:
+
+1. The rule holds wherever the app's page runs: in the APK and in a browser, where the
+   emulator serves the same web code under `/app/`.
