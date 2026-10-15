@@ -8298,3 +8298,28 @@ that holds `python`.
 
 **Resolution.** `converter/tests/support.js`, `stored.js`, `expected.test.js`, the test
 files of the converter; `docs/converter.md`, "Tests".
+
+## Seed 18: What replaces the parts of the Python package that go
+
+**Question.** With `cli`, `__main__`, `media` and `pack` gone, the suites that packed
+shows with `pack.pack`, the media that the walk-through and the app's suite drew with
+Pillow and PyAV, and the pages and checks that named `python -m odrig` or installed
+`requirements.txt` need another way. Which?
+
+**Answer.** One helper packs for the suites of the core, the emulator, the firmware tool and
+the board: `pack_with_the_converter` of `tests/core/support.py`, which runs
+`node converter/odrig.js pack` and which the other supports import; the emulator's test of
+the demo show runs the converter's `pack` itself, as its page does. The core's benchmark
+encodes its clip with the converter, and the uncompressed clip is the same file as
+before. The GIF of the walk-through and the media of the app's suite are stored in the
+programs that wrote them, as their bytes, since no media file is tracked in the
+repository; the files they write are those Pillow and PyAV made before. The helper that
+gives a command line its exit status moves to `errors` as `status_of`. The Python tests
+of the removed modules go, and those of the show reader stay in `test_show.py`. The setup
+of the getting-started page makes `.venv` and installs nothing into it, and the check of
+the pages' commands refuses `python -m odrig` and `pip`. The vocabulary's entry of the
+Python package no longer starts it as a program; the rest of the pages follow in task 6.
+
+**Resolution.** `odrig/`; `tests/core/support.py`; `core/Makefile`;
+`tests/walkthrough/make_gif.py`; `tests/app/media.py`; `agent/getting-started.md`,
+`agent/vocabulary.md`; `tests/onboarding/support.py`.

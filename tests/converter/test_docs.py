@@ -2,7 +2,7 @@ import re
 import subprocess
 import unittest
 
-from odrig import cli, errors, jsonframes, mapping, odrg
+from odrig import errors, jsonframes, mapping, odrg
 from odrig.generators import dense
 
 from . import support
@@ -59,17 +59,18 @@ class ConverterDocument(unittest.TestCase):
     tool's, and what belongs to the Python tool is on the page of the reference."""
 
     TOOL = "node converter/odrig.js"
+    SUBCOMMANDS = ("import", "encode", "decode", "check", "pack")
 
     @classmethod
     def setUpClass(cls):
         cls.text = (DOCS / "converter.md").read_text(encoding="utf-8")
 
     def test_it_names_every_subcommand_with_a_section_and_an_example(self):
-        for subcommand in cli.SUBCOMMANDS:
-            with self.subTest(subcommand=subcommand.name):
-                self.assertIn(f"\n## {subcommand.name}\n", self.text)
-                section = self.text.split(f"\n## {subcommand.name}\n")[1].split("\n## ")[0]
-                self.assertGreaterEqual(section.count(f"{self.TOOL} {subcommand.name} "), 2)
+        for subcommand in self.SUBCOMMANDS:
+            with self.subTest(subcommand=subcommand):
+                self.assertIn(f"\n## {subcommand}\n", self.text)
+                section = self.text.split(f"\n## {subcommand}\n")[1].split("\n## ")[0]
+                self.assertGreaterEqual(section.count(f"{self.TOOL} {subcommand} "), 2)
 
     def test_no_command_of_it_starts_the_python_tool(self):
         self.assertNotIn("python -m odrig", self.text)
@@ -107,26 +108,11 @@ class ReferenceDocument(unittest.TestCase):
         self.assertIn("reference", opening)
         self.assertIn("[converter.md](converter.md)", opening)
 
-    def test_it_gives_the_usage_line_of_every_subcommand(self):
-        section = self.text.split("\n## Command line\n")[1].split("\n## ")[0]
-        for subcommand in cli.SUBCOMMANDS:
-            with self.subTest(subcommand=subcommand.name):
-                self.assertEqual(section.count(f"\npython -m odrig {subcommand.name} "), 1)
-
     def test_it_gives_the_test_command(self):
         self.assertIn("python -m unittest discover -s tests/converter -t .", self.text)
 
     def test_it_describes_the_setup_with_a_virtual_environment_in_the_repository(self):
         self.assertIn("python3 -m venv .venv", self.text)
-        self.assertIn(".venv/bin/python -m pip install -r requirements.txt", self.text)
-
-    def test_it_names_the_versions_that_the_requirements_file_pins(self):
-        pinned = dict(
-            re.findall(r"(?m)^([a-z]+)==([0-9.]+)(?:;.*)?$", (support.ROOT / "requirements.txt").read_text())
-        )
-        self.assertEqual(sorted(pinned), ["av", "numpy", "pillow"])
-        for version in pinned.values():
-            self.assertIn(version, self.text)
 
     def test_it_describes_the_generators(self):
         for name in ("hello_world", "dvd_bounce", "dense"):

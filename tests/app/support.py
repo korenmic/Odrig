@@ -211,16 +211,13 @@ Run = collections.namedtuple("Run", "seen elsewhere")
 
 # The media the suite converts, as a scenario fetches them.
 MEDIA_TYPES = {".gif": "image/gif", ".mp4": "video/mp4"}
-VENV_PYTHON = ROOT / ".venv" / "bin" / "python"
 CONVERTER_TOOL = ROOT / "converter" / "odrig.js"
 
 
 def make_media(folder):
-    """Writes the GIF and the mp4 the suite converts into a folder: `clip.gif` and
-    `clip.mp4`. The Python of `.venv` writes them, which has the packages for it."""
-    if not VENV_PYTHON.is_file():
-        raise AssertionError(f"there is no {VENV_PYTHON.relative_to(ROOT)}; the getting-started page sets it up")
-    done = subprocess.run([str(VENV_PYTHON), "-m", "tests.app.media", str(folder)], cwd=ROOT, capture_output=True, text=True)
+    """Writes the media the suite converts into a folder, as tests/app/media.py stores them:
+    `clip.gif`, `clip.mp4`, `long.mp4` and `broken.mp4`."""
+    done = subprocess.run([sys.executable, "-m", "tests.app.media", str(folder)], cwd=ROOT, capture_output=True, text=True)
     if done.returncode != 0:
         raise AssertionError(f"the media were not written: {done.stderr}")
     return pathlib.Path(folder)

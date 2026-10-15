@@ -22,7 +22,6 @@ import time
 import unittest
 
 from emulator import app
-from odrig import pack
 from tests.core import support as core_support
 from tests.core.support import ReferencePlayer
 
@@ -52,10 +51,10 @@ LINES = "serial" if HAS_SERIAL else "tcp"
 
 @contextlib.contextmanager
 def packed(show, mapping, sources, compressed=True):
-    """A temporary folder that holds a show as `python -m odrig pack` installs it."""
+    """A temporary folder that holds a show as the converter's `pack` installs it."""
     with tempfile.TemporaryDirectory() as folder:
         out = pathlib.Path(folder, "show")
-        pack.pack(show, mapping, sources, out, compressed=compressed)
+        core_support.pack_with_the_converter(show, mapping, sources, out, compressed=compressed)
         yield out
 
 
@@ -102,6 +101,15 @@ def run_tool(*argv):
         except SystemExit as stopped:
             status = stopped.code
     return Result(status, out.getvalue(), err.getvalue())
+
+
+def run_converter(*argv):
+    """Runs a command line of the converter, `node converter/odrig.js`, from the repository
+    root."""
+    done = subprocess.run(
+        ["node", str(core_support.CONVERTER), *(str(argument) for argument in argv)], cwd=ROOT, capture_output=True, text=True
+    )
+    return Result(done.returncode, done.stdout, done.stderr)
 
 
 def run_module(*argv, module="emulator", cwd=ROOT):

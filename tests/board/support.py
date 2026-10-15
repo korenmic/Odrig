@@ -13,10 +13,11 @@ import tempfile
 import time
 
 from emulator import recfile
-from odrig import jsonframes, mapping as mapping_file, odrg, pack
+from odrig import jsonframes, mapping as mapping_file, odrg
 from odrig.generators import dense, dvd_bounce, hello_world
 from odrigctl import cli as command_tool
 from odrigctl import client, content
+from tests.core.support import pack_with_the_converter
 
 from fwtool import Failure, board, build, cli, flasher, limit, paths, storage, wifi
 
@@ -282,7 +283,7 @@ def dim_show(show=EXAMPLE_SHOW, mapping=TWO_LEGS, sources=ANIMATIONS, brightness
         dimmed = pathlib.Path(folder, "show.json")
         dimmed.write_text(json.dumps(changed))
         out = pathlib.Path(folder, "show")
-        pack.pack(dimmed, mapping, sources, out, compressed=compressed)
+        pack_with_the_converter(dimmed, mapping, sources, out, compressed=compressed)
         yield out
 
 

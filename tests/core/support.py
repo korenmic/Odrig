@@ -17,10 +17,22 @@ import tempfile
 import unittest
 import zlib
 
-from odrig import errors, jsonframes, mapping, odrg, pack, show
+from odrig import errors, jsonframes, mapping, odrg, show
 from odrig.generators import dense, dvd_bounce, hello_world
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+CONVERTER = ROOT / "converter" / "odrig.js"
+
+
+def pack_with_the_converter(show_file, mapping_file, sources, out, compressed=True):
+    """Packs a show into the folder `out` with the converter, `node converter/odrig.js pack`.
+    A refusal is an error with the converter's error line."""
+    argv = ["node", str(CONVERTER), "pack", "--show", str(show_file), "--mapping", str(mapping_file), "--sources", str(sources), "--out", str(out)]
+    if not compressed:
+        argv.append("--uncompressed")
+    done = subprocess.run(argv, capture_output=True, text=True)
+    if done.returncode != 0:
+        raise RuntimeError(f"the converter did not pack {show_file}: {done.stderr.strip()}")
 CORE = ROOT / "core"
 BUILD = CORE / "build"
 
@@ -379,7 +391,7 @@ def start_each(file_sets, script=(), options=(), check_first=True):
 def _example_show():
     with tempfile.TemporaryDirectory() as folder:
         out = pathlib.Path(folder, "show")
-        pack.pack(ROOT / "shows" / "example" / "show.json", ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
+        pack_with_the_converter(ROOT / "shows" / "example" / "show.json", ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
         return tuple((path.name, path.read_bytes()) for path in sorted(out.iterdir()))
 
 

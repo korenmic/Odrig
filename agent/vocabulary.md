@@ -80,10 +80,10 @@ the entry links to it.
   ODRG file and back, checks a file, and packs a show into an installed file set. Its
   library, `converter/lib/`, also runs in a web page. See
   [converter.md](../docs/converter.md).
-- **reference converter**: The Python package `odrig/`, started as `python -m odrig`. It
-  was the converter before and does the same work. It is kept so that tests can compare
-  the converter with it, and nobody converts with it any more. The generators are part of
-  it. See [reference-converter.md](../docs/reference-converter.md).
+- **reference converter**: The Python package `odrig/`. It was the converter before; now it
+  converts nothing and is a library for the tests and the tools, which holds the
+  generators. What it answered to the converter's tests is stored with them, so that they
+  compare the converter with it. See [reference-converter.md](../docs/reference-converter.md).
 - **core**: The C++ library in `core/` that plays an installed file set: it reads the
   files, keeps time, handles commands and gives the colour of every LED of every leg.
   Everything that must behave the same wherever a show plays is in the core. See

@@ -32,7 +32,6 @@ installed. The setup and the four suites that pass, in PowerShell:
 git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
 npm ci --prefix converter
 .venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
@@ -57,16 +56,15 @@ command of this repository is run from that folder, the repository root.
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
 npm ci --prefix converter
 make -C core shared
 ```
 
-The first command makes a Python environment in the folder `.venv`. The second puts three
-libraries into it, numpy, Pillow and PyAV, with which the reference converter reads videos
-and GIFs. The third puts the converter's two packages for the same job into
-`converter/node_modules/`; one of them fetches a decoder program, an ffmpeg built for your
-computer. The fourth builds the core as the library the emulator loads,
+The first command makes a Python environment in the folder `.venv`; nothing is installed
+into it, since every Python program of the repository needs only Python's own library. The
+second puts the converter's two packages into `converter/node_modules/`; one of them
+fetches a decoder program, an ffmpeg built for your computer, with which the converter
+reads videos. The third builds the core as the library the emulator loads,
 `core/build/libodrig_core.dylib`. Git ignores these three folders. `.venv/bin/python` is
 the Python for every command of this repository. The other documents write it as `python`.
 

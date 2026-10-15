@@ -299,7 +299,7 @@ def example_show(brightness=None):
     import json
     import pathlib
     import tempfile
-    from odrig import pack
+    from tests.core.support import pack_with_the_converter
     with tempfile.TemporaryDirectory() as folder:
         show = ROOT / "shows" / "example" / "show.json"
         if brightness is not None:
@@ -308,7 +308,7 @@ def example_show(brightness=None):
             show = pathlib.Path(folder, "show.json")
             show.write_text(json.dumps(changed))
         out = pathlib.Path(folder, "show")
-        pack.pack(show, ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
+        pack_with_the_converter(show, ROOT / "mapping" / "legs-2.json", ROOT / "animations", out)
         yield out
 
 

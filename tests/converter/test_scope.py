@@ -1,9 +1,21 @@
 import ast
+import re
+import sys
 import unittest
 
 from . import support
 
 PACKAGE = support.ROOT / "odrig"
+
+# What stays of the package: a library that reads and writes the project's files for the
+# tests and the tools, and the generators. Converting and packing are the converter's.
+LIBRARY = {
+    "__init__.py", "errors.py", "files.py", "strictjson.py", "jsonframes.py", "odrg.py", "mapping.py", "show.py", "mapdoc.py",
+    "generators/__init__.py", "generators/dense.py", "generators/dvd_bounce.py", "generators/hello_world.py", "generators/rainbow.py",
+}
+# The tools, which run no converter logic, and what of the library they may read with.
+TOOLS = ("emulator", "odrigctl", "preview", "firmware/fwtool")
+READING = {"odrig", "odrig.errors", "odrig.files", "odrig.strictjson", "odrig.mapping", "odrig.show", "odrig.odrg"}
 
 # Modules that open a network connection or a serial port.
 FORBIDDEN_MODULES = (
@@ -46,11 +58,38 @@ def is_or_is_inside(name, module):
     return name == module or name.startswith(module + ".")
 
 
-class Scope(unittest.TestCase):
-    def test_the_package_has_the_modules_this_test_reads(self):
+def tool_modules():
+    """`(path, text, syntax tree)` for every module of the tools."""
+    paths = sorted(path for folder in TOOLS for path in (support.ROOT / folder).rglob("*.py"))
+    return [(path, path.read_text(encoding="utf-8")) for path in paths]
+
+
+class WhoConverts(unittest.TestCase):
+    def test_the_package_is_the_library_and_the_generators(self):
         names = {path.relative_to(PACKAGE).as_posix() for path, _ in modules()}
-        for expected in ("cli.py", "odrg.py", "media.py", "pack.py", "generators/dense.py"):
-            self.assertIn(expected, names)
+        self.assertEqual(names, LIBRARY)
+
+    def test_the_library_needs_only_the_standard_library(self):
+        for path, tree in modules():
+            for name in imported(tree):
+                top = name.split(".")[0]
+                self.assertTrue(top in sys.stdlib_module_names or top == "odrig", f"{path.name} imports {name}")
+
+    def test_the_tools_read_with_the_library_and_convert_nothing(self):
+        for path, text in tool_modules():
+            for name in imported(ast.parse(text, filename=str(path))):
+                if is_or_is_inside(name, "odrig"):
+                    self.assertIn(name, READING, f"{path.relative_to(support.ROOT)} imports {name}")
+            self.assertNotRegex(text, r"\bodrg\.encode\(|\bjsonframes\b", path.relative_to(support.ROOT))
+
+    def test_only_the_preview_starts_the_converter_and_only_to_check_and_pack(self):
+        starting = {path.relative_to(support.ROOT).as_posix() for path, text in tool_modules() if "odrig.js" in text}
+        self.assertEqual(starting, {"preview/__init__.py"})
+        preview = (support.ROOT / "preview" / "__init__.py").read_text(encoding="utf-8")
+        self.assertEqual(sorted(set(re.findall(r'converter\(node, "([a-z]+)"', preview))), ["check", "pack"])
+
+
+class Scope(unittest.TestCase):
 
     def test_no_module_imports_a_network_or_serial_module(self):
         for path, tree in modules():
@@ -96,23 +135,6 @@ class Scope(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     self.assertNotIn(node.value, reasons, f"{path.name}, line {node.lineno}")
-
-    def test_only_the_media_module_imports_a_third_party_library(self):
-        third_party = ("numpy", "PIL", "av")
-        for path, tree in modules():
-            uses = {name for name in imported(tree) for library in third_party if is_or_is_inside(name, library)}
-            if path.name == "media.py":
-                self.assertTrue(uses)
-            else:
-                self.assertEqual(uses, set(), path.name)
-
-    def test_a_media_file_is_only_ever_a_file_on_this_computer(self):
-        from odrig import errors, mapping, media
-
-        canvas = mapping.read(support.ROOT / "mapping" / "legs-2.json")
-        with self.assertRaises(errors.Rejection) as caught:
-            media.import_media("http://localhost:9/clip.mp4", canvas)
-        self.assertEqual(caught.exception.reason, "not-found")
 
 
 if __name__ == "__main__":

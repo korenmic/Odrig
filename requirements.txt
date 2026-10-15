@@ -1,5 +1,0 @@
-# Needed by `python -m odrig import` and by the test suite. Everything else runs without them.
-numpy==2.2.6; python_version < "3.11"
-numpy==2.4.6; python_version >= "3.11"
-pillow==12.3.0
-av==17.1.0

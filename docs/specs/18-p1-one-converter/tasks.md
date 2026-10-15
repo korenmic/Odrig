@@ -57,7 +57,7 @@ Rules for every task:
     goes, fails: the helper starts Python.
   - Requirements: 2.3, 2.4
 
-- [ ] 5. The library
+- [x] 5. The library
   - `odrig/cli.py`, `__main__.py`, `media.py` and `pack.py` go, with their tests and
     `tests/converter/make_expected.py`; the helper of the generators moves to `errors`.
     The suites of the core, the emulator, the firmware tool and the board pack with the

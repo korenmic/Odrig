@@ -90,7 +90,6 @@ class GettingStarted(unittest.TestCase):
             CLONE,
             "cd Odrig",
             "python -m venv .venv",
-            f"{python} -m pip install -r requirements.txt",
             "npm ci --prefix converter",
             f"{python} core/build.py shared",
             f"{python} -m unittest discover -s tests/converter -t .",
@@ -138,13 +137,12 @@ class GettingStarted(unittest.TestCase):
             self.assertIn(here, used, "the page no longer uses what the table translates")
 
     def test_the_setup_is_the_clone_the_environment_the_libraries_the_packages_and_the_shared_library(self):
-        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", ".venv/bin/python -m pip install -r requirements.txt", "npm ci --prefix converter", "make -C core shared"])
-        pinned = re.findall(r"(?m)^([a-z]+)==", (support.ROOT / "requirements.txt").read_text(encoding="utf-8"))
-        self.assertEqual(sorted(set(pinned)), ["av", "numpy", "pillow"])
+        self.assertEqual(self.commands("Set up"), ["python3 -m venv .venv", "npm ci --prefix converter", "make -C core shared"])
+        self.assertFalse((support.ROOT / "requirements.txt").exists())
         package = json.loads((support.ROOT / "converter" / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(package["dependencies"]), ["ffmpeg-static", "omggif"])
         setup = flat(self.part("Set up"))
-        for phrase in (f"`{CLONE}`", "numpy, Pillow and PyAV", "with which the reference converter reads videos and GIFs", "the converter's two packages for the same job",
+        for phrase in (f"`{CLONE}`", "nothing is installed into it", "needs only Python's own library", "the converter's two packages",
                        "`converter/node_modules/`", "fetches a decoder program", "`core/build/libodrig_core.dylib`", "Git ignores these three folders",
                        "`.venv/bin/python` is the Python for every command", "write it as `python`"):
             self.assertIn(phrase, setup)
