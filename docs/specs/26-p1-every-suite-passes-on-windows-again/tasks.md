@@ -38,7 +38,7 @@ Rules for every task:
     with `PermissionError: [WinError 32]`.
   - Requirements: 1.1, 1.2, 1.5, 7.1, 7.2
 
-- [ ] 2. The preview ends on Ctrl+Break, and its tests stop it on Windows
+- [x] 2. The preview ends on Ctrl+Break, and its tests stop it on Windows
   - `preview/__init__.py`: SIGBREAK, where the system has it, ends the preview as SIGTERM
     does.
   - `tests/emulator/test_preview.py`: the preview in its own group, stopped with
