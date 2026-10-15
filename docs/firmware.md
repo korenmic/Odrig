@@ -777,7 +777,7 @@ kind of the line, and its text.
 #log 31.407 usb: a device came: maker 0781, product 5581, a stick
 #log 31.902 usb: stick opened: 12 animation files in odrig
 #log 32.115 player: drive file clip.odrg left out: size-mismatch
-#log 58.230 usb: a device went
+#log 58.230 usb: a device went: maker 0781, product 5581, a stick
 ```
 
 The lines of the kind `usb`:
@@ -789,8 +789,12 @@ The lines of the kind `usb`:
 - A device: `a device came: maker <four hex digits>, product <four hex digits>, <kind>`,
   where the kind is that of its first interface, or of the device when it has none:
   `a hub` for the class 9, `a stick` for the class 8, `another device (class <n>)` for any
-  other; `a device came that could not be opened (<error>)`; and `a device went`. The
-  maker's and the product's numbers are those of the device's descriptor.
+  other; `a device came that could not be opened (<error>)`; and
+  `a device went: maker <four hex digits>, product <four hex digits>, <kind>`, which names
+  the device as its line of coming did. The maker's and the product's numbers are those of
+  the device's descriptor; they are only written, and the firmware treats no maker and no
+  product apart. The log keeps up to eight devices at once, a hub and what is plugged into
+  it among them, to say when each goes; a ninth has its line of coming only.
 - A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
   `stick not opened: no file system it reads (<error>)`,
   `stick not opened: a fault in reading (<error>)`, or

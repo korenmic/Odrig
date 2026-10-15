@@ -53,7 +53,7 @@ Rules for every task:
     error.
   - Requirements: 1.1, 1.2, 1.3, 1.6, 7.1
 
-- [ ] 2. The log names every device that comes and goes
+- [x] 2. The log names every device that comes and goes
   - `firmware/usermod/odrig_drive.cpp`: the watcher keeps up to eight devices open, and
     the line of a device that goes names it as its line of coming did.
   - `tests/firmware/`: the watcher and its lines; no source of `firmware/usermod/`
