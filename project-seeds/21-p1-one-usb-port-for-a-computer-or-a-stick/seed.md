@@ -73,9 +73,16 @@ The board's suite, `fw.py test-board`, talks to the board on the chip's own port
 5. Afterwards the board is left running the two-leg bench show, autostarting, at
    brightness 40 or less.
 
-## Open Questions
+## The Owner's Answers
 
-1. Is the choice made only as the board starts, or also when a cable is plugged into the
-   port later?
-2. How long may the board look for a computer before it takes the port for a stick? A
-   stick is read that much later.
+On 2026-10-15:
+
+1. The choice is made as the board starts: it looks for a computer on the chip's own
+   port, and when none shows itself, the port becomes the stick's and the board looks
+   for a stick there. From then on a stick may be pulled out and plugged in again at
+   any time: pulling it out drops its animations from the playlist and the list, and
+   plugging it in again reads its folder anew and adds its animations again. The port
+   becomes a computer's again only at the next start.
+2. The board looks for a computer for 5 seconds. The time is a setting: a named
+   constant in the firmware's source as its default, and a value in a settings file in
+   the board's own storage, where the owner can see it and change it.

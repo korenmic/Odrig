@@ -62,8 +62,11 @@ at a start, and the command tool skips every line that is not a reply.
 3. Afterwards the board is left running the two-leg bench show, autostarting, at
    brightness 40 or less.
 
-## Open Questions
+## The Owner's Answers
 
-1. Should the other lines the core logs, such as the reason a show becomes invalid, go
-   to the same log?
-2. Should the command tool print the log, or is a serial terminal enough?
+On 2026-10-15:
+
+1. The other lines the core logs, such as the reason a show becomes invalid, go to the
+   same log.
+2. The command tool can show the log: it prints the log's lines as they arrive, and no
+   command is added to the board for it.
