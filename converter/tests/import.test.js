@@ -18,18 +18,26 @@ const QUIET = {status: 0, out: "", err: ""};
 
 // A folder with the media of the tests, which the Python package made with Pillow and PyAV
 // and which are stored with its answers: the GIFs and the videos of the Python suite's
-// import tests among them.
+// import tests among them. The Python tool writes its files there too. What only the
+// JavaScript side writes, the files `fresh` names for it and the list of files a program
+// of the tests reads, goes into a folder of its own, `ours`. The key of each request of the
+// Python tool holds the files of the folder the request names, and those files are not
+// the same on every computer: the pictures decoded from a video differ by a colour value
+// or two from one build of FFmpeg to another, and the list names the temporary folder.
 let folder;
+let ours;
 let made;
 let outputs = 0;
 
 before(() => {
   folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
+  ours = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
   made = storedAnswer("media", [], {folder});
 });
 
 after(() => {
   fs.rmSync(folder, {recursive: true, force: true});
+  fs.rmSync(ours, {recursive: true, force: true});
 });
 
 function media(name) {
@@ -38,7 +46,7 @@ function media(name) {
 
 function fresh(side) {
   outputs += 1;
-  return path.join(folder, `out-${side}-${outputs}.json`);
+  return path.join(side === "js" ? ours : folder, `out-${side}-${outputs}.json`);
 }
 
 // Imports with both tools, each into a file of its own: the Python tool for all command
@@ -628,7 +636,7 @@ test("a damaged or cut media file ends the import with a result or with unreadab
   await t.test("every cut and every changed byte of four GIFs, in a program with a limit of two minutes", () => {
     const files = ["clip.gif", "smaller.gif", "disposal-2.gif", "disposal-3.gif"].flatMap((name) => copies(name, 400)).map((copy) => copy.file);
     assert.ok(files.length > 3000, `${files.length} files`);
-    const list = media("gifs.json");
+    const list = path.join(ours, "gifs.json");
     fs.writeFileSync(list, JSON.stringify(files));
     const done = spawnSync(process.execPath, [path.join(CONVERTER, "tests", "gifs.js"), list], {encoding: "utf8", timeout: 120000, maxBuffer: 1 << 28});
     assert.equal(done.error, undefined, `the program did not come to an end: ${done.error}`);
