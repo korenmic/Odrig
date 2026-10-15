@@ -8359,3 +8359,14 @@ written; a table it cannot read is a board that gets the stock files as before.
 
 **Resolution.** `firmware/fwtool/storage.py`, `geometry`, `with_settings`;
 `firmware/fwtool/cli.py`, `_big_storage`, `wleds_storage`.
+
+## Seed 24: What WLED's information says of an update over Wi-Fi
+
+**Question.** The design has the firmware refuse an update over Wi-Fi on a board without a
+second slot. How does the owner see on the board which way it goes, before trying one?
+
+**Answer.** WLED's information has an entry `odrig update`: `refused: no second slot` where
+the refusal is registered, `WLED's` where WLED's own update works. The page's table of the
+information names `odrig drive` too, which it had left out.
+
+**Resolution.** `firmware/usermod/odrig_usermod.cpp`, `addToJsonInfo`; `docs/firmware.md`.

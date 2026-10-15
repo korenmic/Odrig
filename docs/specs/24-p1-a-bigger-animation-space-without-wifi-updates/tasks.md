@@ -52,7 +52,7 @@ Rules for every task:
     tool as it is, fails: the command is a usage error.
   - Requirements: 2.1 to 2.5, 4.1 to 4.3, 7.1
 
-- [ ] 3. The firmware refuses an update over Wi-Fi without a second slot
+- [x] 3. The firmware refuses an update over Wi-Fi without a second slot
   - `firmware/usermod/odrig_update.h`, `odrig_update.cpp`; `odrig_usermod.cpp` starts it.
   - `tests/firmware/`: the checks of the design. `python3 firmware/fw.py build` builds,
     and the probe build too. `docs/firmware.md`: the refused update, "What the firmware

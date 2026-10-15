@@ -17,11 +17,13 @@ PLATFORM_HEADER = "odrig_platform.h"
 STANDALONE = FIRMWARE / "standalone"
 # The headers of the chip's own software that a source names: the USB unit behind the
 # port, which the port's driver does not let through; the USB host, the driver of flash
-# drives, the reading of a folder and the frame index of the USB unit, for a drive; and, in the probe build, the pulse
+# drives, the reading of a folder and the frame index of the USB unit, for a drive; the
+# firmware slots, for an update over Wi-Fi; and, in the probe build, the pulse
 # counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
 ALLOWED_IN = {
     "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
     "odrig_drive.cpp": {"dirent.h", "soc/usb_serial_jtag_struct.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
+    "odrig_update.cpp": {"esp_ota_ops.h"},
     "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
 }
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}
@@ -138,10 +140,11 @@ class Includes(unittest.TestCase):
 
 
 class WebServer(unittest.TestCase):
-    def test_one_handler_is_registered_for_the_command_path(self):
+    def test_one_handler_is_registered_for_the_command_path_and_one_for_the_refused_update(self):
         registered = [(path.name, match) for path in SOURCES for match in re.findall(r"\bserver\.on\(([^,]+),", text_of(path))]
-        self.assertEqual(registered, [("odrig_http.cpp", "PATH")])
+        self.assertEqual(registered, [("odrig_http.cpp", "PATH"), ("odrig_update.cpp", "PATH")])
         self.assertRegex(text_of(USERMOD / "odrig_http.cpp"), r'const char PATH\[\] = "/odrig";')
+        self.assertRegex(text_of(USERMOD / "odrig_update.cpp"), r'const char PATH\[\] = "/update";')
 
     def test_the_handler_answers_as_the_commands_document_defines(self):
         text = text_of(USERMOD / "odrig_http.cpp")
@@ -184,9 +187,9 @@ class WebServer(unittest.TestCase):
         self.assertEqual(first, "if (updating) return;")
         self.assertIn("void onUpdateBegin(bool begins) override { updating = begins; }", text)
 
-    def test_the_information_has_the_three_entries(self):
+    def test_the_information_has_its_entries(self):
         text = text_of(USERMOD / "odrig_usermod.cpp")
-        for entry in ("odrig show", "odrig outputs", "odrig start", "odrig drive"):
+        for entry in ("odrig show", "odrig outputs", "odrig start", "odrig drive", "odrig update"):
             self.assertIn(f'F("{entry}")', text)
 
 

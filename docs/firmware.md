@@ -793,7 +793,7 @@ through its own interface keep working; while WLED writes a new firmware, the us
 no file and sends nothing to the LEDs.
 
 **WLED's information** (`/json/info`, and the Info page of its interface) reports the
-access point as active in `wifi.ap`, the release name `odrig_ESP32-S3_16MB_opi`, and three
+access point as active in `wifi.ap`, the release name `odrig_ESP32-S3_16MB_opi`, and the
 entries of the usermod:
 
 | Entry | Value |
@@ -801,6 +801,20 @@ entries of the usermod:
 | `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
 | `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
 | `odrig start` | The milliseconds the core took to start. |
+| `odrig drive` | What there is of a USB drive, as [A USB drive](#a-usb-drive) says. |
+| `odrig update` | `refused: no second slot` on a board of the bigger layout, where an update over Wi-Fi is refused; `WLED's` on WLED's layout, where WLED's own update works. |
+
+**An update over Wi-Fi.** On a board of the bigger layout of
+[The regions of the flash](#the-regions-of-the-flash) there is no second firmware slot, and
+the firmware is updated over the USB cable only. An update sent to WLED's page, its own
+form or `POST /update`, is answered with WLED's message page, status 501, `Update refused`
+and *This board has no second firmware slot: that room holds animations. Its firmware is
+updated over the USB cable with python3 firmware/fw.py flash.* Nothing is written, the
+LEDs go on playing, and the upload is thrown away as it arrives. The layout itself keeps
+any other update from writing: its one slot is a factory slot, for which the update
+library finds no slot to write, so WLED's own update, and ArduinoOTA when it is on, fail
+before they write. On WLED's layout the firmware registers nothing, and WLED's update works
+as it does in stock WLED.
 
 **The outputs** are set from the mapping file. When the core has started with a valid
 mapping, the usermod replaces WLED's outputs with one output for each leg, in the order of
@@ -887,9 +901,9 @@ lock to know them.
 | The outputs are the mapping's. WLED's LED output settings are replaced by them when WLED's LED settings are saved. | The web interface, the JSON interface and WebSocket. |
 | WLED's switch, its brightness slider and its live override do not change the LEDs. | The current limiter and its maximum in WLED's LED settings. |
 | The USB serial port speaks only [commands.md](commands.md): WLED's serial handling, Adalight, TPM2, Improv and JSON over serial, is switched off. | The file system and every file of WLED on it. |
-| WLED's information shows the three `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface. |
+| WLED's information shows the `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface, on WLED's layout. |
 | The audio usermod of the stock build is not included. | Buttons, relay and infrared settings. |
-| The web server also answers `POST /odrig`. | Every page and address WLED serves. |
+| The web server also answers `POST /odrig`, and on the bigger layout it answers `POST /update` with the refusal. | Every other page and address WLED serves. |
 
 One patch changes files of WLED, `firmware/patches/010-sixteen-parallel-outputs.patch`,
 which `build` and `build --probe` apply and `build --stock` does not. Stock WLED drives

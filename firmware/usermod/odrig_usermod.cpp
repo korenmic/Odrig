@@ -3,8 +3,9 @@
 // chip's own socket, carries bytes between the USB serial port and the core, and command
 // lines between the board's UART and the core and between WLED's web server and the core,
 // sets WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED
-// data to the outputs, puts the lines the player logs into the log the UART writes, and
-// reports its state in WLED's information. Every decision about files, time, the layout
+// data to the outputs, puts the lines the player logs into the log the UART writes, refuses
+// an update over Wi-Fi on a board without a second firmware slot, and reports its state in
+// WLED's information. Every decision about files, time, the layout
 // and commands is the core's.
 #include "wled.h"
 
@@ -16,6 +17,7 @@
 #include "odrig_log.h"
 #include "odrig_serial.h"
 #include "odrig_uart.h"
+#include "odrig_update.h"
 
 #ifdef ODRIG_PROBE
 #include "odrig_probe.h"
@@ -177,6 +179,7 @@ class OdrigUsermod : public Usermod {
     OdrigLeds::hold();
     if (OdrigLeds::legs() == 0) OdrigLeds::dark();
     OdrigHttp::begin(commandLine);
+    OdrigUpdate::begin();
     if (core != nullptr) {
       xTaskCreatePinnedToCore(requestRefreshes, TASK_NAME, TASK_STACK, nullptr, TASK_PRIORITY, &requester, TASK_PROCESSOR);
     }
@@ -232,7 +235,8 @@ class OdrigUsermod : public Usermod {
   }
 
   // WLED's information page: whether the show is valid, how many outputs work, how long
-  // the core took to start, and what there is of a USB drive.
+  // the core took to start, what there is of a USB drive, and whether an update over
+  // Wi-Fi is refused.
   void addToJsonInfo(JsonObject &root) override {
     JsonObject user = root["u"];
     if (user.isNull()) user = root.createNestedObject("u");
@@ -250,6 +254,7 @@ class OdrigUsermod : public Usermod {
     start.add(startMs);
     start.add(F(" ms"));
     user.createNestedArray(F("odrig drive")).add(String(OdrigDrive::summary()));
+    user.createNestedArray(F("odrig update")).add(OdrigUpdate::refusing() ? F("refused: no second slot") : F("WLED's"));
   }
 
   void onUpdateBegin(bool begins) override { updating = begins; }
