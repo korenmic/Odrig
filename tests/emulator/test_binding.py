@@ -158,7 +158,7 @@ class ExampleShow(unittest.TestCase):
     def test_command_answers_status(self):
         reply = self.core.command(0, b"status")
         self.assertEqual(reply, self.reference.command(0, b"status"))
-        self.assertEqual(json.loads(reply), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None})
+        self.assertEqual(json.loads(reply), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6})
         self.assertEqual(self.core.command(5, b"status\r\n"), reply)
 
     def test_command_gives_the_reply_of_a_line_that_is_no_command(self):

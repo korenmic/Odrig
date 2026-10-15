@@ -29,6 +29,15 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The canvas of the installed mapping, which the core has while it has legs.
+    if (core.leg_count != 0) {
+        reply.text(",\"width\":");
+        reply.number(core.width);
+        reply.text(",\"height\":");
+        reply.number(core.height);
+    } else {
+        reply.text(",\"width\":null,\"height\":null");
+    }
     reply.text("}\n");
     return reply.length;
 }

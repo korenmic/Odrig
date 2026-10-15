@@ -1119,6 +1119,8 @@ class ReferencePlayer:
             "animation": self.shown if self.playing is not None else None,
             "fps": self.refreshes_in[second - 1] if second >= 1 else 0,
             "error": self.error,
+            "width": self.canvas[0] if self.legs else None,
+            "height": self.canvas[1] if self.legs else None,
         }
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 

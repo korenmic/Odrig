@@ -99,12 +99,12 @@ class ValidShow(unittest.TestCase):
 class EachReason(unittest.TestCase):
     """One case at least for each text of the table of invalid shows."""
 
-    def check(self, files, text, options=(), legs=EXAMPLE_LEGS):
+    def check(self, files, text, options=(), legs=EXAMPLE_LEGS, canvas=(60, 6)):
         run = support.start(files, QUESTIONS, options)
-        self.assert_invalid(run, text, legs)
+        self.assert_invalid(run, text, legs, canvas)
         return run
 
-    def assert_invalid(self, run, text, legs):
+    def assert_invalid(self, run, text, legs, canvas=(60, 6)):
         """The show is invalid with this text: `status` reports it, the LEDs stay dark,
         `play` is refused, and the other commands work as ever."""
         self.assertEqual(run.core, "ok")
@@ -125,7 +125,8 @@ class EachReason(unittest.TestCase):
         self.assertEqual([lines.pop(0) for _ in range(3)], [OK] * 3)
         self.assertEqual([lines.pop(0) for _ in polled[1] + polled[2]], polled[1] + polled[2])
         last = json.loads(lines.pop(0)[len("reply "):])
-        self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text})
+        width, height = canvas if legs else (None, None)
+        self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text, "width": width, "height": height})
         self.assertEqual(lines, [])
 
     def test_mapping_missing(self):
@@ -187,6 +188,7 @@ class EachReason(unittest.TestCase):
         vectors = sorted(VECTORS.iterdir())
         self.assertGreaterEqual(len(vectors), 30)
         file_sets = []
+        canvases = []
         for path in vectors:
             data = path.read_bytes()
             # The canvas the vector states, so that a vector with a sound header is judged
@@ -196,17 +198,18 @@ class EachReason(unittest.TestCase):
             usable = 1 <= width and 1 <= height and width * height <= 65534
             mapping = support.one_leg_mapping(width, height) if usable else support.one_leg_mapping(3, 3)
             file_sets.append({"mapping.json": mapping, "show.json": support.show_text([animation(1, "vector.odrg")]), "vector.odrg": data})
+            canvases.append((width, height) if usable else (3, 3))
         runs = support.start_each(file_sets, QUESTIONS)
-        for path, run in zip(vectors, runs):
+        for path, run, canvas in zip(vectors, runs, canvases):
             with self.subTest(vector=path.name):
                 self.assertEqual(len(run.legs), 1)
-                self.assert_invalid(run, f"file-malformed vector.odrg {path.name.split('.')[0]}", run.legs)
+                self.assert_invalid(run, f"file-malformed vector.odrg {path.name.split('.')[0]}", run.legs, canvas)
 
     def test_size_mismatch_names_the_file(self):
         self.check(example(dvd_odrg=support.clip(1, 60, 5)), "size-mismatch dvd.odrg")
         self.check(example(hello_odrg=support.clip(1, 59, 6)), "size-mismatch hello.odrg")
         twenty_legs = tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1))
-        self.check(example(mapping_json=support.mapping_texts()["legs-20"]), "size-mismatch hello.odrg", legs=twenty_legs)
+        self.check(example(mapping_json=support.mapping_texts()["legs-20"]), "size-mismatch hello.odrg", legs=twenty_legs, canvas=(60, 60))
 
     def test_read_error_names_the_file(self):
         self.check(example(), "read-error mapping.json", ["--read-fails", "mapping.json", "0"], legs=())
@@ -485,7 +488,10 @@ class TablesWithRoom(unittest.TestCase):
         run = support.start(files, QUESTIONS[:3] + [support.line(T0, "play 1"), support.line(T0, "list")])
         self.assertIsNone(run.error)
         self.assertEqual(run.legs, EXAMPLE_LEGS)
-        self.assertEqual(json.loads(run.lines[1][len("reply "):]), {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None})
+        self.assertEqual(
+            json.loads(run.lines[1][len("reply "):]),
+            {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6},
+        )
         self.assertEqual(run.lines[-2:], ['reply {"ok":false,"error":"unknown-id"}', 'reply {"ok":true,"items":[],"next":null}'])
         self.assertEqual(run.lines, support.ReferencePlayer(files).run(QUESTIONS[:3] + [support.line(T0, "play 1"), support.line(T0, "list")]))
 

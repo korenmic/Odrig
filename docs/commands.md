@@ -43,7 +43,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
 ```
 
 | Member | Meaning |
@@ -54,6 +54,7 @@ A number in a command is written in decimal digits.
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
+| `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
 
 ## Storage and the installed items
 

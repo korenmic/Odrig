@@ -34,7 +34,7 @@ Rules for every task:
 - Before a push, fetch: another contributor pushes to this repository.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The canvas in `status`
+- [x] 1. The canvas in `status`
   - Set `"state": "in_progress"` in
     `project-seeds/17-p2-operators-app-converting-and-uploading/state.json`.
   - `core/src/commands.cpp`: `width` and `height` after `error`, `null` without legs.

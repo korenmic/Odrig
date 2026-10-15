@@ -27,10 +27,16 @@ async function carriedOut(line) {
   return reply;
 }
 
+// A side of the canvas as `status` reports it: a whole number, or null when the target
+// has no mapping it can use or does not report the canvas.
+function side(value) {
+  return value === undefined || value === null ? null : value;
+}
+
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
 // "all" for the playlist, the id of a cycle or null, the id of the animation on the
-// LEDs or null, the refreshes in the last second, and the reason of an invalid show or
-// null.
+// LEDs or null, the refreshes in the last second, the reason of an invalid show or null,
+// and the width and the height of the canvas, each null when the target gives none.
 export async function status() {
   const reply = await carriedOut("status");
   const sound =
@@ -39,11 +45,22 @@ export async function status() {
     (reply.playing === null || reply.playing === "all" || whole(reply.playing, 1, 65535)) &&
     (reply.animation === null || whole(reply.animation, 1, 65535)) &&
     whole(reply.fps, 0, 1000000) &&
-    (reply.error === null || typeof reply.error === "string");
+    (reply.error === null || typeof reply.error === "string") &&
+    (side(reply.width) === null || whole(reply.width, 1, 65535)) &&
+    (side(reply.height) === null || whole(reply.height, 1, 65535));
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
-  return {on: reply.on, brightness: reply.brightness, playing: reply.playing, animation: reply.animation, fps: reply.fps, error: reply.error};
+  return {
+    on: reply.on,
+    brightness: reply.brightness,
+    playing: reply.playing,
+    animation: reply.animation,
+    fps: reply.fps,
+    error: reply.error,
+    width: side(reply.width),
+    height: side(reply.height),
+  };
 }
 
 // One part of the items of the show, in its order, from a position on: each animation
