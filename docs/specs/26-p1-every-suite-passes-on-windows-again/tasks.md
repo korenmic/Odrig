@@ -29,7 +29,7 @@ Rules for every task:
   versions. No command, script or document lists test files.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The emulator lets go of a folder it reads
+- [x] 1. The emulator lets go of a folder it reads
   - Set `"state": "in_progress"` in
     `project-seeds/26-p1-every-suite-passes-on-windows-again/state.json`.
   - `emulator/host.py`: one function opens a file to read; on Windows with read, write and
