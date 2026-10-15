@@ -73,7 +73,7 @@ class GettingStarted(unittest.TestCase):
     def test_it_says_what_works_on_windows_what_stays_with_the_first_computer_and_what_to_install(self):
         windows = flat(self.part("On Windows"))
         for phrase in ("The Python library, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
-                       f"The converter's own suite, `{CONVERTER_SUITE[1]}`, does not pass there yet.",
+                       f"The converter's own suite, `{CONVERTER_SUITE[1]}`, passes there too.",
                        "The firmware tool, the board and the walk-through suite stay with the first computer.",
                        "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
                        "`g++` or `clang++` on the path, and Microsoft's C++ build tools", "the WinLibs build of MinGW-w64",
@@ -82,7 +82,7 @@ class GettingStarted(unittest.TestCase):
         self.assertIn("It is verified on macOS and on Windows 11, each with Python 3.14.", flat(support.read("docs/python-library.md")))
         self.assertEqual(support.subprocess.run(["git", "check-ignore", "-q", "tools/x"], cwd=support.ROOT).returncode, 0)
 
-    def test_the_setup_on_windows_and_its_four_suites_are_commands_their_tools_understand(self):
+    def test_the_setup_on_windows_and_its_suites_are_commands_their_tools_understand(self):
         self.assertEqual(self.commands("On Windows"), [], "the walk-through runs on macOS and is not to run these")
         shown = [block.body.splitlines() for block in support.blocks(self.text) if block.heading == "On Windows"]
         python = support.WINDOWS_PYTHON
@@ -91,6 +91,7 @@ class GettingStarted(unittest.TestCase):
             "cd Odrig",
             "python -m venv .venv",
             "npm ci --prefix converter",
+            CONVERTER_SUITE[1],
             f"{python} core/build.py shared",
             f"{python} -m unittest discover -s tests/converter -t .",
             f"{python} core/build.py test",
@@ -101,9 +102,9 @@ class GettingStarted(unittest.TestCase):
             self.assertIsNone(support.refusal(command), command)
         self.assertEqual(python, ".venv\\Scripts\\python")
 
-    def test_the_four_suites_of_windows_are_the_four_the_page_runs_after_the_setup(self):
-        on_windows = [line for block in support.blocks(self.text) if block.heading == "On Windows" for line in block.body.splitlines() if "tests/" in line or line.endswith(" test")]
-        after_setup = [command for command in self.commands("Run the tests") if command != CONVERTER_SUITE[1]]
+    def test_the_suites_of_windows_are_the_suites_the_page_runs_after_the_setup(self):
+        on_windows = [line for block in support.blocks(self.text) if block.heading == "On Windows" for line in block.body.splitlines() if "tests/" in line or line.endswith(" test") or line == CONVERTER_SUITE[1]]
+        after_setup = self.commands("Run the tests")
         self.assertEqual(len(on_windows), len(after_setup))
         written = {".venv/bin/python": support.WINDOWS_PYTHON, "make -C core test": f"{support.WINDOWS_PYTHON} core/build.py test"}
         for here, there in zip(after_setup, on_windows):

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {spawn, spawnSync} from "node:child_process";
+import {spawn} from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -101,8 +101,20 @@ function ended(child) {
   });
 }
 
+// The version of the Chrome that runs with a profile folder, as its DevTools give it, or
+// why it is not known. Chrome is not asked with --version: on Windows that opens a window.
+async function versionOf(profile) {
+  try {
+    const port = Number(fs.readFileSync(path.join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]);
+    const response = await fetch(`http://127.0.0.1:${port}/json/version`);
+    return (await response.json()).Browser;
+  } catch (error) {
+    return `not known: ${error.message}`;
+  }
+}
+
 // Starts Chrome without a window on the page, with a profile folder of its own, waits for
-// the page's answer, ends Chrome and removes the folder.
+// the page's answer, asks Chrome its version, ends Chrome and removes the folder.
 async function inChrome(program) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-chrome-"));
   const {server, answer, asked, address} = await serve();
@@ -117,6 +129,7 @@ async function inChrome(program) {
     "--disable-breakpad",
     "--use-mock-keychain",
     "--password-store=basic",
+    "--remote-debugging-port=0",
     `--user-data-dir=${profile}`,
     address,
   ], {stdio: "ignore"});
@@ -132,7 +145,8 @@ async function inChrome(program) {
         child.once("exit", (code, signal) => resolve({failure: `Chrome ended before the page answered, with ${signal === null ? `status ${code}` : signal}; the page asked for: ${asked.join(", ")}`}));
       }),
     ]);
-    return {...outcome, asked, pid: child.pid};
+    const version = outcome.failure === undefined ? await versionOf(profile) : "not known";
+    return {...outcome, asked, version, pid: child.pid};
   } finally {
     clearTimeout(timer);
     child.removeAllListeners("exit");
@@ -192,12 +206,10 @@ test("the library gives the same in Chrome as in Node.js, byte for byte", async 
     t.skip(`no Chrome was found; looked at ${found.looked.join(", ")}; the environment variable ODRIG_CHROME names another place`);
     return;
   }
-  const version = spawnSync(found.program, ["--version"], {encoding: "utf8", timeout: 30000});
-  t.diagnostic(`${found.program}: ${(version.stdout ?? "").trim()}`);
-
   const source = new Uint8Array(fs.readFileSync(SOURCE));
   const expected = await work(library, source);
-  const {given, failure, asked} = await inChrome(found.program);
+  const {given, failure, asked, version} = await inChrome(found.program);
+  t.diagnostic(`${found.program}: ${version}`);
   assert.equal(failure, undefined, failure);
   assert.equal(given.error, undefined, `the page met an error: ${given.error}`);
   t.diagnostic(`the page ran in ${given.agent}`);

@@ -1270,4 +1270,6 @@ and the command tool, 523 of which 17 are skipped; the onboarding suite, 81. `sp
 `list`, `remove` and `upload` are part of those suites and run over the line port. The
 converter's own suite, `npm test --prefix converter`, does not pass on Windows: of 499
 tests 288 pass and 208 fail, 73 of them with one error, where the suite starts a helper in
-Python that is written for macOS; the others were not looked into. That is not mended here.
+Python that is written for macOS; the others were not looked into. That is not mended here;
+it was afterwards, outside seed 11: "The converter on Windows" at the end of
+[drifts.md](drifts.md).

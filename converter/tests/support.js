@@ -76,6 +76,40 @@ export function temporary(t) {
   return folder;
 }
 
+// Whether the tests may take a right away from themselves: not as root, who keeps every
+// right on macOS and Linux.
+export const RIGHTS_HOLD = process.getuid?.() !== 0;
+
+// Everyone, in the access list of a file on Windows.
+const EVERYONE = "*S-1-1-0";
+
+function icacls(...argv) {
+  const program = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "icacls.exe");
+  const done = spawnSync(program, argv, {encoding: "utf8"});
+  if (done.error || done.status !== 0) {
+    throw new Error(`icacls ${argv.join(" ")}: ${done.error ?? `${done.stdout}${done.stderr}`}`);
+  }
+}
+
+// Takes away the right to read a file, `"read"`, or to make files in a folder, `"write"`:
+// on macOS and Linux by the mode, on Windows by an entry of the access list that denies
+// it to everyone. `allowAgain` gives it back.
+export function forbid(target, right) {
+  if (process.platform !== "win32") {
+    fs.chmodSync(target, right === "read" ? 0o000 : 0o555);
+    return;
+  }
+  icacls(target, "/deny", `${EVERYONE}:(${right === "read" ? "RD" : "WD,AD"})`);
+}
+
+export function allowAgain(target) {
+  if (process.platform !== "win32") {
+    fs.chmodSync(target, fs.statSync(target).isDirectory() ? 0o755 : 0o644);
+    return;
+  }
+  icacls(target, "/remove:d", EVERYONE);
+}
+
 // Every file under a folder, as paths from the folder with `/` between the parts, sorted.
 export function filesUnder(folder) {
   const found = [];
