@@ -459,3 +459,11 @@ are in [format.md](format.md), "Measured sizes".
   line each, with how each reaches another firmware and how far seed 12 has it. A seed
   that adds to the firmware adds its line there; seed 12's spec takes the lines that came
   after it before its open tasks go on.
+- 2026-10-16: The board's network came up as `WLED-AP`, and WLED's factory password did
+  not open it. Its storage showed why: WLED had renamed its settings file to
+  `/rst.cfg.json`, as it does after repeated crashes or when the file is broken and has no
+  backup, while the password file and the show stayed. So WLED used its factory name with
+  the project's password. The firmware of `master` was installed with `install-firmware`
+  over the socket marked COM, which put the name, the password and the limit back; the
+  show of 107 animations was untouched, with 77,824 bytes free. What crashed the board,
+  if it crashed, is not known.
