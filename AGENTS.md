@@ -105,8 +105,8 @@ and 11, and their suites pass there. That was seed 11,
 - The core is built there by `python core/build.py shared`, not by `make`.
 - Windows has no virtual serial port. The emulator takes command lines on a TCP port, and
   the command tool reaches it with `--tcp` or `--http`.
-- The converter's own suite, `npm test --prefix converter`, does not pass on Windows yet:
-  208 of its 499 tests fail there. Mending that is not part of seed 11.
+- The converter's own suite, `npm test --prefix converter`, passes on Windows too. Its
+  test in Chrome starts Chrome there without a window, as everywhere.
 - The firmware tool and the board stay with the first computer.
 - Nothing is installed in the system. A compiler or another program that is fetched is
   unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.

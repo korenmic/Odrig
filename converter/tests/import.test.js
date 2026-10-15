@@ -18,18 +18,26 @@ const QUIET = {status: 0, out: "", err: ""};
 
 // A folder with the media of the tests, which the Python package made with Pillow and PyAV
 // and which are stored with its answers: the GIFs and the videos of the Python suite's
-// import tests among them.
+// import tests among them. The Python tool writes its files there too. What only the
+// JavaScript side writes, the files `fresh` names for it and the list of files a program
+// of the tests reads, goes into a folder of its own, `ours`. The key of each request of the
+// Python tool holds the files of the folder the request names, and those files are not
+// the same on every computer: the pictures decoded from a video differ by a colour value
+// or two from one build of FFmpeg to another, and the list names the temporary folder.
 let folder;
+let ours;
 let made;
 let outputs = 0;
 
 before(() => {
   folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
+  ours = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
   made = storedAnswer("media", [], {folder});
 });
 
 after(() => {
   fs.rmSync(folder, {recursive: true, force: true});
+  fs.rmSync(ours, {recursive: true, force: true});
 });
 
 function media(name) {
@@ -38,7 +46,7 @@ function media(name) {
 
 function fresh(side) {
   outputs += 1;
-  return path.join(folder, `out-${side}-${outputs}.json`);
+  return path.join(side === "js" ? ours : folder, `out-${side}-${outputs}.json`);
 }
 
 // Imports with both tools, each into a file of its own: the Python tool for all command
@@ -73,6 +81,22 @@ function largestDifference(a, b) {
     }
   });
   return largest;
+}
+
+// Compares the JSON frames files the two tools wrote for one media file: of a GIF byte for
+// byte; of a video by its frames, the same canvas, the same durations and no colour value
+// more than 3 apart, since the two tools decode a video with different builds of FFmpeg.
+function sameImport(name, js, python, label) {
+  if (!/\.(mp4|mov)$/i.test(name)) {
+    assert.ok(fs.readFileSync(js).equals(fs.readFileSync(python)), `${label}: the two files differ`);
+    return;
+  }
+  const a = parsed(js);
+  const b = parsed(python);
+  assert.deepEqual([a.width, a.height], [b.width, b.height], label);
+  assert.deepEqual(a.frames.map((frame) => frame.ms), b.frames.map((frame) => frame.ms), `${label}: the durations`);
+  const difference = largestDifference(a, b);
+  assert.ok(difference <= 3, `${label}: a colour value differs by ${difference}`);
 }
 
 // Compares the rejections of the two tools: the same status and the same reason, and the
@@ -246,7 +270,7 @@ test("import as a program", async (t) => {
       const theirs = fresh("py");
       assert.deepEqual(runJs(run(name, ours)), QUIET, name);
       assert.deepEqual(storedRun(run(name, theirs)), QUIET, name);
-      assert.ok(fs.readFileSync(ours).equals(fs.readFileSync(theirs)), name);
+      sameImport(name, ours, theirs, name);
       assert.equal(fs.existsSync(`${ours}.part`), false);
     }
   });
@@ -417,10 +441,10 @@ test("the checks of import run in the order of the Python tool", async (t) => {
   const whole = await imports(accepted.map(([, given]) => given));
   for (let i = 0; i < accepted.length; i += 1) {
     await t.test(accepted[i][0], () => {
-      const {ours, theirs, js, python} = whole[i];
+      const {name, ours, theirs, js, python} = whole[i];
       assert.deepEqual(theirs, QUIET);
       assert.deepEqual(ours, QUIET);
-      assert.ok(fs.readFileSync(js).equals(fs.readFileSync(python)));
+      sameImport(name, js, python, accepted[i][0]);
     });
   }
 
@@ -447,10 +471,10 @@ test("seconds on the command line are rounded to whole milliseconds as the Pytho
   await t.test("for imports of a part given in every form", async () => {
     const parts = [["0.04", "0.1"], [".04", ".1"], ["4e-2", "1e-1"], ["0.0405", "0.1"], ["0.0395", "0.1005"], ["+0.02", "0.2"], ["0.1", null], ["0.0004", "0.0005"], ["0.3994", null], ["0.3996", null]];
     const cases = parts.map(([start, duration]) => ["clip.mp4", ["--mapping", BENCH, "--start", start, ...(duration === null ? [] : ["--duration", duration])]]);
-    for (const {label, ours, theirs, js, python} of await imports(cases)) {
+    for (const {name, label, ours, theirs, js, python} of await imports(cases)) {
       assert.equal(ours.status, theirs.status, `${label}: ${ours.err} / ${theirs.err}`);
       if (theirs.status === 0) {
-        assert.ok(fs.readFileSync(js).equals(fs.readFileSync(python)), label);
+        sameImport(name, js, python, label);
       } else {
         assert.deepEqual(ours, theirs, label);
       }
@@ -628,7 +652,7 @@ test("a damaged or cut media file ends the import with a result or with unreadab
   await t.test("every cut and every changed byte of four GIFs, in a program with a limit of two minutes", () => {
     const files = ["clip.gif", "smaller.gif", "disposal-2.gif", "disposal-3.gif"].flatMap((name) => copies(name, 400)).map((copy) => copy.file);
     assert.ok(files.length > 3000, `${files.length} files`);
-    const list = media("gifs.json");
+    const list = path.join(ours, "gifs.json");
     fs.writeFileSync(list, JSON.stringify(files));
     const done = spawnSync(process.execPath, [path.join(CONVERTER, "tests", "gifs.js"), list], {encoding: "utf8", timeout: 120000, maxBuffer: 1 << 28});
     assert.equal(done.error, undefined, `the program did not come to an end: ${done.error}`);

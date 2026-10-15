@@ -116,7 +116,17 @@ test("no test starts Python", async (t) => {
     inner.after(() => fs.rmSync(folder, {recursive: true, force: true}));
     const only = path.join(folder, "bin");
     fs.mkdirSync(only);
-    fs.symlinkSync(process.execPath, path.join(only, "node"));
+    // Node.js by a symbolic link, or by a copy where the system gives no right to make one,
+    // as Windows does not without the developer mode.
+    const node = path.join(only, process.platform === "win32" ? "node.exe" : "node");
+    try {
+      fs.symlinkSync(process.execPath, node);
+    } catch (error) {
+      if (error.code !== "EPERM") {
+        throw error;
+      }
+      fs.copyFileSync(process.execPath, node);
+    }
     const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
     inner.after(() => fs.rmSync(work, {recursive: true, force: true}));
     const program = `

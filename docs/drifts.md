@@ -8370,3 +8370,57 @@ the refusal is registered, `WLED's` where WLED's own update works. The page's ta
 information names `odrig drive` too, which it had left out.
 
 **Resolution.** `firmware/usermod/odrig_usermod.cpp`, `addToJsonInfo`; `docs/firmware.md`.
+
+## The converter on Windows: its suite passes there
+
+**Question.** The converter's suite, `npm test --prefix converter`, did not pass on Windows.
+Seed 18 took the Python converter out, and the suite now compares with the answers of the
+Python package stored in `converter/tests/expected/`, which were recorded on macOS. What
+failed on Windows, and how do the same stored answers serve both systems?
+
+**Answer.** The suite passes on Windows 11: 1317 tests, none failed and none skipped. What
+failed there, and what was done:
+
+- Two faults of the JavaScript tool. Windows refuses a folder that is written over as if
+  for want of permission, a path below a file as if nothing were there, and a file whose
+  right is denied with EPERM. The tool said `EPERM`, `No such file or directory` and
+  `Operation not permitted` there, where macOS says `Is a directory`, `Not a directory`
+  and `Permission denied`. On Windows it now looks at the path and says what macOS says.
+  The files it writes do not change. One test gave Node.js a path for `--import`, where
+  Windows needs a file URL.
+- 115 tests found no stored answer: a request's key came out other than on macOS. Paths
+  below a temporary folder or the repository kept the separator `\`, a file in a temporary
+  folder was taken for one outside it, and the files of a folder came in the order Windows
+  lists them. The key now joins such paths by `/` and puts the files in the order of their
+  names, as Node.js gives them on macOS. A stored answer is read with the separators of the
+  system, and a path the command line gave keeps the spelling it was given.
+- The key of six requests of `pack` held a file the recording computer had in `animations/`
+  beside the two tracked ones, most likely a `.DS_Store`. A folder of the repository now
+  counts only what git tracks, and the six answers have new keys.
+- In the import tests the JavaScript tool wrote its files into the folder of the media,
+  whose files are part of the key of every request of the Python tool. The pictures decoded
+  from a video differ by a colour value or two from one build of FFmpeg to another: on the
+  recording computer the JavaScript tool's imports of the videos had the Python tool's
+  bytes, on Windows 51 of 55 do not. The JavaScript side now writes into a folder of its
+  own, and the 32 requests from the videos on have new keys; each answer was found by the
+  files it wrote or by the JavaScript tool's answer to the same command line. Three tests
+  that compared an imported video byte for byte compare it by its frames, no colour value
+  more than 3 apart, as the test of the videos does.
+- Windows lets no ordinary user make a symbolic link; the test that puts Node.js alone on
+  a path copies it there.
+- The three tests of a file that may not be read or a folder that may not be written into
+  were skipped on Windows. They now take the right away by an entry of the access list,
+  with `icacls`, where macOS and Linux use the mode.
+- The test in Chrome asked Chrome its version with `--version`, which opens a window on
+  Windows. It now reads the version from the DevTools of the headless Chrome it starts.
+
+Every stored file holds as many answers as before; 38 of them have new keys, each as it
+was. One point stays open: the import tests write `CLIP.MP4` and `Clip.MoV` beside
+`clip.mp4` and `clip.mov`, which macOS and Windows take for the same files. On a system
+that tells them apart, as Linux does, the keys of the later import requests differ, as
+they did before.
+
+**Resolution.** `converter/tests/stored.js`; `converter/tests/support.js`, `forbid` and
+`allowAgain`; `converter/tests/import.test.js`, `expected.test.js`, `browser.test.js`,
+`cli.test.js`, `pack.test.js`; `converter/tests/expected/cli.json.gz` and `run.json.gz`;
+`converter/cli/files.js`, `why`; `AGENTS.md` and `agent/getting-started.md`, On Windows.
