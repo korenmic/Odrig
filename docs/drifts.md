@@ -8450,3 +8450,50 @@ they did before.
 `allowAgain`; `converter/tests/import.test.js`, `expected.test.js`, `browser.test.js`,
 `cli.test.js`, `pack.test.js`; `converter/tests/expected/cli.json.gz` and `run.json.gz`;
 `converter/cli/files.js`, `why`; `AGENTS.md` and `agent/getting-started.md`, On Windows.
+
+## Seed 27: Where the room of the bars comes from, and the colour behind them
+
+**Question.** The seed asks for the room of the bars from what the phone reports, and for
+black behind the bars with readable icons, and allows the Android project to change only
+where the web code cannot. What does the page read, and what changes in the Android
+project?
+
+**Answer.** Capacitor 8.5.3, already installed, has a core plugin `SystemBars` that sets
+the room at each side as four CSS variables on the page's root, and in a web view of
+version 140 or later also as `env(safe-area-inset-*)`. The page takes the variable, else
+the web view's value, else nothing, so a browser sees no room. The plugin's setting
+`style` `DARK` makes the bars' icons light. The plugin paints the window behind the page
+with the theme's window background, which is light in the app's theme, so that theme gets
+a black one. Both are settings of the Android project; no Java changes and no package is
+added.
+
+**Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
+sheet" and "The Android project".
+
+## Seed 27: How the page knows that the keyboard is open
+
+**Question.** The seed asks that the tabs not ride up over a field when the keyboard
+opens. The page has no word from the phone that the keyboard is open, and Capacitor's
+plugin of the keyboard is a package the app does not have.
+
+**Answer.** When the keyboard opens, the plugin of the bars pads the window at the bottom
+by the keyboard's height, so the page's view gets lower. The page keeps the tallest
+height its view has had at each width, and takes the keyboard for open while a field one
+types into has the focus and the view is lower than three quarters of that height. Then
+the tabs are hidden and the field is scrolled into view. In a browser the view does not
+get lower when a field has the focus, so nothing changes there.
+
+**Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The
+keyboard".
+
+## Seed 27: What scrolls under the bar at the top
+
+**Question.** The page scrolls as a whole. With room kept at the top, what scrolls up
+would still pass under the clock. How do the screens scroll within the app's area?
+
+**Answer.** A band of the app's black, fixed at the top and as high as the room there,
+lies over the page; what scrolls up goes under it. The page still scrolls as a whole, as
+the tests of the screens expect, and in a browser the band has no height.
+
+**Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
+sheet".
