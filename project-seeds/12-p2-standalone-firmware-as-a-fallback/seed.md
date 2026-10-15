@@ -48,6 +48,8 @@ and its four single outputs are the ones already proven on this board.
   protects the wiring from a full-white picture.
 - Tests that need the board are kept apart from those that do not. On the board, brightness
   stays at 40 or less.
+- It gets everything the WLED-based firmware adds to WLED, every line of
+  `docs/firmware-additions.md`, also the lines added after this seed's spec was written.
 
 ## Required Behavior
 
@@ -75,3 +77,12 @@ and its four single outputs are the ones already proven on this board.
 ## Open Questions
 
 None. Use the resolved behavior in this seed.
+
+## The Owner's Answers
+
+On 2026-10-16:
+
+1. The fallback was always meant to get every addition made to the WLED-based firmware,
+   not only to start and play. What it must have is the list of
+   `docs/firmware-additions.md`. Before this seed's open tasks go on, its spec takes every
+   line of that list marked *No* in its column "Seed 12".

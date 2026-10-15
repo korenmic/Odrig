@@ -453,3 +453,9 @@ are in [format.md](format.md), "Measured sizes".
   it alone, with one rule of its style sheet and one listener, which go by the kind of
   an element, so a field added later is the same. Tested in Chrome and built into the
   APK; the check on a phone is the owner's and is open.
+- 2026-10-16: The owner: every firmware of the project gets everything the WLED-based
+  firmware adds to WLED, the fallback without WLED of seed 12 included; a fallback is not
+  a firmware that only starts and plays. firmware-additions.md lists the additions, one
+  line each, with how each reaches another firmware and how far seed 12 has it. A seed
+  that adds to the firmware adds its line there; seed 12's spec takes the lines that came
+  after it before its open tasks go on.

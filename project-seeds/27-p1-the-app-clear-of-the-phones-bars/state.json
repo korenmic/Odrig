@@ -1,0 +1,10 @@
+{
+  "number": 27,
+  "slug": "27-p1-the-app-clear-of-the-phones-bars",
+  "state": "remaining",
+  "title": "The app clear of the phone's bars",
+  "priority": "P1",
+  "addedAt": "2026-10-16T01:05:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "On the phone the operators' app draws only between Android's top and bottom bars, by the room the phone reports for them, so its heading is not under the clock and its tabs are not under Back, Home and the list of apps."
+}
