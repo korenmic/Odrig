@@ -12,7 +12,7 @@ import {errorLine, main, summary} from "../cli/main.js";
 import {errors} from "../lib/index.js";
 import {answered} from "./stored.js";
 
-export {EXPECTED, asStored, expected, isDigest} from "./stored.js";
+export {EXPECTED, asStored, expected, isDigest, storedLength} from "./stored.js";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const CONVERTER = path.join(ROOT, "converter");

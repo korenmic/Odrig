@@ -37,7 +37,7 @@ Rules for every task:
     the files are missing.
   - Requirements: 2.1, 2.2
 
-- [ ] 2. The codec on stored files
+- [x] 2. The codec on stored files
   - `decode`, `encode`, `deflate`, `inflate` and the vector checks read the stored
     files; `support.js` gets `expected`.
   - Prove it fails first: `decode.test.js`, with Python taken off its path, fails

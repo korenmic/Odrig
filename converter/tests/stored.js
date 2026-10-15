@@ -25,7 +25,7 @@ export const EXPECTED = path.join(ROOT, "converter", "tests", "expected");
 export const EXPECTED_FILES = path.join(EXPECTED, "files");
 
 // The kinds whose stored answers the tests take without asking Python.
-export const STORED_KINDS = new Set([]);
+export const STORED_KINDS = new Set(["check", "cli", "decode", "deflate", "encode", "forms", "generators", "inflate"]);
 // The kinds whose answers are kept whole: the tests go on to work with them.
 export const KEPT_WHOLE = new Set(["deflate"]);
 
@@ -212,6 +212,12 @@ function compact(value) {
 // Whether a stored value is the digest of a long run of hexadecimal digits.
 export function isDigest(value) {
   return value !== null && typeof value === "object" && typeof value.digest === "string" && typeof value.bytes === "number";
+}
+
+// The number of bytes of a run of hexadecimal digits of an answer, kept whole or as a
+// digest.
+export function storedLength(stored) {
+  return isDigest(stored) ? stored.bytes : stored.length / 2;
 }
 
 // Bytes, or their hexadecimal digits, in the form a stored value has: the digits, or the

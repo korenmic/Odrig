@@ -8240,3 +8240,24 @@ answers hold them take the stored answers without Python, kind by kind.
 
 **Resolution.** `converter/tests/stored.js`, `support.js`, `expected.test.js`;
 `tests/converter/make_expected.py`; `converter/tests/expected/`.
+
+## Seed 18: The compressor's bodies without Python
+
+**Question.** The compressor's tests measured it on bodies the Python tool encoded from
+its generators, among them a dense 60 x 60 clip of 1 second and one of 10 seconds, whose
+time they also took. Without Python the bodies have to come from stored files, and the
+generator's file of the clip of 10 seconds alone would take some 7 MB. What do they use?
+
+**Answer.** The six bodies are those of the generators' files that the other tests store
+already: Hello world, DVD bounce and the dense clip of 2 seconds, on 60 x 6 and on 60 x 60.
+The encoder writes each, and its uncompressed file is checked against the Python tool's;
+zlib's length is that of the Python tool's compressed file. The time is taken on the body of
+the dense 60 x 60 clip of 2 seconds five times over, 5.4 MB: its repeats lie farther apart
+than the compressor looks back for a match, so it has the work of a clip of 10 seconds, and
+its stream is at most 5 percent larger than five of zlib's. The tests of the encoder, the
+decoder, the compressor and the inflater, and the checks of the vectors, take the stored
+answers without Python: the kinds `check`, `cli`, `decode`, `deflate`, `encode`, `forms`,
+`generators` and `inflate`.
+
+**Resolution.** `converter/tests/deflate.test.js`, `encode.test.js`, `inflate.test.js`,
+`stored.js`.

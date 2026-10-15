@@ -1,38 +1,49 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, {after} from "node:test";
 
 import {deflate, inflate, jsonframes, odrg} from "../lib/index.js";
-import {generated, hex, numbers, recordsOf, reference, runJs, runPython, temporary, unhex, utf8} from "./support.js";
+import {asStored, generated, hex, numbers, recordsOf, reference, runJs, runPython, storedLength, temporary, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
 const HEADER = 16;
 
-// The six bodies the compressor is measured on, and the dense clip of ten seconds for its
-// time. Each is made by the Python tool: the bytes after the header of the uncompressed
-// file, with the stream zlib makes of them at level 9, which is the body of the compressed
-// file.
+// The six bodies the compressor is measured on: the bytes after the header of the
+// uncompressed file of a generator's animation, which the encoder writes as the Python tool
+// does, with the length of the stream zlib makes of them at level 9, the body of the Python
+// tool's compressed file.
 const SOURCES = [
   ["Hello world, 60 x 6", {generator: "hello_world", mapping: BENCH}],
   ["DVD bounce, 60 x 6", {generator: "dvd_bounce", mapping: BENCH}],
   ["Dense, 60 x 6, 2 s", {generator: "dense", mapping: BENCH, seconds: 2}],
   ["Hello world, 60 x 60", {generator: "hello_world", mapping: TARGET}],
   ["DVD bounce, 60 x 60", {generator: "dvd_bounce", mapping: TARGET}],
-  ["Dense, 60 x 60, 1 s", {generator: "dense", mapping: TARGET, seconds: 1}],
-  ["Dense, 60 x 60, 10 s", {generator: "dense", mapping: TARGET, seconds: 10}],
+  ["Dense, 60 x 60, 2 s", {generator: "dense", mapping: TARGET, seconds: 2}],
 ];
 
 let made = null;
+let folder = null;
+
+after(() => {
+  if (folder !== null) {
+    fs.rmSync(folder, {recursive: true, force: true});
+  }
+});
+
 function bodies() {
   if (made === null) {
+    folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "odrig-converter-")));
     const files = reference("encode", [], SOURCES.map(([, source]) => source));
-    made = files.map((file, i) => ({
-      name: SOURCES[i][0],
-      body: unhex(file.uncompressed).subarray(HEADER),
-      zlib: unhex(file.compressed).subarray(HEADER),
-    }));
+    made = SOURCES.map(([name, {generator, mapping, seconds}], i) => {
+      const animation = jsonframes.loads(new Uint8Array(fs.readFileSync(generated(folder, generator, mapping, seconds ?? null))));
+      const plain = odrg.encode(animation, {compressed: false});
+      assert.deepEqual(asStored(plain, files[i].uncompressed), files[i].uncompressed, `${name}: the uncompressed file is the Python tool's`);
+      const compressed = asStored(odrg.encode(animation), files[i].compressed);
+      return {name, body: plain.subarray(HEADER), zlib: storedLength(files[i].compressed) - HEADER, same: JSON.stringify(compressed) === JSON.stringify(files[i].compressed)};
+    });
   }
   return made;
 }
@@ -122,7 +133,7 @@ test("every stream of the compressor is a stream zlib reads", async (t) => {
     list.forEach(([label, bytes], i) => {
       assert.equal(theirs[i].reason, undefined, label);
       assert.equal(theirs[i].left, 0, label);
-      assert.ok(Buffer.from(theirs[i].data, "hex").equals(Buffer.from(bytes)), label);
+      assert.deepEqual(asStored(bytes, theirs[i].data), theirs[i].data, label);
     });
   });
 
@@ -167,26 +178,32 @@ test("every stream of the compressor is a stream zlib reads", async (t) => {
 });
 
 test("the stream of each of the six bodies is at most 5 percent larger than zlib's at level 9", async (t) => {
-  for (const {name, body, zlib} of bodies().slice(0, 6)) {
+  for (const {name, body, zlib, same} of bodies()) {
     await t.test(name, (inner) => {
       const ours = deflate.deflateRaw(body);
-      const bytes = Buffer.from(ours).equals(Buffer.from(zlib)) ? "the same bytes" : "other bytes";
-      inner.diagnostic(`${name}: ${body.length} bytes; zlib at level 9 ${zlib.length}; deflateRaw ${ours.length}, ${bytes}`);
-      assert.ok(20 * ours.length <= 21 * zlib.length, `${ours.length} bytes against zlib's ${zlib.length}`);
+      inner.diagnostic(`${name}: ${body.length} bytes; zlib at level 9 ${zlib}; deflateRaw ${ours.length}, ${same ? "the same bytes" : "other bytes"}`);
+      assert.ok(20 * ours.length <= 21 * zlib, `${ours.length} bytes against zlib's ${zlib}`);
       assert.ok(ours.length < body.length);
     });
   }
 });
 
-test("compressing the body of a dense 60 x 60 clip of 10 seconds takes under 20 seconds", (t) => {
-  const {name, body, zlib} = bodies()[6];
-  assert.ok(body.length > 1400000, `${body.length} bytes`);
+test("compressing a body as long as that of a dense 60 x 60 clip of 10 seconds takes under 20 seconds", (t) => {
+  // The body of the clip of 2 seconds five times over. Its repeats lie farther apart than
+  // the compressor looks back for a match, so it has the work of five such bodies.
+  const {name, body, zlib} = bodies()[5];
+  assert.ok(body.length > 32768);
+  const long = new Uint8Array(5 * body.length);
+  for (let i = 0; i < 5; i += 1) {
+    long.set(body, i * body.length);
+  }
+  assert.ok(long.length > 1400000, `${long.length} bytes`);
   const started = process.hrtime.bigint();
-  const ours = deflate.deflateRaw(body);
+  const ours = deflate.deflateRaw(long);
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
-  t.diagnostic(`${name}: ${body.length} bytes; zlib at level 9 ${zlib.length}; deflateRaw ${ours.length}, in ${seconds.toFixed(3)} s`);
+  t.diagnostic(`${name}, five times: ${long.length} bytes; zlib at level 9 ${5 * zlib} for five bodies; deflateRaw ${ours.length}, in ${seconds.toFixed(3)} s`);
   assert.ok(seconds < 20, `it took ${seconds.toFixed(2)} s`);
-  assert.ok(20 * ours.length <= 21 * zlib.length);
+  assert.ok(20 * ours.length <= 21 * 5 * zlib);
 });
 
 test("whole files, through the command line of both tools", async (t) => {

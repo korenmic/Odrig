@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {errors, jsonframes, odrg} from "../lib/index.js";
-import {ROOT, animationFrom, forPython, generated, hex, numbers, reference, runBoth, runJs, runPython, temporary, unhex, utf8} from "./support.js";
+import {ROOT, animationFrom, asStored, forPython, generated, hex, isDigest, numbers, reference, runBoth, runJs, runPython, storedLength, temporary, unhex, utf8} from "./support.js";
 
 const BENCH = "mapping/legs-2.json";
 const TARGET = "mapping/legs-20.json";
@@ -19,8 +19,15 @@ function firstDifference(a, b) {
   return a.length === b.length ? "no byte differs" : `the lengths are ${a.length} and ${b.length}`;
 }
 
+// Checks bytes against those of the Python tool: bytes, or its answer's hexadecimal digits,
+// kept whole or as a digest.
 function sameBytes(ours, theirs, label) {
-  assert.ok(Buffer.from(ours).equals(Buffer.from(theirs)), `${label}: ${firstDifference(ours, theirs)}`);
+  if (isDigest(theirs)) {
+    assert.deepEqual(asStored(ours, theirs), theirs, label);
+    return;
+  }
+  const bytes = typeof theirs === "string" ? unhex(theirs) : theirs;
+  assert.ok(Buffer.from(ours).equals(Buffer.from(bytes)), `${label}: ${firstDifference(ours, bytes)}`);
 }
 
 test("the uncompressed files of the two command lines are identical", async (t) => {
@@ -63,7 +70,7 @@ test("the uncompressed files of 200 animations from seeds are identical", async 
   await t.test("byte for byte", () => {
     animations.forEach((animation, i) => {
       const ours = odrg.encode(animation, {compressed: false});
-      sameBytes(ours, unhex(theirs[i].uncompressed), `seed ${i + 1}, ${animation.width} x ${animation.height}`);
+      sameBytes(ours, theirs[i].uncompressed, `seed ${i + 1}, ${animation.width} x ${animation.height}`);
       const decoded = odrg.decode(ours);
       kinds[decoded.paletteSize > 0 ? "palette" : "rgb"] += 1;
       decoded.modes.forEach((mode) => modes.add(mode));
@@ -93,7 +100,7 @@ test("the uncompressed files of 200 animations from seeds are identical", async 
       assert.equal(decoded.compressed, true);
       assert.deepEqual(decoded.modes, plain.modes, `seed ${i + 1}`);
       assert.deepEqual(decoded.records.map((record) => [record.ms, hex(record.picture)]), plain.records.map((record) => [record.ms, hex(record.picture)]));
-      const size = unhex(theirs[i].compressed).length;
+      const size = storedLength(theirs[i].compressed);
       assert.ok(20 * compressed.length <= 21 * size, `seed ${i + 1}: ${compressed.length} bytes against ${size}`);
     });
   });
@@ -138,8 +145,7 @@ test("the palette", async (t) => {
     const [label, animation] = cases[i];
     await t.test(label, () => {
       const ours = odrg.encode(animation, {compressed: false});
-      assert.deepEqual(paletteOf(ours), paletteOf(unhex(theirs[i].uncompressed)), label);
-      sameBytes(ours, unhex(theirs[i].uncompressed), label);
+      sameBytes(ours, theirs[i].uncompressed, label);
     });
   }
 
@@ -158,8 +164,8 @@ test("the palette", async (t) => {
     assert.equal(odrg.paletteFor(row(colours).frames), null);
     assert.equal(odrg.paletteFor(row(colours.slice(0, 256)).frames).length, 768);
     const both = reference("encode", [], [forPython(row(colours.slice(0, 256))), forPython(row(colours))]);
-    sameBytes(with256, unhex(both[0].uncompressed), "256 colours");
-    sameBytes(with257, unhex(both[1].uncompressed), "257 colours");
+    sameBytes(with256, both[0].uncompressed, "256 colours");
+    sameBytes(with257, both[1].uncompressed, "257 colours");
   });
 
   await t.test("the colours of every frame count, and the order does not depend on where a colour is met", () => {
@@ -229,7 +235,7 @@ test("the search for the smallest record", async (t) => {
               assert.throws(() => odrg.codedRecord(old, fresh, width, bpp, 20, predictor, run, k), RangeError, what);
             } else {
               const record = odrg.codedRecord(old, fresh, width, bpp, 20, predictor, run, k);
-              assert.equal(hex(record), expected, what);
+              assert.deepEqual(asStored(record, expected), expected, what);
               assert.equal(sizes[(run ? 8 : 0) + k], record.length - 5, what);
             }
             form += 1;
@@ -242,8 +248,8 @@ test("the search for the smallest record", async (t) => {
   await t.test("the record that is chosen is the one the Python tool chooses", () => {
     pairs.forEach(({label, old, fresh, width, bpp}, i) => {
       const best = odrg.bestRecord(old, fresh, width, bpp, 20);
-      assert.equal(hex(best), theirs[i].best, label);
-      const sizes = theirs[i].records.filter((record) => record !== null).map((record) => record.length / 2);
+      assert.deepEqual(asStored(best, theirs[i].best), theirs[i].best, label);
+      const sizes = theirs[i].records.filter((record) => record !== null).map(storedLength);
       const smallest = Math.min(...sizes);
       ties += sizes.filter((size) => size === smallest).length > 1 ? 1 : 0;
       storedCount += best[4] === 0x40 ? 1 : 0;
@@ -291,7 +297,7 @@ test("a frame longer than 65,535 ms becomes several records with the same pictur
   for (let i = 0; i < animations.length; i += 1) {
     await t.test(i < times.length ? `${times[i]} ms` : "two frames of 40,000 ms with the same picture", () => {
       const ours = odrg.encode(animations[i], {compressed: false});
-      sameBytes(ours, unhex(theirs[i].uncompressed), "the file");
+      sameBytes(ours, theirs[i].uncompressed, "the file");
       const decoded = odrg.decode(ours);
       const durations = decoded.records.map((record) => record.ms);
       const ms = i < times.length ? times[i] : 80000;
