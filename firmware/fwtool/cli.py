@@ -46,6 +46,9 @@ def parser():
     flash.add_argument("--standalone", action="store_true", help="without --image, write the standalone firmware")
     flash.add_argument("--expect", choices=sorted(board.EXPECTED), default="status", help="what must answer afterwards: the firmware's status, WLED's handshake, or the probe build")
     flash.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's answer after its restart (default: 20)")
+    bigger = commands.add_parser("big-storage", help="move a board of WLED's layout to the bigger layout, keeping its settings and no show")
+    bigger.add_argument("--port", metavar="P", help="the board's USB serial port")
+    bigger.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
     restore = commands.add_parser("restore-stock", help="write the stock WLED image to the board")
     restore.add_argument("--port", metavar="P", help="the board's USB serial port")
     restore.add_argument("--full", action="store_true", help="also write the stock bootloader and partition table")
@@ -99,11 +102,12 @@ def _build(arguments):
     return 0
 
 
-def write_application(port, image, extra=(), table=None, expect="status", wait=board.WAIT_SECONDS):
+def write_application(port, image, extra=(), table=None, expect="status", wait=board.WAIT_SECONDS, regions=()):
     """Puts an application image on the board and waits for what must answer.
 
     Only the first application partition is written and the boot selection data cleared,
-    so that the board starts that partition; `extra` adds the files of a full restore.
+    so that the board starts that partition; `extra` adds the files of a full restore, and
+    `regions` the regions beyond the bootloader and the table that they may lie in.
     Without a table to go by, the board's own partition table is read and checked first,
     and its layout is printed.
     """
@@ -116,8 +120,8 @@ def write_application(port, image, extra=(), table=None, expect="status", wait=b
     else:
         partitions.check(table, size)
     on_port.erase(flasher.BOOT_SELECTION)
-    regions = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE] if extra else [])
-    on_port.write([*extra, (flasher.APPLICATION.address, image)], regions, restart=True)
+    allowed = [flasher.APPLICATION] + ([flasher.BOOTLOADER, flasher.TABLE, *regions] if extra else [])
+    on_port.write([*extra, (flasher.APPLICATION.address, image)], allowed, restart=True)
     return board.EXPECTED[expect](port, wait)
 
 
@@ -130,14 +134,93 @@ def _flash(arguments):
     return 0
 
 
+def wleds_storage(port, table):
+    """On a board of the bigger layout, a storage for the layout of `table`, WLED's, that
+    holds the board's settings and no show: the file and its region. The board's storage is
+    kept in the work folder first, and the layout and that file are printed. None on any
+    other board, also one whose table cannot be read."""
+    from . import storage
+    on_port = flasher.Flasher(port)
+    try:
+        found = partitions.parse(on_port.read_table())
+    except Failure as failure:
+        if failure.reason != "layout-mismatch":
+            raise
+        return None
+    if partitions.layout_of(found) != partitions.BIGGER_NAME:
+        return None
+    region = flasher.storage_region(partitions.storage(found))
+    print(f"layout: {partitions.BIGGER_NAME}, storage {region.size} bytes")
+    before = storage.from_board(on_port, region)
+    print(f"kept: {before}")
+    target = flasher.storage_region(partitions.storage(partitions.parse(table)))
+    return storage.pending(storage.with_settings(before.read_bytes(), target.size)), target
+
+
 def _restore_stock(arguments):
+    from . import storage
     files = stock.checked(arguments.stock_dir, arguments.full)
     port = board.find(arguments.port)
-    extra, table = (), None
+    extra, table, regions, made = (), None, (), None
     if arguments.full:
         extra = ((flasher.BOOTLOADER.address, files.bootloader), (flasher.TABLE.address, files.table))
         table = files.table.read_bytes()
-    print(write_application(port, files.application, extra, table, expect="wled"))
+        made = wleds_storage(port, table)
+        if made is not None:
+            extra += ((made[1].address, made[0]),)
+            regions = (made[1],)
+    try:
+        print(write_application(port, files.application, extra, table, expect="wled", regions=regions))
+    except Failure:
+        if made is not None:
+            storage.discard(made[0])
+        raise
+    if made is not None:
+        storage.keep(made[0], made[1].size)
+    return 0
+
+
+def _big_storage(arguments):
+    """Moves a board of WLED's layout to the bigger one. The storage of the bigger layout,
+    which holds the board's settings, is made so that all it holds lies in the room of
+    WLED's second firmware slot, and is written there first; only then is the new table
+    written. Until that write the board has WLED's layout whole."""
+    import tempfile
+    from . import storage
+    port = board.find(arguments.port)
+    on_port = flasher.Flasher(port)
+    table = on_port.read_table()
+    partitions.check(table, 0)
+    print(partitions.layout_line(table))
+    found = partitions.parse(table)
+    if found == list(partitions.BIGGER):
+        on_port.restart()
+        print("nothing to do: the board has the bigger layout")
+        return 0
+    if found != list(partitions.WLED):
+        on_port.restart()
+        raise Failure("layout-mismatch", "the board's partition table is not WLED's own, entry for entry; only that one is moved")
+    old = flasher.storage_region(partitions.storage(found))
+    new = flasher.storage_region(partitions.storage(partitions.BIGGER))
+    before = storage.from_board(on_port, old)
+    print(f"kept: {before}")
+    room = old.address - new.address
+    made = storage.with_settings(before.read_bytes(), new.size, room=room)
+    with tempfile.TemporaryDirectory() as folder:
+        head = pathlib.Path(folder, "storage-head.bin")
+        head.write_bytes(made[:room])
+        bigger = pathlib.Path(folder, "table.bin")
+        bigger.write_bytes(partitions.table(partitions.BIGGER))
+        try:
+            on_port.write([(new.address, head)], [new], restart=False, data=True)
+            on_port.verify(new.address, head, [new], restart=False)
+            on_port.erase(flasher.BOOT_SELECTION)
+            on_port.write([(flasher.TABLE.address, bigger)], [flasher.TABLE], restart=False)
+            on_port.verify(flasher.TABLE.address, bigger, [flasher.TABLE], restart=True)
+        except Failure:
+            on_port.restart()
+            raise
+    print(board.EXPECTED["status"](port, arguments.wait))
     return 0
 
 
@@ -304,7 +387,7 @@ def _test_air(arguments):
 
 
 ACTIONS = {
-    "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock,
+    "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock, "big-storage": _big_storage,
     "install-show": _install_show, "set-wifi": _set_wifi, "set-limit": _set_limit, "read-limit": _read_limit,
     "install-firmware": _install_firmware, "read-show": _read_show,
     "test": _test, "test-board": _test_board, "test-air": _test_air,

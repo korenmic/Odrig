@@ -42,7 +42,7 @@ Rules for every task:
     layout.
   - Requirements: 1.1, 1.2, 3.1, 3.2, 7.1
 
-- [ ] 2. The move and the way back
+- [x] 2. The move and the way back
   - `firmware/fwtool/cli.py`: `big-storage`; `restore-stock --full` on the bigger layout.
     `firmware/fwtool/storage.py`: the settings, and a storage made with them at a size.
     `firmware/fwtool/flasher.py`: the regions of the move.

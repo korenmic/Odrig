@@ -8340,3 +8340,22 @@ layout has its second slot, takes WLED's table only as it is, entry for entry.
 
 **Resolution.** `firmware/fwtool/partitions.py`, `layout_of`, `layout_line`;
 `firmware/fwtool/cli.py`.
+
+## Seed 24: Reading the size of a grown file system, and the way back's read
+
+**Question.** The tool reads the disk version, the block size and the number of blocks of
+the storage from the figures that follow the superblock's mark. The storage that
+`big-storage` makes is grown from 3 MB to 13.5 MB, and littlefs keeps the grown figures in
+a later commit of its first block, where they no longer follow the mark; after a show is
+installed into it, no copy of the figures follows the mark at all. And `restore-stock
+--full` never read the board before. How are they done?
+
+**Answer.** The tool asks littlefs: it mounts the image with the block size of a copy of
+the figures that follows the mark, or else with each of the usual block sizes, 4,096 first,
+and takes the figures littlefs reads from the newest commit of the superblock. A test
+installs a show into the storage the move leaves and reads it back. `restore-stock --full`
+now reads the board's partition table first, to know whether WLED's storage has to be
+written; a table it cannot read is a board that gets the stock files as before.
+
+**Resolution.** `firmware/fwtool/storage.py`, `geometry`, `with_settings`;
+`firmware/fwtool/cli.py`, `_big_storage`, `wleds_storage`.

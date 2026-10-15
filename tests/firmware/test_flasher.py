@@ -130,7 +130,8 @@ class RestoreStock(Temporary):
 
     def test_with_full_it_also_writes_the_bootloader_at_0x0_and_the_table_at_0x8000_in_the_same_call(self):
         esptool = self.restore("--full")
-        self.assertEqual(esptool.commands(), ["erase-region", "write-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash"])
+        self.assertEqual(esptool.call("read-flash")[:2], ["0x8000", "0xc00"])
         self.assertEqual(esptool.written(), [("0x0", STOCK_NAMES[1]), ("0x8000", STOCK_NAMES[2]), ("0x10000", STOCK_NAMES[0])])
 
     def test_with_full_the_bootloader_gets_the_flash_size_of_the_chip(self):

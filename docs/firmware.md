@@ -93,6 +93,7 @@ python3 firmware/fw.py setup
 python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
+python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
 python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
@@ -273,6 +274,45 @@ and not in the board's. The bootloader is written with the flash size esptool fi
 chip in its header, 16 MB on this board; every other file goes to the flash as it is.
 
 Storage is not written, so WLED's settings and the show it played before are still there.
+On a board of the bigger layout, `--full` puts WLED's layout back, and a storage of WLED's
+size has to come with it: the tool reads the board's storage, keeps it in
+`build/firmware/storage/` and prints `kept: <path>`, makes a storage of 10,354,688 bytes
+that holds the board's settings, every file outside `/odrig`, and no show, and writes it at
+`0x610000` in the same esptool call. The show is not kept; it may not fit, and installing it
+again is the owner's.
+
+### big-storage
+
+```
+python3 firmware/fw.py big-storage
+```
+
+Moves a board of WLED's layout to the bigger one of
+[The regions of the flash](#the-regions-of-the-flash), keeping the board's settings, and
+prints the layout it found, `kept: <path>`, and the board's reply to `status`. The show is
+not kept: the board starts with `/odrig` empty, and the show is installed again with
+`install-show`.
+
+1. It reads the partition table. On a board of the bigger layout it prints
+   `nothing to do: the board has the bigger layout`, writes nothing and ends with 0. A
+   table that is not WLED's own, entry for entry, is `layout-mismatch`.
+2. It reads the board's storage as `install-show` does, keeps it in
+   `build/firmware/storage/`, and prints its path.
+3. It makes the new storage of 13,500,416 bytes: a file system of the disk version of the
+   old one, made at 3,145,728 bytes, the room of WLED's second firmware slot, with the
+   settings in it, and then grown to its whole size. All it holds lies in those first
+   3 MB, and the tool checks that, the settings and that there is no `/odrig`.
+4. It writes those first 3 MB at `0x310000`, as data, and has the chip compare them. The
+   board still has WLED's layout whole: nothing of it lies there.
+5. It erases the boot selection, writes the bigger layout's table at `0x8000`, has the
+   chip compare it and restarts the board. Beyond its first 3 MB the new storage holds
+   what was WLED's storage; the file system knows those blocks as free and erases a block
+   before it writes one.
+6. It waits 20 seconds, or as long as `--wait SECONDS` says, for the reply to `status`.
+
+When step 4 fails, the board has its old layout and its old storage. Step 5 writes one
+sector; when it fails, `restore-stock --full` brings the board back, and `set-wifi` and
+`set-limit`, or the kept image, its settings.
 
 ### install-show
 
@@ -1066,13 +1106,15 @@ touches these regions only:
 | Region | Address | Size | Written by |
 |---|---|---|---|
 | Bootloader | `0x0` | up to `0x8000` | `restore-stock --full` only |
-| Partition table | `0x8000` | `0x1000` | `restore-stock --full` only |
+| Partition table | `0x8000` | `0x1000` | `restore-stock --full` and `big-storage` only |
 | Boot selection (`otadata`) | `0xE000` | `0x2000` | erased by `flash`, `install-firmware` and `restore-stock` |
 | First application (`app0`) | `0x10000` | `0x300000` | `flash`, `install-firmware`, `restore-stock` |
 | Storage (`spiffs`) | `0x610000` | `0x9E0000` | `install-show`, `set-wifi`, `set-limit` and `install-firmware`, changed blocks only |
 
 `nvs` at `0x9000`, the second application partition at `0x310000` and the core-dump
-partition at `0xFF0000` are never written.
+partition at `0xFF0000` are never written. The whole flash is never erased, and no tool
+writes a fuse of the chip or starts a program that can. esptool is given an address only
+after the tool has checked it against this table.
 
 The tool knows a second layout, the bigger one, which gives the room of the second firmware
 slot to the storage. Its one firmware slot is a factory slot, for which an update over
@@ -1083,16 +1125,19 @@ one it is WLED's layout, with one alone the bigger one.
 |---|---|---|
 | `nvs`, `otadata` | `0x9000`, `0xE000` | `0x5000`, `0x2000`, as in WLED's |
 | `app0`, a factory slot | `0x10000` | `0x300000` |
-| `spiffs` | `0x310000` | `0xCE0000`, 13,500,416 bytes |
-| `coredump` | `0xFF0000` | `0x10000` | The whole flash is never erased, and no tool
-writes a fuse of the chip or starts a program that can. esptool is given an address only
-after the tool has checked it against this table.
+| `spiffs` | `0x310000` | `0xCE0000`, 13,500,416 bytes; its first 3 MB written by `big-storage`, and changed blocks by the commands that write storage |
+| `coredump` | `0xFF0000` | `0x10000` |
+
+On a board of WLED's layout `restore-stock --full` writes no storage. On one of the bigger
+layout it writes WLED's storage whole, holding the board's settings, as it puts WLED's
+layout back.
 
 ## Rolling back
 
 `python3 firmware/fw.py restore-stock` brings back stock WLED 16.0.1, with its settings and
 its show as they were. `--full` also brings back the stock bootloader and partition table,
-for a board whose first 64 KB were changed by something else.
+for a board whose first 64 KB were changed by something else, and WLED's layout for a board
+of the bigger one, with its settings and without its show; `big-storage` moves it again.
 
 The last resort is the factory backup of the board: one image of the whole 16 MB flash with
 its own checksum file, kept beside this repository. No tool reads or writes it. It is
