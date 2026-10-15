@@ -88,10 +88,45 @@ function named(value, folders) {
   });
 }
 
-// A value of the stored answers with the names put back.
-function unnamed(value, folders) {
+// A run of a text that may be a path: up to a space, a quote or a colon.
+const PATH_RUN = /[^\s"':]+/g;
+
+// The words of command lines that may name a path, as the stored answers write them and
+// as the request gave them, the longest first.
+function givenWords(commands, folders) {
+  const words = new Map();
+  for (const {argv} of commands) {
+    for (const word of argv) {
+      if (word !== "" && !word.startsWith("-") && !words.has(named(word, folders))) {
+        words.set(named(word, folders), word);
+      }
+    }
+  }
+  return [...words].sort(([a], [b]) => b.length - a.length);
+}
+
+// A text of the stored answers as the tool writes it on this system: a path that begins
+// with a word of the command lines begins with that word as it was given, and the rest of
+// that path, and every other path that starts with a name, has its parts joined as the
+// system joins them.
+function spelled(text, words) {
+  if (path.sep === "/") {
+    return text;
+  }
+  return text.replace(PATH_RUN, (run) => {
+    for (const [stored, given] of words) {
+      if (run.startsWith(stored) && /^(?:$|[/.])/.test(run.slice(stored.length))) {
+        return given + run.slice(stored.length).split("/").join(path.sep);
+      }
+    }
+    return /^<(?:tmp\d+|root)>/.test(run) ? run.split("/").join(path.sep) : run;
+  });
+}
+
+// A value of the stored answers with the names put back, its paths as `spelled` gives them.
+function unnamed(value, folders, words = []) {
   return mapStrings(value, (text) => {
-    let made = text.split("<root>").join(ROOT);
+    let made = spelled(text, words).split("<root>").join(ROOT);
     folders.forEach((folder, i) => {
       made = made.split(`<tmp${i}>`).join(folder);
     });
@@ -272,5 +307,5 @@ export function answered(kind, ask, commands) {
     throw new Error(`no stored answer of the kind ${kind} for this request: what it asks has changed since the answers were stored`);
   }
   apply(stored, folders);
-  return unnamed(stored.answer, folders);
+  return unnamed(stored.answer, folders, givenWords(commands, folders));
 }
