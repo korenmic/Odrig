@@ -409,3 +409,7 @@ are in [format.md](format.md), "Measured sizes".
   [firmware-prerequisites.md](firmware-prerequisites.md): what the firmware must do, where
   each line comes from, stock WLED, a seed or the owner, how far it has come, the seeds
   not finished, and the seeds proposed and not approved yet.
+- 2026-10-15: No stick was read on the board, through a hub or a plain adapter, and the
+  chip's own USB port no longer took a computer. The owner approved three seeds: 21, the
+  chip's own port a computer's when one is plugged in as the board starts; 22, a stick
+  through a hub, on newer USB software; 23, a log of the USB port on the serial port.

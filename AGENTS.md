@@ -125,8 +125,13 @@ present, and do not build on them.
 - **One converter**, seed 18: the JavaScript converter becomes the only one. The Python
   package stops converting and stays as a small library that reads and writes the
   project's files for tests and for the firmware tool. Today both can convert.
-- **Animations from a USB drive**, seed 20: a flash drive is plugged into the board, and
-  the board plays the animations in its folder `odrig`. Today nothing reads a drive.
+- **Animations from a USB drive**, seed 20: the board plays the animations of a stick's
+  folder `odrig`. The core, the emulator and the app do; the board has read no stick yet.
+- **One USB port for a computer or a stick**, seed 21: the chip's own port is a
+  computer's when one is plugged in as the board starts. Today it is always the stick's.
+- **A USB stick through a hub**, seed 22: newer USB software that knows hubs. Today the
+  board reads no stick through a hub.
+- **A USB log on the serial port**, seed 23: what the board's own USB port sees.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 
 The state of every seed is in the `state.json` of its folder.
