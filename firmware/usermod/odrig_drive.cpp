@@ -42,6 +42,9 @@ const UBaseType_t EVENTS = 4;
 // The events the watcher of devices keeps, and how often the host's task serves it.
 const int WATCHER_EVENTS = 4;
 const uint32_t SERVE_EVERY_MS = 20;
+// The most devices the watcher keeps open at once, and the room for what one is with its 0.
+const size_t MOST_DEVICES = 8;
+const size_t ABOUT_ROOM = 96;
 // What the list of a drive is when its folder odrig could not be opened.
 const int32_t NO_FOLDER = -1;
 const int32_t NOT_LISTED = -2;
@@ -87,10 +90,16 @@ msc_host_device_handle_t device = nullptr;
 msc_host_vfs_handle_t mounted = nullptr;
 
 // The host's second client, which only says what comes and goes: it opens each device
-// that comes and keeps it open, since the library tells only the clients that opened a
-// device that it went.
+// that comes and keeps it open with what it is, since the library tells only the clients
+// that opened a device that it went.
 usb_host_client_handle_t watcher = nullptr;
-usb_device_handle_t watched = nullptr;
+
+struct Watched {
+  usb_device_handle_t handle;
+  char about[ABOUT_ROOM];
+};
+
+Watched watched[MOST_DEVICES] = {};
 
 // The host functions for every name that is not the drive's.
 odrig_host files;
@@ -321,7 +330,7 @@ void pullOut() {
 void driverEvent(const msc_host_event_t *event, void *) { xQueueSend(events, event, 0); }
 
 // A device came: what it is, by its device descriptor and the class of its first
-// interface. The first device is kept open until it goes.
+// interface. It is kept open until it goes, while there is room for it.
 void describe(uint8_t address) {
   usb_device_handle_t opened = nullptr;
   const esp_err_t result = usb_host_device_open(watcher, address, &opened);
@@ -329,9 +338,9 @@ void describe(uint8_t address) {
     say("a device came that could not be opened (%s)", esp_err_to_name(result));
     return;
   }
-  const usb_device_desc_t *about = nullptr;
-  if (usb_host_get_device_descriptor(opened, &about) != ESP_OK) about = nullptr;
-  unsigned kind = about != nullptr ? about->bDeviceClass : 0;
+  const usb_device_desc_t *descriptor = nullptr;
+  if (usb_host_get_device_descriptor(opened, &descriptor) != ESP_OK) descriptor = nullptr;
+  unsigned kind = descriptor != nullptr ? descriptor->bDeviceClass : 0;
   const usb_config_desc_t *config = nullptr;
   if (usb_host_get_active_config_descriptor(opened, &config) == ESP_OK && config != nullptr) {
     const usb_intf_desc_t *first = usb_parse_interface_descriptor(config, 0, 0, nullptr);
@@ -340,21 +349,36 @@ void describe(uint8_t address) {
   char other[32];
   snprintf(other, sizeof(other), "another device (class %u)", kind);
   const char *named = kind == USB_CLASS_HUB ? "a hub" : kind == USB_CLASS_MASS_STORAGE ? "a stick" : other;
-  say("a device came: maker %04x, product %04x, %s", about != nullptr ? about->idVendor : 0u, about != nullptr ? about->idProduct : 0u, named);
-  if (watched == nullptr) {
-    watched = opened;
-  } else {
-    usb_host_device_close(watcher, opened);
+  char about[ABOUT_ROOM];
+  snprintf(about, sizeof(about), "maker %04x, product %04x, %s", descriptor != nullptr ? descriptor->idVendor : 0u, descriptor != nullptr ? descriptor->idProduct : 0u, named);
+  say("a device came: %s", about);
+  Watched *place = nullptr;
+  for (Watched &one : watched) {
+    if (one.handle == nullptr) {
+      place = &one;
+      break;
+    }
   }
+  if (place == nullptr) {
+    usb_host_device_close(watcher, opened);
+    return;
+  }
+  place->handle = opened;
+  strcpy(place->about, about);
 }
 
 void watcherEvent(const usb_host_client_event_msg_t *event, void *) {
   if (event->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
     describe(event->new_dev.address);
   } else if (event->event == USB_HOST_CLIENT_EVENT_DEV_GONE) {
-    say("a device went");
+    for (Watched &one : watched) {
+      if (one.handle == event->dev_gone.dev_hdl) {
+        say("a device went: %s", one.about);
+        one.handle = nullptr;
+        break;
+      }
+    }
     usb_host_device_close(watcher, event->dev_gone.dev_hdl);
-    if (event->dev_gone.dev_hdl == watched) watched = nullptr;
   }
 }
 

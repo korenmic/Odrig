@@ -1,0 +1,198 @@
+The names and calls WLED 16.0.1 uses that Arduino-ESP32 3 and ESP-IDF 5.5 changed, for the
+trial build on the newer USB software, whose USB host knows hubs.
+
+Every change is held by ESP_IDF_VERSION_MAJOR >= 5, so the build known good, on ESP-IDF 4.4,
+compiles the same code as before, only some of it on other lines:
+
+- wled00/src/dependencies/network/Network.h: WLED's global Network takes the name
+  WLEDNetwork, as Arduino-ESP32 3 has a global Network of its own.
+- wled00/bus_manager.cpp: the PWM outputs use ledcAttachChannel and ledcDetach, which take
+  the place of ledcSetup, ledcAttachPin and ledcDetachPin.
+- wled00/util.cpp: SHA-1 by the calls without _ret of the newer mbedTLS; esp_chip_info.h
+  and esp_mac.h included; the chip's revision as `revision`; the device's fingerprint
+  without the legacy ADC driver's calibration, as ESP-IDF 5 stops a firmware at its start
+  that holds the legacy ADC driver beside the new one Arduino-ESP32 3 uses.
+
+- wled00/wled.cpp: the static address is compared as a number, as Arduino-ESP32 3 takes
+  the literal 0U for a null byte pointer and reads through it.
+- wled00/network.cpp and wled00/src/dependencies/e131/ESPAsyncE131.cpp: lwIP's core is
+  locked around its raw API and igmp_joingroup, which ESP-IDF 5 asserts at the first call.
+
+The usermod cannot do this from outside: these are WLED's own sources, which must compile
+before any usermod runs.
+
+diff --git a/wled00/bus_manager.cpp b/wled00/bus_manager.cpp
+index 1ba808d..6123608 100644
+--- a/wled00/bus_manager.cpp
++++ b/wled00/bus_manager.cpp
+@@ -452,8 +452,12 @@ BusPwm::BusPwm(const BusConfig &bc)
+       pinMode(_pins[i], OUTPUT);
+       #else
+       unsigned channel = _ledcStart + i;
++      #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++      ledcAttachChannel(_pins[i], _frequency, _depth - (dithering*4), channel);
++      #else
+       ledcSetup(channel, _frequency, _depth - (dithering*4)); // with dithering _frequency doesn't really matter as resolution is 8 bit
+       ledcAttachPin(_pins[i], channel);
++      #endif
+       // LEDC timer reset credit @dedehai
+       uint8_t group = (channel / 8), timer = ((channel / 2) % 4); // same fromula as in ledcSetup()
+       ledc_timer_rst((ledc_mode_t)group, (ledc_timer_t)timer); // reset timer so all timers are almost in sync (for phase shift)
+@@ -623,8 +627,12 @@ void BusPwm::deallocatePins() {
+     #ifdef ESP8266
+     digitalWrite(_pins[i], LOW); //turn off PWM interrupt
+     #else
++    #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++    if (_ledcStart < WLED_MAX_ANALOG_CHANNELS) ledcDetach(_pins[i]);
++    #else
+     if (_ledcStart < WLED_MAX_ANALOG_CHANNELS) ledcDetachPin(_pins[i]);
+     #endif
++    #endif
+   }
+   #ifdef ARDUINO_ARCH_ESP32
+   PinManager::deallocateLedc(_ledcStart, numPins);
+diff --git a/wled00/network.cpp b/wled00/network.cpp
+index 606fa65..3783b7d 100644
+--- a/wled00/network.cpp
++++ b/wled00/network.cpp
+@@ -388,6 +388,9 @@ bool isWiFiConfigured() {
+ 
+ #if defined(ARDUINO_ARCH_ESP32) && defined(LWIP_IPV6)
+ #include "lwip/raw.h"
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++#include "lwip/tcpip.h" // ESP-IDF 5 asserts that lwIP's core is locked around its raw API
++#endif
+ #include "lwip/icmp6.h"
+ // This is a terrible workaround for a terrible bug: on ESP32 platforms, unsolicited IPv6 router
+ // advertisements will cause LwIP to overwrite the IPv4 DNS servers with the IPv6 DNS servers
+@@ -410,8 +413,14 @@ static u8_t blockRouterAdvertisements(void* arg, struct raw_pcb* pcb, struct pbu
+ }
+ 
+ void installIPv6RABlocker() {
++  #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  LOCK_TCPIP_CORE();
++  #endif
+   struct raw_pcb* ra_blocker = raw_new_ip_type(IPADDR_TYPE_V6, IP6_NEXTH_ICMP6);
+   raw_recv(ra_blocker, blockRouterAdvertisements, NULL);
++  #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  UNLOCK_TCPIP_CORE();
++  #endif
+ }
+ #endif
+ 
+diff --git a/wled00/src/dependencies/e131/ESPAsyncE131.cpp b/wled00/src/dependencies/e131/ESPAsyncE131.cpp
+index 8961e75..9151e67 100644
+--- a/wled00/src/dependencies/e131/ESPAsyncE131.cpp
++++ b/wled00/src/dependencies/e131/ESPAsyncE131.cpp
+@@ -20,6 +20,9 @@
+ #include "ESPAsyncE131.h"
+ #include "../network/Network.h"
+ #include <string.h>
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++#include "lwip/tcpip.h" // ESP-IDF 5 asserts that lwIP's core is locked around igmp_joingroup
++#endif
+ 
+ // E1.17 ACN Packet Identifier "ASC-E1.17"
+ const byte ESPAsyncE131::ACN_ID[12] = { 0x41, 0x53, 0x43, 0x2d, 0x45, 0x31, 0x2e, 0x31, 0x37, 0x00, 0x00, 0x00 };
+@@ -81,7 +84,13 @@ bool ESPAsyncE131::initMulticast(uint16_t port, uint16_t universe, uint8_t n) {
+         multicast_addr.addr = static_cast<uint32_t>(IPAddress(239, 255,
+           (((universe + i) >> 8) & 0xff), (((universe + i) >> 0)
+           & 0xff)));
++      #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++      LOCK_TCPIP_CORE();
+       igmp_joingroup(&ifaddr, &multicast_addr);
++      UNLOCK_TCPIP_CORE();
++      #else
++      igmp_joingroup(&ifaddr, &multicast_addr);
++      #endif
+     }
+ 
+     udp.onPacket(std::bind(&ESPAsyncE131::parsePacket, this, std::placeholders::_1));
+diff --git a/wled00/src/dependencies/network/Network.h b/wled00/src/dependencies/network/Network.h
+index 9201d51..d9f516d 100644
+--- a/wled00/src/dependencies/network/Network.h
++++ b/wled00/src/dependencies/network/Network.h
+@@ -8,6 +8,11 @@
+ #ifndef Network_h
+ #define Network_h
+ 
++// Arduino-ESP32 3 has a global Network of its own; WLED's takes another name there.
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  #define Network WLEDNetwork
++#endif
++
+ class NetworkClass
+ {
+ public:
+diff --git a/wled00/util.cpp b/wled00/util.cpp
+index 20c934b..f412a6d 100644
+--- a/wled00/util.cpp
++++ b/wled00/util.cpp
+@@ -1286,9 +1286,15 @@ String computeSHA1(const String& input) {
+     mbedtls_sha1_context ctx;
+ 
+     mbedtls_sha1_init(&ctx);
++    #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++    mbedtls_sha1_starts(&ctx);
++    mbedtls_sha1_update(&ctx, (const unsigned char*)input.c_str(), input.length());
++    mbedtls_sha1_finish(&ctx, shaResult);
++    #else
+     mbedtls_sha1_starts_ret(&ctx);
+     mbedtls_sha1_update_ret(&ctx, (const unsigned char*)input.c_str(), input.length());
+     mbedtls_sha1_finish_ret(&ctx, shaResult);
++    #endif
+     mbedtls_sha1_free(&ctx);
+ 
+     // Convert to hexadecimal string
+@@ -1303,7 +1309,12 @@ String computeSHA1(const String& input) {
+ }
+ 
+ #ifdef ESP32
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  #include "esp_chip_info.h"
++  #include "esp_mac.h"
++#else
+ #include "esp_adc_cal.h"
++#endif
+ #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(4,4,7) // backwards compatibility patch
+   #define ADC_ATTEN_DB_12 ADC_ATTEN_DB_11
+ #endif
+@@ -1313,8 +1324,13 @@ String generateDeviceFingerprint() {
+   esp_chip_info(&chip_info);
+   esp_efuse_mac_get_default((uint8_t*)fp);
+   fp[1] ^= ESP.getFlashChipSize();
++  #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  fp[0] ^= chip_info.revision | (chip_info.model << 16);
++  #else
+   fp[0] ^= chip_info.full_revision | (chip_info.model << 16);
++  #endif
+   // mix in ADC calibration data:
++  #if !(defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5) // ESP-IDF 5 stops at start with the legacy ADC driver beside the new one that Arduino-ESP32 3 uses
+   esp_adc_cal_characteristics_t ch;
+   #if SOC_ADC_MAX_BITWIDTH == 13 // S2 has 13 bit ADC
+   constexpr auto myBIT_WIDTH = ADC_WIDTH_BIT_13;
+@@ -1334,6 +1350,7 @@ String generateDeviceFingerprint() {
+       fp[1] ^= ch.high_curve[i];
+     }
+   }
++  #endif
+   char fp_string[17];  // 16 hex chars + null terminator
+   sprintf(fp_string, "%08X%08X", fp[1], fp[0]);
+   return String(fp_string);
+diff --git a/wled00/wled.cpp b/wled00/wled.cpp
+index 308c939..a3ec08d 100644
+--- a/wled00/wled.cpp
++++ b/wled00/wled.cpp
+@@ -716,7 +716,12 @@ void WLED::initConnection()
+   WiFi.setHostname(hostname);
+ #endif
+ 
++  #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  // Arduino-ESP32 3 takes 0U for a null byte pointer here, and compares through it
++  if ((uint32_t)multiWiFi[selectedWiFi].staticIP != 0U && (uint32_t)multiWiFi[selectedWiFi].staticGW != 0U) {
++  #else
+   if (multiWiFi[selectedWiFi].staticIP != 0U && multiWiFi[selectedWiFi].staticGW != 0U) {
++  #endif
+     WiFi.config(multiWiFi[selectedWiFi].staticIP, multiWiFi[selectedWiFi].staticGW, multiWiFi[selectedWiFi].staticSN, dnsAddress);
+   } else {
+     WiFi.config(IPAddress((uint32_t)0), IPAddress((uint32_t)0), IPAddress((uint32_t)0));

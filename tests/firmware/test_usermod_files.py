@@ -24,7 +24,7 @@ ALLOWED_IN = {
     "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
     "odrig_drive.cpp": {"dirent.h", "soc/usb_serial_jtag_struct.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
     "odrig_update.cpp": {"esp_ota_ops.h"},
-    "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
+    "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/gpio_periph.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
 }
 PROBE_FILES = {"odrig_probe.h", "odrig_probe.cpp"}
 # What the probe build measures of the signal itself: named nowhere else.

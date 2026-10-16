@@ -53,6 +53,43 @@ it:
 | The 67 packages of WLED's `package-lock.json`, which pack the web interface | The npm registry |
 | The Python packages `zopfli`, `wheel` and `tasmota-metrics`, which the platform installs into the tool's Python environment | PyPI |
 
+### The newer USB software
+
+`build --trial` builds the firmware on newer software of Espressif, whose USB host knows
+hubs: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform 55.03.312-1 and
+PlatformIO 6.2.0. It is the trial of the move to that software, and nothing of it is used
+by the other commands. It lives in `build/firmware/newer/`, so the build known good and its
+tools stay as they are. The first `build --trial` fetches it; nothing of it is on a computer
+before. The sizes are those the sources state, about 700 MB in all; a line *named by its
+manifest* is a small manifest that names the real download, which is given as its release
+offers it for a Mac with Apple's processor.
+
+| What | Version | From | Bytes |
+|---|---|---|---:|
+| PlatformIO, into `newer/venv`, with the packages of `firmware/requirements-newer.txt`, which pins the others at the versions WLED pins and takes them from pip's cache | 6.2.0 | `https://files.pythonhosted.org/packages/bf/98/6c5cc249129c72b076ca238a435c48b48568d866c12890e01ee50fb8f322/platformio-6.2.0-py3-none-any.whl` | 418,578 |
+| PlatformIO's own SCons | `tool-scons` 4.41101.0 | `https://dl.registry.platformio.org/download/platformio/tool/tool-scons/4.41101.0/tool-scons-4.41101.0.tar.gz` | 523,448 |
+| The platform | 55.03.312-1 | `https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip` | 2,128,229 |
+| Arduino-ESP32 | 3.3.12 | `https://github.com/espressif/arduino-esp32/releases/download/3.3.12/esp32-core-3.3.12.tar.xz` | 42,843,632 |
+| Arduino-ESP32's compiled libraries | 3.3.12 | `https://github.com/espressif/arduino-esp32/releases/download/3.3.12/esp32-core-3.3.12-libs.tar.xz` | 347,236,084 |
+| The installer of ESP-IDF's tools, `tool-esp_install` | 5.3.5 | `https://github.com/pioarduino/esp_install/releases/download/v5.3.5/esp_install-v5.3.5.zip` | 54,139 |
+| The compiler, `toolchain-xtensa-esp-elf`, named by its manifest | 14.2.0+20260121 | `https://github.com/pioarduino/registry/releases/download/0.0.1/xtensa-esp-elf-14.2.0_20260121.zip`, then `https://github.com/espressif/crosstool-NG/releases/download/esp-14.2.0_20260121/xtensa-esp-elf-14.2.0_20260121-aarch64-apple-darwin.tar.xz` | 1,601 and 170,666,656 |
+| The debugger, `tool-xtensa-esp-elf-gdb`, which the platform installs with the compiler; named by its manifest | 17.1_20260402 | `https://github.com/pioarduino/registry/releases/download/0.0.1/xtensa-esp-gdb-17.1_20260402.zip`, then `https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v17.1_20260402/xtensa-esp-elf-gdb-17.1_20260402-aarch64-apple-darwin24.5.tar.gz` | 1,550 and 46,924,973 |
+| esptool, `tool-esptoolpy`, named by its manifest | 5.4.0 | `https://github.com/pioarduino/registry/releases/download/0.0.1/esptoolpy-v5.4.0.zip`, then `https://github.com/espressif/esptool/releases/download/v5.4.0/esptool-v5.4.0-macos-arm64.tar.gz` | 989 and 62,531,864 |
+| PlatformIO's home page, which the platform installs at every build | `contrib-piohome` 3.4.4 | `https://github.com/pioarduino/registry/releases/download/0.0.1/contrib-piohome-3.4.4.tar.gz` | 922,895 |
+| The platform's own Python environment, `newer/pio/penv`: `uv` first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
+| Then, by `uv`, the newest that PyPI has of `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools` and `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
+
+The hub support is in Arduino-ESP32's compiled libraries: their `sdkconfig.h` has
+`CONFIG_USB_HOST_HUBS_SUPPORTED 1` and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` for every
+memory variant of the ESP32-S3, and nothing of ESP-IDF's own source is fetched.
+
+WLED's libraries are copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in
+WLED's folder before the first trial build; what is missing there PlatformIO fetches at the
+versions WLED names, which on 2026-10-16 were those of the build known good. The platform takes the
+other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and CMake,
+Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the trial does
+not do.
+
 ## The work folder
 
 The work folder is `build/firmware/` under the repository root. Git ignores it, and removing
@@ -68,10 +105,17 @@ build/firmware/
   WLED/            WLED's source at the pinned commit
   out/             the built images
   storage/         storage images read from the board and written to it, the newest eight
+  newer/           the newer USB software of `build --trial`
+    venv/          its Python environment: PlatformIO 6.2.0, Node.js and npm
+    pio/           its PlatformIO folder: the platform, Arduino-ESP32, the compilers and
+                   the platform's own Python environment
+    pio-cache/     its build cache
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
-folder. `HOME` is left as it is.
+folder. `HOME` is left as it is. For `build --trial` the two folders of PlatformIO are
+`build/firmware/newer/pio` and `build/firmware/newer/pio-cache`, and `PATH` begins with
+`build/firmware/newer/venv/bin`; pip's and npm's caches are the same.
 
 | Variable | Value |
 |---|---|
@@ -91,7 +135,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
@@ -217,6 +261,43 @@ flash settings and the libraries are the ones WLED has for this board, and the p
 table is WLED's own file. WLED's files are not patched for it and none is compiled.
 `--standalone` does not go with `--stock`. The standalone firmware is being built; for
 now it is a trial program, see [Verified on the board](#verified-on-the-board).
+
+```
+python3 firmware/fw.py build --trial
+python3 firmware/fw.py build --trial --probe
+```
+
+`build --trial` builds the firmware on [the newer USB software](#the-newer-usb-software),
+for the trial of the move to it: the environment `odrig_trial`, which is `odrig` on the
+newer platform, and the image `odrig-trial.bin`; with `--probe`, the environment
+`odrig_trial_probe` and the image `odrig-trial-probe.bin`. The tool makes the newer
+software's Python environment first, when `build/firmware/newer/venv` is not there or
+`firmware/requirements-newer.txt` changed, and runs that environment's PlatformIO in
+WLED's folder, with WLED's files and the patches as for `build`. The trial's images never
+replace `odrig-firmware.bin` and `odrig-probe.bin`, and nothing of the build known good
+changes. `--trial` goes with neither `--stock` nor `--standalone`. `flash --image
+build/firmware/out/odrig-trial.bin` writes the trial build to the board.
+
+WLED 16.0.1 is not made for Arduino-ESP32 3. The trial builds after these changes, none
+of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of which the
+build known good sees:
+
+- Left out of the trial, as this installation uses none of it: WLED's DMX input with its
+  library `esp_dmx`, the infrared remote with `IRremoteESP8266`, and WLED's own RMT driver
+  `NeoESP32RmtHI`; the four RMT outputs take NeoPixelBus's RMT driver, by
+  `WLED_USE_SHARED_RMT`.
+- `ESP32_ARDUINO_NO_RGB_BUILTIN` keeps Arduino-ESP32's newer RMT driver out, which ESP-IDF
+  does not let start beside the older one that NeoPixelBus uses.
+- `firmware/newer/odrig_newer.h`, read first by every source of the trial, and
+  `firmware/patches/020-newer-software.patch`, whose every change is held by
+  `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed, and what its checks
+  stop at the start: the legacy ADC driver beside the new one, lwIP's raw API without its
+  lock, and an address compared with `0U`.
+
+On 2026-10-16 both trial builds built: `odrig-trial.bin` of 1,822,304 bytes, 56.2% of the
+firmware slot, with 21.5% of the static memory, and `odrig-trial-probe.bin` of 1,748,992
+bytes. The firmware holds ESP-IDF's USB host with its hub driver and its driver of a hub's
+ports.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -515,6 +596,16 @@ image the work folder does not hold. Its last step leaves the board with the fir
 the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
 takes about 55 minutes. Without a board it stops with `no-board` and runs nothing.
 
+```
+ODRIG_BOARD_IMAGES=trial python3 firmware/fw.py test-board
+```
+
+With the variable `ODRIG_BOARD_IMAGES=trial` the suite runs on the trial build of the newer
+USB software: it flashes `odrig-trial.bin` and `odrig-trial-probe.bin` where it takes the
+firmware and the probe build, and builds them with `build --trial` when the work folder does
+not hold them. Its test of `install-firmware`, which writes `odrig-firmware.bin`, flashes the
+trial build after it, and the suite leaves the trial build on the board.
+
 ### test-air
 
 ```
@@ -710,7 +801,7 @@ kind of the line, and its text.
 #log 31.407 usb: a device came: maker 0781, product 5581, a stick
 #log 31.902 usb: stick opened: 12 animation files in odrig
 #log 32.115 player: drive file clip.odrg left out: size-mismatch
-#log 58.230 usb: a device went
+#log 58.230 usb: a device went: maker 0781, product 5581, a stick
 ```
 
 The lines of the kind `usb`:
@@ -722,8 +813,12 @@ The lines of the kind `usb`:
 - A device: `a device came: maker <four hex digits>, product <four hex digits>, <kind>`,
   where the kind is that of its first interface, or of the device when it has none:
   `a hub` for the class 9, `a stick` for the class 8, `another device (class <n>)` for any
-  other; `a device came that could not be opened (<error>)`; and `a device went`. The
-  maker's and the product's numbers are those of the device's descriptor.
+  other; `a device came that could not be opened (<error>)`; and
+  `a device went: maker <four hex digits>, product <four hex digits>, <kind>`, which names
+  the device as its line of coming did. The maker's and the product's numbers are those of
+  the device's descriptor; they are only written, and the firmware treats no maker and no
+  product apart. The log keeps up to eight devices at once, a hub and what is plugged into
+  it among them, to say when each goes; a ninth has its line of coming only.
 - A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
   `stick not opened: no file system it reads (<error>)`,
   `stick not opened: a fault in reading (<error>)`, or
@@ -922,6 +1017,19 @@ of the same method. The patch changes three files, and nothing for another chip:
 The usermod cannot do this from outside: the limits are constants compiled into WLED, and
 the type of the parallel outputs is chosen inside WLED. WLED's LED settings page shows the
 new limits, which it gets from the firmware.
+
+A second patch, `firmware/patches/020-newer-software.patch`, is for the trial build on
+[the newer USB software](#the-newer-usb-software). Every change in it is held by
+`ESP_IDF_VERSION_MAJOR >= 5`, so on the software known good WLED compiles as before:
+
+| File of WLED | Change |
+|---|---|
+| `wled00/src/dependencies/network/Network.h` | WLED's global `Network` takes the name `WLEDNetwork`: Arduino-ESP32 3 has a global `Network` of its own. |
+| `wled00/bus_manager.cpp` | The PWM outputs use `ledcAttachChannel` and `ledcDetach`, which take the place of `ledcSetup`, `ledcAttachPin` and `ledcDetachPin`. |
+| `wled00/util.cpp` | SHA-1 by the calls of the newer mbedTLS, which have no `_ret`; `esp_chip_info.h` and `esp_mac.h` included; the chip's revision as `revision`; the device's fingerprint without the legacy ADC driver's calibration, as ESP-IDF 5 stops a firmware at its start that holds the legacy ADC driver beside the new one Arduino-ESP32 3 uses. |
+| `wled00/wled.cpp` | The static address is compared as a number: Arduino-ESP32 3 takes the literal `0U` for a null byte pointer and reads through it, which stopped the trial at its first connection. |
+| `wled00/network.cpp` | lwIP's core is locked around the raw API that blocks the router advertisements of IPv6, which ESP-IDF 5 asserts at the first call. |
+| `wled00/src/dependencies/e131/ESPAsyncE131.cpp` | lwIP's core is locked around `igmp_joingroup`, as above. |
 
 ## The probe build
 
@@ -1739,3 +1847,33 @@ probe build were built again with the core and flashed.
   fit.
 - Not seen yet: `status` over the board's Wi-Fi and the refusal of an update on WLED's
   page, which need a device on the board's network.
+
+**The trial on the newer USB software.** What the board gave on 2026-10-16 with
+`odrig-trial.bin` (SHA-256 `fed8357a…`), on the bigger layout with the owner's show of 116
+animations, all through the socket marked COM:
+
+- The bootloader of the software known good starts the trial. Its first three builds
+  stopped at their start, as the raw output of the socket marked COM showed: the legacy ADC
+  driver beside the new one, lwIP's raw API without its lock, and an address compared with
+  `0U`. The patch `020-newer-software.patch` has the three changes.
+- Then: `status` at 46 to 50 refreshes a second over 30 samples, and again after a
+  restart; `space` 116 animations and 258,048 bytes free of 13,500,416; the settings kept.
+  After a start, `list` answered `busy` for about 8 minutes while the 13 MB were read; the
+  firmware known good took 491 s for 9 MB.
+- The chip's own socket, with the Mac on it, logged `usb: a computer is on the port, which
+  stays a serial port`; so the USB host, and with it a hub, is tried only without a
+  computer there.
+- The way back: `flash --image` of the firmware known good, and the trial again, each with
+  the show and the settings kept. The trial's file system can raise the storage's disk
+  version from 2.0 to 2.1 when it writes, and did so once while it stopped at its start
+  again and again; the firmware known good then cannot mount the storage and WLED formats
+  it, so the way back after that is `install-firmware` and `install-show`, which the trial's
+  script did.
+- The board suite with `ODRIG_BOARD_IMAGES=trial`, run from the seed's worktree: 16
+  tests, 7 failures and 14 errors, none of them the trial's. The worktree lacks the stock
+  image of `firmware/wled-16.0.1/`, which exists only in the first checkout, and the Mac,
+  which reaches the chip's own socket through the hub of a USB-C display adapter, lost that
+  socket during restarts, so esptool could not open it.
+- The board was left on the trial, playing the owner's show.
+- Not tried yet: a hub with its own power and a stick on the chip's own socket, without
+  the Mac there.
