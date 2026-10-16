@@ -474,3 +474,9 @@ are in [format.md](format.md), "Measured sizes".
   biggest animations first until the storage is full; taken literally that would have
   kept 68, so the show of 113, which seed 24 names, went first, and the later files went
   after it, the biggest first.
+- 2026-10-16: Seed 27: on the phone the operators' app keeps clear of Android's bars and
+  of the camera's cut-out: its heading below the bar at the top, its tabs above the bar at
+  the bottom, upright and sideways, by the room the phone reports, which Capacitor gives
+  the page. Black lies under the bars, with light icons, and the tabs give way while the
+  keyboard is open for a field. In a browser the page is as before. Tested in Chrome and
+  built into the APK; the check on a phone is the owner's and is open.

@@ -143,12 +143,14 @@ class Touch(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             listened |= set(re.findall(r"""addEventListener\(\s*["']([a-z]+)["']""", text))
             self.assertNotRegex(text, r"\bon(mouse|touch|pointer|contextmenu)[a-z]*\s*=", path.name)
-        self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate", "contextmenu"})
+        self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate", "contextmenu", "resize", "focusin", "focusout"})
         # A long press or a right click has one listener, which stops its menu outside
         # the fields and does nothing else.
         start = (support.WWW / "main.js").read_text(encoding="utf-8")
         listener = start.split('document.addEventListener("contextmenu", (event) => {\n')[1].split("\n});\n")[0]
-        self.assertEqual(listener.split(), 'if (!(event.target instanceof Element && event.target.matches(":read-write"))) { event.preventDefault(); }'.split())
+        self.assertEqual(listener.split(), "if (!isField(event.target)) { event.preventDefault(); }".split())
+        field = start.split("function isField(element) {\n")[1].split("\n}\n")[0]
+        self.assertEqual(field.split(), 'return element instanceof Element && element.matches(":read-write");'.split())
         # The media of a conversion tell when they are loaded or sought, and when they
         # cannot be read.
         conversion = (support.WWW / "convert.js").read_text(encoding="utf-8")

@@ -39,13 +39,42 @@ byId("message-close").addEventListener("click", () => {
   byId("message").hidden = true;
 });
 
+// Whether an element is a field one types into: the style sheet names the same kind.
+function isField(element) {
+  return element instanceof Element && element.matches(":read-write");
+}
+
 // A long press or a right click opens a menu only in a field one types into, as the
 // style sheet lets text be marked only there. Nothing of the app is done by a long press.
 document.addEventListener("contextmenu", (event) => {
-  if (!(event.target instanceof Element && event.target.matches(":read-write"))) {
+  if (!isField(event.target)) {
     event.preventDefault();
   }
 });
+
+// While the phone's keyboard is open for a field, the tabs are hidden and the field is
+// kept in view. The app's Android shell ends the view where the keyboard begins, so the
+// keyboard is open when a field one types into has the focus and the view is lower than
+// three quarters of the tallest it has been at its width.
+const tallest = new Map();
+
+function typing() {
+  const width = window.innerWidth;
+  tallest.set(width, Math.max(tallest.get(width) || 0, window.innerHeight));
+  const field = document.activeElement;
+  const open = isField(field) && window.innerHeight < tallest.get(width) * 0.75;
+  if (open && !document.body.classList.contains("typing")) {
+    document.body.classList.add("typing");
+    field.scrollIntoView({block: "nearest"});
+  } else if (!open) {
+    document.body.classList.remove("typing");
+  }
+}
+
+window.addEventListener("resize", typing);
+document.addEventListener("focusin", typing);
+document.addEventListener("focusout", () => setTimeout(typing, 0));
+typing();
 // The page's history holds one entry of the app, its first screen, or two, with another
 // screen on top. So the back gesture goes from any other screen to the first, and from
 // the first it leaves the app.
