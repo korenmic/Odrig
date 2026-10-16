@@ -22,7 +22,7 @@ class TheControllerViewOfTheEmulator(unittest.TestCase):
         self.addCleanup(shutil.rmtree, profile, ignore_errors=True)
         command = [
             support.chrome(), "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
-            "--disable-sync", "--disable-component-update", "--window-size=1200,800", f"--user-data-dir={profile}",
+            "--disable-sync", "--disable-component-update", "--hide-scrollbars", "--window-size=1200,800", f"--user-data-dir={profile}",
             f"http://127.0.0.1:{emulator.port}/{end}",
         ]
         with emulator_support.EventStream(emulator.port) as stream:

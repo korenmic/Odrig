@@ -98,9 +98,11 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 
 ## If you work on Windows
 
-The Python library, the core's build, the emulator and the command tool work on Windows 10
-and 11, and their suites pass there. That was seed 11,
-`project-seeds/11-p0-emulator-and-tools-on-windows/`.
+The Python library, the core's build, the emulator, the command tool and the app's tool
+work on Windows 10 and 11, and every suite that runs there passes: the converter's, the
+Python library's, the core's, the emulator's and the command tool's, the app's and the
+onboarding suite. That was seed 11, `project-seeds/11-p0-emulator-and-tools-on-windows/`,
+and seed 26 for the work that came after it.
 
 - The core is built there by `python core/build.py shared`, not by `make`.
 - Windows has no virtual serial port. The emulator takes command lines on a TCP port, and
@@ -130,9 +132,6 @@ present, and do not build on them.
   up firmware updates over Wi-Fi; the tool and the firmware have it, and no board has been
   moved to it yet.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
-  suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
-  tested there.
 - **The app clear of the phone's bars**, seed 27: on the phone the operators' app is
   drawn under Android's top and bottom bars today; it will end where they begin.
 

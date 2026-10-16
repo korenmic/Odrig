@@ -22,6 +22,28 @@ DRIVE_MOST = 256
 DRIVE_LOOK_SECONDS = 1.0
 DRIVE_PREFIX = "drive/"
 
+# Windows refuses to remove a file that a program holds open, and its folder, unless the
+# program let others do so when it opened the file. The host lets them, as macOS does: a
+# drive is pulled out by moving its folder away while one of its files plays.
+WINDOWS = sys.platform == "win32"
+SHARE_EVERYTHING = 0x1 | 0x2 | 0x4  # FILE_SHARE_READ, FILE_SHARE_WRITE and FILE_SHARE_DELETE
+
+
+def reading(path):
+    """A file opened to be read, which may be moved or removed while it is open. A file that
+    is not there raises `FileNotFoundError` and any other failure an `OSError`, as `open`."""
+    if not WINDOWS:
+        return open(path, "rb")
+    import _winapi
+    import msvcrt
+
+    handle = _winapi.CreateFile(os.fspath(path), _winapi.GENERIC_READ, SHARE_EVERYTHING, 0, _winapi.OPEN_EXISTING, 0, 0)
+    try:
+        return os.fdopen(msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY), "rb")
+    except OSError:
+        _winapi.CloseHandle(handle)
+        raise
+
 
 def drive_list(folder):
     """The names of the animation files of a drive's folder `odrig`: those that end in
@@ -108,7 +130,7 @@ class FolderHost:
             if path is None:
                 return 0
             try:
-                self._file = open(path, "rb")
+                self._file = reading(path)
             except FileNotFoundError:
                 return 0
             except OSError:
@@ -117,7 +139,7 @@ class FolderHost:
         if not name or "/" in name or "\\" in name or os.sep in name or (os.altsep and os.altsep in name):
             return -1
         try:
-            self._file = open(os.path.join(self.folder, name), "rb")
+            self._file = reading(os.path.join(self.folder, name))
         except FileNotFoundError:
             return 0
         except OSError:
@@ -297,7 +319,7 @@ class FolderHost:
         try:
             if self._second_name != name:
                 self._drop_second()
-                self._second = open(path, "rb")
+                self._second = reading(path)
                 self._second_name = name
             if self._second.tell() != offset:
                 self._second.seek(offset)
