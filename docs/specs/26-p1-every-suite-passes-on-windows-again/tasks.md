@@ -72,7 +72,7 @@ Rules for every task:
     Chrome was found`; with it, `test_look`'s buttons test measures 313 against 328.
   - Requirements: 4.1, 4.2, 4.5, 5.2, 7.1
 
-- [ ] 6. The app's tool and its tests on Windows
+- [x] 6. The app's tool and its tests on Windows
   - `app/apptool/webserver.py`: `allow_reuse_address` only where the system is not
     Windows.
   - `tests/app/test_tool.py`: `serve` stopped with Ctrl+Break on Windows; fake programs as
