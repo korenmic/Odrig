@@ -396,7 +396,8 @@ class TheStagedFolder(unittest.TestCase):
     def test_capacitor_is_given_that_folder_and_the_page_for_an_old_web_view(self):
         config = json.loads((support.APP / "capacitor.config.json").read_text(encoding="utf-8"))
         self.assertEqual(config, {"appId": "app.odrig.operators", "appName": "odrig", "webDir": "../build/app/www",
-                                  "android": {"minWebViewVersion": 80, "backgroundColor": "#000000"}, "server": {"errorPath": "old.html"}})
+                                  "android": {"minWebViewVersion": 80, "backgroundColor": "#000000"}, "server": {"errorPath": "old.html"},
+                                  "plugins": {"SystemBars": {"insetsHandling": "css", "style": "DARK", "initialViewportFitValueHint": "cover"}}})
         self.assertEqual((support.APP / config["webDir"]).resolve(), paths.STAGED)
         old = (support.WWW / "old.html").read_text(encoding="utf-8")
         self.assertNotRegex(old, r"<script|src=|href=")
