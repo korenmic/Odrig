@@ -270,6 +270,17 @@ screen, a long press marks nothing and opens nothing, and a tap works as before.
 browser a right click does the same: the browser's menu opens only in a field. A field
 that the app gets later is the same as these three.
 
+The app keeps clear of the phone's bars: its heading begins below the bar at the top,
+with the clock and the icons, and its tabs end above the bar at the bottom, with
+Android's three buttons or the line of gesture navigation. Held sideways, it keeps clear
+of a bar or of the camera at a side too. The room comes from what the phone reports for
+its bars and its camera, so it fits each phone; it shows the app's black, and the bars'
+icons are light on it. What scrolls up goes under a band of black at the top, and the
+last line of a list can be scrolled above the tabs. While the phone's keyboard is open
+for a field, the tabs are hidden, so that they do not stand over the field, and the field
+stays in view; they come back when the keyboard closes. In a browser there are no bars,
+and the page keeps no room.
+
 ## Messages
 
 Every failure is a sentence with its code in brackets at its end. A message stays until
@@ -394,7 +405,16 @@ installed; the phone with mobile data on.
     is marked and no menu opens; in the address a word is marked and the menu of
     copying and pasting opens. The buttons still work by a tap. Note whether a long
     press on a button pressed it too.
-14. **Note** the phone's model, its Android version, the web view's version from the
+14. **The phone's bars.** Hold the phone upright, and then sideways, on each screen.
+    *Seen:* the heading is below the clock and the icons at the top, and the tabs `Show`,
+    `Storage` and `Target` are wholly above Android's buttons or the line of gesture
+    navigation; sideways, nothing of the app lies under a bar or the camera at a side.
+    On the show screen and on `Storage`, scroll to the end: nothing shows under the
+    clock, and the last line stands above the tabs. On the target screen, tap the
+    address: the keyboard opens, the tabs go away and the address stays in view; they
+    come back when the keyboard closes. Note whether the phone has three buttons or
+    gesture navigation.
+15. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -437,6 +457,14 @@ By programs, on a Mac:
   types into, in Chrome: every element of the three screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
   browser's "select all" marks nothing.
+- That the page keeps the room of the phone's bars, in Chrome, with the room set at each
+  side as the app's Android shell sets it: upright with a bar of three buttons and with
+  gesture navigation, and sideways with a bar and the camera at the sides. The heading is
+  below the room at the top, the tabs above the room at the bottom, nothing in the room at
+  a side, nothing shows in the room at the top when the screens are scrolled, the last
+  line of each list can be scrolled above the tabs, and with the keyboard open the field
+  is in view and the tabs are hidden. Without the room the page is as before. The
+  settings of the bars in the Android project, and in the APK.
 - That the web code sends the fourteen lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -452,9 +480,11 @@ By programs, on a Mac:
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without
   internet, that the screen stays on, that the back gesture goes from the target screen
-  to the show screen and from there out of the app, and that a long press marks text and
-  opens its menu only in a field. On 2026-10-15 the owner ran the APK against the board
-  on its own network and saw its state and its list.
+  to the show screen and from there out of the app, that a long press marks text and
+  opens its menu only in a field, and that the app keeps clear of Android's bars, upright
+  and sideways, also with the keyboard open. On 2026-10-15 the owner ran the APK against
+  the board on its own network and saw its state and its list; on 2026-10-16 the owner
+  saw the app lie under the bars, before it kept clear of them.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

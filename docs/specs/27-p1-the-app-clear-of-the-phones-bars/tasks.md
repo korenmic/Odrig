@@ -32,7 +32,7 @@ Rules for every task:
 - A page changes in the commit that changes the code it describes.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The page keeps the room of the bars
+- [x] 1. The page keeps the room of the bars
   - Set `"state": "in_progress"` in
     `project-seeds/27-p1-the-app-clear-of-the-phones-bars/state.json`.
   - `app/www/style.css`, `app/www/main.js`: the room, the band at the top, and the tabs
