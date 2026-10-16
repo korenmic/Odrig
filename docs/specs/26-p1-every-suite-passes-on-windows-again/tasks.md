@@ -58,7 +58,7 @@ Rules for every task:
     tests fail on Windows before the change of `odrigctl/cli.py`.
   - Requirements: 2.2, 2.3, 2.4, 5.1, 7.1
 
-- [ ] 4. The demo test where Python's zlib is zlib-ng
+- [x] 4. The demo test where Python's zlib is zlib-ng
   - `tests/emulator/test_demo.py`: the JSON files byte for byte; the `.odrg` files byte
     for byte unless `zlib.ZLIB_RUNTIME_VERSION` names zlib-ng, and then by header and
     decoded records.
