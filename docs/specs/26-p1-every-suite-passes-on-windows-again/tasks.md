@@ -82,7 +82,7 @@ Rules for every task:
     says.
   - Requirements: 4.3, 4.4, 2.3, 5.1, 7.1
 
-- [ ] 7. The documents, and the seed done
+- [x] 7. The documents, and the seed done
   - Change first the onboarding tests that hold the sentences below, and see them fail.
   - `AGENTS.md`, "If you work on Windows"; `agent/getting-started.md`, "On Windows", with
     the app's suite in its list, within 200 lines; `docs/emulator.md` on ending the

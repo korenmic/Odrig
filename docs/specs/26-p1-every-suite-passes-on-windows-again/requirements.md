@@ -99,7 +99,8 @@ operators' app is checked on the computer I have.
 ## Definition of done
 
 1. On Windows 11, run one at a time, each of the suites ends with no failure.
-2. None of them skips on Windows a test it runs on macOS, except tests of the app's suite
-   that need a thing the computer does not have, each with its reason.
+2. None of them skips on Windows a test it runs on macOS, except the tests that need a
+   virtual serial port or a file name that Windows does not allow, and tests of the app's
+   suite that need a thing the computer does not have, each with its reason.
 3. No window opens while they run, and no program they started runs afterwards.
 4. macOS runs the same tests with the same results; that check is made at the review.

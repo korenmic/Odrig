@@ -1,10 +1,11 @@
 {
   "number": 26,
   "slug": "26-p1-every-suite-passes-on-windows-again",
-  "state": "in_progress",
+  "state": "completed",
   "title": "Every suite passes on Windows again",
   "priority": "P1",
   "addedAt": "2026-10-15T23:39:11+03:00",
   "addedCommit": "pending-local",
-  "summary": "Every suite that runs on Windows passes there again: seven failing emulator tests, the untested stop of odrigctl --log, the app's suite run on Windows for the first time with its two Chrome-finding failures, and an entry file that says what is true; nothing changes on macOS."
+  "summary": "Every suite that runs on Windows passes there again: seven failing emulator tests, the untested stop of odrigctl --log, the app's suite run on Windows for the first time with its two Chrome-finding failures, and an entry file that says what is true; nothing changes on macOS.",
+  "completedAt": "2026-10-16T03:30:17+03:00"
 }

@@ -810,7 +810,8 @@ python -m odrigctl --port /dev/cu.usbmodem5C831043631 --log
 - Every received line that begins with `#log ` is printed as it arrives, without its line
   end; every other line, a reply or a line of the chip's loader, is passed over. The port
   is opened as for a command, and the connection made as for one.
-- It goes on until it is stopped with Ctrl-C, which is status 0. A port that goes away,
+- It goes on until it is stopped with Ctrl-C, on Windows Ctrl-C or Ctrl-Break, which is
+  status 0. A port that goes away,
   or a TCP target that closes the connection, is status 3 with one line
   `error: unreachable: <detail>`. `--log` with `--http` or with a command is status 2.
 - A command takes only a reply as its answer, whatever lines of the log come before it.
@@ -897,10 +898,11 @@ converter logic.
 5. `page: <address>` is printed and the page opens in the default browser, unless
    `--no-browser` is given. The playlist is the one animation, in loops.
 
-Ctrl-C, or a termination, stops the emulator and removes the folder; the command then
-ends with 0. A refusal ends it with 1 and one line on standard error, with nothing left
-running. Without the core's library, or without Node.js, it says which step of
-[getting-started.md](../agent/getting-started.md) is missing and starts nothing.
+Ctrl-C, on Windows Ctrl-C or Ctrl-Break, or a termination, stops the emulator and removes
+the folder; the command then ends with 0. A refusal ends it with 1 and one line on
+standard error, with nothing left running. Without the core's library, or without Node.js,
+it says which step of [getting-started.md](../agent/getting-started.md) is missing and
+starts nothing.
 
 ## Record mode
 

@@ -72,7 +72,7 @@ class GettingStarted(unittest.TestCase):
 
     def test_it_says_what_works_on_windows_what_stays_with_the_first_computer_and_what_to_install(self):
         windows = flat(self.part("On Windows"))
-        for phrase in ("The Python library, the core's build, the emulator, the command tool and their suites work on Windows 10 and 11.",
+        for phrase in ("The Python library, the core's build, the emulator, the command tool, the app's tool and their suites work on Windows 10 and 11.",
                        f"The converter's own suite, `{CONVERTER_SUITE[1]}`, passes there too.",
                        "The firmware tool, the board and the walk-through suite stay with the first computer.",
                        "git, Python 3.10 or later as `python`, Node.js 20 or later, and a C++ compiler",
