@@ -1,0 +1,105 @@
+The names and calls WLED 16.0.1 uses that Arduino-ESP32 3 and ESP-IDF 5.5 changed, for the
+trial build on the newer USB software, whose USB host knows hubs.
+
+Every change is held by ESP_IDF_VERSION_MAJOR >= 5, so the build known good, on ESP-IDF 4.4,
+compiles exactly what it compiled before:
+
+- wled00/src/dependencies/network/Network.h: WLED's global Network takes the name
+  WLEDNetwork, as Arduino-ESP32 3 has a global Network of its own.
+- wled00/bus_manager.cpp: the PWM outputs use ledcAttachChannel and ledcDetach, which take
+  the place of ledcSetup, ledcAttachPin and ledcDetachPin.
+- wled00/util.cpp: SHA-1 by the calls without _ret of the newer mbedTLS; esp_chip_info.h
+  and esp_mac.h included; the chip's revision as `revision`.
+
+The usermod cannot do this from outside: these are WLED's own sources, which must compile
+before any usermod runs.
+
+diff --git a/wled00/bus_manager.cpp b/wled00/bus_manager.cpp
+index 1ba808d..6123608 100644
+--- a/wled00/bus_manager.cpp
++++ b/wled00/bus_manager.cpp
+@@ -452,8 +452,12 @@ BusPwm::BusPwm(const BusConfig &bc)
+       pinMode(_pins[i], OUTPUT);
+       #else
+       unsigned channel = _ledcStart + i;
++      #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++      ledcAttachChannel(_pins[i], _frequency, _depth - (dithering*4), channel);
++      #else
+       ledcSetup(channel, _frequency, _depth - (dithering*4)); // with dithering _frequency doesn't really matter as resolution is 8 bit
+       ledcAttachPin(_pins[i], channel);
++      #endif
+       // LEDC timer reset credit @dedehai
+       uint8_t group = (channel / 8), timer = ((channel / 2) % 4); // same fromula as in ledcSetup()
+       ledc_timer_rst((ledc_mode_t)group, (ledc_timer_t)timer); // reset timer so all timers are almost in sync (for phase shift)
+@@ -623,8 +627,12 @@ void BusPwm::deallocatePins() {
+     #ifdef ESP8266
+     digitalWrite(_pins[i], LOW); //turn off PWM interrupt
+     #else
++    #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++    if (_ledcStart < WLED_MAX_ANALOG_CHANNELS) ledcDetach(_pins[i]);
++    #else
+     if (_ledcStart < WLED_MAX_ANALOG_CHANNELS) ledcDetachPin(_pins[i]);
+     #endif
++    #endif
+   }
+   #ifdef ARDUINO_ARCH_ESP32
+   PinManager::deallocateLedc(_ledcStart, numPins);
+diff --git a/wled00/src/dependencies/network/Network.h b/wled00/src/dependencies/network/Network.h
+index 9201d51..d9f516d 100644
+--- a/wled00/src/dependencies/network/Network.h
++++ b/wled00/src/dependencies/network/Network.h
+@@ -8,6 +8,11 @@
+ #ifndef Network_h
+ #define Network_h
+ 
++// Arduino-ESP32 3 has a global Network of its own; WLED's takes another name there.
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  #define Network WLEDNetwork
++#endif
++
+ class NetworkClass
+ {
+ public:
+diff --git a/wled00/util.cpp b/wled00/util.cpp
+index 20c934b..dcf295d 100644
+--- a/wled00/util.cpp
++++ b/wled00/util.cpp
+@@ -1286,9 +1286,15 @@ String computeSHA1(const String& input) {
+     mbedtls_sha1_context ctx;
+ 
+     mbedtls_sha1_init(&ctx);
++    #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++    mbedtls_sha1_starts(&ctx);
++    mbedtls_sha1_update(&ctx, (const unsigned char*)input.c_str(), input.length());
++    mbedtls_sha1_finish(&ctx, shaResult);
++    #else
+     mbedtls_sha1_starts_ret(&ctx);
+     mbedtls_sha1_update_ret(&ctx, (const unsigned char*)input.c_str(), input.length());
+     mbedtls_sha1_finish_ret(&ctx, shaResult);
++    #endif
+     mbedtls_sha1_free(&ctx);
+ 
+     // Convert to hexadecimal string
+@@ -1304,6 +1310,10 @@ String computeSHA1(const String& input) {
+ 
+ #ifdef ESP32
+ #include "esp_adc_cal.h"
++#if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  #include "esp_chip_info.h"
++  #include "esp_mac.h"
++#endif
+ #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(4,4,7) // backwards compatibility patch
+   #define ADC_ATTEN_DB_12 ADC_ATTEN_DB_11
+ #endif
+@@ -1313,7 +1323,11 @@ String generateDeviceFingerprint() {
+   esp_chip_info(&chip_info);
+   esp_efuse_mac_get_default((uint8_t*)fp);
+   fp[1] ^= ESP.getFlashChipSize();
++  #if defined(ESP_IDF_VERSION_MAJOR) && ESP_IDF_VERSION_MAJOR >= 5
++  fp[0] ^= chip_info.revision | (chip_info.model << 16);
++  #else
+   fp[0] ^= chip_info.full_revision | (chip_info.model << 16);
++  #endif
+   // mix in ADC calibration data:
+   esp_adc_cal_characteristics_t ch;
+   #if SOC_ADC_MAX_BITWIDTH == 13 // S2 has 13 bit ADC

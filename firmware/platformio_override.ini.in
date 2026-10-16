@@ -32,6 +32,16 @@ build_flags = ${env:odrig.build_flags}
 extends = env:odrig
 platform = https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip
 platform_packages =
+lib_ignore = esp_dmx
+  IRremoteESP8266
+  NeoESP32RmtHI
+build_unflags = ${env:odrig.build_unflags}
+  -D WLED_ENABLE_DMX_INPUT
+build_flags = ${env:odrig.build_flags}
+  -D WLED_DISABLE_INFRARED
+  -D WLED_USE_SHARED_RMT
+  -D ESP32_ARDUINO_NO_RGB_BUILTIN
+  -include @REPO@/firmware/newer/odrig_newer.h
 
 [env:odrig_trial_probe]
 extends = env:odrig_trial

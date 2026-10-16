@@ -8546,3 +8546,19 @@ comes is passed over until the first goes. Reading two would change seed 20's li
 its names, which is not this seed's work.
 
 **Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, 2.5.
+
+## Seed 22: The hub support is already in Arduino-ESP32 3.3.12
+
+**Question.** The design builds ESP-IDF 5.5.5's USB host library with its hub support on,
+as a library of the repository, because Arduino-ESP32 comes with that library compiled.
+Is the compiled one without hubs?
+
+**Answer.** No. Every memory variant of the ESP32-S3 in Arduino-ESP32 3.3.12's compiled
+libraries, `qio_opi` of this board among them, has `CONFIG_USB_HOST_HUBS_SUPPORTED 1`
+and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` in its `sdkconfig.h`, and its `libusb.a` is built
+so. The trial takes the compiled library as it is: no `firmware/usb_host/`, no source of
+ESP-IDF in the repository or fetched for it, and no flags for its options. The support is
+still the USB standard's own, with nothing for one maker or model.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The USB host
+library with hubs"; `docs/firmware.md`, "The newer USB software".

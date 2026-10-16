@@ -64,7 +64,7 @@ Rules for every task:
     the code as it is, fails: the line is `a device went`.
   - Requirements: 3.1, 3.2, 7.1
 
-- [ ] 3. The trial build, without the board
+- [x] 3. The trial build, without the board
   - Only after the owner approved the list of downloads in the design.
   - `python3 firmware/fw.py build --trial` sets up the newer software. ESP-IDF 5.5.5's
     USB host library goes into `firmware/usb_host/`, with `README.md`, `LICENCE` and

@@ -108,32 +108,39 @@ without `--image` writes `odrig-firmware.bin`, which the trial never replaces.
 
 ## The USB host library with hubs
 
-`firmware/usb_host/`: ESP-IDF 5.5.5's `components/usb` as it is at the commit above,
-without its tests, its build files for ESP-IDF and its notes: the ten sources in `src/`,
-`include/` and `private_include/`, `Kconfig` for the defaults of its options, its licence
-`LICENCE`, Apache 2.0, a `README.md` that says where it comes from, and this repository's
-`library.json`, as `firmware/usb_host_msc/` has them.
+Arduino-ESP32 3.3.12 comes with ESP-IDF's USB host library compiled, and compiled with its
+hub support on: every memory variant of the ESP32-S3 in its libraries, `qio_opi` of this
+board among them, has `CONFIG_USB_HOST_HUBS_SUPPORTED 1` and
+`CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` in its `sdkconfig.h`. The trial takes that library as
+it is: nothing of ESP-IDF's source is in the repository or fetched for it, and no flag
+sets its options. The support is the USB standard's own, and nothing of it names a hub of
+one maker or model.
 
-- **Its options.** The flags of `odrig_trial` define `CONFIG_USB_HOST_HUBS_SUPPORTED`,
-  `CONFIG_USB_HOST_HUB_MULTI_LEVEL` and the options of the hubs' ports at the defaults
-  of `Kconfig`, for every source of the build, so that the library and the code that
-  uses it read its headers alike. Nothing of it names a hub of one maker or model.
-- **Its place in the build.** `library.json` has `"libArchive": false`, so its objects are
-  linked as objects, before the libraries of Arduino-ESP32. Every symbol of the library
-  that Arduino-ESP32's compiled one also holds is then found in these objects first, and
-  none of the compiled one's parts is taken. A symbol defined twice stops the trial build,
-  and the trial records it.
-- **The driver of flash drives** stays `usb_host_msc` 1.1.1, which Espressif gives for
-  ESP-IDF 4.4.1 and later. When it does not build on the newer software, version 1.1.4,
-  the last for both, is the one change, and it is on the list of downloads.
-- **WLED's libraries.** Before the first trial build, the libraries of the environment
-  `odrig` are copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in WLED's
-  folder, so that none is fetched again. When one needs a version of its own for the
-  newer software, the trial stops and the owner is asked.
-- **WLED's source.** A change it needs goes into a patch file of `firmware/patches/`,
-  every change held by `#if ESP_IDF_VERSION_MAJOR >= 5`, and the build known good is
-  built again to show that it is unchanged. A change of WLED's drivers of the LEDs, the
-  Wi-Fi or the storage ends the trial.
+- **The driver of flash drives** stays `usb_host_msc` 1.1.1, which builds on the newer
+  software unchanged.
+- **WLED's libraries** are those of the build known good, at the same versions.
+
+## What the trial leaves out, and why
+
+WLED 16.0.1 is not made for Arduino-ESP32 3, and the trial changes no driver of the LEDs,
+the Wi-Fi or the storage. What does not build there is left out of the trial, or given
+the names the newer software uses:
+
+- **Left out**, none of it used by this installation: WLED's DMX input and its library
+  `esp_dmx`, the infrared remote and its library `IRremoteESP8266`, and WLED's own
+  interrupt-driven RMT driver `NeoESP32RmtHI`. Its four RMT outputs take NeoPixelBus's own
+  RMT driver instead, by WLED's switch `WLED_USE_SHARED_RMT`.
+- **`ESP32_ARDUINO_NO_RGB_BUILTIN`** keeps Arduino-ESP32's driver of the board's RGB LED,
+  and so its new RMT driver, out of the firmware: ESP-IDF stops a firmware at its start
+  that holds both RMT drivers, and NeoPixelBus 2.8.4 uses the older one.
+- **`firmware/newer/odrig_newer.h`**, read first by every source of the trial, gives
+  NeoPixelBus's parallel driver the register macro for a call ESP-IDF 5.5 no longer has.
+- **`firmware/patches/020-newer-software.patch`** changes WLED where the newer software
+  renamed or moved something: its global `Network` takes the name `WLEDNetwork`, the LED
+  PWM calls of Arduino-ESP32 3, SHA-1 without `_ret`, and the chip's information from its
+  own headers. Every change is held by `ESP_IDF_VERSION_MAJOR >= 5`, so the build known
+  good is the same.
+- **The usermod** includes `soc/gpio_periph.h` in the probe build on the newer software.
 
 ## The log of what comes and goes
 
@@ -246,8 +253,6 @@ processor, as far as could be told without fetching the manifest.
 | 11 | PlatformIO's home page, which the platform installs at every build | `contrib-piohome` 3.4.4 | `https://github.com/pioarduino/registry/releases/download/0.0.1/contrib-piohome-3.4.4.tar.gz` | 922,895 |
 | 12 | The platform's own Python environment, `newer/pio/penv`: `uv` 0.13.1 first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
 | 13 | Then, by `uv`, the newest from PyPI of: `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools`, `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
-| 14 | ESP-IDF's USB host library, into `firmware/usb_host/` of the repository | ESP-IDF v5.5.5, commit `ff1bac0aeecdd2b797b9c3a558c6bd03629bc013` | `https://github.com/espressif/esp-idf/tree/v5.5.5/components/usb`: ten sources, twelve headers, `Kconfig`, and ESP-IDF's `LICENSE` | about 678,000 |
-| 15 | Only when `usb_host_msc` 1.1.1 does not build on the newer software | 1.1.4 | `https://components-file.espressif.com/components/espressif/usb_host_msc/1.1.4/espressif__usb_host_msc-v1.1.4.zip` | 36,826 |
 
 Not fetched: WLED's libraries, which are copied from the build known good; the other
 compiler, `toolchain-riscv32-esp`, which the platform takes only for a project with a

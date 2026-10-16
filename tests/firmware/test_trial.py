@@ -203,6 +203,41 @@ class TheOverride(unittest.TestCase):
                 self.assertNotIn(setting, found[name], f"{name} {setting}")
 
 
+class WhatTheTrialLeavesOut(unittest.TestCase):
+    def test_the_trial_leaves_out_what_does_not_build_on_the_newer_software(self):
+        trial = environments()["env:odrig_trial"]
+        self.assertEqual(trial["lib_ignore"].split("\n"), ["esp_dmx", "IRremoteESP8266", "NeoESP32RmtHI"])
+        self.assertEqual(trial["build_unflags"].split("\n"), ["${env:odrig.build_unflags}", "-D WLED_ENABLE_DMX_INPUT"])
+        flags = trial["build_flags"].split("\n")
+        self.assertEqual(flags[:4], ["${env:odrig.build_flags}", "-D WLED_DISABLE_INFRARED", "-D WLED_USE_SHARED_RMT", "-D ESP32_ARDUINO_NO_RGB_BUILTIN"])
+        self.assertEqual(flags[4:], [f"-include {ROOT}/firmware/newer/odrig_newer.h"])
+
+    def test_the_firmware_known_good_leaves_nothing_out(self):
+        found = environments()
+        for name in ("env:odrig", "env:odrig_probe"):
+            for setting in ("lib_ignore",):
+                self.assertNotIn(setting, found[name], f"{name} {setting}")
+            self.assertNotIn("odrig_newer.h", found[name].get("build_flags", ""))
+
+    def test_the_header_of_the_newer_software_gives_back_the_old_name(self):
+        text = (ROOT / "firmware" / "newer" / "odrig_newer.h").read_text(encoding="utf-8")
+        self.assertIn("#define gpio_hal_iomux_func_sel(pin_reg, func) PIN_FUNC_SELECT(pin_reg, func)", text)
+
+    def test_every_change_of_the_patch_is_held_by_the_version_of_esp_idf(self):
+        text = (ROOT / "firmware" / "patches" / "020-newer-software.patch").read_text(encoding="utf-8")
+        files = re.findall(r"(?m)^\+\+\+ b/(\S+)$", text)
+        self.assertTrue(files)
+        for chunk in re.split(r"(?m)^diff --git ", text)[1:]:
+            name = chunk.split()[0]
+            added = [line[1:] for line in chunk.splitlines() if line.startswith("+") and not line.startswith("+++")]
+            self.assertTrue(any("ESP_IDF_VERSION_MAJOR >= 5" in line for line in added), name)
+
+    def test_no_hub_of_one_maker_or_model_is_told_apart(self):
+        for path in (ROOT / "firmware" / "usermod").glob("*.cpp"):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotRegex(text, r"id(Vendor|Product)\s*[!=]=", path.name)
+
+
 class TheBoardsSuite(unittest.TestCase):
     def test_it_takes_the_trials_images_when_told_to(self):
         text = BOARD_SUPPORT.read_text(encoding="utf-8")

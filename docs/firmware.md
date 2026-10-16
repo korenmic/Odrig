@@ -78,11 +78,14 @@ offers it for a Mac with Apple's processor.
 | PlatformIO's home page, which the platform installs at every build | `contrib-piohome` 3.4.4 | `https://github.com/pioarduino/registry/releases/download/0.0.1/contrib-piohome-3.4.4.tar.gz` | 922,895 |
 | The platform's own Python environment, `newer/pio/penv`: `uv` first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
 | Then, by `uv`, the newest that PyPI has of `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools` and `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
-| ESP-IDF's USB host library, taken into `firmware/usb_host/` of the repository | ESP-IDF v5.5.5, commit `ff1bac0aeecdd2b797b9c3a558c6bd03629bc013` | `https://github.com/espressif/esp-idf/tree/v5.5.5/components/usb`: ten sources, twelve headers, `Kconfig`, and ESP-IDF's `LICENSE` | about 678,000 |
-| Only when Espressif's driver of flash drives 1.1.1 does not build on the newer software: `usb_host_msc` | 1.1.4 | `https://components-file.espressif.com/components/espressif/usb_host_msc/1.1.4/espressif__usb_host_msc-v1.1.4.zip` | 36,826 |
 
-WLED's libraries are not fetched again: before the first trial build they are copied from
-`.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in WLED's folder. The platform takes the
+The hub support is in Arduino-ESP32's compiled libraries: their `sdkconfig.h` has
+`CONFIG_USB_HOST_HUBS_SUPPORTED 1` and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` for every
+memory variant of the ESP32-S3, and nothing of ESP-IDF's own source is fetched.
+
+WLED's libraries are copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in
+WLED's folder before the first trial build; what is missing there PlatformIO fetches at the
+versions WLED names, which on 2026-10-16 were those of the build known good. The platform takes the
 other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and CMake,
 Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the trial does
 not do.
@@ -274,6 +277,25 @@ WLED's folder, with WLED's files and the patches as for `build`. The trial's ima
 replace `odrig-firmware.bin` and `odrig-probe.bin`, and nothing of the build known good
 changes. `--trial` goes with neither `--stock` nor `--standalone`. `flash --image
 build/firmware/out/odrig-trial.bin` writes the trial build to the board.
+
+WLED 16.0.1 is not made for Arduino-ESP32 3. The trial builds after these changes, none
+of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of which the
+build known good sees:
+
+- Left out of the trial, as this installation uses none of it: WLED's DMX input with its
+  library `esp_dmx`, the infrared remote with `IRremoteESP8266`, and WLED's own RMT driver
+  `NeoESP32RmtHI`; the four RMT outputs take NeoPixelBus's RMT driver, by
+  `WLED_USE_SHARED_RMT`.
+- `ESP32_ARDUINO_NO_RGB_BUILTIN` keeps Arduino-ESP32's newer RMT driver out, which ESP-IDF
+  does not let start beside the older one that NeoPixelBus uses.
+- `firmware/newer/odrig_newer.h`, read first by every source of the trial, and
+  `firmware/patches/020-newer-software.patch`, whose every change is held by
+  `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed.
+
+On 2026-10-16 both trial builds built: `odrig-trial.bin` of 1,822,304 bytes, 56.2% of the
+firmware slot, with 21.5% of the static memory, and `odrig-trial-probe.bin` of 1,748,992
+bytes. The firmware holds ESP-IDF's USB host with its hub driver and its driver of a hub's
+ports.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -993,6 +1015,16 @@ of the same method. The patch changes three files, and nothing for another chip:
 The usermod cannot do this from outside: the limits are constants compiled into WLED, and
 the type of the parallel outputs is chosen inside WLED. WLED's LED settings page shows the
 new limits, which it gets from the firmware.
+
+A second patch, `firmware/patches/020-newer-software.patch`, is for the trial build on
+[the newer USB software](#the-newer-usb-software). Every change in it is held by
+`ESP_IDF_VERSION_MAJOR >= 5`, so on the software known good WLED compiles as before:
+
+| File of WLED | Change |
+|---|---|
+| `wled00/src/dependencies/network/Network.h` | WLED's global `Network` takes the name `WLEDNetwork`: Arduino-ESP32 3 has a global `Network` of its own. |
+| `wled00/bus_manager.cpp` | The PWM outputs use `ledcAttachChannel` and `ledcDetach`, which take the place of `ledcSetup`, `ledcAttachPin` and `ledcDetachPin`. |
+| `wled00/util.cpp` | SHA-1 by the calls of the newer mbedTLS, which have no `_ret`; `esp_chip_info.h` and `esp_mac.h` included; the chip's revision as `revision`. |
 
 ## The probe build
 
