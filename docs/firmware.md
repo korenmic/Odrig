@@ -290,7 +290,9 @@ build known good sees:
   does not let start beside the older one that NeoPixelBus uses.
 - `firmware/newer/odrig_newer.h`, read first by every source of the trial, and
   `firmware/patches/020-newer-software.patch`, whose every change is held by
-  `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed.
+  `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed, and what its checks
+  stop at the start: the legacy ADC driver beside the new one, lwIP's raw API without its
+  lock, and an address compared with `0U`.
 
 On 2026-10-16 both trial builds built: `odrig-trial.bin` of 1,822,304 bytes, 56.2% of the
 firmware slot, with 21.5% of the static memory, and `odrig-trial-probe.bin` of 1,748,992
@@ -1024,7 +1026,10 @@ A second patch, `firmware/patches/020-newer-software.patch`, is for the trial bu
 |---|---|
 | `wled00/src/dependencies/network/Network.h` | WLED's global `Network` takes the name `WLEDNetwork`: Arduino-ESP32 3 has a global `Network` of its own. |
 | `wled00/bus_manager.cpp` | The PWM outputs use `ledcAttachChannel` and `ledcDetach`, which take the place of `ledcSetup`, `ledcAttachPin` and `ledcDetachPin`. |
-| `wled00/util.cpp` | SHA-1 by the calls of the newer mbedTLS, which have no `_ret`; `esp_chip_info.h` and `esp_mac.h` included; the chip's revision as `revision`. |
+| `wled00/util.cpp` | SHA-1 by the calls of the newer mbedTLS, which have no `_ret`; `esp_chip_info.h` and `esp_mac.h` included; the chip's revision as `revision`; the device's fingerprint without the legacy ADC driver's calibration, as ESP-IDF 5 stops a firmware at its start that holds the legacy ADC driver beside the new one Arduino-ESP32 3 uses. |
+| `wled00/wled.cpp` | The static address is compared as a number: Arduino-ESP32 3 takes the literal `0U` for a null byte pointer and reads through it, which stopped the trial at its first connection. |
+| `wled00/network.cpp` | lwIP's core is locked around the raw API that blocks the router advertisements of IPv6, which ESP-IDF 5 asserts at the first call. |
+| `wled00/src/dependencies/e131/ESPAsyncE131.cpp` | lwIP's core is locked around `igmp_joingroup`, as above. |
 
 ## The probe build
 

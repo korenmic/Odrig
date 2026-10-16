@@ -138,7 +138,10 @@ the names the newer software uses:
 - **`firmware/patches/020-newer-software.patch`** changes WLED where the newer software
   renamed or moved something: its global `Network` takes the name `WLEDNetwork`, the LED
   PWM calls of Arduino-ESP32 3, SHA-1 without `_ret`, and the chip's information from its
-  own headers. Every change is held by `ESP_IDF_VERSION_MAJOR >= 5`, so the build known
+  own headers. It also keeps the trial clear of what the newer software stops at its
+  start: the legacy ADC driver beside the new one, lwIP's raw API and `igmp_joingroup`
+  without lwIP's lock, and an address compared with `0U`, which Arduino-ESP32 3 reads as a
+  null pointer. Every change is held by `ESP_IDF_VERSION_MAJOR >= 5`, so the build known
   good is the same.
 - **The usermod** includes `soc/gpio_periph.h` in the probe build on the newer software.
 
