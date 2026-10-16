@@ -467,3 +467,9 @@ are in [format.md](format.md), "Measured sizes".
   over the socket marked COM, which put the name, the password and the limit back; the
   show of 107 animations was untouched, with 77,824 bytes free. What crashed the board,
   if it crashed, is not known.
+- 2026-10-16: Seed 27: on the phone the operators' app keeps clear of Android's bars and
+  of the camera's cut-out: its heading below the bar at the top, its tabs above the bar at
+  the bottom, upright and sideways, by the room the phone reports, which Capacitor gives
+  the page. Black lies under the bars, with light icons, and the tabs give way while the
+  keyboard is open for a field. In a browser the page is as before. Tested in Chrome and
+  built into the APK; the check on a phone is the owner's and is open.
