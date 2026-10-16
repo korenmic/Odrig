@@ -65,7 +65,7 @@ Rules for every task:
   - Prove it fails first: the test fails on Windows, `hello.odrg` 1210 bytes against 1213.
   - Requirements: 1.4, 7.1
 
-- [ ] 5. The app's suite finds Chrome on Windows and lays out the page as on macOS
+- [x] 5. The app's suite finds Chrome on Windows and lays out the page as on macOS
   - `tests/app/support.py`: `chrome()` with the places of Windows after `ODRIG_CHROME`;
     `--hide-scrollbars` for every headless Chrome of the suite.
   - Prove it fails first: without `ODRIG_CHROME`, `test_docs`'s two tests fail with `no
