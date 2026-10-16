@@ -1827,3 +1827,33 @@ probe build were built again with the core and flashed.
   accepts, and what made the compressed clip slower in this run was not looked for.
 - The whole board suite, 53 tests, passes in 55 minutes. Its last step leaves the
   firmware and the dim example show, whose cycle plays from its start.
+
+**The trial on the newer USB software.** What the board gave on 2026-10-16 with
+`odrig-trial.bin` (SHA-256 `fed8357a…`), on the bigger layout with the owner's show of 116
+animations, all through the socket marked COM:
+
+- The bootloader of the software known good starts the trial. Its first three builds
+  stopped at their start, as the raw output of the socket marked COM showed: the legacy ADC
+  driver beside the new one, lwIP's raw API without its lock, and an address compared with
+  `0U`. The patch `020-newer-software.patch` has the three changes.
+- Then: `status` at 46 to 50 refreshes a second over 30 samples, and again after a
+  restart; `space` 116 animations and 258,048 bytes free of 13,500,416; the settings kept.
+  After a start, `list` answered `busy` for about 8 minutes while the 13 MB were read; the
+  firmware known good took 491 s for 9 MB.
+- The chip's own socket, with the Mac on it, logged `usb: a computer is on the port, which
+  stays a serial port`; so the USB host, and with it a hub, is tried only without a
+  computer there.
+- The way back: `flash --image` of the firmware known good, and the trial again, each with
+  the show and the settings kept. The trial's file system can raise the storage's disk
+  version from 2.0 to 2.1 when it writes, and did so once while it stopped at its start
+  again and again; the firmware known good then cannot mount the storage and WLED formats
+  it, so the way back after that is `install-firmware` and `install-show`, which the trial's
+  script did.
+- The board suite with `ODRIG_BOARD_IMAGES=trial`, run from the seed's worktree: 16
+  tests, 7 failures and 14 errors, none of them the trial's. The worktree lacks the stock
+  image of `firmware/wled-16.0.1/`, which exists only in the first checkout, and the Mac,
+  which reaches the chip's own socket through the hub of a USB-C display adapter, lost that
+  socket during restarts, so esptool could not open it.
+- The board was left on the trial, playing the owner's show.
+- Not tried yet: a hub with its own power and a stick on the chip's own socket, without
+  the Mac there.
