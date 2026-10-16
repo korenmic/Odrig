@@ -16,9 +16,8 @@ from . import support
 if support.HAS_SERIAL:
     from emulator import serialport
 
-# Interrupting another program as Ctrl-C does takes SIGINT, which Windows cannot send to
-# another program.
-needs_interrupt = unittest.skipIf(sys.platform == "win32", "Windows cannot send SIGINT to another program")
+# Ctrl-C to another program is SIGINT; Windows sends Ctrl+Break to the program's own group.
+INTERRUPT = support.STOP if sys.platform == "win32" else signal.SIGINT
 
 OK = '{"ok":true}\n'
 READY = b"#log 0.001 test: ready\n"
@@ -45,7 +44,8 @@ class Following:
     line as it comes."""
 
     def __init__(self, *target):
-        self.program = subprocess.Popen([sys.executable, "-m", "odrigctl", *target, "--log"], cwd=support.ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.program = subprocess.Popen([sys.executable, "-m", "odrigctl", *target, "--log"], cwd=support.ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                        creationflags=support.OWN_GROUP)
         self.lines = []
         self._reader = threading.Thread(target=self._read, daemon=True)
         self._reader.start()
@@ -74,7 +74,7 @@ class Following:
         """Interrupts the tool as Ctrl-C does, and gives its exit status, what it printed
         after the READY lines, and its errors."""
         if self.program.poll() is None:
-            self.program.send_signal(signal.SIGINT)
+            self.program.send_signal(INTERRUPT)
         status = self.program.wait(10)
         self._reader.join(5)
         error = self.program.stderr.read()
@@ -149,7 +149,6 @@ class TheLog(unittest.TestCase):
         return following
 
     @support.needs_serial
-    @needs_interrupt
     def test_it_prints_the_lines_of_the_log_of_a_serial_port_and_only_them_and_sends_nothing(self):
         work = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
         received = []
@@ -167,7 +166,6 @@ class TheLog(unittest.TestCase):
         self.assertEqual(printed, PRINTED)
         self.assertEqual(b"".join(received), b"")
 
-    @needs_interrupt
     def test_it_prints_the_lines_of_the_log_of_a_tcp_target_and_only_them_and_sends_nothing(self):
         target = LogTarget()
         self.addCleanup(target.close)

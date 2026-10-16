@@ -49,7 +49,7 @@ Rules for every task:
     and `WinError 10022`.
   - Requirements: 1.3, 2.1, 2.3, 3.1, 3.2, 3.3, 5.1, 7.1
 
-- [ ] 3. `odrigctl --log` ends on Ctrl+Break, and the tests of its stop run on Windows
+- [x] 3. `odrigctl --log` ends on Ctrl+Break, and the tests of its stop run on Windows
   - `odrigctl/cli.py`: for `--log`, SIGBREAK where the system has it ends the tool as
     Ctrl+C does.
   - `tests/emulator/test_tool_log.py`: the program in its own group, stopped with
