@@ -133,6 +133,8 @@ present, and do not build on them.
 - **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
   suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
   tested there.
+- **The app's count of installed and stick animations**, seed 28: the dashboard will show
+  how many animations are in the board's own storage and how many come from a USB stick.
 
 The state of every seed is in the `state.json` of its folder.
 
