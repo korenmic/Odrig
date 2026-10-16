@@ -1719,3 +1719,23 @@ probe build were built again with the core and flashed.
   accepts, and what made the compressed clip slower in this run was not looked for.
 - The whole board suite, 53 tests, passes in 55 minutes. Its last step leaves the
   firmware and the dim example show, whose cycle plays from its start.
+
+**The bigger layout on the board.** What the board gave on 2026-10-16, with the firmware of
+`master` installed over the socket marked COM:
+
+- `big-storage` found WLED's layout with 10,354,688 bytes of storage, kept the settings
+  and left `/odrig` empty: `status` answered `mapping-missing`, as a board without a show
+  does.
+- The way back: `restore-stock --full` wrote stock WLED with WLED's layout. Stock WLED
+  answers no handshake on the socket marked COM, so the command ended with `no-reply`
+  after it had written; `install-firmware` then put the firmware back on WLED's layout,
+  with the network's name, its password and the limit of 850 mA, and `big-storage` moved
+  the board again. Each step took one to three minutes.
+- The owner's show of 2026-10-15, all 113 animations, together with three later ones,
+  116 animations and 12,978,156 bytes, was installed with `install-show`: `space`
+  answered 116 animations and 139,264 bytes free of 13,500,416, and the show's cycle
+  played at 46 to 50 refreshes a second. Two later files were renamed for the board,
+  whose names are at most 32 characters of small letters, and four later ones did not
+  fit.
+- Not seen yet: `status` over the board's Wi-Fi and the refusal of an update on WLED's
+  page, which need a device on the board's network.

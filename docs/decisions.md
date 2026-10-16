@@ -467,3 +467,10 @@ are in [format.md](format.md), "Measured sizes".
   over the socket marked COM, which put the name, the password and the limit back; the
   show of 107 animations was untouched, with 77,824 bytes free. What crashed the board,
   if it crashed, is not known.
+- 2026-10-16: The board was moved to the bigger layout of seed 24, after the way back to
+  WLED's layout and again to the bigger one was tried on it. It holds the owner's show of
+  2026-10-15 whole, 113 animations, and three later ones, 116 in all, with 139,264 bytes
+  left free so that WLED can still write its settings. The owner had asked for the
+  biggest animations first until the storage is full; taken literally that would have
+  kept 68, so the show of 113, which seed 24 names, went first, and the later files went
+  after it, the biggest first.
