@@ -13,9 +13,12 @@ local preparation only; it does not authorize flashing or claim hardware verific
 - [x] 2. Rebuild SD-enabled firmware.
   Use `python3 firmware/fw.py build --microsd`; do not access the board.
   The configured image compiled successfully: 1,765,808 bytes. See [build.md](build.md).
-- [ ] 3. Rerun tests and verify checksum.
+- [x] 3. Rerun tests and verify checksum.
   Run the firmware suite by discovery and check the built image, its linked SD transport,
   mount path and checksum. Record the result without claiming on-board behavior.
+  Final result: 545 firmware tests and 82 media/playlist integration tests pass; checksum,
+  image copy, live SD symbols, mount path and SPI pin arguments are verified.
 - [ ] 4. Confirm wiring and readiness to flash.
   Local configuration can be checked now. Physical wiring and power remain the owner's
   check after the board is prepared; no local test can complete this step in advance.
+  The software-side readiness checks are complete. No board access or flashing occurred.
