@@ -18,7 +18,10 @@ local preparation only; it does not authorize flashing or claim hardware verific
   mount path and checksum. Record the result without claiming on-board behavior.
   Final result: 545 firmware tests and 82 media/playlist integration tests pass; checksum,
   image copy, live SD symbols, mount path and SPI pin arguments are verified.
-- [ ] 4. Confirm wiring and readiness to flash.
+- [x] 4. Confirm wiring and readiness to flash.
   Local configuration can be checked now. Physical wiring and power remain the owner's
   check after the board is prepared; no local test can complete this step in advance.
-  The software-side readiness checks are complete. No board access or flashing occurred.
+  The software-side readiness checks were completed before board access. On 2026-10-22
+  the owner reported the agreed wiring complete and authorized flashing. The flash
+  succeeded and SD access was demonstrated, but the card repeatedly drops out. Stable
+  operation is not confirmed; see [the board trial](board-trial.md).

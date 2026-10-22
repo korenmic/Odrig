@@ -33,7 +33,8 @@ agreed SPI pins for the SparkFun Shifting microSD adapter:
 The twenty LED outputs on GPIO1–18, 21 and 47, native USB, UART and module memory
 pins keep their existing uses. The generic `odrig_sd_config.h` defaults remain -1, so
 another build that omits the pin flags initializes no SD GPIOs. The selected microSD
-build is configured, but actual wiring and power still need the owner's confirmation.
+build is configured. The owner reported the agreed wiring complete before the first
+board trial; the agent has not independently measured the wiring or supply voltage.
 
 ## Card
 
@@ -45,12 +46,19 @@ The reader retries mounting and checks a real card-sector read for removal. A fa
 card can hold a read until the low-level driver's timeout, briefly delaying playback.
 Host-side recovery tests do not establish the refresh rate during physical removal.
 
-## Still required on hardware
+## Hardware verification
 
-- Confirm the physical wiring matches the configured pins and uses 3.3 V.
-- Flash through `firmware/fw.py` only after the owner is ready for that step.
-- Verify card mounting, the animation list, playback and Wi-Fi commands on the board.
+- The owner confirmed the agreed wiring and authorized the first flash. The flash,
+  initial card access and brief software-reported SD playback succeeded.
+- Verify stable access to all 122 card animations and sustained SD playback.
+- Verify Wi-Fi commands and the owner's visual LED checks on the board.
 - Measure playback with twenty outputs; the accepted refresh rate is 20 to 50 per second.
 
 A successful compilation or a host-side test does not establish any of these hardware
 checks.
+
+The [first board trial](microsd-preflight/board-trial.md) mounted the card, validated
+animation files and played an SD animation, but repeated dropouts prevent a claim of
+stable operation. Trials at 1 MHz and 400 kHz also dropped files; the prepared 4 MHz
+configuration was restored. UART diagnostics and stable validation of all 122 card
+animations remain open.
