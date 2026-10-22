@@ -52,3 +52,7 @@ build_flags = ${env:odrig_trial.build_flags}
 extends = env:odrig_trial
 build_flags = ${env:odrig_trial.build_flags}
   -D ODRIG_DRIVE_SD_SPI
+  -D ODRIG_SD_SCK=39
+  -D ODRIG_SD_MISO=40
+  -D ODRIG_SD_MOSI=41
+  -D ODRIG_SD_CS=42

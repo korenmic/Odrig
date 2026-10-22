@@ -17,11 +17,23 @@ Arduino 3 / ESP-IDF 5.5.5 platform used by the trial firmware. It does not flash
 The native USB socket stays a serial connection in this build; the SD transport never
 starts the USB host or waits for a USB computer.
 
-The SPI configuration is in `firmware/usermod/odrig_sd_config.h`. All four GPIOs default
-to -1, so an unconfigured build initializes no SD GPIOs. The adapter's identity, voltage
-requirements and pin labels must be confirmed by the owner before those values are set.
-The twenty LED outputs, native USB, UART and module memory pins must stay available for
-their existing uses. No pin assignment in this preparation is a wiring instruction.
+The `odrig_microsd` environment in `firmware/platformio_override.ini.in` selects the
+agreed SPI pins for the SparkFun Shifting microSD adapter:
+
+| Adapter | ESP32-S3 |
+|---|---|
+| SCK | GPIO39 |
+| DO / MISO | GPIO40 |
+| DI / MOSI | GPIO41 |
+| CS | GPIO42 |
+| VCC | 3V3, never 5V with direct ESP32 signals |
+| GND | GND |
+| CD | Unconnected |
+
+The twenty LED outputs on GPIO1–18, 21 and 47, native USB, UART and module memory
+pins keep their existing uses. The generic `odrig_sd_config.h` defaults remain -1, so
+another build that omits the pin flags initializes no SD GPIOs. The selected microSD
+build is configured, but actual wiring and power still need the owner's confirmation.
 
 ## Card
 
@@ -35,8 +47,7 @@ Host-side recovery tests do not establish the refresh rate during physical remov
 
 ## Still required on hardware
 
-- Identify the adapter and confirm its wiring and power requirements.
-- Set the matching GPIO configuration and rebuild the image.
+- Confirm the physical wiring matches the configured pins and uses 3.3 V.
 - Flash through `firmware/fw.py` only after the owner is ready for that step.
 - Verify card mounting, the animation list, playback and Wi-Fi commands on the board.
 - Measure playback with twenty outputs; the accepted refresh rate is 20 to 50 per second.

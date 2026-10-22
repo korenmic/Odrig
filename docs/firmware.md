@@ -245,10 +245,11 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 `build --microsd` builds the SPI microSD variant as `odrig-microsd.bin`, on the newer
 Arduino 3 / ESP-IDF 5.5.5 platform. It reads external animations from the card's `odrig`
 folder instead of starting a USB host, and leaves the native USB socket serial. It does
-not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its GPIOs default to
-unconfigured, so no SD pins are initialized until the adapter and its wiring have been
-confirmed and the configuration set. [microSD preparation](microsd.md) describes the
-remaining steps; this build is not yet verified on the board.
+not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its SPI profile uses
+GPIO39 for SCK, GPIO40 for MISO, GPIO41 for MOSI and GPIO42 for CS, preserving all twenty
+LED outputs. The generic driver's pin defaults remain unconfigured when a build omits
+those flags. [microSD preparation](microsd.md) describes the wiring and remaining
+hardware checks; this build is not yet verified on the board.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder

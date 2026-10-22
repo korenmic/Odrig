@@ -1,4 +1,5 @@
 import configparser
+import json
 import os
 import unittest
 from unittest import mock
@@ -65,6 +66,23 @@ class BuildingMicroSD(unittest.TestCase):
         self.assertEqual(microsd["extends"], "env:odrig_trial")
         self.assertEqual(microsd["build_flags"].split("\n"), [
             "${env:odrig_trial.build_flags}", "-D ODRIG_DRIVE_SD_SPI",
+            "-D ODRIG_SD_SCK=39", "-D ODRIG_SD_MISO=40",
+            "-D ODRIG_SD_MOSI=41", "-D ODRIG_SD_CS=42",
         ])
         for section in ("env:odrig", "env:odrig_probe", "env:odrig_trial", "env:odrig_trial_probe"):
             self.assertNotIn("ODRIG_DRIVE_SD_SPI", environments[section].get("build_flags", ""))
+
+    def test_deployment_pins_match_the_agreed_wiring_and_leave_every_snake_output_free(self):
+        environments = configparser.ConfigParser(interpolation=None)
+        environments.read_string(wled.override_text())
+        flags = environments["env:odrig_microsd"]["build_flags"].splitlines()
+        pins = dict(flag.strip().removeprefix("-D ").split("=", 1)
+                    for flag in flags if flag.strip().startswith("-D ODRIG_SD_") and "=" in flag)
+        self.assertEqual(pins, {"ODRIG_SD_SCK": "39", "ODRIG_SD_MISO": "40",
+                                "ODRIG_SD_MOSI": "41", "ODRIG_SD_CS": "42"})
+        assigned = {int(pin) for pin in pins.values()}
+        target = json.loads((paths.ROOT / "mapping" / "legs-20.json").read_text())
+        led_pins = {leg["pin"] for leg in target["legs"]}
+        self.assertEqual(len(led_pins), 20)
+        self.assertEqual(len(assigned), 4)
+        self.assertTrue(assigned.isdisjoint(led_pins | {19, 20, 43, 44}))

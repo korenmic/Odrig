@@ -485,3 +485,8 @@ are in [format.md](format.md), "Measured sizes".
   `odrig` folder and external-animation interface. The adapter's identity and voltage,
   the GPIO assignment, flashing and hardware verification remain open until its photos
   and the owner's wiring confirmation. The existing USB build stays available.
+- 2026-10-22: The owner's adapter photo identifies a SparkFun Shifting microSD board.
+  The owner requested completing the local preflash preparation with the agreed SPI
+  assignment: SCK39, MISO40, MOSI41 and CS42. The adapter's VCC is 3.3 V because its
+  return signal follows VCC. The snake outputs stay on GPIO1–18, 21 and 47. Physical
+  wiring, power readiness, flashing and on-board behavior remain unconfirmed.

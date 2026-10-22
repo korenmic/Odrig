@@ -6,8 +6,10 @@ local preparation only; it does not authorize flashing or claim hardware verific
 - [x] Bridge: Prepare the SPI microSD firmware and local build checks.
   The preparatory transport, build variant, safety tests and documentation pass all
   544 firmware tests before the confirmed deployment pins are applied.
-- [ ] 1. Configure microSD GPIO39–42 without affecting snake legs.
+- [x] 1. Configure microSD GPIO39–42 without affecting snake legs.
   Use SCK 39, MISO/DO 40, MOSI/DI 41 and CS 42. Preserve LED pins 1–18, 21 and 47.
+  The configured profile passes all 545 firmware tests; its pin test checks the actual
+  twenty-leg mapping and USB/UART reservations.
 - [ ] 2. Rebuild SD-enabled firmware.
   Use `python3 firmware/fw.py build --microsd`; do not access the board.
 - [ ] 3. Rerun tests and verify checksum.
