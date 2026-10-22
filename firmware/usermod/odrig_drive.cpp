@@ -2,10 +2,16 @@
 
 #include <dirent.h>
 
+#ifdef ODRIG_DRIVE_SD_SPI
+#include <SD.h>
+#include <SPI.h>
+#include "odrig_sd_config.h"
+#else
 #include "soc/usb_serial_jtag_struct.h"
 #include "usb/msc_host.h"
 #include "usb/msc_host_vfs.h"
 #include "usb/usb_host.h"
+#endif
 #include "wled.h"
 
 #include "odrig_log.h"
@@ -14,8 +20,13 @@ namespace {
 
 // Where the drive is mounted, the folder of its animations, and the beginning of the name
 // the core gives a file of the drive.
+#ifdef ODRIG_DRIVE_SD_SPI
+const char MOUNT[] = ODRIG_SD_MOUNT_PATH;
+const char FOLDER[] = ODRIG_SD_MOUNT_PATH "/odrig";
+#else
 const char MOUNT[] = "/usb";
 const char FOLDER[] = "/usb/odrig";
+#endif
 const char PREFIX[] = "drive/";
 const size_t PREFIX_LENGTH = sizeof(PREFIX) - 1;
 // The most files of the list, and the room for a name with its 0: a file with a longer
@@ -23,21 +34,22 @@ const size_t PREFIX_LENGTH = sizeof(PREFIX) - 1;
 const uint32_t MOST_FILES = 256;
 const size_t NAME_ROOM = 256;
 const size_t PATH_ROOM = sizeof(FOLDER) + 1 + NAME_ROOM;
-// The buffer of each file that is read, in memory the USB unit reaches: one request to
-// the drive brings this many bytes.
+// The buffer of each file that is read: one request to the drive brings this many bytes.
 const size_t READ_BUFFER = 4096;
 // The room for a name `drive/<place>`.
 const size_t SHORT_NAME = 16;
 
-// The tasks: the events of the USB host library, those of the driver, and the one that
-// mounts a drive, lists it and drops it. They run on the processor of WLED's loop.
+// The tasks run on the processor of WLED's loop. The drive's task mounts and lists media.
+#ifndef ODRIG_DRIVE_SD_SPI
 const uint32_t HOST_STACK = 4096;
 const UBaseType_t HOST_PRIORITY = 2;
 const uint32_t DRIVER_STACK = 4096;
 const UBaseType_t DRIVER_PRIORITY = 2;
+#endif
 const uint32_t DRIVE_STACK = 6144;
 const UBaseType_t DRIVE_PRIORITY = 1;
 const BaseType_t DRIVE_PROCESSOR = 1;
+#ifndef ODRIG_DRIVE_SD_SPI
 const UBaseType_t EVENTS = 4;
 // The events the watcher of devices keeps, and how often the host's task serves it.
 const int WATCHER_EVENTS = 4;
@@ -45,6 +57,7 @@ const uint32_t SERVE_EVERY_MS = 20;
 // The most devices the watcher keeps open at once, and the room for what one is with its 0.
 const size_t MOST_DEVICES = 8;
 const size_t ABOUT_ROOM = 96;
+#endif
 // What the list of a drive is when its folder odrig could not be opened.
 const int32_t NO_FOLDER = -1;
 const int32_t NOT_LISTED = -2;
@@ -54,12 +67,18 @@ const int32_t NOT_LISTED = -2;
 // often it looks.
 const uint32_t COMPUTER_WAIT_MS = 5000;
 const uint32_t MOST_WAIT_MS = 60000;
+#ifndef ODRIG_DRIVE_SD_SPI
 const uint32_t LOOK_EVERY_MS = 10;
+#endif
 uint32_t waitMs = COMPUTER_WAIT_MS;
 
 enum State : uint8_t { NO_HOST, LOOKING, COMPUTER, NO_DRIVE, NOT_READ, MOUNTED };
 volatile State state = NO_HOST;
+#ifdef ODRIG_DRIVE_SD_SPI
+char summaryText[24] = "SD not configured";
+#else
 char summaryText[24] = "no USB host";
+#endif
 
 // Held for the number, the list and every file of the drive: by the core's calls, and by
 // the task while it publishes a list or drops a drive. A list is made while the number is
@@ -85,6 +104,14 @@ uint32_t secondAt = 0;
 char *playedBuffer = nullptr;
 char *secondBuffer = nullptr;
 
+#ifdef ODRIG_DRIVE_SD_SPI
+SPIClass cardBus(FSPI);
+bool cardMounted = false;
+// Set only with the guard held. The worker closes the files before it unmounts the card.
+bool cardFailed = false;
+const uint32_t CARD_POLL_MS = 1000;
+alignas(4) uint8_t cardProbe[512];
+#else
 QueueHandle_t events = nullptr;
 msc_host_device_handle_t device = nullptr;
 msc_host_vfs_handle_t mounted = nullptr;
@@ -100,18 +127,30 @@ struct Watched {
 };
 
 Watched watched[MOST_DEVICES] = {};
+#endif
 
 // The host functions for every name that is not the drive's.
 odrig_host files;
 
-// A line of the log of the kind `usb`.
+// A line of the log of the media's kind.
 void say(const char *format, ...) {
   char text[OdrigLog::LINE_ROOM];
   va_list values;
   va_start(values, format);
   vsnprintf(text, sizeof(text), format, values);
   va_end(values);
+#ifdef ODRIG_DRIVE_SD_SPI
+  OdrigLog::add("sd", text);
+#else
   OdrigLog::add("usb", text);
+#endif
+}
+
+// Reading callbacks hold the guard and leave unmounting to the worker.
+void readFailed() {
+#ifdef ODRIG_DRIVE_SD_SPI
+  cardFailed = true;
+#endif
 }
 
 // The place a name `drive/<place>` stands for, MOST_FILES for a place beyond the list's
@@ -177,6 +216,7 @@ int openFile(void *ctx, const char *name) {
       if (!pathAt(place, path)) return 0;
       played = opened(path, playedBuffer);
       if (played != nullptr) return 1;
+      if (errno != ENOENT) readFailed();
       return errno == ENOENT ? 0 : -1;
     }
   }
@@ -188,7 +228,9 @@ int32_t readSome(void *ctx, uint8_t *buffer, size_t capacity) {
     Guarded held;
     if (played != nullptr) {
       const size_t count = fread(buffer, 1, capacity, played);
-      return count == 0 && ferror(played) ? -1 : (int32_t)count;
+      const bool failed = ferror(played) != 0;
+      if (failed) readFailed();
+      return count == 0 && failed ? -1 : (int32_t)count;
     }
   }
   return files.read(ctx, buffer, capacity);
@@ -211,16 +253,24 @@ int32_t readPart(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, 
     char path[PATH_ROOM];
     if (strlen(name) >= SHORT_NAME || !pathAt(place, path)) return -1;
     second = opened(path, secondBuffer);
-    if (second == nullptr) return -1;
+    if (second == nullptr) {
+      if (errno != ENOENT) readFailed();
+      return -1;
+    }
     strcpy(secondName, name);
     secondAt = 0;
   }
   if (secondAt != offset) {
-    if (fseek(second, (long)offset, SEEK_SET) != 0) return -1;
+    if (fseek(second, (long)offset, SEEK_SET) != 0) {
+      readFailed();
+      return -1;
+    }
     secondAt = offset;
   }
   const size_t count = fread(buffer, 1, capacity, second);
-  if (count == 0 && ferror(second)) return -1;
+  const bool failed = ferror(second) != 0;
+  if (failed) readFailed();
+  if (count == 0 && failed) return -1;
   secondAt += (uint32_t)count;
   return (int32_t)count;
 }
@@ -259,9 +309,17 @@ int32_t listFolder() {
 
 void setSummary() {
   if (state == NO_HOST) {
+#ifdef ODRIG_DRIVE_SD_SPI
+    strcpy(summaryText, OdrigSdConfig::valid() ? "no SD reader" : "SD not configured");
+#else
     strcpy(summaryText, "no USB host");
+#endif
   } else if (state == LOOKING) {
+#ifdef ODRIG_DRIVE_SD_SPI
+    strcpy(summaryText, "looking for SD");
+#else
     strcpy(summaryText, "looking for a computer");
+#endif
   } else if (state == COMPUTER) {
     strcpy(summaryText, "computer");
   } else if (state == NO_DRIVE) {
@@ -273,6 +331,7 @@ void setSummary() {
   }
 }
 
+#ifndef ODRIG_DRIVE_SD_SPI
 // A drive came: it is mounted read as it is, never formatted, and its list is published
 // with a new number.
 void plugIn(uint8_t address) {
@@ -463,16 +522,99 @@ void driveEvents(void *) {
     }
   }
 }
+#else
+
+// Called with no card published. The VFS is read only through the callbacks above.
+void mountCard() {
+  if (!SD.begin(ODRIG_SD_CS, cardBus, ODRIG_SD_FREQUENCY, MOUNT, 3, false)) {
+    if (state != NOT_READ) say("card not mounted; no card or unreadable file system");
+    state = NOT_READ;
+    setSummary();
+    return;
+  }
+  cardMounted = true;
+  const int32_t found = listFolder();
+  if (found == NO_FOLDER) {
+    say("the card has no folder odrig");
+  } else if (found == NOT_LISTED) {
+    say("card folder odrig could not be read");
+  } else {
+    say("card opened: %u animation files in odrig", (unsigned)found);
+  }
+  Guarded held;
+  listed = found < 0 ? 0 : (uint32_t)found;
+  // Zero always means absent, also when the generation counter wraps.
+  if (++plugged == 0) ++plugged;
+  number = plugged;
+  cardFailed = false;
+  state = MOUNTED;
+  setSummary();
+}
+
+// One worker pass. Card type and size are cached by Arduino and do not prove presence:
+// a sector read does. It uses the same guard as the playback and validation handles.
+void sdStep() {
+  if (!cardMounted) {
+    mountCard();
+    return;
+  }
+  bool removed = false;
+  {
+    Guarded held;
+    if (cardFailed || !SD.readRAW(cardProbe, 0)) {
+      number = 0;
+      listed = 0;
+      closePlayed();
+      closeSecond();
+      SD.end();
+      cardMounted = false;
+      cardFailed = false;
+      state = NO_DRIVE;
+      setSummary();
+      removed = true;
+    }
+  }
+  if (removed) say("card unavailable; files closed, waiting for a card");
+}
+
+void driveEvents(void *) {
+  // SD.begin calls SPI.begin without pin arguments. Never let it fall back to the
+  // board's default SPI pins when our explicit assignment could not be started.
+  if (!cardBus.begin(ODRIG_SD_SCK, ODRIG_SD_MISO, ODRIG_SD_MOSI, ODRIG_SD_CS)) {
+    say("SPI did not start on the configured pins; reader disabled");
+    state = NO_HOST;
+    setSummary();
+    vTaskDelete(nullptr);
+    return;
+  }
+  for (;;) {
+    sdStep();
+    vTaskDelay(pdMS_TO_TICKS(CARD_POLL_MS));
+  }
+}
+
+#endif
 
 }  // namespace
 
 void OdrigDrive::begin() {
+#ifdef ODRIG_DRIVE_SD_SPI
+  if (!OdrigSdConfig::valid()) {
+    say("SD pins or SPI frequency not configured safely; reader disabled");
+    return;
+  }
+#endif
   guard = xSemaphoreCreateMutex();
+#ifndef ODRIG_DRIVE_SD_SPI
   events = xQueueCreate(EVENTS, sizeof(msc_host_event_t));
+#endif
   names = static_cast<char (*)[NAME_ROOM]>(heap_caps_malloc(MOST_FILES * NAME_ROOM, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   playedBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
   secondBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-  if (guard == nullptr || events == nullptr || names == nullptr || playedBuffer == nullptr || secondBuffer == nullptr) return;
+  if (guard == nullptr || names == nullptr || playedBuffer == nullptr || secondBuffer == nullptr) return;
+#ifndef ODRIG_DRIVE_SD_SPI
+  if (events == nullptr) return;
+#endif
   state = LOOKING;
   setSummary();
   xTaskCreatePinnedToCore(driveEvents, "odrig-drive", DRIVE_STACK, nullptr, DRIVE_PRIORITY, nullptr, DRIVE_PROCESSOR);

@@ -135,7 +135,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial | --microsd] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
@@ -241,6 +241,14 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 | `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
 | `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
+
+`build --microsd` builds the SPI microSD variant as `odrig-microsd.bin`, on the newer
+Arduino 3 / ESP-IDF 5.5.5 platform. It reads external animations from the card's `odrig`
+folder instead of starting a USB host, and leaves the native USB socket serial. It does
+not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its GPIOs default to
+unconfigured, so no SD pins are initialized until the adapter and its wiring have been
+confirmed and the configuration set. [microSD preparation](microsd.md) describes the
+remaining steps; this build is not yet verified on the board.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder

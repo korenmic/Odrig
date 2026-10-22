@@ -55,6 +55,7 @@ takes every line marked *No*.
 | 21 | Tells a person what it is doing without a command: the show's state, the outputs, the start's time, the stick, and whether an update over Wi-Fi is taken. | 04, 20, 23, 24 | WLED's information page, filled by `odrig_usermod.cpp` | Written again | No: it has no page; how it tells these is settled with the owner when seed 12 goes on |
 | 22 | Has a probe build, which measures the outputs and the rate on the board. | 04 | `odrig_probe.cpp`, `build --probe` | Written again | In its spec |
 | 23 | Is built, flashed, rolled back and set up by one tool: `build`, `flash`, `restore-stock`, `big-storage`, `install-show`, `set-wifi`, `set-limit`, `read-limit`, `install-firmware`, `read-show` and the board's suites. | 04, 08, 15, 24 | `firmware/fw.py`, `firmware/fwtool/` | Written again: each command takes the other firmware too | In part: `build`, `flash` and the board's suite are in its spec |
+| 24 | Has an experimental SPI microSD build in place of the USB-storage transport, preserving the external-animation interface and native USB serial; its GPIOs are disabled until the adapter is confirmed, and it is not verified on the board. | Owner | `odrig_drive.cpp`, `odrig_sd_config.h`, `build --microsd`; see [microSD preparation](microsd.md) | Written again | No |
 
 ## Coming
 

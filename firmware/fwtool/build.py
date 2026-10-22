@@ -20,13 +20,14 @@ KINDS = {
     "standalone-probe": Kind("odrig_standalone_probe", "odrig-standalone-probe.bin"),
     "trial": Kind("odrig_trial", "odrig-trial.bin"),
     "trial-probe": Kind("odrig_trial_probe", "odrig-trial-probe.bin"),
+    "microsd": Kind("odrig_microsd", "odrig-microsd.bin"),
 }
 
 # The kinds that are built without WLED, as a project of their own.
 WITHOUT_WLED = ("standalone", "standalone-probe")
 
 # The kinds that are built on the newer USB software, with its own PlatformIO.
-ON_NEWER = ("trial", "trial-probe")
+ON_NEWER = ("trial", "trial-probe", "microsd")
 
 # The trial's kind that takes the place of the firmware and of the probe build.
 TRIAL_OF = {"firmware": "trial", "probe": "trial-probe"}

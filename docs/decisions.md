@@ -480,3 +480,8 @@ are in [format.md](format.md), "Measured sizes".
   the page. Black lies under the bars, with light icons, and the tabs give way while the
   keyboard is open for a field. In a browser the page is as before. Tested in Chrome and
   built into the APK; the check on a phone is the owner's and is open.
+- 2026-10-21: The owner requested preparing a microSD card and a firmware variant that
+  reads its animations instead of a USB stick through a hub. The card keeps the same
+  `odrig` folder and external-animation interface. The adapter's identity and voltage,
+  the GPIO assignment, flashing and hardware verification remain open until its photos
+  and the owner's wiring confirmation. The existing USB build stays available.

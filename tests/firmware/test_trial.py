@@ -179,7 +179,7 @@ class TheImages(unittest.TestCase):
         self.assertEqual(build.KINDS["trial-probe"], ("odrig_trial_probe", "odrig-trial-probe.bin"))
         images = [kind.image for kind in build.KINDS.values()]
         self.assertEqual(len(images), len(set(images)))
-        self.assertEqual(build.ON_NEWER, ("trial", "trial-probe"))
+        self.assertEqual(build.ON_NEWER, ("trial", "trial-probe", "microsd"))
 
     def test_the_trial_takes_the_place_of_the_firmware_and_of_the_probe_build(self):
         self.assertEqual(build.TRIAL_OF, {"firmware": "trial", "probe": "trial-probe"})
