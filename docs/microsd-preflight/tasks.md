@@ -10,8 +10,9 @@ local preparation only; it does not authorize flashing or claim hardware verific
   Use SCK 39, MISO/DO 40, MOSI/DI 41 and CS 42. Preserve LED pins 1–18, 21 and 47.
   The configured profile passes all 545 firmware tests; its pin test checks the actual
   twenty-leg mapping and USB/UART reservations.
-- [ ] 2. Rebuild SD-enabled firmware.
+- [x] 2. Rebuild SD-enabled firmware.
   Use `python3 firmware/fw.py build --microsd`; do not access the board.
+  The configured image compiled successfully: 1,765,808 bytes. See [build.md](build.md).
 - [ ] 3. Rerun tests and verify checksum.
   Run the firmware suite by discovery and check the built image, its linked SD transport,
   mount path and checksum. Record the result without claiming on-board behavior.
