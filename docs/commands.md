@@ -26,6 +26,10 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `remove <id>` | Removes an item from the show. |
+| `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
+| `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
+| `mapping test on` | Shows the built-in diagonal until stopped. |
+| `mapping test off` | Stops the diagonal and resumes the show. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
@@ -197,6 +201,7 @@ succeeds.
 | `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
@@ -224,3 +229,29 @@ other line.
 or without the final newline. The response body is the reply line, with content type
 `application/json`. The response status is 200 whenever the line reached the command
 front-end, including replies with `"ok":false`. Any other method on `/odrig` gets status 405.
+
+## Mapping controls
+
+`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false}`.
+Pins are in snake order, 1 through 20. Unsupported or invalid mappings report
+`editable:false`, an empty `pins` array and revision 0. The test flag is target-wide.
+Only the target's existing twenty-pin permutation is editable.
+
+`mapping set <revision> <pins>` accepts exactly twenty comma-separated GPIO numbers.
+The revision is the decimal CRC-32 of the current twenty pin bytes in snake order.
+Every current output pin must occur exactly once. A successful reply means the new
+mapping is durably committed and ready for output routing. An identical assignment
+performs no storage writes. Re-read after any uncertain reply.
+
+A stale revision gives `mapping-conflict`; malformed or unsupported assignments give
+`bad-argument`. Invalid shows give `show-invalid`; startup checking or an open upload
+makes writes `busy`; failed or unavailable writable storage gives `storage-error`.
+
+`mapping test on` displays the built-in diagonal until `mapping test off` or a valid
+ordinary play command. Both test commands are idempotent. Entry requires the valid
+60 x 60 target mapping and a completed startup check with no open upload. During the
+test status reports no ordinary playing item or animation; `mapping get` identifies
+the active test. Upload and remove return `busy`, but mapping saves, list, space,
+status, power and brightness remain available. The test changes no show entry.
+
+The protocol is identical over HTTP, board serial and emulator serial or TCP.

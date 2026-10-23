@@ -2,7 +2,7 @@
 
 Run in an isolated branch/worktree. One task is one commit, including its checkbox; stage named paths only and inspect git show --stat. New regression tests are observed failing first. Existing unrelated preview failures caused by the owner's running emulator on port 8600 must be reported, not fixed by stopping it. No flash or phone installation in this run.
 
-- [ ] 1. Implement shared-core mapping transactions and the packaged diagonal diagnostic
+- [x] 1. Implement shared-core mapping transactions and the packaged diagonal diagnostic
   - Add the tracked JSON source, converter-based asset generator/check, embedded ODRG, protocol parser and durable mapping.part transaction.
   - Add diagnostic pause/resume, output generation and busy rules without runtime allocation; preserve old shows and mappings.
   - Start the seed as in_progress. Update command/mapping/core decisions and docs together with protocol changes; append resolution notes.

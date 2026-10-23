@@ -8540,3 +8540,23 @@ The seed specifies startup, conflicts, failures, test-mode exit and compatibilit
 the combined scope and resolved behavior. Implementation must update the default-pin
 and command decisions and the defining documents together. No installed mapping,
 firmware, animation or hardware is changed while creating the seed.
+
+## Seed 30: Mapping protocol, asset and output handoff
+
+**Question.** How can twenty pins be saved within the existing line limit, conflicts
+be detected across restarts, and a diagnostic be shipped without consuming user
+animation storage? The firmware also caches startup leg descriptors.
+
+**Answer.** Use `mapping get`, `mapping set REV PINS` with a comma-separated complete
+permutation and the CRC-32 of current pin bytes, and `mapping test on/off`. Serialize
+to mapping.part and commit by atomic rename. Probe and discard a leftover part at
+startup without changing ordinary startup storage-call numbering. Embed the same
+converter-produced ODRG bytes in the core and decode once into existing playback
+memory. Freeze physical output resources and refresh their cached RGB pointers by
+matching the new logical leg assignment to each physical pin under the core lock.
+The fallback currently remains a seed-12 trial; its output adapter can share this
+routing contract without claiming a completed standalone player.
+
+**Resolution.** The seed-30 design, core mapping_control implementation and command,
+mapping and core documentation specify these choices. Hardware acceptance remains
+explicitly deferred because the owner requested no flashing in this run.

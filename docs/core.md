@@ -258,7 +258,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+`unknown-id`, `in-use`, `mapping-conflict`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
 changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
 upload they are about.
 
@@ -537,7 +537,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,360 |
+| The core object | fixed | 3,376 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -553,15 +553,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,605** |
+| **Total** | | **124,621** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,090 bytes. A host
+46,008 of them. The example show on the two-leg mapping asks for 88,106 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,097 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,113 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,701 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,717 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -665,3 +665,20 @@ when a check fails:
 | 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or for an offset that is neither 0 nor where its last call for that file ended. |
 | 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |
 | 75 | `power cut` | The storage call that `--cut-at` names was reached. |
+
+## Live mapping and its diagnostic
+
+The mapping command family is specified in commands.md. The core accepts only
+whole permutations of the existing pins on the canonical twenty-snake canvas.
+It validates geometry against its LED-to-pixel table and keeps mapping entry order.
+The pin-list CRC revision prevents a stale client from replacing another edit.
+The bounded writer uses the existing storage chunk, and commits mapping.part with
+one atomic rename before changing in-memory pins. Startup discards a leftover
+mapping.part without touching the installed mapping.
+
+Diagnostic entry saves the current playlist or cycle selection, closes playback,
+and decodes the embedded converter-built ODRG through the ordinary decoder into
+existing pixel memory. Poll uses the normal palette, brightness and LED mapping
+on that picture while ordinary show progression is paused. Exit restarts the
+saved animation; cycles retain the current entry as their first resumed turn.
+The mode is transient and no show file changes. There is no runtime allocation.

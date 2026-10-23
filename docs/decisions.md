@@ -53,7 +53,7 @@ it stands now.
 - A strip lies flat or stands upright, so it is a row or a column of the canvas. The
   mapping file format has both kinds of leg: row legs, whose strips are rows, and column
   legs, whose strips are columns. All legs of one mapping file are of one kind.
-- Leg N uses the pin labelled N, except legs 19 and 20, which use pins 21 and 47: the pins
+- By default, leg N uses the pin labelled N, except legs 19 and 20, which use pins 21 and 47: the pins
   labelled 19 and 20 carry the board's USB connection.
 - The bench build, today's: 2 row legs, a 60 x 6 canvas, 360 LEDs, confirmed working. Leg 1
   holds the top three rows and leg 2 the three rows below them, and each chain starts at
@@ -480,3 +480,11 @@ are in [format.md](format.md), "Measured sizes".
   the page. Black lies under the bars, with light icons, and the tabs give way while the
   keyboard is open for a field. In a browser the page is as before. Tested in Chrome and
   built into the APK; the check on a phone is the owner's and is open.
+
+- 2026-10-23: The owner requested app-controlled pin-to-snake assignments together with
+  a diagonal check. The default pin table stays the default; an installed target
+  mapping may permute its twenty existing outputs among whole three-column snakes.
+  One mapping command family reads and durably saves that assignment and starts or
+  stops a built-in diagnostic, on every route. The diagnostic is excluded from
+  ordinary shows and playlists and does not change power or brightness. Physical
+  confirmation remains the owner's. No board has been flashed for this change.

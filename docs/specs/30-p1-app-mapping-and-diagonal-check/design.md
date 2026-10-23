@@ -7,7 +7,7 @@ The editor supports only the canonical 60x60 geometry: leg identities 1-20, thre
 One command family uses existing routes and limits:
 
 - `mapping get` returns `{ok:true,editable:true,pins:[...20 pins in snake order...],revision:N,test:false}`. Unsupported/invalid mappings return editable false and an empty pin list.
-- `mapping set REV P1,P2,...,P20` validates an exact permutation and a decimal CRC-32 revision of the current pin list. A stale revision returns `mapping-conflict`; bad syntax/pins return `bad-argument`. Read-only storage returns `storage-failed`; an upload or unfinished startup check returns `busy`.
+- `mapping set REV P1,P2,...,P20` validates an exact permutation and a decimal CRC-32 revision of the current pin list. A stale revision returns `mapping-conflict`; bad syntax/pins return `bad-argument`. Read-only storage returns `storage-error`; an upload or unfinished startup check returns `busy`.
 - `mapping test on` and `mapping test off` are idempotent. Unsupported geometry returns `bad-argument`; invalid shows return `show-invalid`; startup/upload work returns `busy` for entry.
 
 No status members are added: while diagnostic mode is active status reports playing and animation null. `mapping get` is the authoritative test state. Errors and new protocol forms are documented across routes and clients together.

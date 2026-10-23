@@ -49,6 +49,10 @@ void storage_clear_parts(Core &core) {
     if (!storage_changes(core)) {
         return;
     }
+    uint8_t probe;
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "mapping.part", 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, "mapping.part");
+    }
     core.host.remove(core.host.ctx, kUploadPart);
     core.host.remove(core.host.ctx, kShowPart);
 }

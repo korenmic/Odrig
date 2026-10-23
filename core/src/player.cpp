@@ -248,7 +248,7 @@ bool advance(Core &core, uint64_t now) {
         const uint64_t turn_length = 1000ull * cycle.seconds;
         turn = (now - core.zero) / turn_length;
         in_turn = (now - core.zero) % turn_length;
-        animation = core.entries[cycle.first + turn % cycle.count];
+        animation = core.entries[cycle.first + (turn + core.cycle_start_entry) % cycle.count];
     }
     if (reason == kNone) {
         reason = show_at(core, animation, turn, in_turn);
@@ -345,7 +345,7 @@ uint32_t player_first_in_playlist(const Core &core) {
 }
 
 void player_drive_joined(Core &core, uint32_t place) {
-    if (core.playing == kNothing && !core.invalid) {
+    if (core.playing == kNothing && !core.invalid && !core.mapping_test) {
         player_play_all(core, kDriveBase + place);
     }
 }
@@ -391,6 +391,7 @@ void player_halt(Core &core) {
 }
 
 void player_play_cycle(Core &core, uint32_t item) {
+    core.cycle_start_entry = 0;
     close_stream(core);
     core.playing = item;
     core.zero_pending = 1;
@@ -494,8 +495,8 @@ int player_poll(Core &core, uint64_t now_ms) {
     }
     ++core.count_running;
 
-    bool lit = false;
-    if (!core.invalid && core.playing != kNothing) {
+    bool lit = core.mapping_test && !core.invalid;
+    if (!core.mapping_test && !core.invalid && core.playing != kNothing) {
         if (core.zero_pending) {
             core.zero = grid;
             core.zero_pending = 0;

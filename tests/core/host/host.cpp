@@ -609,7 +609,7 @@ private:
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
         const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
-                           given == "show.part" || given == "pending.txt";
+                           given == "show.part" || given == "pending.txt" || given == "mapping.part";
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }

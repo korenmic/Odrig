@@ -221,6 +221,12 @@ struct Core {
     uint16_t line_length;
     uint8_t line_over;
 
+    // The diagnostic holds a decoded picture and a selection to resume.
+    uint8_t mapping_test;
+    uint32_t mapping_saved_playing;
+    uint32_t mapping_saved_shown;
+    uint32_t cycle_start_entry;
+
     // Playback.
     uint8_t on;
     uint8_t scale[256];     // what each colour value is sent as, at the current brightness

@@ -1,6 +1,7 @@
 #include "commands.h"
 
 #include "content.h"
+#include "mapping_control.h"
 #include "odrig_core.h"
 #include "player.h"
 #include "show.h"
@@ -202,6 +203,17 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     Words words;
     words.split(line, length);
 
+    if (words.is(0, "mapping")) {
+        if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
+        if (words.count == 3 && words.is(1, "test") && (words.is(2, "on") || words.is(2, "off"))) {
+            return mapping_test(core, words.is(2, "on"), reply);
+        }
+        uint32_t revision;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision)) {
+            return mapping_set(core, revision, words.text[3], words.size[3], reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
     if (words.is(0, "status")) {
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
@@ -246,6 +258,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }
+        core.mapping_test = 0;
         // An animation is played as its turn of the playlist, which goes on after it.
         if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
@@ -286,9 +299,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             // The check after the start reads the files the removal would take away.
             return refuse(reply, "busy");
         }
+        if (core.mapping_test) return refuse(reply, "busy");
         return content_remove(core, id, reply);
     }
     if (words.is(0, "upload")) {
+        if (core.mapping_test) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");
