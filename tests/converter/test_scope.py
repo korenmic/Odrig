@@ -11,7 +11,7 @@ PACKAGE = support.ROOT / "odrig"
 # tests and the tools, and the generators. Converting and packing are the converter's.
 LIBRARY = {
     "__init__.py", "errors.py", "files.py", "strictjson.py", "jsonframes.py", "odrg.py", "mapping.py", "show.py", "mapdoc.py",
-    "generators/__init__.py", "generators/dense.py", "generators/dvd_bounce.py", "generators/hello_world.py", "generators/rainbow.py",
+    "generators/__init__.py", "generators/dense.py", "generators/dvd_bounce.py", "generators/hello_world.py", "generators/lines_test.py", "generators/rainbow.py",
 }
 # The tools, which run no converter logic, and what of the library they may read with.
 TOOLS = ("emulator", "odrigctl", "preview", "firmware/fwtool")
