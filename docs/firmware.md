@@ -1739,3 +1739,13 @@ probe build were built again with the core and flashed.
   fit.
 - Not seen yet: `status` over the board's Wi-Fi and the refusal of an update on WLED's
   page, which need a device on the board's network.
+
+## Live pin assignments
+
+The shared core durably commits a whole pin permutation through the mapping command
+family. WLED keeps its startup physical outputs and driver channels; cached RGB
+pointers are resolved to the logical leg currently assigned to each physical pin.
+Both command transports and a complete refresh copy use the core lock, so a save
+cannot split a frame between two assignments. The standalone output adapter follows
+the same pin lookup contract. Its current main program remains a seed-12 trial,
+not a complete standalone player or evidence that app control works on that trial.

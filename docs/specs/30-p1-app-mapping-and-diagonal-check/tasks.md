@@ -9,9 +9,9 @@ Run in an isolated branch/worktree. One task is one commit, including its checkb
   - Verify: converter asset check, core suite and Python library suite by discovery. Prove new command/persistence/diagnostic tests fail first.
   - Requirements: 1.2, 1.4, 2.1-2.3, 3.1-3.5, 4.3.
 
-- [ ] 2. Apply complete live routing in firmware and emulator transports
+- [x] 2. Apply complete live routing in firmware and emulator transports
   - Synchronize WLED's cached descriptors by physical pin and protect whole-refresh copying. Provide equivalent fallback output routing support.
-  - Refresh emulator leg metadata and publish mapping changes for HTTP, serial and TCP; rebuild its Mapping view live.
+  - Refresh emulator leg metadata and publish mapping changes for HTTP, serial and TCP; rebuild its Mapping view live. Add the basic odrigctl mapping forms alongside this transport integration.
   - Add transport, per-pin and output-adapter regressions, including restart and atomic updates.
   - Verify: emulator and firmware suites by discovery, plus core regressions. Prove stale cached-routing behavior fails first.
   - Requirements: 2.1, 2.4, 4.1-4.3.
@@ -19,7 +19,7 @@ Run in an isolated branch/worktree. One task is one commit, including its checkb
 - [ ] 3. Add the shared app mapping editor, diagonal controls and serial CLI
   - Implement protocol clients, one serialized request stream, target-change handling, revision conflicts, draft swap/save/cancel/defaults and test controls.
   - Use one responsive, accessible Mapping screen everywhere app/www runs. Include readable failure and off-state messages.
-  - Extend odrigctl for all mapping forms and add browser/protocol/CLI regressions.
+  - Verify odrigctl mapping forms end to end and add browser/protocol/CLI regressions.
   - Verify: app and emulator suites by discovery; run new UI tests against the emulator. Prove missing editor/commands fail first.
   - Requirements: 1.1-1.3, 2.4-2.5, 3.6, 4.1.
 

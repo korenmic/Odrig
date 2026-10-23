@@ -122,9 +122,9 @@ class Includes(unittest.TestCase):
         naming = {path.name for path in SOURCES if re.search(r"\bSerial\b", text_of(path))}
         self.assertEqual(naming, {"odrig_serial.cpp"})
 
-    def test_the_core_is_called_only_by_the_usermod_itself(self):
+    def test_core_queries_belong_to_the_usermod_and_its_pin_routing_helper(self):
         calling = {path.name for path in SOURCES if re.search(r"\bodrig_core_\w+\(", text_of(path))}
-        self.assertEqual(calling, {"odrig_usermod.cpp"})
+        self.assertEqual(calling, {"odrig_usermod.cpp", "odrig_routing.h"})
 
     def test_every_call_to_the_core_after_its_start_is_made_with_the_lock_held(self):
         text = text_of(USERMOD / "odrig_usermod.cpp")
@@ -256,12 +256,14 @@ class TheTask(unittest.TestCase):
         self.assertEqual(self.usermod.count("refreshDue()"), 3)
         self.assertNotIn("refreshDue()", self.usermod[self.usermod.index("class OdrigUsermod"):])
 
-    def test_the_legs_are_read_once_so_that_the_loop_needs_no_lock_for_them(self):
+    def test_physical_pins_are_read_once_and_routing_is_refreshed_under_the_core_lock(self):
         legs = self.usermod[self.usermod.index("void readLegs() {"):self.usermod.index("// Asks the core for a refresh.")]
         self.assertIn("Locked held;", legs[:legs.index("uint32_t legCount()")])
         self.assertNotIn("Locked held;", legs[legs.index("uint32_t legCount()"):])
         self.assertNotRegex(legs[legs.index("uint32_t legCount()"):], r"odrig_core_")
         self.assertEqual(self.usermod.count("readLegs();"), 1)
+        self.assertIn("OdrigRouting::onPin(core, legs[i].pin, &leg)", self.usermod)
+        self.assertIn("Locked held;\n        syncLegs();", self.usermod)
 
     def test_the_port_hands_a_line_on_under_one_hold_of_the_lock(self):
         feed = self.usermod[self.usermod.index("size_t feedBytes("):self.usermod.index("// One command line of the web server")]
@@ -556,7 +558,7 @@ class Pacing(unittest.TestCase):
         self.assertIn("if (byte == '\\n') lineHandedOn = true;", self.serial)
 
     def test_a_request_waits_before_it_takes_the_lock(self):
-        command = self.usermod[self.usermod.index("size_t commandLine("):self.usermod.index("// The legs as the core lists them")]
+        command = self.usermod[self.usermod.index("size_t commandLine("):self.usermod.index("// Physical output resources remain fixed.")]
         steps = [command.index(step) for step in ("while (OdrigFiles::holding()) delay(1);", "Locked held;", "odrig_core_command(")]
         self.assertEqual(steps, sorted(steps))
 

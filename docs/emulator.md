@@ -708,6 +708,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
@@ -871,6 +872,15 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 `odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
+
+The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
+The pin list is twenty comma-separated GPIO numbers, in snake order.
+
+```
+python -m odrigctl --port build/emulator/serial mapping get
+python -m odrigctl --tcp 127.0.0.1:8601 mapping get
+python -m odrigctl --http 127.0.0.1:8600 mapping get
+```
 
 ## Previewing one animation
 
@@ -1273,3 +1283,16 @@ tests 288 pass and 208 fail, 73 of them with one error, where the suite starts a
 Python that is written for macOS; the others were not looked into. That is not mended here;
 it was afterwards, outside seed 11: "The converter on Windows" at the end of
 [drifts.md](drifts.md).
+
+## Live output assignments
+
+The shared app's Mapping screen reads and saves the target's twenty-snake pin
+assignment through the same mapping commands as serial and TCP clients. A committed
+save updates the core binding's leg metadata, emits a `mapping` stream event and
+refreshes the page's Mapping view without restarting the emulator. The event carries
+one complete array of `[leg, pin, LED count]` entries. New connections receive current
+routing in their hello event. The mapping file endpoint returns the committed file.
+
+For a serial client, `python3 -m odrigctl --port build/emulator/serial mapping get`
+reads the assignment. Use `mapping set REV PINS` to save the complete comma-separated
+pin list, and `mapping test on` or `mapping test off` for the packaged diagonal.

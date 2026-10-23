@@ -72,3 +72,11 @@ These exist only because WLED is there, and another firmware has nothing to do f
 - The mapping's outputs are put back when WLED's LED settings are saved.
 - WLED's audio usermod is left out of the build.
 - WLED's pages, its JSON interface and its own update over Wi-Fi.
+
+## Live mapping controls
+
+The shared core supplies mapping reads, atomic twenty-pin assignment saves and the
+packaged diagonal diagnostic. WLED's adapter refreshes cached RGB pointers by fixed
+physical pin under its core lock; the standalone output adapter uses the same pin
+lookup contract. The complete standalone player is still pending seed 12. No new
+firmware has been flashed or checked on real LEDs for these controls yet.

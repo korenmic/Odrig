@@ -8560,3 +8560,19 @@ routing contract without claiming a completed standalone player.
 **Resolution.** The seed-30 design, core mapping_control implementation and command,
 mapping and core documentation specify these choices. Hardware acceptance remains
 explicitly deferred because the owner requested no flashing in this run.
+
+## Seed 30: Keeping transport inventories consistent during implementation
+
+**Question.** The core and documentation now expose a mapping command family, while
+the command tool's inventory was assigned to the later app task. Host integration
+verification checks that those inventories agree.
+
+**Answer.** Add the command tool's basic mapping argument forms in the transport task,
+with the corresponding inventory fixtures. Keep app controls and end-to-end client
+scenarios in the following task. This changes task ownership, not seed scope. Keep
+physical driver resources stable and change cached pointers under one lock instead
+of rebuilding outputs while another processor copies a refresh.
+
+**Resolution.** Seed-30 tasks 2 and 3, the command tool, firmware routing helper and
+emulator mapping events carry the integration boundary. Per-pin byte regressions
+were observed failing with the old cached assignment before the host changes.

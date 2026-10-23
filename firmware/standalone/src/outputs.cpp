@@ -1,6 +1,9 @@
 #include "outputs.h"
 
 #include <NeoPixelBus.h>
+#include <string.h>
+
+#include "odrig_routing.h"
 
 namespace {
 
@@ -31,6 +34,8 @@ struct OutputOn : Output {
 const odrig_leg *legsNow = nullptr;
 uint32_t legCount = 0;
 Output *outputs[OdrigOutputs::MOST];
+uint16_t physicalPins[OdrigOutputs::MOST];
+uint32_t physicalCounts[OdrigOutputs::MOST];
 
 // The pins of this board that can carry a signal: not 19 and 20, which are the USB
 // port, not 22 to 32, which are not there or carry the flash, and not 33 to 37, which
@@ -44,6 +49,8 @@ void OdrigOutputs::begin(const odrig_leg *legs, uint32_t count) {
   legCount = count;
   for (uint32_t i = 0; i < MOST; i++) {
     outputs[i] = nullptr;
+    physicalPins[i] = i < count ? legs[i].pin : 0;
+    physicalCounts[i] = i < count ? legs[i].led_count : 0;
     if (i >= count || !usable(legs[i].pin) || legs[i].led_count == 0 || legs[i].led_count > UINT16_MAX) continue;
     const uint16_t leds = (uint16_t)legs[i].led_count;
     const uint8_t pin = (uint8_t)legs[i].pin;
@@ -65,9 +72,9 @@ uint32_t OdrigOutputs::working() {
 
 bool OdrigOutputs::ok(uint32_t index) { return index < MOST && outputs[index] != nullptr; }
 
-uint32_t OdrigOutputs::pin(uint32_t index) { return index < legCount ? legsNow[index].pin : 0; }
+uint32_t OdrigOutputs::pin(uint32_t index) { return index < legCount && index < MOST ? physicalPins[index] : 0; }
 
-uint32_t OdrigOutputs::leds(uint32_t index) { return index < legCount ? legsNow[index].led_count : 0; }
+uint32_t OdrigOutputs::leds(uint32_t index) { return index < legCount && index < MOST ? physicalCounts[index] : 0; }
 
 const char *OdrigOutputs::driver(uint32_t index) {
   if (!ok(index)) return "none";
@@ -80,9 +87,14 @@ uint8_t *OdrigOutputs::bytes(uint32_t index) { return ok(index) ? outputs[index]
 void OdrigOutputs::fill() {
   for (uint32_t i = 0; i < MOST; i++) {
     if (outputs[i] == nullptr) continue;
-    const uint8_t *rgb = legsNow[i].rgb;
+    const odrig_leg *leg = OdrigRouting::onPin(legsNow, legCount, physicalPins[i]);
+    if (leg == nullptr || leg->led_count != physicalCounts[i]) {
+      memset(outputs[i]->bytes(), 0, physicalCounts[i] * 3u);
+      continue;
+    }
+    const uint8_t *rgb = leg->rgb;
     uint8_t *grb = outputs[i]->bytes();
-    for (uint32_t n = 0; n < legsNow[i].led_count; n++, rgb += 3, grb += 3) {
+    for (uint32_t n = 0; n < physicalCounts[i]; n++, rgb += 3, grb += 3) {
       grb[0] = rgb[1];
       grb[1] = rgb[0];
       grb[2] = rgb[2];

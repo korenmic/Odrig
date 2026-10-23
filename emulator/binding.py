@@ -126,6 +126,10 @@ class Core:
         self._core = self._library.odrig_core_begin(ctypes.byref(self._record))
         if not self._core:
             raise failure.Failure(failure.CORE_NOT_BUILT, "the core could not start")
+        self._refresh_legs()
+
+    def _refresh_legs(self):
+        """Read current routing while retaining the core's logical frame order."""
         legs = []
         self._rgb = []
         for index in range(self._library.odrig_core_leg_count(self._core)):
@@ -213,7 +217,10 @@ class Core:
     def command(self, now_ms, line):
         """One command line in, its reply out, with the reply's newline."""
         length = self._library.odrig_core_command(self._core, now_ms, line, len(line), self._reply, REPLY_MAX)
-        return self._reply.raw[:length]
+        reply = self._reply.raw[:length]
+        if line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true'):
+            self._refresh_legs()
+        return reply
 
     def feed(self, now_ms, data):
         """Bytes of a transport. Returns `(line, reply, cut)` for every line they finish:
@@ -222,6 +229,8 @@ class Core:
         self._answered = []
         self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []
+        if any(line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered):
+            self._refresh_legs()
         return answered
 
     def error(self):
