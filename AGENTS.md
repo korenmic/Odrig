@@ -135,6 +135,9 @@ present, and do not build on them.
   tested there.
 - **The app's count of installed and stick animations**, seed 28: the dashboard will show
   how many animations are in the board's own storage and how many come from a USB stick.
+- **Toggle animations in the playlist**, seed 29: exclude installed animations without
+  removing them, through the shared app and emulator controller or serial; the setting
+  survives a restart and explicit play remains available.
 
 The state of every seed is in the `state.json` of its folder.
 

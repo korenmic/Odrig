@@ -8497,3 +8497,25 @@ the tests of the screens expect, and in a browser the band has no height.
 
 **Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
 sheet".
+
+## Seed 29: The scope and meaning of ignoring an animation
+
+**Question.** The owner requested a playlist toggle in the Android app, emulator and
+serial tool. Does ignoring delete or hide an animation, affect explicit play or cycles,
+or apply to a removable drive? What happens when all installed animations are ignored?
+
+**Answer.** The setting belongs to each animation in the writable installed show and
+survives restarts. It only excludes automatic playlist turns. Explicit play still gives
+an ignored animation one normal turn, and explicit cycles keep their contents. Drive
+animations remain outside this seed. Ignoring the current playlist animation advances
+immediately; an empty eligible playlist becomes idle and black without changing the
+on/off setting. Including an animation while idle resumes the playlist. The shared
+web app supplies one labelled toggle everywhere it runs. The command is an idempotent
+`ignore <id> <0|1>`, with an optional boolean `ignored` in show items and a boolean in
+installed animation list replies. New uploads are included; replacements preserve the
+setting. This plans the owner's requested extension of the default playlist decision;
+implementation must update the defining documents and their change log together.
+
+**Resolution.** `project-seeds/29-p1-toggle-animations-in-the-playlist/seed.md` states
+these choices, including startup, errors, persistence, synchronization and checks.
+The entry file lists the planned seed. No runtime behavior changes with this record.
