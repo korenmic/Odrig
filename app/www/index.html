@@ -63,6 +63,32 @@
 </div>
 </div>
 </section>
+<section id="mapping" hidden>
+<h1>Mapping</h1>
+<p>Assign each three-column snake to an existing ESP32-S3 data pin. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
+<p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
+<p id="mapping-error" role="alert" hidden></p>
+<div id="mapping-rows"></div>
+<div class="pair">
+<button id="mapping-save" type="button" disabled>Save</button>
+<button id="mapping-cancel" type="button" disabled>Cancel</button>
+</div>
+<button id="mapping-defaults" type="button" disabled>Restore defaults</button>
+<button id="mapping-reload" type="button">Reload</button>
+<h1>Check the installation</h1>
+<p>Show one white diagonal from bottom left to top right, on black. Inspect the real LEDs for one continuous line. The screen cannot verify wiring. Save the mapping before checking it.</p>
+<p id="mapping-mode" role="status" aria-live="polite">State unavailable</p>
+<p id="mapping-power"></p>
+<button id="mapping-test-on" type="button" disabled>Show diagonal</button>
+<button id="mapping-test-off" type="button" disabled>Stop diagonal</button>
+<p class="small">Stop restores the previous playback selection. Leaving this screen keeps the diagonal on the target; normal Play also stops it.</p>
+<div class="pair">
+<button id="mapping-on" type="button">On</button>
+<button id="mapping-off" type="button">Off</button>
+</div>
+<label for="mapping-level">Set the brightness to <span id="mapping-level-number">-</span></label>
+<input id="mapping-level" type="range" min="0" max="255" step="1" value="0">
+</section>
 <section id="target">
 <h1>Target</h1>
 <label for="address">Address of the installation</label>
@@ -93,6 +119,7 @@
 <nav>
 <button id="to-show" type="button">Show</button>
 <button id="to-storage" type="button">Storage</button>
+<button id="to-mapping" type="button">Mapping</button>
 <button id="to-target" type="button">Target</button>
 </nav>
 <script type="module" src="main.js"></script>

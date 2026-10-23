@@ -8576,3 +8576,21 @@ of rebuilding outputs while another processor copies a refresh.
 **Resolution.** Seed-30 tasks 2 and 3, the command tool, firmware routing helper and
 emulator mapping events carry the integration boundary. Per-pin byte regressions
 were observed failing with the old cached assignment before the host changes.
+
+
+## Seed 30: Recovering an uncertain save in the shared app
+
+**Question.** A mapping save may commit even when its reply is lost. Background reads
+and target changes must not silently replace the operator's unsaved assignments.
+
+**Answer.** Serialize mapping requests with the app's existing command stream. Keep a
+local draft and its base revision, poll only while Mapping is visible, and block a stale
+save until Reload or Cancel. After a failed mutation read once, keep the draft, and
+require an explicit reload before another attempt. Never repeat the write automatically.
+Changing the target clears the draft and rejects replies from the previous target.
+The diagnostic is target-owned and stays active through app navigation or restart.
+
+**Resolution.** The shared Mapping screen and browser regressions cover swaps, save,
+cancel, default drafts, concurrent edits, lost replies, target changes, app restarts,
+unsupported targets and both portrait and landscape. Four bottom tabs use equal widths
+and 16px labels to fit at 320px while keeping 56px touch targets.

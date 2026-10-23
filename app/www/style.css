@@ -85,7 +85,8 @@ label {
 }
 
 button,
-input {
+input,
+select {
   display: block;
   width: 100%;
   min-height: 56px;
@@ -223,4 +224,30 @@ label.button {
   image-rendering: pixelated;
   background: var(--back);
   border: 1px solid var(--edge);
+}
+
+
+nav button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: 16px;
+}
+
+#mapping-rows label {
+  margin-bottom: 0;
+}
+
+#mapping-rows select {
+  margin-top: 8px;
+}
+
+button:disabled,
+select:disabled {
+  color: var(--lesser);
+}
+
+#mapping-error {
+  color: var(--marked);
 }

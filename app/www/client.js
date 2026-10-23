@@ -203,17 +203,20 @@ async function askListPart() {
 async function give(request) {
   const asked = target;
   try {
-    await request.carry();
+    const reply = await request.carry();
     if (asked !== target) {
+      request.reject?.(new Error("the address changed"));
       return;
     }
     heard();
+    request.resolve?.(reply);
     if (request.kind === "remove") {
       listDue = true;
       spaceDue = true;
     }
   } catch (error) {
     if (asked !== target) {
+      request.reject?.(new Error("the address changed"));
       return;
     }
     if (error instanceof commands.Refusal) {
@@ -222,10 +225,13 @@ async function give(request) {
         // The list the operator chose from is not what the target has any more.
         listDue = true;
       }
-      refused(error);
+      if (!request.reject) {
+        refused(error);
+      }
     } else {
       failed(error);
     }
+    request.reject?.(error);
   }
   // The status that shows what the command did goes before a list that waits.
   statusDue = true;
@@ -337,7 +343,7 @@ export function begin() {
   state.animations = null;
   state.cycles = [];
   state.space = null;
-  wanted.length = 0;
+  cancelWaiting();
   statusDue = true;
   listDue = false;
   listing = null;
@@ -428,9 +434,41 @@ export function onRefusal(handler) {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     // What was asked for and not sent is not sent later, when the app comes back.
-    wanted.length = 0;
+    cancelWaiting();
   } else {
     statusDue = true;
     next();
   }
 });
+
+
+// Mapping requests share the same serialized stream and report their own recovery UI.
+export function targetVersion() {
+  return target;
+}
+
+function mappingRequest(carry) {
+  return new Promise((resolve, reject) => {
+    wanted.push({kind: "mapping", carry, resolve, reject});
+    next();
+  });
+}
+
+function cancelWaiting() {
+  for (const request of wanted) {
+    request.reject?.(new Error("the request was cancelled"));
+  }
+  wanted.length = 0;
+}
+
+export function mappingGet() {
+  return mappingRequest(() => commands.mappingGet());
+}
+
+export function mappingSet(revision, pins) {
+  return mappingRequest(() => commands.mappingSet(revision, pins));
+}
+
+export function mappingTest(enabled) {
+  return mappingRequest(() => commands.mappingTest(enabled));
+}

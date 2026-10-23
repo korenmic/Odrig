@@ -158,3 +158,24 @@ export async function off() {
 export async function brightness(value) {
   await carriedOut(`brightness ${value}`);
 }
+
+
+// The target's complete assignment, and its transient diagnostic mode.
+export async function mappingGet() {
+  const reply = await carriedOut("mapping get");
+  if (typeof reply.editable !== "boolean" || typeof reply.test !== "boolean" ||
+      !whole(reply.revision, 0, MOST_BYTES) || !Array.isArray(reply.pins) ||
+      (reply.editable ? reply.pins.length !== 20 || new Set(reply.pins).size !== 20 ||
+        reply.pins.some(pin => !whole(pin, 0, 255)) : reply.pins.length !== 0)) {
+    throw new Failure("bad-reply", address());
+  }
+  return {editable: reply.editable, pins: reply.pins, revision: reply.revision, test: reply.test};
+}
+
+export async function mappingSet(revision, pins) {
+  await carriedOut(`mapping set ${revision} ${pins.join(",")}`);
+}
+
+export async function mappingTest(enabled) {
+  await carriedOut(`mapping test ${enabled ? "on" : "off"}`);
+}

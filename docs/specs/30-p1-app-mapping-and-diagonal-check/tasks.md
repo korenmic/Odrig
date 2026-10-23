@@ -16,7 +16,7 @@ Run in an isolated branch/worktree. One task is one commit, including its checkb
   - Verify: emulator and firmware suites by discovery, plus core regressions. Prove stale cached-routing behavior fails first.
   - Requirements: 2.1, 2.4, 4.1-4.3.
 
-- [ ] 3. Add the shared app mapping editor, diagonal controls and serial CLI
+- [x] 3. Add the shared app mapping editor, diagonal controls and serial CLI
   - Implement protocol clients, one serialized request stream, target-change handling, revision conflicts, draft swap/save/cancel/defaults and test controls.
   - Use one responsive, accessible Mapping screen everywhere app/www runs. Include readable failure and off-state messages.
   - Verify odrigctl mapping forms end to end and add browser/protocol/CLI regressions.

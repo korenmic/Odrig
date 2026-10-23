@@ -5,9 +5,10 @@ import * as client from "./client.js";
 import * as messages from "./messages.js";
 import * as showScreen from "./screens/show.js";
 import * as storageScreen from "./screens/storage.js";
+import * as mappingScreen from "./screens/mapping.js";
 import * as targetScreen from "./screens/target.js";
 
-const SCREENS = ["show", "storage", "target"];
+const SCREENS = ["show", "storage", "mapping", "target"];
 let screen = "target";
 // The screen of the app's first entry of the page's history: the target screen until
 // the target has answered, the show screen from then on.
@@ -26,6 +27,7 @@ function show(name) {
     byId(`to-${other}`).setAttribute("aria-current", String(other === name));
   }
   client.showing(name);
+  mappingScreen.showing(name === "mapping");
 }
 
 // Shows a text in the place for messages until it is dismissed or another takes its
@@ -106,6 +108,7 @@ window.addEventListener("popstate", (event) => {
 });
 byId("to-show").addEventListener("click", () => go("show"));
 byId("to-storage").addEventListener("click", () => go("storage"));
+byId("to-mapping").addEventListener("click", () => go("mapping"));
 byId("to-target").addEventListener("click", () => go("target"));
 
 window.history.replaceState({screen: "target", depth: 0}, "");
@@ -113,6 +116,7 @@ show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 showScreen.start();
 storageScreen.start({message});
+mappingScreen.start();
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
   // The app begins on the target screen and goes to the show screen as soon as the

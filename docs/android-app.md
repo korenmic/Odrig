@@ -6,8 +6,8 @@ built, installed and used, what it says when something fails, and what has been 
 
 ## What it is
 
-The app has three screens, and a button for each at the bottom: `Show`, `Storage` and
-`Target`.
+The app has four screens, and a button for each at the bottom: `Show`, `Storage`,
+`Mapping` and `Target`.
 
 - **The show screen** says what the installation does: `ON` or `OFF`, the brightness, what
   plays, the animation on the LEDs with its id and its file name, and the refreshes a
@@ -19,11 +19,13 @@ The app has three screens, and a button for each at the bottom: `Show`, `Storage
   playlist, each with its id, its file name and its size in kilobytes, and a button
   `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
   a GIF of the phone, and uploads it.
+- **The mapping screen** edits the twenty saved snake-to-pin assignments and controls
+  the built-in diagonal for a person to check on the real LEDs.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-fourteen command lines and no other, each as `POST /odrig` to the address that is set:
+eighteen command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -37,9 +39,13 @@ fourteen command lines and no other, each as `POST /odrig` to the address that i
 | Presses `Remove` and then `Remove it` | `remove <id>` |
 | Presses `Upload` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
 | Presses `Cancel` while it uploads | `upload cancel` |
+| Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
+| Saves the twenty assignments | `mapping set <revision> <pins>` |
+| Shows or stops the diagonal | `mapping test on`, `mapping test off` |
 
-It adds no command, changes nothing of the installation's software, and shows only what a
-reply said.
+It uses the shared command protocol and shows only what a reply said. Mapping saves
+require firmware that supports the mapping commands; an older target gives a readable
+unsupported message.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -281,9 +287,32 @@ for a field, the tabs are hidden, so that they do not stand over the field, and 
 stays in view; they come back when the keyboard closes. In a browser there are no bars,
 and the page keeps no room.
 
+**Mapping.** Twenty selectors name snakes 1-20 and their three columns, left to right
+when viewed from the front. Each snake starts at the bottom and runs up, down, up.
+Only the installed 60x60 geometry is editable. Select an existing GPIO to swap the two
+assignments in a local draft. Save writes the entire permutation with its base revision;
+Cancel adopts the latest saved assignment, Reload reads it again, and Restore defaults
+creates a draft only when the installed pin set matches those defaults. No new pin can
+be entered. Save is disabled while a request is pending or another controller has changed
+the mapping. A background read preserves the draft and asks for Reload or Cancel.
+
+Show diagonal uses the saved mapping and displays one white line on black, bottom left
+to top right. It keeps the target's power and brightness; On, Off and brightness remain
+available on Mapping, and an off/zero-brightness message explains a dark installation.
+Stop diagonal restores the previous playback selection. Leaving Mapping or restarting
+the app leaves this transient mode on the target; normal Play also stops it. The target's
+mapping reply supplies the mode. Only the person looking at the LEDs can judge the line.
+
+Mapping requests use the same single request stream as playback and uploads. Changing
+the target clears the draft and discards older replies. A failed save is not retried: the
+app reads the target once to reconcile, preserves the draft and asks for Reload before a
+new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
+have readable messages on Mapping.
+
 ## Messages
 
-Every failure is a sentence with its code in brackets at its end. A message stays until
+The shared message panel gives each failure as a sentence with its code in brackets at
+its end. Mapping shows its recovery message inline until Reload or Cancel. A panel message stays until
 it is dismissed with `OK` or another takes its place.
 
 | Code | When | The sentence |
@@ -304,6 +333,7 @@ it is dismissed with `OK` or another takes its place.
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
+| `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -441,11 +471,11 @@ Neither needs a phone.
 
 By programs, on a Mac:
 
-- The three screens and every action of the web code, in Chrome against the emulator:
+- The four screens and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
   `play all`, `on`, `off`, the brightness with at most five commands a second, the free
   storage, a removal confirmed and one kept, each message, the look at widths of 360 and
-  320 pixels, and the back gesture across the three screens.
+  320 pixels, and the back gesture across the four screens.
 - Converting in Chrome: a GIF with each fit and with a part gives the very file the
   converter's command line makes of it, and an mp4 in H.264, whole and as a part, gives
   its frames and lengths; stopping; a file that cannot be read; a target without a
@@ -454,7 +484,7 @@ By programs, on a Mac:
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
 - That a long press or a right click marks text and opens a menu only in a field one
-  types into, in Chrome: every element of the three screens, of a message and of the
+  types into, in Chrome: every element of the screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
   browser's "select all" marks nothing.
 - That the page keeps the room of the phone's bars, in Chrome, with the room set at each
@@ -465,7 +495,7 @@ By programs, on a Mac:
   line of each list can be scrolled above the tabs, and with the keyboard open the field
   is in view and the tabs are hidden. Without the room the page is as before. The
   settings of the bars in the Android project, and in the APK.
-- That the web code sends the fourteen lines above and no other, and names no address
+- That the web code sends the eighteen lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
