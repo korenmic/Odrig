@@ -2,9 +2,9 @@
   "number": 29,
   "slug": "29-p1-toggle-animations-in-the-playlist",
   "state": "remaining",
-  "title": "Toggle animations in the playlist",
+  "title": "Manage playlist inclusion, bulk deletion and storage capacity",
   "priority": "P1",
   "addedAt": "2026-10-23T18:00:35+03:00",
   "addedCommit": "pending-local",
-  "summary": "Persistently exclude and restore installed animations in the automatic playlist through one shared Android and emulator toggle and the same command over serial and HTTP, while retaining manual play and explicit cycles."
+  "summary": "Persist playlist inclusion, select and delete installed animations in batches, and report internal and external free space through the shared core and app."
 }

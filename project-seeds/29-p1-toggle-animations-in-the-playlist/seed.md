@@ -1,4 +1,4 @@
-# Toggle animations in the playlist
+# Manage playlist inclusion, bulk deletion and storage capacity
 
 ## Summary
 
@@ -6,7 +6,8 @@ An operator can exclude an uploaded animation from the automatic playlist withou
 removing it, then include it again. A toggle labelled "Include in playlist" appears
 beside each installed animation in the shared web app used by Android and the
 emulator's Controller view. The same setting is available over serial and HTTP and
-survives a restart.
+survives a restart. Operators can also select and delete multiple installed animations,
+and see free space in internal and external storage after startup, uploads and deletions.
 
 ## Priority
 
@@ -105,6 +106,47 @@ plans that change; it does not implement it or change the board's installed file
     additions list as part of implementation. Describe how the default playlist
     decision is extended and that explicit cycles are unaffected.
 
+## Bulk deletion and capacity (resolved extension)
+
+The owner added these features before implementation began. They belong to this
+seed and use the same shared command implementation and web app as the toggle.
+
+- Add `remove many <id,id,...>` alongside unchanged `remove <id>`. A batch contains
+  1–32 distinct installed animation ids. Validate the whole batch first: unknown ids
+  return `unknown-id`; cycles, drive entries and animations referenced by a cycle
+  return `in-use`; malformed or duplicate ids return `bad-argument`. No item is
+  removed on validation failure. Startup, upload and diagonal-test busy rules apply.
+- Commit one complete show change per batch, using the existing atomic rename and
+  pending-file recovery mechanism. Power loss leaves all or none of its metadata
+  removed; unreachable files are cleaned after commit or on recovery. Shared files
+  survive while another item references them. A later mutation must not overwrite
+  an unresolved cleanup journal. Playback continues from surviving items without
+  invalidating the show. Settings of surviving items are preserved.
+- Storage provides accessible checkboxes for installed animations, Select all,
+  Clear selection and Delete selected. Confirm count and filenames before sending.
+  External media remains read-only and has no deletion or inclusion controls.
+  Arbitrary selections are sent in batches of at most 32. Disable conflicting
+  actions while working; report progress and partial completion on failure. Refresh
+  list and space after every outcome. Never automatically retry an uncertain delete.
+  Preserve selection only for items confirmed still present; clear it on target change.
+- Extend `space` without removing its legacy `free`, `total` and `animations` fields.
+  Add `external: {present, free, total, read_only: true}`. No mounted external media
+  reports `present:false` and null capacities. Mounted media whose capacity cannot
+  be queried reports `present:true` and null capacities. Known free and total are
+  byte integers (up to the JavaScript exact-integer limit), including volumes above
+  4 GiB. Internal capacity still describes the writable animation filesystem.
+- Query external capacity through an optional host callback; command processing and
+  JSON schema stay solely in the shared core. Firmware queries the mounted FAT
+  volume without writes or formatting; emulator queries its mounted folder's
+  filesystem. Unsupported hosts explicitly report unavailable external capacity.
+- Show internal free/total and external free/total (or absent/unavailable) on Storage
+  and the Show dashboard. Fetch on app startup and reconnection, after deletions and
+  uploads (including uncertain outcomes), and at most every 10 seconds while either
+  screen is active, so another client's changes and a target reboot are reflected.
+  Ignore replies from an earlier target and clear stale values on target change.
+- Document and test both commands on serial, HTTP, TCP, odrigctl and the shared web
+  controller. No transport may implement its own playlist or deletion semantics.
+
 ## Definition Of Done
 
 1. Requirements, design and tasks cover all behavior above without owner questions.
@@ -126,4 +168,6 @@ plans that change; it does not implement it or change the board's installed file
 ## Open Questions
 
 None. Use the resolved behavior in this seed. The remaining work is specification,
-implementation and verification, not another product decision.
+implementation and verification, not another product decision. The owner authorizes the new command forms and the
+playlist decision extension by requesting their implementation. External media remains
+read-only; no new hardware behavior is assumed.
