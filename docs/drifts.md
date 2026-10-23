@@ -8519,3 +8519,24 @@ implementation must update the defining documents and their change log together.
 **Resolution.** `project-seeds/29-p1-toggle-animations-in-the-playlist/seed.md` states
 these choices, including startup, errors, persistence, synchronization and checks.
 The entry file lists the planned seed. No runtime behavior changes with this record.
+
+## Seed 30: Reassign whole snakes and check them with one diagonal
+
+**Question.** The owner requested app-controlled pin-to-snake mapping and a diagonal
+animation in one seed. Does this include arbitrary GPIOs, changes within a snake or
+automatic detection of wiring? Is the test an ordinary uploaded playlist item?
+
+**Answer.** The feature permutes the twenty output pins of the target's valid mapping
+among the twenty fixed three-column snakes. It does not choose new pins or alter the
+geometry, snake directions, wiring or power. The app edits a draft and saves the whole
+assignment in one durable operation to the existing mapping file. A built-in diagnostic
+animation shows only white pixels at x = y on black, through the normal decoder and
+mapping pipeline, until stopped. It does not need an upload or join the playlist. The
+shared app controls both features on Android and in the emulator; all target operations
+also use the common command routes. An operator verifies the physical line by eye.
+The seed specifies startup, conflicts, failures, test-mode exit and compatibility.
+
+**Resolution.** `project-seeds/30-p1-app-mapping-and-diagonal-check/seed.md` records
+the combined scope and resolved behavior. Implementation must update the default-pin
+and command decisions and the defining documents together. No installed mapping,
+firmware, animation or hardware is changed while creating the seed.
