@@ -8594,3 +8594,34 @@ The diagnostic is target-owned and stays active through app navigation or restar
 cancel, default drafts, concurrent edits, lost replies, target changes, app restarts,
 unsupported targets and both portrait and landscape. Four bottom tabs use equal widths
 and 16px labels to fit at 320px while keeping 56px touch targets.
+
+
+## Seed 30: Keeping the packaged diagnostic outside example fixtures
+
+**Question.** The fresh-checkout walkthrough failed after the new tracked diagnostic
+source changed the directory digest of `animations/`, used by the converter's stored
+reference requests. Before the source was tracked, that suite had passed locally.
+
+**Answer.** Keep the diagnostic JSON in `core/assets/`, beside the player that packages
+it. Update the converter-only asset generator and mapping documentation to that path.
+Leave the example sources, frozen reference answers and converter output unchanged.
+
+**Resolution.** The fresh-checkout failure was observed before moving the file. The
+converter's 1,317 tests then passed with the source tracked at its final location, the
+asset regeneration check still produced the same 45 bytes, and all 29 mapping tests
+passed. Both firmware builds and the rebuilt APK are retained without flashing; real
+installation and phone acceptance remain the owner's later task.
+
+
+## Seed 30: Preserving APK update identity across worktrees
+
+**Question.** A build in the temporary worktree generated a new debug signing key. The
+resulting APK's certificate differed from the previously published APK's certificate.
+
+**Answer.** Build the delivery APK with the existing local debug keystore, copied only
+into the worktree's ignored build folder. Verify both APK certificate hashes and rerun
+the APK suite against that final signed file. Never track or publish the keystore.
+
+**Resolution.** The rebuilt APK has the same signer as the existing public APK and all
+eight APK checks pass. Its final hash is in the verification record. The branch carries
+only source and documentation; APK binaries and local key material remain ignored.

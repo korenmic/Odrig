@@ -135,6 +135,11 @@ The first build takes about a minute, a later one about five seconds. A build of
 files gives the same bytes. Nothing of a build stays running, and nothing is written
 outside the repository's folder.
 
+When distributing an update from another worktree, use the same ignored debug keystore
+as the existing APK (`build/app/android-user/debug.keystore`). A freshly generated key
+has a different certificate and Android cannot use it to update the installed package.
+The mapping APK delivery retains the previously published certificate; no key is tracked.
+
 ### install
 
 ```
@@ -476,6 +481,10 @@ By programs, on a Mac:
   `play all`, `on`, `off`, the brightness with at most five commands a second, the free
   storage, a removal confirmed and one kept, each message, the look at widths of 360 and
   320 pixels, and the back gesture across the four screens.
+- Mapping in Chrome against the real emulator: twenty labelled swaps, saved/default
+  drafts, Cancel/Reload, concurrent edits, uncertain save replies, target changes,
+  diagnostic state across navigation and app restart, native bridge reply validation,
+  and portrait/landscape layouts. See [the verification record](specs/30-p1-app-mapping-and-diagonal-check/verification.md).
 - Converting in Chrome: a GIF with each fit and with a part gives the very file the
   converter's command line makes of it, and an mp4 in H.264, whole and as a part, gives
   its frames and lengths; stopping; a file that cannot be read; a target without a
@@ -505,6 +514,10 @@ By programs, on a Mac:
   and the rule that allows plain HTTP.
 
 ## What is open
+
+- **Mapping and the diagonal on the real installation.** No firmware was flashed for
+  this run. Seed 30 task 5 requires the owner to inspect all twenty snakes, correct an
+  assignment from the APK, see a continuous diagonal, restart and resume ordinary playback.
 
 - **The check on a phone**, all of it. No program has run the app on a phone, and no test
   runs the sender. In particular nobody has seen yet that a request reaches the board

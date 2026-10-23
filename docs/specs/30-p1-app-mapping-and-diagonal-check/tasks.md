@@ -23,7 +23,7 @@ Run in an isolated branch/worktree. One task is one commit, including its checkb
   - Verify: app and emulator suites by discovery; run new UI tests against the emulator. Prove missing editor/commands fail first.
   - Requirements: 1.1-1.3, 2.4-2.5, 3.6, 4.1.
 
-- [ ] 4. Complete no-board verification, build artifacts and document the handoff
+- [x] 4. Complete no-board verification, build artifacts and document the handoff
   - Update app/emulator/firmware docs and additions/prerequisites; document commands, limitations, actual verification and deferred owner checks.
   - Run all suites that work locally; diagnose any new failures. Build both firmware variants and a fresh APK with the repository tools; run the APK suite against that exact APK.
   - Prepare an ignored local copy of the owner's full animation show for emulator testing, avoiding user files and the live emulator.

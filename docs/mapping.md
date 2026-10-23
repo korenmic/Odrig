@@ -357,6 +357,6 @@ change is detected by the revision returned from `mapping get`.
 The built-in mapping diagnostic is a single white diagonal on black, from (1,1) to
 (60,60). It remains displayed until stopped, uses the saved mapping rather than an
 app draft, and preserves power, brightness and current limiting. Its JSON source is
-`animations/mapping-diagonal.json`; `python3 core/diagonal.py --check` checks the
+`core/assets/mapping-diagonal.json`; `python3 core/diagonal.py --check` checks the
 embedded ODRG bytes against the converter. Explicit physical verification is an
 owner's check; software cannot detect whether a wire actually reaches a snake.

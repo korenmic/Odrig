@@ -55,6 +55,7 @@ takes every line marked *No*.
 | 21 | Tells a person what it is doing without a command: the show's state, the outputs, the start's time, the stick, and whether an update over Wi-Fi is taken. | 04, 20, 23, 24 | WLED's information page, filled by `odrig_usermod.cpp` | Written again | No: it has no page; how it tells these is settled with the owner when seed 12 goes on |
 | 22 | Has a probe build, which measures the outputs and the rate on the board. | 04 | `odrig_probe.cpp`, `build --probe` | Written again | In its spec |
 | 23 | Is built, flashed, rolled back and set up by one tool: `build`, `flash`, `restore-stock`, `big-storage`, `install-show`, `set-wifi`, `set-limit`, `read-limit`, `install-firmware`, `read-show` and the board's suites. | 04, 08, 15, 24 | `firmware/fw.py`, `firmware/fwtool/` | Written again: each command takes the other firmware too | In part: `build`, `flash` and the board's suite are in its spec |
+| 24 | Saves a complete twenty-pin permutation atomically and displays a packaged white diagonal through the shared core; the same commands reach it over HTTP and serial. | 30 | `core/src/mapping_control.cpp`, `odrig_routing.h`, `odrig_usermod.cpp` | Written again: fixed physical outputs resolve the currently assigned logical snake | Output adapter supports pin lookup; full standalone player remains pending seed 12 |
 
 ## Coming
 

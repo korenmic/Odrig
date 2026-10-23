@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'animations/mapping-diagonal.json'
+SOURCE = ROOT / 'core/assets/mapping-diagonal.json'
 INCLUDE = ROOT / 'core/src/diagonal_data.h'
 
 
