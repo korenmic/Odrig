@@ -50,15 +50,21 @@ Host-side recovery tests do not establish the refresh rate during physical remov
 
 - The owner confirmed the agreed wiring and authorized the first flash. The flash,
   initial card access and brief software-reported SD playback succeeded.
-- Verify stable access to all 122 card animations and sustained SD playback.
+- In the current two-USB bench setup, all 122 card files validated and remained listed
+  alongside the internal animation. Four representative SD playback tests reported
+  26–50 refreshes per second without list losses; the combined playlist advanced onto
+  SD storage automatically. See [the UART verification](microsd-preflight/uart-verification.md).
+- Verify one-cable and autonomous-power operation separately; the prior dropout's cause
+  has not been established.
 - Verify Wi-Fi commands and the owner's visual LED checks on the board.
-- Measure playback with twenty outputs; the accepted refresh rate is 20 to 50 per second.
+- The measurements used the twenty-output mapping. The actual fully wired LED canvas
+  and physical card-removal timing remain unverified.
 
 A successful compilation or a host-side test does not establish any of these hardware
 checks.
 
-The [first board trial](microsd-preflight/board-trial.md) mounted the card, validated
-animation files and played an SD animation, but repeated dropouts prevent a claim of
-stable operation. Trials at 1 MHz and 400 kHz also dropped files; the prepared 4 MHz
-configuration was restored. UART diagnostics and stable validation of all 122 card
-animations remain open.
+The [first board trial](microsd-preflight/board-trial.md) mounted the card and played an
+SD animation but repeatedly lost the card, including at 1 MHz and 400 kHz. The prepared
+4 MHz configuration was restored. The later UART verification above succeeded with
+the same firmware after the owner connected both USB sockets; it does not establish
+the cause of the earlier failures.

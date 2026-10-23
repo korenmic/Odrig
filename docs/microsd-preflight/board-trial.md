@@ -56,3 +56,7 @@ USB-C socket, leaving the SD wiring unchanged, for the existing UART diagnostic 
 Native USB carries commands but not that log. Stable access to all 122 files, sustained
 SD playback and Wi-Fi verification remain open. Local logs and diagnostic artifacts
 are under the ignored `build/microsd-*` paths in this worktree.
+
+The [later UART verification](uart-verification.md) on 2026-10-23 confirmed all 122
+animations and representative playback with the same firmware in the two-USB bench
+setup. This first-trial record remains the account of the earlier failures.

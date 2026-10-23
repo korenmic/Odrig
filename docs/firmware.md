@@ -249,7 +249,8 @@ not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its SPI profile u
 GPIO39 for SCK, GPIO40 for MISO, GPIO41 for MOSI and GPIO42 for CS, preserving all twenty
 LED outputs. The generic driver's pin defaults remain unconfigured when a build omits
 those flags. [microSD preparation](microsd.md) describes the wiring and remaining
-hardware checks; this build is not yet verified on the board.
+hardware checks. All 122 card animations and representative playback have been verified
+in the current two-USB bench setup; one-cable and autonomous-power operation remain open.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder
