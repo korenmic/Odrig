@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from odrig import errors, jsonframes, mapping, odrg
-from odrig.generators import dense, dvd_bounce, hello_world, lines_test, rainbow
+from odrig.generators import dense, dvd_bounce, hello_world, line_groups, lines_test, rainbow
 
 from . import support
 
@@ -89,6 +89,21 @@ class LinesTest(unittest.TestCase):
         self.assertEqual([duration for duration, _ in frames], [200] * 4)
         for column, (_, picture) in enumerate(frames, 1):
             self.assertEqual(lit(picture, 4), {(column, row) for row in range(1, 4)})
+
+
+class LineGroups(unittest.TestCase):
+    def test_each_of_twenty_groups_lights_only_its_three_columns_with_a_rainbow(self):
+        covered = set()
+        for group in range(1, 21):
+            frames = line_groups.frames(60, 60, group)
+            self.assertEqual(len(frames), 1)
+            duration, picture = frames[0]
+            self.assertEqual(duration, 1000)
+            expected = {(column, row) for column in range(3 * group - 2, 3 * group + 1) for row in range(1, 61)}
+            self.assertEqual(lit(picture, 60), expected)
+            self.assertEqual({at(picture, 60, column, row) for column, row in expected}, {rainbow.colour(column, row, 60, 60) for column, row in expected})
+            covered.update(expected)
+        self.assertEqual(covered, {(column, row) for column in range(1, 61) for row in range(1, 61)})
 
 
 class HelloWorld(unittest.TestCase):
@@ -269,6 +284,7 @@ class DvdBounce(unittest.TestCase):
 class TrackedSources(unittest.TestCase):
     SOURCES = (("hello.json", hello_world, "hello_world"), ("dvd.json", dvd_bounce, "dvd_bounce"))
     TARGET_SOURCE = ("lines-test.json", lines_test, "lines_test")
+    TEST_ANIMATIONS = support.ROOT / "test-animations"
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
@@ -294,8 +310,25 @@ class TrackedSources(unittest.TestCase):
     def test_the_lines_test_source_is_what_its_generator_gives_for_the_target(self):
         name, generator, _ = self.TARGET_SOURCE
         canvas = mapping.read(TARGET)
-        expected = jsonframes.dumps(jsonframes.Animation(canvas.width, canvas.height, tuple(generator.frames(canvas.width, canvas.height))))
-        self.assertEqual((support.ROOT / "animations" / name).read_bytes(), expected)
+        expected = jsonframes.dumps(
+            jsonframes.Animation(canvas.width, canvas.height, tuple(generator.frames(canvas.width, canvas.height)))
+        )
+        self.assertEqual((self.TEST_ANIMATIONS / name).read_bytes(), expected)
+
+    def test_each_rainbow_line_group_source_is_what_its_generator_gives_for_the_target(self):
+        canvas = mapping.read(TARGET)
+        for group in range(1, 21):
+            with self.subTest(group=group):
+                expected = jsonframes.dumps(
+                    jsonframes.Animation(
+                        canvas.width,
+                        canvas.height,
+                        tuple(line_groups.frames(canvas.width, canvas.height, group)),
+                    )
+                )
+                self.assertEqual(
+                    (self.TEST_ANIMATIONS / f"rainbow-lines-{group:02d}.json").read_bytes(), expected
+                )
 
     def test_the_canvas_size_comes_from_the_mapping_file(self):
         output = self.folder / "hello.json"
