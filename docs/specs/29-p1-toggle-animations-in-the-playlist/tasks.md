@@ -4,7 +4,7 @@ Use the combined seeds29+30 branch in the existing temporary worktree. One task 
 commit, named staging only, checkbox in its proof commit. Observe fault regressions
 failing before fixes. No flash, phone installation or external-drive writes.
 
-- [ ] 1. Extend show validation and packing with persisted playlist inclusion
+- [x] 1. Extend show validation and packing with persisted playlist inclusion
   - Add strict optional ignored boolean to JS converter and Python library; preserve
     absence and explicit false. Cover malformed values/cycles, packing and old shows.
   - Update show/tool format documentation. Start seed29 in_progress.
