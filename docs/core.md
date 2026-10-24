@@ -584,7 +584,12 @@ never written in place. The text of `show.json` is the one of [show.md](show.md)
   tables are as they were. An upload it happened to is discarded with its bytes.
 - **When a call fails after the arrow**, the change stands and the reply is
   `{"ok":true}`: a file that could not be removed is named by `pending.txt` and is
-  removed at the next start.
+  removed before the next change, or at the next start. Before a change the core reads
+  `pending.txt` with `read_at`, at most 1,500 bytes, removes every file it names that no
+  item names, and then `pending.txt`; while that fails, the change is refused with
+  `storage-error` and nothing of it is written. A file the show names is never removed.
+- **`remove many`** writes `pending.txt` only when a file goes: when every removed
+  animation's file is another item's, it writes the show file alone.
 - **The tables** change after the arrow. In a removal the items after the removed one
   move up, the entries of a removed cycle leave the entry table, and a file that no item
   names any more leaves the file table; every position the core holds follows, so what
@@ -618,6 +623,12 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 - **`upload begin`** asks the host for its space and refuses a file for which
   `bytes + bytes / 256 + 16,384` is more than the free bytes; then it begins the file
   `upload.part`.
+- **An unchanged file.** After `upload end` installed a file, the upload's record keeps
+  its id, its name, its size and its CRC-32, and a byte of its padding says that it is
+  installed, until the next upload begins or the core starts again. `upload begin` with a
+  CRC-32 compares them, and the item's file, and answers `unchanged` without a call to the
+  host when all agree and the file is usable. The core keeps no CRC-32 of the other files:
+  8 bytes more an entry of the file table would not fit the memory of the target file.
 - **`upload data`** checks the base64 whole, decodes it into the chunk buffer and gives
   the bytes to the host in one `write`. With the last byte the file is closed.
 - **The check.** A file must be decoded whole before it joins the show. That is done
@@ -824,8 +835,9 @@ stays 16 bytes. `ignore` writes and renames the show before changing playback.
 Its pending journal holds up to 32 filenames (1,056 bytes), within the existing
 chunk of 1,500 bytes. Cleanup yields an unfinished drive check and uses the checker's
 read_at source, preserving the playback file. The drive check then restarts safely.
-A failed cleanup keeps the journal and blocks later metadata changes with storage-error
-until reboot retries cleanup, so no transaction overwrites unresolved file cleanup.
+A failed cleanup keeps the journal; the next metadata change first finishes it, and is
+refused with storage-error while that fails, so no transaction overwrites unresolved file
+cleanup. The next start retries it too.
 
 ## The saved order
 

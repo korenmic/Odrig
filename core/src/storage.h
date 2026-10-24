@@ -37,6 +37,11 @@ void storage_clear_parts(Core &core);
 // file is asked for it and nothing else.
 void storage_settle_pending(Core &core);
 
+// Finishes the cleanup a change left unfinished: removes every file that `pending.txt`
+// names and no item names, and then `pending.txt`, which it reads with `read_at`. True when
+// nothing is left to clean up; a change is made only then.
+bool storage_cleanup(Core &core);
+
 // Puts the upload whose check has passed in place: its file under its name, and its item
 // into the show in storage and then into the tables, as a new last item or in place of
 // the animation the item with its id had. What plays starts again when its file was

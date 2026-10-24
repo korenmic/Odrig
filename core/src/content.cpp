@@ -320,7 +320,7 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");
     if ((item.ignored != 0) == ignored) return succeed(reply);
-    if (!storage_changes(core) || core.pending_cleanup) return refuse(reply, "storage-error");
+    if (!storage_changes(core) || !storage_cleanup(core)) return refuse(reply, "storage-error");
     ShowChange change;
     change.inclusion = position;
     change.ignored = ignored;

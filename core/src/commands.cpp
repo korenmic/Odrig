@@ -157,7 +157,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
 }
 
 // The most words a command has. A line with more is no valid command.
-const uint32_t kMostWords = 5;
+const uint32_t kMostWords = 6;
 
 // The words of a line. The line is split at every space, so it has one word more than it
 // has spaces, and a word may be empty. The first kMostWords of them are kept.
@@ -242,9 +242,10 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
     if (words.count >= 2 && words.is(1, "begin")) {
         uint32_t id;
         uint32_t bytes;
+        uint32_t crc = 0;
         char name[33];
-        if (words.count != 5 || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
-            !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes)) {
+        if ((words.count != 5 && words.count != 6) || !number_word(words, 2, 1, 65535, &id) || words.size[3] < 1 || words.size[3] > 32 ||
+            !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) || (words.count == 6 && !crc_word(words, 5, &crc))) {
             return refuse(reply, "bad-argument");
         }
         for (uint32_t at = 0; at < words.size[3]; ++at) {
@@ -256,6 +257,9 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
+        }
+        if (words.count == 6) {
+            return upload_begin_known(core, now, id, name, bytes, crc, reply);
         }
         return upload_begin(core, now, id, name, bytes, reply);
     }

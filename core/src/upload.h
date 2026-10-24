@@ -36,6 +36,12 @@ void upload_step(Core &core, uint64_t now);
 // The four commands on a valid show, with their arguments read. Each writes its reply.
 // `name` ends in a zero and is a file name; `count` is what base64_size gave for the text.
 uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply);
+
+// `upload begin` with the CRC-32 of the file: `{"ok":true,"unchanged":true}`, and no upload
+// opened, when the last upload of this boot installed this file with this id, these bytes
+// and this CRC-32, no upload has begun since, and the item still names it, usable;
+// otherwise `upload_begin`.
+uint32_t upload_begin_known(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, uint32_t crc, Reply &reply);
 uint32_t upload_data(Core &core, uint64_t now, uint32_t offset, const char *text, uint32_t length, uint32_t count, Reply &reply);
 uint32_t upload_end(Core &core, uint32_t crc, Reply &reply);
 uint32_t upload_cancel(Core &core, Reply &reply);
