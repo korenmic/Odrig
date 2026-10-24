@@ -9302,3 +9302,22 @@ board checks of tasks 8 and 9, which the run leaves to the session with the boar
 `firmware/platformio_override.ini.in`, `tests/board/support.py`; `docs/firmware.md`,
 "The newer software" and "build"; `docs/decisions.md`, "Firmware";
 `docs/specs/12-p2-standalone-firmware-as-a-fallback/requirements.md`, Requirement 13.
+
+## Seed 38: The last task before the board session
+
+**Question.** Task 11 sets the seed's state to `completed` and takes the seed out of
+"What is coming" in `AGENTS.md`. The run of 2026-10-24 does task 11 before tasks 8 and 9,
+which need the board and the owner and are left to the session with the board at the end
+of the run. Is the seed completed by task 11 then?
+
+**Answer.** No. With Requirement 9 and the definition of done's points 3, 4 and 6 open,
+`completed` would say what is not so; seeds 20, 24, 27, 29 and 30 stay `in_progress` with
+their owner's checks open. Task 11 does what is true now: the change log says what the
+board runs and what the two sessions showed, and that the session is open; line 9 of
+`firmware-prerequisites.md` says the same; `AGENTS.md` keeps the seed in "What is coming"
+with what is left. Setting `state.json` to `completed` with `completedAt`, and taking the
+seed out of "What is coming", move to the commit of the last of tasks 8 and 9 that is
+done, which task 9 now names.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/tasks.md`,
+tasks 9 and 11; `docs/decisions.md`, the change log; `AGENTS.md`, "What is coming".

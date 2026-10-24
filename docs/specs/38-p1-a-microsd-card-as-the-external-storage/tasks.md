@@ -155,6 +155,11 @@ Rules for every task:
   - `docs/microsd.md`, `docs/firmware.md`: what was seen. A cause in the card's code or
     its clock is mended here; a cause in the hardware is the owner's and is proposed as a
     new seed, in words.
+  - The question 7 is answered: the two cables of 2026-10-23, both sockets on the Mac,
+    for the fifteen minutes. When tasks 8 and 9 are both done, the commit of the later
+    one also does what task 11 left: `state.json` to `completed` with `completedAt`, the
+    seed out of "What is coming" in `AGENTS.md`, and the final states of lines 9 and 16
+    of `docs/firmware-prerequisites.md`.
   - Requirements: 9.4, 9.5, 9.6
 
 - [x] 10. The firmware that `build` makes
@@ -171,7 +176,7 @@ Rules for every task:
     Answers" and this task is ticked with it.
   - Requirements: 10.1, 10.2
 
-- [ ] 11. The state and the change log
+- [x] 11. The state and the change log
   - `docs/decisions.md`: a line in the change log, what the board runs and what the
     sessions showed. `docs/firmware-prerequisites.md`: the final states of lines 9 and
     16. `AGENTS.md`: the seed leaves "What is coming". Set the seed's `state.json` to
