@@ -103,9 +103,14 @@ class AnimationManagement(unittest.TestCase):
         replies = [{'command': 'space', 'reply': {'ok': True, 'free': 1, 'total': 2, 'external': drive}} for drive in capacities]
         for ignored in [False, True, 'false', 0, None]:
             replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 60001, 'file': 'a.odrg', 'bytes': 1, 'ignored': ignored}], 'next': None}})
+        for external in [True, False, 'true', 1, None]:
+            replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 60001, 'file': 'a.odrg', 'bytes': 1, 'external': external}], 'next': None}})
+        replies.append({'command': 'list', 'reply': {'ok': True, 'items': [{'id': 3, 'cycle': [1], 'seconds': 1, 'external': False}], 'next': None}})
         found = support.run('management-protocol', settings={'replies': replies}).seen
         self.assertEqual([item.get('error') for item in found['results'][:7]], [None]*3 + ['bad-reply']*4)
-        self.assertEqual([item.get('error') for item in found['results'][7:]], [None]*2 + ['bad-reply']*3)
+        self.assertEqual([item.get('error') for item in found['results'][7:12]], [None]*2 + ['bad-reply']*3)
+        self.assertEqual([item.get('error') for item in found['results'][12:]], [None]*2 + ['bad-reply']*4)
+        self.assertEqual([item['items'][0]['external'] for item in found['results'][12:14]], [True, False])
         self.assertEqual(found['sent'][-3:], ['ignore 60001 1', 'ignore 60001 0', 'remove many 1,60001'])
 
     def test_dashboard_refreshes_capacity_on_boot_reconnect_and_return(self):

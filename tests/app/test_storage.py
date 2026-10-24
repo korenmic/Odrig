@@ -104,5 +104,21 @@ class TheListOfAnimations(unittest.TestCase):
                 self.assertEqual(found["before"]["space"], "Internal storage: 2 animations, free 8.4 MB of 10.4 MB")
                 self.assertEqual([line for _, line in target.lines if line.startswith(b"remove")], [b"remove 2"])
 
+class TheBadges(unittest.TestCase):
+    def test_the_badge_and_the_menu_follow_external_of_list(self):
+        # An internal animation without `ignored`, of a target that reports `external`, is
+        # internal; the absence of `ignored` counts only where `external` is missing.
+        listed = {"ok": True, "items": [{"id": 1, "file": "one.odrg", "bytes": 1000, "ignored": False, "external": False},
+                                        {"id": 2, "file": "two.odrg", "bytes": 1000, "external": False},
+                                        {"id": 60001, "file": "card.odrg", "bytes": 1000, "external": True},
+                                        {"id": 60002, "file": "old.odrg", "bytes": 1000}], "next": None}
+        replies = {"status": support.PLAYING, "list": (200, json.dumps(listed)), "space": SPACE}
+        with support.StandIn(replies) as target:
+            found = support.run("storage", address=target.address, settings={"rows": 4}).seen
+        self.assertEqual([row["badge"] for row in found["before"]["rows"]], ["in", "in", "ex", "ex"])
+        self.assertEqual(found["menus"]["2"][-1], "This installation's software does not let the app change this animation.")
+        self.assertEqual(found["menus"]["60001"][-1], "External storage is read-only: this animation cannot be ignored or deleted from the app.")
+
+
 if __name__ == "__main__":
     unittest.main()
