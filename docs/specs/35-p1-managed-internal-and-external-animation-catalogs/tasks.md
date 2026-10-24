@@ -20,7 +20,7 @@ Rules for every task:
   advance by the owner on 2026-10-24; each goes into `docs/commands.md` and a dated line of
   `docs/decisions.md` with the task that adds it.
 
-- [ ] 1. The regression: every start and every plug-in read the whole library
+- [x] 1. The regression: every start and every plug-in read the whole library
   - Set the seed's `state.json` to `in_progress`.
   - `tests/core/test_catalog_regression.py`, with catalog files written by hand in the
     design's format: a start with a catalog of every file opens and reads every installed
