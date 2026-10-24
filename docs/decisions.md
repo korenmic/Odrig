@@ -148,6 +148,16 @@ animations.
 
 Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
 
+The runtime format was extended on purpose with seed 37: ODRGX, a container of 20 bytes
+that names what its payload is, holds frames as an ODRG file, a text, or a widget, a clock.
+The tracked source of a text or a clock is typed JSON, not JSON frames: the settings of
+the text with its words, or of the clock. The player draws them at every refresh from
+those settings, with fonts and clocks that are built into the core and the converter
+alike, generated from one source; a file names a font or a clock and brings no glyph, no
+code and no network to the player. The converter makes a text's layout and stores it,
+and the core checks its bounds and draws it. A clock's randomness comes from the timing
+of the refreshes, mixed with the turn. See [format.md](format.md), "ODRGX".
+
 ### Measurements behind the choice
 
 Sizes in bytes of the same animations in each format. Every lossless file was decoded back
@@ -595,3 +605,9 @@ are in [format.md](format.md), "Measured sizes".
   error `stale`, after `mapping-conflict`, when it has not. Approved by the owner in
   advance. `read` reads with the host's `read_at` from any offset; the other readers still
   begin at 0.
+- 2026-10-25: Seed 37: the runtime format is ODRG and ODRGX, and a text or a clock has a
+  typed JSON source that the core draws at runtime; recorded under "Animation formats".
+  The operators' app makes, previews, uploads and edits texts and clocks on Upload, and
+  edits only the board's own. The firmware grew by 19,760 bytes, the core asks for 16
+  bytes more. The board session and the owner's look are open, and seed 35's catalogs
+  take the type when the branches are combined.

@@ -9660,3 +9660,28 @@ it. The owner's look on the LEDs is task 13.
 
 **Resolution.** `docs/format.md`, "The widget payload"; `core/src/clock.cpp`;
 `converter/lib/draw.js`.
+
+## Seed 37: Carried onto the joined seeds, and what task 14 has left
+
+**Question.** Seeds 31, 32, 36 and 39 were joined while this seed was being built, on
+`seeds-28-to-39-unified`, and the run's main session asked for seed 37 to be built on
+top of them before its app tasks. Task 14 was to fit seed 37 to them after combining.
+What of task 14 is left?
+
+**Answer.** Seed 37 was carried onto the joined branch as
+`seed-37-odrgx-text-and-clock-animations-unified`, each task with its own commit again,
+and fitted there: a text or a clock with a fault is quarantined as seed 32 quarantines
+any file, and `read` answers `unavailable` for one; `list` gives `type` after seed 36's
+`external` and before seed 32's `fault`; a cycle's turns take the animation seed 32
+chooses for each; `stale` stands after `mapping-conflict` and before `order-conflict`;
+the forms of tasks 9 to 11 were built in seed 36's Upload tab and rows' menus, from the
+start; seed 39's filter reads `type` as it is. The core asks for 16 bytes more than the
+joined seeds: the noise and the seed lie in holes of its object, a drive entry keeps its
+type in a half byte beside its state, and the upload's check reads its header into the
+check's. What is left of task 14 is seed 35's catalogs, which register the type and the
+loop of every file; it waits for seed 35 to be joined. The seed's state then follows task
+13 too.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14;
+the branch `seed-37-odrgx-text-and-clock-animations-unified`.
+

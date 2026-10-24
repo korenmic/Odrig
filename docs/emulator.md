@@ -4,7 +4,9 @@ The emulator is a program for macOS and Windows that runs the core of [core.md](
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
 repository root and uses only the Python standard library. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
-decision about files, time and commands to it.
+decision about files, time and commands to it. So it plays texts and clocks as the board
+does, drawn by the core at every refresh, a clock with the seed `status` reports; its
+suite finds every reference picture of `tests/vectors/procedural/` on its LEDs.
 
 This page covers the [commands](#commands) that build and test it, the
 [two shows](#two-shows-to-run) to run, [starting](#starting) it, its
