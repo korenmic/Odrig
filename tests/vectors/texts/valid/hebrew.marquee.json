@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "שלום עולם",
+  "font": "medium",
+  "color": 4243711,
+  "background": 16,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "marquee",
+  "motion": "left",
+  "speed": 30,
+  "pause_ms": 2000
+}

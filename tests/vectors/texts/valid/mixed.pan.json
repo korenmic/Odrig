@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "שלום world 2026!",
+  "font": "large",
+  "color": 16764992,
+  "background": 16,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "pan",
+  "motion": "left",
+  "speed": 25,
+  "pause_ms": 500
+}
