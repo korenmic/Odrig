@@ -5,7 +5,7 @@ import unittest
 from odrig import odrg
 
 from . import huge_tail, support, test_decoder
-from .test_body_faults import show_with
+from .test_body_faults import cut_clip, show_with
 from .test_drive import a_drive, logged, replies
 from .test_playback import T0, refreshes
 from .test_vectors import INVALID, VALID
@@ -252,6 +252,71 @@ class PlaybackInSlices(unittest.TestCase):
                 self.assertEqual(picture, held, time)
             elif time >= failed:
                 self.assertEqual(picture, tuple((leg, bytes(len(data))) for leg, data in held), time)
+
+
+
+def fault_of(run):
+    """`(work, record, body bytes, reason, name)` of the last `fault` line of a session, or
+    None for `fault none`."""
+    line = [line for line in run.lines if line.startswith("fault ")][-1]
+    if line == "fault none":
+        return None
+    _, work, record, body, reason, name = line.split(" ", 5)
+    return work, int(record), int(body), reason, name
+
+
+class TheFaultsContext(unittest.TestCase):
+    # The body of the reproducer on 4 x 4 before its tail: a palette of two colours and one
+    # stored record.
+    BODY = 6 + 5 + 16
+    WANTED = huge_tail.REASON
+
+    def test_there_is_none_before_a_fault(self):
+        run = support.start(show_with(support.clip(1, 4, 4), sound=2), every_20_ms(5) + ["fault"])
+        self.assertIsNone(fault_of(run))
+
+    def test_the_check_after_the_start(self):
+        run = support.start(show_with(small(), sound=2), every_20_ms(30) + ["fault"], check_first=False)
+        self.assertEqual(fault_of(run), ("start", 0, self.BODY + SMALL_TAIL, self.WANTED, "faulty.odrg"))
+
+    def test_the_start_of_a_host_that_cannot_change_its_storage(self):
+        run = support.start(show_with(small(), sound=2), ["fault"], options=["--no-storage"], check_first=False)
+        self.assertEqual(fault_of(run), ("start", 0, self.BODY + SMALL_TAIL, self.WANTED, "faulty.odrg"))
+
+    def test_playback(self):
+        files = show_with(small(), sound=400, cycle=5, alone=True)
+        run = support.start(files, [f"poll {T0 + 40 * step}" for step in range(60)] + ["fault"], check_first=False)
+        self.assertEqual(fault_of(run), ("play", 0, self.BODY + SMALL_TAIL, self.WANTED, "faulty.odrg"))
+
+    def test_the_check_of_an_upload(self):
+        data = small()
+        script = [support.line(T0, line) for line in support.upload_lines(9, "new.odrg", data)] + every_20_ms(40, start=20) + ["fault"]
+        run = support.start(show_with(support.clip(1, 4, 4), sound=2), script)
+        self.assertEqual(fault_of(run), ("upload", 0, self.BODY + SMALL_TAIL, self.WANTED, "new.odrg"))
+
+    def test_the_check_of_a_drives_file(self):
+        files = {"mapping.json": support.one_leg_mapping(4, 4), "sound.odrg": support.clip(1, 4, 4), "show.json": support.show_text([{"id": 1, "file": "sound.odrg"}])}
+        with a_drive({"huge.odrg": small()}) as top:
+            run = support.start(files, every_20_ms(20) + ["fault"], ["--drive", top], check_first=False)
+        self.assertEqual(fault_of(run), ("drive", 0, self.BODY + SMALL_TAIL, self.WANTED, "huge.odrg"))
+
+    def test_a_file_cut_short_in_its_fourth_record(self):
+        data = cut_clip(10, 3)
+        run = support.start(show_with(data, sound=2), every_20_ms(10) + ["fault"], check_first=False)
+        self.assertEqual(fault_of(run), ("start", 3, len(data) - 16, "truncated", "faulty.odrg"))
+
+    def test_the_latest_fault_replaces_the_one_before(self):
+        files = {"mapping.json": support.one_leg_mapping(3, 2), "sound.odrg": support.clip(1, 3, 2), "show.json": support.show_text([{"id": 1, "file": "sound.odrg"}])}
+        drive = {"a.odrg": cut_clip(10, 3), "b.odrg": cut_clip(10, 1)}
+        with a_drive(drive) as top:
+            # The check takes 1 + 2 + 3 + 4 steps at the first five refreshes: the sound
+            # file's five, and a.odrg's header, three records and the cut one.
+            first = support.start(files, every_20_ms(5) + ["fault"], ["--drive", top], check_first=False)
+            both = support.start(files, every_20_ms(10) + ["fault"], ["--drive", top], check_first=False)
+        self.assertEqual(fault_of(first)[:2], ("drive", 3))
+        self.assertEqual(fault_of(first)[4], "a.odrg")
+        self.assertEqual(fault_of(both)[:2], ("drive", 1))
+        self.assertEqual(fault_of(both)[3:], ("truncated", "b.odrg"))
 
 
 if __name__ == "__main__":

@@ -179,6 +179,11 @@ fails decides; the files are taken in the order in which `show.json` first names
 each by its header, then its size, then its body. The last two rows are reported at the
 point where they happen.
 
+Inside the core, work that is not finished yet gives the internal result `pending`: the
+decoder settling a defect in slices, or the player catching up over several refreshes;
+see [core.md](core.md#bounded-work). `pending` is no reason. It is never reported, in a
+reply, a log line or a reason text, and a file's reason is the same whatever the slices.
+
 `<id>` is a decimal number. For `undefined-id` it is the number as the file writes it, which
 need not be an id at all, such as `0`, `-5` or `70000`; a number beyond 32 bits is given as
 `4294967295`, with its sign. `<name>` is the file name as `show.json` has it, or

@@ -321,7 +321,8 @@ goes through the files in the order in which the show first names them. It runs 
 inside `odrig_core_poll`, after the LED data of a refresh is complete:
 
 - the first step of a file opens it with `read_at` and reads its header again;
-- each further step decodes one frame record;
+- each further step decodes one frame record, or takes one slice of the settling of a
+  defect, as [Bounded work](#bounded-work) says;
 - the step after the last record asks for the end of the file: nothing may follow. The
   core then knows the size of the file, which `list` reports, and the length of its loop.
 
@@ -364,6 +365,59 @@ What a late refresh costs:
 
 The check and the player may have the same file open at the same time, each through its
 own source: the player with `open` and `read`, the check with `read_at`.
+
+## Bounded work
+
+No call of the core does more than a bounded piece of work on a file, whatever the file
+holds, so that a command never waits long for the core and a bad file cannot hold the
+board.
+
+**Settling in slices.** A reader that holds a whole file inflates a compressed body before
+it looks at a record, and has every data byte of a record before it looks at a bit; the
+reason it gives for a file with several defects is the defect it meets first. The core's
+decoder reads front to back, so when it finds a defect inside a body it settles it: it
+reads on to the end of the body to find the defect such a reader meets first, a defect of
+the stream, bytes after the stream or a record cut short. Settling takes at most 32,768
+bytes of the body in one call, inflated bytes of a compressed body; then the decoder gives
+the internal result `pending`, keeps where it was, and goes on at its next call. The
+reason settling ends with is the same whatever the slices, and every later call gives it
+again. A body may be as large as the format allows: a 65 KB file whose stream inflates
+64 MiB of zeros after a bad record settles in 2,048 slices.
+
+**`pending` is no reason.** It means "go on later" and goes between the parts of the
+core only. No reply, log line or reason text ever holds it.
+
+**The steps of the checks.** A step of the check after the start, of the check of an
+uploaded file and of the check of a drive's file decodes one frame record, or takes one
+slice of a settling. A step that ends `pending` counts no record and is taken again at
+the next step. The check at the start of a host whose storage cannot be changed reads
+every file whole inside `odrig_core_begin`, through every slice: nothing waits on it.
+
+**Playback in slices.** At one refresh the player decodes at most 131,072 bytes of a body,
+a record's boundary after it, and always one whole record; a slice of settling counts
+against it. What is left is decoded at the next refresh, from where it stopped. A refresh
+that has not come to the picture of its time yet, or meets a file that settles, keeps the
+LED data of the refresh before, and `status` keeps naming the animation that picture is
+of. When settling ends with a reason, the player acts on it as on any reason.
+
+**The budgets.**
+
+| Budget | Value | Why |
+|---|---|---|
+| Settling in one call | 32,768 bytes | The decoder inflates about 30 MB a second on the board's chip; 32 KiB is about a millisecond, far below a refresh of 20 ms. |
+| Decoding at one refresh | 131,072 bytes | Twelve dense 60 x 60 records: a pause of a quarter of a second is caught up at once, and a longer one over a few refreshes. |
+| One call on the board | 50 ms at most | A command waits for one call; 50 ms keeps a session of commands quick. |
+| One read of the host | 250 ms at most | The microSD card's and the USB drive's own drivers time out sooner; a read that fails is `read-error`. |
+
+The emulator's suite measures the wait of `status` while a file with such a tail is played
+and checked; the board session measures it on the board.
+
+**The fault's context.** For the latest file that came to a reason the core keeps, in its
+object, the work it came in (the check at the start or after it, playback, the check of an
+upload, the check of a drive's file), the file's name cut to 32 characters, the frame
+record it was at counted from 0, the bytes of its body read so far, and the reason. Each
+fault replaces the one before. Keeping it needs no second decode. The test host prints it
+with its input line `fault`.
 
 ## A drive
 
@@ -538,7 +592,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,416 |
+| The core object | fixed | 3,464 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -554,15 +608,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,685** |
+| **Total** | | **124,733** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,170 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,218 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,153 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,201 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,781 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,829 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -621,6 +675,7 @@ leg; and `ready`.
 | `linehex <ms> <hex>` | `odrig_core_command` with exactly these bytes | `reply <json>` |
 | `bytes <ms> <hex>` | `odrig_core_feed` with these bytes | `fed <hex of the line>` and `reply <json>` for each line |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
+| `fault` | Reads the context the core keeps of the latest fault of a file | `fault <work> <record> <bytes> <reason> <name>`, the work `start`, `play`, `upload` or `drive`; or `fault none` |
 | `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one and the list of the folder as it is now. The core sees it at its next refresh. | nothing |
 | `drive pull` | With `--drive`: the drive is pulled out. | nothing |
 

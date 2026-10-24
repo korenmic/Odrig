@@ -999,6 +999,16 @@ most: the port hands the core a whole line under one hold of the lock, and a com
 HTTP is one call. The legs are read from the core once, at the start, so the loop needs no
 lock to know them.
 
+No call of the core does unbounded work on a file: it settles a defect in slices of 32 KiB
+and decodes at most 128 KiB of a body at a refresh, as [core.md](core.md#bounded-work)
+says. On the board a call is to take 50 ms at most, so a command never waits longer, and a
+read of the microSD card or of a USB drive 250 ms at most. ESP-IDF's task watchdog, whose
+five seconds restarted the board in the investigation of 2026-10-24, stays on: the
+firmware changes none of its settings, and no task feeds it while it waits for the lock,
+so a call that held the lock for seconds would still restart the chip. WLED's own watchdog
+of its loop is off (`WLED_WATCHDOG_TIMEOUT=0`), as it has been since seed 04. The board
+session of seed 31 measures these budgets.
+
 ## What the firmware changes in WLED
 
 | Changed | Left as it is |

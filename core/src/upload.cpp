@@ -93,6 +93,7 @@ void upload_step(Core &core, uint64_t now) {
     Checker &checker = *core.checker;
     upload.progress = now;
     Reason reason;
+    uint32_t record = 0;
     if (!upload.header_read) {
         // The header is judged first, then the size against the mapping.
         checker.file.open_at(core.host, kUploadPart);
@@ -109,6 +110,7 @@ void upload_step(Core &core, uint64_t now) {
         }
     } else if (upload.records_left != 0) {
         uint16_t duration = 0;
+        record = checker.decoder.frames - upload.records_left;
         reason = checker.decoder.next(core.check_pixels, &duration);
         if (reason == kPendingWork) {
             // A slice of the settling of a defect: the next step goes on with it.
@@ -122,6 +124,7 @@ void upload_step(Core &core, uint64_t now) {
     } else {
         // After the last record nothing may follow, and what was read back from storage
         // must be what was received.
+        record = checker.decoder.frames;
         reason = checker.decoder.finish();
         if (reason == kPendingWork) {
             return;
@@ -132,6 +135,7 @@ void upload_step(Core &core, uint64_t now) {
             return;
         }
     }
+    note_fault(core, kWorkUpload, upload.name, record, upload.header_read ? checker.decoder.body_read : 0, reason);
     check_ended(core, reason == kReadError ? kCheckStorageFailed : kCheckBadFile, reason);
 }
 

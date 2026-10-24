@@ -525,3 +525,9 @@ are in [format.md](format.md), "Measured sizes".
   animations of each storage, the board's own from `space` and the external storage's
   from the list less those; an absent medium shows no number, a present empty one 0. The
   web code alone does it; the check on a phone with the card is the owner's and is open.
+- 2026-10-24: Seed 31: no call of the core does unbounded work on a file. The decoder settles
+  a defect in slices of 32 KiB, giving the internal result `pending`, which is no reason;
+  the player decodes at most 128 KiB of a body at a refresh and keeps the picture before
+  while it catches up; the core keeps the context of the latest fault of a file. The
+  reasons of every file are as before; the budgets are 50 ms a call and 250 ms a read on
+  the board. The board's measurement is open.

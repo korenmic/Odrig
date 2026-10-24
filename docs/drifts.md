@@ -9070,3 +9070,20 @@ settling again at each of its turns, as it opens anew; the check after the start
 reads files beside playback and is not bound to turns, comes to its reason.
 
 **Resolution.** `core/src/player.cpp`, `next_record` and `advance`.
+
+## Seed 31: what the fault's context names, and how the emulator measures a call
+
+**Question.** The design keeps the file's name in the fault's context, but a drive's file
+is known to the core as `drive/<place>`; and the emulator cannot time a call of the core
+from outside. What is kept, and what is measured?
+
+**Answer.** A drive's file is kept by the name the host gives it, cut to 32 characters,
+as an installed file is; a file that did not open was at record 0 with no body read. An
+upload whose bytes read back differ from those received has no reason and leaves the
+context as it was. The emulator's suite measures what a command waits: the time from a
+`status` line on the line port to its reply, which holds the wait for the core's lock and
+the call. With a show that plays the reproducer in a cycle and checks it after a sound
+file of 3,000 frames, every wait stays within 50 ms on the Mac; the core before seed 31
+made one wait 122.8 ms.
+
+**Resolution.** `core/src/core_state.h`, `FaultContext`; `tests/emulator/test_bounded.py`.

@@ -1036,6 +1036,10 @@ private:
             print_error();
             return true;
         }
+        if (line == "fault") {
+            print_fault();
+            return true;
+        }
         if (line == "drive plug" || line == "drive pull") {
             if (!host_.has_drive()) {
                 return false;
@@ -1089,6 +1093,20 @@ private:
         if (length != 0) {
             stop("a reply was written where there is too little room", 1);
         }
+    }
+
+    // `fault <work> <record> <bytes> <reason> <name>`: the context the core keeps of the
+    // latest fault of a file; or `fault none`.
+    void print_fault() {
+        const odrig::FaultContext &fault = core_->state.fault;
+        if (!fault.present) {
+            std::printf("fault none\n");
+            return;
+        }
+        static const char *const works[] = {"none", "start", "play", "upload", "drive"};
+        std::printf("fault %s %u %llu %s %s\n", fault.work < 5 ? works[fault.work] : "?", fault.record,
+                    static_cast<unsigned long long>(fault.body_bytes),
+                    odrig::reason_name(static_cast<odrig::Reason>(fault.reason)), fault.name);
     }
 
     // Turns hexadecimal digits into the bytes they stand for.

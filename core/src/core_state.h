@@ -47,6 +47,29 @@ struct FileInfo {
     uint64_t total_ms;
 };
 
+// The work in which a file came to a reason: the check at the start or after it, playback,
+// the check of an upload, the check of a drive's file.
+const uint8_t kWorkStart = 1;
+const uint8_t kWorkPlay = 2;
+const uint8_t kWorkUpload = 3;
+const uint8_t kWorkDrive = 4;
+
+// Room for the name of a file in the fault's context: 32 characters and the closing zero.
+const uint32_t kFaultNameSize = 33;
+
+// The latest fault of a file: in which work, the file's name (cut to 32 characters), the
+// frame record it was at counted from 0 (the number of records after the last one), the
+// bytes of its body read so far, inflated ones of a compressed body, and the reason.
+// Each fault replaces the one before; `present` is 0 until the first.
+struct FaultContext {
+    uint8_t present;
+    uint8_t work;
+    uint8_t reason;
+    char name[kFaultNameSize];
+    uint32_t record;
+    uint64_t body_bytes;
+};
+
 // Stands for no item, and for the playlist: every animation item of the show in turn.
 const uint32_t kNothing = 0xFFFFFFFFu;
 const uint32_t kPlaylist = 0xFFFFFFFEu;
@@ -255,7 +278,13 @@ struct Core {
     FileSource file;
     Inflate inflate;
     OdrgDecoder decoder;
+
+    // The latest fault of a file, kept for reporting.
+    FaultContext fault;
 };
+
+// Keeps the context of a file's fault, in place of the one before.
+void note_fault(Core &core, uint8_t work, const char *name, uint32_t record, uint64_t body_bytes, Reason reason);
 
 // Makes the show invalid with a reason text: `<reason>`, `<reason> <about>` or
 // `<reason> <about> <detail>`, and passes the text to the host's log. The first failure
@@ -280,6 +309,11 @@ bool drive_waits(const Core &core);
 // The name the core gives the host for the file at a place of the drive, into room for
 // kDriveNameSize characters.
 void drive_file_name(uint32_t place, char *name);
+
+// The name of the file at a place of the drive as the host gives it, cut to what fits into
+// `room` characters with the closing zero; the core's own name for it when the host gives
+// none.
+void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t room);
 
 // Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
 void drive_touch(Core &core);

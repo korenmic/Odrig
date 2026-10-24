@@ -47,6 +47,7 @@ void open_file(Core &core, const FileInfo &info) {
         core.file.close();
     }
     if (reason != kNone) {
+        note_fault(core, kWorkStart, info.name, 0, 0, reason);
         fail_file(core, info, reason);
     }
 }
@@ -57,24 +58,30 @@ void open_file(Core &core, const FileInfo &info) {
 void check_file(Core &core, FileInfo &info) {
     Reason reason = core.file.open(core.host, info.name);
     if (reason != kNone) {
+        note_fault(core, kWorkStart, info.name, 0, 0, reason);
         core_fail(core, reason, info.name, kNone);
         return;
     }
     reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
         core.file.close();
+        note_fault(core, kWorkStart, info.name, 0, 0, kSizeMismatch);
         core_fail(core, kSizeMismatch, info.name, kNone);
         return;
     }
     // Nothing waits on this check: it goes on through every slice of a settling.
     uint64_t total = 0;
+    uint32_t record = 0;
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
-        for (uint32_t record = 0; record < core.decoder.frames && reason == kNone; ++record) {
+        for (; record < core.decoder.frames; ++record) {
             uint16_t duration = 0;
             do {
                 reason = core.decoder.next(core.pixels, &duration);
             } while (reason == kPendingWork);
+            if (reason != kNone) {
+                break;
+            }
             total += duration;
         }
     }
@@ -86,6 +93,9 @@ void check_file(Core &core, FileInfo &info) {
     // A file that was read to its end was read whole.
     const uint32_t bytes = core.file.taken;
     core.file.close();
+    if (reason != kNone) {
+        note_fault(core, kWorkStart, info.name, record, core.decoder.body_read, reason);
+    }
     if (reason == kReadError) {
         core_fail(core, kReadError, info.name, kNone);
     } else if (reason != kNone) {
@@ -103,10 +113,11 @@ enum StepOutcome { kStepGoingOn, kStepWhole, kStepFault };
 // frame record, its end, after which nothing may follow, or one slice of the settling of a
 // defect, after which the same step is taken again. When the file is whole, its size is the
 // bytes the second source took and its length the sum of the durations; when it has a
-// fault, `reason` says which.
-StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
+// fault, `reason` says which, and `record` the frame record it was at.
+StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32_t *record) {
     Checker &checker = *core.checker;
     Reason found;
+    *record = 0;
     if (!core.check_header_read) {
         checker.file.open_at(core.host, name);
         found = checker.decoder.open(&checker.file, &checker.inflate, core.check_window);
@@ -122,6 +133,7 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
         }
     } else if (core.check_records_left != 0) {
         uint16_t duration = 0;
+        *record = checker.decoder.frames - core.check_records_left;
         found = checker.decoder.next(core.check_pixels, &duration);
         if (found == kPendingWork) {
             return kStepGoingOn;
@@ -132,6 +144,7 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
             return kStepGoingOn;
         }
     } else {
+        *record = checker.decoder.frames;
         found = checker.decoder.finish();
         if (found == kPendingWork) {
             return kStepGoingOn;
@@ -153,13 +166,15 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
 void check_step(Core &core) {
     FileInfo &info = core.files[core.check_at];
     Reason reason = kNone;
-    const StepOutcome outcome = check_file_step(core, info.name, &reason);
+    uint32_t record = 0;
+    const StepOutcome outcome = check_file_step(core, info.name, &reason, &record);
     if (outcome == kStepWhole) {
         info.bytes = core.checker->file.taken;
         info.total_ms = core.check_total_ms;
         ++core.check_at;
         core.check_done = core.check_at == core.file_count;
     } else if (outcome == kStepFault) {
+        note_fault(core, kWorkStart, info.name, record, core.checker->decoder.body_read, reason);
         fail_file(core, info, reason);
     }
 }
@@ -194,7 +209,8 @@ void drive_step(Core &core) {
     const uint32_t place = core.drive_check_at;
     drive_file_name(place, core.drive_check_name);
     Reason reason = kNone;
-    const StepOutcome outcome = check_file_step(core, core.drive_check_name, &reason);
+    uint32_t record = 0;
+    const StepOutcome outcome = check_file_step(core, core.drive_check_name, &reason, &record);
     DriveEntry &entry = core.drive[place];
     if (outcome == kStepWhole) {
         const uint16_t id = free_drive_id(core);
@@ -213,6 +229,9 @@ void drive_step(Core &core) {
     } else if (outcome == kStepFault) {
         ++core.drive_check_at;
         entry.state = kDriveLeftOut;
+        char name[kFaultNameSize];
+        drive_given_name(core, place, name, sizeof name);
+        note_fault(core, kWorkDrive, name, record, core.checker->decoder.body_read, reason);
         drive_left_out(core, place, reason);
     }
 }
@@ -421,6 +440,26 @@ void check_after_start(Core &core, bool in_step, bool on_time) {
             drive_step(core);
         }
     }
+}
+
+void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t room) {
+    if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, room) != 1) {
+        drive_file_name(place, name);
+    }
+}
+
+void note_fault(Core &core, uint8_t work, const char *name, uint32_t record, uint64_t body_bytes, Reason reason) {
+    FaultContext &fault = core.fault;
+    fault.present = 1;
+    fault.work = work;
+    fault.reason = static_cast<uint8_t>(reason);
+    uint32_t length = 0;
+    for (; name[length] != 0 && length + 1 < sizeof fault.name; ++length) {
+        fault.name[length] = name[length];
+    }
+    fault.name[length] = 0;
+    fault.record = record;
+    fault.body_bytes = body_bytes;
 }
 
 void core_fail(Core &core, Reason reason, const char *about, Reason detail) {

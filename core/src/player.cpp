@@ -152,6 +152,7 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) 
             break;
         }
         core.frame_end += duration;
+        ++core.stream_records;
     }
     return reason;
 }
@@ -291,6 +292,16 @@ Shown advance(Core &core, uint64_t now) {
         // The rest is decoded at the next refresh, or the file settles a defect and its
         // reason comes at a later one.
         return kShowsBefore;
+    }
+    if (reason != kNone) {
+        // Where the file was: a file that did not open was at its start.
+        const bool opened = core.stream_open && core.stream_item == animation;
+        char name[kFaultNameSize];
+        if (is_drive(animation)) {
+            drive_given_name(core, animation - kDriveBase, name, sizeof name);
+        }
+        note_fault(core, kWorkPlay, is_drive(animation) ? name : core.files[core.items[animation].first].name,
+                   opened ? core.stream_records : 0, opened ? core.decoder.body_read : 0, reason);
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.

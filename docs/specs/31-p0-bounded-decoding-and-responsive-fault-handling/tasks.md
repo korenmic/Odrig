@@ -44,7 +44,7 @@ Rules for every task:
     picture of their time; the demo show's pictures and times unchanged.
   - Requirements: 2.1 to 2.3
 
-- [ ] 4. The fault's context, the emulator's measure and the documents
+- [x] 4. The fault's context, the emulator's measure and the documents
   - `core/src/core_state.h`, `core/src/core.cpp`, `core/src/upload.cpp`, the drive's
     check: `FaultContext`.
   - `tests/emulator/test_bounded.py`: every `status` within 50 ms with the reproducer
