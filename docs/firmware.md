@@ -315,6 +315,13 @@ total space, `build` made `odrig-firmware.bin` of 1,771,808 bytes, SHA-256
 the same bytes; `build --probe` made `odrig-probe.bin` of 1,758,624 bytes and
 `build --stick` `odrig-stick.bin` of 1,289,264 bytes. None of them was flashed.
 
+With the texts and clocks of [core.md](core.md), "Texts" and "Clocks", `build` made
+`odrig-firmware.bin` of 1,791,568 bytes on 2026-10-24, SHA-256
+`fdf6bc2a5ccbacfaa55e686f041c906dcbc89e408a24d4ac100c5f8f503de555`: 19,760 bytes more
+than before, 55.2% of the firmware slot. Of them 5,464 bytes are the tables of the fonts
+and of the sine, 1,464 for `small`, 1,952 for `medium` and 2,048 for the sine, which stay
+in the flash; the static memory is the same, 70,012 bytes, 21.4%. It was not flashed.
+
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
 standard output names the image:
@@ -668,7 +675,7 @@ The firmware is WLED with one usermod, `firmware/usermod/`, that hosts the core 
 carries.
 
 **At start** the usermod starts the core on the files of the folder `/odrig` of storage:
-`mapping.json`, `show.json` and the `.odrg` files, as `install-show` put them there. It
+`mapping.json`, `show.json` and the `.odrg` and `.odrgx` files, as `install-show` put them there. It
 gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
 holds a whole file. The core's memory comes from the chip's internal memory, and from the
 external memory only when the internal memory has none. The time the core is given is the

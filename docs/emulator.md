@@ -173,8 +173,8 @@ python -m emulator build/demo-20/show --drive build/stick
 ```
 
 - The emulator looks for the folder `DIR/odrig` once a second. When it appears, a drive
-  is plugged in: its list is made then, of the files whose names end in `.odrg`, in any
-  case, and do not begin with a dot, in the order of their names, at most 256. When the
+  is plugged in: its list is made then, of the files whose names end in `.odrg` or
+  `.odrgx`, in any case, and do not begin with a dot, in the order of their names, at most 256. When the
   folder goes, the drive is pulled out. A folder `DIR` that is not there yet is no
   error: the drive is plugged in once `DIR/odrig` is.
 - The list is made when the folder appears and not again while it stays, as the files of
@@ -900,7 +900,8 @@ python -m odrigctl --http 127.0.0.1:8600 mapping get
 python -m preview FILE [--mapping FILE] [--no-browser] [--core PATH]
 ```
 
-Shows one finished `.odrg` file in the emulator, alone, until Ctrl-C. The path may be
+Shows one finished `.odrg` or `.odrgx` file in the emulator, alone, until Ctrl-C: frames,
+a text or a clock. The path may be
 absolute or relative, and the file may have any name: it is not changed. `preview` is a
 small program of its own, beside the emulator and the command tool, and holds no
 converter logic.
@@ -913,7 +914,8 @@ converter logic.
 3. The emulator starts on that folder, on port 8600, or on a free port when that is
    taken: the command then says `preview: port 8600 is taken; the page is on <port>`.
    It has a serial port and a line port of its own, so it runs beside another emulator.
-4. The file is uploaded as item 1, `preview.odrg`, as the operators' app will upload one
+4. The file is uploaded as item 1, `preview.odrgx` when its name ends in `.odrgx` and
+   `preview.odrg` otherwise, as the operators' app will upload one
    to the board: the core checks it whole. A file of another canvas ends the command with
    `preview: <file> is 60 x 60, and the mapping <mapping> is 60 x 6`.
 5. `page: <address>` is printed and the page opens in the default browser, unless

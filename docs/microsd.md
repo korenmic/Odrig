@@ -1,7 +1,7 @@
 # The microSD card
 
 The installation's external storage of animations is a microSD card in a small reader
-wired to four pins of the board. The firmware reads the `.odrg` files of the card's
+wired to four pins of the board. The firmware reads the `.odrg` and `.odrgx` files of the card's
 folder `odrig` and plays them after the installed ones, with ids from 60001 up, as
 [show.md](show.md#animations-from-a-usb-drive) describes for a drive. The card is never
 written. The core, the emulator and the app see a drive, whether the firmware fills it
@@ -33,8 +33,9 @@ card is missing, and plays the rest from the card.
 - **The file system.** FAT32 or FAT16: a card of 32 GB or less as it comes from the shop,
   or any card formatted FAT32 on a computer. A card above 32 GB comes as exFAT, which the
   firmware does not promise to read: format it FAT32 on a computer first.
-- **The folder.** A folder `odrig` at the top of the card holds the `.odrg` files, made
-  for the board's canvas as the installed ones are. Names ending in `.odrg`, in any case,
+- **The folder.** A folder `odrig` at the top of the card holds the `.odrg` and `.odrgx`
+  files, made for the board's canvas as the installed ones are. Names ending in `.odrg` or
+  `.odrgx`, in any case,
   and not beginning with a dot are taken, in the order of their names, at most 256.
   Folders inside `odrig` and other files are passed over.
 - **The names.** Keep names to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`.

@@ -33,9 +33,10 @@ class TheOption(unittest.TestCase):
         self.assertEqual(list(self.work.iterdir()), [])
 
     def test_the_list_of_a_folder_passes_over_hidden_and_other_files_and_keeps_the_order_of_names(self):
-        folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b"", ".a.odrg": b"", "c.odrg.txt": b"", "notes.txt": b""})
+        folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b"", ".a.odrg": b"", "c.odrg.txt": b"", "notes.txt": b"",
+                                                         "d.odrgx": b"", "C.ODRGX": b"", ".e.odrgx": b"", "f.odrgx.txt": b""})
         (folder / "inner.odrg").mkdir()
-        self.assertEqual(host.drive_list(folder), ["A.ODRG", "b.odrg"])
+        self.assertEqual(host.drive_list(folder), ["A.ODRG", "C.ODRGX", "b.odrg", "d.odrgx"])
         support.installed(folder, {f"{index:03d}.odrg": b"" for index in range(300)})
         self.assertEqual(len(host.drive_list(folder)), 256)
 

@@ -48,14 +48,14 @@ def reading(path):
 
 def drive_list(folder):
     """The names of the animation files of a drive's folder `odrig`: those that end in
-    `.odrg`, in any case, and do not begin with a dot, in the order of their bytes, the
-    first 256. Empty when the folder cannot be listed."""
+    `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order of their
+    bytes, the first 256. Empty when the folder cannot be listed."""
     try:
         with os.scandir(folder) as entries:
             names = [entry.name for entry in entries if entry.is_file()]
     except OSError:
         return []
-    kept = [name for name in names if name.lower().endswith(".odrg") and not name.startswith(".")]
+    kept = [name for name in names if name.lower().endswith((".odrg", ".odrgx")) and not name.startswith(".")]
     return sorted(kept, key=os.fsencode)[:DRIVE_MOST]
 
 
