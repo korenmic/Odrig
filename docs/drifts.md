@@ -9486,3 +9486,46 @@ with the reader that the check uses.
 **Resolution.** `core/src/order.cpp`, `listed()` and `listed_with()`;
 `core/src/commands.cpp`, the route of `order get`; docs/commands.md, `order get`;
 tests/core/test_order.py, `UnavailableAnimations` and `test_it_is_refused_as_list_is`.
+
+## Seed 33: where readiness and the last fault are reported
+
+**Question.** The seed asks to extend existing reporting where it can and approves no
+command, while the owner approved in advance every command the specs of the run need.
+Does the fault's context go into `status`, or a command of its own?
+
+**Answer.** Readiness and the counts go into `status`, which every client asks already.
+The fault's context, a file name, a record, a byte count and a reason, is asked for
+seldom and would make every `status` longer; it gets the command `fault`, approved in
+advance. Its reply names a decoder's reason and the work it came in, and claims no damage
+on the storage.
+
+**Resolution.** The spec's requirements 1 and 2; `docs/commands.md`.
+
+## Seed 33: what names the host, and what survives a reset
+
+**Question.** The seed asks for the firmware's identity, its storage, its media and the
+reason of its last reset in the reports, and for the last fault to survive a reset. The
+core knows none of the first, and the board has no storage meant for logs.
+
+**Answer.** An optional host function, `about`, gives a text of at most 95 bytes that
+`status` reports as `host`. The firmware gives WLED's release name, the build's date and
+time, its storage and the reset reason ESP-IDF names; the emulator gives its own name.
+The firmware keeps the latest reason text its player logged in memory that survives a
+software or watchdog reset, never in flash or on the card, with a CRC-32, and writes it
+to its log at its next start. A power cut loses it, as the seed allows when it is said.
+
+**Resolution.** The spec's requirements 3 and 4; `docs/firmware.md`.
+
+## Seed 33: the tool's wait after seed 32
+
+**Question.** `install-show` waited for a `list` that is not `busy`. Since seed 32 `list`
+is answered at once during the check, so the tool stops waiting at once. How does it know
+the check has ended, and what does it say?
+
+**Answer.** It asks `status` until `readiness` leaves `checking`, and falls back to the
+`busy` list of a firmware without `readiness`. It prints `outcome: healthy`,
+`outcome: degraded: <n> unavailable` or `outcome: recovery: <reason>`; healthy and
+degraded end with 0, as the board plays, and recovery with 1. A wait that runs out stays
+the failure `check-not-done`.
+
+**Resolution.** The spec's requirement 5; `firmware/fwtool/board.py`.
