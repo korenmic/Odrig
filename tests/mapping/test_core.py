@@ -28,9 +28,9 @@ def files():
 class MappingCommands(unittest.TestCase):
     def test_get_returns_current_assignments_and_bench_is_unsupported(self):
         reply = answers(support.start(files(), [support.line(1000, 'mapping get')]))[0]
-        self.assertEqual(reply, dict(ok=True, editable=True, pins=PINS, revision=REVISION, test=False))
+        self.assertEqual(reply, dict(ok=True, editable=True, pins=PINS, revision=REVISION, test=False, snake=None))
         reply = answers(support.start(support.example_show(), [support.line(1000, 'mapping get')]))[0]
-        self.assertEqual(reply, dict(ok=True, editable=False, pins=[], revision=0, test=False))
+        self.assertEqual(reply, dict(ok=True, editable=False, pins=[], revision=0, test=False, snake=None))
 
     def test_save_is_durable_and_does_not_change_the_show_or_animations(self):
         source = files()

@@ -253,8 +253,10 @@ struct Core {
     uint16_t line_length;
     uint8_t line_over;
 
-    // The diagnostic holds a decoded picture and a selection to resume.
+    // The diagnostic holds a decoded picture and a selection to resume. `mapping_snake` is the
+    // snake whose test shows, 1 to 20, or 0 for the diagonal.
     uint8_t mapping_test;
+    uint8_t mapping_snake;
     uint32_t mapping_saved_playing;
     uint32_t mapping_saved_shown;
     uint32_t cycle_start_entry;

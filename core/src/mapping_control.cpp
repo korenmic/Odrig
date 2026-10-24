@@ -10,6 +10,7 @@ namespace odrig {
 namespace {
 
 #include "diagonal_data.h"
+#include "snakes_data.h"
 
 const uint32_t kSnakes = 20;
 const char kMappingPart[] = "mapping.part";
@@ -100,7 +101,10 @@ bool persist(Core &core, const uint8_t *pins) {
     return true;
 }
 
+// An ODRG file the core holds, read as a host reads a file.
 struct Asset {
+    const uint8_t *bytes;
+    uint32_t size;
     uint32_t offset;
 };
 int asset_open(void *ctx, const char *) {
@@ -109,29 +113,34 @@ int asset_open(void *ctx, const char *) {
 }
 int32_t asset_read(void *ctx, uint8_t *out, size_t capacity) {
     Asset &asset = *static_cast<Asset *>(ctx);
-    size_t count = sizeof kDiagonal - asset.offset;
+    size_t count = asset.size - asset.offset;
     if (count > capacity) count = capacity;
-    memcpy(out, kDiagonal + asset.offset, count);
+    memcpy(out, asset.bytes + asset.offset, count);
     asset.offset += static_cast<uint32_t>(count);
     return static_cast<int32_t>(count);
 }
 void asset_close(void *) {}
 
-bool decode_diagonal(Core &core) {
-    Asset asset = {0};
+// Decodes the picture of a test into the pixel buffer: the diagonal's one frame, or the
+// frame of snake n of the snakes' file, which holds one for each snake in their order.
+bool decode_test(Core &core, uint32_t snake) {
+    Asset asset = {snake == 0 ? kDiagonal : kSnakeTests, snake == 0 ? static_cast<uint32_t>(sizeof kDiagonal) : static_cast<uint32_t>(sizeof kSnakeTests), 0};
     odrig_host host = {};
     host.ctx = &asset;
     host.open = asset_open;
     host.read = asset_read;
     host.close = asset_close;
-    Reason reason = core.file.open(host, "diagonal");
+    Reason reason = core.file.open(host, "test");
     if (reason == kNone) reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
-        uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
+        const uint32_t records = snake == 0 ? 1 : snake;
+        for (uint32_t record = 0; record < records && reason == kNone; ++record) {
+            uint16_t duration = 0;
+            reason = core.decoder.next(core.pixels, &duration);
+        }
     }
-    if (reason == kNone) reason = core.decoder.finish();
+    if (reason == kNone && snake == 0) reason = core.decoder.finish();
     core.file.close();
     return reason == kNone;
 }
@@ -172,6 +181,8 @@ uint32_t mapping_get(const Core &core, Reply &reply) {
     }
     reply.text("],\"revision\":"); reply.number(editable ? revision_of(core) : 0);
     reply.text(",\"test\":"); reply.text(core.mapping_test ? "true" : "false");
+    reply.text(",\"snake\":");
+    if (core.mapping_test && core.mapping_snake != 0) reply.number(core.mapping_snake); else reply.text("null");
     reply.text("}\n");
     return reply.length;
 }
@@ -202,6 +213,7 @@ uint32_t mapping_set(Core &core, uint32_t revision, const char *text, uint32_t l
 void mapping_test_stop(Core &core) {
     if (!core.mapping_test) return;
     core.mapping_test = 0;
+    core.mapping_snake = 0;
     if (core.invalid) return;
     if (core.mapping_saved_playing < core.item_count && core.items[core.mapping_saved_playing].is_cycle) {
         const uint32_t saved = core.mapping_saved_playing;
@@ -221,20 +233,24 @@ void mapping_test_stop(Core &core) {
     }
 }
 
-uint32_t mapping_test(Core &core, bool enabled, Reply &reply) {
+uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     if (!enabled) {
         mapping_test_stop(core);
         return succeed(reply);
     }
-    if (core.mapping_test) return succeed(reply);
+    if (core.mapping_test && core.mapping_snake == snake) return succeed(reply);
     if (core.invalid) return refuse(reply, "show-invalid");
     if (!mapping_editable(core)) return refuse(reply, "bad-argument");
     if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
-    core.mapping_saved_playing = core.playing;
-    core.mapping_saved_shown = core.shown;
-    player_halt(core);
+    // A test that follows another one resumes what played before the first.
+    if (!core.mapping_test) {
+        core.mapping_saved_playing = core.playing;
+        core.mapping_saved_shown = core.shown;
+        player_halt(core);
+    }
     core.mapping_test = 1;
-    if (!decode_diagonal(core)) {
+    core.mapping_snake = static_cast<uint8_t>(snake);
+    if (!decode_test(core, snake)) {
         mapping_test_stop(core);
         return refuse(reply, "storage-error");
     }

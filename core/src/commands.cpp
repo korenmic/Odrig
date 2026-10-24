@@ -207,7 +207,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "mapping")) {
         if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
         if (words.count == 3 && words.is(1, "test") && (words.is(2, "on") || words.is(2, "off"))) {
-            return mapping_test(core, words.is(2, "on"), reply);
+            return mapping_test(core, words.is(2, "on"), 0, reply);
+        }
+        uint32_t snake;
+        if (words.count == 4 && words.is(1, "test") && words.is(2, "snake") && number_word(words, 3, 1, 20, &snake)) {
+            return mapping_test(core, true, snake, reply);
         }
         uint32_t revision;
         if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision)) {

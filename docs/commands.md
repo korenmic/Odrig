@@ -32,6 +32,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
+| `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
 | `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
@@ -238,7 +239,7 @@ front-end, including replies with `"ok":false`. Any other method on `/odrig` get
 
 ## Mapping controls
 
-`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false}`.
+`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false,snake:null}`.
 Pins are in snake order, 1 through 20. Unsupported or invalid mappings report
 `editable:false`, an empty `pins` array and revision 0. The test flag is target-wide.
 Only the target's existing twenty-pin permutation is editable.
@@ -259,6 +260,16 @@ ordinary play command. Both test commands are idempotent. Entry requires the val
 test status reports no ordinary playing item or animation; `mapping get` identifies
 the active test. Upload and remove return `busy`, but mapping saves, list, space,
 status, power and brightness remain available. The test changes no show entry.
+
+`mapping test snake <n>` shows the test of snake n, n from 1 to 20, until
+`mapping test off` or a valid ordinary play command: one white line one pixel wide from
+the bottom of the snake's first column to the top of its third, 20 pixels in each of its
+three columns, through the saved mapping, with every other LED dark. While it shows,
+`mapping get` reports `"test":true` and `"snake":<n>`; for the diagonal and while no test
+shows, `"snake":null`. Entry, busy refusals, power, brightness and restart are as for the
+diagonal. A test that starts while another one shows takes its place, and stopping it
+resumes what played before the first. No test enters the playlist, `start`, a cycle or
+the saved order, and none changes a file.
 
 The protocol is identical over HTTP, board serial and emulator serial or TCP.
 
