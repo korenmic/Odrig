@@ -1,0 +1,548 @@
+{
+ "damaged-line-form": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-line-name": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-line-size": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-line-twice": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-line-wrong-page": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-line-zero-width": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-marker-crc": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-marker-empty-page-crc": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-marker-generation": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-marker-line": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-marker-long": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-marker-short": {
+  "detail": "marker",
+  "state": "damaged"
+ },
+ "damaged-page-crc": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "damaged-page-missing": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "damaged-page-unended": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "incompatible-check": {
+  "state": "incompatible"
+ },
+ "incompatible-format": {
+  "state": "incompatible"
+ },
+ "interrupted": {
+  "detail": "interrupted",
+  "state": "damaged"
+ },
+ "none": {
+  "state": "none"
+ },
+ "ok-empty": {
+  "entries": [],
+  "generation": 1,
+  "state": "ok"
+ },
+ "ok-entries": {
+  "entries": [
+   [
+    "sunrise.odrg",
+    52340,
+    439041101,
+    60,
+    60,
+    12000,
+    "frames"
+   ],
+   [
+    "lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll.odrg",
+    4294967295,
+    195948557,
+    65535,
+    65535,
+    18446744073709551615,
+    "frames"
+   ],
+   [
+    "moon.odrg",
+    1612,
+    1,
+    60,
+    60,
+    4000,
+    "frames"
+   ],
+   [
+    "Fire Swirl 2.ODRG",
+    734002,
+    4294967295,
+    60,
+    60,
+    61000,
+    "frames"
+   ],
+   [
+    "a.odrg",
+    0,
+    0,
+    1,
+    1,
+    0,
+    "frames"
+   ]
+  ],
+  "generation": 42,
+  "state": "ok"
+ },
+ "ok-many-pages": {
+  "entries": [
+   [
+    "clip-004.odrg",
+    1004,
+    31676,
+    60,
+    60,
+    4000,
+    "frames"
+   ],
+   [
+    "clip-013.odrg",
+    1013,
+    102947,
+    60,
+    60,
+    13000,
+    "frames"
+   ],
+   [
+    "clip-039.odrg",
+    1039,
+    308841,
+    60,
+    60,
+    39000,
+    "frames"
+   ],
+   [
+    "clip-009.odrg",
+    1009,
+    71271,
+    60,
+    60,
+    9000,
+    "frames"
+   ],
+   [
+    "clip-027.odrg",
+    1027,
+    213813,
+    60,
+    60,
+    27000,
+    "frames"
+   ],
+   [
+    "clip-034.odrg",
+    1034,
+    269246,
+    60,
+    60,
+    34000,
+    "frames"
+   ],
+   [
+    "clip-024.odrg",
+    1024,
+    190056,
+    60,
+    60,
+    24000,
+    "frames"
+   ],
+   [
+    "clip-037.odrg",
+    1037,
+    293003,
+    60,
+    60,
+    37000,
+    "frames"
+   ],
+   [
+    "clip-007.odrg",
+    1007,
+    55433,
+    60,
+    60,
+    7000,
+    "frames"
+   ],
+   [
+    "clip-010.odrg",
+    1010,
+    79190,
+    60,
+    60,
+    10000,
+    "frames"
+   ],
+   [
+    "clip-029.odrg",
+    1029,
+    229651,
+    60,
+    60,
+    29000,
+    "frames"
+   ],
+   [
+    "clip-008.odrg",
+    1008,
+    63352,
+    60,
+    60,
+    8000,
+    "frames"
+   ],
+   [
+    "clip-026.odrg",
+    1026,
+    205894,
+    60,
+    60,
+    26000,
+    "frames"
+   ],
+   [
+    "clip-035.odrg",
+    1035,
+    277165,
+    60,
+    60,
+    35000,
+    "frames"
+   ],
+   [
+    "clip-023.odrg",
+    1023,
+    182137,
+    60,
+    60,
+    23000,
+    "frames"
+   ],
+   [
+    "clip-030.odrg",
+    1030,
+    237570,
+    60,
+    60,
+    30000,
+    "frames"
+   ],
+   [
+    "clip-019.odrg",
+    1019,
+    150461,
+    60,
+    60,
+    19000,
+    "frames"
+   ],
+   [
+    "clip-020.odrg",
+    1020,
+    158380,
+    60,
+    60,
+    20000,
+    "frames"
+   ],
+   [
+    "clip-033.odrg",
+    1033,
+    261327,
+    60,
+    60,
+    33000,
+    "frames"
+   ],
+   [
+    "clip-025.odrg",
+    1025,
+    197975,
+    60,
+    60,
+    25000,
+    "frames"
+   ],
+   [
+    "clip-036.odrg",
+    1036,
+    285084,
+    60,
+    60,
+    36000,
+    "frames"
+   ],
+   [
+    "clip-022.odrg",
+    1022,
+    174218,
+    60,
+    60,
+    22000,
+    "frames"
+   ],
+   [
+    "clip-031.odrg",
+    1031,
+    245489,
+    60,
+    60,
+    31000,
+    "frames"
+   ],
+   [
+    "clip-001.odrg",
+    1001,
+    7919,
+    60,
+    60,
+    1000,
+    "frames"
+   ],
+   [
+    "clip-016.odrg",
+    1016,
+    126704,
+    60,
+    60,
+    16000,
+    "frames"
+   ],
+   [
+    "clip-002.odrg",
+    1002,
+    15838,
+    60,
+    60,
+    2000,
+    "frames"
+   ],
+   [
+    "clip-015.odrg",
+    1015,
+    118785,
+    60,
+    60,
+    15000,
+    "frames"
+   ],
+   [
+    "clip-018.odrg",
+    1018,
+    142542,
+    60,
+    60,
+    18000,
+    "frames"
+   ],
+   [
+    "clip-021.odrg",
+    1021,
+    166299,
+    60,
+    60,
+    21000,
+    "frames"
+   ],
+   [
+    "clip-032.odrg",
+    1032,
+    253408,
+    60,
+    60,
+    32000,
+    "frames"
+   ],
+   [
+    "clip-000.odrg",
+    1000,
+    0,
+    60,
+    60,
+    0,
+    "frames"
+   ],
+   [
+    "clip-017.odrg",
+    1017,
+    134623,
+    60,
+    60,
+    17000,
+    "frames"
+   ],
+   [
+    "clip-005.odrg",
+    1005,
+    39595,
+    60,
+    60,
+    5000,
+    "frames"
+   ],
+   [
+    "clip-012.odrg",
+    1012,
+    95028,
+    60,
+    60,
+    12000,
+    "frames"
+   ],
+   [
+    "clip-038.odrg",
+    1038,
+    300922,
+    60,
+    60,
+    38000,
+    "frames"
+   ],
+   [
+    "clip-006.odrg",
+    1006,
+    47514,
+    60,
+    60,
+    6000,
+    "frames"
+   ],
+   [
+    "clip-011.odrg",
+    1011,
+    87109,
+    60,
+    60,
+    11000,
+    "frames"
+   ],
+   [
+    "clip-028.odrg",
+    1028,
+    221732,
+    60,
+    60,
+    28000,
+    "frames"
+   ],
+   [
+    "clip-003.odrg",
+    1003,
+    23757,
+    60,
+    60,
+    3000,
+    "frames"
+   ],
+   [
+    "clip-014.odrg",
+    1014,
+    110866,
+    60,
+    60,
+    14000,
+    "frames"
+   ]
+  ],
+  "generation": 4294967295,
+  "state": "ok"
+ },
+ "torn-commit-record": {
+  "entries": [
+   [
+    "sunrise.odrg",
+    52340,
+    439041101,
+    60,
+    60,
+    12000,
+    "frames"
+   ],
+   [
+    "lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll.odrg",
+    4294967295,
+    195948557,
+    65535,
+    65535,
+    18446744073709551615,
+    "frames"
+   ],
+   [
+    "moon.odrg",
+    1612,
+    1,
+    60,
+    60,
+    4000,
+    "frames"
+   ],
+   [
+    "Fire Swirl 2.ODRG",
+    734002,
+    4294967295,
+    60,
+    60,
+    61000,
+    "frames"
+   ],
+   [
+    "a.odrg",
+    0,
+    0,
+    1,
+    1,
+    0,
+    "frames"
+   ]
+  ],
+  "generation": 42,
+  "state": "ok"
+ }
+}
