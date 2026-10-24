@@ -521,3 +521,7 @@ are in [format.md](format.md), "Measured sizes".
   run, on one branch per seed stacked in order and merged by one pull request, the branches
   kept. Afterwards the board keeps one or two small animations in its own storage, as a
   fallback when the card is missing, and plays the rest from the microSD card.
+- 2026-10-24: Seed 28: the operators' app's storage lines begin with the number of
+  animations of each storage, the board's own from `space` and the external storage's
+  from the list less those; an absent medium shows no number, a present empty one 0. The
+  web code alone does it; the check on a phone with the card is the owner's and is open.

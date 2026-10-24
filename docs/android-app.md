@@ -535,6 +535,10 @@ By programs, on a Mac:
   line of each list can be scrolled above the tabs, and with the keyboard open the field
   is in view and the tabs are hidden. Without the room the page is as before. The
   settings of the bars in the Android project, and in the APK.
+- That the show screen's and the storage screen's storage lines begin with the number
+  of animations of each storage, in Chrome against the emulator with no drive, a drive of
+  animations, an empty drive, and a drive plugged in and pulled out, and against stand-in
+  targets that answer `list` with `busy` or report an invalid show.
 - That the web code sends the twenty lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -556,7 +560,8 @@ By programs, on a Mac:
   internet, that the screen stays on, that the back gesture goes from the target screen
   to the show screen and from there out of the app, that a long press marks text and
   opens its menu only in a field, and that the app keeps clear of Android's bars, upright
-  and sideways, also with the keyboard open. On 2026-10-15 the owner ran the APK against
+  and sideways, also with the keyboard open, and that the numbers of animations match the
+  board's and the card's. On 2026-10-15 the owner ran the APK against
   the board on its own network and saw its state and its list; on 2026-10-16 the owner
   saw the app lie under the bars, before it kept clear of them.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
