@@ -1469,7 +1469,6 @@ class ReferencePlayer:
             "error": self.error,
             "width": self.canvas[0] if self.legs else None,
             "height": self.canvas[1] if self.legs else None,
-            "seed": self.seed if self.seed_shown and self.error is None and self.playing is not None else None,
         }
         # How far the check is, and what is unavailable: files whose check has ended and
         # those still to read, and the animations unavailable; all 0 for an invalid show.
@@ -1480,6 +1479,8 @@ class ReferencePlayer:
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
         state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
                      checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
+        # The seed of the clock on the LEDs, the last member.
+        state["seed"] = self.seed if self.seed_shown and self.error is None and self.playing is not None else None
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def feed(self, now, data):

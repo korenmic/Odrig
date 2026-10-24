@@ -75,7 +75,6 @@ int usage() {
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
         "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --about TEXT\n"
-
         "       --command-read-fails FILE OFFSET\n",
         stderr);
     return kUsage;
