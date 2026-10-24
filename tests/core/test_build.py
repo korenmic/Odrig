@@ -261,8 +261,8 @@ static void on_reply(void *ctx, const char *line, size_t line_length, const char
 int main(void) {
     odrig_host host = {0, give, open_file, read_file, close_file, log_line,
                        begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part,
-                       drive_number, drive_name, 0};
-    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                       drive_number, drive_name, 0, 0};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];

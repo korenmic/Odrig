@@ -53,7 +53,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null}
 ```
 
 | Member | Meaning |
@@ -70,6 +70,7 @@ A number in a command is written in decimal digits.
 | `to_check` | The files it has still to read. No time is given for them. |
 | `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
 | `checking` | The name of the file the player reads now, or `null`. |
+| `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
 is invalid.

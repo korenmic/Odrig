@@ -114,7 +114,7 @@ class Recording(unittest.TestCase):
         state = json.loads(printed[-1].split(" ", 2)[2])
         self.assertEqual((state["playing"], state["animation"]), ("all", 9))
         refreshes, replies = support.reference(support.files_of(self.example()), tick_times(3), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
         self.assert_equals_reference(recfile.read(self.work / "1.odrr"), refreshes)
 
     def test_the_storage_option_goes_with_record_mode(self):
@@ -155,13 +155,13 @@ class Recording(unittest.TestCase):
         animations = [json.loads(line.split(" ", 2)[2])["animation"] for line in printed]
         self.assertEqual(animations, [1, 2, 2, 1, 1, 2])
         _, replies = support.reference(support.files_of(folder), tick_times(46), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
 
     def test_a_script_with_every_command_gives_the_replies_and_the_led_data_of_the_reference(self):
         folder = self.example()
         recording, printed = self.record(folder, 4, SCRIPT)
         refreshes, replies = support.reference(support.files_of(folder), tick_times(4), SCRIPT)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(SCRIPT, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(SCRIPT, replies)]))
         self.assert_equals_reference(recording, refreshes)
         codes = [json.loads(reply).get("error") for reply in replies]
         self.assertEqual(sorted(set(filter(None, codes))), ["bad-argument", "line-too-long", "unknown-command", "unknown-id"])
@@ -319,7 +319,7 @@ class Recording(unittest.TestCase):
         commands = [(990, "brightness 3"), (999, "status")]
         _, printed = self.record(folder, 1, commands)
         _, replies = support.reference(support.files_of(folder), tick_times(1), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
         self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["brightness"], 3)
 
     def test_a_script_may_hold_comments_empty_lines_and_carriage_returns(self):

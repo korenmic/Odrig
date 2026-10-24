@@ -175,6 +175,20 @@ def checked(listed):
     return all(item.get("bytes", 0) is not None or "fault" in item for item in listed.get("items", []))
 
 
+def without_host(printed):
+    """Lines `reply <time> <json>` of the record mode with the host's name left out of each
+    reply of `status`: the emulator names itself, the reference player names no host."""
+    kept = []
+    for line in printed:
+        word, time, reply = (line.split(" ", 2) + ["", ""])[:3]
+        if word == "reply" and reply.startswith('{"ok":true,"on"'):
+            value = json.loads(reply)
+            value.pop("host", None)
+            line = f"reply {time} {json.dumps(value, separators=(',', ':'))}"
+        kept.append(line)
+    return kept
+
+
 def without_fps(reply):
     """A reply as a value, without the members that depend on the speed of this Mac: the
     refreshes of the last second, and what the status says of the check, which reads the

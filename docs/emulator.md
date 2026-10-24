@@ -775,6 +775,9 @@ python -m odrigctl --http 127.0.0.1:8600 order get
 python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 ```
 
+`status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
+system and the processor of the computer.
+
 The tool prints the reply line to standard output:
 
 ```

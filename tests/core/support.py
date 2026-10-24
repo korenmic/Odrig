@@ -1290,7 +1290,7 @@ class ReferencePlayer:
         unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
         state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
-                     checking=self.checks[0][0] if self.error is None and self.checks else None)
+                     checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def feed(self, now, data):

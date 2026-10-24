@@ -73,6 +73,9 @@ void checking_of(const Core &core, Reply &reply) {
     reply.text("null");
 }
 
+// Room for the text `about` gives: 95 bytes and the closing zero.
+const uint32_t kAboutSize = 96;
+
 // The names of the works a fault can come in, by their numbers.
 const char *const kWorkNames[] = {"start", "start", "play", "upload", "drive"};
 
@@ -138,6 +141,17 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.number(counts.unavailable);
     reply.text(",\"checking\":");
     checking_of(core, reply);
+    // The name the host gives itself.
+    char about[kAboutSize];
+    reply.text(",\"host\":");
+    if (core.host.about != nullptr && core.host.about(core.host.ctx, about, sizeof about) == 1) {
+        about[sizeof about - 1] = '\0';
+        reply.text("\"");
+        reply.escaped(about);
+        reply.text("\"");
+    } else {
+        reply.text("null");
+    }
     reply.text("}\n");
     return reply.length;
 }

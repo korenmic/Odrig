@@ -2,6 +2,7 @@
 
 import collections
 import os
+import platform
 import shutil
 import sys
 import time
@@ -197,6 +198,10 @@ class FolderHost:
     def drive_name(self, drive, place):
         """The name of the file at a place of that drive's list, or `None`."""
         return self.drive.name(drive, place)
+
+    def about(self):
+        """The name the emulator gives itself in `status`."""
+        return f"odrig emulator on {platform.system()} {platform.machine()}"
 
     def log(self, text):
         self.logged.append(text)

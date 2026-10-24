@@ -98,7 +98,7 @@ class RecordMode(unittest.TestCase):
         self.assertEqual((result.status, result.err), (0, ""))
         printed = result.out.splitlines()
         _, replies = support.reference(files, range(0, 3000, 20), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
         self.assertEqual(sizes(printed[0].split(" ", 2)[2]), [None, None])
         self.assertIn(None, sizes(printed[2].split(" ", 2)[2]))
         self.assertEqual(len(json.loads(printed[3].split(" ", 2)[2])["items"]), 3)

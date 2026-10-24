@@ -41,7 +41,7 @@ Rules for every task:
   - `docs/commands.md`, `docs/core.md`, `docs/decisions.md`.
   - Requirements: 1.1 to 1.4, 2.1, 2.2, 7.1, 8.2
 
-- [ ] 3. The host's name: `about`
+- [x] 3. The host's name: `about`
   - `core/include/odrig_core.h`, `core/src/commands.cpp`: `about` and `host`.
   - `tests/core/host/host.cpp`: `--about TEXT`; `emulator/binding.py`, `emulator/host.py`:
     the emulator's `about`.

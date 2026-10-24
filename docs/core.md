@@ -88,6 +88,7 @@ Every function receives `ctx` as its first argument.
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
+| `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -655,7 +656,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,664 |
+| The core object | fixed | 3,672 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -672,17 +673,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,197** |
+| **Total** | | **125,205** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,674 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,682 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,401 bytes for the target file. A host with a drive
+of the check and the saved order: 77,409 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 16 bytes
 for each of 256 places, 4,096 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 130,701 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 130,709 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -757,6 +758,7 @@ leg; and `ready`.
 | `--trace-files` | Prints `open <name> <result>` for every call of `open`. |
 | `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
 | `--trace-calls` | Prints `call <bytes>` after every `poll` and every command: how many bytes `read` and `read_at` gave during that call of the core. |
+| `--about TEXT` | The host has `about`, which gives this text. |
 | `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
 | `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |
 | `--no-storage` | The seven storage functions are `NULL`. |

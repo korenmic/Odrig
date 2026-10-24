@@ -70,7 +70,7 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET\n",
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --about TEXT\n",
         stderr);
     return kUsage;
 }
@@ -157,6 +157,7 @@ struct Options {
     std::string drive_read_fails_file;  // the file of the drive whose reading with `read`
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
+    std::string about;              // the text `about` gives; without one the host has no `about`
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -215,6 +216,7 @@ public:
         functions.drive = drive ? drive_number : nullptr;
         functions.drive_name = drive ? drive_name : nullptr;
         functions.drive_space = nullptr;
+        functions.about = options_.about.empty() ? nullptr : about;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -555,6 +557,15 @@ private:
         const uint64_t used = host.used_bytes();
         *total_bytes = static_cast<uint32_t>(total);
         *free_bytes = static_cast<uint32_t>(used < total ? total - used : 0);
+        return 1;
+    }
+
+    static int about(void *ctx, char *buffer, size_t capacity) {
+        guard::InHost lowered;
+        const std::string &text = static_cast<Host *>(ctx)->options_.about;
+        const size_t length = std::min(text.size(), capacity - 1);
+        std::memcpy(buffer, text.data(), length);
+        buffer[length] = '\0';
         return 1;
     }
 
@@ -1442,6 +1453,9 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--trace-calls") {
                 options.trace_calls = true;
                 at += 1;
+            } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
+                options.about = arguments[at + 1];
+                at += 2;
             } else if (arguments[at] == "--check-first") {
                 options.check_first = true;
                 at += 1;

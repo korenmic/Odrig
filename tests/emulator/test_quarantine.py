@@ -25,6 +25,10 @@ class ABadFile(unittest.TestCase):
                 self.assertEqual(ask("play 1"), b'{"ok":true}\n', route)
             self.assertIsNone(emulator.status()["error"])
             self.assertEqual(support.files_of(folder)["dvd.odrg"], files["dvd.odrg"])
+            # The emulator names itself, and gives the fault's context, on every route.
+            for route, ask in routes.items():
+                self.assertTrue(json.loads(ask("status"))["host"].startswith("odrig emulator on "), route)
+                self.assertEqual(json.loads(ask("fault"))["fault"]["file"], "dvd.odrg", route)
 
 
 if __name__ == "__main__":

@@ -88,6 +88,10 @@ typedef struct odrig_host {
     /* Optional capacity of this mounted drive, in bytes. Returns 1, or -1 when
        unavailable or the generation changed. No writes are performed. */
     int (*drive_space)(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes);
+    /* Optional: a text that names the host, its build, its storage and the reason of its
+       last start, into buffer with a 0 after it, cut to capacity - 1 bytes. Returns 1, or
+       0 when it has none. */
+    int (*about)(void *ctx, char *buffer, size_t capacity);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

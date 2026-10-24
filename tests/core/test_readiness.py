@@ -110,5 +110,18 @@ class TheLastFault(unittest.TestCase):
         self.assertEqual((fault["fault"]["work"], fault["fault"]["file"]), ("drive", 'z"z.odrg'))
 
 
+
+class TheHostsName(unittest.TestCase):
+    def status(self, options=()):
+        state, = states(support.start(ASilentStatus().files(), [support.line(T0, "status")], options))
+        return state["host"]
+
+    def test_it_is_the_text_of_about_or_null(self):
+        self.assertIsNone(self.status())
+        self.assertEqual(self.status(["--about", "odrig test host, storage internal, reset power-on"]), "odrig test host, storage internal, reset power-on")
+        self.assertEqual(self.status(["--about", 'a "quoted" \\ name']), 'a "quoted" \\ name')
+        self.assertEqual(self.status(["--about", "x" * 200]), "x" * 95)
+
+
 if __name__ == "__main__":
     unittest.main()
