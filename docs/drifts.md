@@ -9106,3 +9106,31 @@ status was, the one that is in effect is marked, and a status keeps them true. T
 measures of that entry stand.
 
 **Resolution.** `app/www/index.html`, `#power-switch`; `app/www/screens/show.js`.
+
+## Seed 39: Move up and Move down while a filter hides rows
+
+**Question.** The seed turns dragging off while a filter is not All, because the places of
+hidden rows would be unclear, and keeps the row menu, inclusion, play and deletion as they
+are. Move up and Move down are in the row menu and move a row as a drag does. Do they stay?
+
+**Answer.** No: they are reordering, and with rows hidden "up" would pass over rows the
+operator cannot see. Both are off in the menu while a filter is not All, and the list says
+`Set both filters to All to move animations: hidden rows would make the places unclear.`
+The menu's other actions work as before.
+
+**Resolution.** `docs/specs/39-p2-playlist-filters-by-storage-and-type/requirements.md`,
+1.6; `app/www/screens/reorder.js`, `blocked()`.
+
+## Seed 39: what counts as which type, and when the filters show
+
+**Question.** `type` comes from seed 37, which another line builds at the same time. What
+of a `type` the app does not know, of a target change, and of an installation without
+animations?
+
+**Answer.** A missing `type`, and any value other than `text` and `widget`, counts as
+Normal, so a newer type never vanishes from All and Normal. The choices are the phone's
+and stay across a target change, as they stay across a reload. The two rows of choices
+show while the list has animations, and the list says that no animation is installed, as
+before, when it has none.
+
+**Resolution.** `app/www/screens/filters.js`; the spec's design, "The filters".
