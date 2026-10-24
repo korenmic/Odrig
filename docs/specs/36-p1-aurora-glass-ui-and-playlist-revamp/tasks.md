@@ -103,7 +103,7 @@ Rules for every task:
   - Prove it fails first: Settings has no checkbox Show test animations.
   - Requirements: 8.1 to 8.3
 
-- [ ] 8. The documents, the APK and every suite
+- [x] 8. The documents, the APK and every suite
   - docs/android-app.md for the four tabs, the order and the tests; docs/decisions.md, a
     dated line; AGENTS.md's line of seed 36; the app's page's verified and open lists.
   - Every suite that runs without a board; `python3 app/app.py build`; `tests/apk`;

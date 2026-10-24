@@ -134,7 +134,7 @@ present, and do not build on them.
 - **Readiness progress and retained fault diagnostics**, seed 33: a truthful start-up state.
 - **Incremental and interruption-safe content updates**, seed 34: one file changed, not all.
 - **Managed internal and external animation catalogs**, seed 35: no full check at every start.
-- **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
+- **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **ODRGX text and clock animations**, seed 37: text and clocks as animations.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.

@@ -561,3 +561,15 @@ are in [format.md](format.md), "Measured sizes".
   second. The card's code, its documents, and `build` making it are done; the board
   session, with the firmware of today, plugging in and pulling out, the dropouts with two
   cables, Wi-Fi and the owner's look, is open, and the seed stays in progress until then.
+- 2026-10-24: Seed 36, under the owner's advance approval of the run: the saved playlist
+  order is `order.txt` in the board's own storage, naming internal animations by id and
+  the card's by file name in one mixed order, an absent card entry keeping its place;
+  the playlist, `play all` and the start follow it. New commands `order get [<from>]`,
+  `order move <revision> <id> <before>` and `mapping test snake <n>`; new reply members
+  `external` of every animation item of `list`, `ids`, `next` and `revision` of
+  `order get`, and `snake` of `mapping get`; new error `order-conflict`. The operators'
+  app is redrawn in the owner's Aurora Glass look with four tabs, Animations, Upload,
+  Settings and Target, rows with `in`/`ex` badges and a menu, moving by a long press or
+  Move up and Move down, and a Tests group of the diagonal and twenty snake tests shown
+  by a Settings checkbox. The 21 hand-uploaded line-test files leave the board in its
+  board session; the owner's phone and LED checks are open.
