@@ -1,0 +1,10 @@
+{
+  "number": 39,
+  "slug": "39-p2-playlist-filters-by-storage-and-type",
+  "state": "remaining",
+  "title": "Playlist filters by storage and type",
+  "priority": "P2",
+  "addedAt": "2026-10-24T08:20:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Two filters in the app's list of animations, by storage (internal or external) and by type (normal, text or widget), in the app's web code alone, on what list already reports; a filter changes the view, never the playlist."
+}
