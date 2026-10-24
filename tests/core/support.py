@@ -436,6 +436,26 @@ def demo_show():
     return dict(_demo_show())
 
 
+# The members of a reply of `status` that say how far the check is.
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host")
+
+
+def without_readiness(state):
+    """A reply of `status`, as a value, without the members that say how far the check is,
+    for tests of the others."""
+    return {name: value for name, value in state.items() if name not in READINESS}
+
+
+def status_lines_without_readiness(lines):
+    """The lines of a session with every reply of `status` written without those members."""
+    kept = []
+    for line in lines:
+        if line.startswith('reply {"ok":true,"on"'):
+            line = "reply " + json.dumps(without_readiness(json.loads(line[len("reply "):])), separators=(",", ":"))
+        kept.append(line)
+    return kept
+
+
 def with_show_fault(files, missing=99):
     """The files with a cycle added to the show file that names an id no item has: a fault
     of the show, which makes it invalid with `undefined-id <missing>`. A fault of one file
@@ -919,7 +939,7 @@ class ReferencePlayer:
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
     REPLY_MAX = 1024
 
@@ -937,6 +957,10 @@ class ReferencePlayer:
             return b'{"ok":false,"error":"' + code.encode("ascii") + b'"}\n'
         if line == b"status":
             return self._status(now)
+        if line == b"fault":
+            if self.faults:
+                raise NotImplementedError("the reference player does not state where in a file a fault lies")
+            return b'{"ok":true,"fault":null}\n'
         if line == b"space":
             return self._space()
         if line.split(b" ")[0] == b"list":
@@ -1001,7 +1025,7 @@ class ReferencePlayer:
             if not self.changeable:
                 return "storage-error"
             self._remove(value)
-        elif name != b"status":
+        elif name not in (b"status", b"fault"):
             self.on = name == b"on"
         return None
 
@@ -1258,6 +1282,15 @@ class ReferencePlayer:
             "width": self.canvas[0] if self.legs else None,
             "height": self.canvas[1] if self.legs else None,
         }
+        # How far the check is, and what is unavailable: files whose check has ended and
+        # those still to read, and the animations unavailable; all 0 for an invalid show.
+        names = {item.file for item in self.items.values() if item.cycle is None}
+        to_check = 0 if self.error is not None else len([check for check in self.checks if check[0] in names])
+        checked = 0 if self.error is not None else len(names) - to_check
+        unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
+        readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
+        state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
+                     checking=self.checks[0][0] if self.error is None and self.checks else None)
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def feed(self, now, data):

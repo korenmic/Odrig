@@ -423,7 +423,7 @@ class Remove(Content):
             self.removed(files, number, before=before)
             written = json.loads(self.left["show.json"])
             self.assertNotIn("start", written)
-            self.assertEqual(support.start(self.left, [support.line(T0, "status")]).lines,
+            self.assertEqual(support.status_lines_without_readiness(support.start(self.left, [support.line(T0, "status")]).lines),
                              ['reply {"ok":true,"on":true,"brightness":128,"playing":"all","animation":%d,"fps":0,"error":null,"width":60,"height":6}' % first])
         files = small_show(self.ITEMS, start=6)
         self.removed(files, 3, before=every_20_ms(25))

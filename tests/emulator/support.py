@@ -176,8 +176,10 @@ def checked(listed):
 
 
 def without_fps(reply):
-    """A reply as a value, without the one member that depends on the speed of this Mac."""
-    value = json.loads(reply)
+    """A reply as a value, without the members that depend on the speed of this Mac: the
+    refreshes of the last second, and what the status says of the check, which reads the
+    files while the emulator runs in real time."""
+    value = core_support.without_readiness(json.loads(reply))
     value.pop("fps", None)
     return value
 

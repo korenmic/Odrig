@@ -459,6 +459,17 @@ record it was at counted from 0, the bytes of its body read so far, and the reas
 fault replaces the one before. Keeping it needs no second decode. The test host prints it
 with its input line `fault`.
 
+## Readiness
+
+`status` says how far the check after the start is, from the core's own tables: the files
+whose check has ended, by being read whole or by a fault, and those still to read, of the
+show (a file once however many items name it) and of a drive; the animations unavailable;
+and the name of the file the check is at. From these it gives the readiness: `checking`
+while a file is still to read, `degraded` when none is and an animation is unavailable,
+`ready` otherwise, and `recovery` for an invalid show. Nothing is decoded for it. The
+command `fault` gives the fault's context of "Bounded work". [commands.md](commands.md)
+has both replies.
+
 ## A drive
 
 A host with a drive gives the core animations that are not in the show: the files of the

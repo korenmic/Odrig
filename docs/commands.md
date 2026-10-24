@@ -23,6 +23,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
 | `status` | Reports the current state. |
+| `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `remove <id>` | Removes an item from the show. |
@@ -52,7 +53,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null}
 ```
 
 | Member | Meaning |
@@ -64,6 +65,32 @@ A number in a command is written in decimal digits.
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 | `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
+| `readiness` | `checking` while the player still reads files after a start, `degraded` when it has read them all and one or more animations are unavailable, `ready` when it has read them all and none is, and `recovery` while the show is invalid. What plays is said by `playing` and `animation`, whatever the readiness. |
+| `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. |
+| `to_check` | The files it has still to read. No time is given for them. |
+| `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
+| `checking` | The name of the file the player reads now, or `null`. |
+
+`checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
+is invalid.
+
+## The last fault
+
+```
+fault
+{"ok":true,"fault":{"work":"play","file":"dvd.odrg","record":3,"bytes":1234,"reason":"truncated"}}
+```
+
+`fault` reports the latest fault the player met in a file since its start: `work` is
+`start` for the check at and after the start, `play` for playback, `upload` for the check
+of an upload and `drive` for the check of a drive's file; `file` is the file's name, cut to
+32 characters; `record` the frame record it was at, counted from 0, the number of records
+after the last one; `bytes` the bytes of its body read so far, inflated ones of a
+compressed body; `reason` the reason, as [reasons.md](reasons.md) names it. A later fault
+replaces an earlier one. Before any fault the reply is `{"ok":true,"fault":null}`. The
+reason is what the decoder found in the bytes it was given; it does not tell whether the
+storage is damaged or a read went wrong on the way. `fault` is answered while the show
+is invalid too.
 
 ## Storage and the installed items
 

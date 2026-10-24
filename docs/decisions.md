@@ -578,3 +578,7 @@ are in [format.md](format.md), "Measured sizes".
   choice, choices kept on the phone, and moving off while a filter hides rows. The web
   code alone does it, from `external` and `type` of `list`; no command or reply member is
   added. The owner's check on a phone with the card in is open.
+- 2026-10-24: Seed 33: `status` reports the readiness of the player, `checking`, `ready`,
+  `degraded` or `recovery`, with the new members `readiness`, `checked`, `to_check`,
+  `unavailable` and `checking`, and the new command `fault` reports the context of the
+  latest fault of a file. Both were approved in advance by the owner.

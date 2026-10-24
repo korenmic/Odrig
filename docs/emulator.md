@@ -705,6 +705,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
@@ -723,6 +724,7 @@ python -m odrigctl --port build/emulator/serial on
 python -m odrigctl --port build/emulator/serial off
 python -m odrigctl --port build/emulator/serial brightness 40
 python -m odrigctl --port build/emulator/serial status
+python -m odrigctl --port build/emulator/serial fault
 python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
@@ -742,6 +744,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 on
 python -m odrigctl --tcp 127.0.0.1:8601 off
 python -m odrigctl --tcp 127.0.0.1:8601 brightness 40
 python -m odrigctl --tcp 127.0.0.1:8601 status
+python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
@@ -761,6 +764,7 @@ python -m odrigctl --http 127.0.0.1:8600 on
 python -m odrigctl --http 127.0.0.1:8600 off
 python -m odrigctl --http 127.0.0.1:8600 brightness 40
 python -m odrigctl --http 127.0.0.1:8600 status
+python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
@@ -784,7 +788,7 @@ The tool prints the reply line to standard output:
 | 2 | The command line was not understood, or the file to upload cannot be read: then one line `error: not-found: <detail>` is written to standard error and nothing is sent. |
 | 3 | The target could not be reached, or no reply arrived within the time limit. One line `error: unreachable: <detail>` is written to standard error. |
 
-- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `space`, `list` or
+- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `fault`, `space`, `list` or
   `remove <ID>`, followed by a newline. ID and N are sent as they were typed and are not
   checked: `play abc` is sent and the reply says `bad-argument`. Every judgement is the
   command front-end's.

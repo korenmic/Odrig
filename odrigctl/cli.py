@@ -21,6 +21,7 @@ COMMANDS = {
     "off": (),
     "brightness": ("N",),
     "status": (),
+    "fault": (),
     "space": (),
     "list": (),
     "remove": ("ID",),
@@ -58,7 +59,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")

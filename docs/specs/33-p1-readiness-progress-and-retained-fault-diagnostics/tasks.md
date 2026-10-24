@@ -32,7 +32,7 @@ Rules for every task:
     list.
   - Requirements: 8.1
 
-- [ ] 2. Readiness, counts and `fault` in the core
+- [x] 2. Readiness, counts and `fault` in the core
   - `core/src/commands.cpp`, `core.cpp`, `core_state.h`: the members of `status`, the
     command `fault`.
   - `tests/core/support.py`: the reference player's counts; the tests that compare

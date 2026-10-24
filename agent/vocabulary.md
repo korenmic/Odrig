@@ -69,7 +69,7 @@ the entry links to it.
   reads this folder and nothing else. A folder made this way is also called a packed show.
   See [show.md](../docs/show.md#installed-file-set).
 - **command**: One line of text sent to whatever is playing a show. The command families include:
-  `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`,
+  `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `fault`, `space`, `list`,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, and `upload`, which
   sends a file as several lines. Each is answered by one

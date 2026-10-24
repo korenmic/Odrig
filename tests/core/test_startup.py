@@ -146,7 +146,7 @@ class EachReason(unittest.TestCase):
         self.assertEqual([lines.pop(0) for _ in range(2)], ['reply {"ok":false,"error":"show-invalid"}'] * 2)
         self.assertEqual([lines.pop(0) for _ in range(3)], [OK] * 3)
         self.assertEqual([lines.pop(0) for _ in polled[1] + polled[2]], polled[1] + polled[2])
-        last = json.loads(lines.pop(0)[len("reply "):])
+        last = support.without_readiness(json.loads(lines.pop(0)[len("reply "):]))
         width, height = canvas if legs else (None, None)
         self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text, "width": width, "height": height})
         self.assertEqual(lines, [])
@@ -518,7 +518,7 @@ class TablesWithRoom(unittest.TestCase):
         self.assertIsNone(run.error)
         self.assertEqual(run.legs, EXAMPLE_LEGS)
         self.assertEqual(
-            json.loads(run.lines[1][len("reply "):]),
+            support.without_readiness(json.loads(run.lines[1][len("reply "):])),
             {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6},
         )
         self.assertEqual(run.lines[-2:], ['reply {"ok":false,"error":"unknown-id"}', 'reply {"ok":true,"items":[],"next":null}'])

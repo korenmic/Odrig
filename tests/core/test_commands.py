@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
@@ -181,7 +181,7 @@ class LineEndings(Commands):
         state = self.status(support.example_show(), [support.line(T0, longest), support.line(T0, "status")])
         self.assertEqual(state["brightness"], 200)
 
-    def test_the_longest_reply_to_status_is_one_line_of_under_192_bytes(self):
+    def test_the_longest_reply_to_status_is_one_line_well_under_the_limit(self):
         longest_name = "a" * 27 + ".odrg"
         bad_index = odrg.container(60, 6, [b"\1\2\3", b"\4\5\6"], [odrg.stored_record(bytes([2]) * 360, 20)])
         files = support.example_show()
@@ -189,11 +189,13 @@ class LineEndings(Commands):
         files[longest_name] = bad_index
         printed = self.assert_as_the_reference(files, [support.line(T0, "off"), support.line(T0, "status")])
         reply = printed[-1][len("reply "):]
-        # A bad file is quarantined and the show has no error. The reason of a show fault is
-        # at most 24 characters, `duplicate-id` and an id of 11; one of 65 would still fit
-        # with the largest numbers.
+        # A bad file is quarantined and the show has no error. With the longest reason text
+        # the core can hold, 65 characters, the largest numbers, a file of 32 characters
+        # being checked and the longest name of a host, every byte of it escaped, the reply
+        # still fits into 1,024 bytes.
         self.assertIsNone(json.loads(reply)["error"])
-        self.assertLess(len(reply) - len("null") + len('""') + 65 + 1 + len("4294967295"), 192)
+        longest = len(reply) - len("null") + len('""') + 65 + 1 + len("4294967295") + 3 * 10 + len('"' + "a" * 32 + '"') + len(',"host":""') + 6 * 95
+        self.assertLess(longest, 1024)
 
 
 class BytesOfATransport(Commands):

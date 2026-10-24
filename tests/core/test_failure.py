@@ -71,9 +71,9 @@ class FailureWhilePlaying(unittest.TestCase):
         before, played, after = replies[-3:]
         fps = 50 if last >= 1000 else 0
         expected = {"ok": True, "on": True, "brightness": 255, "playing": "all", "animation": 2, "fps": fps, "error": None, "width": 60, "height": 6}
-        self.assertEqual(json.loads(before), expected)
+        self.assertEqual(support.without_readiness(json.loads(before)), expected)
         self.assertEqual(played, '{"ok":false,"error":"unavailable"}')
-        self.assertEqual(json.loads(after), expected)
+        self.assertEqual(support.without_readiness(json.loads(after)), expected)
 
     def test_a_file_removed_before_the_next_loop(self):
         shown, logs, replies = self.play(["--remove-after", "hello.odrg", "2"])
@@ -194,7 +194,7 @@ class FailureWhilePlaying(unittest.TestCase):
         self.assertEqual(replies[0], '{"ok":true}')
         self.assertEqual(replies[1], '{"ok":true}')
         self.assertEqual(
-            json.loads(replies[2]),
+            support.without_readiness(json.loads(replies[2])),
             {"ok": True, "on": False, "brightness": 9, "playing": "all", "animation": 2, "fps": 50, "error": None, "width": 60, "height": 6},
         )
         self.assertIs(json.loads(replies[4])["on"], True)

@@ -96,8 +96,7 @@ class Stream(unittest.TestCase):
                 kinds = [event.kind for event in events if event.kind != "frame"]
                 self.assertEqual(kinds.count("log"), 1, line)
                 after_the_log = events[[event.kind for event in events].index("log"):]
-                status = support.of_kind(after_the_log, "status")[-1]
-                status.pop("fps")
+                status = support.without_fps(json.dumps(support.of_kind(after_the_log, "status")[-1]))
                 self.assertEqual(status, support.without_fps(port.ask("status")), line)
                 stream.read_until(has("log"), 5)
         logged = support.of_kind(self.stream().read_until(has("status"), 5), "log")
@@ -128,7 +127,7 @@ class Stream(unittest.TestCase):
             for event in stream.read_until(has("status"), 2):
                 if event.kind == "status":
                     arrivals.append(time.monotonic())
-                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6\}\Z')
+                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6,"readiness":"[a-z]+",[^{}]*\}\Z')
         self.assertGreaterEqual(len(arrivals), 3)
         self.assertLess(max(later - earlier for earlier, later in zip(arrivals, arrivals[1:])), 1.2)
 

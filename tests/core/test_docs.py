@@ -141,7 +141,7 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
         self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move"})

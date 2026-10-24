@@ -12,6 +12,92 @@ namespace odrig {
 
 namespace {
 
+// How far the check after the start is, and what is unavailable: the files whose check has
+// ended and those it has still to read, of the show and of a drive, and the animations
+// unavailable now. All 0 while the show is invalid.
+struct Readiness {
+    uint32_t checked;
+    uint32_t to_check;
+    uint32_t unavailable;
+};
+
+Readiness readiness_of(const Core &core) {
+    Readiness counts = {0, 0, 0};
+    if (core.invalid) {
+        return counts;
+    }
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        const FileInfo &info = core.files[file];
+        if (info.checked || info.fault != kNone) {
+            ++counts.checked;
+        } else {
+            ++counts.to_check;
+        }
+    }
+    for (uint32_t item = 0; item < core.item_count; ++item) {
+        const ItemInfo &info = core.items[item];
+        if (!info.is_cycle && core.files[info.first].fault != kNone) {
+            ++counts.unavailable;
+        }
+    }
+    for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
+        const uint8_t state = core.drive[place].state;
+        if (state == kDriveToCheck) {
+            ++counts.to_check;
+        } else {
+            ++counts.checked;
+            counts.unavailable += state == kDriveLeftOut ? 1 : 0;
+        }
+    }
+    return counts;
+}
+
+// Writes the name of the file the check is at, as a JSON string, or null.
+void checking_of(const Core &core, Reply &reply) {
+    if (!core.invalid && !check_complete(core) && core.check_at < core.file_count) {
+        reply.text("\"");
+        reply.text(core.files[core.check_at].name);
+        reply.text("\"");
+        return;
+    }
+    for (uint32_t place = core.drive_check_at; !core.invalid && core.drive != nullptr && place < core.drive_count; ++place) {
+        if (core.drive[place].state == kDriveToCheck) {
+            char name[kFaultNameSize];
+            drive_given_name(core, place, name, sizeof name);
+            reply.text("\"");
+            reply.escaped(name);
+            reply.text("\"");
+            return;
+        }
+    }
+    reply.text("null");
+}
+
+// The names of the works a fault can come in, by their numbers.
+const char *const kWorkNames[] = {"start", "start", "play", "upload", "drive"};
+
+// The reply to `fault`: the context of the latest fault of a file, or null.
+uint32_t fault_reply(const Core &core, Reply &reply) {
+    const FaultContext &fault = core.fault;
+    reply.text("{\"ok\":true,\"fault\":");
+    if (!fault.present) {
+        reply.text("null}\n");
+        return reply.length;
+    }
+    reply.text("{\"work\":\"");
+    reply.text(fault.work <= kWorkDrive ? kWorkNames[fault.work] : "start");
+    reply.text("\",\"file\":\"");
+    reply.escaped(fault.name);
+    reply.text("\",\"record\":");
+    reply.number(fault.record);
+    reply.text(",\"bytes\":");
+    reply.number(fault.body_bytes);
+    reply.text(",\"reason\":\"");
+    reply.text(reason_name(static_cast<Reason>(fault.reason)));
+    reply.text("\"}}\n");
+    return reply.length;
+}
+
 uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text("{\"ok\":true,\"on\":");
     reply.text(core.on ? "true" : "false");
@@ -40,6 +126,18 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text(",\"width\":null,\"height\":null");
     }
+    // How far the check is, and what is unavailable.
+    const Readiness counts = readiness_of(core);
+    reply.text(",\"readiness\":\"");
+    reply.text(core.invalid ? "recovery" : counts.to_check != 0 ? "checking" : counts.unavailable != 0 ? "degraded" : "ready");
+    reply.text("\",\"checked\":");
+    reply.number(counts.checked);
+    reply.text(",\"to_check\":");
+    reply.number(counts.to_check);
+    reply.text(",\"unavailable\":");
+    reply.number(counts.unavailable);
+    reply.text(",\"checking\":");
+    checking_of(core, reply);
     reply.text("}\n");
     return reply.length;
 }
@@ -220,6 +318,12 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return refuse(reply, "bad-argument");
         }
         return status(core, now, reply);
+    }
+    if (words.is(0, "fault")) {
+        if (words.count != 1) {
+            return refuse(reply, "bad-argument");
+        }
+        return fault_reply(core, reply);
     }
     const bool switch_on = words.is(0, "on");
     if (switch_on || words.is(0, "off")) {

@@ -197,7 +197,9 @@ class Busy(Playback):
         self.assertEqual([item["bytes"] for item in json.loads(given[-1])["items"]], [None, None])
         for command, reply in zip(commands, given):
             self.assertTrue(json.loads(reply)["ok"], command)
-        self.assertEqual(given[:-1], replies(support.start(self.files(), [told(0, command) for command in commands]).lines))
+        # Only what the status says of the check differs from a core that has read its files.
+        read = replies(support.start(self.files(), [told(0, command) for command in commands]).lines)
+        self.assertEqual(support.status_lines_without_readiness([f"reply {reply}" for reply in given[:-1]]), support.status_lines_without_readiness([f"reply {reply}" for reply in read]))
 
     def test_without_an_upload_data_end_and_cancel_are_no_upload(self):
         commands = ["upload data 0 AAAA", "upload end 00000000", "upload cancel"]
@@ -226,7 +228,8 @@ class Apart(Playback):
         the start, and compares every line. The lines are those of a core that had read
         every file before the script began."""
         printed = self.assert_as_the_reference(files, script, check_first=False)
-        self.assertEqual(printed, support.start(files, script).lines)
+        # Only what the status says of the check differs.
+        self.assertEqual(support.status_lines_without_readiness(printed), support.status_lines_without_readiness(support.start(files, script).lines))
         return printed
 
     def animation_at(self, files, times, commands=()):
