@@ -213,6 +213,7 @@ public:
         const bool drive = changes && !options_.drive.empty();
         functions.drive = drive ? drive_number : nullptr;
         functions.drive_name = drive ? drive_name : nullptr;
+        functions.drive_space = nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -609,7 +610,7 @@ private:
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
         const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
-                           given == "show.part" || given == "pending.txt";
+                           given == "show.part" || given == "pending.txt" || given == "mapping.part";
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }

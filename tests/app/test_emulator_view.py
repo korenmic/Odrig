@@ -44,7 +44,7 @@ class TheControllerViewOfTheEmulator(unittest.TestCase):
         self.assertEqual({transport for transport, _ in lines}, {"http"})
         self.assertEqual(lines[0], ("http", "status"))
         self.assertIn(("http", "list 0"), lines)
-        self.assertLessEqual({line for _, line in lines}, {"status", "list 0"})
+        self.assertLessEqual({line for _, line in lines}, {"status", "list 0", "space"})
         self.assertIsNone(emulator.status()["error"])
 
     def test_in_the_other_views_the_app_does_not_run(self):

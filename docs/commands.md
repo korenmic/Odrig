@@ -26,13 +26,19 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `remove <id>` | Removes an item from the show. |
+| `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
+| `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
+| `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
+| `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
+| `mapping test on` | Shows the built-in diagonal until stopped. |
+| `mapping test off` | Stops the diagonal and resumes the show. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
-what [show.md](show.md) says it plays by itself: the playlist of all its animations, or
+what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
 the cycle its `start` names. What `play`, `on`, `off` and `brightness` change is not kept
 across a restart. What `remove` and `upload` change is: they change the installed show.
 
@@ -60,7 +66,7 @@ A number in a command is written in decimal digits.
 
 ```
 space
-{"ok":true,"free":11517952,"total":13500416,"animations":2}
+{"ok":true,"free":11517952,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}
 ```
 
 `free` and `total` are bytes of the storage the show is in. `animations` is the number of
@@ -68,7 +74,7 @@ animation items of the show, and 0 while the show is invalid.
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138},{"id":2,"file":"dvd.odrg","bytes":1612},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
@@ -83,7 +89,7 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The animations of a USB drive come after the items of the show, in the order of their
-file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340}`.
+file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false}`.
 Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
@@ -197,6 +203,7 @@ succeeds.
 | `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
@@ -224,3 +231,52 @@ other line.
 or without the final newline. The response body is the reply line, with content type
 `application/json`. The response status is 200 whenever the line reached the command
 front-end, including replies with `"ok":false`. Any other method on `/odrig` gets status 405.
+
+## Mapping controls
+
+`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false}`.
+Pins are in snake order, 1 through 20. Unsupported or invalid mappings report
+`editable:false`, an empty `pins` array and revision 0. The test flag is target-wide.
+Only the target's existing twenty-pin permutation is editable.
+
+`mapping set <revision> <pins>` accepts exactly twenty comma-separated GPIO numbers.
+The revision is the decimal CRC-32 of the current twenty pin bytes in snake order.
+Every current output pin must occur exactly once. A successful reply means the new
+mapping is durably committed and ready for output routing. An identical assignment
+performs no storage writes. Re-read after any uncertain reply.
+
+A stale revision gives `mapping-conflict`; malformed or unsupported assignments give
+`bad-argument`. Invalid shows give `show-invalid`; startup checking or an open upload
+makes writes `busy`; failed or unavailable writable storage gives `storage-error`.
+
+`mapping test on` displays the built-in diagonal until `mapping test off` or a valid
+ordinary play command. Both test commands are idempotent. Entry requires the valid
+60 x 60 target mapping and a completed startup check with no open upload. During the
+test status reports no ordinary playing item or animation; `mapping get` identifies
+the active test. Upload and remove return `busy`, but mapping saves, list, space,
+status, power and brightness remain available. The test changes no show entry.
+
+The protocol is identical over HTTP, board serial and emulator serial or TCP.
+
+## Playlist inclusion and batch deletion
+
+`ignore <id> <0|1>` persists an installed animation's automatic-playlist exclusion:
+1 excludes, 0 includes. It is idempotent and returns `{"ok":true}` after durability.
+`list` includes boolean `ignored` on installed animations only. Explicit play and
+cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-use.
+
+`remove many <id,id,...>` deletes 1–32 distinct installed animation items atomically
+per command. Every id is validated first; unknown ids return unknown-id; cycles,
+external entries and animations referenced by cycles return in-use. Duplicates and
+malformed lists return bad-argument. Single `remove <id>` retains cycle deletion.
+Both mutation forms return busy during startup checking, upload or mapping test;
+show-invalid and storage-error retain their meanings. Every transport forwards these
+commands into the same core parser; no route has separate deletion/playback rules.
+
+### External storage capacity
+
+`space` retains its internal `free`, `total` and installed `animations` count, including
+ignored items. Its `external` object contains boolean `present`, `read_only:true`, and
+nullable `free` and `total` byte counts. Absent media reports false/null/null. Mounted
+media with unknown capacity reports true/null/null. Known counters support volumes
+over 4 GiB, up to 9,007,199,254,740,991 bytes. Capacity never grants write access to a drive.

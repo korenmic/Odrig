@@ -25,7 +25,7 @@ export const ENDING = ".odrg";
 const MEMBERS = ["version", "brightness", "items"];
 const OPTIONAL = ["start", "min_seconds"];
 const ANIMATION_MEMBERS = ["id", "file"];
-const ANIMATION_OPTIONAL = ["repeat", "max_seconds"];
+const ANIMATION_OPTIONAL = ["repeat", "max_seconds", "ignored"];
 const CYCLE_MEMBERS = ["id", "cycle", "seconds"];
 
 // Reads a show file given as bytes: its format first, then its ids.
@@ -105,7 +105,13 @@ function itemOf(entry, what) {
     }
     const repeat = entry.has("repeat") ? strictjson.integer(entry.get("repeat"), 1, MOST_LOOPS, `repeat of item ${number}`) : null;
     const maxSeconds = entry.has("max_seconds") ? strictjson.integer(entry.get("max_seconds"), 1, LONGEST_TURN, `max_seconds of item ${number}`) : null;
-    return {id: number, file: name, cycle: null, seconds: null, repeat, maxSeconds};
+    const inclusion = {};
+    if (entry.has("ignored")) {
+      const ignored = entry.get("ignored");
+      if (typeof ignored !== "boolean") throw new Rejection(BAD_TYPE, `ignored of item ${number} is not a boolean`);
+      inclusion.ignored = ignored;
+    }
+    return {id: number, file: name, cycle: null, seconds: null, repeat, maxSeconds, ...inclusion};
   }
   const cycle = strictjson.array(entry.get("cycle"), `cycle of item ${number}`);
   if (cycle.length === 0) {

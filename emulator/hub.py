@@ -114,6 +114,13 @@ class Hub:
             for connection in self._connections:
                 connection.put("status", self._status)
 
+    def mapping(self, legs):
+        """Publish a complete committed routing assignment."""
+        data = compact([list(leg) for leg in legs])
+        with self._lock:
+            for connection in self._connections:
+                connection.put("mapping", data)
+
     def refresh(self, ms, frame):
         """Takes the refresh the core produced at a timestamp as the newest one."""
         with self._lock:

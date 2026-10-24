@@ -1,6 +1,7 @@
 #include "commands.h"
 
 #include "content.h"
+#include "mapping_control.h"
 #include "odrig_core.h"
 #include "player.h"
 #include "show.h"
@@ -202,6 +203,17 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     Words words;
     words.split(line, length);
 
+    if (words.is(0, "mapping")) {
+        if (words.count == 2 && words.is(1, "get")) return mapping_get(core, reply);
+        if (words.count == 3 && words.is(1, "test") && (words.is(2, "on") || words.is(2, "off"))) {
+            return mapping_test(core, words.is(2, "on"), reply);
+        }
+        uint32_t revision;
+        if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision)) {
+            return mapping_set(core, revision, words.text[3], words.size[3], reply);
+        }
+        return refuse(reply, "bad-argument");
+    }
     if (words.is(0, "status")) {
         if (words.count != 1) {
             return refuse(reply, "bad-argument");
@@ -246,6 +258,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }
+        core.mapping_test = 0;
         // An animation is played as its turn of the playlist, which goes on after it.
         if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
@@ -274,6 +287,33 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return content_list(core, from, reply);
     }
+    if (words.is(0, "ignore")) {
+        uint32_t id, value;
+        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        return content_ignore(core, id, value != 0, reply);
+    }
+    if (words.is(0, "remove") && words.count == 3 && words.is(1, "many")) {
+        uint16_t ids[32];
+        uint32_t count = 0, value = 0, digits = 0;
+        for (uint32_t at = 0; at <= words.size[2]; ++at) {
+            const char c = at < words.size[2] ? words.text[2][at] : ',';
+            if (c == ',') {
+                if (digits == 0 || value == 0 || count == 32) return refuse(reply, "bad-argument");
+                for (uint32_t before = 0; before < count; ++before) if (ids[before] == value) return refuse(reply, "bad-argument");
+                ids[count++] = static_cast<uint16_t>(value);
+                value = digits = 0;
+            } else {
+                if (c < '0' || c > '9' || value > 6553 || (value == 6553 && c > '5')) return refuse(reply, "bad-argument");
+                value = value * 10 + static_cast<uint32_t>(c - '0');
+                ++digits;
+            }
+        }
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        return content_remove_many(core, ids, count, reply);
+    }
     if (words.is(0, "remove")) {
         uint32_t id;
         if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
@@ -286,9 +326,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             // The check after the start reads the files the removal would take away.
             return refuse(reply, "busy");
         }
+        if (core.mapping_test) return refuse(reply, "busy");
         return content_remove(core, id, reply);
     }
     if (words.is(0, "upload")) {
+        if (core.mapping_test) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");

@@ -129,3 +129,20 @@ esp_err_t msc_host_vfs_unregister(msc_host_vfs_handle_t vfs_handle)
     dealloc_msc_vfs(vfs);
     return ESP_OK;
 }
+
+esp_err_t msc_host_vfs_space(msc_host_vfs_handle_t vfs_handle, uint64_t *free_bytes, uint64_t *total_bytes)
+{
+    if (vfs_handle == NULL || free_bytes == NULL || total_bytes == NULL) return ESP_ERR_INVALID_ARG;
+    FATFS *fs = NULL;
+    DWORD free_clusters = 0;
+    if (f_getfree(vfs_handle->drive, &free_clusters, &fs) != FR_OK || fs == NULL || fs->n_fatent < 2) return ESP_FAIL;
+#if FF_MAX_SS != FF_MIN_SS
+    const uint64_t sector_bytes = fs->ssize;
+#else
+    const uint64_t sector_bytes = FF_MIN_SS;
+#endif
+    const uint64_t cluster_bytes = sector_bytes * fs->csize;
+    *free_bytes = cluster_bytes * free_clusters;
+    *total_bytes = cluster_bytes * (fs->n_fatent - 2);
+    return *free_bytes <= *total_bytes ? ESP_OK : ESP_FAIL;
+}

@@ -43,12 +43,15 @@ const REFUSALS = {
   "bad-argument": NOT_UNDERSTOOD,
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
-  "unknown-id": (line) => (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  "unknown-id": (line) => line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
+    line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
+    line.startsWith("ignore ") ? "Only installed animations support playlist inclusion." :
     line.startsWith("upload ")
       ? "That name or id is in use on the installation. The list is asked for again; upload again."
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
+  "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "storage-error": () => "The installation could not use its storage.",
   "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,

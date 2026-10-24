@@ -149,6 +149,12 @@ uint32_t driveNumber(void *) {
   return number;
 }
 
+int driveSpace(void *, uint32_t drive, uint64_t *freeBytes, uint64_t *totalBytes) {
+  Guarded held;
+  if (drive == 0 || drive != number || mounted == nullptr) return -1;
+  return msc_host_vfs_space(mounted, freeBytes, totalBytes) == ESP_OK ? 1 : -1;
+}
+
 int driveName(void *, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
   Guarded held;
   if (drive == 0 || drive != number || place >= listed || capacity == 0) return 0;
@@ -468,6 +474,7 @@ odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   made.read_at = readPart;
   made.drive = driveNumber;
   made.drive_name = driveName;
+  made.drive_space = driveSpace;
   return made;
 }
 

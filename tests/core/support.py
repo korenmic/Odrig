@@ -639,7 +639,7 @@ class ReferencePlayer:
         if self.changeable and self.PENDING in files:
             # What an interrupted change left: a file named there that no item names.
             named = show.files(listed)
-            for line in files.pop(self.PENDING)[:512].split(b"\n")[:-1]:
+            for line in files.pop(self.PENDING)[:1500].split(b"\n")[:-1]:
                 name = line.decode("latin-1")
                 if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDING) and name not in named:
                     files.pop(name, None)
@@ -1051,7 +1051,7 @@ class ReferencePlayer:
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
         if item.cycle is None:
-            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file])}, separators=(",", ":"))
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
 
     def _list(self, first):
@@ -1080,7 +1080,7 @@ class ReferencePlayer:
         items = []
         for item in self.items.values():
             if item.cycle is None:
-                turn = {name: value for name, value in (("repeat", item.repeat), ("max_seconds", item.max_seconds)) if value is not None}
+                turn = {name: value for name, value in (("repeat", item.repeat), ("max_seconds", item.max_seconds), ("ignored", item.ignored)) if value is not None}
                 items.append({"id": item.id, "file": item.file, **turn})
             else:
                 items.append({"id": item.id, "cycle": list(item.cycle), "seconds": item.seconds})
@@ -1118,7 +1118,7 @@ class ReferencePlayer:
 
     def _space(self):
         animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)
-        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations}
+        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations, "external": {"present": False, "free": None, "total": None, "read_only": True}}
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def _status(self, now):

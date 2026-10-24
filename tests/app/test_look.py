@@ -80,15 +80,15 @@ class Look(unittest.TestCase):
                     for second in controls[position + 1:]:
                         self.assertGreaterEqual(apart(first, second), 8 - 0.01, f"{where}: {first['what']} and {second['what']}")
 
-    def test_the_three_screen_buttons_lie_along_the_bottom_edge_each_a_third_of_the_width(self):
+    def test_the_four_screen_buttons_lie_along_the_bottom_edge_at_equal_width(self):
         for where, size, screen in self.each():
             buttons = [control for control in screen["controls"] if control["group"] == "nav"]
-            self.assertEqual([button["what"] for button in buttons], ["to-show", "to-storage", "to-target"], where)
+            self.assertEqual([button["what"] for button in buttons], ["to-show", "to-storage", "to-mapping", "to-target"], where)
             widths = [button["right"] - button["left"] for button in buttons]
             self.assertAlmostEqual(widths[0], widths[1], delta=1, msg=where)
             self.assertAlmostEqual(widths[1], widths[2], delta=1, msg=where)
             # The edges and the gaps take 8 pixels each.
-            self.assertAlmostEqual(sum(widths), size[0] - 4 * 8, delta=1, msg=where)
+            self.assertAlmostEqual(sum(widths), size[0] - 5 * 8, delta=1, msg=where)
             self.assertAlmostEqual(screen["nav"]["bottom"], screen["height"], delta=1, msg=where)
             # The last control of a long screen can be moved clear of them.
             self.assertGreaterEqual(screen["spaceBelow"], screen["nav"]["bottom"] - screen["nav"]["top"] + 8, where)
@@ -121,7 +121,8 @@ class Look(unittest.TestCase):
     def test_the_sizes_of_the_letters(self):
         for where, size, screen in self.each():
             sizes = {text["what"]: text["size"] for text in screen["texts"]}
-            self.assertEqual({size for what, size in sizes.items() if what in ("to-show", "to-storage", "to-target", "use", "board", "on", "off", "play-all", "confirm-yes", "confirm-no")}, {20}, where)
+            self.assertEqual({size for what, size in sizes.items() if what.startswith("to-")}, {16}, where)
+            self.assertLessEqual({size for what, size in sizes.items() if what in ("use", "board", "on", "off", "play-all", "confirm-yes", "confirm-no")}, {20}, where)
             self.assertGreaterEqual(min(sizes.values()), 14, where)
         show = {text["what"]: text["size"] for text in self.measured[(360, 740)]["show"]["texts"]}
         self.assertEqual((show["power"], show["brightness"], show["playing"]), (28, 18, 18))

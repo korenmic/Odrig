@@ -17,7 +17,7 @@ ENDING = ".odrg"
 _MEMBERS = ("version", "brightness", "items")
 _OPTIONAL = ("start", "min_seconds")
 _ANIMATION_MEMBERS = ("id", "file")
-_ANIMATION_OPTIONAL = ("repeat", "max_seconds")
+_ANIMATION_OPTIONAL = ("repeat", "max_seconds", "ignored")
 _CYCLE_MEMBERS = ("id", "cycle", "seconds")
 
 
@@ -29,6 +29,7 @@ class Item:
     seconds: int | None
     repeat: int | None = None
     max_seconds: int | None = None
+    ignored: bool | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -107,7 +108,10 @@ def _item(entry, what):
             )
         repeat = strictjson.integer(entry["repeat"], 1, MOST_LOOPS, what=f"repeat of item {number}") if "repeat" in entry else None
         longest = strictjson.integer(entry["max_seconds"], 1, LONGEST_TURN, what=f"max_seconds of item {number}") if "max_seconds" in entry else None
-        return Item(number, name, None, None, repeat, longest)
+        ignored = entry.get("ignored")
+        if "ignored" in entry and type(ignored) is not bool:
+            raise errors.Rejection(errors.BAD_TYPE, f"ignored of item {number} is not a boolean")
+        return Item(number, name, None, None, repeat, longest, ignored)
     cycle = strictjson.array(entry["cycle"], what=f"cycle of item {number}")
     if not cycle:
         raise _malformed(f"cycle of item {number} is empty")

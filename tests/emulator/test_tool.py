@@ -33,6 +33,7 @@ OK = '{"ok":true}\n'
 # range, and a line that is too long. Each entry is what follows the target on the command
 # line.
 SESSION = (
+    ("mapping", "test", "off"),
     ("status",),
     ("brightness", "77"),
     ("status",),
@@ -50,6 +51,7 @@ SESSION = (
     ("space",),
     ("list",),
     ("remove", "99"),
+    ("ignore", "999", "1"),
     ("status",),
 )
 
@@ -57,7 +59,7 @@ SESSION = (
 def reference_replies(files, session):
     player = ReferencePlayer(files)
     player.poll(0)
-    return [player.command(100, " ".join(words).encode("ascii")) for words in session]
+    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words == ("ignore", "999", "1") else player.command(100, " ".join(words).encode("ascii")) for words in session]
 
 
 class AgainstTheEmulator(unittest.TestCase):
@@ -167,7 +169,7 @@ class Session(unittest.TestCase):
                 self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
-        self.assertEqual(codes[-8:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id"])
+        self.assertEqual(codes[-9:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id"])
         self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload"})
 
 
@@ -278,16 +280,16 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "upload begin <id> <file> <bytes>",
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith("upload ") and command != "play all"]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name != "upload"],
-                         [command.replace("<id>", "<x>").replace("<n>", "<x>") for command in one_line])
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ")) and command not in ("play all", "remove many <ids>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping")],
+                         [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "remove": ("ID",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -586,7 +588,7 @@ class Upload(Content):
                     result = support.run_tool(*target, "upload", "9", self.hello)
                     self.assertEqual((result.status, result.out), (0, OK))
                     self.assertRegex(result.err, rf"\Aupload: 100% {size}/{size} bytes \d+ B/s\nupload: checking\n\Z")
-                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, ("all", 9, None)))
+                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
                 finally:
                     emulator.stop()
                 self.assertEqual(support.files_of(self.folder)["hello-again.odrg"], self.before["hello.odrg"])
@@ -594,7 +596,7 @@ class Upload(Content):
                 again = support.Emulator(self.folder)
                 try:
                     target = targets(again)[transport]
-                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size}, ("all", 9, None)))
+                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
                     removed = support.run_tool(*target, "remove", "9")
                     self.assertEqual((removed.status, removed.out, removed.err), (0, OK, ""))
                     # It was the last animation of the playlist: the first one is next.
@@ -620,7 +622,7 @@ class Upload(Content):
                 self.assertRegex(lines[-2], rf"\Aupload: 100% {len(clip)}/{len(clip)} bytes \d+ B/s\Z")
                 self.assertEqual(support.files_of(self.folder)["clip.odrg"], clip)
                 listed = json.loads(support.run_tool(*target, "list").out)["items"]
-                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip)})
+                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip), "ignored": False})
                 self.assertEqual(support.run_tool(*target, "remove", number).status, 0)
         with support.EventStream(emulator.port) as stream:
             logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")

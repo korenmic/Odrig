@@ -25,7 +25,7 @@ class Controls(unittest.TestCase):
             events = stream.read_until(lambda events: any(done(json.loads(event.data)["line"]) for event in events if event.kind == "log"), 10)
         logged = emulator_support.of_kind(events, "log")
         self.assertEqual({entry["transport"] for entry in logged}, {"http"})
-        return found.seen, [(entry["line"], entry["ms"]) for entry in logged if entry["line"].split(" ")[0] not in ("status", "list")]
+        return found.seen, [(entry["line"], entry["ms"]) for entry in logged if entry["line"].split(" ")[0] not in ("status", "list", "space")]
 
 
 class Buttons(Controls):

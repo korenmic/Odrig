@@ -85,6 +85,9 @@ typedef struct odrig_host {
        a dot, in the order of their names, the first 256. Returns 1, or 0 when that drive
        has no file at that place or is not plugged in any more. */
     int (*drive_name)(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity);
+    /* Optional capacity of this mounted drive, in bytes. Returns 1, or -1 when
+       unavailable or the generation changed. No writes are performed. */
+    int (*drive_space)(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

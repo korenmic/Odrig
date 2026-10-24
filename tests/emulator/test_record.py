@@ -125,7 +125,7 @@ class Recording(unittest.TestCase):
         script.write_text(script_text(commands), encoding="utf-8")
         result = support.run(folder, "--record", self.out, "--seconds", 2, "--script", script, "--storage", 30000)
         self.assertEqual((result.status, result.err), (0, ""))
-        self.assertEqual(result.out.splitlines(), ['reply 0 {"ok":true,"free":13616,"total":30000,"animations":2}', 'reply 1000 {"ok":false,"error":"no-space"}'])
+        self.assertEqual(result.out.splitlines(), ['reply 0 {"ok":true,"free":13616,"total":30000,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}', 'reply 1000 {"ok":false,"error":"no-space"}'])
 
     def test_60_seconds_of_the_example_show_equal_the_reference_at_every_tick(self):
         folder = self.example()

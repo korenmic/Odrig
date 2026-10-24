@@ -23,6 +23,8 @@ COMMANDS = {
     "space": (),
     "list": (),
     "remove": ("ID",),
+    "ignore": ("ID", "VALUE"),
+    "mapping": ("OPERATION",),
     "upload": ("ID", "FILE"),
 }
 TIMEOUT_SECONDS = 2.0
@@ -54,7 +56,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, upload ID FILE. ID and N are sent as they are typed.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, upload ID FILE. ID and N are sent as they are typed.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -80,6 +82,18 @@ def checked(made, arguments):
         return []
     if arguments.command is None:
         made.error("a command is needed, or --log")
+    if arguments.command == "remove" and len(arguments.arguments) == 2 and arguments.arguments[0] == "many":
+        if any("\n" in word or "\r" in word for word in arguments.arguments):
+            made.error("a command is one line")
+        return [arguments.command, *arguments.arguments]
+    if arguments.command == "mapping":
+        words = arguments.arguments
+        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set")
+        if not valid:
+            made.error("mapping takes get, set REV PINS, or test on|off")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
     takes = COMMANDS[arguments.command]
     if len(arguments.arguments) != len(takes):
         made.error(f"{arguments.command} takes {COUNTS[len(takes)]}" + (": " + " ".join(takes) if takes else ""))
