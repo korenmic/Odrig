@@ -52,7 +52,7 @@ Rules for every task:
     measured and `docs/core.md`'s table.
   - Task 1's start test passes. Prove it fails first.
 
-- [ ] 4. The core: changes of the internal storage commit the catalog
+- [x] 4. The core: changes of the internal storage commit the catalog
   - `catalog_commit`; uploads, `remove`, `remove many`; legacy storage unchanged.
   - Tests, `tests/core/test_catalog_changes.py`: the files after each change; a cut and a
     failure at every storage call of each change, then a start; the same sequences

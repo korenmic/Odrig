@@ -310,11 +310,20 @@ __attribute__((noinline)) void act(Core &core, uint32_t storage, bool moves, con
     }
 }
 
-// The actions of a whole commit record of a place, read again: does them when `act` is
-// set. The record is whole when every line is in its form and its CRC-32 is right. Returns
-// whether it is whole; `mask` is its pages.
-bool read_record(Core &core, const Place &place, bool acting, uint32_t *mask) {
+// One action of a commit record: whether it moves `upload.part` onto the name, else removes
+// the file of the name, and the name with a zero after it.
+struct Action {
+    bool moves;
+    char name[kCatalogNameMost + 1];
+};
+
+// Reads the commit record of a place whole, and gives its action at position `wanted`, when
+// it has one, in `action`. Returns whether the record is whole; `mask` is its pages and
+// `actions` the number of its actions. Nothing is done while it is read: the source reads one
+// file at a time.
+__attribute__((noinline)) bool read_record(Core &core, const Place &place, uint32_t *mask, uint32_t *actions, uint32_t wanted, Action *action) {
     FileSource &source = source_of(core, place);
+    *actions = 0;
     if (open_for(core, place, kRecordNames[place.storage]) != kNone) {
         return false;
     }
@@ -336,22 +345,28 @@ bool read_record(Core &core, const Place &place, bool acting, uint32_t *mask) {
         }
         at = 0;
         uint32_t sealed;
+        bool moves = false;
         if (word(line, &at, "crc ")) {
             whole = hexadecimal(line, &at, 8, &sealed) && line[at] == '\0' && sealed == before && reader.next(source, line, sizeof line) == kLineEnd;
             ended = true;
+            continue;
         } else if (word(line, &at, "move upload.part ")) {
             whole = catalog_name_allowed(line + at, reader.length - at);
-            if (whole && acting) {
-                act(core, place.storage, true, line + at, reader.length - at);
-            }
+            moves = true;
         } else if (word(line, &at, "remove ")) {
             whole = catalog_name_allowed(line + at, reader.length - at) || is_part(line + at, reader.length - at);
-            if (whole && acting) {
-                act(core, place.storage, false, line + at, reader.length - at);
-            }
         } else {
             whole = false;
         }
+        if (whole && *actions == wanted && action != nullptr) {
+            action->moves = moves;
+            uint32_t length = 0;
+            for (; at + length < reader.length; ++length) {
+                action->name[length] = line[at + length];
+            }
+            action->name[length] = '\0';
+        }
+        ++*actions;
     }
     source.close();
     return whole && ended;
@@ -373,10 +388,22 @@ uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker 
 // written. True when there was one.
 bool finish(Core &core, const Place &place) {
     uint32_t mask = 0;
-    if (!read_record(core, place, false, &mask)) {
+    uint32_t actions = 0;
+    if (!read_record(core, place, &mask, &actions, kNothing, nullptr)) {
         return false;
     }
-    read_record(core, place, true, &mask);
+    // Each action is read again on its own, and done once the record is closed.
+    for (uint32_t index = 0; index < actions; ++index) {
+        Action action;
+        uint32_t count = 0;
+        if (read_record(core, place, &mask, &count, index, &action)) {
+            uint32_t length = 0;
+            while (action.name[length] != '\0') {
+                ++length;
+            }
+            act(core, place.storage, action.moves, action.name, length);
+        }
+    }
     // The counts of the new marker, or of the marker when it was renamed already; a page
     // whose count is not known counts as one, so that it is not removed.
     const uint32_t storage = place.storage;
@@ -397,6 +424,178 @@ bool finish(Core &core, const Place &place) {
     }
     rename_there(core, kNewMarkerNames[storage], kMarkerNames[storage]);
     core.host.remove(core.host.ctx, kRecordNames[storage]);
+    return true;
+}
+
+uint32_t text_size(const char *text) {
+    uint32_t size = 0;
+    while (text[size] != '\0') {
+        ++size;
+    }
+    return size;
+}
+
+// Writes text into the chunk buffer from `*length` on.
+void put(Core &core, uint32_t *length, const char *text) {
+    while (*text != '\0') {
+        core.chunk[(*length)++] = static_cast<uint8_t>(*text++);
+    }
+}
+
+void put_bytes(Core &core, uint32_t *length, const char *text, uint32_t size) {
+    for (uint32_t at = 0; at < size; ++at) {
+        core.chunk[(*length)++] = static_cast<uint8_t>(text[at]);
+    }
+}
+
+void put_number(Core &core, uint32_t *length, uint64_t value) {
+    char digits[20];
+    uint32_t count = 0;
+    do {
+        digits[count++] = static_cast<char>('0' + value % 10);
+        value /= 10;
+    } while (value != 0);
+    while (count != 0) {
+        core.chunk[(*length)++] = static_cast<uint8_t>(digits[--count]);
+    }
+}
+
+void put_hex(Core &core, uint32_t *length, uint32_t value, uint32_t digits) {
+    for (uint32_t digit = 0; digit < digits; ++digit) {
+        core.chunk[(*length)++] = static_cast<uint8_t>("0123456789abcdef"[value >> (4 * (digits - 1 - digit)) & 0xFu]);
+    }
+}
+
+// Writes the chunk buffer's first `length` bytes as a new file, by its host's name.
+bool write_whole(Core &core, const char *name, uint32_t length) {
+    const odrig_host &host = core.host;
+    return host.write_open(host.ctx, name) == 1 && host.write(host.ctx, core.chunk, length) == 1 && host.write_close(host.ctx) == 1;
+}
+
+// Puts a marker's text into the chunk buffer from 0 on, and returns its length, 409.
+uint32_t marker_text(Core &core, const Marker &marker) {
+    uint32_t length = 0;
+    put(core, &length, "odrig-catalog 1 check 1 generation ");
+    put_hex(core, &length, marker.generation, 8);
+    put(core, &length, "\n");
+    for (uint32_t page = 0; page < kCatalogPages; ++page) {
+        put(core, &length, "page ");
+        put_number(core, &length, page / 10);
+        put_number(core, &length, page % 10);
+        put(core, &length, " ");
+        for (uint32_t divisor = 1000; divisor != 0; divisor /= 10) {
+            put_number(core, &length, marker.counts[page] / divisor % 10);
+        }
+        put(core, &length, " ");
+        put_hex(core, &length, marker.crcs[page], 8);
+        put(core, &length, "\n");
+    }
+    uint32_t crc = kCrcStart;
+    for (uint32_t at = 0; at < length; ++at) {
+        crc = crc_add(crc, core.chunk[at]);
+    }
+    put(core, &length, "crc ");
+    put_hex(core, &length, crc_value(crc), 8);
+    put(core, &length, "\n");
+    return length;
+}
+
+// Puts the line of the added entry of a change into the chunk buffer from `*length` on.
+void put_entry(Core &core, uint32_t *length, const CatalogChange &change) {
+    put_hex(core, length, change.added_crc, 8);
+    put(core, length, " ");
+    put_number(core, length, change.added_bytes);
+    put(core, length, " ");
+    put_number(core, length, core.width);
+    put(core, length, " ");
+    put_number(core, length, core.height);
+    put(core, length, " ");
+    put_number(core, length, change.added_total_ms);
+    put(core, length, " frames ");
+    put(core, length, change.added);
+    put(core, length, "\n");
+}
+
+// The most bytes of a page gathered in the chunk buffer before they go to the host.
+const uint32_t kPageFlush = 1200;
+
+// Writes the new page of a change from the old one: every line but the dropped ones, the
+// added entry in the place of the line of its name, or last. Gives its count and CRC-32.
+__attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t page, const Marker &old, const CatalogChange &change, uint16_t *count, uint32_t *crc) {
+    const odrig_host &host = core.host;
+    const char *fresh = kNewPageNames[storage][page];
+    const Place place = {storage, true};
+    const uint32_t added_length = change.added != nullptr ? text_size(change.added) : 0;
+    const bool adds_here = change.added != nullptr && catalog_page_of(change.added, added_length) == page;
+    bool placed = false;
+    bool opened = false;
+    uint32_t length = 0;
+    uint32_t lines = 0;
+    uint32_t sum = kCrcStart;
+    LineReader reader;
+    char line[kCatalogLineRoom];
+    if (old.counts[page] != 0 && open_for(core, place, kPageNames[storage][page]) != kNone) {
+        return false;
+    }
+    for (;;) {
+        bool got = false;
+        if (old.counts[page] != 0) {
+            const LineRead read = reader.next(core.checker->file, line, sizeof line);
+            if (read == kLineFailed || (read == kLineGot && (reader.over || reader.unended))) {
+                core.checker->file.close();
+                return false;
+            }
+            got = read == kLineGot;
+        }
+        if (got) {
+            EntryLine entry;
+            if (!parse_entry(line, reader.length, page, entry)) {
+                core.checker->file.close();
+                return false;
+            }
+            if (adds_here && entry.name_length == added_length && same_text(entry.name, change.added)) {
+                put_entry(core, &length, change);
+                placed = true;
+            } else if (change.drops == nullptr || !change.drops(core, entry.name, entry.name_length, change.context)) {
+                put_bytes(core, &length, line, reader.length);
+                put(core, &length, "\n");
+            } else {
+                continue;
+            }
+        } else if (adds_here && !placed) {
+            put_entry(core, &length, change);
+            placed = true;
+        } else {
+            break;
+        }
+        ++lines;
+        if (length >= kPageFlush) {
+            for (uint32_t at = 0; at < length; ++at) {
+                sum = crc_add(sum, core.chunk[at]);
+            }
+            if ((!opened && host.write_open(host.ctx, fresh) != 1) || host.write(host.ctx, core.chunk, length) != 1) {
+                core.checker->file.close();
+                return false;
+            }
+            opened = true;
+            length = 0;
+        }
+    }
+    core.checker->file.close();
+    for (uint32_t at = 0; at < length; ++at) {
+        sum = crc_add(sum, core.chunk[at]);
+    }
+    if (lines == 0) {
+        // A new page left by a change that was not committed must not be finished.
+        *count = 0;
+        *crc = 0;
+        return host.remove(host.ctx, fresh) != -1;
+    }
+    if ((!opened && host.write_open(host.ctx, fresh) != 1) || (length != 0 && host.write(host.ctx, core.chunk, length) != 1) || host.write_close(host.ctx) != 1) {
+        return false;
+    }
+    *count = static_cast<uint16_t>(lines);
+    *crc = crc_value(sum);
     return true;
 }
 
@@ -517,6 +716,67 @@ void catalog_finish_internal(Core &core) {
     finish(core, place);
 }
 
+bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change) {
+    CatalogState &catalog = core.catalogs[storage];
+    if (catalog.state != kCatalogOk) {
+        return true;
+    }
+    drive_check_yields(core);
+    const Place place = {storage, true};
+    Marker marker;
+    if (read_marker_of(core, place, kMarkerNames[storage], marker) != kCatalogOk) {
+        return false;
+    }
+    uint32_t mask = change.drop_pages;
+    if (change.added != nullptr) {
+        mask |= 1u << catalog_page_of(change.added, text_size(change.added));
+    }
+    for (uint32_t page = 0; page < kCatalogPages; ++page) {
+        if ((mask & (1u << page)) != 0 && !write_page(core, storage, page, marker, change, &marker.counts[page], &marker.crcs[page])) {
+            return false;
+        }
+    }
+    marker.generation = marker.generation == 0xFFFFFFFFu ? 1 : marker.generation + 1;
+    if (!write_whole(core, kNewMarkerNames[storage], marker_text(core, marker))) {
+        return false;
+    }
+    uint32_t length = 0;
+    put(core, &length, "odrig-catalog-do 1 generation ");
+    put_hex(core, &length, marker.generation, 8);
+    put(core, &length, "\npages ");
+    put_hex(core, &length, mask, 4);
+    put(core, &length, "\n");
+    if (change.moves_part) {
+        put(core, &length, "move upload.part ");
+        put(core, &length, change.added);
+        put(core, &length, "\n");
+    }
+    if (change.removed_file != nullptr) {
+        put(core, &length, "remove ");
+        put(core, &length, change.removed_file);
+        put(core, &length, "\n");
+    }
+    uint32_t crc = kCrcStart;
+    for (uint32_t at = 0; at < length; ++at) {
+        crc = crc_add(crc, core.chunk[at]);
+    }
+    put(core, &length, "crc ");
+    put_hex(core, &length, crc_value(crc), 8);
+    put(core, &length, "\n");
+    if (!write_whole(core, kRecordNames[storage], length)) {
+        return false;
+    }
+    // Committed: what is left of it is finished at the next start when a call fails now.
+    finish(core, place);
+    catalog.generation = marker.generation;
+    uint32_t entries = 0;
+    for (uint32_t page = 0; page < kCatalogPages; ++page) {
+        entries += marker.counts[page];
+    }
+    catalog.entries = static_cast<uint16_t>(entries);
+    return true;
+}
+
 void catalog_read_internal(Core &core) {
     CatalogState &catalog = core.catalogs[kInternal];
     catalog.state = kCatalogNone;
@@ -525,7 +785,8 @@ void catalog_read_internal(Core &core) {
     catalog.entries = 0;
     uint32_t mask = 0;
     const Place place = {kInternal, false};
-    if (!storage_changes(core) && read_record(core, place, false, &mask)) {
+    uint32_t actions = 0;
+    if (!storage_changes(core) && read_record(core, place, &mask, &actions, kNothing, nullptr)) {
         // A whole commit record that this host cannot finish.
         catalog.state = kCatalogDamaged;
         catalog.detail = kDamagedInterrupted;

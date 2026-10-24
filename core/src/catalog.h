@@ -39,6 +39,28 @@ void catalog_finish_internal(Core &core);
 // gives every file of the show it has an entry for its size and length without opening it.
 void catalog_read_internal(Core &core);
 
+// A change of a storage's catalog: the entry `added` (a name, with its size, CRC-32 and
+// length, for the mapping's canvas) put in the place of the entry of its name or added; the
+// entries whose names `drops` gives true for taken out, on the pages of `drop_pages`; and the
+// actions of the commit record, `move upload.part <added>` and `remove <removed_file>`.
+struct CatalogChange {
+    const char *added = nullptr;
+    uint32_t added_bytes = 0;
+    uint32_t added_crc = 0;
+    uint64_t added_total_ms = 0;
+    bool (*drops)(const Core &core, const char *name, uint32_t length, const void *context) = nullptr;
+    const void *context = nullptr;
+    uint32_t drop_pages = 0;
+    bool moves_part = false;
+    const char *removed_file = nullptr;
+};
+
+// Commits a change of a storage's catalog and finishes it, with the second source and the
+// chunk buffer. A storage whose catalog is not ok is not changed: true. False on a failed
+// storage call: before the commit record nothing changed; after it the rest is finished at
+// the next start.
+bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change);
+
 // The reply to `catalog`.
 uint32_t catalog_reply(const Core &core, Reply &reply);
 

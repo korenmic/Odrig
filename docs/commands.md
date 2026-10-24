@@ -421,6 +421,13 @@ the start; an entry for another canvas than the mapping's makes its file unavail
 `catalog internal incompatible`) and its storage is read as without one. A change of the
 catalog that a cut interrupted after its commit is finished first.
 
+An upload, `remove` and `remove many` keep a catalog that is `ok`: an upload commits the
+entry of its file, with the size, the CRC-32 and the length its check found, in the same
+commit that puts the file in place; a removal takes the entries of the files that go out
+before the show file is written. Each writes the pages of its entries, the marker and the
+commit record, and no other file of the catalog. A storage without a catalog, or with one
+that is not `ok`, gets none from a change.
+
 ## The saved playlist order
 
 The playlist plays its included animations in the saved order, which the board keeps in

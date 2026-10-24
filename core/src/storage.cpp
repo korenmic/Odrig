@@ -1,6 +1,8 @@
 #include "storage.h"
 
+#include "catalog.h"
 #include "content.h"
+#include "crc32.h"
 #include "json_reader.h"
 #include "order.h"
 #include "player.h"
@@ -42,6 +44,74 @@ bool write_pending(Core &core, const char *first, const char *second) {
     }
     const uint32_t length = add_line(core, add_line(core, 0, first), second);
     return host.write(host.ctx, core.chunk, length) == 1 && host.write_close(host.ctx) == 1;
+}
+
+// Whether a name is the one given as the context.
+bool is_the_name(const Core &, const char *name, uint32_t length, const void *context) {
+    const char *given = static_cast<const char *>(context);
+    uint32_t at = 0;
+    for (; at < length && given[at] == name[at]; ++at) {
+    }
+    return at == length && given[at] == '\0';
+}
+
+// Whether a name is the file of an animation that a `remove many`, given as the context,
+// takes out of the show and that no item it keeps names.
+bool is_removed_file(const Core &core, const char *name, uint32_t length, const void *context) {
+    const ShowChange &change = *static_cast<const ShowChange *>(context);
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        if (!is_the_name(core, name, length, core.files[file].name)) {
+            continue;
+        }
+        bool removed = false;
+        bool retained = false;
+        for (uint32_t at = 0; at < core.item_count; ++at) {
+            if (!core.items[at].is_cycle && core.items[at].first == file) {
+                if (content_removed(core, at, change)) removed = true;
+                else retained = true;
+            }
+        }
+        return removed && !retained;
+    }
+    return false;
+}
+
+uint32_t page_of_name(const char *name) {
+    uint32_t length = 0;
+    while (name[length] != '\0') {
+        ++length;
+    }
+    return 1u << catalog_page_of(name, length);
+}
+
+// The upload's file put in place under its name, as the commit of the internal catalog
+// does it with its entry when the storage has one, and by a rename otherwise. The entry of
+// `dropped`, when given, is taken out in the same commit.
+bool place_upload(Core &core, const char *dropped) {
+    const Upload &upload = core.upload;
+    if (core.catalogs[kInternal].state != kCatalogOk) {
+        return core.host.rename(core.host.ctx, kUploadPart, upload.name) == 1;
+    }
+    CatalogChange change;
+    change.added = upload.name;
+    change.added_bytes = upload.size;
+    change.added_crc = crc_value(upload.crc);
+    change.added_total_ms = upload.total_ms;
+    change.moves_part = true;
+    if (dropped != nullptr) {
+        change.drops = is_the_name;
+        change.context = dropped;
+        change.drop_pages = page_of_name(dropped);
+    }
+    return catalog_commit(core, kInternal, change);
+}
+
+// The file of the item at a position: its size came from the catalog's new entry when the
+// storage has a catalog.
+void entered(Core &core, uint32_t position) {
+    if (core.catalogs[kInternal].state == kCatalogOk) {
+        core.files[core.items[position].first].checked = kCheckedFromCatalog;
+    }
 }
 
 }  // namespace
@@ -167,10 +237,11 @@ bool storage_install_upload(Core &core) {
         // The item's file is replaced under its own name: the show file stays as it is,
         // and the one rename is where the show changes.
         player_releases_file(core, position);
-        if (host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+        if (!place_upload(core, nullptr)) {
             return false;
         }
         content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, position);
         player_file_replaced(core, position);
         return true;
     }
@@ -198,7 +269,7 @@ bool storage_install_upload(Core &core) {
     const bool with_old_file = old_file[0] != '\0';
 
     if (!write_pending(core, upload.name, with_old_file ? old_file : nullptr) ||
-        host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+        !place_upload(core, with_old_file ? old_file : nullptr)) {
         host.remove(host.ctx, kPending);
         return false;
     }
@@ -220,12 +291,14 @@ bool storage_install_upload(Core &core) {
     // The show in storage is the new one from here on.
     if (is_new) {
         content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, core.item_count - 1);
         // An old entry of the order may name the new item's id: it stands there at once,
         // as it would after a restart.
         order_reload(core);
         player_item_added(core);
     } else {
         content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, position);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;
@@ -259,6 +332,17 @@ bool storage_remove_item(Core &core, uint32_t position) {
     }
     const bool with_file = file[0] != '\0';
 
+    // The catalog first: a cut after it leaves a file of the show without an entry, which
+    // the next start reads as without a catalog.
+    if (with_file) {
+        CatalogChange taken;
+        taken.drops = is_the_name;
+        taken.context = file;
+        taken.drop_pages = page_of_name(file);
+        if (!catalog_commit(core, kInternal, taken)) {
+            return false;
+        }
+    }
     if (with_file && !write_pending(core, file, nullptr)) {
         host.remove(host.ctx, kPending);
         return false;
@@ -290,6 +374,23 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
     ShowChange change;
     change.removed = ids;
     change.removed_count = count;
+    // The catalog first, as for one removal.
+    CatalogChange taken;
+    taken.drops = is_removed_file;
+    taken.context = &change;
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        const char *name = core.files[file].name;
+        uint32_t size = 0;
+        while (name[size] != '\0') {
+            ++size;
+        }
+        if (is_removed_file(core, name, size, &change)) {
+            taken.drop_pages |= page_of_name(name);
+        }
+    }
+    if (taken.drop_pages != 0 && !catalog_commit(core, kInternal, taken)) {
+        return false;
+    }
     uint32_t length = 0;
     for (uint32_t file = 0; file < core.file_count; ++file) {
         bool removed = false;
