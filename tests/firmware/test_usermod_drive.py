@@ -29,7 +29,7 @@ class TheDrive(unittest.TestCase):
         self.assertIn('const char FOLDER[] = "/usb/odrig";', self.drive)
         self.assertIn("const uint32_t MOST_FILES = 256;", self.drive)
         named = self.drive[self.drive.index("bool isAnimation(const char *name) {"):self.drive.index("void keepName(")]
-        for expected in ("name[0] != '.'", 'strcasecmp(name + length - 5, ".odrg") == 0'):
+        for expected in ("name[0] == '.'", 'strcasecmp(name + length - 5, ".odrg") == 0', 'strcasecmp(name + length - 6, ".odrgx") == 0'):
             self.assertIn(expected, named)
         self.assertIn("strcmp(names[at - 1], name) > 0", self.drive)
         self.assertIn("entry->d_type == DT_REG", self.drive)

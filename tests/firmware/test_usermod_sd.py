@@ -236,8 +236,10 @@ int main(int argc, char **argv) {
   assert(generation != 0);
   if (mode == "names") {
     assert(named(host, generation, 0) == "A.ODRG");
-    assert(named(host, generation, 1) == "b.odrg");
-    assert(named(host, generation, 2).empty());
+    assert(named(host, generation, 1) == "D.ODRGX");
+    assert(named(host, generation, 2) == "b.odrg");
+    assert(named(host, generation, 3) == "c.odrgx");
+    assert(named(host, generation, 4).empty());
     assert(named(host, generation + 1, 0).empty());
     assert(host.drive_name(nullptr, generation, 0, nullptr, 0) == 0);
     assert(host.open(nullptr, "drive/../b.odrg") == 0);
@@ -376,7 +378,8 @@ class SpiCard(unittest.TestCase):
         self.case("filesystem")
 
     def test_names_are_filtered_sorted_and_do_not_allow_traversal(self):
-        self.case("names", {"b.odrg": b"b", "A.ODRG": b"a", ".hidden.odrg": b"h", "other.txt": b"x", "nested.odrg": None})
+        self.case("names", {"b.odrg": b"b", "A.ODRG": b"a", "c.odrgx": b"c", "D.ODRGX": b"d", ".hidden.odrgx": b"h", "e.odrgx.txt": b"x",
+                            "other.txt": b"x", "nested.odrg": None})
 
     def test_only_the_first_256_names_are_published(self):
         self.case("limit", {f"q{at:03}.odrg": b"x" for at in reversed(range(300))})
