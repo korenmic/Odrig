@@ -505,3 +505,9 @@ are in [format.md](format.md), "Measured sizes".
   in. The move to the newer software stays, as the microSD firmware is built on it.
 - 2026-10-24: Seeds 31 to 35 and 37, which Codex wrote from its investigation of the
   board on 2026-10-24, came to master as seeds; none has a spec yet.
+- 2026-10-24: The owner approved in advance every new command, reply member and error code
+  that the specs of seeds 31 to 39 need; each is recorded in commands.md and here when it is
+  added. The owner asked for seeds 28 and 31 to 39 to be specified and built in one serial
+  run, on one branch per seed stacked in order and merged by one pull request, the branches
+  kept. Afterwards the board keeps one or two small animations in its own storage, as a
+  fallback when the card is missing, and plays the rest from the microSD card.
