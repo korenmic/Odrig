@@ -9321,3 +9321,87 @@ done, which task 9 now names.
 
 **Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/tasks.md`,
 tasks 9 and 11; `docs/decisions.md`, the change log; `AGENTS.md`, "What is coming".
+## Seed 36: the order file and what it names
+
+**Question.** The owner answered that the playlist order is a file of the internal storage
+that names internal items by id and card items by file name, one mixed order, an absent
+card entry keeping its place. What is its form, where do animations it does not name go,
+and what of an entry whose internal item was removed?
+
+**Answer.** `order.txt` beside `show.json`, a header line `odrig-order 1` and one entry a
+line, `i <id>` or `x <name>`, at most 512 entries. Animations it does not name come after
+the named ones, the internal ones in the order of `show.json`, then the card's in the
+order of their names, so that a new upload is last until it is moved and a show without
+the file plays as before. An entry of a removed internal id stays until the file is next
+written, and an upload that reuses the id takes its place; the core reads the file again
+after such an upload, so that a restart gives the same order. The core keeps a key of two
+bytes per item and per drive place, and a byte of each card name's hash, not the names.
+
+**Resolution.** `docs/specs/36-p1-aurora-glass-ui-and-playlist-revamp/design.md`, "The
+order file"; `docs/show.md` and `docs/core.md` with task 1.
+
+## Seed 36: the order's commands
+
+**Question.** The seed leaves the protocol of the saved order to the spec. Should `list`
+report each item's place and the order's revision, or should the order have commands of
+its own?
+
+**Answer.** Commands of its own: `order get [<from>]` gives the listed animations' ids in
+the saved order with a revision, in parts as `list` does, and
+`order move <revision> <id> <before>` moves one animation before another or to the `end`,
+refused with the new error `order-conflict` when the revision is stale. `list` gains only
+`external`, which the three lines of the run agreed on, so that the other lines' tests of
+`list` keep their replies. The revision is the CRC-32 of each listed animation's id and
+key, so it is the same after a restart for the same files and changes with any change of
+the order or of the listed animations. A move is refused `busy` during the startup check
+and an open upload, whose check shares the second file source, and allowed while a test
+animation shows, since it changes no playback.
+
+**Resolution.** The spec's design, "`order get`" and "`order move`"; docs/commands.md with
+tasks 1 and 2.
+
+## Seed 36: what a snake test shows
+
+**Question.** The seed asks that Snake N identify one three-strip snake through the saved
+mapping, and to reuse the diagonal's one-white-pixel-wide line from bottom left to top
+right. Three pixels of the canvas's diagonal fall into one snake; is that the picture?
+
+**Answer.** No: each snake shows its own diagonal across its three columns, from the
+bottom of its first column to the top of its third, 20 white pixels in each column and
+every other LED dark. That lights 60 LEDs, places the snake at once, and shows whether each
+of its strips runs the right way, which three pixels would not. The diagonal of the whole
+canvas stays the 21st test. The pictures are one 20-frame JSON source that the converter
+encodes, embedded in the core as the diagonal is.
+
+**Resolution.** The spec's requirement 3.1 and design, "The test animations".
+
+## Seed 36: the look's measures
+
+**Question.** The app's look tests demanded a black background, three colours of text and
+controls of 56 pixels; the owner chose Aurora Glass, a midnight background with teal and
+violet accents and translucent panels, with a small `...` button on each row. Which
+measures stay?
+
+**Answer.** Every text keeps a contrast of 7:1 or more against what lies behind it, the
+translucent panels composited onto the midnight background; the page's background stays
+dark; the tabs stay along the bottom at equal width. The main controls keep 48 pixels or
+more, and the row's `...` button, the badge-sized controls and the test buttons 44, the
+size of a fingertip that Android's own guidelines name. Power is one toggle, as the mockup
+draws it, which sends `on` or `off` by the state the target last reported.
+
+**Resolution.** The spec's design, "The look"; `tests/app/test_look.py` with task 5.
+
+## Seed 36: the diagonal's buttons and the test state
+
+**Question.** Settings keeps the mapping editor and loses the duplicated playback
+controls; where do the diagonal's Show and Stop go, and how does an app learn that a test
+shows when it did not start it?
+
+**Answer.** The diagonal is one of the 21 entries of the Tests group, and Settings says to
+turn on Show test animations to check the wiring. Every test, from any controller, makes
+`status` say that nothing plays on a valid show; only then, and after a test command, does
+the app ask `mapping get` every two seconds while Animations shows, and it names the
+active test with Stop test in the now-playing area, whether the Tests group is shown or
+not. No member is added to `status`.
+
+**Resolution.** The spec's design, "Tests and Settings".
