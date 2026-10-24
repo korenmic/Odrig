@@ -8608,3 +8608,138 @@ the tests of the screens expect, and in a browser the band has no height.
 
 **Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
 sheet".
+
+## Seed 38: Which file systems of a card the firmware reads
+
+**Question.** The seed says the card's file system is "FAT32 as a card comes". Arduino's
+`SD` library mounts a card with the chip's FatFs, which reads FAT16 and FAT32, and reads
+exFAT only when it was compiled with it, which the compiled libraries of Arduino-ESP32
+3.3.12 may or may not be. What does the firmware promise?
+
+**Answer.** FAT32 and FAT16: a card of 32 GB or less as it comes from the shop, or any
+card formatted FAT32 on a computer. A card above 32 GB comes as exFAT, which is not
+promised; the owner formats such a card FAT32 on a computer before use. Names are kept to
+the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`, as for the stick: another
+letter may come out as `?` and such a file cannot be opened by its name and is left out.
+The owner's card of 122 animations has such names.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+2.1 and 2.2; `design.md`, "The card".
+
+## Seed 38: The emulator and the card
+
+**Question.** Seed 20 gave the emulator an option `--drive DIR`, a folder that stands in
+for the stick. Does the emulator change for the card?
+
+**Answer.** No. The core knows "a drive": a number that changes when one comes and is 0
+while none is there, and a list of names. Whether the firmware fills that from a USB stick
+or from a card is the host's matter, and the emulator's folder stands in for either. The
+app shows the external animations the same way. Nothing of the core, the emulator or the
+app is touched by this seed; the words "drive" and "USB drive" in their documents mean the
+external storage, and `docs/show.md` gets one sentence that says so.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/design.md`,
+"What does not change".
+
+## Seed 38: Codex's pages, `docs/microsd.md` and `docs/microsd-preflight/`
+
+**Question.** Codex wrote `docs/microsd.md` and six files under `docs/microsd-preflight/`:
+two records of the board sessions of 2026-10-22 and 2026-10-23, and four checklists of its
+own. `docs/` holds the documents that define the project, and a checklist of a session
+is not one. What becomes of them?
+
+**Answer.** `docs/microsd.md` stays and becomes the card's page, in the house style: how
+to prepare a card, the reader's wiring as the owner reported it, the build, flashing, the
+log's lines, WLED's information, what the two board sessions gave, and what is open. The
+two records are folded into it, the four checklists are superseded by this spec's
+`tasks.md`, and the folder `docs/microsd-preflight/` goes, with every link to it. Until
+the documents task is done, the pages stay as Codex wrote them, so that nothing is lost
+in the meantime.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/design.md`,
+"The documents"; `tasks.md`, the documents task.
+
+## Seed 38: The dropouts of 2026-10-22 are found out, not solved
+
+**Question.** In the first board session the card's entries disappeared and were found
+again, at 4 MHz, 1 MHz and 400 kHz alike; in the second, with both USB sockets of the
+board on the Mac, nothing was lost in fifteen minutes. Does this seed undertake to solve
+the dropouts?
+
+**Answer.** It undertakes to find out whether they are still there, with the cable
+arrangement the owner names for the event, and to record what was seen, with the evidence
+kept before anything is changed: the log's lines, `status` and `list` over time, and the
+image's hash. A cause inside the card's code or its clock that the session shows is this
+seed's to mend, since the card's firmware is its subject. A cause in the wiring, the
+power or the reader is the owner's, and what follows from it becomes a new seed. Slower
+clocks are not tried again: they did not help on 2026-10-22.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirement 9; `design.md`, "The board session".
+
+## Seed 38: The seed is added in progress
+
+**Question.** The working rules have a seed added as `remaining`, and the first task of
+its spec set it to `in_progress`. This seed's first five tasks are Codex's commits of
+2026-10-22 and 2026-10-23, made before the seed existed. Which state is the seed added in?
+
+**Answer.** `in_progress`, in the commit that adds it. The spec's `tasks.md` ticks those
+five tasks and names their commits, so the rule is met in substance: the state was set by
+the commit that accounts for the work already done. `remaining` would say that nothing
+has begun, which is false.
+
+**Resolution.** `project-seeds/38-p1-a-microsd-card-as-the-external-storage/state.json`;
+`docs/specs/38-p1-a-microsd-card-as-the-external-storage/tasks.md`, tasks 1 to 5.
+
+## Seed 38: The stick's code and the hub's trial stay
+
+**Question.** The card takes the stick's place. Do the stick's code, `build --trial` and
+the trial's environments go now?
+
+**Answer.** No. The owner's decision of 2026-10-21 keeps the USB build available, and the
+one of 2026-10-24 keeps the move to the newer software, which the card's build is built
+on: `build` goes on building the firmware with the stick's code on the software known
+good, `build --trial` the hub's trial, and `build --microsd` the card's firmware, in the
+same folder `build/firmware/newer/`. Where the documents call the newer software "the
+trial", one sentence says that the microSD build uses the same software. Whether the
+card's build becomes the firmware that `build` makes, and the trial's environments and
+`ODRIG_BOARD_IMAGES=trial` go with that move, is the owner's question 8 of the seed; the
+last tasks wait for it.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirement 10; `design.md`, "What does not change" and "What needs the owner".
+
+## Seed 38: The log's kind `sd`, and `odrig drive` in WLED's information
+
+**Question.** The seed asks for "the same log" as the stick. Codex's code writes the
+card's lines with the kind `sd`, where the stick's have `usb`, and keeps WLED's
+information entry under the name `odrig drive`. Which names does the spec take?
+
+**Answer.** Those built: the lines of the card are of the kind `sd`, since they say what
+the card does and not what a USB port sees, and `odrig drive` keeps its name in WLED's
+information, with the card's states in it, so that the documents and the owner's habits
+keep one name for the external storage. The player's lines, `drive file <name> left out:
+<reason>`, stay as they are for the card.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirements 3 and 5; `design.md`, "The log and WLED's information".
+
+## Seed 38: The card's free and total space
+
+**Question.** Seed 29, on `master` since 2026-10-24, gave the core an optional host
+function `drive_space`, and the stick's code answers it from the FAT volume of the USB
+driver. Codex's card code was written before and has no such function; merged as they
+are, the card's build would not compile, since the stick's function names what the card's
+build leaves out. What does the card's build answer?
+
+**Answer.** The card's numbers, from Arduino's `SD` library: `totalBytes()` and
+`usedBytes()`, which read the volume's free clusters and write nothing; free is total
+minus used. The function answers only while the card is mounted and the number asked for
+is the card's current number, with the same guard as every other call, and -1 otherwise,
+so `space` reports the card present with null capacities when the numbers cannot be read.
+This is done in the commit that merges `master` into the seed's branch, with the test
+that compiles the card's code against the stand-in card, since that commit is the first
+in which both sides exist.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+2.6; `design.md`, "Free and total space"; `tasks.md`, task 6.
