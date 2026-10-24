@@ -40,7 +40,7 @@ bool plays(const Core &core, uint32_t position) {
         const uint32_t place = position - kDriveBase;
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
-    return position < core.item_count && !core.items[position].is_cycle;
+    return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored;
 }
 
 // The position after this one in the order of the playlist: the show's items, then the
@@ -158,7 +158,7 @@ uint32_t next_animation(const Core &core, uint32_t position) {
             return at;
         }
     }
-    return position;
+    return kNothing;
 }
 
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
@@ -197,7 +197,7 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
             }
             turn = longest;
         }
-        if (!rounds_taken) {
+        if (!rounds_taken && plays(core, core.turn_item)) {
             // Whole rounds of the playlist are taken off at once when the length of every
             // animation is known, so that a long time without a refresh costs one walk
             // over the items.
@@ -205,7 +205,7 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
             uint64_t round = 0;
             bool all_known = true;
             for (uint32_t position = 0; position < core.item_count && all_known; ++position) {
-                if (!core.items[position].is_cycle) {
+                if (!core.items[position].is_cycle && !core.items[position].ignored) {
                     all_known = core.files[core.items[position].first].total_ms != 0;
                     round += all_known ? turn_ms(core, position) : 0;
                 }
@@ -215,7 +215,7 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
                     round += turn_ms(core, kDriveBase + place);
                 }
             }
-            if (all_known && elapsed >= round) {
+            if (all_known && round != 0 && elapsed >= round) {
                 core.zero += elapsed / round * round;
                 elapsed %= round;
                 ++core.turn_number;
@@ -225,6 +225,12 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
         core.zero += turn;
         elapsed -= turn;
         core.turn_item = next_animation(core, core.turn_item);
+        if (core.turn_item == kNothing) {
+            close_stream(core);
+            core.playing = core.shown = kNothing;
+            *in_turn = 0;
+            return kNone;
+        }
         ++core.turn_number;
     }
 }
@@ -241,6 +247,7 @@ bool advance(Core &core, uint64_t now) {
     Reason reason = kNone;
     if (core.playing == kPlaylist) {
         reason = playlist_turn(core, now, &in_turn);
+        if (core.playing == kNothing) return false;
         animation = core.turn_item;
         turn = core.turn_number;
     } else {
@@ -325,7 +332,7 @@ void player_set_brightness(Core &core, uint8_t value) {
 
 uint32_t player_first_animation(const Core &core) {
     uint32_t position = 0;
-    while (position < core.item_count && core.items[position].is_cycle) {
+    while (position < core.item_count && (core.items[position].is_cycle || core.items[position].ignored)) {
         ++position;
     }
     return position;
@@ -378,8 +385,9 @@ void player_start(Core &core) {
         player_play_cycle(core, core.start_item);
         return;
     }
-    const uint32_t from = core.has_start ? core.start_item : player_first_animation(core);
-    if (from != core.item_count) {
+    uint32_t from = core.has_start ? core.start_item : player_first_animation(core);
+    if (from < core.item_count && core.items[from].ignored) from = next_animation(core, from);
+    if (from != core.item_count && from != kNothing) {
         player_play_all(core, from);
     }
 }
@@ -434,14 +442,25 @@ void player_file_replaced(Core &core, uint32_t item) {
 
 void player_item_added(Core &core) {
     if (core.playing == kNothing) {
-        player_play_all(core, player_first_animation(core));
+        const uint32_t first = player_first_in_playlist(core);
+        if (first != kNothing) player_play_all(core, first);
+    }
+}
+
+void player_inclusion_changed(Core &core, uint32_t item) {
+    if (core.playing == kPlaylist && core.turn_item == item && core.items[item].ignored) {
+        const uint32_t next = next_animation(core, item);
+        if (next == kNothing) player_halt(core);
+        else player_play_all(core, next);
+    } else if (core.playing == kNothing && !core.items[item].ignored) {
+        player_play_all(core, item);
     }
 }
 
 void player_item_leaves(Core &core, uint32_t item) {
     if (core.playing == kPlaylist && core.turn_item == item) {
         const uint32_t next = next_animation(core, item);
-        if (next == item) {
+        if (next == item || next == kNothing) {
             // It was the only animation of the show.
             close_stream(core);
             core.playing = kNothing;
@@ -451,7 +470,9 @@ void player_item_leaves(Core &core, uint32_t item) {
         player_play_all(core, next);
     } else if (core.playing == item) {
         // A cycle lists an animation, so the show has one.
-        player_play_all(core, player_first_animation(core));
+        const uint32_t first = player_first_in_playlist(core);
+        if (first == kNothing) player_halt(core);
+        else player_play_all(core, first);
     }
     // The positions of the show's items after it are one lower now; those of a drive's
     // animations stay.

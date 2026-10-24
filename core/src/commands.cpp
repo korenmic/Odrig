@@ -287,6 +287,33 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         return content_list(core, from, reply);
     }
+    if (words.is(0, "ignore")) {
+        uint32_t id, value;
+        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        return content_ignore(core, id, value != 0, reply);
+    }
+    if (words.is(0, "remove") && words.count == 3 && words.is(1, "many")) {
+        uint16_t ids[32];
+        uint32_t count = 0, value = 0, digits = 0;
+        for (uint32_t at = 0; at <= words.size[2]; ++at) {
+            const char c = at < words.size[2] ? words.text[2][at] : ',';
+            if (c == ',') {
+                if (digits == 0 || value == 0 || count == 32) return refuse(reply, "bad-argument");
+                for (uint32_t before = 0; before < count; ++before) if (ids[before] == value) return refuse(reply, "bad-argument");
+                ids[count++] = static_cast<uint16_t>(value);
+                value = digits = 0;
+            } else {
+                if (c < '0' || c > '9' || value > 6553 || (value == 6553 && c > '5')) return refuse(reply, "bad-argument");
+                value = value * 10 + static_cast<uint32_t>(c - '0');
+                ++digits;
+            }
+        }
+        if (core.invalid) return refuse(reply, "show-invalid");
+        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        return content_remove_many(core, ids, count, reply);
+    }
     if (words.is(0, "remove")) {
         uint32_t id;
         if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {

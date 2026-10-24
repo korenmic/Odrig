@@ -184,7 +184,7 @@ are in [format.md](format.md), "Measured sizes".
   ID, play the playlist, switch on, switch off, set brightness, and report status; and for
   the content: report the free storage, list what is installed, remove an item, and
   upload an animation.
-- A show plays all its animations in turn by itself: the playlist. An animation plays
+- A show plays its included animations in turn by itself: the playlist. An animation plays
   until at least 30 seconds have passed and then finishes the loop it is in, unless the
   show gives it a repeat count, a longest duration, or another shortest time. Playing an
   animation by its ID is a jump in the playlist, which goes on after it. A cycle plays
@@ -488,3 +488,9 @@ are in [format.md](format.md), "Measured sizes".
   stops a built-in diagnostic, on every route. The diagnostic is excluded from
   ordinary shows and playlists and does not change power or brightness. Physical
   confirmation remains the owner's. No board has been flashed for this change.
+
+- 2026-10-24: The owner authorized playlist exclusion and expanded it with bulk
+  deletion and free-space reporting before implementation. Installed animations may
+  opt out of automatic playback through ignored; explicit play and cycles retain
+  access. Batch deletion changes one complete show per command, and external media
+  stays read-only. These commands and data remain owned by the shared core.

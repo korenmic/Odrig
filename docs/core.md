@@ -283,7 +283,7 @@ change left:
 
 1. Before anything is read, it removes `upload.part` and `show.part`.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
-   it reads at most 512 bytes and takes every line that ends in a line feed and is a file
+   it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
    removed, and then `pending.txt`. When a file could not be removed, `pending.txt` stays
    for the next start; when it could not be read, nothing is removed.
@@ -682,3 +682,14 @@ existing pixel memory. Poll uses the normal palette, brightness and LED mapping
 on that picture while ordinary show progression is paused. Exit restarts the
 saved animation; cycles retain the current entry as their first resumed turn.
 The mode is transient and no show file changes. There is no runtime allocation.
+
+### Inclusion and batch changes
+
+ItemInfo uses two existing padding bytes for ignored and explicit presence; its size
+stays 16 bytes. `ignore` writes and renames the show before changing playback.
+`remove many` validates up to 32 distinct animation ids and writes one complete show.
+Its pending journal holds up to 32 filenames (1,056 bytes), within the existing
+chunk of 1,500 bytes. Cleanup yields an unfinished drive check and uses the checker's
+read_at source, preserving the playback file. The drive check then restarts safely.
+A failed cleanup keeps the journal and blocks later metadata changes with storage-error
+until reboot retries cleanup, so no transaction overwrites unresolved file cleanup.

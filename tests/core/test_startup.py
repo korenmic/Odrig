@@ -392,15 +392,15 @@ class Leftovers(unittest.TestCase):
         self.assertEqual(list(run.stored)[2:], ["remove .odrg 1", f"remove {longest} 1", "remove pending.txt 1"])
         self.assertEqual(sorted(left), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
 
-    def test_of_a_long_pending_the_first_512_bytes_are_read(self):
+    def test_of_a_long_pending_the_first_1500_bytes_are_read(self):
         names = [f"stray-{number:03d}.odrg" for number in range(40)]
         self.assertEqual(len(names[0]), 14)
         files = example(pending_txt="".join(f"{name}\n" for name in names).encode())
         files.update({name: self.CLIP for name in names})
         run, left = self.started(files)
         self.assertIsNone(run.error)
-        # 34 lines of 15 bytes are 510 bytes; the 35th is cut by the limit.
-        self.assertEqual(sorted(name for name in left if name.startswith("stray-")), names[34:])
+        # All 40 lines of 15 bytes fit into the journal buffer.
+        self.assertEqual(sorted(name for name in left if name.startswith("stray-")), [])
         self.assertNotIn("pending.txt", left)
         self.assert_as_the_reference(files, left)
 

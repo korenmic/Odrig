@@ -8625,3 +8625,14 @@ the APK suite against that final signed file. Never track or publish the keystor
 **Resolution.** The rebuilt APK has the same signer as the existing public APK and all
 eight APK checks pass. Its final hash is in the verification record. The branch carries
 only source and documentation; APK binaries and local key material remain ignored.
+
+## 2026-10-24 — playlist storage transactions
+
+The owner's expanded playlist-management request authorizes ignore and remove many
+on every existing command route. Batch commands accept at most 32 distinct installed
+animations; the app chunks larger selections and reports partial failure. Shared
+files survive any remaining reference. The existing chunk of 1,500 bytes also bounds the
+recovery journal, extended from 512 bytes. Failed cleanup blocks subsequent show
+mutations until restart retries it, preventing journal overwrite. Explicit false is
+preserved; omitted ignored remains omitted until changed. External capacity is an
+optional fact supplied by the host, never a new permission to write removable media.

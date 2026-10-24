@@ -11,7 +11,7 @@ failing before fixes. No flash, phone installation or external-drive writes.
   - Verify: converter npm suite and Python converter/library suite by discovery.
   - Requirements: 1.1, 1.5.
 
-- [ ] 2. Implement shared-core inclusion and atomic bulk removal
+- [x] 2. Implement shared-core inclusion and atomic bulk removal
   - Add ignored state/parser/writer, idempotent ignore, filtered playlist scheduling,
     one-off manual turns, cycle independence and empty/resume semantics.
   - Add remove many parsing/validation, durable filtered metadata transaction,

@@ -84,6 +84,7 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
     uint32_t seconds = 0;
     uint32_t repeat = 0;
     uint32_t max_seconds = 0;
+    bool ignored = false;
     uint32_t own_entries = 0;
 
     if (!json.object_begin()) {
@@ -101,6 +102,8 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
             member = 8;
         } else if (same_text(name, "repeat")) {
             member = 16;
+        } else if (same_text(name, "ignored")) {
+            member = 64;
         } else if (same_text(name, "max_seconds")) {
             member = 32;
         } else {
@@ -111,7 +114,9 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
         }
         members |= member;
 
-        if (member == 1) {
+        if (member == 64) {
+            if (!json.boolean(&ignored)) return false;
+        } else if (member == 1) {
             if (!json.integer(&id) || id < 1 || id > kLargestId) {
                 return false;
             }
@@ -164,10 +169,10 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
         return false;
     }
     // An item with `file` is an animation: it has `id`, and may have `repeat` and
-    // `max_seconds`, and no other member. Any other item is a cycle and has exactly `id`,
+    // `max_seconds` and `ignored`, and no other member. Any other item is a cycle and has exactly `id`,
     // `cycle` and `seconds`.
     const bool is_animation = (members & 2) != 0;
-    if (is_animation ? (members & ~48u) != 3u : members != 13u) {
+    if (is_animation ? (members & ~112u) != 3u : members != 13u) {
         return false;
     }
 
@@ -179,6 +184,8 @@ bool read_item(Core &core, JsonReader &json, const Seen *limits, Seen &seen) {
         item.id = static_cast<uint16_t>(id);
         item.seconds = static_cast<uint16_t>(is_animation ? max_seconds : seconds);
         item.is_cycle = is_animation ? 0 : 1;
+        item.ignored = ignored ? 1 : 0;
+        item.has_ignored = (members & 64) != 0 ? 1 : 0;
         item.first = is_animation ? file_entry(core, file) : seen.entries;
         item.count = is_animation ? repeat : own_entries;
     }

@@ -182,6 +182,19 @@ bool JsonReader::integer(uint32_t *value) {
     return true;
 }
 
+bool JsonReader::boolean(bool *value) {
+    skip_space();
+    const bool yes = peek() == 't';
+    const char *word = yes ? "true" : "false";
+    for (uint32_t at = 0; word[at] != '\0'; ++at) {
+        if (peek() != word[at]) return fail();
+        take();
+    }
+    *value = yes;
+    fresh = false;
+    return true;
+}
+
 bool JsonReader::string(char *text, uint8_t capacity) {
     skip_space();
     if (failed || peek() != '"') {

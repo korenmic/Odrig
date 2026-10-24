@@ -114,7 +114,7 @@ class NewAndReplaced(Uploads):
         script = Script().polls(20).upload(9, "new.odrg", clip).line("list", "play 9", "status").polls(30).line("status", "space")
         given = self.play(files, script)
         self.assertEqual(given[:3], [CHUNK, received(len(clip)), OK])
-        self.assertEqual(json.loads(given[3])["items"][-1], {"id": 9, "file": "new.odrg", "bytes": len(clip)})
+        self.assertEqual(json.loads(given[3])["items"][-1], {"id": 9, "file": "new.odrg", "bytes": len(clip), "ignored": False})
         self.assertEqual([item["id"] for item in json.loads(given[3])["items"]], [1, 2, 3, 4, 5, 6, 9])
         self.assertEqual(given[4], OK)
         self.assertEqual((json.loads(given[5])["playing"], json.loads(given[5])["animation"], json.loads(given[6])["animation"]), ("all", 9, 9))
@@ -130,7 +130,7 @@ class NewAndReplaced(Uploads):
         self.assertEqual(self.play(files, Script().polls(5).upload(700, "kept.odrg", clip))[-1], OK)
         again = Script().line("list", "play 700").polls(10).line("status")
         given = self.play(self.left, again)
-        self.assertEqual(json.loads(given[0])["items"][-1], {"id": 700, "file": "kept.odrg", "bytes": len(clip)})
+        self.assertEqual(json.loads(given[0])["items"][-1], {"id": 700, "file": "kept.odrg", "bytes": len(clip), "ignored": False})
         self.assertEqual((json.loads(given[2])["playing"], json.loads(given[2])["animation"]), ("all", 700))
 
     def test_a_replacement_under_the_same_name_leaves_the_show_file_and_restarts_what_plays(self):
@@ -143,7 +143,7 @@ class NewAndReplaced(Uploads):
         self.assertEqual(self.answers("upload end"), [OK])
         self.assertEqual(self.left["one.odrg"], clip)
         self.assertEqual(self.left["show.json"], before)
-        self.assertEqual(json.loads(self.answers("list")[0])["items"][0], {"id": 1, "file": "one.odrg", "bytes": len(clip)})
+        self.assertEqual(json.loads(self.answers("list")[0])["items"][0], {"id": 1, "file": "one.odrg", "bytes": len(clip), "ignored": False})
         # The one storage call that puts it in place is the rename onto its name.
         self.assertEqual(self.stored[-1], "rename upload.part one.odrg 1")
         self.assertNotIn("write_open show.part 1", self.stored)

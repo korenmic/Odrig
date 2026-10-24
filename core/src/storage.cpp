@@ -61,9 +61,12 @@ void storage_settle_pending(Core &core) {
     if (!storage_changes(core) || core.chunk == nullptr) {
         return;
     }
-    if (core.file.open(core.host, kPending) != kNone) {
+    const Reason opened = core.file.open(core.host, kPending);
+    if (opened != kNone) {
+        core.pending_cleanup = opened == kFileMissing ? 0 : 1;
         return;
     }
+    core.pending_cleanup = 1;
     uint32_t length = 0;
     int got = 0;
     while (length < kPendingSize && (got = core.file.get()) >= 0) {
@@ -97,11 +100,12 @@ void storage_settle_pending(Core &core) {
     }
     // A file that could not be removed stays named, for the next start.
     if (all_gone) {
-        host.remove(host.ctx, kPending);
+        core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
     }
 }
 
 bool storage_install_upload(Core &core) {
+    if (core.pending_cleanup) return false;
     const odrig_host &host = core.host;
     const Upload &upload = core.upload;
     uint32_t position = 0;
@@ -171,13 +175,15 @@ bool storage_install_upload(Core &core) {
         content_change_file(core, position, upload.name, upload.size, upload.total_ms);
         player_file_replaced(core, position);
     }
+    core.pending_cleanup = 1;
     if (!with_old_file || host.remove(host.ctx, old_file) != -1) {
-        host.remove(host.ctx, kPending);
+        core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
     }
     return true;
 }
 
 bool storage_remove_item(Core &core, uint32_t position) {
+    if (core.pending_cleanup) return false;
     const odrig_host &host = core.host;
     const ItemInfo &item = core.items[position];
 
@@ -218,9 +224,69 @@ bool storage_remove_item(Core &core, uint32_t position) {
     // named by `pending.txt` and is removed at the next start.
     player_item_leaves(core, position);
     content_take_out(core, position);
-    if (with_file && host.remove(host.ctx, file) != -1) {
-        host.remove(host.ctx, kPending);
+    if (with_file) {
+        core.pending_cleanup = 1;
+        if (host.remove(host.ctx, file) != -1) core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
     }
+    return true;
+}
+
+bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
+    if (core.pending_cleanup) return false;
+    const odrig_host &host = core.host;
+    ShowChange change;
+    change.removed = ids;
+    change.removed_count = count;
+    uint32_t length = 0;
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        bool removed = false;
+        bool retained = false;
+        for (uint32_t at = 0; at < core.item_count; ++at) {
+            if (!core.items[at].is_cycle && core.items[at].first == file) {
+                if (content_removed(core, at, change)) removed = true;
+                else retained = true;
+            }
+        }
+        if (removed && !retained) length = add_line(core, length, core.files[file].name);
+    }
+    if (host.write_open(host.ctx, kPending) != 1 || host.write(host.ctx, core.chunk, length) != 1 || host.write_close(host.ctx) != 1) {
+        host.remove(host.ctx, kPending);
+        return false;
+    }
+    if (!content_write_show(core, change) || host.rename(host.ctx, kShowPart, kShowFile) != 1) {
+        host.remove(host.ctx, kShowPart);
+        host.remove(host.ctx, kPending);
+        return false;
+    }
+    // Excluded candidates cannot become the next automatic turn while tables compact.
+    for (uint32_t at = 0; at < core.item_count; ++at) {
+        if (content_removed(core, at, change)) core.items[at].ignored = 1;
+    }
+    for (uint32_t at = core.item_count; at != 0;) {
+        --at;
+        if (content_removed(core, at, change)) {
+            player_item_leaves(core, at);
+            content_take_out(core, at);
+        }
+    }
+    core.pending_cleanup = 1;
+    drive_check_yields(core);
+    FileSource &source = core.checker->file;
+    source.open_at(host, kPending);
+    length = 0;
+    int got = 0;
+    while (length < kPendingSize && (got = source.get()) >= 0) core.chunk[length++] = static_cast<uint8_t>(got);
+    source.close();
+    if (got == -kReadError) return true;
+    bool clean = true;
+    uint32_t begin = 0;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (core.chunk[at] != '\n') continue;
+        core.chunk[at] = 0;
+        if (host.remove(host.ctx, reinterpret_cast<const char *>(core.chunk + begin)) == -1) clean = false;
+        begin = at + 1;
+    }
+    if (clean) core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
     return true;
 }
 

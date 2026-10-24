@@ -26,6 +26,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `remove <id>` | Removes an item from the show. |
+| `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
+| `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
 | `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
@@ -36,7 +38,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `upload cancel` | Discards the open upload. |
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
-what [show.md](show.md) says it plays by itself: the playlist of all its animations, or
+what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
 the cycle its `start` names. What `play`, `on`, `off` and `brightness` change is not kept
 across a restart. What `remove` and `upload` change is: they change the installed show.
 
@@ -72,7 +74,7 @@ animation items of the show, and 0 while the show is invalid.
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138},{"id":2,"file":"dvd.odrg","bytes":1612},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
@@ -87,7 +89,7 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The animations of a USB drive come after the items of the show, in the order of their
-file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340}`.
+file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false}`.
 Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
@@ -255,3 +257,18 @@ the active test. Upload and remove return `busy`, but mapping saves, list, space
 status, power and brightness remain available. The test changes no show entry.
 
 The protocol is identical over HTTP, board serial and emulator serial or TCP.
+
+## Playlist inclusion and batch deletion
+
+`ignore <id> <0|1>` persists an installed animation's automatic-playlist exclusion:
+1 excludes, 0 includes. It is idempotent and returns `{"ok":true}` after durability.
+`list` includes boolean `ignored` on installed animations only. Explicit play and
+cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-use.
+
+`remove many <id,id,...>` deletes 1–32 distinct installed animation items atomically
+per command. Every id is validated first; unknown ids return unknown-id; cycles,
+external entries and animations referenced by cycles return in-use. Duplicates and
+malformed lists return bad-argument. Single `remove <id>` retains cycle deletion.
+Both mutation forms return busy during startup checking, upload or mapping test;
+show-invalid and storage-error retain their meanings. Every transport forwards these
+commands into the same core parser; no route has separate deletion/playback rules.

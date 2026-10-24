@@ -20,7 +20,7 @@ const char kPending[] = "pending.txt";      // the `.odrg` names a change makes 
 const uint32_t kChunkSize = 1500;
 
 // The most bytes of `pending.txt` the core reads at its start.
-const uint32_t kPendingSize = 512;
+const uint32_t kPendingSize = 1500;
 
 // Whether the host has storage that can be changed. A host without it sets `write_open`
 // to a null pointer, and the core then calls none of the storage functions but `space`.
@@ -49,6 +49,7 @@ bool storage_install_upload(Core &core);
 // names it. False when storage could not be written; the show is then as it was, in
 // storage and in the tables.
 bool storage_remove_item(Core &core, uint32_t position);
+bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count);
 
 }  // namespace odrig
 
