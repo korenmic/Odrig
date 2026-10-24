@@ -55,7 +55,7 @@ Rules for every task:
     reasons; `docs/decisions.md`: a line for the tool's additions.
   - Requirements: 2.1 to 2.6, 3.1 to 3.6, 4.1, 4.2, 6.4
 
-- [ ] 4. The live route: an unchanged upload and the cleanup at the next change
+- [x] 4. The live route: an unchanged upload and the cleanup at the next change
   - `core/src/core_state.h`: `Upload.installed`; `core/src/upload.h/.cpp`:
     `upload_begin_known`, `upload end` sets `installed`; `core/src/storage.cpp`:
     `storage_cleanup`; `core/src/commands.cpp`: `upload begin` with six words;

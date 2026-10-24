@@ -587,3 +587,8 @@ are in [format.md](format.md), "Measured sizes".
   `recover-storage [--whole]`, `install-show --dry-run` and `--keep-copies DIR`, and the
   reasons `cancelled`, `recovery-needed` and `storage-changed`, approved in advance by the
   owner.
+- 2026-10-24: Seed 34: `upload begin <id> <file> <bytes> <crc32>`, approved in advance by the
+  owner, answers `{"ok":true,"unchanged":true}` and opens no upload when the last upload of
+  the boot installed that file and the item holds it still; the core keeps no more memory
+  for it. A cleanup a change could not finish is done before the next change instead of
+  blocking every change until a restart, and `remove many` writes no empty `pending.txt`.

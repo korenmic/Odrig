@@ -114,6 +114,7 @@ struct Upload {
     uint8_t header_read;    // the first step of the check has been taken
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
+    uint8_t installed;      // the file is installed: the id, the name, the size and the CRC-32 are its
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received

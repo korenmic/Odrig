@@ -35,7 +35,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
 | `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
-| `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
+| `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
@@ -165,6 +165,23 @@ whichever route its commands arrive by.
   cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
+**`upload begin <id> <file> <bytes> <crc32>`** is the same with the CRC-32 of the file, as
+`upload end` takes it: eight hexadecimal digits, `0`-`9` and `a`-`f`. When the last upload
+of this boot installed `<file>` as the file of the animation item `<id>`, with `<bytes>`
+bytes and this CRC-32, no upload has begun since, and the item names that file still,
+usable, the reply is
+
+```
+upload begin 4 clip.odrg 3200 1c291ca3
+{"ok":true,"unchanged":true}
+```
+
+and no upload opens: nothing is sent and nothing is written. Otherwise the line is taken
+as `upload begin <id> <file> <bytes>`: a file that was installed in another way, or before
+another upload, is uploaded again. A client that sends the same file again after a reply
+that did not arrive is told so instead of writing the file a second time. A target older
+than this form answers `bad-argument`.
+
 **`upload data <offset> <base64>`** adds bytes. `<offset>` is the number of bytes sent
 before these, and must equal the number received so far; otherwise the reply is
 `bad-offset` and the bytes are not taken. `<base64>` is 1 to `chunk` bytes in base64 with
@@ -218,7 +235,7 @@ succeeds.
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
-| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. |
+| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
 
 When more than one code applies, the reply has the first in the order of this table.
 

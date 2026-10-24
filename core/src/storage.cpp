@@ -108,8 +108,54 @@ void storage_settle_pending(Core &core) {
     }
 }
 
+bool storage_cleanup(Core &core) {
+    if (!core.pending_cleanup) {
+        return true;
+    }
+    const odrig_host &host = core.host;
+    if (host.read_at == nullptr || core.chunk == nullptr) {
+        return false;
+    }
+    // `pending.txt` is read with `read_at`, beside the files of playback and of the checks.
+    uint32_t length = 0;
+    while (length < kPendingSize) {
+        const uint32_t room = kPendingSize - length;
+        const int32_t got = host.read_at(host.ctx, kPending, length, core.chunk + length, room < kFileBufferSize ? room : kFileBufferSize);
+        if (got < 0) {
+            return false;
+        }
+        if (got == 0) {
+            break;
+        }
+        length += static_cast<uint32_t>(got);
+    }
+    bool all_gone = true;
+    uint32_t begin = 0;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (core.chunk[at] != '\n') {
+            continue;
+        }
+        const uint32_t size = at - begin;
+        char name[33];
+        if (size >= 1 && size <= 32) {
+            for (uint32_t index = 0; index < size; ++index) {
+                name[index] = static_cast<char>(core.chunk[begin + index]);
+            }
+            name[size] = '\0';
+            if (is_file_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
+                all_gone = false;
+            }
+        }
+        begin = at + 1;
+    }
+    if (all_gone) {
+        core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
+    }
+    return core.pending_cleanup == 0;
+}
+
 bool storage_install_upload(Core &core) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     const Upload &upload = core.upload;
     uint32_t position = 0;
@@ -190,7 +236,7 @@ bool storage_install_upload(Core &core) {
 }
 
 bool storage_remove_item(Core &core, uint32_t position) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     const ItemInfo &item = core.items[position];
 
@@ -239,7 +285,7 @@ bool storage_remove_item(Core &core, uint32_t position) {
 }
 
 bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     ShowChange change;
     change.removed = ids;
@@ -256,13 +302,16 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
         }
         if (removed && !retained) length = add_line(core, length, core.files[file].name);
     }
-    if (host.write_open(host.ctx, kPending) != 1 || host.write(host.ctx, core.chunk, length) != 1 || host.write_close(host.ctx) != 1) {
+    // Without a file that goes, as when each removed animation's file is another item's,
+    // there is no `pending.txt`.
+    const bool with_files = length != 0;
+    if (with_files && (host.write_open(host.ctx, kPending) != 1 || host.write(host.ctx, core.chunk, length) != 1 || host.write_close(host.ctx) != 1)) {
         host.remove(host.ctx, kPending);
         return false;
     }
     if (!content_write_show(core, change) || host.rename(host.ctx, kShowPart, kShowFile) != 1) {
         host.remove(host.ctx, kShowPart);
-        host.remove(host.ctx, kPending);
+        if (with_files) host.remove(host.ctx, kPending);
         return false;
     }
     // Excluded candidates cannot become the next automatic turn while tables compact.
@@ -276,6 +325,7 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
             content_take_out(core, at);
         }
     }
+    if (!with_files) return true;
     core.pending_cleanup = 1;
     drive_check_yields(core);
     FileSource &source = core.checker->file;

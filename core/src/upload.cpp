@@ -189,11 +189,31 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     upload.received = 0;
     upload.crc = kCrcStart;
     upload.header_read = 0;
+    upload.installed = 0;
     upload.progress = now;
     reply.text("{\"ok\":true,\"chunk\":");
     reply.number(kChunkSize);
     reply.text("}\n");
     return reply.length;
+}
+
+uint32_t upload_begin_known(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, uint32_t crc, Reply &reply) {
+    const Upload &last = core.upload;
+    uint32_t position = 0;
+    while (position < core.item_count && core.items[position].id != id) {
+        ++position;
+    }
+    if (last.installed && last.id == id && same_text(last.name, name) && last.size == bytes && crc_value(last.crc) == crc &&
+        position < core.item_count && !core.items[position].is_cycle) {
+        const FileInfo &file = core.files[core.items[position].first];
+        if (same_text(file.name, name) && file.fault == kNone) {
+            // The last upload installed this file, and the item holds it still: nothing is
+            // sent, and nothing is written.
+            reply.text("{\"ok\":true,\"unchanged\":true}\n");
+            return reply.length;
+        }
+    }
+    return upload_begin(core, now, id, name, bytes, reply);
 }
 
 uint32_t upload_data(Core &core, uint64_t now, uint32_t offset, const char *text, uint32_t length, uint32_t count, Reply &reply) {
@@ -258,6 +278,7 @@ uint32_t upload_end(Core &core, uint32_t crc, Reply &reply) {
         return refuse(reply, "storage-error");
     }
     upload.state = kUploadNone;
+    upload.installed = 1;
     return succeed(reply);
 }
 
