@@ -214,3 +214,16 @@ two-letter source badges, removal of duplicated controls and manual-only test vi
 are settled. Exact protocol syntax and implementation structure belong to seed-to-spec,
 subject to the repository's owner-approval rules; no implementation is authorized by this
 planning commit.
+
+## The Owner's Answers
+
+On 2026-10-24:
+
+1. The playlist order is a thing of its own: a file in the internal storage, which can
+   point to card items and internal items alike. So one mixed order is saved, whatever the
+   origin of each item. An entry whose card item is absent keeps its place and is skipped
+   while absent; a card item is identified by its file name.
+2. The 21 hand-uploaded line-test files are removed from the board once the built-in tests
+   exist. The tests are not visible unless the checkbox in Settings is on; when it is, they
+   are fused at the top of the list and cannot be moved by reordering, and they are never
+   ordinary entries of the playlist.

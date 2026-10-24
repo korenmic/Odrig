@@ -136,6 +136,7 @@ present, and do not build on them.
 - **Managed internal and external animation catalogs**, seed 35: no full check at every start.
 - **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
 - **ODRGX text and clock animations**, seed 37: text and clocks as animations.
+- **Playlist filters by storage and type**, seed 39: two filters in the app only.
 
 The state of every seed is in the `state.json` of its folder.
 
