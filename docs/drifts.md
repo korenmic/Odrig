@@ -8498,6 +8498,42 @@ the tests of the screens expect, and in a browser the band has no height.
 **Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
 sheet".
 
+## Seed 26: what failed on Windows, and three points the spec had otherwise
+
+**Question.** Seed 26 makes every suite that runs on Windows pass there again. Where did
+the work come out otherwise than the spec said?
+
+**Answer.** The causes were those of the design, and so were the fixes, with three
+differences.
+
+- The design gave the app's suite a line in the Windows list of commands of
+  `agent/getting-started.md`. That list has to match the list "Run the tests", which the
+  onboarding suite checks, and that list has no app's suite: its command is in
+  `docs/android-app.md`. So the page names the app's tool among what works on Windows, and
+  the list stays as it is.
+- The definition of done said that no suite skips on Windows a test it runs on macOS. The
+  emulator's suite skips the 19 tests that need a virtual serial port, which Windows does
+  not have, and the core's suite skips one test of file names that Windows does not allow,
+  both as before this seed. The definition now says so.
+- The design made the stand-ins for `sdkmanager`, `adb` and `node` `.cmd` files on
+  Windows. Each is now a few lines of Python on every system, started by a `#!` wrapper
+  where the system has one and by a `.cmd` file on Windows, so a stand-in has one text.
+  And the preview tests stop every preview they start at the end of the test, also when
+  the test fails: a failed test had left a preview holding port 8600 for the tests after
+  it.
+
+On Windows 11 with Python 3.14 every suite passes, run one at a time, with nothing left
+running after it: the converter's 1317 tests, none skipped; the Python library's 465; the
+core's 504, 1 skipped; the emulator's and the command tool's 565, 19 skipped; the app's
+144, none skipped; the onboarding suite's 81.
+
+**Resolution.** `emulator/host.py`, `reading`; `preview/__init__.py`, `waited` and
+SIGBREAK; `odrigctl/cli.py`, SIGBREAK for `--log`; `app/apptool/webserver.py`,
+`allow_reuse_address`; `tests/emulator/test_binding.py`, `test_preview.py`,
+`test_tool_log.py`, `test_demo.py`; `tests/app/support.py`, `test_emulator_view.py`,
+`test_tool.py`; `AGENTS.md`, `agent/getting-started.md`, `docs/emulator.md`;
+`docs/specs/26-p1-every-suite-passes-on-windows-again/requirements.md`.
+
 ## Seed 29: The scope and meaning of ignoring an animation
 
 **Question.** The owner requested a playlist toggle in the Android app, emulator and

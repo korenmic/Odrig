@@ -70,7 +70,8 @@ class Server(http.server.ThreadingHTTPServer):
     with its content type, and nothing else."""
 
     daemon_threads = True
-    allow_reuse_address = True
+    # On Windows the option would let a second program take a port another one holds.
+    allow_reuse_address = sys.platform != "win32"
 
     def __init__(self, port=PORT, folder=paths.WWW, handler=Handler):
         self.folder = folder

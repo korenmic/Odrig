@@ -4,6 +4,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 
 from emulator import recfile
 from odrig import mapping, odrg
@@ -14,6 +15,10 @@ from tests.core.support import ReferencePlayer
 from . import support
 
 SHOW = support.DEMO_SHOW
+
+# Python built with zlib-ng, as on Windows, compresses with other DEFLATE bytes than zlib,
+# which the converter's bytes match. The animation in them is the same.
+ZLIB_NG = "zlib-ng" in zlib.ZLIB_RUNTIME_VERSION
 
 # Leg N of the target file is on pin N, but for the last two.
 LEGS = tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1))
@@ -90,7 +95,17 @@ class DemoShow(unittest.TestCase):
             self.assertEqual([duration for duration, _ in odrg.decode(packed).records], [ms] * frames)
 
     def test_the_packed_folder_holds_the_files_the_other_tests_of_the_suites_play(self):
-        self.assertEqual(support.files_of(self.folder), core_support.demo_show())
+        packed, expected = support.files_of(self.folder), core_support.demo_show()
+        if not ZLIB_NG:
+            self.assertEqual(packed, expected)
+            return
+        self.assertEqual(sorted(packed), sorted(expected))
+        for name, data in expected.items():
+            with self.subTest(file=name):
+                if name.endswith(".odrg"):
+                    self.assertEqual(odrg.decode(packed[name]), odrg.decode(data))
+                else:
+                    self.assertEqual(packed[name], data)
 
     def test_73_seconds_of_it_equal_the_reference_at_every_tick(self):
         self.assertEqual((self.recorded.status, self.recorded.out, self.recorded.err), (0, "", ""))

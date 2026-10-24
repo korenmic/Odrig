@@ -98,9 +98,11 @@ Do not decide these, and do not work on a guess. Ask in words and wait.
 
 ## If you work on Windows
 
-The Python library, the core's build, the emulator and the command tool work on Windows 10
-and 11, and their suites pass there. That was seed 11,
-`project-seeds/11-p0-emulator-and-tools-on-windows/`.
+The Python library, the core's build, the emulator, the command tool and the app's tool
+work on Windows 10 and 11, and every suite that runs there passes: the converter's, the
+Python library's, the core's, the emulator's and the command tool's, the app's and the
+onboarding suite. That was seed 11, `project-seeds/11-p0-emulator-and-tools-on-windows/`,
+and seed 26 for the work that came after it.
 
 - The core is built there by `python core/build.py shared`, not by `make`.
 - Windows has no virtual serial port. The emulator takes command lines on a TCP port, and
@@ -124,7 +126,6 @@ present, and do not build on them.
 - **A USB log on the serial port**, seed 23: built; the plug-in and pull-out check is open.
 - **A bigger animation space**, seed 24: the board was moved to it on 2026-10-16; checks open.
 - **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
-- **Every suite passes on Windows again**, seed 26: done on its branch; being merged.
 - **The app's count of installed and external animations**, seed 28: a dashboard line.
 - **Toggle animations in the playlist**, seed 29: merged; the owner's phone check is open.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.

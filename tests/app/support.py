@@ -39,11 +39,20 @@ CHROMES = (
 )
 
 
+def usual_chromes():
+    """The places Chrome is installed in on this system: on Windows under the folders of
+    programs and the user's own, elsewhere those of macOS and Linux."""
+    if sys.platform == "win32":
+        bases = [os.environ.get(name) for name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")]
+        return [os.path.join(base, "Google", "Chrome", "Application", "chrome.exe") for base in bases if base]
+    return list(CHROMES)
+
+
 def chrome():
     """The Chrome to start: the program the environment variable ODRIG_CHROME names, or
     the first of the usual places that has one."""
     named = os.environ.get("ODRIG_CHROME")
-    places = ([named] if named else []) + list(CHROMES)
+    places = ([named] if named else []) + usual_chromes()
     for place in places:
         if os.path.exists(place):
             return place
@@ -291,7 +300,8 @@ def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None):
         asked["address"] = address
     command = [
         chrome(), "--headless=new", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
-        "--disable-sync", "--disable-component-update", f"--window-size={size[0]},{size[1]}", f"--user-data-dir={profile}",
+        # No scrollbar takes room from the page, as on macOS; Chrome on Windows would give it one.
+        "--disable-sync", "--disable-component-update", "--hide-scrollbars", f"--window-size={size[0]},{size[1]}", f"--user-data-dir={profile}",
         # What is not for this computer goes to the suite's own server, and no further.
         f"--proxy-server=http://127.0.0.1:{server.port}",
         f"{server.url}t/driver.html?{urllib.parse.urlencode(asked)}",
