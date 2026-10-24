@@ -38,10 +38,36 @@ function side(value) {
   return value === undefined || value === null ? null : value;
 }
 
+// The readiness of a target after its start, as `status` reports it.
+const READINESS = ["checking", "ready", "degraded", "recovery"];
+
+// The most files a count of `status` names.
+const MOST_FILES = 1000000;
+
+// How far a target has read its files after its start, as `status` reports it, or null
+// when the target does not report it.
+function progressOf(reply) {
+  if (reply.readiness === undefined) {
+    return null;
+  }
+  const sound =
+    READINESS.includes(reply.readiness) &&
+    whole(reply.checked, 0, MOST_FILES) &&
+    whole(reply.to_check, 0, MOST_FILES) &&
+    whole(reply.unavailable, 0, MOST_FILES) &&
+    (reply.checking === null || typeof reply.checking === "string");
+  if (!sound) {
+    throw new Failure("bad-reply", address());
+  }
+  return {readiness: reply.readiness, checked: reply.checked, toCheck: reply.to_check, unavailable: reply.unavailable, checking: reply.checking};
+}
+
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
 // "all" for the playlist, the id of a cycle or null, the id of the animation on the
 // LEDs or null, the refreshes in the last second, the reason of an invalid show or null,
-// and the width and the height of the canvas, each null when the target gives none.
+// the width and the height of the canvas, each null when the target gives none; in
+// `progress`, how far it has read its files after its start, and in `host`, the text
+// that names it, each null when the target gives none.
 export async function status() {
   const reply = await carriedOut("status");
   const sound =
@@ -52,7 +78,8 @@ export async function status() {
     whole(reply.fps, 0, 1000000) &&
     (reply.error === null || typeof reply.error === "string") &&
     (side(reply.width) === null || whole(reply.width, 1, 65535)) &&
-    (side(reply.height) === null || whole(reply.height, 1, 65535));
+    (side(reply.height) === null || whole(reply.height, 1, 65535)) &&
+    (reply.host === undefined || reply.host === null || typeof reply.host === "string");
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
@@ -65,7 +92,27 @@ export async function status() {
     error: reply.error,
     width: side(reply.width),
     height: side(reply.height),
+    progress: progressOf(reply),
+    host: typeof reply.host === "string" ? reply.host : null,
   };
+}
+
+// The works in which a target meets a fault of a file.
+const WORKS = ["start", "play", "upload", "drive"];
+
+// The latest fault of a file the target met since its start, as `{work, file, record,
+// bytes, reason}`, or null when it has met none.
+export async function fault() {
+  const reply = await carriedOut("fault");
+  const found = reply.fault;
+  const sound =
+    found === null ||
+    (typeof found === "object" && found !== undefined && WORKS.includes(found.work) && typeof found.file === "string" &&
+      whole(found.record, 0, MOST_BYTES) && whole(found.bytes, 0, MOST_BYTES) && typeof found.reason === "string");
+  if (!sound) {
+    throw new Failure("bad-reply", address());
+  }
+  return found === null ? null : {work: found.work, file: found.file, record: found.record, bytes: found.bytes, reason: found.reason};
 }
 
 // One part of the items of the show, in its order, from a position on: each animation

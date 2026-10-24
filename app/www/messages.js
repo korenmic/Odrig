@@ -17,16 +17,58 @@ export function ofInvalidShow(reason) {
   return `The installed show is invalid: ${reason}.`;
 }
 
-// Why an animation is unavailable, in words, from the reason the installation gives for
-// its file, which follows in brackets.
-export function ofFault(reason) {
-  const words = {
+// A reason the installation gives for a file, in words.
+function faultWords(reason) {
+  return {
     "file-missing": "the file is missing",
     "read-error": "the file cannot be read",
     "size-mismatch": "the file is made for another canvas",
     "duplicate-id": "no id is left for it",
   }[reason] ?? "the file is damaged";
-  return `Unavailable: ${words} (${reason}).`;
+}
+
+// Why an animation is unavailable, in words, from the reason the installation gives for
+// its file, which follows in brackets.
+export function ofFault(reason) {
+  return `Unavailable: ${faultWords(reason)} (${reason}).`;
+}
+
+// What the show screen says of the installation's reading of its animations after a
+// start: how far it is while it reads them, and how many are unavailable when it has read
+// them all and some are; null when there is nothing to say.
+export function ofProgress(progress) {
+  if (progress === null) {
+    return null;
+  }
+  if (progress.readiness === "checking") {
+    const unavailable = progress.unavailable > 0 ? `, ${progress.unavailable} unavailable` : "";
+    return `Reading the animations: ${progress.checked} read, ${progress.toCheck} to read${unavailable}.`;
+  }
+  if (progress.readiness === "degraded") {
+    return `${progress.unavailable} ${progress.unavailable === 1 ? "animation" : "animations"} unavailable; the others play.`;
+  }
+  return null;
+}
+
+// The line of the target screen that names the installation, as its software names
+// itself.
+export function ofHost(host) {
+  return `Installation: ${host}`;
+}
+
+// What the installation was doing with a file when it met a fault in it.
+const WORKS = {
+  start: "checked after the start",
+  play: "played",
+  upload: "checked after its upload",
+  drive: "read from the external storage",
+};
+
+// The last fault the installation met in a file, in words, with the reason it gives in
+// brackets and where in the file it was.
+export function ofLastFault(fault) {
+  return `Last fault: ${fault.file}, while it was ${WORKS[fault.work]}, at frame record ${fault.record} after ${fault.bytes} bytes of its frames: ` +
+    `${faultWords(fault.reason)} (${fault.reason}).`;
 }
 
 // The line under an unavailable file of external storage, which the installation does not

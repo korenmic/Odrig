@@ -57,7 +57,7 @@ Rules for every task:
   - `docs/firmware.md`: `about`, the kept record, the outcomes, "Capturing evidence".
   - Requirements: 3.3, 4.1 to 4.3, 5.1 to 5.3, 8.3
 
-- [ ] 5. The app
+- [x] 5. The app
   - `app/www/commands.js`, `screens/show.js`, `screens/target.js`, `messages.js`.
   - `tests/app`: a target that checks and then is degraded; the target screen's host and
     fault.

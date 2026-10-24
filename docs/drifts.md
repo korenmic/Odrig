@@ -9529,3 +9529,34 @@ degraded end with 0, as the board plays, and recovery with 1. A wait that runs o
 the failure `check-not-done`.
 
 **Resolution.** The spec's requirement 5; `firmware/fwtool/board.py`.
+
+## Seed 33: the emulator's name
+
+**Question.** The design has the emulator name itself `odrig emulator, core <date of the
+library's build>`. The core's library tells no date of its build: no function of its
+interface gives one. Does the core get one for the emulator?
+
+**Answer.** No. The interface stays as the other hosts use it. The emulator names itself
+and the computer it runs on, `odrig emulator on <system> <processor>`, as Python tells
+them, which is what tells one emulator from another in a report.
+
+**Resolution.** `emulator/host.py`; `docs/emulator.md`.
+
+## Seed 33: the app's lines on the screens of seed 36
+
+**Question.** The spec was written for the app before seed 36. Its task 5 is built on seed
+36's four tabs. Where do the line of the reading, the installation's name and the last
+fault go, and when is `fault` asked for?
+
+**Answer.** The line of the reading stands in the panel of Animations, under the
+refreshes a second: `Reading the animations: <n> read, <m> to read.`, with
+`, <k> unavailable` when there are, and `<k> animations unavailable; the others play.`
+when the reading has ended with some unavailable, `1 animation` for one; no line for a
+ready installation or one that does not say. The name and the last fault stand on the
+target screen, the name as `Installation: <host>`. `fault` is asked for each time the
+operator opens the target screen after the installation has answered, once for each
+opening, and never at the start: the app leaves the target screen at the first answer. A
+software that does not know `fault` shows no line of it, and no message.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/target.js`,
+`app/www/messages.js`; `docs/android-app.md`.

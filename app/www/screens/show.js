@@ -218,6 +218,7 @@ function draw(state) {
   byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space, counted.internal)}`;
   byId("show-external-space").textContent = capacity.external(state.space, counted.external);
   const status = state.status;
+  say("readiness", status === null ? null : messages.ofProgress(status.progress));
   if (status === null) {
     for (const id of ["power", "brightness", "playing", "fps"]) {
       byId(id).textContent = "-";

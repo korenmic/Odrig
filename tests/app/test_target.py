@@ -170,7 +170,7 @@ class Requests(Target):
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
             logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
-        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http")})
+        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http")})
         self.assertIn(("status", "http"), {(entry["line"], entry["transport"]) for entry in logged})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 

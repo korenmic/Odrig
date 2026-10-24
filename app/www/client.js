@@ -558,6 +558,21 @@ export function mappingTestSnake(snake) {
   return requestOperation("mapping", () => commands.mappingTestSnake(snake));
 }
 
+// The latest fault of a file the target met since its start, or null when it met none or
+// its software does not know `fault`.
+export function lastFault() {
+  return requestOperation("fault", async () => {
+    try {
+      return await commands.fault();
+    } catch (error) {
+      if (error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code)) {
+        return null;
+      }
+      throw error;
+    }
+  });
+}
+
 export function contentBusy() {
   return contentLocked || job !== null;
 }

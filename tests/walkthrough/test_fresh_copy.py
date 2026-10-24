@@ -11,6 +11,13 @@ from . import support
 
 Followed = collections.namedtuple("Followed", "page followed left_out")
 
+
+def on_any_computer(reply):
+    """A reply of `status` with the emulator's name in `host` cut to the words that do not
+    name the computer it runs on, which the page cannot know."""
+    return re.sub(r'"host":"odrig emulator on [^"]*"', '"host":"odrig emulator on <system>"', reply)
+
+
 # The pages the walk-through follows, in the order a newcomer reads them. For each: the
 # headings whose commands are run, in the order of the page, and the headings whose
 # commands are not run, each with the reason.
@@ -146,7 +153,7 @@ class FreshCopy(unittest.TestCase):
         self.assertIsNotNone(answer, recorded[0])
         for member in ('"ok":true', '"playing":"all"', '"animation":1', '"error":null'):
             self.assertIn(member, answer)
-        self.assertEqual(self.shown(START, "Check it without a screen"), [f"reply 1000 {answer}\n"])
+        self.assertEqual([on_any_computer(block) for block in self.shown(START, "Check it without a screen")], [on_any_computer(f"reply 1000 {answer}\n")])
         recording = recfile.read(self.copy / DEMO_RECORD)
         self.assertEqual(len(recording.legs), 20)
         self.assertEqual(len(recording.ticks), 100)

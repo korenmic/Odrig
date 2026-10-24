@@ -14,7 +14,9 @@ a top bar with the app's name and whether the installation answers.
 - **Animations** says what the installation does and holds its animations. A panel says
   what plays, the animation on the LEDs with its id and its file name, `ON` or `OFF`, the
   brightness and the refreshes a second, with `On` and `Off` together in one pill and a
-  slider for the brightness. A compact panel has the two storage lines: each begins with
+  slider for the brightness. Under the refreshes, while the installation reads its
+  animations after a start, a line says how far it is, as `Reading the animations: 12
+  read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
   `Internal storage: 84 animations, free 6.7 MB of 13.5 MB` and
   `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`: the board's
@@ -38,11 +40,12 @@ a top bar with the app's name and whether the installation answers.
   the free internal storage above it.
 - **Settings** has the checkbox `Show test animations` and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
-- **Target** has the address of the installation, says whether it answers, and says how
-  the phone's requests travel.
+- **Target** has the address of the installation, says whether it answers, names the
+  installation and the last fault it met in a file, and says how the phone's requests
+  travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty-four command lines and no other, each as `POST /odrig` to the address that is set:
+twenty-five command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -64,6 +67,7 @@ twenty-four command lines and no other, each as `POST /odrig` to the address tha
 | Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
+| Opens the target screen while the installation answers | `fault` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -242,6 +246,29 @@ until it has read them all: the installation refuses a move with `busy` until th
 the app says so. With a few small animations that is over within two seconds; with the
 storage full of heavy ones it takes longer, see
 [firmware.md](firmware.md#measurements-on-the-board).
+
+Meanwhile a line under the refreshes says how far the installation has read, from
+`readiness`, `checked`, `to_check` and `unavailable` of `status`:
+`Reading the animations: <n> read, <m> to read.`, with `, <k> unavailable` before the
+full stop when it has found some unavailable. When it has read them all and some are
+unavailable, the line says `<k> animations unavailable; the others play.`, or
+`1 animation unavailable; the others play.`; when it has read them all and every one plays,
+and on an installation whose software does not say, there is no line. No time is given for
+the rest, as the installation gives none. Every control works meanwhile, and the
+refreshes are counted as refreshes a second as at any other time.
+
+The target screen names the installation as its software names itself, from `host` of
+`status`, as `Installation: odrig emulator on Darwin arm64`: the board gives its release,
+the date and the time of its build, its storage and the reason of its last start. Each
+time the screen is opened while the installation answers, the app asks for `fault` and
+says the last fault the installation met in a file since its start, as
+`Last fault: b.odrg, while it was played, at frame record 3 after 1234 bytes of its
+frames: the file is damaged (truncated).` The work is `checked after the start`,
+`played`, `checked after its upload` or `read from the external storage`, and the words
+of the reason are those of an unavailable row. The reason is what the installation found
+in the bytes it read; it does not say whether the storage is damaged. An installation that
+names nothing, or met no fault, or whose software does not know `fault`, shows no such
+line.
 
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, Animations says `Cycle` with its id, and `Playlist from the start` leaves it.
@@ -642,7 +669,13 @@ By programs, on a Mac:
   of animations of each storage, in Chrome against the emulator with no drive, a drive of
   animations, an empty drive, and a drive plugged in and pulled out, and against stand-in
   targets that answer `list` with `busy` or report an invalid show.
-- That the web code sends the twenty-four lines above and no other, and names no address
+- How far the installation has read its animations, in Chrome against a stand-in target
+  that reads three and against the emulator: each count in turn, the unavailable ones,
+  the end with unavailable animations, no line for an installation that has read every
+  one or does not say, and the controls usable meanwhile; the target screen's name of
+  the emulator and its last fault, asked once when the screen is opened, and neither line
+  for a target that does not say.
+- That the web code sends the twenty-five lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -661,6 +694,9 @@ By programs, on a Mac:
   the LEDs: steps 16 to 18 above, and seed 36's board session, which also removes the 21
   hand-uploaded line-test files from the board.
 
+- **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
+  name of the board and its last fault on a phone; that belongs to the seed's board
+  session.
 - **The check on a phone**, all of it. No program has run the app on a phone, and no test
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without

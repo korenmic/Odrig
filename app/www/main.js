@@ -30,6 +30,7 @@ function show(name) {
   client.showing(name);
   settingsScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
+  targetScreen.showing(name === "target");
 }
 
 // Shows a text in the place for messages until it is dismissed or another takes its
