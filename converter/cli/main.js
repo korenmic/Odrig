@@ -104,12 +104,16 @@ export function readRuntime(data) {
   return {format: "odrg", type: "frames", header: null, ...odrg.decode(data)};
 }
 
-// Writes the JSON frames of frames, and the JSON source of a text.
+// Writes the JSON frames of frames, and the JSON source of a text or a clock.
 function decode(values) {
   const data = files.read(values.input);
   const decoded = errors.naming(values.input, () => readRuntime(data));
   if (decoded.type === "text") {
     files.write(values.output, odrgx.dumpsText(odrgx.textOf(decoded)));
+    return;
+  }
+  if (decoded.type === "widget") {
+    files.write(values.output, odrgx.dumpsWidget(odrgx.widgetOf(decoded)));
     return;
   }
   const animation = {width: decoded.width, height: decoded.height, frames: decoded.records};
@@ -131,6 +135,9 @@ export function summary(kind, data) {
     const decoded = readRuntime(data);
     if (decoded.type === "text") {
       return textSummary(decoded, data);
+    }
+    if (decoded.type === "widget") {
+      return widgetSummary(decoded, data);
     }
     ({width, height, records: frames} = decoded);
     lines.push(`format: ${decoded.format}`);
@@ -161,6 +168,20 @@ function textSummary(decoded, data) {
     `block: ${decoded.block.width}x${decoded.block.height}`,
     `glyphs: ${decoded.glyphs.length}`,
     `text_bytes: ${new TextEncoder().encode(decoded.text).length}`,
+    `file_bytes: ${data.length}`,
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+// What `check` prints for a container of a clock.
+function widgetSummary(decoded, data) {
+  const lines = [
+    "format: odrgx",
+    "type: widget",
+    `canvas: ${decoded.header.width}x${decoded.header.height}`,
+    `loop_ms: ${decoded.header.loopMs}`,
+    `widget: ${decoded.settings.widget}`,
+    `speed: ${decoded.settings.speedMin} to ${decoded.settings.speedMax}`,
     `file_bytes: ${data.length}`,
   ];
   return `${lines.join("\n")}\n`;

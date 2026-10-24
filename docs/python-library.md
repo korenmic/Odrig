@@ -164,8 +164,9 @@ decode to and in `invalid/` named by their reason as above, one of "ODRGX files"
 fault of a frames payload, of "ODRG files". They are made from the ODRG vectors by
 `node tests/vectors/containers/build.mjs`, and the converter's suite checks that the files
 are what it makes. `odrig/odrgx.py` reads them for the suites of this library and of the
-core. Of a text it reads the header only: the payload is read by the converter and the
-core.
+core. Of a text and a clock it reads the header only: the payload is read by the
+converter and the core. `tests/vectors/widgets/` holds the clocks, made the same way by
+`node tests/vectors/widgets/build.mjs`.
 
 ## Tests
 

@@ -57,18 +57,19 @@ test("the reference pictures", async (t) => {
     for (const [name, picture] of pictures) assert.deepEqual(fs.readFileSync(path.join(FOLDER, name)), builder.png(picture), name);
   });
 
-  await t.test("each is the library's drawing of its container at its time", () => {
-    assert.ok(manifest.length >= 19);
+  await t.test("each is the library's drawing of its container at its time, a clock's with its seed", () => {
+    assert.ok(manifest.length >= 35);
+    assert.ok(manifest.filter((entry) => "seed" in entry).length >= 16);
     for (const entry of manifest) {
       const decoded = odrgx.decode(new Uint8Array(fs.readFileSync(path.join(ROOT, "tests", "vectors", entry.file))));
       const {width, height, pixels} = pixelsOf(fs.readFileSync(path.join(FOLDER, entry.picture)));
       assert.deepEqual([width, height], [decoded.header.width, decoded.header.height], entry.picture);
-      assert.deepEqual(odrgx.pictureAt(decoded, entry.ms), pixels, entry.picture);
+      assert.deepEqual(odrgx.pictureAt(decoded, entry.ms, entry.seed), pixels, entry.picture);
     }
   });
 
   await t.test("a text shows its colour on its background, and the same picture a pass later", () => {
-    for (const entry of manifest) {
+    for (const entry of manifest.filter((one) => !("seed" in one))) {
       const decoded = odrgx.decode(new Uint8Array(fs.readFileSync(path.join(ROOT, "tests", "vectors", entry.file))));
       const {settings} = decoded;
       const seen = colours(odrgx.pictureAt(decoded, entry.ms));

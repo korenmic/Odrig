@@ -130,13 +130,13 @@ class TheVectors(unittest.TestCase):
 class ThePictures(unittest.TestCase):
     def test_the_core_draws_every_reference_picture_as_the_converter_does(self):
         manifest = json.loads((PICTURES / "manifest.json").read_text(encoding="utf-8"))
-        self.assertGreaterEqual(len(manifest), 19)
+        self.assertGreaterEqual(len(manifest), 35)
         for entry in manifest:
             with self.subTest(picture=entry["picture"]):
                 width, height, pixels = png_pixels(PICTURES / entry["picture"])
                 data = (support.ROOT / "tests" / "vectors" / entry["file"]).read_bytes()
                 self.assertEqual((width, height), (odrgx.read_header(data).width, odrgx.read_header(data).height))
-                self.assertEqual(support.rendered(data, [entry["ms"]]), [pixels])
+                self.assertEqual(support.rendered(data, [entry["ms"]], entry.get("seed")), [pixels])
 
     def test_a_text_is_drawn_again_after_each_pass(self):
         data = text_of()

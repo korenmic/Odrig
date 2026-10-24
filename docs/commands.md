@@ -52,7 +52,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 | Member | Meaning |
@@ -64,6 +64,7 @@ A number in a command is written in decimal digits.
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 | `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
+| `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
 
 ## Storage and the installed items
 
@@ -85,8 +86,9 @@ from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation it
 `id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
 animation of the board's own storage, `true` for one of the external storage; then its
 `type`, what the file holds as its header says ([format.md](format.md)): `"frames"` for an
-ODRG file and for an ODRGX container of frames. A reply without `type` comes from a player
-before it, and its animations are frames. A cycle has its `id`, the ids of its
+ODRG file and for an ODRGX container of frames, `"text"` for a text and `"widget"` for a
+clock. A reply without `type` comes from a player before it, and its animations are
+frames. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
 `list <next>`, or `null` when the last item is in the reply. An unavailable animation, one

@@ -24,8 +24,8 @@ Converts animations between media files, JSON frames, ODRG and ODRGX.
 
 subcommands:
   import   Turns a video or GIF file into a JSON frames file.
-  encode   Turns a JSON frames file or the source of a text into an ODRG file or an
-           ODRGX container.
+  encode   Turns a JSON frames file or the source of a text or a clock into an ODRG
+           file or an ODRGX container.
   decode   Turns an ODRG file or an ODRGX container back into its JSON source.
   check    Validates a JSON frames, ODRG or ODRGX file and summarises it.
   pack     Builds the folder of files that is installed for a show.
@@ -75,10 +75,10 @@ Turns a video or GIF file into a JSON frames file.
     usage: `usage: ${TOOL} encode IN.json OUT.odrg [--uncompressed]
 
 Turns a JSON frames file into an ODRG file, or into an ODRGX container of frames
-when the name of OUT.odrg ends in .odrgx; and the JSON source of a text into an ODRGX
-container, whose name ends in .odrgx.
+when the name of OUT.odrg ends in .odrgx; and the JSON source of a text or a clock
+into an ODRGX container, whose name ends in .odrgx.
 
-  IN.json         the JSON frames file or the source of a text to read
+  IN.json         the JSON frames file or the source of a text or a clock to read
   OUT.odrg        the ODRG file or the ODRGX container to write
   --uncompressed  write the body without compression
   --help          shows this text
@@ -91,7 +91,7 @@ container, whose name ends in .odrgx.
     usage: `usage: ${TOOL} decode IN.odrg OUT.json
 
 Turns an ODRG file, or an ODRGX container of frames, back into a JSON frames file,
-and an ODRGX container of a text back into its JSON source.
+and an ODRGX container of a text or a clock back into its JSON source.
 
   IN.odrg   the ODRG file or the ODRGX container to read
   OUT.json  the JSON frames file to write

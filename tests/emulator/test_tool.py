@@ -78,7 +78,7 @@ class AgainstTheEmulator(unittest.TestCase):
                     self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
             result = support.run_tool(*target, "status")
             self.assertEqual((result.status, result.err), (0, ""))
-            self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6})
+            self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
             self.assertTrue(result.out.endswith("}\n"))
             self.assertEqual(result.out.count("\n"), 1)
 

@@ -40,6 +40,13 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text(",\"width\":null,\"height\":null");
     }
+    uint32_t seed = 0;
+    reply.text(",\"seed\":");
+    if (player_seed(core, &seed)) {
+        reply.number(seed);
+    } else {
+        reply.text("null");
+    }
     reply.text("}\n");
     return reply.length;
 }

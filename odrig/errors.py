@@ -49,6 +49,7 @@ UNKNOWN_FONT = "unknown-font"
 BAD_GLYPH = "bad-glyph"
 DOES_NOT_FIT = "does-not-fit"
 UNSUPPORTED_CHARACTER = "unsupported-character"
+UNKNOWN_WIDGET = "unknown-widget"
 
 MAPPING_MISSING = "mapping-missing"
 MAPPING_MALFORMED = "mapping-malformed"

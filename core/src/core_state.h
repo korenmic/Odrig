@@ -116,7 +116,6 @@ struct Upload {
     uint8_t header_read;    // the first step of the check has been taken
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
-    ContentHeader content;  // what the file holds, once the check has read its header
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received
@@ -246,6 +245,8 @@ struct Core {
     // many refreshes in a row came without a grid time left out, counted to
     // kCheckMostSteps; and at how many refreshes in a row the check took no step.
     uint32_t check_at;
+    // What the file the second decoders read holds, by its header: the file of this check,
+    // of a drive's check or of an upload's check, which never read at the same time.
     ContentHeader check_content;
     uint32_t check_records_left;
     uint64_t check_total_ms;
@@ -323,6 +324,7 @@ struct Core {
     uint32_t playing;       // the position of the cycle being played, kPlaylist, or kNothing
     uint32_t shown;         // the position of the animation item the latest refresh chose
     uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
+    uint32_t noise;         // what the timestamps of the polls were mixed into
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
     uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
@@ -340,6 +342,8 @@ struct Core {
     // it has decoded a record.
     uint32_t catch_up_left;
     uint8_t catch_up_begun;
+    // The seed of the turn of the clock that is open for playback.
+    uint32_t seed;
 
     FileSource file;
     Inflate inflate;

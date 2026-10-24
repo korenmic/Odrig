@@ -128,7 +128,7 @@ class Stream(unittest.TestCase):
             for event in stream.read_until(has("status"), 2):
                 if event.kind == "status":
                     arrivals.append(time.monotonic())
-                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6\}\Z')
+                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6,"seed":null\}\Z')
         self.assertGreaterEqual(len(arrivals), 3)
         self.assertLess(max(later - earlier for earlier, later in zip(arrivals, arrivals[1:])), 1.2)
 

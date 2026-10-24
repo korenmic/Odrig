@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "type": "widget",
+  "width": 60,
+  "height": 60,
+  "widget": "digital",
+  "seconds": 20,
+  "face": 4243711,
+  "hands": 2105376,
+  "rim": 16764992,
+  "background": 0,
+  "speed_min": 60,
+  "speed_max": 600
+}

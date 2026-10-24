@@ -9602,3 +9602,61 @@ new phrase in the same place: every other byte of each answer, and every key, st
 reason, `show-malformed`, does not change.
 
 **Resolution.** `odrig/show.py`, `converter/lib/show.js`, `converter/tests/expected/`.
+
+## Seed 37: The swing of a clock's speed
+
+**Question.** The design gives a clock's speed a swing of up to all the room between its
+base speed and the nearer of its two limits, so that the speed is never below the least.
+The cosine is read from the sine table between its entries, and those straight pieces are
+steeper than the true curve by up to 0.47 percent. With the whole room, the speed dips
+below the least by that much, and below nothing for a least speed of 1: the hands would go
+back for a moment. Is the room or the guarantee kept?
+
+**Answer.** The guarantee. The swing is at most 100/102 of the room, `(r % 101) / 102`
+where the design had `/ 100`, so the steepest piece of the table stays inside the limits.
+The converter's suite checks the speed over irregular steps for hundreds of seeds and
+limits.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The virtual
+time"; `docs/format.md`, "The widget payload".
+
+## Seed 37: When `status` has a seed
+
+**Question.** Requirement 8 asks for the seed of the clock whose turn it is, and `null`
+while no clock is on the LEDs. A `play` closes what plays until the next refresh, and
+`off` darkens the LEDs while the turn goes on. What does `status` give then?
+
+**Answer.** The seed belongs to the turn. `status` gives it from the turn's first refresh
+to its end, also while the LEDs are off, since the turn and its clock go on and `on`
+shows them again at once. From a `play` until the next refresh, while the new turn has
+no seed yet, and while frames or a text or nothing plays, it gives `null`.
+
+**Resolution.** `docs/commands.md`, "Status reply"; `docs/core.md`, "Clocks".
+
+## Seed 37: A status reply longer than 192 bytes
+
+**Question.** `seed` makes the longest `status` reply 210 bytes. Seed 02 held every reply
+to 192 bytes, and the core's suite still holds `status` to that. Is a member dropped?
+
+**Answer.** No. Seed 07 raised every reply to 1,024 bytes, and nothing reads `status` into
+a smaller buffer: the emulator's and the firmware's replies take 1,024. The test now holds
+the longest `status` under 256 bytes.
+
+**Resolution.** `tests/core/test_commands.py`; the change log of `docs/decisions.md`.
+
+## Seed 37: The look of the melting watch
+
+**Question.** The melting clock is to resemble the seed's picture, a tilted pocket watch
+whose lower half sags, with hands that stay joined at their pivot. Which shape, made of
+integer steps the core can take at every refresh?
+
+**Answer.** The dial of the analog clock, two thirds as large, up and to the left of the
+centre, tilted counter-clockwise by 25 to 40 degrees. Above a fold line it lies flat;
+below it the face hangs straight down, stretched by 130 to 170 percent, drifting right and
+narrowing as it hangs, and darker the deeper it hangs, with a dark crease at the fold. The
+fold waves slowly with the real time. A crown and a ring of the rim's colour sit at 12
+o'clock. Each pixel is taken back to the dial, so the hands bend with the face and stay on
+it. The owner's look on the LEDs is task 13.
+
+**Resolution.** `docs/format.md`, "The widget payload"; `core/src/clock.cpp`;
+`converter/lib/draw.js`.
