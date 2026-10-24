@@ -90,3 +90,11 @@ adapter adds only a read-only FAT capacity query, using 64-bit byte arithmetic; 
 space JSON is produced by the core. The tracked MSC VFS copy exposes this capacity
 helper; its mount/unmount and licence remain unchanged. The standalone trial still
 has no external drive adapter and does not claim complete player functionality.
+
+## The saved playlist order and the snake tests
+
+The shared core keeps the saved playlist order in `order.txt` of the board's own storage
+and shows the twenty snake tests from pictures it holds; the firmware carries their
+commands as it carries every other line and gives the core its storage functions, whose
+names `order.txt` and `order.part` fit its rule of 32 characters. Nothing of the firmware
+changes for them. No firmware with them has been flashed or checked on the LEDs yet.

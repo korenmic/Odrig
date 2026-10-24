@@ -61,7 +61,7 @@ Rules for every task:
   - Prove it fails first: `mapping test snake 1` is refused with `bad-argument`.
   - Requirements: 3.1 to 3.4
 
-- [ ] 4. The routes and the command tool
+- [x] 4. The routes and the command tool
   - `odrigctl/cli.py`: `order get [FROM]`, `order move REV ID BEFORE`,
     `mapping test snake N`.
   - Tests, `tests/emulator/test_order.py`: the three forms over HTTP, TCP and the serial

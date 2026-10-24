@@ -26,6 +26,7 @@ COMMANDS = {
     "remove": ("ID",),
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
+    "order": ("OPERATION",),
     "upload": ("ID", "FILE"),
 }
 TIMEOUT_SECONDS = 2.0
@@ -57,7 +58,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, upload ID FILE. ID and N are sent as they are typed.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -89,9 +90,17 @@ def checked(made, arguments):
         return [arguments.command, *arguments.arguments]
     if arguments.command == "mapping":
         words = arguments.arguments
-        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set")
+        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
+            len(words) == 3 and words[:2] == ["test", "snake"])
         if not valid:
-            made.error("mapping takes get, set REV PINS, or test on|off")
+            made.error("mapping takes get, set REV PINS, test on|off, or test snake N")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
+    if arguments.command == "order":
+        words = arguments.arguments
+        if not (words == ["get"] or (len(words) == 2 and words[0] == "get") or (len(words) == 4 and words[0] == "move")):
+            made.error("order takes get [FROM], or move REV ID BEFORE")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
@@ -188,6 +197,8 @@ def main(argv=None):
         with client.Session(port=arguments.port, tcp=arguments.tcp, http=arguments.http, timeout=arguments.timeout) as session:
             if arguments.command == "list":
                 return 0 if content.list_all(session, _print) else 1
+            if words == ["order", "get"]:
+                return 0 if content.list_all(session, _print, b"order get") else 1
             if arguments.command == "upload":
                 progress = Progress(sys.stderr)
                 try:
