@@ -164,7 +164,8 @@ label {
 
 button,
 input,
-select {
+select,
+textarea {
   display: block;
   width: 100%;
   min-height: 48px;
@@ -201,6 +202,7 @@ select:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 label.button:focus-within {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
@@ -695,7 +697,8 @@ label.button {
   text-align: center;
 }
 
-#preview {
+#preview,
+#author-preview {
   display: block;
   width: 100%;
   margin: 8px 0;

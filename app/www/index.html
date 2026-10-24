@@ -117,6 +117,43 @@
 </div>
 </div>
 </div>
+<div class="pair">
+<button id="make-text" type="button">Make a text</button>
+</div>
+<div id="author" class="panel" hidden>
+<h2 id="author-title">A text</h2>
+<div id="text-form">
+<label for="text-words">Text</label>
+<textarea id="text-words" rows="3" autocomplete="off" spellcheck="false"></textarea>
+<label for="text-font">Font</label>
+<select id="text-font"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select>
+<div class="pair">
+<div><label for="text-color">Colour</label><input id="text-color" type="color" value="#ffd040"></div>
+<div><label for="text-background">Background</label><input id="text-background" type="color" value="#000000"></div>
+</div>
+<label for="text-effect">Effect</label>
+<select id="text-effect"><option value="static">Still</option><option value="marquee" selected>Marquee</option><option value="slide">Slide in and out</option><option value="pan">Pan</option></select>
+<label for="text-motion">Motion</label>
+<select id="text-motion"><option value="left">To the left</option><option value="right">To the right</option><option value="up">Up</option><option value="down">Down</option></select>
+<div class="pair">
+<div><label for="text-align">Alignment</label><select id="text-align"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select></div>
+<div><label for="text-valign">Height</label><select id="text-valign"><option value="top">Top</option><option value="middle" selected>Middle</option><option value="bottom">Bottom</option></select></div>
+</div>
+<label for="text-direction">Direction</label>
+<select id="text-direction"><option value="auto">As the text begins</option><option value="ltr">Left to right</option><option value="rtl">Right to left</option></select>
+<label class="check" for="text-wrap"><input id="text-wrap" type="checkbox"><span class="title">Wrap long lines</span></label>
+<div class="pair">
+<div><label for="text-speed">Speed, pixels a second</label><input id="text-speed" type="text" inputmode="numeric" autocomplete="off" value="20"></div>
+<div><label for="text-pause">Pause, milliseconds</label><input id="text-pause" type="text" inputmode="numeric" autocomplete="off" value="1000"></div>
+</div>
+</div>
+<canvas id="author-preview"></canvas>
+<p id="author-says" role="status" aria-live="polite"></p>
+<button id="author-upload" type="button" class="primary">Upload to the installation</button>
+<p id="author-uploading" hidden></p>
+<button id="author-cancel" type="button" hidden>Cancel</button>
+<button id="author-close" type="button">Close</button>
+</div>
 </section>
 <section id="settings" hidden>
 <h1>Settings</h1>

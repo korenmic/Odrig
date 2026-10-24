@@ -8,7 +8,7 @@ from .test_storage import SPACE
 # or switched off, and so is a text area.
 TYPED = {"text", "number", "search", "url", "email", "tel", "password", "date", "time", "datetime-local", "month", "week"}
 # The fields of the page: the address, and the start and the length of a part of a video.
-FIELDS = ["#start", "#length", "#address"]
+FIELDS = ["#start", "#length", "#text-words", "#text-speed", "#text-pause", "#address"]
 LOOKS = ("animations", "upload", "question", "target", "message")
 
 
@@ -52,7 +52,7 @@ class ALongPressOrARightClick(unittest.TestCase):
         rows = [element["what"] for element in self.seen["animations"]["elements"] if element["what"].startswith("#animations-list > div.row")]
         self.assertGreaterEqual(len(rows), 2 * 6)
 
-    def test_in_the_three_fields_text_can_be_marked_and_the_menu_opens(self):
+    def test_in_every_field_text_can_be_marked_and_the_menu_opens(self):
         for look in LOOKS:
             fields = [element for element in self.seen[look]["elements"] if is_field(element)]
             self.assertEqual([field["what"] for field in fields], FIELDS, look)

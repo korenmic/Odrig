@@ -107,7 +107,7 @@ Rules for every task:
     `docs/firmware.md`, `docs/emulator.md`.
   - Requirements: 2.2, 9.3, 14.1 to 14.3
 
-- [ ] 9. The app: making a text
+- [x] 9. The app: making a text
   - `app/www/`: "Make a text", its form, the moving preview, the pass's length, the
     refusals in words, the upload as a new item.
   - Tests in `tests/app/`: the preview's pixels are those of the converter's drawing; an
