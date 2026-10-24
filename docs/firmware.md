@@ -145,6 +145,7 @@ python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
 python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--limit FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
+python3 firmware/fw.py recover-storage [--port P] [--whole] [--wait SECONDS]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
 python3 firmware/fw.py test-air --http ADDRESS [--port P]
@@ -189,6 +190,9 @@ with that environment's Python.
 | `limit-invalid` | The limit is not from 0 to 65,535. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
+| `cancelled` | An interrupt from the keyboard, Ctrl-C, ended the command before a change of storage was committed. The board holds its storage from before. |
+| `recovery-needed` | A change of the board's storage was cut while the blocks its file system uses were written or compared, or the journal of such a change is in the work folder: run `recover-storage`. Until then every command that reads or writes the board refuses with this reason before it looks for the board. |
+| `storage-changed` | `recover-storage` found the board's storage changed outside the blocks of the change it is to finish. Nothing was written. |
 
 **The layout.** A command that reads the board's partition table, `flash`,
 `install-firmware`, `install-show`, `set-wifi`, `set-limit`, `read-limit` and `read-show`,
@@ -475,10 +479,22 @@ whether it is sound is not known yet.
 6. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
    every file outside `/odrig` is as it was, and every file outside `/odrig` and every file
    it kept lies in the blocks it lay in.
-7. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
-   the chip compare the whole partition with the new image, and restarts the board.
-   esptool is told that these blocks are data: it would otherwise take a block that begins
-   with the first byte of a program image for a program and refuse it.
+7. It writes the blocks that changed, neighbouring ones joined, in two esptool calls, and
+   prints how many first: `storage: 33 blocks to write, 135168 bytes: 31 free first, then
+   2 in use`. The first call writes the blocks the board's file system does not use; a
+   failure of esptool there, or Ctrl-C, ends the command with the board's file system as
+   it was, and the board is restarted. The second call writes the blocks the file system
+   uses: the commit. Then the chip compares every written block with the new image. During
+   the commit and the comparison Ctrl-C waits for their end. A failure there ends with
+   `recovery-needed`, and the chip stays in its bootloader: WLED formats a file system it
+   cannot read when it starts. No call of the write resets the chip, as esptool would
+   after a failure too; once the comparison has passed, the board is restarted and the
+   tool prints `storage: committed: 135168 bytes written and compared; the board
+   restarts`. A folder that the board holds already writes and compares nothing:
+   `storage: unchanged: nothing written; the board restarts`. esptool is told that these
+   blocks are data: it would otherwise take a block that begins with the first byte of a
+   program image for a program and refuse it. The rest of the partition is not compared:
+   it is the image the chip confirmed, or that was read whole, in step 3.
 
 Removing, adding or replacing one animation of a storage 80 % full changes the blocks of
 the files written and two blocks of the file system's records, where the folder rebuilt
@@ -491,6 +507,11 @@ whole changed 8.4 MB of WLED's layout and 10.9 MB of the bigger one;
 board. `--keep-copies DIR` copies every file the install removes or replaces, as the board
 holds it, into `DIR`, a folder that is new or empty, before anything is written, and
 prints `kept copies: 2 files in DIR`: a file kept for a look at why it failed.
+
+From its first write to the comparison the change is named by the journal
+`build/firmware/storage/change.json`: the storage region, the new image and the blocks of
+each call, and the step reached. `set-wifi`, `set-limit` and `install-firmware` write their
+change of storage in the same way.
 
 A copy of storage from before the write and the new image stay in
 `build/firmware/storage/`, named by time; the newest eight images are kept. The new image
@@ -622,6 +643,38 @@ the emulator ran:
 ```
 diff -r build/example-show build/show-from-board
 ```
+
+### recover-storage
+
+```
+python3 firmware/fw.py recover-storage
+```
+
+Finishes or gives up the change of the board's storage that the journal
+`build/firmware/storage/change.json` names, after a command ended with `recovery-needed`.
+Without a journal it prints `storage: nothing to recover: no change of the board's storage
+is unfinished` and touches nothing.
+
+- A change that was cut before its commit, as when the computer lost power while the free
+  blocks were written, is given up: the board holds its storage from before. The journal
+  and the new image are removed, the board is restarted, and the tool prints
+  `storage: given up: ...` and the board's reply to `status`.
+- Otherwise the chip first compares the board's storage outside the blocks of the change
+  with the new image. When it is the same, the tool writes the change again, the free
+  blocks and then the blocks in use, has the chip compare them, keeps the new image as the
+  board's, removes the journal, restarts the board, and prints
+  `storage: committed: the change was finished: ... bytes written and compared; the board
+  restarts` and the reply to `status`. Ctrl-C waits for the end of the writing.
+- When the storage outside the change differs, something else wrote it since, for
+  example the board started on the half-written storage and formatted it. The command
+  ends with `storage-changed`, writes nothing, and leaves the chip in its bootloader.
+  `recover-storage --whole` writes the new image whole, every block of storage: the last
+  resort, which brings back the settings and the show the new image holds and loses what
+  the board wrote since.
+- A recovery that is cut keeps the journal; the same command finishes it later.
+
+`--wait SECONDS` is how long it waits for the board's reply after the restart (default:
+20).
 
 ### test
 

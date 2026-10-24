@@ -43,7 +43,7 @@ Rules for every task:
   - `docs/firmware.md`, "install-show".
   - Requirements: 1.1 to 1.6, 4.1, 4.3, 4.4, 6.5, 7.2
 
-- [ ] 3. The order of the write, the journal and recover-storage
+- [x] 3. The order of the write, the journal and recover-storage
   - `firmware/fwtool/journal.py`; `firmware/fwtool/cli.py`: `write_storage`, `apply_change`,
     `held_interrupts`, `recover-storage`, the refusal of every command that touches the
     board while a journal is there; `firmware/fwtool/flasher.py`: `compare`, esptool in a

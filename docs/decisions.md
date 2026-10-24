@@ -588,3 +588,12 @@ are in [format.md](format.md), "Measured sizes".
   its log at its next start; `install-show` waits for the readiness and prints the
   outcome, healthy, degraded or recovery. The new reply member `host` was approved in
   advance by the owner.
+- 2026-10-24: Seed 34: the firmware tool's `install-show` changes only the files of `/odrig`
+  that differ, where it rebuilt the folder whole, and writes a change of the board's
+  storage in two parts: the blocks its file system does not use, then the blocks it uses,
+  the commit, after which the chip compares what was written. A journal in the work folder
+  names the change until it is finished; a change cut in the commit is finished by the new
+  command `recover-storage`, and the board stays in its bootloader meanwhile. New:
+  `recover-storage [--whole]`, `install-show --dry-run` and `--keep-copies DIR`, and the
+  reasons `cancelled`, `recovery-needed` and `storage-changed`, approved in advance by the
+  owner.

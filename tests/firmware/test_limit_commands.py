@@ -45,10 +45,10 @@ class SetLimit(WithALimitFile):
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: 36000 mA\n{REPLY}\n")
         self.assertEqual(limit.stored(self.on_the_board(esptool)), 36000)
 
-    def test_it_writes_once_as_data_inside_storage_and_compares_the_partition(self):
+    def test_it_writes_once_as_data_inside_storage_and_compares_what_it_wrote(self):
         esptool = self.esptool()
         self.set_limit(esptool, 0)
-        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         write = next(call for call in esptool.calls if "write-flash" in call)
         self.assertIn("--force", write)
         for address, content in esptool.wrote:
@@ -64,7 +64,7 @@ class SetLimit(WithALimitFile):
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nlimit: 850 mA\n{REPLY}\n")
         self.assertEqual(esptool.wrote, [])
         self.assertNotIn("write-flash", esptool.commands())
-        self.assertEqual(esptool.commands()[-1], "verify-flash")
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "chip-id"])
 
     def test_its_status_is_0_also_when_the_reply_reports_an_invalid_show(self):
         answer = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"show-missing"}'
@@ -151,7 +151,7 @@ class InstallFirmware(WithALimitFile):
         result = self.install(esptool, 0)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: off\n{REPLY}\noutcome: healthy\n")
-        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         in_storage = [(address, content) for address, content in esptool.wrote if address >= STORAGE_AT]
         board_now = applied(self.old, in_storage)
         self.assertEqual(limit.stored(board_now), 0)

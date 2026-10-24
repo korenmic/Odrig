@@ -174,7 +174,7 @@ class Outputs(unittest.TestCase):
             (folder / "mapping.json").write_text("{")
             done = support.install(folder, "--no-check")
         self.assertEqual(done.status, 1, done.err)
-        self.assertEqual(json.loads(done.out)["error"], "mapping-malformed")
+        self.assertEqual(json.loads(done.out.splitlines()[-1])["error"], "mapping-malformed")
         stored = json.loads(storage.other_files(support.storage_image())["/cfg.json"])["hw"]["led"]["ins"]
         report = report_after_a_moment()
         self.assertEqual([(output["pin"], output["count"]) for output in report["outputs"]], [(entry["pin"][0], entry["len"]) for entry in stored])
