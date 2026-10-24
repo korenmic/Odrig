@@ -247,6 +247,10 @@ struct Core {
     uint64_t stream_loop;
     uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
     uint32_t stream_records;    // the frame records of the open file that were decoded
+    // At the refresh being made: the body bytes the player may still decode, and whether
+    // it has decoded a record.
+    uint32_t catch_up_left;
+    uint8_t catch_up_begun;
 
     FileSource file;
     Inflate inflate;

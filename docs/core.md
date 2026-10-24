@@ -538,7 +538,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,408 |
+| The core object | fixed | 3,416 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -554,15 +554,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,677** |
+| **Total** | | **124,685** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,162 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,170 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,145 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,153 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,773 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,781 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

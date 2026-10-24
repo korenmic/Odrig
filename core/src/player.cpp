@@ -88,6 +88,21 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     return kNone;
 }
 
+// Decodes the next frame record of the file open for playback into the pixel buffer, as
+// long as the refresh has bytes left to decode: kPendingWork when it has none, and the
+// record is decoded at the next refresh. The first record of a refresh is always decoded.
+Reason next_record(Core &core, uint16_t *duration) {
+    if (core.catch_up_begun && core.catch_up_left == 0) {
+        return kPendingWork;
+    }
+    const uint64_t before = core.decoder.body_read;
+    const Reason reason = core.decoder.next(core.pixels, duration);
+    const uint64_t used = core.decoder.body_read - before;
+    core.catch_up_left = used >= core.catch_up_left ? 0 : core.catch_up_left - static_cast<uint32_t>(used);
+    core.catch_up_begun = 1;
+    return reason;
+}
+
 // Decodes the first loop of an animation whose length is not known, up to a time since
 // the start of its turn. When every record was decoded and the time lies at their end or
 // beyond it, their durations add up to the length, and it is noted.
@@ -98,7 +113,7 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
     }
     while (reason == kNone && core.frame_end <= time && core.stream_records < core.decoder.frames) {
         uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
+        reason = next_record(core, &duration);
         if (reason != kNone) {
             break;
         }
@@ -132,7 +147,7 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) 
     }
     while (reason == kNone && core.frame_end <= within) {
         uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
+        reason = next_record(core, &duration);
         if (reason != kNone) {
             break;
         }
@@ -241,9 +256,13 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     }
 }
 
-// Brings the pixel buffer to the picture of what is being played at a moment. False when
-// there is no picture to show.
-bool advance(Core &core, uint64_t now) {
+// What a refresh shows: no picture, the picture in the pixel buffer, or the picture of the
+// refresh before, while the player has not come to the picture of the moment yet.
+enum Shown { kShowsNothing, kShowsPicture, kShowsBefore };
+
+// Brings the pixel buffer to the picture of what is being played at a moment, decoding at
+// most kCatchUpBytes of a body.
+Shown advance(Core &core, uint64_t now) {
     // The playlist is a row of turns, each as long as its animation makes it. A cycle is
     // a row of turns of equal length, each with the next animation of its list. The time
     // of an animation is counted from the start of its turn.
@@ -251,9 +270,11 @@ bool advance(Core &core, uint64_t now) {
     uint64_t turn;
     uint64_t in_turn = 0;
     Reason reason = kNone;
+    core.catch_up_left = kCatchUpBytes;
+    core.catch_up_begun = 0;
     if (core.playing == kPlaylist) {
         reason = playlist_turn(core, now, &in_turn);
-        if (core.playing == kNothing) return false;
+        if (core.playing == kNothing) return kShowsNothing;
         animation = core.turn_item;
         turn = core.turn_number;
     } else {
@@ -267,8 +288,9 @@ bool advance(Core &core, uint64_t now) {
         reason = show_at(core, animation, turn, in_turn);
     }
     if (reason == kPendingWork) {
-        // The file settles a defect: its reason comes at a later refresh.
-        return false;
+        // The rest is decoded at the next refresh, or the file settles a defect and its
+        // reason comes at a later one.
+        return kShowsBefore;
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.
@@ -277,7 +299,7 @@ bool advance(Core &core, uint64_t now) {
         core.drive[place].state = kDriveLeftOut;
         drive_left_out(core, place, reason);
         player_drive_changed(core);
-        return false;
+        return kShowsNothing;
     }
     if (reason != kNone) {
         // The file cannot be played: the show is invalid from this refresh on.
@@ -287,10 +309,10 @@ bool advance(Core &core, uint64_t now) {
         } else {
             core_fail(core, kFileMalformed, file.name, reason);
         }
-        return false;
+        return kShowsNothing;
     }
     core.shown = animation;
-    return true;
+    return kShowsPicture;
 }
 
 // Writes the colour of every LED: its pixel, through the palette in a palette file, at the
@@ -526,17 +548,17 @@ int player_poll(Core &core, uint64_t now_ms) {
     }
     ++core.count_running;
 
-    bool lit = core.mapping_test && !core.invalid;
+    Shown shows = core.mapping_test && !core.invalid ? kShowsPicture : kShowsNothing;
     if (!core.mapping_test && !core.invalid && core.playing != kNothing) {
         if (core.zero_pending) {
             core.zero = grid;
             core.zero_pending = 0;
         }
-        lit = advance(core, now);
+        shows = advance(core, now);
     }
-    if (lit && core.on) {
+    if (shows == kShowsPicture && core.on) {
         fill_leds(core);
-    } else {
+    } else if (shows != kShowsBefore || !core.on) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     // The LED data is complete. The check of an uploaded file takes one step now, and

@@ -10,6 +10,11 @@ namespace odrig {
 // The grid: a refresh is due at the power-on moment and every 20 ms after it.
 const uint32_t kGridStep = 20;
 
+// The most bytes of a body the player decodes at one refresh, a record's boundary after
+// it: twelve dense records of 60 x 60. It always decodes one record; what is left is
+// decoded at the next refresh, from where it stopped.
+const uint32_t kCatchUpBytes = 131072;
+
 // Takes the timestamp of a call. The first one is the power-on moment; one below the
 // latest counts as the latest. Returns the time the call happens at.
 uint64_t clock_touch(Core &core, uint64_t now_ms);

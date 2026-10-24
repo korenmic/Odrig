@@ -37,7 +37,7 @@ Rules for every task:
     `pending`.
   - Requirements: 1.1 to 1.5, 3.1 to 3.3, 4.3
 
-- [ ] 3. Playback in slices
+- [x] 3. Playback in slices
   - `core/src/player.cpp`: `kCatchUpBytes` in the catch-up loops; a refresh without a new
     picture keeps the one before.
   - Tests: frames of 1 ms after a pause catch up over several refreshes and reach the

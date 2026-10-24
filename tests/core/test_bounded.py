@@ -2,18 +2,22 @@ import json
 import random
 import unittest
 
+from odrig import odrg
+
 from . import huge_tail, support, test_decoder
 from .test_body_faults import show_with
 from .test_drive import a_drive, logged, replies
-from .test_playback import T0
+from .test_playback import T0, refreshes
 from .test_vectors import INVALID, VALID
 
 # What one call of the core may read of files while it settles the reproducer: a few of
 # the host's reads, never the whole file.
 MOST_BYTES_IN_A_CALL = 4096
 
-# The bytes of a body one call of the decoder settles, as the core is built.
+# The bytes of a body one call of the decoder settles, as the core is built, and the most
+# bytes of a body the player decodes at one refresh, a record's boundary after it.
 SETTLE_SLICE = 32768
+CATCH_UP = 131072
 
 # A reproducer on a canvas of 4 x 4 whose tail settles in 32 slices, and one of 256.
 SMALL_TAIL = 1024 * 1024
@@ -193,6 +197,61 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         self.assertEqual(logged(run), [])
         self.assertEqual([item["id"] for item in replies(run)[-1]["items"]], [1])
         self.assert_no_pending(run)
+
+
+
+def pictures_of(lines):
+    """`(time after power-on, LED data of every leg)` for each refresh of a session."""
+    produced, _ = refreshes([line for line in lines if line.split(" ")[0] in ("refresh", "data", "idle")])
+    return [(time - T0, tuple(sorted(data.items()))) for time, data in produced]
+
+
+class PlaybackInSlices(unittest.TestCase):
+    def test_frames_of_1_ms_after_a_pause_catch_up_over_several_refreshes(self):
+        # Records of 773 bytes: about 170 a refresh, while the time goes on by 20.
+        animation = support.seeded_animation(31, 16, 16, (1,) * 2000, colours=1000)
+        clip = odrg.encode(animation, compressed=False)
+        files = {"mapping.json": support.one_leg_mapping(16, 16), "show.json": support.show_text([{"id": 1, "file": "clip.odrg"}]), "clip.odrg": clip}
+        # Ten refreshes, a pause of eleven seconds, and forty refreshes: the first of them
+        # lies 1,000 ms into a loop of 2,000.
+        script = every_20_ms(10) + every_20_ms(40, start=11000)
+        run = support.start(files, script, options=["--trace-calls"])
+        record = (len(clip) - 16) // 2000
+        self.assertLessEqual(max(calls(run.lines)), CATCH_UP + record + 512)
+        printed = pictures_of(run.lines)
+        expected = pictures_of(support.ReferencePlayer(files).run(script))
+        self.assertEqual(printed[:10], expected[:10])
+        before = printed[9][1]
+        caught = next(number for number in range(10, 50) if printed[number] == expected[number])
+        self.assertGreaterEqual(caught - 10, 3, "the catching up takes several refreshes")
+        self.assertEqual([picture for _, picture in printed[10:caught]], [before] * (caught - 10))
+        self.assertEqual(printed[caught:], expected[caught:])
+
+    def test_the_demo_show_plays_as_before_through_a_pause(self):
+        files = support.demo_show()
+        script = every_20_ms(100) + every_20_ms(100, start=4000) + [support.line(T0 + 6000, "status")]
+        run = support.start(files, script)
+        self.assertEqual(run.lines, support.ReferencePlayer(files).run(script))
+
+    def test_while_a_file_settles_the_refreshes_keep_the_picture_before(self):
+        # A cycle of a sound file and the reproducer, turns of 15 seconds, refreshes 40 ms
+        # apart so that the player meets the fault: from 15,000 ms on it settles, one slice
+        # a refresh, and the LEDs keep the picture of 14,960 ms until the reason comes.
+        files = show_with(small(LONGER_TAIL), sound=400, cycle=15)
+        script = [f"poll {T0 + 40 * step}" for step in range(660)]
+        run = support.start(files, script, check_first=False)
+        printed = pictures_of(run.lines)
+        position = next(number for number, line in enumerate(run.lines) if line.startswith("log "))
+        self.assertEqual(run.lines[position], f"log {TEXT}")
+        failed = int(run.lines[position + 1].split()[1]) - T0
+        self.assertGreater(failed, 15000 + 40 * 200)
+        held = dict(printed)[14960]
+        self.assertNotEqual(held, tuple((leg, bytes(len(data))) for leg, data in held))
+        for time, picture in printed:
+            if 15000 <= time < failed:
+                self.assertEqual(picture, held, time)
+            elif time >= failed:
+                self.assertEqual(picture, tuple((leg, bytes(len(data))) for leg, data in held), time)
 
 
 if __name__ == "__main__":

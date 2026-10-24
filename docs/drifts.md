@@ -9051,3 +9051,22 @@ can stop between blocks inside a frame record, which is larger than this seed. I
 proposed to the owner as new work and left as it is.
 
 **Resolution.** None yet; said to the owner in the run's report.
+
+## Seed 31: what a refresh shows while the player catches up
+
+**Question.** The design says a refresh that brought no picture keeps the picture before.
+What does `status` report as the animation then, and is there content that never catches
+up?
+
+**Answer.** The LEDs keep the LED data of the refresh before, and `status` keeps naming
+the animation that picture came from until a picture of the new one is shown. A refresh
+decodes at most 131,072 bytes of a body, a record's boundary after it, and always one
+record; a settling slice counts against it, so a settling takes one slice a refresh. A
+clip whose frames last less than its records take to decode at that rate, such as frames
+of 1 ms on a dense 60 x 60 canvas, would fall further behind at every refresh and keep its
+picture: no file of the converter has such frames, and the board could not show them in
+time before either. A file that settles longer than a cycle's turn lasts begins its
+settling again at each of its turns, as it opens anew; the check after the start, which
+reads files beside playback and is not bound to turns, comes to its reason.
+
+**Resolution.** `core/src/player.cpp`, `next_record` and `advance`.

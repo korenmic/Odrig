@@ -1017,6 +1017,8 @@ public:
         }
         refuse_a_small_reply();
         std::printf("ready\n");
+        // What the start read is no call's.
+        host_.call_bytes_ = 0;
 
         std::string line;
         while (std::getline(script, line)) {
