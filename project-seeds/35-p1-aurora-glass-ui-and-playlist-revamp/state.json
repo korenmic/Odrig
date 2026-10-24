@@ -1,0 +1,10 @@
+{
+  "number": 35,
+  "slug": "35-p1-aurora-glass-ui-and-playlist-revamp",
+  "state": "remaining",
+  "title": "Aurora Glass UI and playlist revamp",
+  "priority": "P1",
+  "addedAt": "2026-10-24T06:25:12+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Revamp the shared app with Aurora Glass styling, unified Animations, a separate GIF/MP4 Upload tab, Settings without duplicated playback controls, row menus and in/ex badges, saved drag ordering, and 21 visible-on-demand manual-only test animations."
+}
