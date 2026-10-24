@@ -1,12 +1,13 @@
 """The board's storage as an image: its LittleFS file system, the folder `/odrig` in it, and
 the blocks in which two images differ."""
 
+import collections
 import json
 import pathlib
 import struct
 import time
 
-from littlefs import LittleFS
+from littlefs import LittleFS, UserContext
 from littlefs.errors import LittleFSError
 
 from odrig import errors as show_errors
@@ -17,12 +18,17 @@ from . import Failure, paths
 FOLDER = "/odrig"
 MAPPING_NAME = "mapping.json"
 SHOW_NAME = "show.json"
+# The saved playlist order, which a show folder may hold beside the files of the show.
+ORDER_NAME = "order.txt"
 MARK = b"littlefs"
 NO_SPACE = -28
 KEPT_IMAGES = 8
 # The block sizes a file system of the board can have, WLED's first.
 USUAL_BLOCK_SIZES = (4096, 512, 1024, 2048, 8192, 16384, 32768, 65536)
 PENDING = ".part"
+# The beginning of the name under which a changed file of `/odrig` is written before it takes
+# the place of the old one, in the image on this computer only.
+SPARE = "~"
 
 
 def geometry(image):
@@ -85,18 +91,6 @@ def has_folder(system, folder):
         return False
 
 
-def remove_tree(system, folder):
-    """Removes a folder with everything in it. A folder that is absent is fine."""
-    if not has_folder(system, folder):
-        return
-    for root, folders, names in list(system.walk(folder))[::-1]:
-        for name in names:
-            system.remove(root.rstrip("/") + "/" + name)
-        for name in folders:
-            system.rmdir(root.rstrip("/") + "/" + name)
-    system.rmdir(folder)
-
-
 def show_of(image):
     """The files of `/odrig` in an image: the content of each by its name."""
     system = mount(image)
@@ -110,34 +104,157 @@ def other_files(image):
     return {path: content for path, content in files_in(mount(image)).items() if not path.startswith(FOLDER + "/")}
 
 
+Change = collections.namedtuple("Change", "kept added replaced removed")
+
+
+def change_of(present, wanted):
+    """What turns the files `present` into the files `wanted`, each by its name: the names
+    kept with their bytes, the names added, the names whose bytes are replaced, and the
+    names removed, each list in the order of the names."""
+    return Change(
+        sorted(name for name in wanted if present.get(name) == wanted[name]),
+        sorted(name for name in wanted if name not in present),
+        sorted(name for name in wanted if name in present and present[name] != wanted[name]),
+        sorted(name for name in present if name not in wanted),
+    )
+
+
+def _spare_name(taken):
+    """A short name that no file of `taken` has: a new file waits under it until it takes
+    the place of the file it replaces."""
+    number = 0
+    while f"{SPARE}{number}" in taken:
+        number += 1
+    return f"{SPARE}{number}"
+
+
+def _changed(image, present, wanted, write_first):
+    """The image with the files of `/odrig` changed from `present` to `wanted`, and nothing
+    else touched. With `write_first` every new and changed file is written while the files
+    of the image before are all still there, so that the file system puts the new bytes
+    into blocks the image before does not use; a changed file waits under a spare name and
+    then takes the place of the old one, and the files that go are removed last. Without
+    it the files that go and the files that change are removed first, which leaves the
+    most room."""
+    change = change_of(present, wanted)
+    system = mount(image)
+    if not has_folder(system, FOLDER):
+        system.mkdir(FOLDER)
+    gone = change.removed if write_first else change.removed + change.replaced
+    if not write_first:
+        for name in gone:
+            system.remove(f"{FOLDER}/{name}")
+    taken = set(present) | set(wanted)
+    waiting = []
+    for name in sorted(change.added + change.replaced):
+        target = name
+        if write_first and name in present:
+            target = _spare_name(taken)
+            taken.add(target)
+            waiting.append((target, name))
+        with system.open(f"{FOLDER}/{target}", "wb") as file:
+            file.write(wanted[name])
+    for target, name in waiting:
+        system.rename(f"{FOLDER}/{target}", f"{FOLDER}/{name}")
+    if write_first:
+        for name in gone:
+            system.remove(f"{FOLDER}/{name}")
+    # A folder inside `/odrig` that is empty now goes too.
+    for root, folders, names in list(system.walk(FOLDER))[::-1]:
+        if root.rstrip("/") != FOLDER and not folders and not names:
+            system.rmdir(root.rstrip("/"))
+    system.unmount()
+    return bytes(system.context.buffer)
+
+
 def with_show(image, files):
     """The image with `/odrig` holding exactly the files given, and everything else as it
-    was. The result is checked before it is returned. An image that holds exactly these
-    files already is returned as it is."""
-    system = mount(image)
-    if show_of(image) == dict(files):
+    was. A file the folder holds with the same bytes stays where it is, unread and
+    unwritten; only the files that are new, changed or gone are written or removed. The
+    result is checked before it is returned. An image that holds exactly these files
+    already is returned as it is."""
+    wanted = dict(files)
+    present = show_of(image)
+    if present == wanted:
         return image
     try:
-        remove_tree(system, FOLDER)
-        system.mkdir(FOLDER)
-        for name in sorted(files):
-            with system.open(f"{FOLDER}/{name}", "wb") as file:
-                file.write(files[name])
-        system.unmount()
+        try:
+            made = _changed(image, present, wanted, write_first=True)
+        except LittleFSError as error:
+            if error.code != NO_SPACE:
+                raise
+            made = _changed(image, present, wanted, write_first=False)
     except LittleFSError as error:
         if error.code == NO_SPACE:
             raise Failure("no-space", f"the {len(files)} files, {sum(map(len, files.values()))} bytes, do not fit into storage") from None
         raise Failure("verify-failed", f"the file system refused the files: {error}") from None
-    made = bytes(system.context.buffer)
     if geometry(made) != geometry(image):
         raise Failure("verify-failed", "the file system changed its version or its size")
-    difference = differing(show_of(made), dict(files))
+    difference = differing(show_of(made), wanted)
     if difference:
         raise Failure("verify-failed", f"{FOLDER} in the new image does not hold exactly the files given: {difference}")
     difference = differing(other_files(made), other_files(image))
     if difference:
         raise Failure("verify-failed", f"a file outside {FOLDER} changed in the new image: {difference}")
+    kept = change_of(present, wanted).kept
+    before, after = blocks_of_files(image), blocks_of_files(made)
+    moved = [path for path in sorted(before) if path in after and before[path] != after[path]
+             and (not path.startswith(FOLDER + "/") or path[len(FOLDER) + 1:] in kept)]
+    if moved:
+        raise Failure("verify-failed", f"a file that did not change was moved in the new image: {', '.join(moved)}")
     return made
+
+
+class _Watched(UserContext):
+    """The image of a file system in memory, which notes every block that is read."""
+
+    def __init__(self, image):
+        super().__init__(buffer=bytearray(image))
+        self.blocks = set()
+
+    def read(self, cfg, block, off, size):
+        self.blocks.add(block)
+        return super().read(cfg, block, off, size)
+
+
+def _watched(image):
+    version, block_size, block_count = geometry(image)
+    context = _Watched(image)
+    system = LittleFS(context=context, block_size=block_size, block_count=block_count, mount=False, disk_version=version)
+    system.mount()
+    return system, context
+
+
+def blocks_in_use(image):
+    """The blocks the file system of an image uses: the two of its superblock, its metadata
+    pairs and the blocks of every file. They are the blocks it reads while it counts its
+    used blocks and while every file is read to its end."""
+    system, context = _watched(image)
+    system.used_block_count
+    for root, _, names in system.walk("/"):
+        for name in names:
+            with system.open(root.rstrip("/") + "/" + name, "rb") as file:
+                file.read()
+    return context.blocks | {0, 1}
+
+
+def blocks_of_files(image):
+    """The blocks of its own that each file of an image is read from, by its full path:
+    the blocks its bytes are read from, less the blocks of the file system's records, which
+    the folders' lists and the opening of files read. A small file kept inside those records
+    has none of its own."""
+    system, context = _watched(image)
+    listed = [root.rstrip("/") + "/" + name for root, _, names in system.walk("/") for name in names]
+    records = set(context.blocks)
+    found = {}
+    for path in listed:
+        with system.open(path, "rb") as file:
+            records |= context.blocks
+            context.blocks = set()
+            file.read()
+            found[path] = set(context.blocks)
+            context.blocks = set()
+    return {path: frozenset(blocks - records) for path, blocks in found.items()}
 
 
 def with_settings(image, size, room=None):
@@ -185,12 +302,14 @@ def differing(found, wanted):
     return "; ".join(said)
 
 
-def runs(old, new, block_size):
+def runs(old, new, block_size, among=None):
     """The stretches in which two images differ, as `(offset, bytes of the new image)`:
-    whole blocks, neighbouring changed blocks joined."""
+    whole blocks, neighbouring changed blocks joined. With `among`, a set of block numbers,
+    only the changed blocks that are among them."""
     found, start = [], None
     for offset in range(0, len(new) + block_size, block_size):
         differs = offset < len(new) and old[offset:offset + block_size] != new[offset:offset + block_size]
+        differs = differs and (among is None or offset // block_size in among)
         if differs and start is None:
             start = offset
         elif not differs and start is not None:
@@ -233,7 +352,7 @@ def folder_files(folder, check=True):
         except show_errors.Rejection as rejection:
             raise _rejected(rejection) from None
         for name in files:
-            if name not in (MAPPING_NAME, SHOW_NAME, *named):
+            if name not in (MAPPING_NAME, SHOW_NAME, ORDER_NAME, *named):
                 raise Failure("not-a-show-folder", f"{folder / name} is not a file of the show")
     return files
 
@@ -314,3 +433,24 @@ def discard(path):
 def status_error(reply):
     """The `error` member of a reply to `status`: None for a valid show."""
     return json.loads(reply).get("error")
+
+
+# The runs of a change, as `(offset, bytes)` in the storage region, in its two parts: the
+# blocks the board's file system does not use, and the blocks it uses.
+Plan = collections.namedtuple("Plan", "free in_use")
+
+
+def plan(before, after):
+    """The change from the image the board holds to the new one, in the two parts it is
+    written in: the runs of blocks the file system of `before` does not use, which can be
+    written without changing what the board's file system holds, and the runs of blocks it
+    uses, whose writing is the commit."""
+    block_size = geometry(before)[1]
+    in_use = blocks_in_use(before)
+    every = range(len(before) // block_size)
+    return Plan(runs(before, after, block_size, set(every) - in_use), runs(before, after, block_size, in_use))
+
+
+def run_bytes(found):
+    """The bytes of a list of runs."""
+    return sum(len(content) for _, content in found)

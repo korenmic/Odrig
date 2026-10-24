@@ -60,6 +60,8 @@ def parser():
     install.add_argument("--port", metavar="P", help="the board's USB serial port")
     install.add_argument("--no-check", action="store_true", help="install any flat folder of files, also an invalid show")
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after the restart for the board's reply and for it to read its animations (default: 300)")
+    install.add_argument("--dry-run", action="store_true", help="say what would change and write nothing")
+    install.add_argument("--keep-copies", metavar="DIR", type=pathlib.Path, help="copy every file the install removes or replaces, as the board holds it, into a folder that is new or empty, before anything is written")
     network = commands.add_parser("set-wifi", help="put the network's name and password from the settings file into the board's storage")
     network.add_argument("--port", metavar="P", help="the board's USB serial port")
     network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
@@ -281,12 +283,61 @@ def write_storage(on_port, region, before, make):
         raise
 
 
+def plan_line(found, block_size):
+    """The line that says what a change writes: its blocks and bytes, the free ones first."""
+    from . import storage
+    free, in_use = storage.run_bytes(found.free), storage.run_bytes(found.in_use)
+    if not free + in_use:
+        return "storage: unchanged: no block to write"
+    return f"storage: {(free + in_use) // block_size} blocks to write, {free + in_use} bytes: {free // block_size} free first, then {in_use // block_size} in use"
+
+
+def show_lines(present, wanted):
+    """The lines that say how the files of `/odrig` change: how many are kept, and each
+    file added, replaced or removed with its bytes."""
+    from . import storage
+    change = storage.change_of(present, wanted)
+    lines = [f"show: kept {len(change.kept)} files" + ("; nothing added, replaced or removed" if change.kept == sorted(wanted) and not change.removed else "")]
+    lines += [f"show: added {name}, {len(wanted[name])} bytes" for name in change.added]
+    lines += [f"show: replaced {name}, {len(wanted[name])} bytes, was {len(present[name])}" for name in change.replaced]
+    lines += [f"show: removed {name}, {len(present[name])} bytes" for name in change.removed]
+    return lines
+
+
 def _install_show(arguments):
     from . import storage
     files = storage.folder_files(arguments.dir, check=not arguments.no_check)
+    copies = None
+    if arguments.keep_copies is not None:
+        copies = paths.output(arguments.keep_copies)
+        if copies.exists() and (not copies.is_dir() or any(copies.iterdir())):
+            raise Failure("output-not-empty", f"{copies} exists and is not an empty folder")
     port = board.find(arguments.port)
     on_port, region, before_path = storage_of(port)
-    write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
+    before = before_path.read_bytes()
+    try:
+        present = storage.show_of(before)
+        if storage.ORDER_NAME in present and storage.ORDER_NAME not in files:
+            # The saved order is the operator's choice: a folder without one keeps the board's.
+            files = dict(files, **{storage.ORDER_NAME: present[storage.ORDER_NAME]})
+        for line in show_lines(present, files):
+            print(line)
+        if copies is not None:
+            change = storage.change_of(present, files)
+            storage.write_folder(copies, {name: present[name] for name in change.replaced + change.removed})
+            print(f"kept copies: {len(change.replaced) + len(change.removed)} files in {copies}")
+        if arguments.dry_run:
+            after = storage.with_show(before, files)
+            found = storage.plan(before, after) if after != before else storage.Plan([], [])
+    except Failure:
+        on_port.restart()
+        raise
+    if arguments.dry_run:
+        on_port.restart()
+        print(plan_line(found, storage.geometry(before)[1]))
+        print("storage: dry run: nothing written; the board restarts")
+        return 0
+    write_storage(on_port, region, before, lambda image: storage.with_show(image, files))
     reply = board.settled(port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1

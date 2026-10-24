@@ -110,6 +110,10 @@ class ShowFolders(Temporary):
     def test_a_packed_show_is_accepted_as_it_is(self):
         self.assertEqual(storage.folder_files(self.show), support.files_of(self.show))
 
+    def test_a_saved_playlist_order_is_a_file_of_the_show(self):
+        (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 2\n")
+        self.assertEqual(storage.folder_files(self.show)["order.txt"], b"odrig-order 1\ni 2\n")
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -189,9 +193,64 @@ class Commands(Temporary):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f'{LAYOUT_LINE}\n{{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}}\n')
+        lines = result.out.splitlines()
+        self.assertEqual((lines[0], lines[-1]), (LAYOUT_LINE, '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}'))
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), support.files_of(self.show))
         self.assertEqual(storage.other_files(self.on_the_board(esptool)), storage.other_files(self.old))
+
+    def test_it_says_how_the_show_changes_before_it_writes(self):
+        first = self.esptool()
+        result = self.install(first)
+        files = support.files_of(self.show)
+        self.assertEqual(result.out.splitlines()[1:7], [
+            "show: kept 0 files",
+            f"show: added dvd.odrg, {len(files['dvd.odrg'])} bytes",
+            f"show: added hello.odrg, {len(files['hello.odrg'])} bytes",
+            f"show: added show.json, {len(files['show.json'])} bytes",
+            f"show: replaced mapping.json, {len(files['mapping.json'])} bytes, was 16",
+            "show: removed old.odrg, 1800 bytes",
+        ])
+        again = self.install(self.esptool(self.on_the_board(first)))
+        self.assertIn("show: kept 4 files; nothing added, replaced or removed\n", again.out)
+
+    def test_the_boards_saved_order_is_kept_for_a_folder_without_one(self):
+        order = b"odrig-order 1\ni 2\nx sunrise.odrg\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/order.txt": order}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(support.files_of(self.show), **{"order.txt": order}))
+        self.assertIn("show: kept 1 files\n", result.out)
+        (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 1\n")
+        esptool = self.esptool()
+        self.install(esptool)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool))["order.txt"], b"odrig-order 1\ni 1\n")
+
+    def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
+        esptool = self.esptool()
+        result = self.install(esptool, "--dry-run")
+        self.assertEqual((result.status, result.err), (0, ""))
+        lines = result.out.splitlines()
+        self.assertEqual((lines[0], lines[1], lines[-1]), (LAYOUT_LINE, "show: kept 0 files", "storage: dry run: nothing written; the board restarts"))
+        self.assertRegex(lines[-2], r"\Astorage: \d+ blocks to write, \d+ bytes: \d+ free first, then \d+ in use\Z")
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "chip-id"])
+        self.assertEqual((esptool.wrote, esptool.waited), ([], []))
+        self.assertEqual([path.name.split("-", 1)[1] for path in storage.kept_images(len(self.old))], ["before.bin"])
+
+    def test_copies_of_the_files_removed_or_replaced_are_kept_before_the_write(self):
+        esptool = self.esptool()
+        result = self.install(esptool, "--keep-copies", self.folder / "copies")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copies"), {"mapping.json": b"an older mapping", "old.odrg": b"an older animation" * 100})
+        self.assertIn(f"kept copies: 2 files in {self.folder / 'copies'}\n", result.out)
+
+    def test_a_folder_for_the_copies_that_is_not_empty_is_refused_before_the_board_is_touched(self):
+        (self.folder / "full").mkdir()
+        (self.folder / "full" / "x").write_text("x")
+        with support.untouched_board():
+            result = support.run_main("install-show", self.show, "--keep-copies", self.folder / "full")
+        self.assertEqual(result.status, 1)
+        self.assertRegex(result.err, r"^error: output-not-empty: ")
 
     def test_the_reply_is_waited_for_300_seconds_or_as_long_as_told(self):
         esptool = self.esptool()
@@ -204,14 +263,14 @@ class Commands(Temporary):
         answer = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"show-missing"}'
         result = self.install(self.esptool(), "--no-check", answer=answer)
         self.assertEqual(result.status, 1)
-        self.assertEqual(result.out, f"{LAYOUT_LINE}\n{answer}\n")
+        self.assertEqual((result.out.splitlines()[0], result.out.splitlines()[-1]), (LAYOUT_LINE, answer))
         self.assertEqual(result.err, "")
 
     def test_the_reply_printed_is_the_one_the_board_gives_once_it_has_read_its_animations(self):
         talks = support.Talking({"status": [support.VALID], "list": [support.BUSY, support.BUSY, support.BUSY, support.LISTED]})
         with support.no_board(self.esptool(), talks=talks):
             result = support.run_main("install-show", self.show)
-        self.assertEqual((result.status, result.out, result.err), (0, f"{LAYOUT_LINE}\n{support.VALID}\n", ""))
+        self.assertEqual((result.status, result.out.splitlines()[0], result.out.splitlines()[-1], result.err), (0, LAYOUT_LINE, support.VALID, ""))
         self.assertEqual(talks.sent, ["status", "list", "list", "list", "list", "status"])
 
     def test_a_show_that_turns_invalid_while_the_board_reads_it_is_status_1(self):
@@ -219,13 +278,14 @@ class Commands(Temporary):
         talks = support.Talking({"status": [support.VALID, invalid], "list": [support.BUSY, support.BUSY, '{"ok":false,"error":"show-invalid"}']})
         with support.no_board(self.esptool(), talks=talks):
             result = support.run_main("install-show", self.show, "--no-check")
-        self.assertEqual((result.status, result.out, result.err), (1, f"{LAYOUT_LINE}\n{invalid}\n", ""))
+        self.assertEqual((result.status, result.out.splitlines()[0], result.out.splitlines()[-1], result.err), (1, LAYOUT_LINE, invalid, ""))
 
     def test_a_board_that_is_still_reading_when_the_time_is_over_is_check_not_done(self):
         talks = support.Talking({"status": [support.VALID], "list": [support.BUSY]})
         with support.no_board(self.esptool(), talks=talks):
             result = support.run_main("install-show", self.show, "--wait", "4")
-        self.assertEqual((result.status, result.out), (1, f"{LAYOUT_LINE}\n"))
+        self.assertEqual((result.status, result.out.splitlines()[0]), (1, LAYOUT_LINE))
+        self.assertFalse(result.out.splitlines()[-1].startswith("{"))
         self.assertRegex(result.err, r"\Aerror: check-not-done: the board was still reading its animations after 4 seconds; give it longer with --wait\n\Z")
 
     def test_a_copy_of_storage_from_before_and_the_new_image_are_kept_in_the_work_folder(self):
