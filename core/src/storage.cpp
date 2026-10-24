@@ -170,7 +170,7 @@ bool storage_install_upload(Core &core) {
         if (host.rename(host.ctx, kUploadPart, upload.name) != 1) {
             return false;
         }
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms, upload.content.type);
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
         player_file_replaced(core, position);
         return true;
     }
@@ -219,13 +219,13 @@ bool storage_install_upload(Core &core) {
 
     // The show in storage is the new one from here on.
     if (is_new) {
-        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms, upload.content.type);
+        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms, core.check_content.type);
         // An old entry of the order may name the new item's id: it stands there at once,
         // as it would after a restart.
         order_reload(core);
         player_item_added(core);
     } else {
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms, upload.content.type);
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;

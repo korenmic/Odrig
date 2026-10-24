@@ -62,6 +62,9 @@ enum Reason {
     kDoesNotFit,
     kBadGlyph,
 
+    // A widget of an ODRGX container.
+    kUnknownWidget,
+
     kReasonCount,
 
     // Work that is not finished: the same call is made again later and goes on. It is

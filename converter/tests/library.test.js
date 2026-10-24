@@ -216,10 +216,10 @@ test("the reasons are those of the Python tool", async (t) => {
   }
   const ours = new Map(Object.entries(index.errors).filter(([name, value]) => /^[A-Z][A-Z_]*$/.test(name) && typeof value === "string"));
 
-  await t.test("there are 54 of them, with the same names for the same words", () => {
-    assert.equal(expected.size, 54);
+  await t.test("there are 55 of them, with the same names for the same words", () => {
+    assert.equal(expected.size, 55);
     assert.deepEqual([...ours].sort(), [...expected].sort());
-    assert.equal(new Set(ours.values()).size, 54);
+    assert.equal(new Set(ours.values()).size, 55);
   });
 
   await t.test("the library offers nothing else but Rejection and naming", () => {

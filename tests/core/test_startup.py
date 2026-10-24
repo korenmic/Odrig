@@ -148,7 +148,7 @@ class EachReason(unittest.TestCase):
         self.assertEqual([lines.pop(0) for _ in polled[1] + polled[2]], polled[1] + polled[2])
         last = support.without_readiness(json.loads(lines.pop(0)[len("reply "):]))
         width, height = canvas if legs else (None, None)
-        self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text, "width": width, "height": height})
+        self.assertEqual(last, {"ok": True, "on": True, "brightness": 200, "playing": None, "animation": None, "fps": 0, "error": text, "width": width, "height": height, "seed": None})
         self.assertEqual(lines, [])
 
     def test_mapping_missing(self):
@@ -519,7 +519,7 @@ class TablesWithRoom(unittest.TestCase):
         self.assertEqual(run.legs, EXAMPLE_LEGS)
         self.assertEqual(
             support.without_readiness(json.loads(run.lines[1][len("reply "):])),
-            {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 9, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
         self.assertEqual(run.lines[-2:], ['reply {"ok":false,"error":"unknown-id"}', 'reply {"ok":true,"items":[],"next":null}'])
         self.assertEqual(run.lines, support.ReferencePlayer(files).run(QUESTIONS[:3] + [support.line(T0, "play 1"), support.line(T0, "list")]))

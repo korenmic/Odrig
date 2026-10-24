@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "clock.h"
 #include "text.h"
 
 namespace odrig {
@@ -14,11 +15,14 @@ const uint8_t kContainerVersion = 1;
 // The version of each content type the core reads, 0 for a type it does not read, and the
 // most bytes its payload may have.
 uint8_t version_of(uint8_t type) {
-    return type == kTypeFrames || type == kTypeText ? 1 : 0;
+    return type == kTypeFrames || type == kTypeText || type == kTypeWidget ? 1 : 0;
 }
 
 uint32_t largest_payload(uint8_t type) {
-    return type == kTypeText ? kLargestTextPayload : 0xFFFFFFFFu;
+    if (type == kTypeText) {
+        return kLargestTextPayload;
+    }
+    return type == kTypeWidget ? kWidgetSize : 0xFFFFFFFFu;
 }
 
 // The next byte of the header, or the reason the file ends.
@@ -101,6 +105,10 @@ Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeade
         return kPayloadSize;
     }
     return total_ms == header.loop_ms ? kNone : kLoopMismatch;
+}
+
+Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into) {
+    return header.type == kTypeText ? text_read(file, header, into) : clock_read(file, header, into);
 }
 
 const char *type_name(uint8_t type) {

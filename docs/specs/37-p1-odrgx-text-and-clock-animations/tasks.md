@@ -79,7 +79,7 @@ Rules for every task:
     end; `play` and `off` at once; frames timing unchanged.
   - Requirements: 5.2, 6.1 to 6.4, 9.1 to 9.4, 15.1 to 15.3, 16.1 to 16.3
 
-- [ ] 6. The clocks
+- [x] 6. The clocks
   - `core/src/clock.h/.cpp` and `converter/lib/draw.js`: the widget's check, the seed, the
     virtual time, the analog, digital and melting clocks; the widget's JSON source and
     payload in `odrgx.js`; `status` with `seed`. The clocks' reference pictures.

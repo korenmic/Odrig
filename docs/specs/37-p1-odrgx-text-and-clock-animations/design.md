@@ -214,7 +214,7 @@ timestamps the core gives the same seeds, which keeps it repeatable for the test
 
 From the seed, xorshift32 gives in turn: the start, `seed % 43,200,000`; the base speed
 `b = least + r % (greatest - least + 1)`; the swing `A = min(b - least, greatest - b) *
-(r % 101) / 100`; the period `P = 6,000 + r % 14,001` ms; the phase `phi = r % 1,024`. At t
+(r % 101) / 102`; the period `P = 6,000 + r % 14,001` ms; the phase `phi = r % 1,024`. At t
 milliseconds into the turn:
 
 ```
@@ -239,10 +239,14 @@ angle and 64-bit integers for every product.
   colon in the rim's colour and shown in the first half of every real second.
 - **Melting**: each canvas pixel is taken back into the plane of an analog dial through
   the fold: a tilt chosen by the seed between 25 and 40 degrees, a fold line below which
-  the face hangs down and narrows towards a drip, and a slow wave along the fold whose
-  phase moves with the real time of the turn. The point in the dial's plane is drawn as
-  the analog clock draws it, shaded darker the deeper it hangs, with a crown and a ring at
-  the top of the rim. Pixels that land outside the watch are the background.
+  the face hangs straight down, stretched, drifting sideways and narrowing towards a drip,
+  and a slow wave along the fold whose phase moves with the real time of the turn. The
+  point in the dial's plane is drawn as the analog clock draws it, its strokes widened
+  where the face narrows, shaded darker the deeper it hangs, with a crown and a ring at
+  the top of the rim. Pixels that land outside the watch are the background. The seed
+  chooses, after the virtual time's numbers, the tilt, the fold, the stretch, the
+  narrowing, the drift and the wave, each within a range of its own: docs/format.md has
+  them.
 
 ## The core
 

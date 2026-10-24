@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
@@ -191,10 +191,10 @@ class LineEndings(Commands):
         reply = printed[-1][len("reply "):]
         # A bad file is quarantined and the show has no error. With the longest reason text
         # the core can hold, 65 characters, the largest numbers, a file of 32 characters
-        # being checked and the longest name of a host, every byte of it escaped, the reply
-        # still fits into 1,024 bytes.
+        # being checked, the longest name of a host, every byte of it escaped, and a seed of
+        # ten digits, the reply still fits into 1,024 bytes.
         self.assertIsNone(json.loads(reply)["error"])
-        longest = len(reply) - len("null") + len('""') + 65 + 1 + len("4294967295") + 3 * 10 + len('"' + "a" * 32 + '"') + len(',"host":""') + 6 * 95
+        longest = len(reply) - 2 * len("null") + len('""') + 65 + 1 + 2 * len("4294967295") + 3 * 10 + len('"' + "a" * 32 + '"') + len(',"host":""') + 6 * 95
         self.assertLess(longest, 1024)
 
 

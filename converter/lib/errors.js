@@ -46,6 +46,7 @@ export const UNKNOWN_FONT = "unknown-font";
 export const BAD_GLYPH = "bad-glyph";
 export const DOES_NOT_FIT = "does-not-fit";
 export const UNSUPPORTED_CHARACTER = "unsupported-character";
+export const UNKNOWN_WIDGET = "unknown-widget";
 
 export const MAPPING_MISSING = "mapping-missing";
 export const MAPPING_MALFORMED = "mapping-malformed";

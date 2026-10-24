@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "odrig_core.h"
+#include "clock.h"
 #include "order.h"
 #include "text.h"
 #include "upload.h"
@@ -34,6 +35,11 @@ uint32_t loops_of(const Core &core, uint32_t animation) {
 
 uint32_t seconds_of(const Core &core, uint32_t animation) {
     return is_drive(animation) ? 0 : core.items[animation].seconds;
+}
+
+// The id `list` and `status` give the animation at a position of the playlist.
+uint32_t id_of(const Core &core, uint32_t animation) {
+    return is_drive(animation) ? core.drive[animation - kDriveBase].id : core.items[animation].id;
 }
 
 // What the animation at a position of the playlist holds, as its header says.
@@ -103,7 +109,7 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     }
     if (is_drawn(header.type)) {
         // The payload is held whole in the window, which no frames file uses meanwhile.
-        reason = text_read(&core.file, header, core.window);
+        reason = drawn_read(&core.file, header, core.window);
         core.file.close();
         if (reason != kNone) {
             return reason;
@@ -165,12 +171,15 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
 }
 
 // Brings the pixel buffer to the picture an animation shows at a time since the start of
-// its turn. While the length of the animation is not known, the time lies in its first
-// loop. Once it is known, the loop and the place in it are found by division.
-Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) {
-    if (type_of(core, animation) == kTypeText) {
-        const uint64_t pass = length_of(core, animation);
-        if (pass == 0) {
+// its turn, which began at `start`. While the length of the animation is not known, the
+// time lies in its first loop. Once it is known, the loop and the place in it are found by
+// division. A text is drawn at its time in its pass; a clock at its time in the turn, with
+// the seed the turn got when it began.
+Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, uint64_t start) {
+    const uint8_t type = type_of(core, animation);
+    if (is_drawn(type)) {
+        const uint64_t loop = length_of(core, animation);
+        if (loop == 0) {
             return kLoopMismatch;
         }
         if (!core.stream_open || !core.stream_drawn || core.stream_item != animation || core.stream_turn != turn) {
@@ -178,9 +187,17 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) 
             if (reason != kNone) {
                 return reason;
             }
+            // A clock's turn gets its seed when it begins: its file is opened once in a turn.
+            if (type == kTypeWidget) {
+                core.seed = clock_seed(core.noise, id_of(core, animation), start);
+            }
         }
         core.decoder.colours = 0;
-        text_draw(core.window, core.width, core.height, in_turn % pass, core.pixels);
+        if (type == kTypeText) {
+            text_draw(core.window, core.width, core.height, in_turn % loop, core.pixels);
+            return kNone;
+        }
+        clock_draw(core.window, core.seed, core.width, core.height, in_turn, core.pixels);
         return kNone;
     }
     uint64_t length = length_of(core, animation);
@@ -378,7 +395,7 @@ Shown advance(Core &core, uint64_t now) {
         in_turn = within;
     }
     if (reason == kNone) {
-        reason = show_at(core, animation, turn, in_turn);
+        reason = show_at(core, animation, turn, in_turn, now - in_turn);
     }
     if (reason == kPendingWork) {
         // The rest is decoded at the next refresh, or the file settles a defect and its
@@ -635,6 +652,7 @@ void player_item_leaves(Core &core, uint32_t item) {
 }
 
 int player_poll(Core &core, uint64_t now_ms) {
+    core.noise = clock_stir(core.noise, now_ms);
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
     if (core.leg_count == 0 || now < core.next_due) {
@@ -685,6 +703,15 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     return 1;
+}
+
+bool player_seed(const Core &core, uint32_t *seed) {
+    if (core.invalid || core.playing == kNothing || core.shown == kNothing || !core.stream_open || !core.stream_drawn ||
+        core.stream_item != core.shown || type_of(core, core.shown) != kTypeWidget) {
+        return false;
+    }
+    *seed = core.seed;
+    return true;
 }
 
 uint32_t player_fps(const Core &core, uint64_t now) {

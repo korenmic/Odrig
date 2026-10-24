@@ -15,7 +15,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const VECTORS = join(HERE, "..");
 const {odrgx} = await import(new URL("../../../converter/lib/index.js", import.meta.url).href);
 
-// Each case: the container, relative to tests/vectors/, and the times to draw it at.
+// Each case: the container, relative to tests/vectors/, the times to draw it at, and for a
+// clock the seed of its turn.
 export const CASES = [
   ["texts/valid/english.static.odrgx", [0]],
   ["texts/valid/hebrew.marquee.odrgx", [0, 800, 2000, 3500]],
@@ -24,12 +25,19 @@ export const CASES = [
   ["texts/valid/finals.slide.odrgx", [300, 1200, 2400]],
   ["texts/valid/tall.up.odrgx", [1000, 5000, 9000]],
   ["texts/valid/rtl.down.odrgx", [0, 900, 2000]],
+  ["widgets/valid/analog.odrgx", [0, 15000], 1],
+  ["widgets/valid/analog.odrgx", [0, 29980], 2864038069],
+  ["widgets/valid/digital.odrgx", [0, 500, 12000], 1],
+  ["widgets/valid/digital.odrgx", [250, 750], 77],
+  ["widgets/valid/melting.odrgx", [0, 3500, 44980], 1],
+  ["widgets/valid/melting.odrgx", [0, 20000], 424242],
+  ["widgets/valid/small.analog.odrgx", [0, 980], 9],
 ];
 
 // The picture of a case: three bytes for each pixel in the pixel order of docs/format.md.
-export function picture(file, ms) {
+export function picture(file, ms, seed) {
   const decoded = odrgx.decode(new Uint8Array(readFileSync(join(VECTORS, file))));
-  return {width: decoded.header.width, height: decoded.header.height, pixels: odrgx.pictureAt(decoded, ms)};
+  return {width: decoded.header.width, height: decoded.header.height, pixels: odrgx.pictureAt(decoded, ms, seed)};
 }
 
 const CRC_TABLE = Array.from({length: 256}, (_, n) => {
@@ -75,11 +83,12 @@ export function png({width, height, pixels}) {
 export function pictures() {
   const manifest = [];
   const made = new Map();
-  for (const [file, times] of CASES) {
+  for (const [file, times, seed] of CASES) {
     for (const ms of times) {
-      const name = `${file.split("/").pop().replace(/\.odrgx$/, "")}.${ms}.png`;
-      manifest.push({picture: name, file, ms});
-      made.set(name, picture(file, ms));
+      const stem = file.split("/").pop().replace(/\.odrgx$/, "");
+      const name = seed === undefined ? `${stem}.${ms}.png` : `${stem}.${seed}.${ms}.png`;
+      manifest.push(seed === undefined ? {picture: name, file, ms} : {picture: name, file, ms, seed});
+      made.set(name, picture(file, ms, seed));
     }
   }
   return {manifest, made};

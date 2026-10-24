@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "type": "widget",
+  "width": 21,
+  "height": 13,
+  "widget": "analog",
+  "seconds": 1,
+  "face": 16051408,
+  "hands": 2105376,
+  "rim": 13934615,
+  "background": 0,
+  "speed_min": 3600,
+  "speed_max": 3600
+}

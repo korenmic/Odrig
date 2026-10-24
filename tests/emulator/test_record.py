@@ -429,7 +429,7 @@ class Recording(unittest.TestCase):
         result = support.run_module(folder, "--record", self.out, "--seconds", "0.5", "--script", script)
         self.assertEqual((result.status, result.err), (0, ""))
         self.assertTrue(result.out.startswith("reply 0 ") and result.out.endswith("}\n") and result.out.count("\n") == 1, result.out)
-        self.assertEqual(support.without_fps(result.out[len("reply 0 "):]), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6})
+        self.assertEqual(support.without_fps(result.out[len("reply 0 "):]), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertEqual(len(recfile.read(self.out).ticks), 25)
         failed = support.run_module(self.work / "none", "--record", self.out, "--seconds", "0.5")
         self.assertEqual(failed.status, 1)

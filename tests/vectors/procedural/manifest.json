@@ -93,5 +93,101 @@
     "picture": "rtl.down.2000.png",
     "file": "texts/valid/rtl.down.odrgx",
     "ms": 2000
+  },
+  {
+    "picture": "analog.1.0.png",
+    "file": "widgets/valid/analog.odrgx",
+    "ms": 0,
+    "seed": 1
+  },
+  {
+    "picture": "analog.1.15000.png",
+    "file": "widgets/valid/analog.odrgx",
+    "ms": 15000,
+    "seed": 1
+  },
+  {
+    "picture": "analog.2864038069.0.png",
+    "file": "widgets/valid/analog.odrgx",
+    "ms": 0,
+    "seed": 2864038069
+  },
+  {
+    "picture": "analog.2864038069.29980.png",
+    "file": "widgets/valid/analog.odrgx",
+    "ms": 29980,
+    "seed": 2864038069
+  },
+  {
+    "picture": "digital.1.0.png",
+    "file": "widgets/valid/digital.odrgx",
+    "ms": 0,
+    "seed": 1
+  },
+  {
+    "picture": "digital.1.500.png",
+    "file": "widgets/valid/digital.odrgx",
+    "ms": 500,
+    "seed": 1
+  },
+  {
+    "picture": "digital.1.12000.png",
+    "file": "widgets/valid/digital.odrgx",
+    "ms": 12000,
+    "seed": 1
+  },
+  {
+    "picture": "digital.77.250.png",
+    "file": "widgets/valid/digital.odrgx",
+    "ms": 250,
+    "seed": 77
+  },
+  {
+    "picture": "digital.77.750.png",
+    "file": "widgets/valid/digital.odrgx",
+    "ms": 750,
+    "seed": 77
+  },
+  {
+    "picture": "melting.1.0.png",
+    "file": "widgets/valid/melting.odrgx",
+    "ms": 0,
+    "seed": 1
+  },
+  {
+    "picture": "melting.1.3500.png",
+    "file": "widgets/valid/melting.odrgx",
+    "ms": 3500,
+    "seed": 1
+  },
+  {
+    "picture": "melting.1.44980.png",
+    "file": "widgets/valid/melting.odrgx",
+    "ms": 44980,
+    "seed": 1
+  },
+  {
+    "picture": "melting.424242.0.png",
+    "file": "widgets/valid/melting.odrgx",
+    "ms": 0,
+    "seed": 424242
+  },
+  {
+    "picture": "melting.424242.20000.png",
+    "file": "widgets/valid/melting.odrgx",
+    "ms": 20000,
+    "seed": 424242
+  },
+  {
+    "picture": "small.analog.9.0.png",
+    "file": "widgets/valid/small.analog.odrgx",
+    "ms": 0,
+    "seed": 9
+  },
+  {
+    "picture": "small.analog.9.980.png",
+    "file": "widgets/valid/small.analog.odrgx",
+    "ms": 980,
+    "seed": 9
   }
 ]

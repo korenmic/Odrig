@@ -606,21 +606,38 @@ def type_of(data):
     return "frames"
 
 
-def rendered(data, times):
-    """The pictures the core's drawing makes of a text at these times into its turn, by
-    `odrig_host render`, or the reason it is refused for."""
+def rendered(data, times, seed=None):
+    """The pictures the core's drawing makes of a text or a clock at these times into its
+    turn, a clock with a seed, by `odrig_host render`, or the reason it is refused for."""
     with tempfile.TemporaryDirectory() as folder:
-        path = pathlib.Path(folder) / "text.odrgx"
+        path = pathlib.Path(folder) / "drawn.odrgx"
         path.write_bytes(data)
-        lines = host_lines("render", str(path), *(str(time) for time in times))
+        seeded = () if seed is None else ("--seed", str(seed))
+        lines = host_lines("render", *seeded, str(path), *(str(time) for time in times))
     if lines[0].startswith("rejected "):
         return lines[0][len("rejected "):]
     return [bytes.fromhex(line.split(" ")[3]) for line in lines]
 
 
+def mix(value):
+    """MurmurHash3's finalizer, as the core mixes the timestamps of the refreshes and the
+    seed of a clock's turn."""
+    value ^= value >> 16
+    value = (value * 0x85EBCA6B) & 0xFFFFFFFF
+    value ^= value >> 13
+    value = (value * 0xC2B2AE35) & 0xFFFFFFFF
+    return value ^ (value >> 16)
+
+
+def seed_of(noise, number, start):
+    """The seed of the turn of a clock: the noise, the item's id and the turn's start."""
+    return mix(noise ^ mix((number ^ start) & 0xFFFFFFFF)) or 1
+
+
 class _Drawn:
-    """A text. The reference knows the length of its pass, and takes the pictures of a pass
-    from the core's drawing, which tests of their own hold to the converter's pictures."""
+    """A text or a clock. The reference knows the length of its loop, a text's pass or a
+    clock's seconds, and takes the pictures from the core's drawing, which tests of their
+    own hold to the converter's pictures."""
 
     AHEAD = 250
 
@@ -628,15 +645,18 @@ class _Drawn:
         self.data = data
         self.total = loop
         self.broken = None
+        self.widget = type_of(data) == "widget"
         self.pictures = {}
 
-    def picture_at(self, elapsed):
-        time = elapsed % self.total
-        if time not in self.pictures:
+    def picture_at(self, elapsed, seed=None):
+        # A text is drawn at its time in its pass, a clock at its time in the turn.
+        time = elapsed if self.widget else elapsed % self.total
+        if (seed, time) not in self.pictures:
             # The times of the refreshes to come are drawn with it, 20 ms apart.
-            times = sorted({(time + 20 * step) % self.total for step in range(self.AHEAD)})
-            self.pictures.update(zip(times, rendered(self.data, times)))
-        return self.pictures[time]
+            ahead = (time + 20 * step for step in range(self.AHEAD))
+            times = sorted(set(ahead) if self.widget else {later % self.total for later in ahead})
+            self.pictures.update(((seed, later), picture) for later, picture in zip(times, rendered(self.data, times, seed)))
+        return self.pictures[(seed, time)]
 
 
 class _Clip:
@@ -708,6 +728,10 @@ class ReferencePlayer:
         self.clips = {}         # the frames of each file by name
         self.on = True
         self.brightness = 0
+        self.noise = 0          # what the timestamps of the polls were mixed into
+        self.seed = 0           # the seed of the latest clock's turn
+        self.seed_turn = None   # that turn: the clock's id and the turn's start
+        self.seed_shown = False # whether the latest refresh drew that clock, and nothing came between
         self.playing = None     # the id of the cycle being played, ALL for the playlist, or None
         self.turn = None        # while the playlist plays, the id of the animation whose turn it is
         self.zero = None        # the time zero of that item, once a refresh has set it
@@ -867,6 +891,7 @@ class ReferencePlayer:
     def _fail(self, reason):
         """Makes the show invalid while it runs: nothing plays from here on."""
         self.error = reason
+        self.seed_shown = False
         self.playing = self.shown = self.zero = self.turn = None
         if self.upload is not None:
             self._discard()
@@ -875,6 +900,7 @@ class ReferencePlayer:
 
     def _play(self, number):
         """Starts a cycle. An animation is not played by itself: it has its turn."""
+        self.seed_shown = False
         self.playing = number
         self.zero = None
         self.shown = next(member for member in self.items[number].cycle if self._usable(member))
@@ -885,6 +911,7 @@ class ReferencePlayer:
 
     def _play_all(self, number=None):
         """Starts the playlist with the turn of an animation, or of its first one."""
+        self.seed_shown = False
         self.playing = self.ALL
         self.zero = None
         self.turn = self.shown = self._animations()[0] if number is None else number
@@ -892,7 +919,7 @@ class ReferencePlayer:
     def _whole_passes(self, number, turn):
         """A longest time given to the turn of a text, rounded up to its whole passes."""
         clip = self.clips[self.items[number].file]
-        if not isinstance(clip, _Drawn):
+        if not isinstance(clip, _Drawn) or clip.widget:
             return turn
         return -(-turn // clip.total) * clip.total
 
@@ -973,7 +1000,16 @@ class ReferencePlayer:
                 self._quarantine(item.file, clip.broken)
                 return self.KEEP
         self.shown = item.id
-        picture = clip.picture_at(elapsed)
+        self.seed_shown = isinstance(clip, _Drawn) and clip.widget
+        if self.seed_shown:
+            # A clock's turn gets its seed at its first refresh and keeps it to its end.
+            start = now - elapsed
+            if self.seed_turn != (item.id, start):
+                self.seed = seed_of(self.noise, item.id, start)
+                self.seed_turn = (item.id, start)
+            picture = clip.picture_at(elapsed, self.seed)
+        else:
+            picture = clip.picture_at(elapsed)
         return picture if self.on else None
 
     def poll(self, now):
@@ -981,6 +1017,7 @@ class ReferencePlayer:
 
         Returns `(leg number, LED data)` for each leg, or None when no refresh is due.
         """
+        self.noise = mix(self.noise ^ (now & 0xFFFFFFFF))
         now = self._touch(now)
         if not self.legs or now < self.next_due:
             return None
@@ -1384,6 +1421,7 @@ class ReferencePlayer:
             "error": self.error,
             "width": self.canvas[0] if self.legs else None,
             "height": self.canvas[1] if self.legs else None,
+            "seed": self.seed if self.seed_shown and self.error is None and self.playing is not None else None,
         }
         # How far the check is, and what is unavailable: files whose check has ended and
         # those still to read, and the animations unavailable; all 0 for an invalid show.

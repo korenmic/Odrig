@@ -5,7 +5,6 @@
 #include "crc32.h"
 #include "json_reader.h"
 #include "storage.h"
-#include "text.h"
 
 namespace odrig {
 
@@ -98,13 +97,13 @@ void upload_step(Core &core, uint64_t now) {
     if (!upload.header_read) {
         // The header is judged first, then the size against the mapping.
         checker.file.open_at(core.host, kUploadPart);
-        reason = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &upload.content);
-        if (reason == kNone && (upload.content.width != core.width || upload.content.height != core.height)) {
+        reason = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &core.check_content);
+        if (reason == kNone && (core.check_content.width != core.width || core.check_content.height != core.height)) {
             reason = kSizeMismatch;
         }
         if (reason == kNone) {
             // A drawn payload is read and checked whole in one step, as one record.
-            const bool drawn = is_drawn(upload.content.type);
+            const bool drawn = is_drawn(core.check_content.type);
             if (!drawn) {
                 memset(core.check_pixels, 0, checker.decoder.n);
             }
@@ -114,9 +113,9 @@ void upload_step(Core &core, uint64_t now) {
             return;
         }
     } else if (upload.records_left != 0) {
-        if (is_drawn(upload.content.type)) {
-            reason = text_read(&checker.file, upload.content, nullptr);
-            upload.total_ms = upload.content.loop_ms;
+        if (is_drawn(core.check_content.type)) {
+            reason = drawn_read(&checker.file, core.check_content, nullptr);
+            upload.total_ms = core.check_content.loop_ms;
         } else {
             uint16_t duration = 0;
             record = checker.decoder.frames - upload.records_left;
@@ -135,7 +134,7 @@ void upload_step(Core &core, uint64_t now) {
         // After the last record nothing may follow, and what was read back from storage
         // must be what was received.
         record = checker.decoder.frames;
-        reason = content_finish(&checker.file, &checker.decoder, upload.content, upload.total_ms);
+        reason = content_finish(&checker.file, &checker.decoder, core.check_content, upload.total_ms);
         if (reason == kPendingWork) {
             return;
         }

@@ -99,6 +99,11 @@ ends at the end of the pass in which `max_seconds` falls, and in a cycle its tur
 turn of 12 seconds. The turns of an animation of frames are as above. `play`, `off` and
 `on` act at once, in the middle of a pass too.
 
+The loop of a clock is its `seconds`, and its turn is its loops as an animation's of
+frames, cut by `max_seconds` in the middle of a loop if need be. Each turn of a clock gets
+a seed when it begins, a `play` too, and keeps it to its end through all its loops; the
+clock's time runs on from the turn's start, not from the start of a loop.
+
 A turn begins with the first frame of its animation, and at the moment the turn before
 it ended. The time of the playlist goes on while the LEDs are switched off.
 

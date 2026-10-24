@@ -91,6 +91,10 @@ void player_set_brightness(Core &core, uint8_t value);
 
 // The number of refreshes produced in the second that ended most recently before this time,
 // with the seconds counted from the power-on moment. 0 when no second has ended.
+// The seed of the clock whose turn it is, while it is on the canvas: false when the
+// animation whose turn it is is no clock, or its turn has had no refresh yet.
+bool player_seed(const Core &core, uint32_t *seed);
+
 uint32_t player_fps(const Core &core, uint64_t now);
 
 }  // namespace odrig
