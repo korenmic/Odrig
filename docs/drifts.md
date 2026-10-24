@@ -8962,3 +8962,33 @@ When a later seed marks each item's storage in `list`, the app counts by that ma
 place of the difference; the ids are never used.
 
 **Resolution.** Requirements 3 and 4 of the spec; `app/www/client.js`, `state.listBusy`.
+
+## Seed 31: no new limit on a body's size
+
+**Question.** The seed asks for explicit expansion limits, and a limit would end the
+reproducer quickly; but the format says a compressed body is inflated whole before its
+records count, and a limit would change which reason an overlong bad file gets, in the
+converter and the Python library too. Limit, or slices?
+
+**Answer.** Slices, and no new limit. Settling inflates on in slices of 32 KiB, one per
+call, and ends with the very reason a whole-file reader gives, so the format and its
+other readers do not change. A huge tail only takes longer to settle, in the background,
+while every command is answered; seed 32 makes the file's animation unplayable as soon as
+its first defect is found, before settling ends.
+
+**Resolution.** `docs/specs/31-p0-bounded-decoding-and-responsive-fault-handling/`,
+Requirement 1.
+
+## Seed 31: the budgets, and the reproducer on the board
+
+**Question.** Must the budgets wait for a board session, and how does the reproducer reach
+the board, which the seed forbids to install as an ordinary animation?
+
+**Answer.** The budgets are set from what is on record (seed 05's 9 to 17 ms for a dense
+frame, seed 14's timings, Codex's captures): 32 KiB a settling slice, 128 KiB of catch-up a
+refresh, 50 ms a call, 250 ms a host's read. The board session measures them. The
+reproducer goes on the microSD card for that session, never into the board's own storage,
+and is taken off again. The check at the start of a host that cannot change its storage,
+the emulator's record mode, still reads whole files in one call: nothing waits on it.
+
+**Resolution.** The spec's design, "Budgets and their reasons"; task 5.
