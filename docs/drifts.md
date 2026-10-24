@@ -9740,3 +9740,104 @@ its place. `order.part` is the core's own and goes like any file the folder does
 
 **Resolution.** `firmware/fwtool/storage.py`, `folder_files`; `firmware/fwtool/cli.py`,
 `install-show`; the spec's requirement 1.6.
+## Seed 37: The header, the three versions and the names
+
+**Question.** The seed asks for a header-selected container with magic, lengths, canvas,
+type and version, keeps the owner's names odrg1, odrg2 and odrg3 for frames, text and
+widgets, and leaves the layout of the header to the specification.
+
+**Answer.** A header of 20 bytes, `ODRX`, the container's version, the type (1 frames,
+2 text, 3 widget, the owner's odrg1 to odrg3), the type's own version, a reserved byte,
+the canvas, the loop in milliseconds and the payload's length. The loop is in the header so
+that the start, which reads headers only, knows every file's length and type at once, and
+the check after the start holds it to the payload. A frames payload is an ODRG file as it
+is, so no second codec exists. The extension is `.odrgx`, and readers dispatch by the
+magic: a container named `.odrg` is read as a container, and an ODRG file named `.odrgx`
+as an ODRG file.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The
+container".
+
+## Seed 37: Where the layout of a text is made
+
+**Question.** The seed wants the C++ core to own rendering and the app's preview to show
+the same pixels, allows "compact precomputed layout ... with font/version references",
+and asks for the Unicode Bidirectional Algorithm for mixed Hebrew and English. Is the
+bidirectional ordering and the wrapping done by the core at every start, or once?
+
+**Answer.** Once, by the converter's library, when the file is made, in the app or on a
+computer; the file stores the text as written, its settings, and the glyphs with their
+places. The core checks that every glyph is in its font and in its block, computes the
+pass from the settings and the block, and draws. So the algorithm exists once, in
+JavaScript, beside the preview that uses it, and the core stays small; a text whose stored
+glyphs do not spell its text can only show its glyphs. Both the core and the converter
+draw, with the same integer rules, and reference pictures that both must reproduce hold
+them together; compiling the core to WebAssembly for the app would need a toolchain the
+project does not have.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The layout,
+in the converter" and "Decisions".
+
+## Seed 37: The fonts
+
+**Question.** The owner wants the fonts in the firmware, preferably pixel fonts drawn by
+hand for Hebrew and Latin in two or three sizes, made in the repository. Which sizes and
+which characters?
+
+**Answer.** Two drawn fonts and a third made from the first: `small`, 7 pixels from the
+baseline to a capital's top with 2 below, ten pixels a line, five lines and more on 60
+rows; `medium`, 10 and 3, fourteen a line, four lines; and `large`, `small` at twice the
+size, for big messages and the digital clock's digits. Each has the 95 printable ASCII
+characters and the 27 Hebrew letters, the five final forms among them, which descend below
+the baseline as `ק` does. Niqqud, other scripts and emoji are refused by name. The glyphs
+are text files that show the pixels, and one generator writes the core's tables and the
+converter's.
+
+**Resolution.** `fonts/`; `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`,
+"The fonts".
+
+## Seed 37: Where a clock's randomness comes from
+
+**Question.** A clock needs a fresh random seed at each turn. The core has no source of
+randomness, and promises the same output for the same timestamps. Does the host give one?
+
+**Answer.** No member is added to the host. The core mixes the timestamp of every refresh
+into a 32-bit noise, and a clock's seed is that noise mixed with the item and the start
+time of the turn. On the board and in the emulator the refreshes come at times that jitter,
+so every turn and every start differs; in the tests the timestamps are given, so the seeds
+are repeatable. `status` reports the seed, and the converter's drawing replays it.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The seed".
+
+## Seed 37: The commands for editing
+
+**Question.** The app must read an installed text or clock back to edit it, and must not
+overwrite another controller's change. Which commands, given that a command line has at
+most five words and the owner approved new commands in advance?
+
+**Answer.** `read <id> <offset>`, which gives up to 600 bytes of an animation's file in
+base64, and `upload expect <crc32>`, sent between `upload begin` and `upload end`, which
+makes the upload replace the item's file only when that file has the CRC-32 the app read;
+otherwise the new error `stale`, and the upload is discarded. While an upload is open no
+other controller can change the show's files, so the comparison holds until the end. The
+core keeps no CRC-32 of a file: it reads the item's file when asked, which is why `upload
+expect` takes files of at most 16,384 bytes. `list` gains `type` and `status` gains
+`seed`.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/requirements.md`,
+Requirement 10; `design.md`, "Commands".
+
+## Seed 37: What waits for seeds 32, 35, 36 and 39
+
+**Question.** The seed registers every type through seed 35's catalogs, keeps seed 32's
+quarantine, puts authoring into seed 36's upload screen, and seed 39 filters by type.
+Those seeds are built at the same time on other branches.
+
+**Answer.** This branch builds on today's upload path and today's storage screen, and its
+last task is done by the session that combines the branches: the catalogs take the type
+and the loop of the header, the quarantine takes a refused file, the forms move into seed
+36's screens, and the filter reads `type`. Until then a refused file installed by hand
+makes the show invalid, as any refused file does today, while an upload of one is refused
+with `bad-file` and changes nothing.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14.
