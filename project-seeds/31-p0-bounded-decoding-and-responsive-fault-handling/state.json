@@ -1,0 +1,10 @@
+{
+  "number": 31,
+  "slug": "31-p0-bounded-decoding-and-responsive-fault-handling",
+  "state": "remaining",
+  "title": "Bounded decoding and responsive fault handling",
+  "priority": "P0",
+  "addedAt": "2026-10-24T05:39:38+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Bound and resume decoding, validation, error settlement and media I/O so bad animations cannot block boot, lock out commands or trigger watchdog reboot loops, while preserving error precedence and watchdog protection."
+}
