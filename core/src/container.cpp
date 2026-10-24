@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "text.h"
+
 namespace odrig {
 
 namespace {
@@ -9,9 +11,14 @@ namespace {
 const uint8_t kMagic[4] = {0x4F, 0x44, 0x52, 0x58};
 const uint8_t kContainerVersion = 1;
 
-// The version of each content type the core reads, 0 for a type it does not read.
+// The version of each content type the core reads, 0 for a type it does not read, and the
+// most bytes its payload may have.
 uint8_t version_of(uint8_t type) {
-    return type == kTypeFrames ? 1 : 0;
+    return type == kTypeFrames || type == kTypeText ? 1 : 0;
+}
+
+uint32_t largest_payload(uint8_t type) {
+    return type == kTypeText ? kLargestTextPayload : 0xFFFFFFFFu;
 }
 
 // The next byte of the header, or the reason the file ends.
@@ -65,7 +72,13 @@ Reason content_open(FileSource *file, Inflate *inflate, uint8_t *window, OdrgDec
     if (header->width == 0 || header->height == 0) {
         return kZeroSize;
     }
+    if (header->payload > largest_payload(header->type)) {
+        return kPayloadSize;
+    }
     header->container = 1;
+    if (is_drawn(header->type)) {
+        return kNone;
+    }
     const Reason reason = decoder->open(file, inflate, window);
     if (reason != kNone) {
         return reason;
@@ -77,6 +90,9 @@ Reason content_open(FileSource *file, Inflate *inflate, uint8_t *window, OdrgDec
 }
 
 Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeader &header, uint64_t total_ms) {
+    if (is_drawn(header.type)) {
+        return kNone;
+    }
     const Reason reason = decoder->finish();
     if (reason != kNone || !header.container) {
         return reason;

@@ -31,6 +31,7 @@
 #include "guard.h"
 #include "inflate.h"
 #include "container.h"
+#include "text.h"
 #include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
@@ -61,6 +62,7 @@ int usage() {
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
         "       odrig_host decode [--slice BYTES] FILE | --batch\n"
+        "       odrig_host render FILE MS...\n"
         "       odrig_host session DIR | --batch [options]\n"
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
@@ -931,7 +933,11 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     }
     unsigned long pending = 0;
     uint64_t total_ms = 0;
-    if (reason == odrig::kNone) {
+    if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
+        // A text is read and checked whole, as the core reads it.
+        std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+        reason = odrig::text_read(&file, content, payload.data());
+    } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
         std::vector<uint8_t> pixels(decoder.n, 0);
@@ -980,6 +986,53 @@ size_t last_separator(const std::string &path) {
 #else
     return path.rfind('/');
 #endif
+}
+
+// Draws a text, as the player draws it, at each of a number of milliseconds into its turn.
+// Prints `picture <W> <H> <hex>` for each, with three bytes for each pixel in the pixel
+// order of docs/format.md, or `rejected <reason>` once.
+int render(const std::string &path, const std::vector<std::string> &times) {
+    for (const std::string &time : times) {
+        if (time.empty() || time.size() > 12 || time.find_first_not_of("0123456789") != std::string::npos) {
+            return usage();
+        }
+    }
+    size_t slash = last_separator(path);
+    Host host = Host::of_folder(slash == std::string::npos ? "." : path.substr(0, slash));
+    odrig_host functions = host.interface();
+    odrig::FileSource file;
+    std::memset(&file, 0, sizeof file);
+    odrig::OdrgDecoder decoder;
+    std::memset(&decoder, 0, sizeof decoder);
+    odrig::Inflate inflate;
+    std::memset(&inflate, 0, sizeof inflate);
+    std::vector<uint8_t> window(odrig::kWindowSize);
+    odrig::ContentHeader content;
+    std::memset(&content, 0, sizeof content);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    odrig::Reason reason = file.open(functions, name.c_str());
+    if (reason == odrig::kNone) {
+        reason = odrig::content_open(&file, &inflate, window.data(), &decoder, &content);
+    }
+    if (reason == odrig::kNone && !odrig::is_drawn(content.type)) {
+        reason = odrig::kUnknownType;
+    }
+    std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    if (reason == odrig::kNone) {
+        reason = odrig::text_read(&file, content, payload.data());
+    }
+    file.close();
+    if (reason != odrig::kNone) {
+        std::printf("rejected %s\n", odrig::reason_name(reason));
+        return 0;
+    }
+    std::vector<uint8_t> pixels(3u * content.width * content.height);
+    for (const std::string &time : times) {
+        const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
+        odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
+        std::printf("picture %u %u %s\n", content.width, content.height, hex(std::string(pixels.begin(), pixels.end())).c_str());
+    }
+    return 0;
 }
 
 int decode(const std::string &argument, uint32_t slice) {
@@ -1409,6 +1462,9 @@ int main(int argc, char **argv) {
     if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
         whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
         return decode(arguments[3], static_cast<uint32_t>(slice));
+    }
+    if (invocation == "render" && arguments.size() >= 3) {
+        return render(arguments[1], std::vector<std::string>(arguments.begin() + 2, arguments.end()));
     }
     if (invocation == "guard" && arguments.size() == 2 &&
         (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {

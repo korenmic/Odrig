@@ -93,6 +93,12 @@ which is the sum of the durations of its frames, and from three numbers:
 - With `max_seconds`, the turn ends when that time is reached, in the middle of a loop if
   need be.
 
+The loop of a text is its pass, and a text is never cut in the middle of one: its turn
+ends at the end of the pass in which `max_seconds` falls, and in a cycle its turn is
+`seconds` rounded up in the same way. A pass of 3 seconds with a `max_seconds` of 10 has a
+turn of 12 seconds. The turns of an animation of frames are as above. `play`, `off` and
+`on` act at once, in the middle of a pass too.
+
 A turn begins with the first frame of its animation, and at the moment the turn before
 it ended. The time of the playlist goes on while the LEDs are switched off.
 

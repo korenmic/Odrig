@@ -328,8 +328,10 @@ struct Core {
     uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
-    // The file that is open for playback: an animation item in one turn and one loop.
+    // The file that is open for playback: an animation item in one turn and one loop. A
+    // drawn one is held in the window, its payload read whole, and its file is closed.
     uint8_t stream_open;
+    uint8_t stream_drawn;
     uint32_t stream_item;
     uint64_t stream_turn;
     uint64_t stream_loop;

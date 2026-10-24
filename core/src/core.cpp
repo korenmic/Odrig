@@ -10,6 +10,7 @@
 #include "reasons.h"
 #include "show.h"
 #include "storage.h"
+#include "text.h"
 #include "upload.h"
 
 namespace odrig {
@@ -30,7 +31,8 @@ void append(Core &core, const char *text) {
 
 // Opens one file of the show and reads its header: an ODRG file's, or a container's and
 // that of its payload, and compares the canvas with the mapping's. The palette and the
-// frame records are not read. A file that cannot be used is quarantined.
+// frame records are not read. A drawn type's length is its header's loop from here on. A
+// file that cannot be used is quarantined.
 void open_file(Core &core, uint32_t index) {
     FileInfo &info = core.files[index];
     Reason reason = core.file.open(core.host, info.name);
@@ -41,6 +43,9 @@ void open_file(Core &core, uint32_t index) {
             reason = kSizeMismatch;
         }
         info.type = header.type;
+        if (reason == kNone && is_drawn(header.type)) {
+            info.total_ms = header.loop_ms;
+        }
         core.file.close();
     }
     if (reason != kNone) {
@@ -69,7 +74,10 @@ void check_file(Core &core, uint32_t index) {
     info.type = header.type;
     uint64_t total = 0;
     uint32_t record = 0;
-    if (reason == kNone) {
+    if (reason == kNone && is_drawn(header.type)) {
+        reason = text_read(&core.file, header, nullptr);
+        total = header.loop_ms;
+    } else if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
         for (; record < core.decoder.frames; ++record) {
             uint16_t duration = 0;
@@ -118,20 +126,29 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
             found = kSizeMismatch;
         }
         if (found == kNone) {
-            memset(core.check_pixels, 0, checker.decoder.n);
-            core.check_records_left = checker.decoder.frames;
+            // A drawn payload is read and checked whole in one step, as one record.
+            const bool drawn = is_drawn(core.check_content.type);
+            if (!drawn) {
+                memset(core.check_pixels, 0, checker.decoder.n);
+            }
+            core.check_records_left = drawn ? 1 : checker.decoder.frames;
             core.check_total_ms = 0;
             core.check_header_read = 1;
             return kStepGoingOn;
         }
     } else if (core.check_records_left != 0) {
-        uint16_t duration = 0;
-        *record = checker.decoder.frames - core.check_records_left;
-        found = checker.decoder.next(core.check_pixels, &duration);
-        if (found == kPendingWork) {
-            return kStepGoingOn;
+        if (is_drawn(core.check_content.type)) {
+            found = text_read(&checker.file, core.check_content, nullptr);
+            core.check_total_ms = core.check_content.loop_ms;
+        } else {
+            uint16_t duration = 0;
+            *record = checker.decoder.frames - core.check_records_left;
+            found = checker.decoder.next(core.check_pixels, &duration);
+            if (found == kPendingWork) {
+                return kStepGoingOn;
+            }
+            core.check_total_ms += duration;
         }
-        core.check_total_ms += duration;
         --core.check_records_left;
         if (found == kNone) {
             return kStepGoingOn;

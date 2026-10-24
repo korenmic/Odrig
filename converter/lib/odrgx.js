@@ -247,33 +247,44 @@ function cursor(bytes) {
   };
 }
 
-// Whether bytes are UTF-8 as the standard has it: no overlong form, no surrogate, nothing
-// above U+10FFFF, and no character cut off at the end.
+// A reader of UTF-8 as the standard has it, one byte after the other, as the core reads it:
+// `feed` is false at the first byte that no UTF-8 text can have there, and `done` is false
+// while a character is not complete. No overlong form, no surrogate, nothing above
+// U+10FFFF.
+export function utf8Reader() {
+  let need = 0;
+  let low = 0x80;
+  let high = 0xbf;
+  return {
+    feed(byte) {
+      if (need !== 0) {
+        if (byte < low || byte > high) return false;
+        need -= 1;
+        [low, high] = [0x80, 0xbf];
+        return true;
+      }
+      [low, high] = [0x80, 0xbf];
+      if (byte <= 0x7f) return true;
+      if (byte >= 0xc2 && byte <= 0xdf) need = 1;
+      else if (byte === 0xe0) [need, low] = [2, 0xa0];
+      else if ((byte >= 0xe1 && byte <= 0xec) || byte === 0xee || byte === 0xef) need = 2;
+      else if (byte === 0xed) [need, high] = [2, 0x9f];
+      else if (byte === 0xf0) [need, low] = [3, 0x90];
+      else if (byte >= 0xf1 && byte <= 0xf3) need = 3;
+      else if (byte === 0xf4) [need, high] = [3, 0x8f];
+      else return false;
+      return true;
+    },
+    done() {
+      return need === 0;
+    },
+  };
+}
+
+// Whether bytes are UTF-8 as `utf8Reader` reads it.
 export function isUtf8(bytes) {
-  let at = 0;
-  while (at < bytes.length) {
-    const first = bytes[at];
-    let more;
-    let low = 0x80;
-    let high = 0xbf;
-    if (first <= 0x7f) more = 0;
-    else if (first >= 0xc2 && first <= 0xdf) more = 1;
-    else if (first === 0xe0) [more, low] = [2, 0xa0];
-    else if ((first >= 0xe1 && first <= 0xec) || first === 0xee || first === 0xef) more = 2;
-    else if (first === 0xed) [more, high] = [2, 0x9f];
-    else if (first === 0xf0) [more, low] = [3, 0x90];
-    else if (first >= 0xf1 && first <= 0xf3) more = 3;
-    else if (first === 0xf4) [more, high] = [3, 0x8f];
-    else return false;
-    for (let one = 1; one <= more; one += 1) {
-      const next = bytes[at + one];
-      if (next === undefined) return false;
-      const [from, to] = one === 1 ? [low, high] : [0x80, 0xbf];
-      if (next < from || next > to) return false;
-    }
-    at += 1 + more;
-  }
-  return true;
+  const reader = utf8Reader();
+  return bytes.every((byte) => reader.feed(byte)) && reader.done();
 }
 
 function colour(bytes, at) {
@@ -341,8 +352,13 @@ export function decodeText(data, header = readHeader(data)) {
   if (!draw.fits(settings, block, canvas)) {
     throw new Rejection(DOES_NOT_FIT, `a block of ${block.width} x ${block.height} cannot be seen whole on ${canvas.width} x ${canvas.height} with ${settings.effect} ${settings.motion}`);
   }
-  const textData = read.take(textBytes, "the text");
-  if (!isUtf8(textData)) throw new Rejection(BAD_TEXT, "the text is not UTF-8");
+  const textData = new Uint8Array(textBytes);
+  const utf8 = utf8Reader();
+  for (let at = 0; at < textBytes; at += 1) {
+    textData[at] = read.take(1, "the text")[0];
+    if (!utf8.feed(textData[at])) throw new Rejection(BAD_TEXT, `the text is not UTF-8 at its byte ${at + 1}`);
+  }
+  if (!utf8.done()) throw new Rejection(BAD_TEXT, "the text ends inside a character");
   const font = textlayout.fontOf(textlayout.FONTS[settings.font].id);
   const glyphs = [];
   for (let one = 0; one < count; one += 1) {
@@ -439,6 +455,14 @@ export function encodeText(text) {
     putU16(payload, at + 4, glyph.y);
   });
   return wrap("text", text.width, text.height, draw.passMs(text, block, canvas), payload);
+}
+
+// The picture of a decoded text `t` milliseconds into its turn, as the player draws it:
+// three bytes for each pixel in the pixel order of docs/format.md.
+export function pictureAt(decoded, t) {
+  const picture = new Uint8Array(3 * decoded.header.width * decoded.header.height);
+  const font = textlayout.fontOf(textlayout.FONTS[decoded.settings.font].id);
+  return draw.drawText(decoded, font, t % decoded.header.loopMs, picture);
 }
 
 // The text of a decoded container, as its JSON source has it.
