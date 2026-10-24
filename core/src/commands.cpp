@@ -295,6 +295,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             if (!check_complete(core)) return refuse(reply, "busy");
             return order_get(core, from, reply);
         }
+        uint32_t revision, id, before = 0;
+        if (words.count == 5 && words.is(1, "move") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) && number_word(words, 3, 1, 65535, &id) &&
+            (words.is(4, "end") || number_word(words, 4, 1, 65535, &before))) {
+            return order_move(core, revision, id, before, reply);
+        }
         return refuse(reply, "bad-argument");
     }
     if (words.is(0, "ignore")) {

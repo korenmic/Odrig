@@ -40,7 +40,7 @@ Rules for every task:
     order.
   - Requirements: 1.1 to 1.5, 1.10, 1.11, 2.1
 
-- [ ] 2. The saved order in the core, write side
+- [x] 2. The saved order in the core, write side
   - `order move` in `core/src/order.cpp` and `core/src/commands.cpp`; `order-conflict` in
     the error table.
   - Tests: moves before an id and to the end, internal and external, with absent card
@@ -48,7 +48,7 @@ Rules for every task:
     a power cut at every storage call and a failed call at each, recovered by a start; the
     turn in progress, power and brightness kept; the order after a restart.
   - docs/commands.md, docs/core.md, docs/reasons.md if it lists codes.
-  - Prove it fails first: `order move` is an unknown command.
+  - Prove it fails first: `order move` is refused with `bad-argument`.
   - Requirements: 1.6 to 1.9
 
 - [ ] 3. The snake tests in the core
