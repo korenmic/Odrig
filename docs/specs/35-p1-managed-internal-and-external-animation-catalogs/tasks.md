@@ -100,7 +100,7 @@ Rules for every task:
     import.
   - Prove it fails first.
 
-- [ ] 9. The PC tool's command line
+- [x] 9. The PC tool's command line
   - `python3 -m odrig.catalog <mount> status|import|add|remove|check|recover`;
     `docs/microsd.md` (preparing a card on a computer), `docs/python-library.md`.
   - Tests, `tests/converter/test_catalog_cli.py`: each command, its outcome lines and exit

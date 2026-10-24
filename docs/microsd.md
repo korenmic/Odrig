@@ -44,6 +44,39 @@ card is missing, and plays the rest from the card.
   opens its files for reading only, and no command changes it. Nothing is installed
   from it into the board's storage.
 
+### The catalog, made on a computer
+
+`python3 -m odrig.catalog MOUNT COMMAND` keeps the catalog of the card's folder `odrig`,
+the files [catalog.md](catalog.md) describes, while the card is in a computer: MOUNT is
+where the card is mounted, as `/Volumes/CARD` on macOS or `E:\` on Windows, and with
+`--folder` it is the folder `odrig` itself. It needs Python 3.10 or later and the
+repository, and is run from the repository's top:
+
+```
+python3 -m odrig.catalog /Volumes/CARD import
+refused: clip.odrg: size-mismatch
+imported: 2 animations, generation 1
+python3 -m odrig.catalog /Volumes/CARD status
+catalog: ok, generation 1, 2 entries; 3 animation files, 1 without an entry
+```
+
+| Command | What it does |
+|---|---|
+| `status` | Says what the catalog is, `none`, `ok` with its generation and its entries, `damaged` or `incompatible` with what, and how many animation files the folder holds and how many of them have no entry. |
+| `import` | Checks every animation file of the folder, as the board lists them, and writes the catalog anew: `refused: NAME: REASON` for each file the check refuses, then `imported: N animations, generation G`. |
+| `add FILE...` | Puts each file into the folder under the last part of its path, in place of a file of that name, checked and with its entry in the same change: `added: NAME, BYTES bytes`, `replaced: NAME, BYTES bytes` or `refused: NAME: REASON`. |
+| `remove NAME...` | Takes each animation out of the folder with its entry: `removed: NAME` or `refused: NAME: file-missing`. |
+| `check` | Compares each file's size and CRC-32 with its entry: `differs: NAME: missing`, `size` or `crc` for each file that does, then `checked: N entries, M differ`. |
+| `recover` | Finishes a change that a pulled card or a cut left committed, removes what a change that was not committed left, says which, and gives the line of `status`. |
+
+The check is the board's, through the project's reader, for the canvas of 60 x 60; its
+reasons are those of [reasons.md](reasons.md). `add`, `remove` and `check` work on a card
+whose catalog is `ok`: on one without a catalog they say `error: the catalog is none;
+import writes it`, and on a damaged or incompatible one that `import` writes it anew, or
+for an interrupted change that `recover` finishes it. The exit status is 0, 1 when a file
+was refused, a file differs from its entry or the catalog cannot be used, and 2 for a
+command line that is not understood or a folder that is not there.
+
 ## The reader and its wiring
 
 The reader is the SparkFun Shifting microSD board, a microSD socket with level shifters,

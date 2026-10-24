@@ -9791,3 +9791,24 @@ second; otherwise it stores on the board as before. Settings shows both catalogs
 rebuilds; a card's row has `Delete` when the card can be written.
 
 **Resolution.** The design, "The app".
+
+## Seed 35: the PC tool's lines and exit statuses
+
+**Question.** The design gives `python3 -m odrig.catalog <mount> status|import|add|remove|
+check|recover`, exit 0, 1 and 2 and a line of outcome per change. What are the lines, and
+what does it do on a card without a catalog or a folder that is not there?
+
+**Answer.** One line per file or outcome, `added: NAME, BYTES bytes`, `replaced: ...`,
+`removed: NAME`, `refused: NAME: REASON` with the check's reason, `imported: N animations,
+generation G`, `differs: NAME: missing|size|crc` and `checked: N entries, M differ`;
+`status` gives the catalog's state with its generation and entries, the animation files of
+the folder and those without an entry. A refused file does not stop the others. `add`,
+`remove` and `check` need a catalog that is `ok` and say so on standard error with what to
+run (`import`, or `recover` for an interrupted change); `status`, `import` and `recover` work
+on any. A file to add that cannot be read is refused as `file-missing`. A MOUNT without a
+folder `odrig`, or with `--folder` a path that is no folder, is a usage error, status 2,
+as `odrigctl` treats what it cannot start with. The canvas is the installation's, 60 x 60.
+`main` is added to `odrig/catalog.py` and nothing of the module changes.
+
+**Resolution.** `odrig/catalog.py`, `main`; `tests/converter/test_catalog_cli.py`;
+`docs/microsd.md`, "The catalog, made on a computer".
