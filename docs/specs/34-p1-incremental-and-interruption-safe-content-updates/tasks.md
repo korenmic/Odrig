@@ -30,7 +30,7 @@ Rules for every task:
   - Prove it fails first: the removal changes megabytes at each layout.
   - Requirements: 7.1
 
-- [ ] 2. The image changes what differs
+- [x] 2. The image changes what differs
   - `firmware/fwtool/storage.py`: `change_of`, the file-by-file `with_show` with its second
     way, `blocks_in_use`, `blocks_of_files`, `plan`, `run_bytes`, `runs` with `among`.
   - `firmware/fwtool/cli.py`: `install-show` prints how the show changes and keeps the

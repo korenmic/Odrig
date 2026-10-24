@@ -139,7 +139,7 @@ python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --mic
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
@@ -178,7 +178,7 @@ with that environment's Python.
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
-| `output-not-empty` | The folder `read-show` is to write exists and is not an empty folder. |
+| `output-not-empty` | The folder `read-show` is to write, or the folder of `install-show --keep-copies`, exists and is not an empty folder. |
 | `wifi-settings-missing` | The settings file to read is not there or is not a file. |
 | `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
 | `wifi-name-invalid` | The name does not have 1 to 32 characters of printable ASCII. |
@@ -454,16 +454,43 @@ whether it is sound is not known yet.
    image it kept there when esptool has the chip confirm that storage has that image's
    checksum, which takes 17 seconds, and reads the whole partition otherwise, which takes
    64 seconds.
-4. In that image it removes `/odrig` with everything in it, creates it again and writes the
-   files of the folder. The file system keeps the disk version it had. Files that do not
-   fit are `no-space`, and nothing has been written to the board then. An image that
-   already holds exactly these files is left as it is.
-5. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
-   and every file outside `/odrig` is as it was.
-6. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
+4. It prints how the show changes: the number of files of `/odrig` it keeps, and each
+   file it adds, replaces or removes with its bytes, as `show: kept 56 files`,
+   `show: added new.odrg, 120000 bytes`, `show: replaced mapping.json, 184 bytes, was 16`,
+   `show: removed bad.odrg, 65262 bytes`; for a folder that the board holds already,
+   `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
+   `order.txt` of [show.md](show.md#the-saved-playlist-order), may be a file of the folder;
+   a folder without one keeps the board's, as installing animations does not change the
+   order the operator chose.
+5. In that image it changes only what differs. A file of the folder that `/odrig` holds
+   with the same bytes stays where it is, neither read nor written. A new file is written
+   under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
+   takes the place of the old file by a rename; the files the folder does not hold are
+   removed last. So the bytes of the new files go into blocks that the file system before
+   did not use. When there is no room for the new files beside the old ones, the files
+   that go and the old files of the changed ones are removed first. The file system keeps
+   the disk version it had. Files that do not fit even so are `no-space`, and nothing has
+   been written to the board then. An image that already holds exactly these files is
+   left as it is.
+6. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
+   every file outside `/odrig` is as it was, and every file outside `/odrig` and every file
+   it kept lies in the blocks it lay in.
+7. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
    the chip compare the whole partition with the new image, and restarts the board.
    esptool is told that these blocks are data: it would otherwise take a block that begins
    with the first byte of a program image for a program and refuse it.
+
+Removing, adding or replacing one animation of a storage 80 % full changes the blocks of
+the files written and two blocks of the file system's records, where the folder rebuilt
+whole changed 8.4 MB of WLED's layout and 10.9 MB of the bigger one;
+`tests/firmware/test_incremental.py` measures it at both layouts.
+
+`--dry-run` does steps 1 to 6, prints the blocks it would write,
+`storage: 33 blocks to write, 135168 bytes: 31 free first, then 2 in use`, and
+`storage: dry run: nothing written; the board restarts`, writes nothing and restarts the
+board. `--keep-copies DIR` copies every file the install removes or replaces, as the board
+holds it, into `DIR`, a folder that is new or empty, before anything is written, and
+prints `kept copies: 2 files in DIR`: a file kept for a look at why it failed.
 
 A copy of storage from before the write and the new image stay in
 `build/firmware/storage/`, named by time; the newest eight images are kept. The new image
