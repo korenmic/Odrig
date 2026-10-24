@@ -573,3 +573,8 @@ are in [format.md](format.md), "Measured sizes".
   Move up and Move down, and a Tests group of the diagonal and twenty snake tests shown
   by a Settings checkbox. The 21 hand-uploaded line-test files leave the board in its
   board session; the owner's phone and LED checks are open.
+- 2026-10-24: Seed 39: the operators' app filters its list of animations by storage, all,
+  internal or external, and by type, all, normal, text or widget, with a count on each
+  choice, choices kept on the phone, and moving off while a filter hides rows. The web
+  code alone does it, from `external` and `type` of `list`; no command or reply member is
+  added. The owner's check on a phone with the card in is open.
