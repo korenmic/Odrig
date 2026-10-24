@@ -296,18 +296,19 @@ class Commands(Temporary):
         self.assertEqual(kept["before.bin"], self.old)
         self.assertEqual(kept["after.bin"], self.on_the_board(esptool))
 
-    def test_the_whole_partition_is_compared_with_the_new_image_and_the_board_restarted_last(self):
+    def test_the_written_runs_are_compared_with_the_new_image_and_the_board_restarted_last(self):
         esptool = self.esptool()
         self.install(esptool)
-        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash"])
-        verify = esptool.calls[-1]
-        address, image = esptool.pairs(esptool.call("verify-flash"))[0]
-        self.assertEqual(address, "0x610000")
-        self.assertEqual(storage.kept_images(len(self.old))[0].read_bytes(), self.on_the_board(esptool))
-        self.assertEqual(pathlib.Path(image).parent, self.folder / "storage")
-        self.assertEqual(verify[verify.index("--after") + 1], "hard-reset")
-        for call in esptool.calls[:-1]:
-            self.assertEqual(call[call.index("--after") + 1], "no-reset")
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "write-flash", "verify-flash", "chip-id"])
+        written = sorted(address for call in esptool.calls if "write-flash" in call for address, _ in esptool.pairs(call[call.index("write-flash") + 1:]))
+        compared = esptool.pairs(esptool.call("verify-flash"))
+        self.assertEqual(sorted(address for address, _ in compared), written)
+        new = storage.kept_images(len(self.old))[0].read_bytes()
+        self.assertEqual(new, self.on_the_board(esptool))
+        for address, piece in compared:
+            self.assertEqual(pathlib.Path(piece).parent, self.folder / "storage")
+            self.assertFalse(pathlib.Path(piece).exists())
+        self.assertEqual([call[call.index("--after") + 1] for call in esptool.calls], ["no-reset"] * 5 + ["hard-reset"])
 
     def test_an_invalid_show_folder_is_refused_before_the_board_is_touched(self):
         (self.show / "dvd.odrg").unlink()
@@ -335,8 +336,9 @@ class Commands(Temporary):
         first = self.esptool()
         self.install(first)
         second = self.esptool(self.on_the_board(first))
-        self.install(second)
-        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "verify-flash"])
+        result = self.install(second)
+        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "chip-id"])
+        self.assertIn("storage: unchanged: nothing written; the board restarts\n", result.out)
         self.assertEqual(second.call("read-flash")[:2], ["0x8000", "0xc00"])
         self.assertEqual(second.wrote, [])
 
@@ -345,13 +347,15 @@ class Commands(Temporary):
         self.install(first)
         second = self.esptool(failing_verifies=1)
         self.install(second)
-        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "read-flash", "write-flash", "write-flash", "verify-flash", "chip-id"])
         self.assertEqual(storage.show_of(self.on_the_board(second)), support.files_of(self.show))
 
-    def test_a_board_that_holds_something_else_after_the_write_is_verify_failed(self):
-        result = self.install(self.esptool(failing_verifies=1))
+    def test_a_board_that_holds_something_else_after_the_write_needs_the_recovery(self):
+        esptool = self.esptool(failing_verifies=1)
+        result = self.install(esptool)
         self.assertEqual(result.status, 1)
-        self.assertRegex(result.err, r"^error: verify-failed: ")
+        self.assertRegex(result.err, r"^error: recovery-needed: .*run python3 firmware/fw\.py recover-storage\n")
+        self.assertEqual(esptool.commands()[-1], "verify-flash")
 
     def test_read_show_gives_the_files_back(self):
         esptool = self.esptool()
@@ -398,5 +402,5 @@ class Commands(Temporary):
 
     def test_a_new_image_that_the_board_does_not_hold_after_the_write_is_not_kept(self):
         self.install(self.esptool(failing_verifies=1))
-        kept = sorted(path.name.split("-", 1)[1] for path in (self.folder / "storage").iterdir())
-        self.assertEqual(kept, ["before.bin"])
+        self.assertEqual([path.name.split("-", 1)[1] for path in storage.kept_images(len(self.old))], ["before.bin"])
+        self.assertEqual(sorted(path.name for path in (self.folder / "storage").iterdir())[-1], "change.json")

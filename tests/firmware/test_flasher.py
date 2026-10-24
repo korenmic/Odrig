@@ -161,13 +161,13 @@ class InstallShow(Temporary):
         for address, content in esptool.wrote:
             self.assertTrue(start <= address and address + len(content) <= end, hex(address))
 
-    def test_it_writes_all_its_stretches_in_one_call_and_erases_nothing(self):
+    def test_it_writes_its_stretches_in_two_calls_and_erases_nothing(self):
         esptool = self.install()
-        self.assertEqual(esptool.commands().count("write-flash"), 1)
+        self.assertEqual(esptool.commands().count("write-flash"), 2)
         self.assertNotIn("erase-region", esptool.commands())
-        write = next(call for call in esptool.calls if "write-flash" in call)
-        for setting in ("--flash-mode", "--flash-freq", "--flash-size"):
-            self.assertEqual(write[write.index(setting) + 1], "keep")
+        for write in (call for call in esptool.calls if "write-flash" in call or "verify-flash" in call):
+            for setting in ("--flash-mode", "--flash-freq", "--flash-size"):
+                self.assertEqual(write[write.index(setting) + 1], "keep")
 
     def test_it_reads_only_the_partition_table_and_storage(self):
         reads = [call[call.index("read-flash") + 1:][:2] for call in self.install().calls if "read-flash" in call]

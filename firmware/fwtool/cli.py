@@ -7,12 +7,14 @@ understood.
 """
 
 import argparse
+import contextlib
 import os
 import pathlib
+import signal
 import subprocess
 import sys
 
-from . import Failure, board, build, env, flasher, partitions, paths, stock, toolchain
+from . import Failure, board, build, env, flasher, journal, partitions, paths, stock, toolchain
 
 SUITES = {"test": "tests/firmware", "test-board": "tests/board", "test-air": "tests/air"}
 
@@ -62,6 +64,10 @@ def parser():
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after the restart for the board's reply and for it to read its animations (default: 300)")
     install.add_argument("--dry-run", action="store_true", help="say what would change and write nothing")
     install.add_argument("--keep-copies", metavar="DIR", type=pathlib.Path, help="copy every file the install removes or replaces, as the board holds it, into a folder that is new or empty, before anything is written")
+    recover = commands.add_parser("recover-storage", help="finish or give up a change of the board's storage that was cut")
+    recover.add_argument("--port", metavar="P", help="the board's USB serial port")
+    recover.add_argument("--whole", action="store_true", help="write the new image of the change whole: the last resort when storage changed since the change began")
+    recover.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.WAIT_SECONDS, help="how long to wait for the board's reply after its restart (default: 20)")
     network = commands.add_parser("set-wifi", help="put the network's name and password from the settings file into the board's storage")
     network.add_argument("--port", metavar="P", help="the board's USB serial port")
     network.add_argument("--settings", metavar="FILE", type=pathlib.Path, help="a settings file other than firmware/wifi.json")
@@ -246,41 +252,82 @@ def storage_of(port, say=True):
     if say:
         print(partitions.layout_line(table))
     region = flasher.storage_region(partition)
-    return on_port, region, storage.from_board(on_port, region)
-
-
-def write_storage(on_port, region, before, make):
-    """Puts a new storage image on the board. `make` gives the new image for the one the
-    board holds.
-
-    The blocks in which the two differ are written in one call, the whole partition is
-    compared with the new image, and the board is restarted. The new image is then the
-    newest one the work folder keeps. When any of it fails, the new image is not kept
-    and the board is restarted.
-    """
-    from . import storage
-    new_path = None
     try:
-        after = make(before)
-        new_path = storage.pending(after)
-        changed = storage.runs(before, after, storage.geometry(before)[1])
-        pieces = []
-        for number, (offset, content) in enumerate(changed):
-            piece = new_path.with_name(f"{new_path.name}.run-{number}")
-            piece.write_bytes(content)
-            pieces.append((region.address + offset, piece))
-        try:
-            on_port.write(pieces, [region], restart=False, data=True)
-        finally:
-            for _, piece in pieces:
-                piece.unlink()
-        on_port.verify(region.address, new_path, [region], restart=True)
-        storage.keep(new_path, region.size)
-    except Failure:
-        if new_path is not None:
-            storage.discard(new_path)
+        return on_port, region, storage.from_board(on_port, region)
+    except KeyboardInterrupt:
+        raise Failure("cancelled", f"cancelled by an interrupt while the board's storage was read; nothing was written{_restarted(on_port)}") from None
+
+
+@contextlib.contextmanager
+def held_interrupts():
+    """Holds an interrupt from the keyboard while the block runs: the block is not cut,
+    and the list it is given holds True for each interrupt that came."""
+    came = []
+    try:
+        earlier = signal.signal(signal.SIGINT, lambda number, frame: came.append(True))
+    except ValueError:
+        # Only the main thread receives signals.
+        yield came
+        return
+    try:
+        yield came
+    finally:
+        signal.signal(signal.SIGINT, earlier)
+
+
+def _pieces(region, new_path, found, name):
+    """Files beside the new image, one for each run, and the address each goes to."""
+    pieces = []
+    for number, (offset, content) in enumerate(found):
+        piece = new_path.with_name(f"{new_path.name}.{name}-{number}")
+        piece.write_bytes(content)
+        pieces.append((region.address + offset, piece))
+    return pieces
+
+
+def _restarted(on_port):
+    """Restarts the board out of its bootloader; the words to add when it could not."""
+    try:
         on_port.restart()
-        raise
+        return ""
+    except Failure as failure:
+        return f"; the board could not be restarted ({failure.detail}): restart it by its button or by its cable"
+
+
+def apply_change(on_port, region, new_path, change, found):
+    """Writes the runs of a change in their order and compares them, as the journal of the
+    change records step by step: first the runs of free blocks, which leave the file system
+    of the board as it was; then the runs of blocks in use, the commit; then the chip
+    compares every written run with the new image. Each call tells esptool not to reset
+    the chip, which it would do after a failure too. A failure, or an interrupt from the
+    keyboard, before the commit ends with the change given up and the board restarted; in
+    the commit or after it, the journal stays and the chip stays in its bootloader. Returns
+    whether an interrupt came while it was held."""
+    from . import storage
+    pieces = _pieces(region, new_path, found.free, "free") + _pieces(region, new_path, found.in_use, "in-use")
+    free, in_use = pieces[:len(found.free)], pieces[len(found.free):]
+    try:
+        try:
+            on_port.write(free, [region], restart=False, data=True)
+        except (Failure, KeyboardInterrupt) as stopped:
+            journal.end()
+            storage.discard(new_path)
+            said = "cancelled by an interrupt" if isinstance(stopped, KeyboardInterrupt) else stopped.detail
+            reason = "cancelled" if isinstance(stopped, KeyboardInterrupt) else stopped.reason
+            raise Failure(reason, f"{said}; the change was not made: no block the board's file system uses was written, and the board holds its storage from before{_restarted(on_port)}") from None
+        with held_interrupts() as came:
+            try:
+                journal.step(change, journal.STEP_COMMIT)
+                on_port.write(in_use, [region], restart=False, data=True)
+                journal.step(change, journal.STEP_COMPARE)
+                on_port.compare(pieces, [region], restart=False)
+            except Failure as failure:
+                raise Failure("recovery-needed", f"{failure.detail}; the change was cut at its step {change['step']}, when the blocks the board's file system uses were being written or compared. "
+                              "The board stays in its bootloader, so that it does not start on a storage it may not read; run python3 firmware/fw.py recover-storage") from None
+        return bool(came)
+    finally:
+        for _, piece in pieces:
+            piece.unlink(missing_ok=True)
 
 
 def plan_line(found, block_size):
@@ -290,6 +337,39 @@ def plan_line(found, block_size):
     if not free + in_use:
         return "storage: unchanged: no block to write"
     return f"storage: {(free + in_use) // block_size} blocks to write, {free + in_use} bytes: {free // block_size} free first, then {in_use // block_size} in use"
+
+
+def write_storage(on_port, region, before, make, say=lambda line: None):
+    """Puts a new storage image on the board. `make` gives the new image for the one the
+    board holds; `say` takes the lines that tell what is written and how it ended.
+
+    Only the blocks in which the two differ are written, in the order of `apply_change`.
+    The new image is then the newest one the work folder keeps. When the new image cannot
+    be made, or nothing differs, nothing is written and the board is restarted.
+    """
+    from . import storage
+    try:
+        after = make(before)
+        found = storage.plan(before, after) if after != before else storage.Plan([], [])
+    except (Failure, KeyboardInterrupt) as stopped:
+        restarted = _restarted(on_port)
+        if isinstance(stopped, KeyboardInterrupt):
+            raise Failure("cancelled", f"cancelled by an interrupt before anything was written{restarted}") from None
+        raise
+    block_size = storage.geometry(before)[1]
+    written = storage.run_bytes(found.free) + storage.run_bytes(found.in_use)
+    if not written:
+        on_port.restart()
+        say("storage: unchanged: nothing written; the board restarts")
+        return
+    say(plan_line(found, block_size))
+    new_path = storage.pending(after)
+    change = journal.begin(region, new_path, found)
+    held = apply_change(on_port, region, new_path, change, found)
+    storage.keep(new_path, region.size)
+    journal.end()
+    restarted = _restarted(on_port)
+    say(f"storage: committed: {written} bytes written and compared" + ("; an interrupt came while the change was committed and waited for it" if held else "") + (restarted or "; the board restarts"))
 
 
 def show_lines(present, wanted):
@@ -326,21 +406,96 @@ def _install_show(arguments):
             change = storage.change_of(present, files)
             storage.write_folder(copies, {name: present[name] for name in change.replaced + change.removed})
             print(f"kept copies: {len(change.replaced) + len(change.removed)} files in {copies}")
-        if arguments.dry_run:
-            after = storage.with_show(before, files)
-            found = storage.plan(before, after) if after != before else storage.Plan([], [])
-    except Failure:
-        on_port.restart()
+    except (Failure, KeyboardInterrupt) as stopped:
+        restarted = _restarted(on_port)
+        if isinstance(stopped, KeyboardInterrupt):
+            raise Failure("cancelled", f"cancelled by an interrupt before anything was written{restarted}") from None
         raise
     if arguments.dry_run:
+        try:
+            after = storage.with_show(before, files)
+            found = storage.plan(before, after) if after != before else storage.Plan([], [])
+        except (Failure, KeyboardInterrupt):
+            on_port.restart()
+            raise
         on_port.restart()
         print(plan_line(found, storage.geometry(before)[1]))
         print("storage: dry run: nothing written; the board restarts")
         return 0
-    write_storage(on_port, region, before, lambda image: storage.with_show(image, files))
+    write_storage(on_port, region, before, lambda image: storage.with_show(image, files), say=print)
     reply = board.settled(port, arguments.wait)
     print(reply)
     return 0 if storage.status_error(reply) is None else 1
+
+
+def _recover_storage(arguments):
+    """Finishes or gives up the change of the board's storage that the journal names."""
+    from . import storage
+    change = journal.read()
+    if change is None:
+        print("storage: nothing to recover: no change of the board's storage is unfinished")
+        return 0
+    port = board.find(arguments.port)
+    on_port = flasher.Flasher(port)
+    table = on_port.read_table()
+    _, partition = partitions.check(table, 0)
+    print(partitions.layout_line(table))
+    region = flasher.storage_region(partition)
+    if (region.address, region.size) != (change["address"], change["size"]):
+        raise Failure("layout-mismatch", f"the change was of storage at {change['address']:#x}, {change['size']} bytes, and the board's table puts it at "
+                      f"{region.address:#x}, {region.size} bytes; nothing was written. The chip stays in its bootloader")
+    new_path = paths.STORAGE / change["image"]
+    if change["step"] == journal.STEP_FREE:
+        journal.end()
+        storage.discard(new_path)
+        on_port.restart()
+        print("storage: given up: the change was cut before its commit; the board holds its storage from before; the board restarts")
+        print(board.EXPECTED["status"](port, arguments.wait))
+        return 0
+    if not new_path.exists():
+        raise Failure("recovery-needed", f"the new image {new_path} of the change is gone; nothing was written. The chip stays in its bootloader")
+    after = new_path.read_bytes()
+    if len(after) != region.size:
+        raise Failure("recovery-needed", f"the new image {new_path} has {len(after)} bytes and the storage {region.size}; nothing was written")
+    if arguments.whole:
+        found = storage.Plan([], [(0, after)])
+    else:
+        found = storage.Plan(*journal.runs_of(change, after))
+        rest = []
+        for number, (offset, length) in enumerate(journal.outside(found.free + found.in_use, region.size)):
+            piece = new_path.with_name(f"{new_path.name}.rest-{number}")
+            piece.write_bytes(after[offset:offset + length])
+            rest.append((region.address + offset, piece))
+        try:
+            on_port.compare(rest, [region], restart=False)
+        except Failure as failure:
+            if failure.reason != "verify-failed":
+                raise
+            raise Failure("storage-changed", "the board's storage outside the blocks of the change is not what it was when the change began: something else wrote it since. "
+                          "Nothing was written, and the chip stays in its bootloader. python3 firmware/fw.py recover-storage --whole writes the new image whole") from None
+        finally:
+            for _, piece in rest:
+                piece.unlink(missing_ok=True)
+    journal.step(change, journal.STEP_COMMIT)
+    with held_interrupts():
+        pieces = _pieces(region, new_path, found.free, "free") + _pieces(region, new_path, found.in_use, "in-use")
+        try:
+            on_port.write(pieces[:len(found.free)], [region], restart=False, data=True)
+            on_port.write(pieces[len(found.free):], [region], restart=False, data=True)
+            journal.step(change, journal.STEP_COMPARE)
+            on_port.compare(pieces, [region], restart=False)
+        except Failure as failure:
+            raise Failure("recovery-needed", f"{failure.detail}; the recovery was cut and the journal stays: run python3 firmware/fw.py recover-storage again") from None
+        finally:
+            for _, piece in pieces:
+                piece.unlink(missing_ok=True)
+    storage.keep(new_path, region.size)
+    journal.end()
+    written = storage.run_bytes(found.free) + storage.run_bytes(found.in_use)
+    on_port.restart()
+    print(f"storage: committed: the change was finished: {written} bytes written and compared; the board restarts")
+    print(board.EXPECTED["status"](port, arguments.wait))
+    return 0
 
 
 def store_settings(port, wait, network=None, milliamps=None, settled=False, say=True):
@@ -449,9 +604,15 @@ def _test_air(arguments):
 ACTIONS = {
     "setup": _setup, "build": _build, "flash": _flash, "restore-stock": _restore_stock, "big-storage": _big_storage,
     "install-show": _install_show, "set-wifi": _set_wifi, "set-limit": _set_limit, "read-limit": _read_limit,
-    "install-firmware": _install_firmware, "read-show": _read_show,
+    "install-firmware": _install_firmware, "read-show": _read_show, "recover-storage": _recover_storage,
     "test": _test, "test-board": _test_board, "test-air": _test_air,
 }
+
+
+# The commands that read or write the board's flash. None of them runs while a change of the
+# board's storage is unfinished: each would read a storage that may be half written, or start
+# the board on it, and WLED formats a file system it cannot read.
+TOUCHES_THE_BOARD = ("flash", "restore-stock", "big-storage", "install-show", "set-wifi", "set-limit", "read-limit", "install-firmware", "read-show", "test-board", "test-air")
 
 
 def module_environment():
@@ -488,9 +649,13 @@ def main(argv=None):
     """Runs one command in this interpreter, which is the work folder's Python."""
     arguments = parsed(argv)
     try:
+        if arguments.command in TOUCHES_THE_BOARD:
+            journal.refuse_open()
         return ACTIONS[arguments.command](arguments)
     except Failure as failure:
         return report(failure)
+    except KeyboardInterrupt:
+        return report(Failure("cancelled", "cancelled by an interrupt"))
 
 
 def launch(argv):

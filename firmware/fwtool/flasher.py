@@ -42,8 +42,12 @@ def within(address, size, regions):
 
 
 def run_esptool(arguments):
-    """Starts esptool from the work folder's environment and returns its status and output."""
-    done = subprocess.run([str(paths.PYTHON), "-m", "esptool", *arguments], capture_output=True, text=True, env=env.child())
+    """Starts esptool from the work folder's environment and returns its status and output.
+
+    esptool runs in a session of its own, so that an interrupt from the keyboard reaches
+    the tool alone: the tool ends esptool when it gives up, and lets it finish a write that
+    must not be cut."""
+    done = subprocess.run([str(paths.PYTHON), "-m", "esptool", *arguments], capture_output=True, text=True, env=env.child(), start_new_session=True)
     return done.returncode, done.stdout + done.stderr
 
 
@@ -112,6 +116,22 @@ class Flasher:
         settings = DETECT_SIZE if address == BOOTLOADER.address else KEEP
         try:
             self._esptool("hard-reset" if restart else "no-reset", "verify-flash", *settings, f"{address:#x}", str(path))
+        except Failure as failure:
+            raise Failure("verify-failed", failure.detail) from None
+
+    def compare(self, files, regions, restart):
+        """Has the chip compare stretches of the flash with files, each at its address, in
+        one esptool call; the chip works out the checksum of each stretch. With `restart`
+        the board is reset once every stretch is equal; otherwise, and when one differs,
+        the chip stays in its bootloader."""
+        arguments = []
+        for address, path in files:
+            within(address, pathlib.Path(path).stat().st_size, regions)
+            arguments += [f"{address:#x}", str(path)]
+        if not arguments:
+            return
+        try:
+            self._esptool("hard-reset" if restart else "no-reset", "verify-flash", *KEEP, *arguments)
         except Failure as failure:
             raise Failure("verify-failed", failure.detail) from None
 

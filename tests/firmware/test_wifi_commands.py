@@ -7,7 +7,7 @@ from unittest import mock
 
 from littlefs.errors import LittleFSError
 
-from fwtool import Failure, board, build, cli, paths, storage, wifi
+from fwtool import Failure, board, build, cli, journal, paths, storage, wifi
 
 from . import support
 
@@ -81,7 +81,7 @@ class OnASmallLayout(unittest.TestCase):
     def kept(self):
         """The storage images the work folder keeps, by the last part of their names."""
         folder = self.work / "storage"
-        return {path.name.split("-", 1)[1]: path.read_bytes() for path in folder.iterdir()} if folder.is_dir() else {}
+        return {path.name.split("-", 1)[1]: path.read_bytes() for path in folder.glob("*.bin")} if folder.is_dir() else {}
 
     def nothing_shows_the_password(self):
         secret = PASSWORD.encode("ascii")
@@ -92,8 +92,10 @@ class OnASmallLayout(unittest.TestCase):
             self.assertFalse(any(PASSWORD in word for word in esptool.words()), "an argument of esptool")
         for path in sorted(self.work.rglob("*")):
             if path.is_file():
-                self.assertEqual(path.suffix, ".bin", path.name)
+                self.assertTrue(path.name.endswith((".bin", ".bin.part")) or path.name == journal.NAME, path.name)
                 self.assertEqual(path.parent, self.work / "storage", path.name)
+                if path.name == journal.NAME:
+                    self.assertFalse(secret in path.read_bytes())
         self.assertTrue(any(secret in content for content in self.kept().values()))
 
 
@@ -111,19 +113,19 @@ class SetWifi(OnASmallLayout):
         self.assertTrue(wifi.holds(board_now, self.settings))
         self.assertTrue(storage.show_of(board_now) == storage.show_of(self.old))
 
-    def test_it_reads_the_table_and_storage_writes_once_as_data_and_compares_the_partition(self):
+    def test_it_reads_the_table_and_storage_writes_once_as_data_and_compares_what_it_wrote(self):
         esptool = self.esptool()
         self.set_wifi(esptool)
-        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         self.assertEqual(esptool.calls[0][esptool.calls[0].index("read-flash") + 1:][:2], ["0x8000", "0xc00"])
         write = next(call for call in esptool.calls if "write-flash" in call)
         self.assertIn("--force", write)
         for address, content in esptool.wrote:
             self.assertTrue(STORAGE_AT <= address and address + len(content) <= STORAGE_AT + len(self.old), hex(address))
             self.assertEqual((address - STORAGE_AT) % support.BLOCK_SIZE, 0)
-        address, image = esptool.pairs(esptool.call("verify-flash"))[0]
-        self.assertEqual(address, "0x610000")
-        self.assertEqual(pathlib.Path(image).parent, self.work / "storage")
+        compared = esptool.pairs(esptool.call("verify-flash"))
+        self.assertEqual(compared and [address for address, _ in compared], [f"{address:#x}" for address, _ in esptool.wrote])
+        self.assertEqual({pathlib.Path(piece).parent for _, piece in compared}, {self.work / "storage"})
         self.assertTrue(storage.kept_images(len(self.old))[0].read_bytes() == self.on_the_board(esptool))
         self.assertNotIn("erase-region", esptool.words())
         self.assertNotIn("erase-flash", esptool.words())
@@ -153,7 +155,7 @@ class SetWifi(OnASmallLayout):
         result = self.set_wifi(second)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\n{REPLY}\n")
-        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "verify-flash"])
+        self.assertEqual(second.commands(), ["read-flash", "verify-flash", "chip-id"])
         self.assertEqual(second.wrote, [])
 
     def test_the_reply_is_waited_for_20_seconds_or_as_long_as_told(self):
@@ -174,15 +176,15 @@ class SetWifi(OnASmallLayout):
         self.assertTrue(wifi.holds(self.on_the_board(esptool), self.settings))
         self.assertIn("after.bin", self.kept())
 
-    def test_a_comparison_that_fails_is_verify_failed_and_the_new_image_is_not_kept(self):
+    def test_a_comparison_that_fails_needs_the_recovery_and_the_new_image_is_not_kept(self):
         esptool = self.esptool(failing_verifies=1)
         result = self.set_wifi(esptool)
         self.assertEqual(result.status, 1)
-        self.assertRegex(result.err, r"\Aerror: verify-failed: [^\n]*\n\Z")
-        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
-        last = esptool.calls[-1]
-        self.assertEqual(last[last.index("--after") + 1], "hard-reset")
+        self.assertRegex(result.err, r"\Aerror: recovery-needed: [^\n]*recover-storage\n\Z")
+        self.assertEqual(esptool.commands(), ["read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual([call[call.index("--after") + 1] for call in esptool.calls], ["no-reset"] * 4)
         self.assertEqual(sorted(self.kept()), ["before.bin"])
+        self.assertEqual(journal.read()["step"], journal.STEP_COMPARE)
 
     def test_settings_of_wled_that_are_no_object_are_refused_and_nothing_is_written(self):
         for content in (b"[]", b'{"ap":5}', b"not JSON"):
@@ -233,6 +235,7 @@ class SetWifi(OnASmallLayout):
         self.set_wifi(self.esptool(self.on_the_board(first)))
         self.set_wifi(self.esptool(failing_verifies=1), status=silent)
         self.set_wifi(self.esptool(failing_verifies=2))
+        journal.end()
         self.set_wifi(self.esptool(support.storage_image({**support.BENCH_FILES, "/wsec.json": b'"a text"'}), failing_verifies=1))
         self.assertEqual([result.status for result in self.results], [0, 0, 1, 1, 1])
         self.nothing_shows_the_password()
@@ -248,7 +251,7 @@ class InstallFirmware(OnASmallLayout):
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\n")
-        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
+        self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash", "chip-id"])
         self.checked.assert_called_once_with(build.image_path("firmware"))
         program, data = [call for call in esptool.calls if "write-flash" in call]
         self.assertEqual([(address, pathlib.Path(name).name) for address, name in esptool.pairs(program[program.index("write-flash") + 1:])], [("0x10000", "odrig-firmware.bin")])
@@ -268,7 +271,7 @@ class InstallFirmware(OnASmallLayout):
             answered.append(len(esptool.calls))
             return REPLY
         self.install(esptool, status=status)
-        self.assertEqual(answered, [3, 7])
+        self.assertEqual(answered, [3, 8])
         reads_of_storage = [number for number, call in enumerate(esptool.calls) if "read-flash" in call and "0x610000" in call]
         self.assertEqual(reads_of_storage, [4])
 
