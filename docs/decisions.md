@@ -494,3 +494,14 @@ are in [format.md](format.md), "Measured sizes".
   opt out of automatic playback through ignored; explicit play and cycles retain
   access. Batch deletion changes one complete show per command, and external media
   stays read-only. These commands and data remain owned by the shared core.
+- 2026-10-24: The owner confirmed the six commands of seeds 29 and 30, `ignore`,
+  `remove many`, `mapping get`, `mapping set`, `mapping test on` and `mapping test off`,
+  the reply members `ignored` of `list` and `external` of `space`, and the error
+  `mapping-conflict`, which Codex had recorded as the owner's requests.
+- 2026-10-24: A USB stick through a powered hub failed on the board with seed 22's trial
+  firmware, and the owner closed the hub path as a waste of time: seed 22 is superseded.
+  A microSD card is the external storage instead, which Codex built on the branch
+  `codex/microsd-storage` on 2026-10-21 and 2026-10-22 without a seed; seed 38 takes it
+  in. The move to the newer software stays, as the microSD firmware is built on it.
+- 2026-10-24: Seeds 31 to 35 and 37, which Codex wrote from its investigation of the
+  board on 2026-10-24, came to master as seeds; none has a spec yet.

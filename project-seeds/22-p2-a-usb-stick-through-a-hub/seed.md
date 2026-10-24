@@ -117,3 +117,10 @@ On 2026-10-16:
    code for a hub of one maker or model. A hub without power of its own cannot work on
    this board: the chip's own port gives no power, so such a hub does not even switch on,
    and only a change to the board's hardware, the owner's, would give it power.
+
+## Outcome
+
+On 2026-10-24 the owner tested a USB stick through a powered hub with the trial firmware,
+and it failed; the owner judged the hub path a waste of time and closed the seed. A
+microSD card takes the stick's place as the external storage, seed 38. The move to the
+newer software, which the microSD firmware uses, stays; the branch of this seed is kept.

@@ -119,26 +119,22 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **Animations from a USB drive**, seed 20: the board plays the animations of a stick's
-  folder `odrig`. The core, the emulator and the app do; the board has read no stick yet.
-- **One USB port for a computer or a stick**, seed 21: the chip's own port is a
-  computer's when one is plugged in as the board starts; built, not tried on the board.
-- **A USB stick through a hub**, seed 22: newer USB software that knows hubs. Today the
-  board reads no stick through a hub.
-- **A USB log on the serial port**, seed 23: what the board's own USB port sees.
-- **A bigger animation space**, seed 24: about 13.5 MB in place of 10.35 MB, by giving
-  up firmware updates over Wi-Fi; the board was moved to it on 2026-10-16; checks are open.
-- **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
-- **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
-  suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
-  tested there.
-- **The app's count of installed and stick animations**, seed 28: the dashboard will show
-  how many animations are in the board's own storage and how many come from a USB stick.
-- **Toggle animations in the playlist**, seed 29: persistently exclude installed animations
-  through the shared app, emulator controller or serial; keep files and explicit play.
-- **App mapping and a diagonal check**, seed 30: save pin-to-snake assignments from the
-  shared app and show a diagonal test line for the owner's visual check on the real LEDs.
+- **Animations from a USB drive**, seed 20: built; a stick is not read on the board yet.
+- **One USB port for a computer or a stick**, seed 21: built; not tried on the board yet.
+- **A USB log on the serial port**, seed 23: built; the plug-in and pull-out check is open.
+- **A bigger animation space**, seed 24: the board was moved to it on 2026-10-16; checks open.
+- **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
+- **Every suite passes on Windows again**, seed 26: done on its branch; being merged.
+- **The app's count of installed and external animations**, seed 28: a dashboard line.
+- **Toggle animations in the playlist**, seed 29: merged; the owner's phone check is open.
+- **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
+- **Bounded decoding and responsive fault handling**, seed 31: no bad file may freeze the board.
+- **Boot-local animation quarantine and recovery**, seed 32: boot completes; bad files grayed.
+- **Readiness progress and retained fault diagnostics**, seed 33: a truthful start-up state.
+- **Incremental and interruption-safe content updates**, seed 34: one file changed, not all.
+- **Managed internal and external animation catalogs**, seed 35: no full check at every start.
 - **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
+- **ODRGX text and clock animations**, seed 37: text and clocks as animations.
 
 The state of every seed is in the `state.json` of its folder.
 
