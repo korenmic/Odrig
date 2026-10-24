@@ -27,6 +27,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
+| `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
 | `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
@@ -391,6 +392,34 @@ ignored items. Its `external` object contains boolean `present`, `read_only:true
 nullable `free` and `total` byte counts. Absent media reports false/null/null. Mounted
 media with unknown capacity reports true/null/null. Known counters support volumes
 over 4 GiB, up to 9,007,199,254,740,991 bytes. Capacity never grants write access to a drive.
+
+## Catalogs
+
+```
+catalog
+{"ok":true,"internal":{"state":"ok","generation":42,"entries":84,"uncataloged":0},"external":{"state":"absent"},"rebuild":null}
+```
+
+**`catalog`** reports the catalog of each storage, as [catalog.md](catalog.md) states it:
+`internal` of the board's own storage, `external` of the drive.
+
+- `state`: `none` (the storage has no catalog and is read as before catalogs), `ok`,
+  `loading` (a drive's catalog being read), `damaged`, `incompatible` (another version of
+  the format or the check), or `absent` (no drive is plugged in). A damaged one has
+  `detail`: `marker`, `page`, `line` or `interrupted`.
+- `generation` and `entries`: those of a catalog that is `ok` or `loading`.
+- `uncataloged`: the files of the show whose size and length did not come from the
+  catalog; the start opens them and the check after the start reads them, as without a
+  catalog.
+- `writable`: whether the core may write the drive, when one is plugged in.
+- `rebuild`: `null` while no rebuild runs.
+
+At the start the core reads the internal catalog. Every file of the show that it has an
+entry for has its size in `list` at once and is neither opened nor read by the check after
+the start; an entry for another canvas than the mapping's makes its file unavailable with
+`size-mismatch`. A damaged or incompatible catalog is logged (`catalog internal damaged`,
+`catalog internal incompatible`) and its storage is read as without one. A change of the
+catalog that a cut interrupted after its commit is finished first.
 
 ## The saved playlist order
 

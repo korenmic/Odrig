@@ -66,12 +66,10 @@ class TheStart(unittest.TestCase):
     def test_the_marker_is_409_bytes(self):
         self.assertEqual(len(catalog(ANIMATIONS)["catalog.txt"]), 409)
 
-    @unittest.expectedFailure
     def test_a_start_with_a_catalog_of_every_file_opens_none_of_them(self):
         run = support.start({**SHOW, **catalog(ANIMATIONS)}, asked(0, "status"), ["--trace-files"], check_first=False)
         self.assertEqual([name for name, _ in run.opened if name.endswith(".odrg")], [])
 
-    @unittest.expectedFailure
     def test_a_start_with_a_catalog_of_every_file_lists_every_size_at_once(self):
         run = support.start({**SHOW, **catalog(ANIMATIONS)}, asked(0, "list"), check_first=False)
         self.assertEqual([item["bytes"] for item in replies(run)[0]["items"]], [len(data) for data in ANIMATIONS.values()])

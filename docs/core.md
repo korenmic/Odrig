@@ -727,7 +727,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,688 |
+| The core object | fixed | 3,704 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -744,17 +744,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,221** |
+| **Total** | | **125,237** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,698 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,714 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,425 bytes for the target file. A host with a drive
-is asked for two blocks more, after the three of the check: the drive's table, 16 bytes
-for each of 256 places, 4,096 bytes, and the boot's memory of 16 files of drives left
+of the check and the saved order: 77,441 bytes for the target file. A host with a drive
+is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
+for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 130,725 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 129,717 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

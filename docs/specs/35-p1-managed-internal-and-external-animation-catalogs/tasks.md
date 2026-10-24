@@ -40,7 +40,7 @@ Rules for every task:
   - `docs/catalog.md`: the format, the commit, the recovery, the costs.
   - Prove it fails first: the tests on a library without `odrig/catalog.py`.
 
-- [ ] 3. The core: room, and the internal catalog at the start
+- [x] 3. The core: room, and the internal catalog at the start
   - `DriveEntry.total_ms` in 32 bits; `CatalogState`; `kCheckedFromCatalog`;
     `core/src/catalog.h/.cpp`: the marker, the pages, `catalog_finish`,
     `catalog_read_internal`; the start opens and checks only uncataloged files; the

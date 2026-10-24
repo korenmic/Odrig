@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "catalog.h"
 #include "crc32.h"
 #include "core_state.h"
 #include "mapping.h"
@@ -323,7 +324,7 @@ void drive_step(Core &core) {
             return;
         }
         entry.bytes = core.checker->file.taken;
-        entry.total_ms = core.check_total_ms;
+        entry.total_ms = drive_length(core.check_total_ms);
         entry.type = core.check_content.type;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, place);
@@ -338,6 +339,9 @@ void drive_step(Core &core) {
 }
 
 void start(Core &core) {
+    // A change of the catalog that was committed is finished before the parts of a change
+    // are cleared away: its upload's part may be the file it puts in place.
+    catalog_finish_internal(core);
     storage_clear_parts(core);
 
     core.line = static_cast<char *>(arena_take(core, ODRIG_LINE_MAX + 1));
@@ -398,12 +402,17 @@ void start(Core &core) {
     // The files are opened in the order in which the show first names them. Their bodies
     // are read while the show plays, by the second decoders. A host whose storage cannot
     // be changed has none: for it every file is read to its end here. A file that cannot
-    // be used is quarantined, and the others are opened as ever.
+    // be used is quarantined, and the others are opened as ever. A file the catalog has an
+    // entry for is neither opened nor read.
     for (uint32_t index = 0; index < core.file_count; ++index) {
         core.files[index].fault = kNone;
         core.files[index].checked = 0;
     }
+    catalog_read_internal(core);
     for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
+        if (core.files[index].checked != 0 || core.files[index].fault != kNone) {
+            continue;
+        }
         if (core.checker == nullptr) {
             check_file(core, index);
         } else {

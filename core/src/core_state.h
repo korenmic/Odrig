@@ -44,8 +44,11 @@ struct ItemInfo {
 // length, the sum of the durations of its frames, and 0 while it is not known: a check
 // finds it, and so does playing the file through once. `fault` is the Reason of a fault of
 // the file in this boot, kNone while it is usable: a file with a fault is quarantined, and
-// its animations are unavailable until an upload replaces it. `checked` says that a check
-// has read it whole in this boot, so that its `bytes` are known.
+// its animations are unavailable until an upload replaces it. `checked` says that its
+// `bytes` are known: kCheckedRead when a check has read it whole in this boot,
+// kCheckedFromCatalog when they came from the storage's catalog.
+const uint8_t kCheckedRead = 1;
+const uint8_t kCheckedFromCatalog = 2;
 struct FileInfo {
     char name[33];
     uint8_t fault;
@@ -127,9 +130,10 @@ struct Upload {
 
 // What the core knows of the file at one place of a drive's list: its size, its length and
 // its type once the check has read it whole, the id it got when the drive was taken up, its
-// state, and the Reason it was left out for. The state and the type share a byte.
+// state, and the Reason it was left out for. The state and the type share a byte. A length
+// of 4,294,967,295 ms or more is kept as 4,294,967,295.
 struct DriveEntry {
-    uint64_t total_ms;
+    uint32_t total_ms;
     uint32_t bytes;
     uint16_t id;
     uint8_t state : 4;
@@ -177,6 +181,37 @@ struct OrderReader {
     uint8_t header;     // 0 while no line was read, 1 after the header, 2 after anything else
     uint8_t over;
     char line[kOrderLineRoom];
+};
+
+// A length as the drive's table keeps it.
+inline uint32_t drive_length(uint64_t total_ms) {
+    return total_ms < 0xFFFFFFFFu ? static_cast<uint32_t>(total_ms) : 0xFFFFFFFFu;
+}
+
+// The states of a storage's catalog: it has none; it is read and usable; it is being read;
+// it cannot be read; its version is another; there is no such storage now.
+const uint8_t kCatalogNone = 0;
+const uint8_t kCatalogOk = 1;
+const uint8_t kCatalogLoading = 2;
+const uint8_t kCatalogDamaged = 3;
+const uint8_t kCatalogIncompatible = 4;
+const uint8_t kCatalogAbsent = 5;
+// Where a damaged catalog is damaged.
+const uint8_t kDamagedMarker = 1;
+const uint8_t kDamagedPage = 2;
+const uint8_t kDamagedLine = 3;
+const uint8_t kDamagedInterrupted = 4;
+// The catalogs of the core: of the internal storage, and of the drive.
+const uint32_t kInternal = 0;
+const uint32_t kExternal = 1;
+
+// What the core knows of a storage's catalog: its state, where it is damaged, and of one
+// that is read its generation and its number of entries.
+struct CatalogState {
+    uint32_t generation;
+    uint16_t entries;
+    uint8_t state;
+    uint8_t detail;
 };
 
 // Whether a position of the playlist is a drive's file.
@@ -352,6 +387,9 @@ struct Core {
 
     // The latest fault of a file, kept for reporting.
     FaultContext fault;
+
+    // The catalogs of the internal storage and of the drive.
+    CatalogState catalogs[2];
 };
 
 // Keeps the context of a file's fault, in place of the one before.

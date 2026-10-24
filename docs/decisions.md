@@ -635,3 +635,11 @@ are in [format.md](format.md), "Measured sizes".
   edits only the board's own. The firmware grew by 19,760 bytes, the core asks for 16
   bytes more. The board session and the owner's look are open, and seed 35's catalogs
   take the type when the branches are combined.
+- 2026-10-25: Seed 35: each storage of animations has a catalog, in one text format that the
+  core and the PC library `odrig.catalog` both read and write (`docs/catalog.md`): a marker
+  of 409 bytes and 16 pages of entries by the name's hash, changed through a commit record
+  that a start finishes after a cut. At its start the core takes the size and the length of
+  every installed file its catalog names, without opening the file; a storage without a
+  catalog, or with one that cannot be read, is read as before. To make room, the drive's
+  table keeps a file's length in 32 bits. New command `catalog`, approved in advance by the
+  owner.

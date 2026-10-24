@@ -632,7 +632,7 @@ private:
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
     // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
-    // file or one of the eight fixed names.
+    // file or one of the fixed names: the files of the show, of changes and of the catalog.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
@@ -646,9 +646,13 @@ private:
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
         const bool animation = (given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0) ||
                                (given.size() >= 6 && given.compare(given.size() - 6, 6, ".odrgx") == 0);
+        const bool page = given.size() == 14 && given.compare(0, 8, "catalog-") == 0 && given[8] >= '0' && given[8] <= '1' &&
+                          given[9] >= '0' && given[9] <= '9' && (given[8] == '0' || given[9] <= '5') &&
+                          (given.compare(10, 4, ".txt") == 0 || given.compare(10, 4, ".new") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
-                           given == "order.txt" || given == "order.part";
+                           given == "order.txt" || given == "order.part" || given == "catalog.txt" ||
+                           given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }

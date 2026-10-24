@@ -1,5 +1,7 @@
 #include "commands.h"
 
+#include "catalog.h"
+
 #include "content.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
@@ -347,6 +349,12 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return mapping_set(core, revision, words.text[3], words.size[3], reply);
         }
         return refuse(reply, "bad-argument");
+    }
+    if (words.is(0, "catalog")) {
+        if (words.count != 1) {
+            return refuse(reply, "bad-argument");
+        }
+        return catalog_reply(core, reply);
     }
     if (words.is(0, "status")) {
         if (words.count != 1) {
