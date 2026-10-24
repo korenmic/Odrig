@@ -14,7 +14,10 @@ plugged in, the line of the stick is not shown.
 
 - Seed 09, for the operators' app.
 - Seed 20, for the animations of a USB drive and their ids.
-- Seed 22, for a stick through a hub, which this count makes visible at a glance.
+- Seed 29, for `external` in the reply to `space` and the dashboard's line of the external
+  storage's capacity.
+- Seed 38, for the microSD card, which is the external storage since seed 22 was
+  superseded.
 
 ## Product Context
 
@@ -34,6 +37,11 @@ What the app already gets, without a new command:
 
 The difference between the animation items of `list` and `animations` of `space` is the
 number of the stick's animations.
+
+Since then, seed 29 put `external` into the reply to `space`, with `present`, which tells a
+plugged-in medium from none, and a line of the external storage's capacity on the
+dashboard; and seed 38 made a microSD card the external storage in place of the stick. The
+numbers are the same for a card and a stick: the player treats both as its drive.
 
 ## Technical Constraints
 

@@ -8930,3 +8930,35 @@ the authority for every mutation and capacity fact.
 
 **Resolution.** `app/www/commands.js`, the Show and Storage screens, and
 `docs/android-app.md` describe and implement this compatibility behavior.
+
+## Seed 28: where the two numbers stand
+
+**Question.** The seed asks for a line of its own for the external number, hidden when no
+medium is plugged in, but seed 29 has since put a line of the external storage's capacity
+on the same dashboard, which says `absent` when there is none. Two lines about one medium?
+
+**Answer.** One line each, the lines seed 29 made: the number goes before the capacity,
+`Internal storage: 84 animations, free …` and `External storage: 12 animations, free …`.
+While the medium is absent, the external line says `absent` with no number and no label
+of a number, which is what the owner asked for on 2026-10-16: the label or the value is
+missing. A present medium without animations says `0 animations`, as the owner answered.
+The storage screen's lines are made by the same code and say the same words.
+
+**Resolution.** `docs/specs/28-p2-the-apps-count-of-installed-and-stick-animations/`,
+Requirements 1 and 2; `app/www/capacity.js`.
+
+## Seed 28: numbers that cannot be known
+
+**Question.** While the board reads its animations after a start, `list` answers `busy`;
+while the show is invalid, `space` reports 0 animations and `list` is refused. What do the
+lines say then?
+
+**Answer.** The internal number comes from `space`, which answers from the start; while
+the newest status reports an invalid show it says `animations not known`, as 0 would be
+wrong. The external number needs a complete list: while the newest list request was
+answered `busy`, before the first list, and when the difference of the list and `space`
+falls below 0 for a moment between their two replies, it says `animations not known yet`.
+When a later seed marks each item's storage in `list`, the app counts by that mark in
+place of the difference; the ids are never used.
+
+**Resolution.** Requirements 3 and 4 of the spec; `app/www/client.js`, `state.listBusy`.
