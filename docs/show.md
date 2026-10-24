@@ -44,7 +44,7 @@ two kinds, with the members of its kind and no other:
 
 | Kind | Members | Meaning |
 |---|---|---|
-| Animation | `id`, `file`, and optionally `repeat` and `max_seconds` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
+| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
 | Cycle | `id`, `cycle`, `seconds` | `cycle` is a list of one or more ids of animation items. `seconds` is how long each one is shown, 1 to 65,535. |
 
 Example: two animations, and a cycle that alternates them every 15 seconds and starts at
@@ -65,7 +65,7 @@ power-on.
 
 ## The playlist
 
-The playlist is every animation item of the show, in the order of `show.json`, and after
+The playlist is every included animation item of the show, in the order of `show.json`, and after
 them the animations of a USB drive when one is plugged in, see [animations from a USB
 drive](#animations-from-a-usb-drive). It is what a show plays by itself: each animation has its turn, then the next one, and after the
 last the first again, without end. A show with one animation plays it turn after turn. A
@@ -200,3 +200,13 @@ is invalid in more than one way, the first in this order is reported: the mappin
 format of `show.json`, an id used twice, an id that does not exist, a cycle that names a
 cycle, and then the listed files in the order `show.json` names them. The ids are checked
 over the items in file order.
+
+## Playlist inclusion
+
+An animation item can contain `"ignored":true` to exclude it from automatic playback.
+The optional member is a strict boolean; absent means false, and cycles reject it.
+The converter preserves the original show bytes, including explicit false. Shows
+using this member require the updated player and converter; older readers may reject it.
+Manual play still plays one normal turn and cycles retain every explicitly named member.
+All ignored with no external animations leaves a valid, idle black show. An ignored
+startup item is skipped forward to the next included animation, wrapping if necessary.

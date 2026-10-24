@@ -3,5 +3,6 @@
   "appName": "odrig",
   "webDir": "../build/app/www",
   "android": {"minWebViewVersion": 80, "backgroundColor": "#000000"},
-  "server": {"errorPath": "old.html"}
+  "server": {"errorPath": "old.html"},
+  "plugins": {"SystemBars": {"insetsHandling": "css", "style": "DARK", "initialViewportFitValueHint": "cover"}}
 }

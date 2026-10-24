@@ -24,6 +24,7 @@
 
   var hello = null;
   var mapping = null;
+  var mappingRequest = 0;
   var drawing = null;
   var newest = null;
   var waiting = false;
@@ -131,17 +132,29 @@
       build();
       return;
     }
+    readMapping();
+  }
+
+  function readMapping() {
+    var request = ++mappingRequest;
     fetch("show/mapping.json", {cache: "no-store"}).then(function (answer) {
       if (!answer.ok) {
         throw new Error("status " + answer.status);
       }
       return answer.text();
     }).then(function (text) {
+      if (request !== mappingRequest) return;
       mapping = OdrigLayout.read(text);
       build();
     }).catch(function (error) {
-      say("The mapping file of the show could not be read: " + error.message);
+      if (request === mappingRequest) say("The mapping file of the show could not be read: " + error.message);
     });
+  }
+
+  function onMapping(event) {
+    if (!hello) return;
+    hello.legs = JSON.parse(event.data);
+    readMapping();
   }
 
   function onStatus(event) {
@@ -298,6 +311,7 @@
     link.textContent = "not connected";
   };
   source.addEventListener("hello", onHello);
+  source.addEventListener("mapping", onMapping);
   source.addEventListener("status", onStatus);
   source.addEventListener("log", onLog);
   source.addEventListener("frame", onFrame);

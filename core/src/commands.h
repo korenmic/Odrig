@@ -116,8 +116,8 @@ struct Reply {
         }
     }
 
-    void number(uint32_t value) {
-        char digits[10];
+    void number(uint64_t value) {
+        char digits[20];
         uint32_t count = 0;
         do {
             digits[count++] = static_cast<char>('0' + value % 10);

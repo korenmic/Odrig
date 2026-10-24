@@ -39,7 +39,7 @@ class CoreDocument(unittest.TestCase):
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
-        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name"])
+        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space"])
         self.assertEqual(members["odrig_leg"], ["leg", "pin", "led_count", "rgb"])
         for struct, names in members.items():
             self.assertTrue(struct in self.named, struct)
@@ -119,7 +119,7 @@ class CoreDocument(unittest.TestCase):
 class CommandsDocument(unittest.TestCase):
     """docs/commands.md against the core's command front-end."""
 
-    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "in-use", "no-space", "bad-offset",
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "in-use", "mapping-conflict", "no-space", "bad-offset",
              "bad-file", "storage-error"]
 
     @classmethod
@@ -141,10 +141,10 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "upload begin <id> <file> <bytes>",
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
-        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel"})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many"})
 
     def test_its_limits_are_the_cores(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
@@ -217,7 +217,7 @@ class Decisions(unittest.TestCase):
     def test_the_commands_section_lists_what_the_front_end_reads(self):
         text = (support.ROOT / "docs" / "decisions.md").read_text(encoding="utf-8")
         commands = " ".join(text.split("\n## Commands\n")[1].split("\n## ")[0].split())
-        for expected in ("play an item by its ID", "play the playlist", "A show plays all its animations in turn by itself", "switch on", "switch off", "set brightness", "report status", "report the free storage", "list what is installed",
+        for expected in ("play an item by its ID", "play the playlist", "A show plays its included animations in turn by itself", "switch on", "switch off", "set brightness", "report status", "report the free storage", "list what is installed",
                          "remove an item", "upload an animation", "2,048 characters", "1,024 bytes", "the owner approves every addition"):
             self.assertIn(expected, commands)
         log = text.split("\n## Change log\n")[1]

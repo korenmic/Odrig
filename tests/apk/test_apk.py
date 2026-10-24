@@ -88,6 +88,11 @@ class TheApk(unittest.TestCase):
         self.assertNotIn("allowMixedContent", json.dumps(config))
         self.assertEqual(json.loads(self.packed.read("assets/capacitor.plugins.json")), [])
 
+    def test_capacitor_gives_the_page_the_room_of_the_bars_with_light_icons(self):
+        config = json.loads(self.packed.read("assets/capacitor.config.json"))
+        self.assertEqual(config["plugins"]["SystemBars"], {"insetsHandling": "css", "style": "DARK", "initialViewportFitValueHint": "cover"})
+        self.assertEqual(config["android"]["backgroundColor"], "#000000")
+
     def test_the_sender_and_the_activity_are_in_it(self):
         code = b"".join(self.packed.read(name) for name in self.names if re.fullmatch(r"classes[0-9]*\.dex", name))
         for name in ("MainActivity", "TargetPlugin"):

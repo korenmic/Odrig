@@ -44,6 +44,8 @@ The list was first written on 2026-10-15.
 | 16 | A stick is read without soldering: through a powered hub, or through an adapter with a power socket. | Not done | Owner, 2026-10-14 and 2026-10-15. | A hub needs seed 22. An OTG adapter with a power socket and only one USB-A socket needs no new seed; it has not been tried: seed 20, task 4. |
 | 17 | The limit of the LED current is a setting that the tool writes into the board's storage. | Done | Seed 15 (`940193e` to `33bb109`). | Seed 15, task 4 (`ac55a59`): the limiter on the board. |
 | 18 | A second firmware without WLED, as a fallback for the event, with everything the WLED-based firmware adds to WLED, as [firmware-additions.md](firmware-additions.md) lists it. | In part | Owner: seed 12; everything the WLED-based firmware has, the owner on 2026-10-16. Seed 12 (`d1816d8` to `cbc96c2`). | Seed 12, tasks 1 to 5: a bare program on the board with the outputs, the storage and the port; the sources both firmwares share; the stored settings; the limiter; the outputs. Open: tasks 6 to 12. |
+| 19 | Remap the twenty existing data pins among the twenty three-column snakes from the shared app or command routes, save atomically, and show a packaged diagonal without uploading an animation. | In part | Seed 30, [spec](specs/30-p1-app-mapping-and-diagonal-check/requirements.md), side branch `codex/app-mapping-diagonal` (`edb9308`, `94233bf`, `e462494`). | Shared core, live WLED routing and shared app built and tested without the board. The fallback output adapter supports pin-based routing; its full player still belongs to seed 12. Seed 30 task 5, board/phone and real diagonal acceptance, is open. |
+| 20 | Persistently include or ignore installed animations, select and delete several through the shared app, and report internal and external free space after boot or mutations. | In part | Seed 29, [spec](specs/29-p1-toggle-animations-in-the-playlist/requirements.md), combined branch `codex/seeds-29-30-playlist-storage-mapping`. | Core, all routes and shared app verified without a board; phone and board acceptance remain open under the no-flash instruction. External storage stays read-only. |
 
 ## Rules for work on the board
 
@@ -72,6 +74,9 @@ the firmware keeps them.
 | 19, previewing one animation | Task 3, the owner looks at one animation. | No: the emulator |
 | 20, animations from a USB drive | Task 4, the trial with an adapter that gives the stick power; the rest of task 5, the rate and the board's tests with a stick; task 6, the owner's look. | Yes |
 | 25, no text menu outside the app's fields | Task 3, the owner's check on a phone. | No: the app |
+| 27, the app clear of the phone's bars | Task 3, the owner's check on a phone. | No: the app |
+| 29, playlist and storage management | Task 6: phone controls, persistent inclusion, deletion and storage capacity on the board; no flashing in this run. | Yes, and app |
+| 30, app mapping and diagonal check | Task 5: approved later flash, phone controls, continuous real diagonal and persistence after restart. No flashing in this run. | Yes, and app |
 
 ## Seeds not begun
 
@@ -88,3 +93,5 @@ Their folders are in `project-seeds/`; none has a spec yet.
 
 Without a seed, an OTG adapter with a power socket and only one USB-A socket would let the
 firmware as it is read a stick: the owner buys one, and seed 20's task 4 tries it.
+
+Capacity queries use the pinned MSC VFS adapter and FatFs headers already supplied by the build. No new SDK, wiring, storage layout or board action is required.

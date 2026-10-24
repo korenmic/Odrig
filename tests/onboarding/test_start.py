@@ -29,6 +29,7 @@ SUITES = {
     "onboarding": (".venv/bin/python -m unittest discover -s tests/onboarding -t .", True),
     "firmware": ("python3 firmware/fw.py test", False),
     "app": ("python3 -m unittest discover -s tests/app -t .", False),
+    "mapping": ("python3 -m unittest discover -s tests/mapping -t .", False),
     "apk": ("python3 -m unittest discover -s tests/apk -t .", False),
     "walkthrough": (".venv/bin/python -m unittest discover -s tests/walkthrough -t .", False),
     "board": ("python3 firmware/fw.py test-board", False),

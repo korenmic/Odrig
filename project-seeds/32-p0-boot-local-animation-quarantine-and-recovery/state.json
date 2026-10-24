@@ -1,0 +1,10 @@
+{
+  "number": 32,
+  "slug": "32-p0-boot-local-animation-quarantine-and-recovery",
+  "state": "remaining",
+  "title": "Boot-local animation quarantine and recovery",
+  "priority": "P0",
+  "addedAt": "2026-10-24T05:39:38+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Complete boot despite bad animations, retain them as grayed-out unavailable list entries, skip unchanged failed content for the current boot, and keep healthy playback and safe repair available without deleting evidence."
+}

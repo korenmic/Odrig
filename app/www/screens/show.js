@@ -1,6 +1,9 @@
 // The show screen: what the installation does, its controls, and the animations it has.
 
 import * as client from "../client.js";
+import * as capacity from "../capacity.js";
+import {Refusal} from "../commands.js";
+import {Failure} from "../target.js";
 import * as messages from "../messages.js";
 
 // The shortest time between two brightness commands while the slider is moved.
@@ -14,6 +17,8 @@ let held = false;
 let sentValue = null;
 let sentAt = -Infinity;
 let waiting = null;
+const pending = new Map();
+let message = () => {};
 
 function byId(id) {
   return document.getElementById(id);
@@ -46,36 +51,70 @@ function now(status, animations) {
 }
 
 function row(animation) {
-  const made = document.createElement("button");
-  made.type = "button";
+  const made = document.createElement("div");
   made.dataset.id = String(animation.id);
   made.dataset.file = animation.file;
-  const id = document.createElement("span");
-  id.className = "id";
-  id.textContent = String(animation.id);
-  const file = document.createElement("span");
-  file.className = "file";
-  file.textContent = animation.file;
-  made.append(id, " ", file);
-  made.addEventListener("click", () => client.play(animation.id));
+  made.dataset.editable = String(typeof animation.ignored === "boolean");
+  const play = document.createElement("button");
+  play.type = "button";
+  play.dataset.id = String(animation.id);
+  play.textContent = `${animation.id} ${animation.file}`;
+  play.addEventListener("click", () => client.play(animation.id));
+  made.append(play);
+  if (typeof animation.ignored === "boolean") {
+    const label = document.createElement("label");
+    label.className = "check";
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    const words = document.createElement("span");
+    label.append(check, words);
+    made.append(label);
+    check.addEventListener("change", async () => {
+      const ignored = !check.checked;
+      const version = client.targetVersion();
+      pending.set(animation.id, version);
+      draw(client.state);
+      try {
+        await client.ignore(animation.id, ignored);
+      } catch (error) {
+        if (version === client.targetVersion()) {
+          if (error instanceof Refusal) message(messages.ofRefusal(error));
+          else if (error instanceof Failure) message(messages.ofFailure(error));
+        }
+      } finally {
+        if (pending.get(animation.id) === version) pending.delete(animation.id);
+        draw(client.state);
+      }
+    });
+  }
   return made;
 }
 
-// Shows the animations as one button each. The buttons are made again only when the
-// list is another one, so that a press is never lost to a status that arrives.
 function drawRows(animations, onTheLeds) {
   const place = byId("animations");
   const shown = [...place.children];
-  const same = shown.length === animations.length && shown.every((button, at) => button.dataset.id === String(animations[at].id) && button.dataset.file === animations[at].file);
-  if (!same) {
+  if (shown.length !== animations.length || shown.some((made, at) =>
+      made.dataset.id !== String(animations[at].id) || made.dataset.file !== animations[at].file ||
+      made.dataset.editable !== String(typeof animations[at].ignored === "boolean"))) {
     place.replaceChildren(...animations.map(row));
   }
-  for (const button of place.children) {
-    button.setAttribute("aria-current", String(button.dataset.id === String(onTheLeds)));
-  }
+  [...place.children].forEach((made, at) => {
+    const animation = animations[at];
+    const current = animation.id === onTheLeds;
+    made.setAttribute("aria-current", String(current));
+    made.querySelector("button").setAttribute("aria-current", String(current));
+    const check = made.querySelector("input");
+    if (check) {
+      check.checked = !animation.ignored;
+      check.disabled = pending.get(animation.id) === client.targetVersion() || client.contentBusy() || client.state.link !== "answers";
+      made.querySelector("label span").textContent = `Include in playlist: ${animation.ignored ? "Ignored" : "Included"}`;
+    }
+  });
 }
 
 function draw(state) {
+  byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space)}`;
+  byId("show-external-space").textContent = capacity.external(state.space);
   const status = state.status;
   if (status === null) {
     for (const id of ["power", "brightness", "playing", "fps"]) {
@@ -104,6 +143,8 @@ function draw(state) {
 
   const silent = state.link === "no-answer";
   byId("state").classList.toggle("stale", silent);
+  byId("show-space").classList.toggle("stale", silent);
+  byId("show-external-space").classList.toggle("stale", silent);
   byId("animations").classList.toggle("stale", silent);
   say("silent", silent ? messages.ofSilence(Math.floor((Date.now() - (state.heardAt === null ? state.since : state.heardAt)) / 1000)) : null);
   say("silent-why", silent ? messages.ofFailure(state.failure) : null);
@@ -129,7 +170,8 @@ function sendLevel() {
 
 // Starts the screen. While the target does not answer, the line that says for how long
 // is written again every second.
-export function start() {
+export function start(options) {
+  message = options.message;
   byId("on").addEventListener("click", () => client.switchOn());
   byId("off").addEventListener("click", () => client.switchOff());
   byId("play-all").addEventListener("click", () => client.playAll());

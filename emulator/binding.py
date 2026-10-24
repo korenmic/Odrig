@@ -38,6 +38,7 @@ SPACE = CFUNCTYPE(c_int, c_void_p, POINTER(c_uint32), POINTER(c_uint32))
 READ_AT = CFUNCTYPE(c_int32, c_void_p, c_char_p, c_uint32, POINTER(c_uint8), c_size_t)
 DRIVE = CFUNCTYPE(c_uint32, c_void_p)
 DRIVE_NAME = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, POINTER(c_char), c_size_t)
+DRIVE_SPACE = CFUNCTYPE(c_int, c_void_p, c_uint32, POINTER(c_uint64), POINTER(c_uint64))
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -47,7 +48,7 @@ class HostRecord(Structure):
     _fields_ = [
         ("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG),
         ("write_open", WRITE_OPEN), ("write", WRITE), ("write_close", WRITE_CLOSE), ("rename", RENAME), ("remove", REMOVE),
-        ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME),
+        ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME), ("drive_space", DRIVE_SPACE),
     ]
 
 
@@ -120,12 +121,17 @@ class Core:
             self._functions += (DRIVE(self._drive), DRIVE_NAME(self._drive_name))
         else:
             self._functions += (DRIVE(), DRIVE_NAME())
+        self._functions += (DRIVE_SPACE(self._drive_space) if hasattr(host, "drive_space") else DRIVE_SPACE(),)
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
         self._core = self._library.odrig_core_begin(ctypes.byref(self._record))
         if not self._core:
             raise failure.Failure(failure.CORE_NOT_BUILT, "the core could not start")
+        self._refresh_legs()
+
+    def _refresh_legs(self):
+        """Read current routing while retaining the core's logical frame order."""
         legs = []
         self._rgb = []
         for index in range(self._library.odrig_core_leg_count(self._core)):
@@ -189,6 +195,13 @@ class Core:
     def _drive(self, _ctx):
         return self._host.drive_number()
 
+    def _drive_space(self, _ctx, generation, free_bytes, total_bytes):
+        told = self._host.drive_space(generation)
+        if told is None or any(type(value) is not int or value < 0 or value > 2**64 - 1 for value in told):
+            return -1
+        free_bytes[0], total_bytes[0] = told
+        return 1
+
     def _drive_name(self, _ctx, drive, place, buffer, capacity):
         name = self._host.drive_name(drive, place)
         if name is None or capacity == 0:
@@ -213,7 +226,10 @@ class Core:
     def command(self, now_ms, line):
         """One command line in, its reply out, with the reply's newline."""
         length = self._library.odrig_core_command(self._core, now_ms, line, len(line), self._reply, REPLY_MAX)
-        return self._reply.raw[:length]
+        reply = self._reply.raw[:length]
+        if line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true'):
+            self._refresh_legs()
+        return reply
 
     def feed(self, now_ms, data):
         """Bytes of a transport. Returns `(line, reply, cut)` for every line they finish:
@@ -222,6 +238,8 @@ class Core:
         self._answered = []
         self._library.odrig_core_feed(self._core, now_ms, data, len(data), self._on_reply, None)
         answered, self._answered = self._answered, []
+        if any(line.startswith(b"mapping set ") and reply.startswith(b'{"ok":true') for line, reply, _ in answered):
+            self._refresh_legs()
         return answered
 
     def error(self):

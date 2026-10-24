@@ -14,6 +14,7 @@
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
+#include "odrig_routing.h"
 #include "odrig_log.h"
 #include "odrig_serial.h"
 #include "odrig_uart.h"
@@ -36,6 +37,8 @@ struct Locked {
   ~Locked() { xSemaphoreGive(lock); }
 };
 
+void syncLegs();
+
 struct Reply {
   char *text;
   size_t capacity;
@@ -56,6 +59,7 @@ size_t feedBytes(const uint8_t *bytes, size_t length, char *reply, size_t capaci
   Reply kept = {reply, capacity, 0};
   Locked held;
   odrig_core_feed(core, OdrigFiles::nowMs(), bytes, length, keepReply, &kept);
+  syncLegs();
   return kept.length;
 }
 
@@ -66,12 +70,13 @@ size_t commandLine(const char *line, size_t length, char *reply, size_t capacity
   if (core == nullptr) return 0;
   while (OdrigFiles::holding()) delay(1);
   Locked held;
-  return odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity);
+  const size_t answered = odrig_core_command(core, OdrigFiles::nowMs(), line, length, reply, capacity);
+  syncLegs();
+  return answered;
 }
 
-// The legs as the core lists them, for the outputs. They are read once, after the core's
-// start: the mapping does not change afterwards, and the LED data of a leg stays where it
-// is. So the loop needs no call to the core, and no lock, to know them.
+// Physical output resources remain fixed. The cached RGB pointers follow the
+// logical leg currently assigned to each pin, under the core lock.
 OdrigLeg *legs = nullptr;
 uint32_t legsRead = 0;
 
@@ -99,6 +104,16 @@ bool legAt(uint32_t index, OdrigLeg *out) {
   if (index >= legsRead) return false;
   *out = legs[index];
   return true;
+}
+
+// Called with the core lock held, including for a complete refresh copy.
+void syncLegs() {
+  for (uint32_t i = 0; i < legsRead; i++) {
+    odrig_leg leg;
+    if (!OdrigRouting::onPin(core, legs[i].pin, &leg)) continue;
+    legs[i].leg = leg.leg;
+    legs[i].rgb = leg.rgb;
+  }
 }
 
 // Asks the core for a refresh. The timestamp is read after the lock is taken.
@@ -210,6 +225,9 @@ class OdrigUsermod : public Usermod {
     // counts reaches the outputs, and neither decoding nor the copy waits for the LEDs.
     if (!refreshFilled) {
       if (!refreshReady) return;
+      {
+        Locked held;
+        syncLegs();
 #ifdef ODRIG_PROBE
       OdrigProbe::beforeFill();
       const int64_t fillStart = esp_timer_get_time();
@@ -218,6 +236,7 @@ class OdrigUsermod : public Usermod {
 #else
       OdrigLeds::fill();
 #endif
+      }
       refreshFilled = true;
       refreshReady = false;
       xTaskNotifyGive(requester);

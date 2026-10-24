@@ -469,3 +469,6 @@ browser other than Chrome. Of `import`, three things are not verified: a video w
 rotation recorded for display, a video from a real camera or phone, and the decoder
 program that `ffmpeg-static` fetches for any other system or processor, for which
 `converter/ffmpeg.sha256` has no line.
+
+The show reader accepts optional boolean `ignored` on animations; packing preserves
+its original bytes. It affects automatic playback only. See [show.md](show.md).

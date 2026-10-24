@@ -187,3 +187,6 @@ package, is [converter.md](converter.md), "Tests".
 A picture is `bytes` of 3 * W * H: red, green and blue for each pixel in the pixel order of
 [format.md](format.md), the bottom row first. A refused input raises
 `odrig.errors.Rejection`, which carries the `reason` and the `detail`.
+
+`show.Item.ignored` is `None` when absent, otherwise the strict boolean supplied by
+the show. Cycles reject this member. Packing remains the JavaScript converter's job.

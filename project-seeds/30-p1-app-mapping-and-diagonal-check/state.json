@@ -1,0 +1,10 @@
+{
+  "number": 30,
+  "slug": "30-p1-app-mapping-and-diagonal-check",
+  "state": "in_progress",
+  "title": "App mapping and a diagonal check",
+  "priority": "P1",
+  "addedAt": "2026-10-23T18:51:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Edit and persist the assignment of twenty existing ESP32-S3 output pins to the twenty three-strip snakes from the shared Android and emulator app, with a built-in diagonal animation for visual confirmation on the real LEDs."
+}

@@ -6,6 +6,13 @@
   --marked: #ffb000;
   --button: #1c1c1c;
   --edge: #5a5a5a;
+  /* The room of the phone's bars and of its camera's cut-out at each side: as the app's
+     Android shell sets it on this element, else as the web view gives it, else none, as
+     in a browser. */
+  --bar-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --bar-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --bar-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --bar-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 }
 
 * {
@@ -35,7 +42,19 @@ body {
 }
 
 main {
-  padding: 8px 8px 88px;
+  padding: calc(8px + var(--bar-top)) calc(8px + var(--bar-right)) calc(88px + var(--bar-bottom)) calc(8px + var(--bar-left));
+}
+
+/* A band of black over the room at the top: what scrolls up goes under it. */
+body::before {
+  content: "";
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-top);
+  background: var(--back);
 }
 
 section[hidden],
@@ -66,7 +85,8 @@ label {
 }
 
 button,
-input {
+input,
+select {
   display: block;
   width: 100%;
   min-height: 56px;
@@ -96,8 +116,13 @@ nav {
   bottom: 0;
   display: flex;
   gap: 8px;
-  padding: 0 8px;
+  padding: 0 calc(8px + var(--bar-right)) var(--bar-bottom) calc(8px + var(--bar-left));
   background: var(--back);
+}
+
+/* While the phone's keyboard is open for a field, the tabs would stand over the field. */
+body.typing nav {
+  display: none;
 }
 
 nav button[aria-current="true"] {
@@ -107,9 +132,9 @@ nav button[aria-current="true"] {
 #message,
 #confirm {
   position: fixed;
-  left: 8px;
-  right: 8px;
-  bottom: 80px;
+  left: calc(8px + var(--bar-left));
+  right: calc(8px + var(--bar-right));
+  bottom: calc(80px + var(--bar-bottom));
   padding: 8px 12px;
   border: 1px solid var(--marked);
   border-radius: 8px;
@@ -199,4 +224,55 @@ label.button {
   image-rendering: pixelated;
   background: var(--back);
   border: 1px solid var(--edge);
+}
+
+
+nav button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: 16px;
+}
+
+#mapping-rows label {
+  margin-bottom: 0;
+}
+
+#mapping-rows select {
+  margin-top: 8px;
+}
+
+button:disabled,
+select:disabled {
+  color: var(--lesser);
+}
+
+#mapping-error {
+  color: var(--marked);
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+}
+input[type="checkbox"] {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--marked);
+}
+#confirm {
+  max-height: 60vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+#message {
+  max-height: 60vh;
+  overflow: auto;
 }

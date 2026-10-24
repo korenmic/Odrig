@@ -6,24 +6,31 @@ built, installed and used, what it says when something fails, and what has been 
 
 ## What it is
 
-The app has three screens, and a button for each at the bottom: `Show`, `Storage` and
-`Target`.
+The app has four screens, and a button for each at the bottom: `Show`, `Storage`,
+`Mapping` and `Target`.
 
 - **The show screen** says what the installation does: `ON` or `OFF`, the brightness, what
   plays, the animation on the LEDs with its id and its file name, and the refreshes a
   second. Below that are two buttons, `On` and `Off`, a slider for the brightness, the
   button `Playlist from the start`, and one button for each installed animation, in the
-  order of the playlist.
+  order of the playlist. Each installed animation has an `Include in playlist`
+  checkbox and an Included or Ignored label. Explicit Play still plays an ignored item.
+  Both Show and Storage report internal and external capacity; absent media and
+  unavailable capacity are distinct, and external storage is read-only.
 - **The storage screen** says how much of the installation's storage is free, as
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
   playlist, each with its id, its file name and its size in kilobytes, and a button
   `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
-  a GIF of the phone, and uploads it.
+  a GIF of the phone, and uploads it. Select checkboxes, `Select all` and `Clear selection`
+  mark installed animations for `Delete selected`. External entries have no mutation
+  controls. The confirmation names the count and files before anything is sent.
+- **The mapping screen** edits the twenty saved snake-to-pin assignments and controls
+  the built-in diagonal for a person to check on the real LEDs.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-fourteen command lines and no other, each as `POST /odrig` to the address that is set:
+twenty command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -33,13 +40,29 @@ fourteen command lines and no other, each as `POST /odrig` to the address that i
 | Presses `Playlist from the start` | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
 | Moves the slider | `brightness <n>` |
-| Nothing: when the storage screen is shown, every ten seconds while it is, and after a removal | `space` |
+| Nothing: at boot, reconnect, return to the app, entering Show or Storage, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Presses `Remove` and then `Remove it` | `remove <id>` |
+| Changes Include in playlist | `ignore <id> <0-or-1>` |
+| Confirms Delete selected | `remove many <ids>` |
 | Presses `Upload` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
 | Presses `Cancel` while it uploads | `upload cancel` |
+| Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
+| Saves the twenty assignments | `mapping set <revision> <pins>` |
+| Shows or stops the diagonal | `mapping test on`, `mapping test off` |
 
-It adds no command, changes nothing of the installation's software, and shows only what a
-reply said.
+It uses the shared command protocol and shows only what a reply said. Mapping saves
+require firmware that supports the mapping commands; an older target gives a readable
+unsupported message.
+
+Inclusion changes wait for acknowledgement before showing saved state. The list refreshes
+periodically so changes from serial or another app become visible. Older targets whose
+list lacks the inclusion flag keep playback controls but have no mutation controls.
+Deletion sends at most 32 distinct ids per batch on the existing serialized command stream.
+A refused batch preserves the remaining selection; a missing reply reports only the
+confirmed count and refreshes the list before another attempt. It never retries a lost
+delete reply automatically. Changing target clears selection and confirmation, and stale
+replies cannot change the new target's screen. Leaving the app stops unsent batches.
+Uploads and deletions disable conflicting controls until their operation has ended.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -128,6 +151,11 @@ sha256: 43ab3067c7bd119157837774377a34b2965030036d4d9d7738ce540cd104bbe0
 The first build takes about a minute, a later one about five seconds. A build of the same
 files gives the same bytes. Nothing of a build stays running, and nothing is written
 outside the repository's folder.
+
+When distributing an update from another worktree, use the same ignored debug keystore
+as the existing APK (`build/app/android-user/debug.keystore`). A freshly generated key
+has a different certificate and Android cannot use it to update the installed package.
+The mapping APK delivery retains the previously published certificate; no key is tracked.
 
 ### install
 
@@ -270,9 +298,43 @@ screen, a long press marks nothing and opens nothing, and a tap works as before.
 browser a right click does the same: the browser's menu opens only in a field. A field
 that the app gets later is the same as these three.
 
+The app keeps clear of the phone's bars: its heading begins below the bar at the top,
+with the clock and the icons, and its tabs end above the bar at the bottom, with
+Android's three buttons or the line of gesture navigation. Held sideways, it keeps clear
+of a bar or of the camera at a side too. The room comes from what the phone reports for
+its bars and its camera, so it fits each phone; it shows the app's black, and the bars'
+icons are light on it. What scrolls up goes under a band of black at the top, and the
+last line of a list can be scrolled above the tabs. While the phone's keyboard is open
+for a field, the tabs are hidden, so that they do not stand over the field, and the field
+stays in view; they come back when the keyboard closes. In a browser there are no bars,
+and the page keeps no room.
+
+**Mapping.** Twenty selectors name snakes 1-20 and their three columns, left to right
+when viewed from the front. Each snake starts at the bottom and runs up, down, up.
+Only the installed 60x60 geometry is editable. Select an existing GPIO to swap the two
+assignments in a local draft. Save writes the entire permutation with its base revision;
+Cancel adopts the latest saved assignment, Reload reads it again, and Restore defaults
+creates a draft only when the installed pin set matches those defaults. No new pin can
+be entered. Save is disabled while a request is pending or another controller has changed
+the mapping. A background read preserves the draft and asks for Reload or Cancel.
+
+Show diagonal uses the saved mapping and displays one white line on black, bottom left
+to top right. It keeps the target's power and brightness; On, Off and brightness remain
+available on Mapping, and an off/zero-brightness message explains a dark installation.
+Stop diagonal restores the previous playback selection. Leaving Mapping or restarting
+the app leaves this transient mode on the target; normal Play also stops it. The target's
+mapping reply supplies the mode. Only the person looking at the LEDs can judge the line.
+
+Mapping requests use the same single request stream as playback and uploads. Changing
+the target clears the draft and discards older replies. A failed save is not retried: the
+app reads the target once to reconcile, preserves the draft and asks for Reload before a
+new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
+have readable messages on Mapping.
+
 ## Messages
 
-Every failure is a sentence with its code in brackets at its end. A message stays until
+The shared message panel gives each failure as a sentence with its code in brackets at
+its end. Mapping shows its recovery message inline until Reload or Cancel. A panel message stays until
 it is dismissed with `OK` or another takes its place.
 
 | Code | When | The sentence |
@@ -293,6 +355,7 @@ it is dismissed with `OK` or another takes its place.
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
+| `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -394,7 +457,16 @@ installed; the phone with mobile data on.
     is marked and no menu opens; in the address a word is marked and the menu of
     copying and pasting opens. The buttons still work by a tap. Note whether a long
     press on a button pressed it too.
-14. **Note** the phone's model, its Android version, the web view's version from the
+14. **The phone's bars.** Hold the phone upright, and then sideways, on each screen.
+    *Seen:* the heading is below the clock and the icons at the top, and the tabs `Show`,
+    `Storage` and `Target` are wholly above Android's buttons or the line of gesture
+    navigation; sideways, nothing of the app lies under a bar or the camera at a side.
+    On the show screen and on `Storage`, scroll to the end: nothing shows under the
+    clock, and the last line stands above the tabs. On the target screen, tap the
+    address: the keyboard opens, the tabs go away and the address stays in view; they
+    come back when the keyboard closes. Note whether the phone has three buttons or
+    gesture navigation.
+15. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -421,11 +493,15 @@ Neither needs a phone.
 
 By programs, on a Mac:
 
-- The three screens and every action of the web code, in Chrome against the emulator:
+- The four screens and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
   `play all`, `on`, `off`, the brightness with at most five commands a second, the free
   storage, a removal confirmed and one kept, each message, the look at widths of 360 and
-  320 pixels, and the back gesture across the three screens.
+  320 pixels, and the back gesture across the four screens.
+- Mapping in Chrome against the real emulator: twenty labelled swaps, saved/default
+  drafts, Cancel/Reload, concurrent edits, uncertain save replies, target changes,
+  diagnostic state across navigation and app restart, native bridge reply validation,
+  and portrait/landscape layouts. See [the verification record](specs/30-p1-app-mapping-and-diagonal-check/verification.md).
 - Converting in Chrome: a GIF with each fit and with a part gives the very file the
   converter's command line makes of it, and an mp4 in H.264, whole and as a part, gives
   its frames and lengths; stopping; a file that cannot be read; a target without a
@@ -434,10 +510,18 @@ By programs, on a Mac:
   `Cancel`; nothing sent while the app is away, and the upload finished when it is back;
   a file that does not fit; `upload end` answered `busy`; every refusal.
 - That a long press or a right click marks text and opens a menu only in a field one
-  types into, in Chrome: every element of the three screens, of a message and of the
+  types into, in Chrome: every element of the screens, of a message and of the
   question, fields and other elements made later, and the page for an old web view. A
   browser's "select all" marks nothing.
-- That the web code sends the fourteen lines above and no other, and names no address
+- That the page keeps the room of the phone's bars, in Chrome, with the room set at each
+  side as the app's Android shell sets it: upright with a bar of three buttons and with
+  gesture navigation, and sideways with a bar and the camera at the sides. The heading is
+  below the room at the top, the tabs above the room at the bottom, nothing in the room at
+  a side, nothing shows in the room at the top when the screens are scrolled, the last
+  line of each list can be scrolled above the tabs, and with the keyboard open the field
+  is in view and the tabs are hidden. Without the room the page is as before. The
+  settings of the bars in the Android project, and in the APK.
+- That the web code sends the twenty lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -448,13 +532,19 @@ By programs, on a Mac:
 
 ## What is open
 
+- **Mapping and the diagonal on the real installation.** No firmware was flashed for
+  this run. Seed 30 task 5 requires the owner to inspect all twenty snakes, correct an
+  assignment from the APK, see a continuous diagonal, restart and resume ordinary playback.
+
 - **The check on a phone**, all of it. No program has run the app on a phone, and no test
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without
   internet, that the screen stays on, that the back gesture goes from the target screen
-  to the show screen and from there out of the app, and that a long press marks text and
-  opens its menu only in a field. On 2026-10-15 the owner ran the APK against the board
-  on its own network and saw its state and its list.
+  to the show screen and from there out of the app, that a long press marks text and
+  opens its menu only in a field, and that the app keeps clear of Android's bars, upright
+  and sideways, also with the keyboard open. On 2026-10-15 the owner ran the APK against
+  the board on its own network and saw its state and its list; on 2026-10-16 the owner
+  saw the app lie under the bars, before it kept clear of them.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
