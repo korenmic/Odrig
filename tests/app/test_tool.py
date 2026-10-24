@@ -6,6 +6,7 @@ import json
 import os
 import pathlib
 import re
+import shlex
 import signal
 import stat
 import subprocess
@@ -22,6 +23,24 @@ from . import support
 from apptool import Failure, build, cli, device, env, paths, stage, toolchain, webserver  # noqa: E402
 
 TOOL = [sys.executable, str(support.APP / "app.py")]
+# A program in a group of its own, and Ctrl-C to it: on Windows that is Ctrl+Break.
+OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+INTERRUPT = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGINT)
+
+
+def stand_in(path, code):
+    """A stand-in for the program at `path` that runs the Python `code` with the arguments it
+    is given. It is `path` itself where the system starts a script by its `#!` line, and
+    `path` with `.cmd` added on Windows. Gives the path to start."""
+    script = path.with_name(path.name + ".py")
+    script.write_text(code, encoding="utf-8")
+    if sys.platform == "win32":
+        program = path.with_name(path.name + ".cmd")
+        program.write_text(f'@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
+        return program
+    path.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(script))} "$@"\n', encoding="utf-8")
+    path.chmod(0o755)
+    return path
 
 
 def get(port, path, method="GET"):
@@ -98,13 +117,13 @@ class Serve(unittest.TestCase):
 
 class TheCommand(unittest.TestCase):
     def test_serve_prints_its_address_serves_and_ends_with_status_0_at_a_signal(self):
-        process = subprocess.Popen([*TOOL, "serve", "--port", "0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen([*TOOL, "serve", "--port", "0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=OWN_GROUP)
         try:
             line = process.stdout.readline()
             self.assertRegex(line, r"\Aapp: http://127\.0\.0\.1:[0-9]+/\n\Z")
             port = int(line.rstrip("/\n").rsplit(":", 1)[1])
             self.assertEqual(get(port, "/")[0], 200)
-            process.send_signal(signal.SIGINT)
+            process.send_signal(INTERRUPT)
             out, err = process.communicate(timeout=10)
         finally:
             if process.poll() is None:
@@ -239,8 +258,13 @@ class Archives(unittest.TestCase):
         sdk = self.work / "sdk"
         latest = toolchain.unpacked_tools(toolchain.fetched(self.archive("/tools.zip"), self.downloads), sdk)
         self.assertEqual(latest, sdk / "cmdline-tools" / "latest")
-        self.assertTrue(os.access(latest / "bin" / "sdkmanager", os.X_OK))
-        self.assertFalse(os.access(latest / "lib" / "tools.jar", os.X_OK))
+        if os.name == "posix":
+            self.assertTrue(os.access(latest / "bin" / "sdkmanager", os.X_OK))
+            self.assertFalse(os.access(latest / "lib" / "tools.jar", os.X_OK))
+        else:
+            # Windows keeps no executable bits.
+            self.assertTrue((latest / "bin" / "sdkmanager").is_file())
+            self.assertTrue((latest / "lib" / "tools.jar").is_file())
         self.assertEqual(sorted(path.name for path in sdk.iterdir()), ["cmdline-tools"])
         self.assertEqual(sorted(path.name for path in (sdk / "cmdline-tools").iterdir()), ["latest"])
 
@@ -290,13 +314,13 @@ class TheToolchain(unittest.TestCase):
 
     def test_the_environment_of_a_child_keeps_everything_in_the_work_folder(self):
         home = self.work / "jdk" / "Home"
-        made = env.child(home, caller={"PATH": "/usr/bin:/bin", "HOME": "/Users/somebody", "ANDROID_SDK_ROOT": "/elsewhere", "KEPT": "1"})
+        made = env.child(home, caller={"PATH": os.pathsep.join(("/usr/bin", "/bin")), "HOME": "/Users/somebody", "ANDROID_SDK_ROOT": "/elsewhere", "KEPT": "1"})
         work = str(paths.WORK)
         self.assertEqual(paths.WORK, support.ROOT / "build" / "app")
         for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache"):
             self.assertTrue(made[name].startswith(work + os.sep), name)
         self.assertEqual(len({made[name] for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache")}), 4)
-        self.assertEqual((made["JAVA_HOME"], made["PATH"]), (str(home), f"{home}/bin:/usr/bin:/bin"))
+        self.assertEqual((made["JAVA_HOME"], made["PATH"]), (str(home), os.pathsep.join((os.path.join(str(home), "bin"), "/usr/bin", "/bin"))))
         self.assertEqual((made["npm_config_update_notifier"], made["HOME"], made["KEPT"]), ("false", "/Users/somebody", "1"))
         self.assertNotIn("ANDROID_SDK_ROOT", made)
         # Capacitor's command line gets the work folder's own folder as the user's.
@@ -324,21 +348,27 @@ class TheToolchain(unittest.TestCase):
                                  cwd=support.ROOT, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(ignored), 5)
 
-    def manager(self, script):
-        """An SDK folder with a stand-in for `sdkmanager` that runs a shell script."""
+    def manager(self, code):
+        """An SDK folder with a stand-in for `sdkmanager` that runs Python `code`, in which
+        `sdk` is the folder that `--sdk_root` names and `os` and `sys` are imported."""
         sdk = self.work / "sdk"
-        program = sdk / "cmdline-tools" / "latest" / "bin" / "sdkmanager"
-        program.parent.mkdir(parents=True)
-        program.write_text("#!/bin/sh\n" + script)
-        program.chmod(0o755)
-        return sdk, program
+        folder = sdk / "cmdline-tools" / "latest" / "bin"
+        folder.mkdir(parents=True, exist_ok=True)
+        return sdk, stand_in(folder / "sdkmanager", 'import os\nimport sys\nsdk = sys.argv[1].removeprefix("--sdk_root=")\n' + code)
 
     LISTED = {"sdk-packages": ["platform-tools", "platforms;android-36", "build-tools;35.0.0"], "licence": "android-sdk-license"}
-    INSTALLS = 'mkdir -p "$SDK/platform-tools" "$SDK/platforms/android-36" "$SDK/build-tools/35.0.0" "$SDK/licenses"\n'
+    INSTALLS = 'for folder in ("platform-tools", "platforms/android-36", "build-tools/35.0.0", "licenses"):\n    os.makedirs(os.path.join(sdk, folder), exist_ok=True)\n'
+
+    @staticmethod
+    def writes(name, text):
+        """Python that writes `text` into the file `name` of the SDK folder."""
+        return f'with open(os.path.join(sdk, *{tuple(name.split("/"))!r}), "w") as file:\n    file.write({text})\n'
 
     def test_the_sdk_tool_is_given_one_yes_and_the_packages_and_the_one_licence_must_be_there(self):
-        script = 'SDK="${1#--sdk_root=}"\nshift\necho "$@" > "$SDK/asked.txt"\nread answer\nread more\necho "$answer|$more" > "$SDK/answered.txt"\n' + self.INSTALLS + 'echo accepted > "$SDK/licenses/android-sdk-license"\n'
-        sdk, program = self.manager(script)
+        code = (self.writes("asked.txt", '" ".join(sys.argv[2:]) + "\\n"')
+                + 'answer = sys.stdin.readline().rstrip("\\r\\n")\nmore = sys.stdin.readline().rstrip("\\r\\n")\n'
+                + self.writes("answered.txt", 'f"{answer}|{more}\\n"') + self.INSTALLS + self.writes("licenses/android-sdk-license", '"accepted\\n"'))
+        sdk, program = self.manager(code)
         toolchain.sdk_packages(self.LISTED, self.work / "jdk", sdk, program)
         self.assertEqual((sdk / "asked.txt").read_text(), "platform-tools platforms;android-36 build-tools;35.0.0\n")
         self.assertEqual((sdk / "answered.txt").read_text(), "y|\n")
@@ -348,16 +378,16 @@ class TheToolchain(unittest.TestCase):
         self.assertFalse((sdk / "asked.txt").exists())
 
     def test_another_licence_or_a_missing_package_is_licence_refused(self):
-        both = 'SDK="${1#--sdk_root=}"\n' + self.INSTALLS + 'echo a > "$SDK/licenses/android-sdk-license"\necho b > "$SDK/licenses/android-sdk-preview-license"\n'
+        both = self.INSTALLS + self.writes("licenses/android-sdk-license", '"a\\n"') + self.writes("licenses/android-sdk-preview-license", '"b\\n"')
         sdk, program = self.manager(both)
         detail = self.refused("licence-refused", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program)
         self.assertIn("android-sdk-preview-license", detail)
         (sdk / "licenses" / "android-sdk-preview-license").unlink()
         toolchain.sdk_packages(self.LISTED, self.work / "jdk", sdk, program)
         (sdk / "build-tools" / "35.0.0").rmdir()
-        program.write_text("#!/bin/sh\nexit 0\n")
+        sdk, program = self.manager("")
         self.assertIn("build-tools;35.0.0", self.refused("licence-refused", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program))
-        program.write_text("#!/bin/sh\necho 'no network' 1>&2\nexit 7\n")
+        sdk, program = self.manager('sys.stderr.write("no network\\n")\nsys.exit(7)\n')
         self.assertIn("status 7: no network", self.refused("setup-failed", toolchain.sdk_packages, self.LISTED, self.work / "jdk", sdk, program))
 
     def test_a_node_that_is_missing_or_too_old_is_node_missing(self):
@@ -365,11 +395,9 @@ class TheToolchain(unittest.TestCase):
         programs.mkdir()
         with unittest.mock.patch.dict(os.environ, {"PATH": str(programs)}):
             self.assertIn("node is not on the path", self.refused("node-missing", toolchain.node_version))
-            node = programs / "node"
-            node.write_text("#!/bin/sh\necho v18.20.4\n")
-            node.chmod(0o755)
+            stand_in(programs / "node", 'print("v18.20.4")\n')
             self.assertIn("node is v18.20.4", self.refused("node-missing", toolchain.node_version))
-            node.write_text("#!/bin/sh\necho v22.0.0\n")
+            stand_in(programs / "node", 'print("v22.0.0")\n')
             self.assertEqual(toolchain.node_version(), 22)
 
 
@@ -411,10 +439,12 @@ class ThePhone(unittest.TestCase):
         self.apk.write_bytes(b"apk")
 
     def adb(self, listed):
-        program = self.work / "adb"
-        program.write_text(f"#!/bin/sh\nif [ \"$1\" = devices ]; then printf '{listed}'; else echo \"$@\" > '{self.work}/ran.txt'; fi\n")
-        program.chmod(0o755)
-        return program
+        """A stand-in for `adb`: `adb devices` prints `listed`, in which `\\n` and `\\t` stand for
+        a new line and a tab, and any other command is written down in `ran.txt`."""
+        shown = listed.replace("\\n", "\n").replace("\\t", "\t")
+        ran = self.work / "ran.txt"
+        return stand_in(self.work / "adb", f'import sys\nif sys.argv[1:] == ["devices"]:\n    sys.stdout.write({shown!r})\n'
+                                           f'else:\n    with open({str(ran)!r}, "w") as file:\n        file.write(" ".join(sys.argv[1:]) + "\\n")\n')
 
     def test_the_devices_that_are_ready(self):
         self.assertEqual(device.devices("List of devices attached\nR58M123\tdevice\nemulator-5554\toffline\nABC\tunauthorized\n\n"), ["R58M123"])

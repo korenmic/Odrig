@@ -126,7 +126,8 @@ class EntryFile(unittest.TestCase):
 
     def test_it_says_what_works_on_windows_and_what_is_different_there(self):
         windows = " ".join(self.part("If you work on Windows").split())
-        for phrase in ("The Python library, the core's build, the emulator and the command tool work on Windows 10 and 11, and their suites pass there.",
+        for phrase in ("The Python library, the core's build, the emulator, the command tool and the app's tool work on Windows 10 and 11, and every suite that runs there passes:",
+                       "the converter's, the Python library's, the core's, the emulator's and the command tool's, the app's and the onboarding suite.",
                        "The converter's own suite, `npm test --prefix converter`, passes on Windows too.",
                        "That was seed 11", f"`{SEED_FOR_WINDOWS}`", "built there by `python core/build.py shared`, not by `make`",
                        "Windows has no virtual serial port", "with `--tcp` or `--http`", "The firmware tool and the board stay with the first computer.",

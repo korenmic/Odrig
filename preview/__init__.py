@@ -32,6 +32,7 @@ WINDOWS = sys.platform == "win32"
 # is stopped.
 OWN_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 STOP = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGINT)
+WAIT_STEP_SECONDS = 0.2
 
 
 class Refused(Exception):
@@ -163,7 +164,7 @@ def run(arguments):
         if not arguments.no_browser and not webbrowser.open(page):
             print("preview: no browser could be opened; open the address above", file=sys.stderr)
         try:
-            return child.wait()
+            return waited(child)
         except KeyboardInterrupt:
             return 0
     finally:
@@ -172,14 +173,26 @@ def run(arguments):
         shutil.rmtree(work, ignore_errors=True)
 
 
+def waited(child):
+    """The exit status of the emulator, once it ends. The wait comes back now and then, so
+    that Ctrl+Break, which Windows does not let interrupt a wait without a limit, is taken."""
+    while True:
+        try:
+            return child.wait(timeout=WAIT_STEP_SECONDS)
+        except subprocess.TimeoutExpired:
+            pass
+
+
 def interrupted(*_):
-    """A termination ends the preview as Ctrl-C does."""
+    """A termination, and Ctrl+Break on Windows, end the preview as Ctrl-C does."""
     raise KeyboardInterrupt
 
 
 def main(argv=None):
     arguments = parser().parse_args(argv)
     signal.signal(signal.SIGTERM, interrupted)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, interrupted)
     try:
         return run(arguments)
     except Refused as refused:

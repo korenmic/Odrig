@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -313,3 +314,33 @@ class Folder(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AFolderTheHostReads(unittest.TestCase):
+    """The host lets a folder go while it reads a file of it, on every system: a drive is
+    pulled out by moving its folder away while one of its files plays."""
+
+    def test_the_folder_can_be_removed_while_the_host_reads_from_it(self):
+        top = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, top, True)
+        folder = top / "show"
+        folder.mkdir()
+        (folder / "a.odrg").write_bytes(b"ODRG" + bytes(60))
+        files = host.FolderHost(folder)
+        self.addCleanup(files.release)
+        self.assertEqual(files.open("a.odrg"), 1)
+        self.assertEqual(files.read(4), b"ODRG")
+        self.assertEqual(files.read_at("a.odrg", 0, 4), b"ODRG")
+        shutil.rmtree(folder)
+        self.assertFalse(folder.exists())
+        self.assertEqual(files.read(4), bytes(4))
+
+    def test_a_file_that_is_not_there_and_a_folder_in_its_place_are_answered_as_before(self):
+        folder = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, folder, True)
+        (folder / "inner").mkdir()
+        files = host.FolderHost(folder)
+        self.addCleanup(files.release)
+        self.assertEqual(files.open("absent.odrg"), 0)
+        self.assertEqual(files.open("inner"), -1)
+        self.assertIsNone(files.read_at("absent.odrg", 0, 4))

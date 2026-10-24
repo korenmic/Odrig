@@ -8,6 +8,7 @@ target's log until it is interrupted, which is exit status 0.
 
 import argparse
 import os
+import signal
 import sys
 import time
 
@@ -151,6 +152,10 @@ def _print(reply):
     print(reply.decode("utf-8", "replace"))
 
 
+def _interrupted(*_):
+    raise KeyboardInterrupt
+
+
 def _print_log(line):
     print(line.decode("utf-8", "replace"), flush=True)
 
@@ -160,6 +165,10 @@ def main(argv=None):
     arguments = made.parse_args(argv)
     words = checked(made, arguments)
     if arguments.log:
+        # Ctrl+Break, the way a program of its own group is ended on Windows, ends the log
+        # as Ctrl-C does.
+        if hasattr(signal, "SIGBREAK"):
+            signal.signal(signal.SIGBREAK, _interrupted)
         try:
             client.follow_log(_print_log, port=arguments.port, tcp=arguments.tcp, timeout=arguments.timeout)
         except client.Unreachable as unreachable:
