@@ -1338,6 +1338,83 @@ With 1,800 LEDs the core's work for one dense frame was 6.6 ms compressed and 4.
 uncompressed and a send to ten outputs 7.7 ms, and both fitted into the 20 ms of a frame
 in one loop.
 
+## Changing what the board holds
+
+Five kinds of work change or judge what the board holds, and each does its own part only.
+
+| Work | Tool | What it writes | When it is the one |
+|---|---|---|---|
+| Flashing | `flash`, `install-firmware` | The program in the first firmware slot; `install-firmware` also the network's name and password and the limit on LED current into storage. | A new firmware. It never removes, adds or repairs an animation: storage keeps what it had. |
+| A change by command | `odrigctl upload`, `remove`, `remove many`, `ignore`, `order move`; the operators' app | One animation file and the show file, or the saved order, through the core's own file system calls. | Adding, replacing, removing, leaving out or moving one animation, also while others are unavailable. The first choice. |
+| A change by image | `install-show` | The blocks of storage in which the board's file system changes. | A whole show at once, or when the board does not answer commands. |
+| Quarantine | the core, at every start | Nothing. | A file that cannot be played is unavailable for the boot and listed with its reason; it is repaired by a change by command. |
+| The board's check | the core, after every start | Nothing. | Every installed animation is read to its end while the show plays; `list` gives its size once it is read. |
+| The recovery of storage | `recover-storage` | The blocks of a change by image that was cut. | Only after a change by image that ended with `recovery-needed`. |
+
+**A change by command.** The core writes the new file as `upload.part`, checks it and
+renames it onto its name; for a new name or a removal it also writes the show file as
+`show.part` and renames it onto `show.json`, with the names concerned in `pending.txt`
+until the old file is gone; [core.md](core.md), "The files the core writes", has every
+step. A power cut at any step leaves the old show or the new one, whole; the change is
+committed by one rename. Moving an animation in the saved order writes `order.part` and
+renames it onto `order.txt` the same way. What one change writes:
+
+| Change | What is written | Bytes |
+|---|---|---|
+| Removing one animation | `pending.txt` and the show file | the file's name and a line feed, and the show file |
+| Adding one animation | the file, `pending.txt` and the show file | the file, its name and a line feed, and the show file |
+| Replacing one under its name | the file | the file |
+| The same file again (`odrigctl upload`) | nothing | 0 |
+
+`odrigctl upload` sends the CRC-32 of the file with `upload begin`, and a target whose last
+upload installed that file answers `unchanged`: nothing is sent or written. So an upload
+whose last reply did not arrive is run again safely. A cleanup that a change could not finish is finished by the next change, or by
+the next start.
+
+**A change by image.** `install-show` changes only the files that differ, writes the
+blocks of the change in two parts and compares what it wrote:
+
+1. The blocks the board's file system does not use: the bytes of the new and changed
+   files. A cut here, by a failure of esptool, a cable pulled or Ctrl-C, leaves the board's
+   file system as it was before; the tool says `the change was not made` and restarts the
+   board.
+2. The blocks the board's file system uses: its records, one to four blocks for the
+   change of one file. This is the commit. Ctrl-C waits for its end. A cut here, or a
+   comparison that fails, ends with `recovery-needed`: the board stays in its bootloader,
+   because WLED formats a file system it cannot read when it starts, and
+   `recover-storage` finishes the change.
+3. The chip compares every written block with the new image, and the board restarts.
+
+Measured on a storage 80 % full of animations of 50 to 250 KB (the tests of
+`tests/firmware/test_incremental.py`):
+
+| Change of one animation | WLED's layout, 57 files | The bigger layout, 75 files |
+|---|---|---|
+| Removal | 3 blocks, 12,288 bytes, 2 in use | 3 blocks, 12,288 bytes, 2 in use |
+| Addition of 120,000 bytes | 33 blocks, 135,168 bytes, 2 in use | 33 blocks, 135,168 bytes, 2 in use |
+| Replacement by 140,000 bytes | 37 blocks, 151,552 bytes, 2 in use | 37 blocks, 151,552 bytes, 2 in use |
+| The same folder again | nothing | nothing |
+| A removal as `/odrig` was rebuilt before | 2,046 blocks, 8,380,416 bytes | 2,653 blocks, 10,866,688 bytes |
+
+**What the kept images bring back.** `build/firmware/storage/` keeps the newest eight
+images of the board's storage: the one before each change by image and the one after.
+`recover-storage` uses the new image of a change that was cut. The others are a record:
+no command writes one back, and none holds what the board changed itself since, by
+command or by WLED's settings. A file the change removes or replaces is copied before the
+write when `install-show --keep-copies DIR` asks for it; `read-show` copies every file of
+`/odrig`. The last resort for the whole flash stays the factory backup, written by hand.
+
+**What cannot be cancelled.** A change by command is committed by one rename on the
+board; `upload cancel` and an upload left for 60 seconds leave the show as it was. A
+change by image can be cancelled until its commit; from then on it is finished, by the
+same command or by `recover-storage`. Neither `install-show` nor `recover-storage`
+promises to go back to the storage from before: the kept image from before is a record,
+and `recover-storage --whole` writes the new image, not the old one.
+
+`tests/core/test_incremental.py` and `tests/core/test_powercut.py` cut the power at every
+storage call of the changes by command; `tests/firmware/test_recovery.py` cuts a change by
+image at each of its steps, at both layouts.
+
 ## The regions of the flash
 
 The board has WLED's 16 MB layout. The tool reads the partition table before it writes and
