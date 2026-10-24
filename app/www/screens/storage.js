@@ -2,6 +2,7 @@
 // sizes, the removal of one, which is asked about first, and making an animation from a
 // video or a GIF.
 
+import * as capacity from "../capacity.js";
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {NotConverted, Stopped, convert, isGif, stopper, videoLength} from "../convert.js";
@@ -29,6 +30,12 @@ let made = null;
 let previewTimer = null;
 // The upload under way, or null.
 let sending = null;
+const selected = new Set();
+let deleting = false;
+let awaitingRefresh = null;
+let version = -1;
+let listed = null;
+let message = () => {};
 
 function byId(id) {
   return document.getElementById(id);
@@ -50,6 +57,7 @@ function row(animation) {
   made.dataset.id = String(animation.id);
   made.dataset.file = animation.file;
   made.dataset.bytes = String(animation.bytes);
+  made.dataset.editable = String(typeof animation.ignored === "boolean");
   const words = document.createElement("p");
   const id = document.createElement("span");
   id.className = "id";
@@ -61,17 +69,36 @@ function row(animation) {
   size.className = "size";
   size.textContent = `${kilobytes(animation.bytes)} KB`;
   words.append(id, " ", file, " ", size);
+  made.append(words);
+  if (typeof animation.ignored !== "boolean") {
+    const note = document.createElement("span");
+    note.textContent = "Playback only";
+    made.append(note);
+    return made;
+  }
+  const label = document.createElement("label");
+  label.className = "check";
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.addEventListener("change", () => {
+    if (check.checked) selected.add(animation.id);
+    else selected.delete(animation.id);
+    draw(client.state);
+  });
+  label.append(check, `Select animation ${animation.id}`);
+  made.append(label);
   const remove = document.createElement("button");
   remove.type = "button";
   remove.textContent = "Remove";
   remove.addEventListener("click", () => ask(animation));
-  made.append(words, remove);
+  made.append(remove);
   return made;
 }
 
 // Asks whether the animation is to be removed.
 function ask(animation) {
-  asked = animation;
+  if (locked()) return;
+  asked = {animation, version: client.targetVersion()};
   byId("confirm-text").textContent = messages.ofRemoval(animation);
   byId("confirm").hidden = false;
 }
@@ -88,20 +115,96 @@ function drawRows(animations) {
   const shown = [...place.children];
   const same =
     shown.length === animations.length &&
-    shown.every((made, at) => made.dataset.id === String(animations[at].id) && made.dataset.file === animations[at].file && made.dataset.bytes === String(animations[at].bytes));
+    shown.every((made, at) => made.dataset.id === String(animations[at].id) && made.dataset.file === animations[at].file && made.dataset.bytes === String(animations[at].bytes) && made.dataset.editable === String(typeof animations[at].ignored === "boolean"));
   if (!same) {
     place.replaceChildren(...animations.map(row));
   }
 }
 
+function locked() {
+  return deleting || awaitingRefresh !== null || sending !== null || client.contentBusy() || client.state.link !== "answers";
+}
+
 function draw(state) {
-  byId("space").textContent = state.space === null ? "-" : `Free ${megabytes(state.space.free)} MB of ${megabytes(state.space.total)} MB`;
+  if (version !== client.targetVersion()) {
+    version = client.targetVersion();
+    selected.clear();
+    deleting = false;
+    awaitingRefresh = null;
+    listed = null;
+    close();
+    byId("bulk-progress").textContent = "";
+  }
   const animations = state.animations === null ? [] : state.animations;
+  if (listed !== state.animations) {
+    listed = state.animations;
+    const ids = new Set(animations.filter(item => typeof item.ignored === "boolean").map(item => item.id));
+    for (const id of selected) if (!ids.has(id)) selected.delete(id);
+  }
+  if (awaitingRefresh !== null && state.listVersion > awaitingRefresh) awaitingRefresh = null;
+  byId("bulk-progress").dataset.refreshing = String(awaitingRefresh !== null);
+  byId("space").textContent = capacity.internal(state.space);
+  byId("external-space").textContent = capacity.external(state.space);
   drawRows(animations);
+  for (const made of byId("installed").children) {
+    const check = made.querySelector("input");
+    if (check) {
+      check.checked = selected.has(Number(made.dataset.id));
+      check.disabled = locked();
+    }
+    for (const button of made.querySelectorAll("button")) button.disabled = locked();
+  }
+  byId("select-all").disabled = locked() || !animations.some(item => typeof item.ignored === "boolean");
+  byId("clear-selection").disabled = locked() || selected.size === 0;
+  byId("delete-selected").disabled = locked() || selected.size === 0;
+  byId("upload").disabled = locked();
   byId("installed-none").hidden = state.animations === null || animations.length > 0;
   const silent = state.link === "no-answer";
   byId("space").classList.toggle("stale", silent);
+  byId("external-space").classList.toggle("stale", silent);
   byId("installed").classList.toggle("stale", silent);
+}
+
+function askSelected() {
+  if (locked() || selected.size === 0) return;
+  const animations = client.state.animations.filter(item => selected.has(item.id));
+  asked = {animations, version: client.targetVersion()};
+  byId("confirm-text").textContent = `Delete ${animations.length} animations from internal storage? ` + animations.map(item => `${item.id} ${item.file}`).join(", ");
+  byId("confirm").hidden = false;
+}
+
+async function deleteSelected(question) {
+  const ownVersion = question.version;
+  if (ownVersion !== client.targetVersion() || locked()) return;
+  const ids = question.animations.map(item => item.id);
+  let done = 0;
+  deleting = true;
+  client.setContentBusy(true);
+  try {
+    while (done < ids.length) {
+      if (ownVersion !== client.targetVersion() || document.hidden) throw new Error("deletion stopped");
+      const batch = ids.slice(done, done + 32);
+      await client.removeMany(batch);
+      if (ownVersion !== client.targetVersion()) return;
+      done += batch.length;
+      for (const id of batch) selected.delete(id);
+      byId("bulk-progress").textContent = `Deleted ${done} of ${ids.length}.`;
+    }
+    message(`Deleted ${done} animations.`);
+  } catch (error) {
+    if (ownVersion !== client.targetVersion()) return;
+    const detail = error instanceof Refusal ? messages.ofRefusal(error) :
+      "No confirmed reply. The last batch may already be deleted. Refreshing the list before another attempt.";
+    message(`Deleted ${done} of ${ids.length}. ${detail}`);
+  } finally {
+    if (ownVersion === client.targetVersion()) {
+      deleting = false;
+      awaitingRefresh = client.state.listVersion;
+      client.setContentBusy(false);
+      client.refreshContent();
+      draw(client.state);
+    }
+  }
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -174,7 +277,7 @@ function forget() {
 // Uploads the animation that was made, as a new item with the lowest free id and a file
 // name made from the media's name.
 function upload(message) {
-  if (made === null || sending !== null) {
+  if (made === null || locked()) {
     return;
   }
   const state = client.state;
@@ -292,7 +395,14 @@ async function make(message) {
 }
 
 // Starts the screen. `message` shows a text in the place for messages.
-export function start({message}) {
+export function start(options) {
+  message = options.message;
+  byId("select-all").addEventListener("click", () => {
+    for (const item of client.state.animations || []) if (typeof item.ignored === "boolean") selected.add(item.id);
+    draw(client.state);
+  });
+  byId("clear-selection").addEventListener("click", () => { selected.clear(); draw(client.state); });
+  byId("delete-selected").addEventListener("click", askSelected);
   byId("media").addEventListener("change", () => {
     const files = byId("media").files;
     if (files.length === 1) {
@@ -316,11 +426,11 @@ export function start({message}) {
     }
   });
   byId("confirm-yes").addEventListener("click", () => {
-    const animation = asked;
+    const question = asked;
     close();
-    if (animation !== null) {
-      client.remove(animation, (removed) => message(messages.ofRemoved(removed)));
-    }
+    if (question === null || question.version !== client.targetVersion()) return;
+    if (question.animations) deleteSelected(question);
+    else client.remove(question.animation, (removed) => message(messages.ofRemoved(removed)));
   });
   byId("confirm-no").addEventListener("click", close);
   client.watch(draw);

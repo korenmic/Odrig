@@ -42,7 +42,7 @@ class Layout:
 
     def test_the_tabs_lie_wholly_above_the_room_at_the_bottom_and_clear_of_the_sides(self):
         for name, measured in self.screens():
-            self.assertEqual([tab["what"] for tab in measured["tabs"]], ["Show", "Storage", "Target"], name)
+            self.assertEqual([tab["what"] for tab in measured["tabs"]], ["Show", "Storage", "Mapping", "Target"], name)
             for tab in measured["tabs"]:
                 self.inside(tab, measured, name)
 
@@ -94,7 +94,7 @@ class Layout:
 
     def test_a_field_with_the_focus_and_no_keyboard_keeps_the_tabs_and_they_come_back_after(self):
         for name in ("focused", "after"):
-            self.assertEqual([tab["what"] for tab in self.seen[name]["tabs"]], ["Show", "Storage", "Target"], name)
+            self.assertEqual([tab["what"] for tab in self.seen[name]["tabs"]], ["Show", "Storage", "Mapping", "Target"], name)
 
     def test_without_the_room_the_page_is_as_before(self):
         plain = self.seen["plain"]

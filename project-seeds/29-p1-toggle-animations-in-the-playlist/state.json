@@ -1,0 +1,10 @@
+{
+  "number": 29,
+  "slug": "29-p1-toggle-animations-in-the-playlist",
+  "state": "in_progress",
+  "title": "Manage playlist inclusion, bulk deletion and storage capacity",
+  "priority": "P1",
+  "addedAt": "2026-10-23T18:00:35+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Persist playlist inclusion, select and delete installed animations in batches, and report internal and external free space through the shared core and app."
+}

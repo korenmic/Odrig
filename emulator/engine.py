@@ -59,7 +59,10 @@ class Engine:
         """One command line, as HTTP delivers it. Returns the reply."""
         with self._lock:
             now = self.now_ms()
+            before = getattr(self.core, "legs", ())
             reply = self.core.command(now, data)
+            if before != getattr(self.core, "legs", ()):
+                self.hub.mapping(self.core.legs)
         kept = data[:-1] if data.endswith(b"\n") else data
         kept = kept[:-1] if kept.endswith(b"\r") else kept
         self.hub.log(now, transport, kept[:binding.LINE_MAX], len(kept) > binding.LINE_MAX, reply)
@@ -71,7 +74,10 @@ class Engine:
         lines they finish, joined."""
         with self._lock:
             now = self.now_ms()
+            before = getattr(self.core, "legs", ())
             answered = self.core.feed(now, data)
+            if before != getattr(self.core, "legs", ()):
+                self.hub.mapping(self.core.legs)
         for line, reply, cut in answered:
             self.hub.log(now, transport, line, cut, reply)
         if answered:

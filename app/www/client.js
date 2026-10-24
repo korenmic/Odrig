@@ -14,9 +14,9 @@ const SPACE_EVERY_MS = 10000;
 // time of the newest reply of any kind, `since` the time the app began with this address,
 // and `answered` whether the target of this address has answered at least once.
 // `animations` is the animation items of the newest complete list, in the order of the
-// show, each as `{id, file, bytes}`, or null while there is none; `cycles` is the ids of
-// its cycles. `space` is the newest reply to `space` as `{free, total}`, or null.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null};
+// show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
+// its cycles. `space` holds internal and external capacity from the newest reply, or null.
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -46,6 +46,7 @@ let spaceTimer = null;
 let job = null;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
+let contentLocked = false;
 
 // Calls a function now and whenever the state changes.
 export function watch(watcher) {
@@ -63,6 +64,8 @@ function heard() {
   if (state.link !== "answers") {
     // The target answers, for the first time or again: what it has installed is asked.
     listDue = true;
+    listing = null;
+    spaceDue = true;
   }
   state.link = "answers";
   state.failure = null;
@@ -118,12 +121,12 @@ function listAgainLater(after = LIST_EVERY_MS) {
   }, after);
 }
 
-// The storage is asked for again after a while, while the storage screen is shown.
+// Capacity is asked for periodically while Show or Storage is visible.
 function spaceAgainLater() {
   clearTimeout(spaceTimer);
   spaceTimer = setTimeout(() => {
     spaceTimer = null;
-    if (storageScreen) {
+    if (showScreen || storageScreen) {
       spaceDue = true;
       next();
     }
@@ -171,6 +174,7 @@ async function askListPart() {
     if (reply.next !== null) {
       listing = {items, from: reply.next};
     } else {
+      state.listVersion += 1;
       state.animations = items.filter((item) => item.cycle !== true);
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
       listAgainLater();
@@ -203,17 +207,17 @@ async function askListPart() {
 async function give(request) {
   const asked = target;
   try {
-    await request.carry();
+    const reply = await request.carry();
     if (asked !== target) {
+      request.reject?.(new Error("the address changed"));
       return;
     }
     heard();
-    if (request.kind === "remove") {
-      listDue = true;
-      spaceDue = true;
-    }
+    request.confirm?.(reply);
+    request.resolve?.(reply);
   } catch (error) {
     if (asked !== target) {
+      request.reject?.(new Error("the address changed"));
       return;
     }
     if (error instanceof commands.Refusal) {
@@ -222,10 +226,18 @@ async function give(request) {
         // The list the operator chose from is not what the target has any more.
         listDue = true;
       }
-      refused(error);
+      if (!request.reject) {
+        refused(error);
+      }
     } else {
       failed(error);
     }
+    request.reject?.(error);
+  }
+  if (request.kind === "remove" || request.kind === "ignore") {
+    listing = null;
+    listDue = true;
+    spaceDue = true;
   }
   // The status that shows what the command did goes before a list that waits.
   statusDue = true;
@@ -256,6 +268,7 @@ async function sendJobLine(running, line) {
   }
   if (running.over()) {
     job = null;
+    listing = null;
     listDue = true;
     spaceDue = true;
     statusDue = true;
@@ -324,6 +337,8 @@ async function next() {
 // upload to the earlier target ends.
 export function begin() {
   target += 1;
+  contentLocked = false;
+  state.listVersion = 0;
   if (job !== null) {
     job.failed(new Error("the address changed"));
     job = null;
@@ -337,7 +352,7 @@ export function begin() {
   state.animations = null;
   state.cycles = [];
   state.space = null;
-  wanted.length = 0;
+  cancelWaiting();
   statusDue = true;
   listDue = false;
   listing = null;
@@ -345,7 +360,7 @@ export function begin() {
   askedFor = null;
   clearTimeout(listTimer);
   listTimer = null;
-  spaceDue = storageScreen;
+  spaceDue = true;
   clearTimeout(spaceTimer);
   spaceTimer = null;
   changed();
@@ -353,7 +368,7 @@ export function begin() {
 }
 
 // Says which screen is on the screen of the phone. The list is kept fresh while it is
-// the show screen or the storage screen, and the space while it is the storage screen.
+// the show screen or the storage screen, together with capacity.
 export function showing(name) {
   const was = showScreen || storageScreen;
   const wasStorage = storageScreen;
@@ -362,7 +377,7 @@ export function showing(name) {
   if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
     listDue = true;
   }
-  if (storageScreen && !wasStorage) {
+  if ((showScreen || storageScreen) && (!was || storageScreen !== wasStorage)) {
     spaceDue = true;
   }
   next();
@@ -370,12 +385,12 @@ export function showing(name) {
 
 // Takes something the operator asked for. A brightness that still waits is replaced by a
 // newer one, at its place.
-function want(kind, carry) {
+function want(kind, carry, confirm) {
   const waiting = kind === "brightness" ? wanted.findIndex((request) => request.kind === kind) : -1;
   if (waiting === -1) {
-    wanted.push({kind, carry});
+    wanted.push({kind, carry, confirm});
   } else {
-    wanted[waiting] = {kind, carry};
+    wanted[waiting] = {kind, carry, confirm};
   }
   next();
 }
@@ -384,6 +399,7 @@ function want(kind, carry) {
 // goes on only while the app is on the screen.
 export function upload(made) {
   job = made;
+  changed();
   next();
 }
 
@@ -394,10 +410,7 @@ export function wake() {
 
 // Removes an animation from the show. `done` is called when the target has removed it.
 export function remove(animation, done) {
-  want("remove", async () => {
-    await commands.remove(animation.id);
-    done(animation);
-  });
+  want("remove", () => commands.remove(animation.id), () => done(animation));
 }
 
 export function play(id) {
@@ -428,9 +441,68 @@ export function onRefusal(handler) {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     // What was asked for and not sent is not sent later, when the app comes back.
-    wanted.length = 0;
+    cancelWaiting();
   } else {
     statusDue = true;
-    next();
+    refreshContent();
   }
 });
+
+
+// Mapping requests share the same serialized stream and report their own recovery UI.
+export function targetVersion() {
+  return target;
+}
+
+function requestOperation(kind, carry, confirm) {
+  return new Promise((resolve, reject) => {
+    wanted.push({kind, carry, confirm, resolve, reject});
+    next();
+  });
+}
+
+function cancelWaiting() {
+  for (const request of wanted) {
+    request.reject?.(new Error("the request was cancelled"));
+  }
+  wanted.length = 0;
+}
+
+export function mappingGet() {
+  return requestOperation("mapping", () => commands.mappingGet());
+}
+
+export function mappingSet(revision, pins) {
+  return requestOperation("mapping", () => commands.mappingSet(revision, pins));
+}
+
+export function mappingTest(enabled) {
+  return requestOperation("mapping", () => commands.mappingTest(enabled));
+}
+
+export function contentBusy() {
+  return contentLocked || job !== null;
+}
+
+export function setContentBusy(value) {
+  contentLocked = value;
+  changed();
+}
+
+export function refreshContent() {
+  listing = null;
+  listDue = true;
+  spaceDue = true;
+  next();
+}
+
+export function ignore(id, ignored) {
+  return requestOperation("ignore", () => commands.ignore(id, ignored), () => {
+    const animation = state.animations?.find(item => item.id === id);
+    if (animation) animation.ignored = ignored;
+  });
+}
+
+export function removeMany(ids) {
+  return requestOperation("remove", () => commands.removeMany(ids));
+}

@@ -708,6 +708,8 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
@@ -724,6 +726,8 @@ python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial remove 9
+python -m odrigctl --port build/emulator/serial remove many 9,10
+python -m odrigctl --port build/emulator/serial ignore 9 1
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -739,6 +743,8 @@ python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
 python -m odrigctl --tcp 127.0.0.1:8601 remove 9
+python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
+python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -754,6 +760,8 @@ python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
 python -m odrigctl --http 127.0.0.1:8600 remove 9
+python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
+python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
 ```
 
 The tool prints the reply line to standard output:
@@ -871,6 +879,15 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 `odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
+
+The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
+The pin list is twenty comma-separated GPIO numbers, in snake order.
+
+```
+python -m odrigctl --port build/emulator/serial mapping get
+python -m odrigctl --tcp 127.0.0.1:8601 mapping get
+python -m odrigctl --http 127.0.0.1:8600 mapping get
+```
 
 ## Previewing one animation
 
@@ -1273,3 +1290,18 @@ tests 288 pass and 208 fail, 73 of them with one error, where the suite starts a
 Python that is written for macOS; the others were not looked into. That is not mended here;
 it was afterwards, outside seed 11: "The converter on Windows" at the end of
 [drifts.md](drifts.md).
+
+## Live output assignments
+
+The shared app's Mapping screen reads and saves the target's twenty-snake pin
+assignment through the same mapping commands as serial and TCP clients. A committed
+save updates the core binding's leg metadata, emits a `mapping` stream event and
+refreshes the page's Mapping view without restarting the emulator. The event carries
+one complete array of `[leg, pin, LED count]` entries. New connections receive current
+routing in their hello event. The mapping file endpoint returns the committed file.
+
+For a serial client, `python3 -m odrigctl --port build/emulator/serial mapping get`
+reads the assignment. Use `mapping set REV PINS` to save the complete comma-separated
+pin list, and `mapping test on` or `mapping test off` for the packaged diagonal.
+
+The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files remain read-only.

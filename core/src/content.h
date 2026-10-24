@@ -20,10 +20,18 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply);
 // Carries out `remove` on a valid show and writes the reply: the item with this id leaves
 // the show, in storage and in the tables.
 uint32_t content_remove(Core &core, uint32_t id, Reply &reply);
+uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Reply &reply);
+uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply);
+struct ShowChange;
+bool content_removed(const Core &core, uint32_t position, const ShowChange &change);
 
 // How the show that is written differs from the show the tables hold. Without a
 // difference the show is written as it is.
 struct ShowChange {
+    const uint16_t *removed = nullptr;
+    uint32_t removed_count = 0;
+    uint32_t inclusion = kNothing;
+    bool ignored = false;
     uint32_t without = kNothing;    // the position of an item that is left out
     uint32_t renamed = kNothing;    // the position of an animation item that names another file,
     const char *name = nullptr;     // which is this one

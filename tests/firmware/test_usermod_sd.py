@@ -84,6 +84,7 @@ struct FakeSD {
   unsigned mounts = 0, unmounts = 0, probes = 0, frequency = 0, maxFiles = 0;
   int select = -1;
   bool formatting = true;
+  uint64_t total = 0, used = 0;
   SPIClass *bus = nullptr;
   bool begin(int cs, SPIClass &spi, unsigned hz, const char *path, unsigned count, bool format) {
     ++mounts; select = cs; bus = &spi; frequency = hz; maxFiles = count; formatting = format;
@@ -96,6 +97,8 @@ struct FakeSD {
     ++probes; assert(sector == 0); memset(buffer, 0, 512); return present && readable;
   }
   int cardType() { return mounted ? 3 : 0; }
+  uint64_t totalBytes() { return mounted && present ? total : 0; }
+  uint64_t usedBytes() { return mounted && present ? used : 0; }
 };
 static FakeSD SD;
 """
@@ -208,11 +211,12 @@ int main(int argc, char **argv) {
   }
   if (mode == "disabled") {
     assert(fakeTask == nullptr); assert(SD.mounts == 0); assert(host.drive == nullptr);
+    assert(host.drive_space == nullptr);
     assert(strstr(OdrigDrive::summary(), "configured"));
     assert(host.open(nullptr, "mapping.json") == 1); assert(fallbackOpens == 1);
     puts("ok"); return 0;
   }
-  assert(host.drive && host.drive_name);
+  assert(host.drive && host.drive_name && host.drive_space);
   assert(SD.bus && SD.bus->starts == 1);
   assert(SD.bus->clock == ODRIG_SD_SCK && SD.bus->input == ODRIG_SD_MISO);
   assert(SD.bus->output == ODRIG_SD_MOSI && SD.select == ODRIG_SD_CS);
@@ -248,6 +252,21 @@ int main(int argc, char **argv) {
   } else if (mode == "empty") {
     assert(named(host, generation, 0).empty());
     assert(strstr(OdrigDrive::summary(), "0"));
+  } else if (mode == "space") {
+    uint64_t freeBytes = 1, totalBytes = 1;
+    SD.total = 31914983424ull; SD.used = 16475328ull;
+    assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == 1);
+    assert(totalBytes == 31914983424ull && freeBytes == 31914983424ull - 16475328ull);
+    assert(host.drive_space(nullptr, generation + 1, &freeBytes, &totalBytes) == -1);
+    assert(host.drive_space(nullptr, 0, &freeBytes, &totalBytes) == -1);
+    SD.total = 0;
+    assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
+    SD.total = 31914983424ull; SD.used = SD.total + 1;
+    assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
+    SD.used = 16475328ull; SD.present = false; sdStep();
+    assert(host.drive(nullptr) == 0 && SD.unmounts == 1);
+    assert(host.drive_space(nullptr, generation, &freeBytes, &totalBytes) == -1);
+    assert(SD.mounts == 1);
   } else {
     assert(host.open(nullptr, "drive/0") == 1);
     uint8_t bytes[17];
@@ -376,3 +395,6 @@ class SpiCard(unittest.TestCase):
         for mode in ("read-error", "seek-error", "open-error"):
             with self.subTest(mode=mode):
                 self.case(mode)
+
+    def test_free_and_total_space_come_from_the_mounted_card_and_its_current_number_only(self):
+        self.case("space")

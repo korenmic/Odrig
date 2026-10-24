@@ -53,7 +53,7 @@ it stands now.
 - A strip lies flat or stands upright, so it is a row or a column of the canvas. The
   mapping file format has both kinds of leg: row legs, whose strips are rows, and column
   legs, whose strips are columns. All legs of one mapping file are of one kind.
-- Leg N uses the pin labelled N, except legs 19 and 20, which use pins 21 and 47: the pins
+- By default, leg N uses the pin labelled N, except legs 19 and 20, which use pins 21 and 47: the pins
   labelled 19 and 20 carry the board's USB connection.
 - The bench build, today's: 2 row legs, a 60 x 6 canvas, 360 LEDs, confirmed working. Leg 1
   holds the top three rows and leg 2 the three rows below them, and each chain starts at
@@ -184,7 +184,7 @@ are in [format.md](format.md), "Measured sizes".
   ID, play the playlist, switch on, switch off, set brightness, and report status; and for
   the content: report the free storage, list what is installed, remove an item, and
   upload an animation.
-- A show plays all its animations in turn by itself: the playlist. An animation plays
+- A show plays its included animations in turn by itself: the playlist. An animation plays
   until at least 30 seconds have passed and then finishes the loop it is in, unless the
   show gives it a repeat count, a longest duration, or another shortest time. Playing an
   animation by its ID is a jump in the playlist, which goes on after it. A cycle plays
@@ -490,3 +490,28 @@ are in [format.md](format.md), "Measured sizes".
   assignment: SCK39, MISO40, MOSI41 and CS42. The adapter's VCC is 3.3 V because its
   return signal follows VCC. The snake outputs stay on GPIO1–18, 21 and 47. Physical
   wiring, power readiness, flashing and on-board behavior remain unconfirmed.
+
+- 2026-10-23: The owner requested app-controlled pin-to-snake assignments together with
+  a diagonal check. The default pin table stays the default; an installed target
+  mapping may permute its twenty existing outputs among whole three-column snakes.
+  One mapping command family reads and durably saves that assignment and starts or
+  stops a built-in diagnostic, on every route. The diagnostic is excluded from
+  ordinary shows and playlists and does not change power or brightness. Physical
+  confirmation remains the owner's. No board has been flashed for this change.
+
+- 2026-10-24: The owner authorized playlist exclusion and expanded it with bulk
+  deletion and free-space reporting before implementation. Installed animations may
+  opt out of automatic playback through ignored; explicit play and cycles retain
+  access. Batch deletion changes one complete show per command, and external media
+  stays read-only. These commands and data remain owned by the shared core.
+- 2026-10-24: The owner confirmed the six commands of seeds 29 and 30, `ignore`,
+  `remove many`, `mapping get`, `mapping set`, `mapping test on` and `mapping test off`,
+  the reply members `ignored` of `list` and `external` of `space`, and the error
+  `mapping-conflict`, which Codex had recorded as the owner's requests.
+- 2026-10-24: A USB stick through a powered hub failed on the board with seed 22's trial
+  firmware, and the owner closed the hub path as a waste of time: seed 22 is superseded.
+  A microSD card is the external storage instead, which Codex built on the branch
+  `codex/microsd-storage` on 2026-10-21 and 2026-10-22 without a seed; seed 38 takes it
+  in. The move to the newer software stays, as the microSD firmware is built on it.
+- 2026-10-24: Seeds 31 to 35 and 37, which Codex wrote from its investigation of the
+  board on 2026-10-24, came to master as seeds; none has a spec yet.

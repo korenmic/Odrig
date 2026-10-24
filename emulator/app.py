@@ -129,7 +129,7 @@ def serve(arguments, out):
             print("warning: --lan: anyone on the local network can send commands to this emulator and open its page", file=sys.stderr, flush=True)
         server = httpd.Server(
             PORT if arguments.port is None else arguments.port, running, arguments.show_dir,
-            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": described["legs"], "t0": described["t0"], "error": running.error()},
+            lambda: {"show": described["show"], "drive": described["drive"], "page": server.url, "serial": described["serial"], "tcp": described["tcp"], "legs": [list(leg) for leg in core.legs], "t0": described["t0"], "error": running.error()},
             lan=arguments.lan,
         )
 

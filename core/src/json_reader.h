@@ -46,6 +46,7 @@ struct JsonReader {
     // An integer without a sign, or `-0`: a JSON number written without a fraction and
     // without an exponent. A value above 4,294,967,295 is given as 4,294,967,295.
     bool integer(uint32_t *value);
+    bool boolean(bool *value);
 
     // An integer that may be below zero, given as a sign and a size.
     bool any_integer(bool *negative, uint32_t *size);

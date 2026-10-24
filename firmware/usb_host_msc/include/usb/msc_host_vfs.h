@@ -39,6 +39,9 @@ esp_err_t msc_host_vfs_register(msc_host_device_handle_t device,
  */
 esp_err_t msc_host_vfs_unregister(msc_host_vfs_handle_t vfs_handle);
 
+/** Reads free and total data-cluster capacity without modifying the volume. */
+esp_err_t msc_host_vfs_space(msc_host_vfs_handle_t vfs_handle, uint64_t *free_bytes, uint64_t *total_bytes);
+
 #ifdef __cplusplus
 }
 #endif

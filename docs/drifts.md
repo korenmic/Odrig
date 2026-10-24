@@ -8743,3 +8743,154 @@ in which both sides exist.
 
 **Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
 2.6; `design.md`, "Free and total space"; `tasks.md`, task 6.
+## Seed 29: The scope and meaning of ignoring an animation
+
+**Question.** The owner requested a playlist toggle in the Android app, emulator and
+serial tool. Does ignoring delete or hide an animation, affect explicit play or cycles,
+or apply to a removable drive? What happens when all installed animations are ignored?
+
+**Answer.** The setting belongs to each animation in the writable installed show and
+survives restarts. It only excludes automatic playlist turns. Explicit play still gives
+an ignored animation one normal turn, and explicit cycles keep their contents. Drive
+animations remain outside this seed. Ignoring the current playlist animation advances
+immediately; an empty eligible playlist becomes idle and black without changing the
+on/off setting. Including an animation while idle resumes the playlist. The shared
+web app supplies one labelled toggle everywhere it runs. The command is an idempotent
+`ignore <id> <0|1>`, with an optional boolean `ignored` in show items and a boolean in
+installed animation list replies. New uploads are included; replacements preserve the
+setting. This plans the owner's requested extension of the default playlist decision;
+implementation must update the defining documents and their change log together.
+
+**Resolution.** `project-seeds/29-p1-toggle-animations-in-the-playlist/seed.md` states
+these choices, including startup, errors, persistence, synchronization and checks.
+The entry file lists the planned seed. No runtime behavior changes with this record.
+
+## Seed 30: Reassign whole snakes and check them with one diagonal
+
+**Question.** The owner requested app-controlled pin-to-snake mapping and a diagonal
+animation in one seed. Does this include arbitrary GPIOs, changes within a snake or
+automatic detection of wiring? Is the test an ordinary uploaded playlist item?
+
+**Answer.** The feature permutes the twenty output pins of the target's valid mapping
+among the twenty fixed three-column snakes. It does not choose new pins or alter the
+geometry, snake directions, wiring or power. The app edits a draft and saves the whole
+assignment in one durable operation to the existing mapping file. A built-in diagnostic
+animation shows only white pixels at x = y on black, through the normal decoder and
+mapping pipeline, until stopped. It does not need an upload or join the playlist. The
+shared app controls both features on Android and in the emulator; all target operations
+also use the common command routes. An operator verifies the physical line by eye.
+The seed specifies startup, conflicts, failures, test-mode exit and compatibility.
+
+**Resolution.** `project-seeds/30-p1-app-mapping-and-diagonal-check/seed.md` records
+the combined scope and resolved behavior. Implementation must update the default-pin
+and command decisions and the defining documents together. No installed mapping,
+firmware, animation or hardware is changed while creating the seed.
+
+## Seed 30: Mapping protocol, asset and output handoff
+
+**Question.** How can twenty pins be saved within the existing line limit, conflicts
+be detected across restarts, and a diagnostic be shipped without consuming user
+animation storage? The firmware also caches startup leg descriptors.
+
+**Answer.** Use `mapping get`, `mapping set REV PINS` with a comma-separated complete
+permutation and the CRC-32 of current pin bytes, and `mapping test on/off`. Serialize
+to mapping.part and commit by atomic rename. Probe and discard a leftover part at
+startup without changing ordinary startup storage-call numbering. Embed the same
+converter-produced ODRG bytes in the core and decode once into existing playback
+memory. Freeze physical output resources and refresh their cached RGB pointers by
+matching the new logical leg assignment to each physical pin under the core lock.
+The fallback currently remains a seed-12 trial; its output adapter can share this
+routing contract without claiming a completed standalone player.
+
+**Resolution.** The seed-30 design, core mapping_control implementation and command,
+mapping and core documentation specify these choices. Hardware acceptance remains
+explicitly deferred because the owner requested no flashing in this run.
+
+## Seed 30: Keeping transport inventories consistent during implementation
+
+**Question.** The core and documentation now expose a mapping command family, while
+the command tool's inventory was assigned to the later app task. Host integration
+verification checks that those inventories agree.
+
+**Answer.** Add the command tool's basic mapping argument forms in the transport task,
+with the corresponding inventory fixtures. Keep app controls and end-to-end client
+scenarios in the following task. This changes task ownership, not seed scope. Keep
+physical driver resources stable and change cached pointers under one lock instead
+of rebuilding outputs while another processor copies a refresh.
+
+**Resolution.** Seed-30 tasks 2 and 3, the command tool, firmware routing helper and
+emulator mapping events carry the integration boundary. Per-pin byte regressions
+were observed failing with the old cached assignment before the host changes.
+
+
+## Seed 30: Recovering an uncertain save in the shared app
+
+**Question.** A mapping save may commit even when its reply is lost. Background reads
+and target changes must not silently replace the operator's unsaved assignments.
+
+**Answer.** Serialize mapping requests with the app's existing command stream. Keep a
+local draft and its base revision, poll only while Mapping is visible, and block a stale
+save until Reload or Cancel. After a failed mutation read once, keep the draft, and
+require an explicit reload before another attempt. Never repeat the write automatically.
+Changing the target clears the draft and rejects replies from the previous target.
+The diagnostic is target-owned and stays active through app navigation or restart.
+
+**Resolution.** The shared Mapping screen and browser regressions cover swaps, save,
+cancel, default drafts, concurrent edits, lost replies, target changes, app restarts,
+unsupported targets and both portrait and landscape. Four bottom tabs use equal widths
+and 16px labels to fit at 320px while keeping 56px touch targets.
+
+
+## Seed 30: Keeping the packaged diagnostic outside example fixtures
+
+**Question.** The fresh-checkout walkthrough failed after the new tracked diagnostic
+source changed the directory digest of `animations/`, used by the converter's stored
+reference requests. Before the source was tracked, that suite had passed locally.
+
+**Answer.** Keep the diagnostic JSON in `core/assets/`, beside the player that packages
+it. Update the converter-only asset generator and mapping documentation to that path.
+Leave the example sources, frozen reference answers and converter output unchanged.
+
+**Resolution.** The fresh-checkout failure was observed before moving the file. The
+converter's 1,317 tests then passed with the source tracked at its final location, the
+asset regeneration check still produced the same 45 bytes, and all 29 mapping tests
+passed. Both firmware builds and the rebuilt APK are retained without flashing; real
+installation and phone acceptance remain the owner's later task.
+
+
+## Seed 30: Preserving APK update identity across worktrees
+
+**Question.** A build in the temporary worktree generated a new debug signing key. The
+resulting APK's certificate differed from the previously published APK's certificate.
+
+**Answer.** Build the delivery APK with the existing local debug keystore, copied only
+into the worktree's ignored build folder. Verify both APK certificate hashes and rerun
+the APK suite against that final signed file. Never track or publish the keystore.
+
+**Resolution.** The rebuilt APK has the same signer as the existing public APK and all
+eight APK checks pass. Its final hash is in the verification record. The branch carries
+only source and documentation; APK binaries and local key material remain ignored.
+
+## 2026-10-24 — playlist storage transactions
+
+The owner's expanded playlist-management request authorizes ignore and remove many
+on every existing command route. Batch commands accept at most 32 distinct installed
+animations; the app chunks larger selections and reports partial failure. Shared
+files survive any remaining reference. The existing chunk of 1,500 bytes also bounds the
+recovery journal, extended from 512 bytes. Failed cleanup blocks subsequent show
+mutations until restart retries it, preventing journal overwrite. Explicit false is
+preserved; omitted ignored remains omitted until changed. External capacity is an
+optional fact supplied by the host, never a new permission to write removable media.
+
+## Seed 29: mutation controls on an older target
+
+**Question.** An older list reply omits `ignored` on every animation, while the shared
+protocol now omits it only on external entries. Can the app infer editability from ids?
+
+**Answer.** No. An installed animation can have an id above60000. Keep playback controls
+but omit inclusion and deletion controls wherever the flag is absent. A missing external
+capacity object means unavailable, rather than inventing absent media. The core remains
+the authority for every mutation and capacity fact.
+
+**Resolution.** `app/www/commands.js`, the Show and Storage screens, and
+`docs/android-app.md` describe and implement this compatibility behavior.

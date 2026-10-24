@@ -2,6 +2,7 @@
 
 import collections
 import os
+import shutil
 import sys
 import time
 
@@ -160,6 +161,16 @@ class FolderHost:
             if self._second_name is not None and self._second_name.startswith(DRIVE_PREFIX):
                 self._drop_second()
         return number
+
+    def drive_space(self, generation):
+        """Filesystem free and total bytes of the mounted external folder, or unknown."""
+        if self.drive is None or generation == 0 or generation != self.drive.look():
+            return None
+        try:
+            usage = shutil.disk_usage(self.drive.top)
+            return usage.free, usage.total
+        except OSError:
+            return None
 
     def drive_name(self, drive, place):
         """The name of the file at a place of that drive's list, or `None`."""

@@ -1,10 +1,12 @@
 {
   "number": 22,
   "slug": "22-p2-a-usb-stick-through-a-hub",
-  "state": "in_progress",
+  "state": "superseded",
   "title": "A USB stick through a hub",
   "priority": "P2",
   "addedAt": "2026-10-15T03:10:00+03:00",
   "addedCommit": "pending-local",
-  "summary": "The firmware reads a USB stick plugged into a hub with its own power on the chip's own port, by moving its USB software to a version of Espressif's software that knows hubs, after a trial on the board."
+  "summary": "The firmware reads a USB stick plugged into a hub with its own power on the chip's own port, by moving its USB software to a version of Espressif's software that knows hubs, after a trial on the board.",
+  "supersededAt": "2026-10-24T08:40:00+03:00",
+  "supersededBy": 38
 }

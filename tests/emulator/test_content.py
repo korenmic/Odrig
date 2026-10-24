@@ -32,7 +32,7 @@ class Space(unittest.TestCase):
     def test_space_gives_the_reply_of_the_reference_over_serial_and_over_http(self):
         emulator = self.started()
         expected = ReferencePlayer(support.files_of(self.folder)).command(0, b"space")
-        self.assertEqual(expected, b'{"ok":true,"free":13484032,"total":13500416,"animations":2}\n')
+        self.assertEqual(expected, b'{"ok":true,"free":13484032,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}\n')
         for route, ask in ROUTES.items():
             self.assertEqual(ask(emulator, "space"), expected, route)
             self.assertEqual(ask(emulator, "space 1"), b'{"ok":false,"error":"bad-argument"}\n', route)
@@ -42,7 +42,7 @@ class Space(unittest.TestCase):
         emulator = self.started()
         for route, ask in ROUTES.items():
             reply = json.loads(ask(emulator, "space"))
-            self.assertEqual(reply, {"ok": True, "free": BOARD_STORAGE - 6 * STORAGE_BLOCK, "total": BOARD_STORAGE, "animations": 2}, route)
+            self.assertEqual(reply, {"ok": True, "free": BOARD_STORAGE - 6 * STORAGE_BLOCK, "total": BOARD_STORAGE, "animations": 2, "external": {"present": False, "free": None, "total": None, "read_only": True}}, route)
         (self.folder / "more.odrg").write_bytes(bytes(3 * STORAGE_BLOCK))
         self.assertEqual(json.loads(over_http(emulator, "space"))["free"], BOARD_STORAGE - 9 * STORAGE_BLOCK)
         (self.folder / "more.odrg").unlink()
@@ -57,7 +57,7 @@ class Space(unittest.TestCase):
                     expected = ReferencePlayer(support.files_of(self.folder), storage=total).command(0, b"space")
                     for route, ask in ROUTES.items():
                         self.assertEqual(ask(emulator, "space"), expected, route)
-                    self.assertEqual(json.loads(expected), {"ok": True, "free": max(0, total - 4 * STORAGE_BLOCK), "total": total, "animations": 2})
+                    self.assertEqual(json.loads(expected), {"ok": True, "free": max(0, total - 4 * STORAGE_BLOCK), "total": total, "animations": 2, "external": {"present": False, "free": None, "total": None, "read_only": True}})
                 finally:
                     emulator.stop()
 
@@ -65,7 +65,7 @@ class Space(unittest.TestCase):
         (self.folder / "dvd.odrg").unlink()
         emulator = self.started()
         for route, ask in ROUTES.items():
-            self.assertEqual(json.loads(ask(emulator, "space")), {"ok": True, "free": BOARD_STORAGE - 3 * STORAGE_BLOCK, "total": BOARD_STORAGE, "animations": 0}, route)
+            self.assertEqual(json.loads(ask(emulator, "space")), {"ok": True, "free": BOARD_STORAGE - 3 * STORAGE_BLOCK, "total": BOARD_STORAGE, "animations": 0, "external": {"present": False, "free": None, "total": None, "read_only": True}}, route)
         self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
 
     def test_space_changes_no_file_of_the_folder(self):
@@ -99,7 +99,7 @@ class ListAndRemove(unittest.TestCase):
                 self.assertEqual(ask(emulator, line), expected, (route, line))
         self.assertEqual(
             player.command(0, b"list"),
-            b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138},{"id":2,"file":"dvd.odrg","bytes":1612},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}\n',
+            b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}\n',
         )
 
     def test_remove_changes_the_show_and_the_folder_as_the_reference_has_them_by_each_route(self):
@@ -141,7 +141,7 @@ class ListAndRemove(unittest.TestCase):
         self.assertEqual(sorted(support.files_of(self.folder)), ["hello.odrg", "mapping.json", "show.json"])
         again = self.started()
         self.assertEqual(over_serial(again, "list"), listed)
-        self.assertEqual(listed, b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138}],"next":null}\n')
+        self.assertEqual(listed, b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false}],"next":null}\n')
         state = again.status()
         self.assertEqual((state["playing"], state["animation"], state["error"]), ("all", 1, None))
         self.assertEqual(over_http(again, "play 1"), b'{"ok":true}\n')
@@ -208,7 +208,7 @@ class Uploads(unittest.TestCase):
                     self.assertEqual([json.loads(reply)["received"] for reply in given[1:]], [min(len(self.clip), 1500 * count) for count in range(1, len(given))])
                     self.assertEqual(ended, DONE)
                     listed = json.loads(over_http(emulator, "list"))["items"]
-                    self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(self.clip)})
+                    self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False})
                     self.assertEqual(over_serial(emulator, f"play {number}"), DONE)
                     state = emulator.status()
                     self.assertEqual((state["playing"], state["animation"], state["error"]), ("all", number, None))
@@ -234,12 +234,12 @@ class Uploads(unittest.TestCase):
         finally:
             emulator.stop()
         again = self.started()
-        self.assertEqual(json.loads(over_serial(again, "list"))["items"][-1], {"id": 9, "file": "clip.odrg", "bytes": len(self.clip)})
+        self.assertEqual(json.loads(over_serial(again, "list"))["items"][-1], {"id": 9, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False})
         self.assertEqual(over_http(again, "play 9"), DONE)
         self.assertEqual((again.status()["playing"], again.status()["animation"]), ("all", 9))
         smaller = core_support.clip(5, 60, 6)
         self.assertEqual(upload(again, (support.LINES,), 9, "smaller.odrg", smaller)[1], DONE)
-        self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller)})
+        self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller), "ignored": False})
         self.assertEqual((again.status()["playing"], again.status()["animation"]), ("all", 9))
         self.assertEqual(over_http(again, "remove 9"), DONE)
         again.stop()

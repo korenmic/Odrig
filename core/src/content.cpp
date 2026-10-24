@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "player.h"
 #include "storage.h"
 
 namespace odrig {
@@ -41,7 +42,7 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
     uint32_t size = text_length(kListId) + digits(item.id);
     if (!item.is_cycle) {
         const FileInfo &file = core.files[item.first];
-        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + 1;
+        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + (item.ignored ? 15 : 16) + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -141,7 +142,18 @@ uint32_t content_space(const Core &core, Reply &reply) {
     reply.number(total_bytes);
     reply.text(",\"animations\":");
     reply.number(animations);
-    reply.text("}\n");
+    const uint32_t generation = core.host.drive != nullptr && core.host.drive_name != nullptr && storage_changes(core) ? core.host.drive(core.host.ctx) : 0;
+    uint64_t external_free = 0, external_total = 0;
+    const bool known = generation != 0 && core.host.drive_space != nullptr &&
+        core.host.drive_space(core.host.ctx, generation, &external_free, &external_total) == 1 &&
+        external_free <= external_total && external_total <= 9007199254740991ull;
+    reply.text(",\"external\":{\"present\":");
+    reply.text(generation != 0 ? "true" : "false");
+    reply.text(",\"free\":");
+    if (known) reply.number(external_free); else reply.text("null");
+    reply.text(",\"total\":");
+    if (known) reply.number(external_total); else reply.text("null");
+    reply.text(",\"read_only\":true}}\n");
     return reply.length;
 }
 
@@ -203,6 +215,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(file.name);
             reply.text(kListBytes);
             reply.number(file.bytes);
+            reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
         } else {
             reply.text(kListCycle);
             for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -250,6 +263,55 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
     return succeed(reply);
 }
 
+bool content_removed(const Core &core, uint32_t position, const ShowChange &change) {
+    if (position == change.without) return true;
+    for (uint32_t at = 0; at < change.removed_count; ++at) {
+        if (core.items[position].id == change.removed[at]) return true;
+    }
+    return false;
+}
+
+uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
+    if (core.upload.state != kUploadNone) return refuse(reply, "busy");
+    uint32_t position = 0;
+    while (position < core.item_count && core.items[position].id != id) ++position;
+    if (position == core.item_count) return refuse(reply, drive_has_id(core, id) ? "in-use" : "unknown-id");
+    ItemInfo &item = core.items[position];
+    if (item.is_cycle) return refuse(reply, "in-use");
+    if ((item.ignored != 0) == ignored) return succeed(reply);
+    if (!storage_changes(core) || core.pending_cleanup) return refuse(reply, "storage-error");
+    ShowChange change;
+    change.inclusion = position;
+    change.ignored = ignored;
+    if (!content_write_show(core, change) || core.host.rename(core.host.ctx, kShowPart, kShowFile) != 1) {
+        core.host.remove(core.host.ctx, kShowPart);
+        return refuse(reply, "storage-error");
+    }
+    item.ignored = ignored ? 1 : 0;
+    item.has_ignored = 1;
+    player_inclusion_changed(core, position);
+    return succeed(reply);
+}
+
+uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Reply &reply) {
+    if (core.upload.state != kUploadNone) return refuse(reply, "busy");
+    for (uint32_t at = 0; at < count; ++at) {
+        uint32_t position = 0;
+        while (position < core.item_count && core.items[position].id != ids[at]) ++position;
+        if (position == core.item_count) return refuse(reply, drive_has_id(core, ids[at]) ? "in-use" : "unknown-id");
+    }
+    for (uint32_t at = 0; at < count; ++at) {
+        uint32_t position = 0;
+        while (core.items[position].id != ids[at]) ++position;
+        if (core.items[position].is_cycle) return refuse(reply, "in-use");
+        for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
+            if (core.entries[entry] == position) return refuse(reply, "in-use");
+        }
+    }
+    if (!storage_changes(core) || !storage_remove_many(core, ids, count)) return refuse(reply, "storage-error");
+    return succeed(reply);
+}
+
 bool content_write_show(Core &core, const ShowChange &change) {
     const odrig_host &host = core.host;
     if (host.write_open(host.ctx, kShowPart) != 1) {
@@ -268,7 +330,7 @@ bool content_write_show(Core &core, const ShowChange &change) {
     out.text(",\"items\":[");
     bool first = true;
     for (uint32_t position = 0; position < core.item_count; ++position) {
-        if (position == change.without) {
+        if (content_removed(core, position, change)) {
             continue;
         }
         const ItemInfo &item = core.items[position];
@@ -290,6 +352,10 @@ bool content_write_show(Core &core, const ShowChange &change) {
             if (item.seconds != 0) {
                 out.text(",\"max_seconds\":");
                 out.number(item.seconds);
+            }
+            if (item.has_ignored || position == change.inclusion) {
+                out.text(",\"ignored\":");
+                out.text((position == change.inclusion ? change.ignored : item.ignored != 0) ? "true" : "false");
             }
             out.byte('}');
         } else {
@@ -316,7 +382,7 @@ bool content_write_show(Core &core, const ShowChange &change) {
         out.text("\"}");
     }
     out.byte(']');
-    if (core.has_start && core.start_item != change.without) {
+    if (core.has_start && !content_removed(core, core.start_item, change)) {
         out.text(",\"start\":");
         out.number(core.items[core.start_item].id);
     }
@@ -344,6 +410,8 @@ void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes,
     item.id = static_cast<uint16_t>(id);
     item.seconds = 0;
     item.is_cycle = 0;
+    item.ignored = 0;
+    item.has_ignored = 0;
     item.first = core.file_count++;
     item.count = 0;
     set_file(core.files[item.first], name, bytes, total_ms);

@@ -343,3 +343,20 @@ x=60  | 121 -------------------------------------------> 180 |
   bottom of its left column is how the owner's description was read. It has not been
   compared with the installation. If the installation is wired another way, only
   `mapping/legs-20.json` changes.
+
+## Editing an installed target mapping
+
+The pin table above is the default. The mapping controls in the shared operators'
+app can permute the twenty existing GPIOs among the canonical twenty three-column
+snakes. Snake identities, canvas positions and chain directions remain unchanged.
+The target writes the complete assignment to `mapping.part`, closes it durably,
+then atomically renames it over `mapping.json`. Only after that commit do the live
+pin assignments change. Interrupted parts are discarded at startup. A concurrent
+change is detected by the revision returned from `mapping get`.
+
+The built-in mapping diagnostic is a single white diagonal on black, from (1,1) to
+(60,60). It remains displayed until stopped, uses the saved mapping rather than an
+app draft, and preserves power, brightness and current limiting. Its JSON source is
+`core/assets/mapping-diagonal.json`; `python3 core/diagonal.py --check` checks the
+embedded ODRG bytes against the converter. Explicit physical verification is an
+owner's check; software cannot detect whether a wire actually reaches a snake.

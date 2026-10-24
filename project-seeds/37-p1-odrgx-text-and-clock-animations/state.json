@@ -1,0 +1,10 @@
+{
+  "number": 37,
+  "slug": "37-p1-odrgx-text-and-clock-animations",
+  "state": "remaining",
+  "title": "ODRGX text and clock animations",
+  "priority": "P1",
+  "addedAt": "2026-10-24T06:56:27+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Add a backward-compatible header-selected ODRGX container, firmware-font Hebrew/English multiline text effects, analog/digital/melting art clocks, and shared app creation/editing/preview with managed catalogs and bounded runtime rendering."
+}

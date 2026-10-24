@@ -58,7 +58,7 @@ class Space(Content):
         self.assertEqual(sorted(files), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
         self.assertTrue(all(len(content) <= BLOCK for content in files.values()))
         printed = self.run_both(files, [support.line(T0, "space")])
-        self.assertEqual(printed, ['reply {"ok":true,"free":13484032,"total":13500416,"animations":2}'])
+        self.assertEqual(printed, ['reply {"ok":true,"free":13484032,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}'])
         self.assertEqual(BOARD - 4 * BLOCK, 13484032)
 
     def test_the_total_is_the_one_the_host_reports(self):
@@ -66,7 +66,7 @@ class Space(Content):
         for total in (0, 1, 4 * BLOCK - 1, 4 * BLOCK, 4 * BLOCK + 1, 1000000, 4294967295):
             with self.subTest(total=total):
                 reply = self.space(files, ["--storage", str(total)], total)
-                self.assertEqual(reply, {"ok": True, "free": max(0, total - 4 * BLOCK), "total": total, "animations": 2})
+                self.assertEqual(reply, {"ok": True, "free": max(0, total - 4 * BLOCK), "total": total, "animations": 2, "external": {"present": False, "free": None, "total": None, "read_only": True}})
 
     def test_every_file_of_the_folder_takes_whole_blocks(self):
         for size, blocks in ((0, 0), (1, 1), (BLOCK - 1, 1), (BLOCK, 1), (BLOCK + 1, 2), (10 * BLOCK, 10), (10 * BLOCK + 1, 11)):
@@ -100,8 +100,8 @@ class Space(Content):
 
     def test_with_an_invalid_show_the_space_is_reported_and_the_animations_are_0(self):
         reply = self.space(invalid_show())
-        self.assertEqual(reply, {"ok": True, "free": BOARD - 3 * BLOCK, "total": BOARD, "animations": 0})
-        self.assertEqual(self.space({}), {"ok": True, "free": BOARD, "total": BOARD, "animations": 0})
+        self.assertEqual(reply, {"ok": True, "free": BOARD - 3 * BLOCK, "total": BOARD, "animations": 0, "external": {"present": False, "free": None, "total": None, "read_only": True}})
+        self.assertEqual(self.space({}), {"ok": True, "free": BOARD, "total": BOARD, "animations": 0, "external": {"present": False, "free": None, "total": None, "read_only": True}})
         self.assertEqual(self.space({"mapping.json": "{"})["animations"], 0)
         no_show = support.example_show()
         del no_show["show.json"]
@@ -141,7 +141,7 @@ class Space(Content):
         with_storage = support.start(files, [support.line(T0, "space")])
         only_space = support.start(files, [support.line(T0, "space")], ["--only-space"])
         self.assertEqual(only_space.lines, with_storage.lines)
-        self.assertEqual(replies(only_space.lines), ['{"ok":true,"free":13484032,"total":13500416,"animations":2}'])
+        self.assertEqual(replies(only_space.lines), ['{"ok":true,"free":13484032,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}'])
 
     def test_of_two_codes_that_apply_the_first_of_the_order_is_given(self):
         lines = {"space" + " " * 2044: "line-too-long", "spaces 1": "unknown-command", "space 1": "bad-argument", "space": "storage-error"}
@@ -151,7 +151,7 @@ class Space(Content):
     def test_space_through_the_byte_entry(self):
         printed = self.run_both(support.example_show(), [support.fed(T0, b"spa"), support.fed(T0 + 1, b"ce\r\nspace\n")])
         self.assertEqual(printed[0], f"fed {b'space'.hex()}")
-        self.assertEqual(replies(printed), ['{"ok":true,"free":13484032,"total":13500416,"animations":2}'] * 2)
+        self.assertEqual(replies(printed), ['{"ok":true,"free":13484032,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}'] * 2)
 
     def test_space_changes_nothing_and_does_not_disturb_playback(self):
         files = playing(support.example_show(), 3)
@@ -223,11 +223,11 @@ class List(Content):
 
     def expected_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]])) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
 
     def test_the_example_show_is_listed_as_the_document_has_it(self):
         printed = self.run_both(support.example_show(), [support.line(T0, "list"), support.line(T0, "list 0")])
-        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138},{"id":2,"file":"dvd.odrg","bytes":1612},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
+        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
         self.assertEqual(replies(printed), [expected, expected])
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         self.assertIn(f"list\n{expected}\n", text)
@@ -269,7 +269,7 @@ class List(Content):
         self.assertGreater(len(given), 9)
         # Every reply but the last is as full as it can be: the next item would not fit.
         sizes = [len(reply) + 1 for reply in given]
-        self.assertTrue(all(size > 1024 - 75 for size in sizes[:-1]), sizes)
+        self.assertTrue(all(size > 1024 - 91 for size in sizes[:-1]), sizes)
 
     def test_a_reply_is_at_most_1024_bytes_and_one_of_exactly_1024_is_given(self):
         clip = support.clip(1, 60, 6)
@@ -411,7 +411,7 @@ class Remove(Content):
 
     def reference_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]])) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
 
     def test_removing_the_start_item_leaves_the_show_without_start(self):
         # Without a start, the show that is left plays the playlist from its first animation.
@@ -477,7 +477,7 @@ class Remove(Content):
         self.assertEqual(sorted(self.left), ["mapping.json", "show.json"])
         again = support.start(self.left, [support.line(T0, "status"), support.line(T0, "list"), support.line(T0, "space")])
         self.assertIsNone(again.error)
-        self.assertEqual(again.lines[1:], ['reply {"ok":true,"items":[],"next":null}', f'reply {{"ok":true,"free":{BOARD - 2 * BLOCK},"total":{BOARD},"animations":0}}'])
+        self.assertEqual(again.lines[1:], ['reply {"ok":true,"items":[],"next":null}', f'reply {{"ok":true,"free":{BOARD - 2 * BLOCK},"total":{BOARD},"animations":0,"external":{{"present":false,"free":null,"total":null,"read_only":true}}}}'])
         self.assertEqual(json.loads(again.lines[0][6:])["brightness"], 77)
 
     def test_the_brightness_written_is_the_one_of_the_show_file(self):

@@ -1887,3 +1887,15 @@ animations, all through the socket marked COM:
 - The board was left on the trial, playing the owner's show.
 - Not tried yet: a hub with its own power and a stick on the chip's own socket, without
   the Mac there.
+
+## Live pin assignments
+
+The shared core durably commits a whole pin permutation through the mapping command
+family. WLED keeps its startup physical outputs and driver channels; cached RGB
+pointers are resolved to the logical leg currently assigned to each physical pin.
+Both command transports and a complete refresh copy use the core lock, so a save
+cannot split a frame between two assignments. The standalone output adapter follows
+the same pin lookup contract. Its current main program remains a seed-12 trial,
+not a complete standalone player or evidence that app control works on that trial.
+
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never writes or formats removable media. Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.

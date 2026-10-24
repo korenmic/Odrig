@@ -32,6 +32,8 @@ struct ItemInfo {
     uint16_t id;
     uint16_t seconds;
     uint8_t is_cycle;
+    uint8_t ignored;
+    uint8_t has_ignored;
     uint32_t first;
     uint32_t count;
 };
@@ -157,6 +159,7 @@ struct Core {
     // whether the show file says so itself.
     uint16_t min_seconds;
     uint8_t has_min_seconds;
+    uint8_t pending_cleanup;
 
     // A block of kChunkSize bytes for a host whose storage can be changed: a piece of an
     // upload or the text of a file the core writes, on its way to the host, and
@@ -220,6 +223,12 @@ struct Core {
     char *feed_reply;
     uint16_t line_length;
     uint8_t line_over;
+
+    // The diagnostic holds a decoded picture and a selection to resume.
+    uint8_t mapping_test;
+    uint32_t mapping_saved_playing;
+    uint32_t mapping_saved_shown;
+    uint32_t cycle_start_entry;
 
     // Playback.
     uint8_t on;

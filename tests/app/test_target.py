@@ -60,7 +60,7 @@ class TheAddress(Target):
         self.assertEqual(found.seen["failure"], NO_ANSWER.format("4.3.2.1"))
         sent = support.commands_elsewhere(found)
         self.assertGreaterEqual(len(sent), 1)
-        self.assertEqual(set(sent), {("4.3.2.1", b"status")})
+        self.assertEqual(set(sent), {("4.3.2.1", b"status"), ("4.3.2.1", b"space")})
 
     def test_an_address_that_was_set_is_kept_when_the_app_is_opened_again_and_board_puts_the_boards_back(self):
         _, first = self.emulator()
@@ -68,7 +68,7 @@ class TheAddress(Target):
         found = support.run("kept", address=first, settings={"other": other.address})
         self.assertEqual(found.seen["reloaded"], {"field": other.address, "kept": other.address})
         self.assertEqual(found.seen["board"], {"field": "4.3.2.1", "kept": "4.3.2.1", "failure": NO_ANSWER.format("4.3.2.1")})
-        self.assertEqual(set(support.commands_elsewhere(found)), {("4.3.2.1", b"status")})
+        self.assertEqual(set(support.commands_elsewhere(found)), {("4.3.2.1", b"status"), ("4.3.2.1", b"space")})
         self.assertGreaterEqual(len(other.lines), 2)
 
     def test_a_text_that_is_no_address_is_refused_with_a_message_and_the_address_in_use_stays(self):
@@ -151,7 +151,7 @@ class Requests(Target):
     def test_status_is_asked_once_a_second(self):
         target = entered(self, support.StandIn(support.SOUND))
         support.run("waits", address=target.address, settings={"ms": 5300})
-        self.assertEqual(set(target.lines), {self.STATUS, self.LIST})
+        self.assertEqual(set(target.lines), {self.STATUS, self.LIST, ("/odrig", b"space")})
         self.assertIn(target.lines.count(self.STATUS), (6, 7), target.lines)
         self.assertEqual(target.together, 1)
 
@@ -168,7 +168,7 @@ class Requests(Target):
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
             logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
-        self.assertEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http")})
+        self.assertEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http")})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 
 

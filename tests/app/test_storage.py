@@ -45,7 +45,7 @@ class TheStorageScreen(unittest.TestCase):
         self.assertEqual(found["before"]["space"], f"Free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
         self.assertEqual([row["text"] for row in found["before"]["rows"]], [f"{item['id']} {item['file']} {-(-item['bytes'] // 1000)} KB" for item in listed])
         self.assertEqual({tuple(row["buttons"]) for row in found["before"]["rows"]}, {("Remove",)})
-        self.assertEqual(found["buttons"], ["Show", "Storage", "Target"])
+        self.assertEqual(found["buttons"], ["Show", "Storage", "Mapping", "Target"])
         self.assertEqual((found["before"]["none"], found["before"]["dimmed"]), (None, False))
 
     def test_a_cycle_is_no_row_and_a_small_file_is_one_kilobyte(self):

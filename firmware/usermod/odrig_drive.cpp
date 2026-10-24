@@ -197,6 +197,24 @@ uint32_t driveNumber(void *) {
   return number;
 }
 
+// The drive's free and total bytes, read from its file system without a write: the
+// card's from the SD library, the stick's from the USB driver's volume.
+int driveSpace(void *, uint32_t drive, uint64_t *freeBytes, uint64_t *totalBytes) {
+  Guarded held;
+#ifdef ODRIG_DRIVE_SD_SPI
+  if (drive == 0 || drive != number || !cardMounted) return -1;
+  const uint64_t total = SD.totalBytes();
+  const uint64_t used = SD.usedBytes();
+  if (total == 0 || used > total) return -1;
+  *totalBytes = total;
+  *freeBytes = total - used;
+  return 1;
+#else
+  if (drive == 0 || drive != number || mounted == nullptr) return -1;
+  return msc_host_vfs_space(mounted, freeBytes, totalBytes) == ESP_OK ? 1 : -1;
+#endif
+}
+
 int driveName(void *, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
   Guarded held;
   if (drive == 0 || drive != number || place >= listed || capacity == 0) return 0;
@@ -634,6 +652,7 @@ odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   made.read_at = readPart;
   made.drive = driveNumber;
   made.drive_name = driveName;
+  made.drive_space = driveSpace;
   return made;
 }
 

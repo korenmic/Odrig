@@ -87,6 +87,7 @@ Every function receives `ctx` as its first argument.
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
+| `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -115,7 +116,7 @@ The last seven members are the storage functions: three that write a file, `rena
   function than writing, renaming and removing, because `open`, `read` and `close` hold
   the one file that plays.
 
-The last two members are the drive. A host with a drive sets both, and has storage that
+The drive and drive_name members describe the drive. A host with a drive sets both, and has storage that
 can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
 drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
 the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash. A
@@ -258,7 +259,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `in-use`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+`unknown-id`, `in-use`, `mapping-conflict`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
 changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
 upload they are about.
 
@@ -283,7 +284,7 @@ change left:
 
 1. Before anything is read, it removes `upload.part` and `show.part`.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
-   it reads at most 512 bytes and takes every line that ends in a line feed and is a file
+   it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
    removed, and then `pending.txt`. When a file could not be removed, `pending.txt` stays
    for the next start; when it could not be read, nothing is removed.
@@ -537,7 +538,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,360 |
+| The core object | fixed | 3,384 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -553,15 +554,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,605** |
+| **Total** | | **124,629** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,090 bytes. A host
+46,008 of them. The example show on the two-leg mapping asks for 88,114 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,097 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,121 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,701 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,725 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -665,3 +666,31 @@ when a check fails:
 | 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or for an offset that is neither 0 nor where its last call for that file ended. |
 | 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |
 | 75 | `power cut` | The storage call that `--cut-at` names was reached. |
+
+## Live mapping and its diagnostic
+
+The mapping command family is specified in commands.md. The core accepts only
+whole permutations of the existing pins on the canonical twenty-snake canvas.
+It validates geometry against its LED-to-pixel table and keeps mapping entry order.
+The pin-list CRC revision prevents a stale client from replacing another edit.
+The bounded writer uses the existing storage chunk, and commits mapping.part with
+one atomic rename before changing in-memory pins. Startup discards a leftover
+mapping.part without touching the installed mapping.
+
+Diagnostic entry saves the current playlist or cycle selection, closes playback,
+and decodes the embedded converter-built ODRG through the ordinary decoder into
+existing pixel memory. Poll uses the normal palette, brightness and LED mapping
+on that picture while ordinary show progression is paused. Exit restarts the
+saved animation; cycles retain the current entry as their first resumed turn.
+The mode is transient and no show file changes. There is no runtime allocation.
+
+### Inclusion and batch changes
+
+ItemInfo uses two existing padding bytes for ignored and explicit presence; its size
+stays 16 bytes. `ignore` writes and renames the show before changing playback.
+`remove many` validates up to 32 distinct animation ids and writes one complete show.
+Its pending journal holds up to 32 filenames (1,056 bytes), within the existing
+chunk of 1,500 bytes. Cleanup yields an unfinished drive check and uses the checker's
+read_at source, preserving the playback file. The drive check then restarts safely.
+A failed cleanup keeps the journal and blocks later metadata changes with storage-error
+until reboot retries cleanup, so no transaction overwrites unresolved file cleanup.

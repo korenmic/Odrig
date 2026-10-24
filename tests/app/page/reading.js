@@ -4,7 +4,7 @@
 export function rows(app) {
   return [...app.doc.querySelectorAll("#animations > *")].map((row) => ({
     id: Number(row.dataset.id),
-    text: row.innerText.replace(/\s+/g, " ").trim(),
+    text: row.querySelector("button").innerText.replace(/\s+/g, " ").trim(),
     marked: row.getAttribute("aria-current") === "true",
   }));
 }

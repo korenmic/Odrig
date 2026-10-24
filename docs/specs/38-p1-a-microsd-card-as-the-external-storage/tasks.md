@@ -103,7 +103,7 @@ Rules for every task:
     `docs/firmware.md`, `docs/firmware-additions.md`.
   - Requirements: 7.1, 9.2 in part
 
-- [ ] 6. The card's free and total space
+- [x] 6. The card's free and total space
   - In the commit that merges `origin/master` into `seed-38-microsd-card`, since seed 29's
     `drive_space` comes with `master` and the stick's `driveSpace()` names what the card's
     build leaves out.
