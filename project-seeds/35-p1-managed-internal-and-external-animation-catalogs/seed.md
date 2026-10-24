@@ -187,3 +187,10 @@ On 2026-10-24:
 5. A full rebuild is an explicit app/command action, not an automatic startup task.
 6. This is a new seed, separate from the already approved corruption, diagnostics and
    update-safety seeds 31-34. Creating it does not implement or flash any firmware.
+
+On 2026-10-24, later:
+
+7. The board itself may write to the card: it manages the card's catalog through uploads.
+   The catalog management logic of the board's runtime (C++) and of the PC (Python) is the
+   same, and this one duplicate implementation is allowed; the flow of managing the files
+   and the catalog must be identical byte for byte on both.

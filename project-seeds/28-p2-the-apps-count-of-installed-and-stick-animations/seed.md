@@ -73,3 +73,12 @@ number of the stick's animations.
    from no stick at all by what the commands report today, so both hide the line. Is that
    enough, or should a reply tell the stick's state, which is a new member of a reply and
    needs the owner's yes?
+
+## The Owner's Answers
+
+On 2026-10-24:
+
+1. A card or stick that is plugged in and holds no animations shows the line with 0: the
+   board reports a present medium in `external` of `space` since seed 29, so the question's
+   premise is gone. The external storage is a microSD card now (seed 38); the line is
+   worded for any external medium, and the check on a phone is made with the card.
