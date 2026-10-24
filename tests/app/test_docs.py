@@ -96,15 +96,16 @@ class TheAppsPage(unittest.TestCase):
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
         self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "storage-error",
                                 "in-use", "no-space", "no-upload", "bad-checksum", "bad-file",
-                                "mapping-conflict", "order-conflict", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
+                                "mapping-conflict", "order-conflict", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
         self.assertIn("`Uploaded as animation <id> <file>. It plays in the playlist.`", said)
         self.assertIn("| The installation refused the file: `<reason>`. |", said)
         self.assertIn("| The animation needs `<size>` KB, and the installation has `<free>` KB free. |", said)
 
     def test_every_message_of_making_an_animation_is_on_the_page(self):
-        reasons = ["no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"]
-        found = support.run("texts", settings={"refusals": [], "failures": [], "conversions": [[reason, ""] for reason in reasons]}).seen
+        reasons = ["unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"]
+        details = {"unsupported-character": "the text holds characters no font has: `<characters>`", "does-not-fit": "a block; `<the effects that show it>`"}
+        found = support.run("texts", settings={"refusals": [], "failures": [], "conversions": [[reason, details.get(reason, "")] for reason in reasons]}).seen
         messages = section(self.text, "Messages")
         said = flat(messages)
         for reason in reasons:

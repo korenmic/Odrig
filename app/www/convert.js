@@ -1,8 +1,10 @@
 // Converting a video or a GIF that the operator picked into an animation for the canvas of
 // the target: the web view decodes the media, and the converter's library fits the
-// pictures, builds the timeline and encodes the ODRG file.
+// pictures, builds the timeline and encodes the ODRG file. And making a text or a clock
+// from the JSON source a form gives, which the same library writes as a container and
+// draws as the player does.
 
-import {Rejection, jsonframes, odrg, timeline} from "./converter/index.js";
+import {Rejection, jsonframes, odrg, odrgx, timeline} from "./converter/index.js";
 
 // The ticks of the timeline, and how far past a tick a video is sought, so that the
 // picture taken is the one on the screen at the tick even when a frame begins exactly
@@ -207,4 +209,29 @@ export async function convert(file, canvas, {fit, startMs, lengthMs}, stop) {
   }
   stop.check(1);
   return {animation, bytes: odrg.encode(animation, {compressed: true})};
+}
+
+// The container of a text or a clock, as bytes, from its JSON source as an object: the
+// library reads it as strictly as a file, and refuses it with its reason.
+export function makeContainer(source) {
+  try {
+    return odrgx.encodeSource(odrgx.loadsSource(new TextEncoder().encode(JSON.stringify(source))));
+  } catch (error) {
+    if (error instanceof Rejection) {
+      throw new NotConverted(error.reason, error.detail);
+    }
+    throw error;
+  }
+}
+
+// What a container holds, read from its bytes: its header, as `header` with its `width`,
+// `height` and `loopMs`, and its type, as `type`.
+export function readContainer(bytes) {
+  return odrgx.decode(bytes);
+}
+
+// The picture the player draws of a container that was read, `ms` milliseconds into its
+// turn, a clock with a seed: three bytes for each pixel, the bottom row first.
+export function pictureOf(read, ms, seed) {
+  return odrgx.pictureAt(read, ms, seed);
 }

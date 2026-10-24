@@ -34,8 +34,8 @@ a top bar with the app's name and whether the installation answers.
   `Fix it on a computer: the card is read-only here.` Its menu works as any other's. The
   other animations and every other control work as ever, also when every animation is
   unavailable.
-- **Upload** makes an animation from a video or a GIF of the phone and uploads it, with
-  the free internal storage above it.
+- **Upload** makes an animation from a video or a GIF of the phone, or makes a text, and
+  uploads it, with the free internal storage above it.
 - **Settings** has the checkbox `Show test animations` and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, and says how
@@ -336,6 +336,21 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   the list of Animations and in the playlist until it is moved, and plays when it is
   tapped.
 
+To make a text, press `Make a text` on Upload. A form opens under it: the text, written
+with English letters, digits, signs and Hebrew letters, and line feeds; its font,
+`Small`, `Medium` or `Large`; its colour and its background; its effect, `Still`,
+`Marquee`, `Slide in and out` or `Pan`, and its motion, to the left, to the right, up or
+down; its alignment and its height on the canvas; its direction, as the text begins,
+left to right or right to left; whether long lines wrap; its speed in pixels a second and
+its pause in milliseconds. Below the form the text moves in a preview of the
+installation's canvas, drawn by the converter's library as the player draws it, and a
+line says `One pass takes 4.50 seconds.`, or why the text cannot be made: a character no
+font has, named with its code point, or a block that cannot be seen whole with the
+effect, with the effects that show it. `Upload to the installation` sends it as a new
+item, as a video's animation is sent, as an `.odrgx` file named after its first English
+words, `hello-world.odrgx`, or `text.odrgx` when it has none; `Close` closes the form.
+[format.md](format.md) has what a text holds.
+
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the
 medium, and a tap plays one as it plays an installed animation; see
@@ -435,6 +450,8 @@ When an animation cannot be made, the app says why:
 
 | Code | When | The sentence |
 |---|---|---|
+| `unsupported-character` | A text holds a character no font has. | The fonts have no letter for `<characters>`. Write English letters, digits, signs and Hebrew letters. |
+| `does-not-fit` | A text cannot be seen whole on the canvas with its effect and motion. | The text cannot be seen whole on the canvas with this effect: `<the effects that show it>`. |
 | `no-canvas` | The installation reports no canvas: it has no mapping it can use, or its software is older than the app. | The installation has no usable mapping, so the app does not know the canvas to convert for. |
 | `no-gif-decoder` | The phone's web view has no `ImageDecoder`. | This phone's web view cannot read GIF files. Update Android System WebView. |
 | `unreadable-media` | The web view cannot read the file as a video or a GIF. | The phone cannot read this file as a video or a GIF. |

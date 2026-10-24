@@ -24,18 +24,25 @@ export function freeId(taken) {
 
 // The file name an animation made from a media file gets: the media's name without its
 // ending, in lower case, every character outside a-z, 0-9, `-` and `_` turned into `-`,
-// cut so that with `.odrg` it has at most 32 characters, and made unique among the names
-// taken with `-2`, `-3` and so on.
-export function fileName(mediaName, taken) {
+// cut so that with its ending, `.odrg` unless another is given, it has at most 32
+// characters, and made unique among the names taken with `-2`, `-3` and so on.
+export function fileName(mediaName, taken, ending = ENDING) {
   const base = mediaName.replace(/\.[^.]*$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "animation";
-  const room = LONGEST_NAME - ENDING.length;
+  const room = LONGEST_NAME - ending.length;
   for (let number = 1; ; number += 1) {
     const added = number === 1 ? "" : `-${number}`;
-    const name = base.slice(0, room - added.length) + added + ENDING;
+    const name = base.slice(0, room - added.length) + added + ending;
     if (!taken.has(name)) {
       return name;
     }
   }
+}
+
+// The name a text's file is made from: its first English letters and digits, in lower
+// case, the words joined by `-`, at most 20 characters; `text` for a text that has none.
+export function textName(text) {
+  const words = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((word) => word !== "");
+  return words.join("-").slice(0, 20).replace(/-+$/, "") || "text";
 }
 
 // Whether a file of some bytes fits into the free storage, as the target judges it.

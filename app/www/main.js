@@ -3,6 +3,7 @@
 
 import * as client from "./client.js";
 import * as messages from "./messages.js";
+import * as authoring from "./screens/author.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
@@ -119,6 +120,7 @@ show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 animationsScreen.start({message});
 uploadScreen.start({message});
+authoring.start({message});
 settingsScreen.start();
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {

@@ -96,6 +96,8 @@ export function ofUploaded(id, file) {
 // What the app says when an animation cannot be made from a file, by the reason: its own,
 // or one of the library that makes it, whose text is given as the detail.
 const CONVERSIONS = {
+  "unsupported-character": (detail) => `The fonts have no letter for ${detail.replace(/^[^:]*: /, "")}. Write English letters, digits, signs and Hebrew letters.`,
+  "does-not-fit": (detail) => `The text cannot be seen whole on the canvas with this effect: ${detail.replace(/^[^;]*; /, "")}.`,
   "no-canvas": () => "The installation has no usable mapping, so the app does not know the canvas to convert for.",
   "no-gif-decoder": () => "This phone's web view cannot read GIF files. Update Android System WebView.",
   "unreadable-media": () => "The phone cannot read this file as a video or a GIF.",
@@ -104,7 +106,7 @@ const CONVERSIONS = {
 };
 
 export function ofConversion(failure) {
-  const text = Object.prototype.hasOwnProperty.call(CONVERSIONS, failure.reason) ? CONVERSIONS[failure.reason]() : `The animation cannot be made: ${failure.detail}.`;
+  const text = Object.prototype.hasOwnProperty.call(CONVERSIONS, failure.reason) ? CONVERSIONS[failure.reason](failure.detail) : `The animation cannot be made: ${failure.detail}.`;
   return `${text} (${failure.reason})`;
 }
 
