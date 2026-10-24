@@ -47,6 +47,14 @@ enum Reason {
     kBadPaletteIndex,
     kTrailingBytes,
 
+    // An ODRGX container.
+    kBadContainer,
+    kUnknownType,
+    kUnknownTypeVersion,
+    kPayloadSize,
+    kCanvasMismatch,
+    kLoopMismatch,
+
     kReasonCount,
 
     // Work that is not finished: the same call is made again later and goes on. It is

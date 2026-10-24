@@ -20,7 +20,7 @@ def bad_files():
     is not one, and a file that is not there."""
     return {
         "a body cut short": (cut_clip(10, 3), "truncated"),
-        "a bad header": (b"ODRX" + good(2)[4:], "bad-magic"),
+        "a bad header": (b"ODRZ" + good(2)[4:], "bad-magic"),
         "no file": (None, "file-missing"),
     }
 
@@ -119,7 +119,7 @@ class AsTheReference(Compared, unittest.TestCase):
         self.assertEqual(logged(run), ["file b.odrg unavailable: truncated"])
 
     def test_every_animation_bad(self):
-        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRX" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRZ" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
         script = every_20_ms(20) + self.asked(400, "status", "list", "play 1", "play all", "space")
         run = self.compare(files, script)
         state = replies(run)[0]
@@ -141,7 +141,7 @@ class AsTheReference(Compared, unittest.TestCase):
 
     def test_the_start_names_a_bad_animation(self):
         files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"}],
-                        {"a.odrg": good(1), "b.odrg": b"ODRX" + good(2)[4:], "c.odrg": good(3)}, start=2)
+                        {"a.odrg": good(1), "b.odrg": b"ODRZ" + good(2)[4:], "c.odrg": good(3)}, start=2)
         run = self.compare(files, every_20_ms(10) + self.asked(200, "status"))
         self.assertEqual(replies(run)[0]["animation"], 3)
 
@@ -153,7 +153,7 @@ class AsTheReference(Compared, unittest.TestCase):
         self.assertEqual(replies(run)[1], {"ok": False, "error": "show-invalid"})
 
     def test_an_upload_that_replaces_a_bad_animation_makes_it_play(self):
-        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRX" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRZ" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
         data = good(5)
         script = every_20_ms(5) + [support.line(T0 + 100, line) for line in support.upload_lines(2, "b.odrg", data)]
         script += every_20_ms(20, start=120) + self.asked(520, support.upload_end(data), "status", "list")
@@ -165,7 +165,7 @@ class AsTheReference(Compared, unittest.TestCase):
 
 class NotReadAgain(unittest.TestCase):
     def test_a_quarantined_file_is_opened_once_in_many_turns(self):
-        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": good(1), "b.odrg": b"ODRX" + good(2)[4:]})
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": good(1), "b.odrg": b"ODRZ" + good(2)[4:]})
         files["show.json"] = json.dumps({"version": 1, "brightness": 128, "min_seconds": 1, "items": [{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}]})
         script = every_20_ms(500) + [support.line(T0 + 10000, command) for command in ("list", "play 2", "list")]
         run = support.start(files, script, ["--trace-files"], check_first=False)
@@ -200,7 +200,7 @@ class RepairDuringTheCheck(Compared, unittest.TestCase):
         """A long first animation, which keeps the check busy, a second with a bad header,
         and a third."""
         return show_of([{"id": 1, "file": "long.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"}],
-                       {"long.odrg": support.clip(4, WIDTH, HEIGHT, (20,) * 400), "b.odrg": b"ODRX" + good(2)[4:], "c.odrg": good(3)})
+                       {"long.odrg": support.clip(4, WIDTH, HEIGHT, (20,) * 400), "b.odrg": b"ODRZ" + good(2)[4:], "c.odrg": good(3)})
 
     def test_a_bad_animation_is_replaced_while_the_check_goes_on_and_the_check_ends(self):
         data = good(5)
@@ -255,7 +255,7 @@ class TheDrivesFiles(unittest.TestCase):
         # The first time it settles in 256 slices; the second, its first read is enough.
         self.assertGreater(first, 300)
         self.assertLessEqual(again, 880)
-        self.assertEqual(replies(run)[-1]["items"][1], {"id": 60001, "file": "huge.odrg", "bytes": None, "external": True, "fault": huge_tail.REASON})
+        self.assertEqual(replies(run)[-1]["items"][1], {"id": 60001, "file": "huge.odrg", "bytes": None, "external": True, "type": "frames", "fault": huge_tail.REASON})
 
     def test_another_file_of_the_same_name_is_checked_anew(self):
         bad = huge_tail.huge_tail(self.LONG, 4, 4)
@@ -265,7 +265,7 @@ class TheDrivesFiles(unittest.TestCase):
         self.assertEqual([(item["id"], item.get("fault")) for item in replies(run)[-1]["items"]], [(1, None), (60001, None)])
 
     def test_a_drives_files_get_their_ids_at_once_and_a_left_out_one_is_unavailable(self):
-        drive = {"a.odrg": b"ODRX" + support.clip(2, 4, 4)[4:], "b.odrg": support.clip(3, 4, 4)}
+        drive = {"a.odrg": b"ODRZ" + support.clip(2, 4, 4)[4:], "b.odrg": support.clip(3, 4, 4)}
         script = every_20_ms(10) + [support.line(T0 + 200, command) for command in ("list", "play 60001", "play 60002", "remove 60001", "upload begin 60001 new.odrg 10")]
         run = self.session(script, drive)
         listed, played, playing, removed, uploaded = replies(run)

@@ -11,14 +11,14 @@ A show is installed as one flat folder of files:
 |---|---|
 | `mapping.json` | The layout of the physical LEDs. See [mapping.md](mapping.md). |
 | `show.json` | The list of things that can be played. See below. |
-| `*.odrg` | The animations named by `show.json`. See [format.md](format.md). |
+| `*.odrg`, `*.odrgx` | The animations named by `show.json`: ODRG files, and ODRGX containers. See [format.md](format.md). |
 
 The player also keeps three files of its own in the folder while it changes the show:
 `upload.part`, `show.part` and `pending.txt`. They are gone when a change is complete, and
 the player removes what is left of them when it starts. It keeps the saved playlist order
 in `order.txt`, see [the saved playlist order](#the-saved-playlist-order), and writes its
 next version into `order.part`. No show names them: a name in `show.json` ends in
-`.odrg`.
+`.odrg` or `.odrgx`.
 
 The same folder is what the emulator runs and what is uploaded to the board. The player reads
 these files when it starts. Nothing else defines the layout or the show.
@@ -46,7 +46,7 @@ two kinds, with the members of its kind and no other:
 
 | Kind | Members | Meaning |
 |---|---|---|
-| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
+| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` or `.odrgx` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg` or `.odrgx`. The file's first bytes, not its name, say whether it is an ODRG file or an ODRGX container. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
 | Cycle | `id`, `cycle`, `seconds` | `cycle` is a list of one or more ids of animation items. `seconds` is how long each one is shown, 1 to 65,535. |
 
 Example: two animations, and a cycle that alternates them every 15 seconds and starts at
@@ -114,7 +114,7 @@ show's; they do not take the place of any. Nothing is written to the drive, and 
 On the board the drive is a USB stick or a microSD card, as
 [firmware.md](firmware.md#the-external-storage) says.
 
-- The drive's animations are the files of its folder `odrig` whose names end in `.odrg`,
+- The drive's animations are the files of its folder `odrig` whose names end in `.odrg` or `.odrgx`,
   in any case, and do not begin with a dot, in the order of their names, at most 256.
   Folders inside `odrig` and other files are passed over.
 - The player reads each of them whole, after the installed animations, while the show

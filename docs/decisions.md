@@ -602,3 +602,9 @@ are in [format.md](format.md), "Measured sizes".
   the boot installed that file and the item holds it still; the core keeps no more memory
   for it. A cleanup a change could not finish is done before the next change instead of
   blocking every change until a restart, and `remove many` writes no empty `pending.txt`.
+- 2026-10-24: Seed 37 adds the reply member `type` to every animation item of `list`, of
+  the show and of a drive, after `external` and before `fault`: `"frames"` for an ODRG
+  file and an ODRGX container of frames, by the file's header. Approved by the owner in
+  advance; a reply without it counts as frames. A show may name `.odrgx` files, and the
+  player reads a container of frames as it reads the ODRG file it holds; a container
+  with a fault is quarantined as an ODRG file is.

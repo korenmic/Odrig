@@ -30,6 +30,7 @@
 #include "file_source.h"
 #include "guard.h"
 #include "inflate.h"
+#include "container.h"
 #include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
@@ -250,15 +251,17 @@ public:
             closedir(opened);
         }
 #endif
-        // Files whose names end in `.odrg`, in any case, and do not begin with a dot, in the
-        // order of their names, the first 256.
+        // Files whose names end in `.odrg` or `.odrgx`, in any case, and do not begin with a
+        // dot, in the order of their names, the first 256.
         std::vector<std::string> kept;
         for (const std::string &name : drive_names_) {
-            std::string ending = name.size() >= 5 ? name.substr(name.size() - 5) : "";
-            for (char &letter : ending) {
+            std::string lower = name;
+            for (char &letter : lower) {
                 letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
             }
-            if (name[0] != '.' && ending == ".odrg") {
+            const bool odrg = lower.size() >= 5 && lower.compare(lower.size() - 5, 5, ".odrg") == 0;
+            const bool odrgx = lower.size() >= 6 && lower.compare(lower.size() - 6, 6, ".odrgx") == 0;
+            if (name[0] != '.' && (odrg || odrgx)) {
                 kept.push_back(name);
             }
         }
@@ -613,8 +616,8 @@ private:
     }
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
-    // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` file or
-    // one of the eight fixed names.
+    // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
+    // file or one of the eight fixed names.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
@@ -626,7 +629,8 @@ private:
         }
         bool sound = !given.empty() && given.size() <= 32 &&
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
-        const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
+        const bool animation = (given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0) ||
+                               (given.size() >= 6 && given.compare(given.size() - 6, 6, ".odrgx") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
                            given == "order.txt" || given == "order.part";
@@ -896,12 +900,13 @@ int inflate(bool in_batch) {
     return 0;
 }
 
-// Reads one ODRG file with the core's decoder, as the core does when it checks a file.
-// Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each record with
-// the picture as three bytes for each pixel, then `end`; or, at the point where the file is
-// refused, `rejected <reason>`. The decoder is called again while it settles a defect. With
-// a slice, settling takes at most that many bytes in one call, and `pending <calls>`, the
-// calls that gave kPendingWork, comes before the last line.
+// Reads one ODRG file or ODRGX container of frames with the core's reader, as the core
+// does when it checks a file. Prints, for a container, `container <type> <loop> <payload>`;
+// then `header <W> <H> <C> <F> <compressed>` of the frames, one `frame <ms> <hex>` for each
+// record with the picture as three bytes for each pixel, then `end`; or, at the point where
+// the file is refused, `rejected <reason>`. The decoder is called again while it settles a
+// defect. With a slice, settling takes at most that many bytes in one call, and
+// `pending <calls>`, the calls that gave kPendingWork, comes before the last line.
 void decode_one(Host &host, const char *name, uint32_t slice) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
@@ -912,14 +917,20 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     std::memset(&inflate, 0, sizeof inflate);
     std::vector<uint8_t> window(odrig::kWindowSize);
 
+    odrig::ContentHeader content;
+    std::memset(&content, 0, sizeof content);
     odrig::Reason reason = file.open(functions, name);
     if (reason == odrig::kNone) {
-        reason = decoder.open(&file, &inflate, window.data());
+        reason = odrig::content_open(&file, &inflate, window.data(), &decoder, &content);
         if (slice != 0) {
             decoder.settle_slice = slice;
         }
     }
+    if (content.container) {
+        std::printf("container %u %u %u\n", content.type, content.loop_ms, content.payload);
+    }
     unsigned long pending = 0;
+    uint64_t total_ms = 0;
     if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -933,6 +944,7 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
             if (reason != odrig::kNone) {
                 break;
             }
+            total_ms += duration;
             picture.clear();
             if (decoder.colours != 0) {
                 for (uint8_t index : pixels) {
@@ -944,7 +956,7 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            while ((reason = decoder.finish()) == odrig::kPendingWork) {
+            while ((reason = odrig::content_finish(&file, &decoder, content, total_ms)) == odrig::kPendingWork) {
                 ++pending;
             }
         }

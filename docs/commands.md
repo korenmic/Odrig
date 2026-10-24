@@ -105,13 +105,16 @@ animation items of the show, unavailable ones among them, and 0 while the show i
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false,"type":"frames"},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false,"type":"frames"},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
 `id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
-animation of the board's own storage, `true` for one of the external storage. A cycle has its `id`, the ids of its
+animation of the board's own storage, `true` for one of the external storage; then its
+`type`, what the file holds as its header says ([format.md](format.md)): `"frames"` for an
+ODRG file and for an ODRGX container of frames. A reply without `type` comes from a player
+before it, and its animations are frames. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
 `list <next>`, or `null` when the last item is in the reply. An unavailable animation, one
@@ -125,9 +128,9 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The files of a USB drive or of the card come after the items of the show, in the order of
-their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true}`.
+their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
 A file left out for a fault is listed in its place as
-`{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"fault":"truncated"}`, and `play` of it is
+`{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every

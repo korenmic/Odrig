@@ -138,7 +138,7 @@ reason that applies.
 | `undefined-id` | A cycle, or `start`, names an id that no item has. |
 | `nested-cycle` | A cycle names an item that is a cycle. |
 | `output-not-empty` | The output folder of `pack` exists and is not empty. |
-| `file-missing` | The source `X.json` of a named `X.odrg` is not in the sources folder. |
+| `file-missing` | The source `X.json` of a named `X.odrg` or `X.odrgx` is not in the sources folder. |
 | `file-malformed` | A source is rejected as a JSON frames file. The detail gives that reason too. |
 | `size-mismatch` | A source's canvas size differs from the mapping's. |
 | `canvas-too-large`, `too-many-frames` | A source cannot be written as ODRG, as under `encode`. |
@@ -176,8 +176,9 @@ The core is the library that plays an installed show, on the board and in the em
 text that begins with a reason name, and the `status` command reports that text.
 
 It names an invalid show as "Shows" does, from `mapping-missing` to `nested-cycle`, and a
-rejected `.odrg` file as "ODRG files" does. A fault of one `.odrg` file, `file-missing`,
-`size-mismatch`, `read-error` or a reason of "ODRG files", does not make the show invalid:
+rejected `.odrg` file as "ODRG files" does, and a rejected container as "ODRGX files"
+does. A fault of one `.odrg` or `.odrgx` file, `file-missing`, `size-mismatch`, `read-error`
+or a reason of "ODRG files" or "ODRGX files", does not make the show invalid:
 the file is quarantined, the log says `file <name> unavailable: <reason>`, and `list` gives
 the reason's name as the animation's `fault`. It adds two reasons that only a running
 player can meet:

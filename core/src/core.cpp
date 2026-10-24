@@ -28,17 +28,19 @@ void append(Core &core, const char *text) {
     core.error_text[length] = '\0';
 }
 
-// Opens one file of the show and the decoder on it, which reads the header, and compares
-// the canvas with the mapping's. The palette and the frame records are not read. A file
-// that cannot be used is quarantined.
+// Opens one file of the show and reads its header: an ODRG file's, or a container's and
+// that of its payload, and compares the canvas with the mapping's. The palette and the
+// frame records are not read. A file that cannot be used is quarantined.
 void open_file(Core &core, uint32_t index) {
-    const FileInfo &info = core.files[index];
+    FileInfo &info = core.files[index];
     Reason reason = core.file.open(core.host, info.name);
     if (reason == kNone) {
-        reason = core.decoder.open(&core.file, &core.inflate, core.window);
-        if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+        ContentHeader header;
+        reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
+        if (reason == kNone && (header.width != core.width || header.height != core.height)) {
             reason = kSizeMismatch;
         }
+        info.type = header.type;
         core.file.close();
     }
     if (reason != kNone) {
@@ -56,13 +58,15 @@ void check_file(Core &core, uint32_t index) {
         quarantine_file(core, index, reason, kWorkStart, 0, 0);
         return;
     }
-    reason = core.decoder.open(&core.file, &core.inflate, core.window);
-    if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+    ContentHeader header;
+    reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
+    if (reason == kNone && (header.width != core.width || header.height != core.height)) {
         core.file.close();
         quarantine_file(core, index, kSizeMismatch, kWorkStart, 0, 0);
         return;
     }
     // Nothing waits on this check: it goes on through every slice of a settling.
+    info.type = header.type;
     uint64_t total = 0;
     uint32_t record = 0;
     if (reason == kNone) {
@@ -80,7 +84,7 @@ void check_file(Core &core, uint32_t index) {
     }
     if (reason == kNone) {
         do {
-            reason = core.decoder.finish();
+            reason = content_finish(&core.file, &core.decoder, header, total);
         } while (reason == kPendingWork);
     }
     // A file that was read to its end was read whole.
@@ -109,8 +113,8 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
     *record = 0;
     if (!core.check_header_read) {
         checker.file.open_at(core.host, name);
-        found = checker.decoder.open(&checker.file, &checker.inflate, core.check_window);
-        if (found == kNone && (checker.decoder.width != core.width || checker.decoder.height != core.height)) {
+        found = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &core.check_content);
+        if (found == kNone && (core.check_content.width != core.width || core.check_content.height != core.height)) {
             found = kSizeMismatch;
         }
         if (found == kNone) {
@@ -134,7 +138,7 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
         }
     } else {
         *record = checker.decoder.frames;
-        found = checker.decoder.finish();
+        found = content_finish(&checker.file, &checker.decoder, core.check_content, core.check_total_ms);
         if (found == kPendingWork) {
             return kStepGoingOn;
         }
@@ -183,6 +187,7 @@ void check_step(Core &core) {
         info.bytes = core.checker->file.taken;
         info.total_ms = core.check_total_ms;
         info.checked = 1;
+        info.type = core.check_content.type;
         ++core.check_at;
         check_passes_done(core);
     } else if (outcome == kStepFault) {
@@ -303,6 +308,7 @@ void drive_step(Core &core) {
         }
         entry.bytes = core.checker->file.taken;
         entry.total_ms = core.check_total_ms;
+        entry.type = core.check_content.type;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, place);
     } else if (outcome == kStepFault) {

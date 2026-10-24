@@ -367,7 +367,7 @@ bool is_file_name(const char *name) {
             return false;
         }
     }
-    return length >= 5 && same_text(name + length - 5, ".odrg");
+    return (length >= 5 && same_text(name + length - 5, ".odrg")) || (length >= 6 && same_text(name + length - 6, ".odrgx"));
 }
 
 Reason read_show(Core &core, char *id_text) {
