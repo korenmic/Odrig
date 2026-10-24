@@ -194,6 +194,52 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     return reply.length;
 }
 
+uint32_t upload_expect(Core &core, uint32_t crc, Reply &reply) {
+    Upload &upload = core.upload;
+    if (upload.state == kUploadNone) {
+        return refuse(reply, "no-upload");
+    }
+    uint32_t position = 0;
+    while (position < core.item_count && core.items[position].id != upload.id) {
+        ++position;
+    }
+    if (position == core.item_count || core.items[position].is_cycle) {
+        // The item the client read is gone.
+        upload_discard(core);
+        return refuse(reply, "stale");
+    }
+    const FileInfo &file = core.files[core.items[position].first];
+    if (file.bytes > kExpectLargest) {
+        return refuse(reply, "bad-argument");
+    }
+    // The file is read through the chunk buffer, which holds nothing between commands.
+    const odrig_host &host = core.host;
+    uint32_t running = kCrcStart;
+    uint32_t offset = 0;
+    for (;;) {
+        const int32_t count = host.read_at(host.ctx, file.name, offset, core.chunk, kFileBufferSize);
+        if (count < 0) {
+            upload_discard(core);
+            return refuse(reply, "storage-error");
+        }
+        if (count == 0) {
+            break;
+        }
+        for (int32_t at = 0; at < count; ++at) {
+            running = crc_add(running, core.chunk[at]);
+        }
+        offset += static_cast<uint32_t>(count);
+        if (offset > kExpectLargest) {
+            return refuse(reply, "bad-argument");
+        }
+    }
+    if (crc_value(running) != crc) {
+        upload_discard(core);
+        return refuse(reply, "stale");
+    }
+    return succeed(reply);
+}
+
 uint32_t upload_data(Core &core, uint64_t now, uint32_t offset, const char *text, uint32_t length, uint32_t count, Reply &reply) {
     Upload &upload = core.upload;
     if (upload.state == kUploadNone) {

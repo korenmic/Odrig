@@ -159,6 +159,56 @@ uint32_t content_space(const Core &core, Reply &reply) {
     return reply.length;
 }
 
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
+    char drive_name[kDriveNameSize];
+    const char *name = nullptr;
+    uint32_t size = 0;
+    for (uint32_t position = 0; name == nullptr && position < core.item_count; ++position) {
+        const ItemInfo &item = core.items[position];
+        if (item.id == id && !item.is_cycle) {
+            name = core.files[item.first].name;
+            size = core.files[item.first].bytes;
+        }
+    }
+    if (name == nullptr && core.drive != nullptr && drive_has_id(core, id)) {
+        const uint32_t place = drive_place_of(core, id);
+        drive_file_name(place, drive_name);
+        name = drive_name;
+        size = core.drive[place].bytes;
+    }
+    if (name == nullptr) {
+        return refuse(reply, "unknown-id");
+    }
+    if (offset > size) {
+        return refuse(reply, "bad-argument");
+    }
+    if (!storage_changes(core)) {
+        // Only the second source reads a file beside the one that plays.
+        return refuse(reply, "storage-error");
+    }
+    // The bytes are read into the chunk buffer, which holds nothing between commands.
+    const odrig_host &host = core.host;
+    const uint32_t wanted = size - offset < kReadMost ? size - offset : kReadMost;
+    uint32_t got = 0;
+    while (got < wanted) {
+        const uint32_t piece = wanted - got < kFileBufferSize ? wanted - got : kFileBufferSize;
+        const int32_t count = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
+        if (count < 0) {
+            return refuse(reply, "storage-error");
+        }
+        if (count == 0) {
+            break;
+        }
+        got += static_cast<uint32_t>(count);
+    }
+    reply.text("{\"ok\":true,\"bytes\":");
+    reply.number(size);
+    reply.text(",\"data\":\"");
+    reply.base64(core.chunk, got);
+    reply.text("\"}\n");
+    return reply.length;
+}
+
 uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
     reply.text(kListHead);
     // The items of the show, then the drive's animations in the playlist.

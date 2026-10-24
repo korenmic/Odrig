@@ -90,7 +90,7 @@ Rules for every task:
     from one virtual time; the speed within its range at irregular refreshes.
   - Requirements: 7.1 to 7.4, 8.1 to 8.5, 9.1 to 9.4, 10.4, 16.4
 
-- [ ] 7. Reading back and replacing safely
+- [x] 7. Reading back and replacing safely
   - `read <id> <offset>`, `upload expect <crc32>` and the error `stale` in the core;
     `docs/commands.md`; the change log.
   - Tests: `read` of a text, a clock, a frames file and a drive's file, at offsets and at

@@ -69,8 +69,8 @@ the entry links to it.
   See [show.md](../docs/show.md#installed-file-set).
 - **command**: One line of text sent to whatever is playing a show. The command families include:
   `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`,
-  `remove <id>`, `ignore` for playlist inclusion, `mapping` for assignments and the
-  diagonal check, and `upload`, which
+  `read <id> <offset>`, which reads a file back, `remove <id>`, `ignore` for playlist
+  inclusion, `mapping` for assignments and the diagonal check, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).

@@ -558,3 +558,9 @@ are in [format.md](format.md), "Measured sizes".
   draws texts and clocks, with fonts and widgets built into it; `list` gives them `type`
   `"text"` and `"widget"`, and the reason `unknown-widget` names a widget the player does
   not have. A `status` reply is now up to 210 bytes; every reply stays within 1,024.
+- 2026-10-24: Seed 37 adds the commands `read <id> <offset>`, which gives up to 600 bytes
+  of an animation's file in base64, and `upload expect <crc32>`, which lets an open upload
+  replace its item's file only while that file has the CRC-32 the client read, and the
+  error `stale`, after `mapping-conflict`, when it has not. Approved by the owner in
+  advance. `read` reads with the host's `read_at` from any offset; the other readers still
+  begin at 0.

@@ -23,6 +23,7 @@ COMMANDS = {
     "status": (),
     "space": (),
     "list": (),
+    "read": ("ID", "OFFSET"),
     "remove": ("ID",),
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
@@ -66,7 +67,7 @@ def parser():
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the FILE of upload")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, the ID and the FILE of upload")
     return made
 
 
