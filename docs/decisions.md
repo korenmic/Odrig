@@ -539,3 +539,12 @@ are in [format.md](format.md), "Measured sizes".
   `build --stick`, on the software known good, and `build --microsd` keeps the card's
   firmware under its own name; `build --trial` and `ODRIG_BOARD_IMAGES=trial` are gone.
   Built on the Mac; nothing was flashed.
+- 2026-10-24: Seed 38, what the board runs and what its sessions showed: the card's
+  firmware of 2026-10-22, SHA-256 `fd089753…`, on the bigger layout, given back its 84
+  installed animations that day. With the Mac on the chip's own socket only, on
+  2026-10-22, the card dropped out at 4 MHz, 1 MHz and 400 kHz alike; with both sockets on
+  the Mac, on 2026-10-23, all 122 animations of the owner's card were listed after the
+  installed one, none was lost in fifteen minutes, and four played at 26 to 50 refreshes a
+  second. The card's code, its documents, and `build` making it are done; the board
+  session, with the firmware of today, plugging in and pulling out, the dropouts with two
+  cables, Wi-Fi and the owner's look, is open, and the seed stays in progress until then.
