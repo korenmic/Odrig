@@ -134,7 +134,7 @@ class TheDrivesList(unittest.TestCase):
         without = support.start(SHOW, script)
         with a_drive(DRIVE) as top:
             fixed = support.start(SHOW, script, ["--drive", top, "--only-space"])
-        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False}], "next": None})
+        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False, "external": False}], "next": None})
         self.assertEqual(replies(without)[2], refusal("unknown-id"))
         self.assertEqual(replies(fixed), replies(without))
 
@@ -177,8 +177,9 @@ class TheCheckOfTheDrive(unittest.TestCase):
         without, blocks = support.start(files).memory
         with a_drive({}) as top:
             drive, drive_blocks = support.start(files, options=["--drive", top]).memory
-        # The drive's table of 256 places, and the boot's memory of 16 files left out.
-        self.assertEqual((drive - without, drive_blocks - blocks), (4096 + 640, 2))
+        # The drive's table of 256 places, the boot's memory of 16 files left out, and in
+        # the block of the saved order a key and a hash for each place.
+        self.assertEqual((drive - without, drive_blocks - blocks), (4096 + 640 + 256 * 3, 2))
         self.assertLess(drive, 131072)
         self.assertIn(f"the target file takes {drive:,} bytes", (support.ROOT / "docs" / "core.md").read_text(encoding="utf-8"))
 

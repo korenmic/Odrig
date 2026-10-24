@@ -310,15 +310,16 @@ class TheFaultsContext(unittest.TestCase):
 
     def test_the_latest_fault_replaces_the_one_before(self):
         files = {"mapping.json": support.one_leg_mapping(3, 2), "sound.odrg": support.clip(1, 3, 2), "show.json": support.show_text([{"id": 1, "file": "sound.odrg"}])}
-        drive = {"a.odrg": cut_clip(10, 3), "b.odrg": cut_clip(10, 1)}
+        drive = {"a.odrg": cut_clip(10, 3), "b.odrg": cut_clip(10, 5)}
         with a_drive(drive) as top:
-            # The check takes 1 + 2 + 3 + 4 steps at the first five refreshes: the sound
-            # file's five, and a.odrg's header, three records and the cut one.
-            first = support.start(files, every_20_ms(5) + ["fault"], ["--drive", top], check_first=False)
+            # The check takes 1 + 2 + 3 + 4 + 5 steps at the first six refreshes: the sound
+            # file's five, the saved order's one, and a.odrg's header, three records and the
+            # cut one. b.odrg's cut record comes at a later refresh.
+            first = support.start(files, every_20_ms(6) + ["fault"], ["--drive", top], check_first=False)
             both = support.start(files, every_20_ms(10) + ["fault"], ["--drive", top], check_first=False)
         self.assertEqual(fault_of(first)[:2], ("drive", 3))
         self.assertEqual(fault_of(first)[4], "a.odrg")
-        self.assertEqual(fault_of(both)[:2], ("drive", 1))
+        self.assertEqual(fault_of(both)[:2], ("drive", 5))
         self.assertEqual(fault_of(both)[3:], ("truncated", "b.odrg"))
 
 

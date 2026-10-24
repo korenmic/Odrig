@@ -5,6 +5,7 @@
 #include "core_state.h"
 #include "mapping.h"
 #include "odrig_core.h"
+#include "order.h"
 #include "player.h"
 #include "reasons.h"
 #include "show.h"
@@ -250,6 +251,11 @@ void remember_file(Core &core, const char *name, Reason reason) {
 // One step of the check of the drive's files, after the installed ones. A file that is
 // whole and of the canvas becomes an animation of the playlist; one that is not is left out.
 void drive_step(Core &core) {
+    if (order_drive_due(core)) {
+        // The saved order of the drive's files is known before any of them joins the playlist.
+        order_drive_step(core);
+        return;
+    }
     while (core.drive_check_at < core.drive_count && core.drive[core.drive_check_at].state != kDriveToCheck) {
         ++core.drive_check_at;
     }
@@ -361,6 +367,10 @@ void start(Core &core) {
         core_fail(core, reason, reason == kReadError ? kShowFile : about, kNone);
         return;
     }
+    if (!order_begin(core)) {
+        core_fail(core, kOutOfMemory, nullptr, kNone);
+        return;
+    }
     storage_settle_pending(core);
 
     // The files are opened in the order in which the show first names them. Their bodies
@@ -383,6 +393,9 @@ void start(Core &core) {
         core.check_done = 1;
     } else {
         check_passes_done(core);
+    }
+    if (!core.invalid) {
+        order_start(core);
     }
 }
 
@@ -431,9 +444,10 @@ void drive_touch(Core &core) {
     core.drive_number = number;
     core.drive_count = 0;
     core.drive_check_at = 0;
-    char probe[8];
+    char name[kDriveListedName];
     while (number != 0 && core.drive_count < kDriveMost &&
-           core.host.drive_name(core.host.ctx, number, core.drive_count, probe, sizeof probe) == 1) {
+           core.host.drive_name(core.host.ctx, number, core.drive_count, name, sizeof name) == 1) {
+        order_drive_named(core, core.drive_count, name);
         DriveEntry &entry = core.drive[core.drive_count++];
         entry.bytes = 0;
         entry.total_ms = 0;
@@ -445,7 +459,9 @@ void drive_touch(Core &core) {
     for (uint32_t place = 0; place < core.drive_count; ++place) {
         core.drive[place].id = free_drive_id(core);
     }
+    // The playlist goes on after an animation that left by the keys it had.
     player_drive_changed(core);
+    order_drive_found(core);
 }
 
 void drive_left_out(Core &core, uint32_t place, Reason reason) {
@@ -515,6 +531,7 @@ void drive_check_yields(Core &core) {
         core.checker->file.close();
         core.check_header_read = 0;
     }
+    order_drive_yields(core);
 }
 
 void check_file_left(Core &core, uint32_t file) {

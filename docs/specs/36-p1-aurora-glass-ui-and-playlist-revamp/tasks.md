@@ -19,7 +19,7 @@ Rules for every task:
   in advance by the owner on 2026-10-24; each goes into `docs/commands.md` with the task
   that adds it.
 
-- [ ] 1. The saved order in the core, read side
+- [x] 1. The saved order in the core, read side
   - Set the seed's `state.json` to `in_progress`.
   - `core/src/order.h/.cpp`: the file's reader, the keys block, `order_start`,
     `order_drive_found`, `order_drive_step`, `order_reload`, `order_key`, `order get`.

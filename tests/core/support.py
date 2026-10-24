@@ -1168,12 +1168,12 @@ class ReferencePlayer:
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
         if item.cycle is None and item.file in self.faults:
-            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "fault": self.faults[item.file]}, separators=(",", ":"))
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "external": False, "fault": self.faults[item.file]}, separators=(",", ":"))
         if item.cycle is None and any(check[0] == item.file for check in self.checks):
             # The file has not been read whole yet: its size is not known.
-            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored)}, separators=(",", ":"))
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "external": False}, separators=(",", ":"))
         if item.cycle is None:
-            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored), "external": False}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
 
     def _list(self, first):

@@ -3,6 +3,7 @@
 #include "content.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
+#include "order.h"
 #include "player.h"
 #include "show.h"
 #include "upload.h"
@@ -287,6 +288,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return refuse(reply, "show-invalid");
         }
         return content_list(core, from, reply);
+    }
+    if (words.is(0, "order")) {
+        uint32_t from = 0;
+        if (words.count >= 2 && words.count <= 3 && words.is(1, "get") && (words.count == 2 || number_word(words, 2, 0, 65535, &from))) {
+            if (core.invalid) return refuse(reply, "show-invalid");
+            if (!check_complete(core)) return refuse(reply, "busy");
+            return order_get(core, from, reply);
+        }
+        return refuse(reply, "bad-argument");
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;

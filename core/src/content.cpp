@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "order.h"
 #include "player.h"
 #include "storage.h"
 
@@ -35,6 +36,8 @@ const char kListCycle[] = ",\"cycle\":[";
 const char kListSeconds[] = "],\"seconds\":";
 const char kListNext[] = "],\"next\":";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
+const char kListInternal[] = ",\"external\":false";
+const char kListExternal[] = ",\"external\":true";
 
 // The member that ends an animation of `list` whose file is quarantined, before its reason
 // and the closing quotation mark.
@@ -50,7 +53,8 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
         const Reason fault = static_cast<Reason>(file.fault);
         const uint32_t bytes = fault != kNone || !file.checked ? 4 : digits(file.bytes);
         const uint32_t fault_size = fault != kNone ? text_length(kListFault) + text_length(reason_name(fault)) + 1 : 0;
-        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) + fault_size + 1;
+        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) +
+               text_length(kListInternal) + fault_size + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -190,7 +194,8 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             const bool left_out = entry.state == kDriveLeftOut;
             const char *fault = reason_name(static_cast<Reason>(entry.fault));
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
-                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) + 1;
+                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) +
+                                  text_length(kListExternal) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -205,11 +210,14 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListBytes);
             if (left_out) {
                 reply.text("null");
+            } else {
+                reply.number(entry.bytes);
+            }
+            reply.text(kListExternal);
+            if (left_out) {
                 reply.text(kListFault);
                 reply.text(fault);
                 reply.text("\"");
-            } else {
-                reply.number(entry.bytes);
             }
             reply.text("}");
             continue;
@@ -243,6 +251,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
                 reply.number(file.bytes);
             }
             reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
+            reply.text(kListInternal);
             if (file.fault != kNone) {
                 reply.text(kListFault);
                 reply.text(reason_name(static_cast<Reason>(file.fault)));
@@ -451,6 +460,7 @@ void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes,
     item.first = core.file_count++;
     item.count = 0;
     set_file(core.files[item.first], name, bytes, total_ms);
+    order_item_added(core, core.item_count - 1);
 }
 
 void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms) {
@@ -497,6 +507,7 @@ void content_take_out(Core &core, uint32_t position) {
         }
     }
 
+    order_item_leaves(core, position);
     memmove(core.items + position, core.items + position + 1, (core.item_count - position - 1) * sizeof(ItemInfo));
     --core.item_count;
 

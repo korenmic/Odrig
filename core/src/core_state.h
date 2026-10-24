@@ -80,6 +80,11 @@ struct FaultContext {
 const uint32_t kNothing = 0xFFFFFFFFu;
 const uint32_t kPlaylist = 0xFFFFFFFEu;
 
+// The most entries of `order.txt` the core takes, and what an item or a place that no entry
+// names holds.
+const uint32_t kOrderMost = 512;
+const uint16_t kOrderUnnamed = 0xFFFF;
+
 // What checks an uploaded file beside playback: a second source, which reads the file
 // back from storage, and second decoders.
 struct Checker {
@@ -157,6 +162,18 @@ const uint32_t kDriveNameSize = 16;
 // Room for the name of a drive's file as `list` writes it: a longer one is cut to 127 bytes.
 // Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
 const uint32_t kDriveListedName = 128;
+
+// The reading of `order.txt` line by line: the entries taken so far, whether its first line
+// was read and was the header, and the line so far without its line feed. A line longer
+// than the room is no entry.
+const uint32_t kOrderLineRoom = 130;
+struct OrderReader {
+    uint32_t entries;
+    uint16_t length;
+    uint8_t header;     // 0 while no line was read, 1 after the header, 2 after anything else
+    uint8_t over;
+    char line[kOrderLineRoom];
+};
 
 // Whether a position of the playlist is a drive's file.
 inline bool is_drive(uint32_t position) {
@@ -246,6 +263,18 @@ struct Core {
     uint32_t remembered_next;
     uint32_t drive_first_crc;
     uint16_t drive_first_read;
+
+    // The saved playlist order, for a host whose storage can be changed: for each item of
+    // the item table, and for each place of a drive, the number of the entry of `order.txt`
+    // that names it, or kOrderUnnamed; for each place the low byte of its name's hash. While
+    // `order_due` is set the drive's check reads the file before the drive's files, and
+    // `order_reading` while it is in the middle of it.
+    uint16_t *order_items;
+    uint16_t *order_drive;
+    uint8_t *order_hash;
+    uint8_t order_due;
+    uint8_t order_reading;
+    OrderReader order_reader;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

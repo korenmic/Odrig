@@ -603,7 +603,7 @@ private:
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
     // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` file or
-    // one of the five fixed names.
+    // one of the eight fixed names.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
@@ -617,7 +617,8 @@ private:
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
         const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
-                           given == "show.part" || given == "pending.txt" || given == "mapping.part";
+                           given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
+                           given == "order.txt" || given == "order.part";
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }

@@ -100,7 +100,7 @@ class ListAndRemove(unittest.TestCase):
                 self.assertEqual(ask(emulator, line), expected, (route, line))
         self.assertEqual(
             player.command(0, b"list"),
-            b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}\n',
+            b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}\n',
         )
 
     def test_remove_changes_the_show_and_the_folder_as_the_reference_has_them_by_each_route(self):
@@ -142,7 +142,7 @@ class ListAndRemove(unittest.TestCase):
         self.assertEqual(sorted(support.files_of(self.folder)), ["hello.odrg", "mapping.json", "show.json"])
         again = self.started()
         self.assertEqual(over_serial(again, "list"), listed)
-        self.assertEqual(listed, b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false}],"next":null}\n')
+        self.assertEqual(listed, b'{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false}],"next":null}\n')
         state = again.status()
         self.assertEqual((state["playing"], state["animation"], state["error"]), ("all", 1, None))
         self.assertEqual(over_http(again, "play 1"), b'{"ok":true}\n')
@@ -209,7 +209,7 @@ class Uploads(unittest.TestCase):
                     self.assertEqual([json.loads(reply)["received"] for reply in given[1:]], [min(len(self.clip), 1500 * count) for count in range(1, len(given))])
                     self.assertEqual(ended, DONE)
                     listed = json.loads(over_http(emulator, "list"))["items"]
-                    self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False})
+                    self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False, "external": False})
                     self.assertEqual(over_serial(emulator, f"play {number}"), DONE)
                     state = emulator.status()
                     self.assertEqual((state["playing"], state["animation"], state["error"]), ("all", number, None))
@@ -235,12 +235,12 @@ class Uploads(unittest.TestCase):
         finally:
             emulator.stop()
         again = self.started()
-        self.assertEqual(json.loads(over_serial(again, "list"))["items"][-1], {"id": 9, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False})
+        self.assertEqual(json.loads(over_serial(again, "list"))["items"][-1], {"id": 9, "file": "clip.odrg", "bytes": len(self.clip), "ignored": False, "external": False})
         self.assertEqual(over_http(again, "play 9"), DONE)
         self.assertEqual((again.status()["playing"], again.status()["animation"]), ("all", 9))
         smaller = core_support.clip(5, 60, 6)
         self.assertEqual(upload(again, (support.LINES,), 9, "smaller.odrg", smaller)[1], DONE)
-        self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller), "ignored": False})
+        self.assertEqual(json.loads(over_http(again, "list"))["items"][-1], {"id": 9, "file": "smaller.odrg", "bytes": len(smaller), "ignored": False, "external": False})
         self.assertEqual((again.status()["playing"], again.status()["animation"]), ("all", 9))
         self.assertEqual(over_http(again, "remove 9"), DONE)
         again.stop()

@@ -32,6 +32,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
+| `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
@@ -74,12 +75,13 @@ animation items of the show, unavailable ones among them, and 0 while the show i
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
-`id`, its `file` and the size of that file in `bytes`. A cycle has its `id`, the ids of its
+`id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
+animation of the board's own storage, `true` for one of the external storage. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
 `list <next>`, or `null` when the last item is in the reply. An unavailable animation, one
@@ -93,9 +95,9 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The files of a USB drive or of the card come after the items of the show, in the order of
-their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340}`.
+their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true}`.
 A file left out for a fault is listed in its place as
-`{"id":60002,"file":"broken.odrg","bytes":null,"fault":"truncated"}`, and `play` of it is
+`{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
@@ -286,3 +288,27 @@ ignored items. Its `external` object contains boolean `present`, `read_only:true
 nullable `free` and `total` byte counts. Absent media reports false/null/null. Mounted
 media with unknown capacity reports true/null/null. Known counters support volumes
 over 4 GiB, up to 9,007,199,254,740,991 bytes. Capacity never grants write access to a drive.
+
+## The saved playlist order
+
+The playlist plays its included animations in the saved order, which the board keeps in
+its own storage, internal and external animations in one order. An animation the saved
+order does not name comes after every one it names: the internal ones in the order of
+`show.json`, then the external ones in the order of their file names. An external
+animation is named by its file name, so it keeps its place while its medium is absent
+and takes it again when the medium is back. [show.md](show.md#the-saved-playlist-order)
+has the file.
+
+```
+order get
+{"ok":true,"ids":[3,60002,1],"next":null,"revision":2805384113}
+```
+
+`ids` are the ids of the animations `list` lists, the ignored ones and the external
+storage's among them, in the saved order, beginning at the position `<from>`, counted
+from 0, which is 0 when it is left out; `<from>` is 0 to 65,535. The reply holds as many
+as fit into it, and `next` is the position of the first one left out, or `null`, as for
+`list`. `revision` is a number that changes whenever the order or the listed animations
+change, and is the same after a restart for the same files. `order get` is refused as
+`list` is: `show-invalid` while the show is invalid, and `busy` until the player has read
+every installed animation after a start.

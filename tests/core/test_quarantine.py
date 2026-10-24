@@ -255,7 +255,7 @@ class TheDrivesFiles(unittest.TestCase):
         # The first time it settles in 256 slices; the second, its first read is enough.
         self.assertGreater(first, 300)
         self.assertLessEqual(again, 880)
-        self.assertEqual(replies(run)[-1]["items"][1], {"id": 60001, "file": "huge.odrg", "bytes": None, "fault": huge_tail.REASON})
+        self.assertEqual(replies(run)[-1]["items"][1], {"id": 60001, "file": "huge.odrg", "bytes": None, "external": True, "fault": huge_tail.REASON})
 
     def test_another_file_of_the_same_name_is_checked_anew(self):
         bad = huge_tail.huge_tail(self.LONG, 4, 4)
