@@ -100,6 +100,13 @@ it stands now.
   with WLED's limiter dimming every LED, and side by side, on the chip's two processor
   cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
   on the board".
+- The external storage of animations is a microSD card in a reader on GPIO39 to GPIO42,
+  read and never written, in place of a USB stick. The firmware that
+  `python3 firmware/fw.py build` makes reads the card and is built on the newer software
+  of Espressif, Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5; the USB stick's build stays
+  available as `build --stick`, on the software WLED 16.0.1 names. The fallback of seed 12
+  follows the firmware. The owner, 2026-10-21, 2026-10-22 and 2026-10-24; see
+  [microsd.md](microsd.md).
 - The firmware is updated over the USB cable with `firmware/fw.py`, and not over Wi-Fi: the
   owner gave up updates over Wi-Fi on 2026-10-15, so that the board's second firmware slot
   can hold animations. On the bigger layout of [firmware.md](firmware.md), "The regions of
@@ -538,3 +545,10 @@ are in [format.md](format.md), "Measured sizes".
   `"bytes":null` and the new member `fault`, the reason's name. Faults of the mapping file
   and of the show file still make the show invalid. Nothing is written for a quarantine;
   a new start checks every file again.
+- 2026-10-24: Seed 38, the owner's answer to its question 8 under the mandate of the run:
+  `python3 firmware/fw.py build` makes the firmware that reads the microSD card, on the
+  newer software, as `odrig-firmware.bin`, and `build --probe` its probe build; `flash`,
+  `install-firmware` and the board's suite take them. The USB stick's build is
+  `build --stick`, on the software known good, and `build --microsd` keeps the card's
+  firmware under its own name; `build --trial` and `ODRIG_BOARD_IMAGES=trial` are gone.
+  Built on the Mac; nothing was flashed.

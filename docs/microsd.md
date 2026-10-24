@@ -70,8 +70,9 @@ of the reader is one of the outputs of `mapping/legs-20.json` or a USB pin.
 `ODRIG_SD_FREQUENCY` of 4 MHz and the mount point `/sd`, and the checks: a pin outside 39
 to 42, two pins alike, or a clock below 400 kHz or above 20 MHz start no reader and touch
 no pin. A build that names no pins is such a build. The environment `odrig_microsd` of
-`firmware/platformio_override.ini.in` names the four pins; no other environment has the
-card's flag `ODRIG_DRIVE_SD_SPI`.
+`firmware/platformio_override.ini.in`, the firmware's, names the four pins, and its probe
+build's extends it; the USB stick's environments have none of the card's code and not its
+flag `ODRIG_DRIVE_SD_SPI`.
 
 The clock stays 4 MHz. On 2026-10-22, 1 MHz and 400 kHz dropped out as 4 MHz did, and on
 2026-10-23 4 MHz ran clean for fifteen minutes; a slower clock only makes the reads
@@ -80,19 +81,19 @@ slower.
 ## The build and the flash
 
 ```
-python3 firmware/fw.py build --microsd
-python3 firmware/fw.py flash --image build/firmware/out/odrig-microsd.bin --wait 60
+python3 firmware/fw.py build
+python3 firmware/fw.py flash --wait 60
 ```
 
-`build --microsd` builds the card's firmware on the newer software of
-[firmware.md](firmware.md#the-newer-usb-software), Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5,
-in the same folder `build/firmware/newer/` as `build --trial`, and keeps it as
-`build/firmware/out/odrig-microsd.bin` with its SHA-256 beside it. It does not go with
-`--stock`, `--probe`, `--trial` or `--standalone`, and it never touches
-`odrig-firmware.bin`. `flash` without `--image` writes `odrig-firmware.bin`, the stick's
-build: the card's build is chosen on purpose, every time.
+The card's firmware is the firmware: `build` builds it on the newer software of
+[firmware.md](firmware.md#the-newer-software), Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, in
+the folder `build/firmware/newer/`, and keeps it as `build/firmware/out/odrig-firmware.bin`
+with its SHA-256 beside it; `flash` and `install-firmware` write it. `build --microsd`
+builds the same firmware and keeps it as `odrig-microsd.bin`, the name of the board
+sessions below, which `flash --image build/firmware/out/odrig-microsd.bin` writes. The USB
+stick's firmware is `build --stick`, on the software known good.
 
-In the card's build the USB host is not compiled. The chip's own socket stays a serial
+In the card's firmware the USB host is not compiled. The chip's own socket stays a serial
 port for as long as the board runs, for commands and for flashing, whatever is plugged
 into it, and the socket marked COM takes commands and flashing as before and writes the
 log. The setting `computer_wait_s` of WLED's settings has no effect there.
@@ -105,9 +106,11 @@ image matched the build's own `firmware.bin` byte for byte; its program held Ard
 the task passed 39, 40, 41 and 42 to the SPI unit as SCK, MISO, MOSI and CS, and the
 card was mounted with CS 42 at 4 MHz; both USB serial ports were linked, and nothing of
 the USB host was. The firmware's suite, 545 tests then, and the core's tests of drives and
-of the playlist, 82, passed. The board runs that image. The firmware of today, with the
-card's free and total space, is another image; its hash is recorded when it is built and
-flashed.
+of the playlist, 82, passed. The board runs that image. The firmware with the card's free
+and total space is another image: built on 2026-10-24 by `build`, 1,771,808 bytes, SHA-256
+`1752f8216be641f0c60907f96a64bf2cd3669ed4e25923d34e0e795c596e19bf`, not flashed; the
+image the board session flashes is built from the sources of that day, and its hash is
+recorded then.
 
 ## Plugging in and pulling out
 

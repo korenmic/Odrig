@@ -9264,3 +9264,41 @@ says the board's serial devices by the names the Mac gave them, as `docs/firmwar
 does.
 
 **Resolution.** `docs/microsd.md`, "The board sessions".
+
+## Seed 38: The owner's question 8, the firmware that `build` makes
+
+**Question.** The seed's question 8 was the owner's: once the board checks pass, does the
+microSD build become the firmware that `build` makes, with the stick's build kept behind
+an option? Task 10 waits for the answer, and when it is yes leaves open what the option
+is called, what the images are named, and what becomes of `build --microsd`.
+
+**Answer.** Yes, decided under the owner's mandate for the run of 2026-10-24, before the
+board checks of tasks 8 and 9, which the run leaves to the session with the board:
+
+- `build` makes the card's firmware on the newer software, environment `odrig_microsd`,
+  as `odrig-firmware.bin`, and `build --probe` its probe build, the new environment
+  `odrig_microsd_probe`, as `odrig-probe.bin`. So `flash` without `--image`,
+  `install-firmware` and the board's suite take the card's firmware without a word more.
+- The stick's build is `build --stick`, environment `odrig` on the software known good,
+  as `odrig-stick.bin`, and `build --stick --probe`, environment `odrig_probe`, as
+  `odrig-stick-probe.bin`. The environments keep their names, so WLED's folder keeps the
+  libraries it fetched for them; `--stick` goes with neither `--stock` nor
+  `--standalone`, as `--trial` did not.
+- `build --microsd` stays and builds the same firmware into `odrig-microsd.bin`, the name
+  the board sessions of 2026-10-22 and 2026-10-23 used and the spec's board session
+  names; the other lines of the run may name it too. Two names for one firmware is the
+  price of not breaking a command that is written down.
+- `build --trial`, the environments `odrig_trial` and `odrig_trial_probe`, and
+  `ODRIG_BOARD_IMAGES=trial` go. `tests/firmware/test_trial.py` becomes
+  `test_newer_software.py`, since what it tests, the newer software's folder, packages and
+  environment, stays.
+- The board's suite on the card's firmware is run in the board session of task 8, which
+  flashes that firmware anyway; task 10 has no board of its own in this run.
+- Seed 12's spec takes the card's line, line 26 of `firmware-additions.md`, as its
+  Requirement 13, and the stick's lines 17 and 18 hold for the stick's build only: the
+  seed's question 8 says the fallback follows the firmware the installation runs.
+
+**Resolution.** `firmware/fwtool/build.py`, `firmware/fwtool/cli.py`,
+`firmware/platformio_override.ini.in`, `tests/board/support.py`; `docs/firmware.md`,
+"The newer software" and "build"; `docs/decisions.md`, "Firmware";
+`docs/specs/12-p2-standalone-firmware-as-a-fallback/requirements.md`, Requirement 13.

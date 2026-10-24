@@ -178,3 +178,23 @@ says what each one is, how to switch, and what each offers that the other does n
 1. WHEN the work of this seed ends THEN the board SHALL run the WLED-based firmware and
    the bench show, autostarting, at a brightness of 40 or less.
 2. Every suite that needs no board SHALL pass.
+
+## Requirement 13: the microSD card
+
+**User story.** As the person who prepares the board, I want the fallback to play the
+animations of the microSD card as the firmware does, so that switching to it at the event
+keeps the card's animations.
+
+This is line 26 of [firmware-additions.md](../../firmware-additions.md), which the
+WLED-based firmware has had since 2026-10-24, when the owner made the card's firmware the
+one `python3 firmware/fw.py build` makes; the fallback follows that firmware, and the USB
+stick's lines 17 and 18 hold for the stick's build only.
+
+1. The standalone firmware SHALL read the `.odrg` files of the folder `odrig` of a
+   microSD card in the reader on GPIO39 to GPIO42, at 4 MHz, and give them to the core
+   as a drive, as the WLED-based firmware does: FAT32 or FAT16, at most 256 files, never
+   written, taken up and dropped while the board runs, its free and total space for
+   `space`, and the log's `sd` lines on the socket marked COM.
+2. The standalone firmware SHALL keep the chip's own USB socket a serial port.
+3. The board suite against the standalone firmware SHALL list a card's animations after
+   the installed ones when a card is in the reader.
