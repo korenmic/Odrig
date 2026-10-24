@@ -118,6 +118,7 @@
 </div>
 <div class="pair">
 <button id="make-text" type="button">Make a text</button>
+<button id="make-clock" type="button">Make a clock</button>
 </div>
 <div id="author" class="panel" hidden>
 <h2 id="author-title">A text</h2>
@@ -145,6 +146,26 @@
 <div><label for="text-speed">Speed, pixels a second</label><input id="text-speed" type="text" inputmode="numeric" autocomplete="off" value="20"></div>
 <div><label for="text-pause">Pause, milliseconds</label><input id="text-pause" type="text" inputmode="numeric" autocomplete="off" value="1000"></div>
 </div>
+</div>
+<div id="clock-form" hidden>
+<label for="clock-widget">Clock</label>
+<select id="clock-widget"><option value="analog">With hands</option><option value="digital">With digits</option><option value="melting">Melting watch</option></select>
+<label for="clock-seconds">Seconds of a loop</label>
+<input id="clock-seconds" type="text" inputmode="numeric" autocomplete="off" value="30">
+<div class="pair">
+<div><label for="clock-face">Face</label><input id="clock-face" type="color" value="#f4ecd0"></div>
+<div><label for="clock-hands">Hands</label><input id="clock-hands" type="color" value="#202020"></div>
+</div>
+<div class="pair">
+<div><label for="clock-rim">Rim</label><input id="clock-rim" type="color" value="#d4a017"></div>
+<div><label for="clock-background">Background</label><input id="clock-background" type="color" value="#000000"></div>
+</div>
+<div class="pair">
+<div><label for="clock-speed-min">Least speed</label><input id="clock-speed-min" type="text" inputmode="numeric" autocomplete="off" value="60"></div>
+<div><label for="clock-speed-max">Greatest speed</label><input id="clock-speed-max" type="text" inputmode="numeric" autocomplete="off" value="600"></div>
+</div>
+<p class="small">The speeds are how many times faster than real time the clock's imaginary time runs. Each time the clock plays, its hours, its speed and its shape are chosen anew.</p>
+<button id="clock-seed" type="button">New random time</button>
 </div>
 <canvas id="author-preview"></canvas>
 <p id="author-says" role="status" aria-live="polite"></p>

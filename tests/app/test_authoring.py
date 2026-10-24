@@ -20,6 +20,13 @@ TEXT = {
 }
 
 
+# The clock the tests make, as its JSON source has it, for a canvas.
+CLOCK = {
+    "version": 1, "type": "widget", "widget": "analog", "seconds": 30, "face": 0xF4ECD0, "hands": 0x202020, "rim": 0xD4A017, "background": 0,
+    "speed_min": 60, "speed_max": 600,
+}
+
+
 def status_of(width, height):
     return (200, json.dumps({"ok": True, "on": True, "brightness": 128, "playing": "all", "animation": 1, "fps": 50, "error": None, "width": width,
                              "height": height, "seed": None}, separators=(",", ":")) + "\n")
@@ -103,3 +110,39 @@ class MakingAText(unittest.TestCase):
         self.assertEqual(found["uploading"], "Cancelled.")
         self.assertIn(b"upload cancel", sent)
         self.assertTrue(any(line.startswith(b"upload begin 3 hello-world.odrgx ") for line in sent), sent)
+
+
+class MakingAClock(unittest.TestCase):
+    def test_the_preview_draws_the_clock_of_its_seed_and_a_new_time_draws_another(self):
+        fields = [["clock-widget", "melting"], ["clock-seconds", "45"]]
+        with support.StandIn(stand_in_of(60, 60)) as stand_in:
+            found = support.run("author-clock", address=stand_in.address, settings={"rows": 2, "fields": fields}).seen
+        self.assertEqual(found["title"], "A clock")
+        self.assertEqual(found["says"], ["One loop takes 30.00 seconds.", "One loop takes 45.00 seconds."])
+        data = encoded({**CLOCK, "widget": "melting", "seconds": 45, "width": 60, "height": 60})
+        first, later, other = found["pictures"]
+        self.assertEqual(first["seed"], later["seed"])
+        self.assertNotEqual(other["seed"], first["seed"])
+        for shown in found["pictures"]:
+            self.assertEqual(shown["rgb"], top_row_first(core_support.rendered(data, [shown["ms"]], shown["seed"])[0], 60, 60), (shown["ms"], shown["seed"]))
+        self.assertNotEqual(first["rgb"], later["rgb"])
+
+    def test_a_number_out_of_its_range_is_named(self):
+        fields = [["clock-seconds", "0"], ["clock-seconds", "30"], ["clock-speed-max", "59"], ["clock-speed-max", "x"]]
+        with support.StandIn(stand_in_of(60, 6)) as stand_in:
+            found = support.run("author-clock", address=stand_in.address, settings={"rows": 2, "fields": fields}).seen
+        self.assertEqual(found["says"], ["The animation cannot be made: seconds is below 1. (out-of-range)", "One loop takes 30.00 seconds.",
+                                         "The animation cannot be made: speed_max is below 60. (out-of-range)",
+                                         "The animation cannot be made: speed_max is not an integer. (bad-type)"])
+
+    def test_a_clock_is_uploaded_as_a_new_animation_listed_as_a_widget(self):
+        folder = entered(self, emulator_support.example_show())
+        emulator = entered(self, emulator_support.Emulator(folder))
+        fields = [["clock-widget", "digital"]]
+        found = support.run("author-clock", address=f"127.0.0.1:{emulator.port}", settings={"rows": 2, "fields": fields, "upload": True}).seen
+        self.assertEqual(found["message"], "Uploaded as animation 4 clock-digital.odrgx. It plays in the playlist.")
+        data = encoded({**CLOCK, "widget": "digital", "width": 60, "height": 6})
+        self.assertEqual((folder / "clock-digital.odrgx").read_bytes(), data)
+        self.assertIn({"id": 4, "file": "clock-digital.odrgx", "bytes": len(data), "ignored": False, "external": False, "type": "widget"},
+                      json.loads(emulator.command("list"))["items"])
+        self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 4])

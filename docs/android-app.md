@@ -34,8 +34,8 @@ a top bar with the app's name and whether the installation answers.
   `Fix it on a computer: the card is read-only here.` Its menu works as any other's. The
   other animations and every other control work as ever, also when every animation is
   unavailable.
-- **Upload** makes an animation from a video or a GIF of the phone, or makes a text, and
-  uploads it, with the free internal storage above it.
+- **Upload** makes an animation from a video or a GIF of the phone, or makes a text or a
+  clock, and uploads it, with the free internal storage above it.
 - **Settings** has the checkbox `Show test animations` and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, and says how
@@ -350,6 +350,15 @@ effect, with the effects that show it. `Upload to the installation` sends it as 
 item, as a video's animation is sent, as an `.odrgx` file named after its first English
 words, `hello-world.odrgx`, or `text.odrgx` when it has none; `Close` closes the form.
 [format.md](format.md) has what a text holds.
+
+To make a clock, press `Make a clock`. Its form has the kind, `With hands`, `With digits`
+or `Melting watch`; the seconds of a loop, 30 at first; the colours of its face, its
+hands, its rim and its background; and its least and its greatest speed, how many times
+faster than real time its imaginary time runs. The preview shows it as the installation
+will, with a time, a speed and, for the melting watch, a shape chosen at random as each
+turn of it on the installation chooses them; `New random time` shows another. A line says
+`One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
+uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
 
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the

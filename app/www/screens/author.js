@@ -1,5 +1,5 @@
-// Upload: making a text for the canvas of the target, its moving preview, drawn as the
-// player draws it, and uploading it as a new animation.
+// Upload: making a text or a clock for the canvas of the target, its moving preview,
+// drawn as the player draws it, and uploading it as a new animation.
 
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -12,12 +12,15 @@ import {fileName, fits, freeId, textName, uploading} from "../upload.js";
 const ENDING = ".odrgx";
 const PREVIEW_STEP_MS = 40;
 
-// What the form makes now: its container and what it holds, or why it cannot be made;
-// the preview's timer and the moment its time began; and the upload under way.
+// Which form is open, "text" or "widget"; what it makes now: its container and what it
+// holds, or why it cannot be made; the preview's timer, the moment its time began and the
+// seed of a clock's turn; and the upload under way.
+let kind = "text";
 let made = null;
 let refusal = null;
 let previewTimer = null;
 let previewSince = 0;
+let seed = 1;
 let sending = null;
 // The canvas the container was made for, as `<width>x<height>`, or null.
 let madeFor = null;
@@ -54,6 +57,25 @@ function textSource(canvas) {
   };
 }
 
+// The JSON source of the clock the form holds, for a canvas.
+function clockSource(canvas) {
+  return {
+    version: 1, type: "widget", width: canvas.width, height: canvas.height, widget: byId("clock-widget").value, seconds: numberOf("clock-seconds"),
+    face: colourOf("clock-face"), hands: colourOf("clock-hands"), rim: colourOf("clock-rim"), background: colourOf("clock-background"),
+    speed_min: numberOf("clock-speed-min"), speed_max: numberOf("clock-speed-max"),
+  };
+}
+
+// A seed for the preview of a clock, as a turn of it on the installation gets one: a
+// random number from 1 to 4,294,967,295.
+function newSeed() {
+  const drawn = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(drawn);
+  } while (drawn[0] === 0);
+  return drawn[0];
+}
+
 // The canvas of the target, or null while it reports none.
 function canvasOf() {
   const status = client.state.status;
@@ -67,7 +89,7 @@ function stopPreview() {
 
 // Draws the picture of the container at the time of the preview, again and again. The
 // format keeps the bottom row first; the canvas draws the top row first. The canvas
-// carries the time it shows, for whoever checks its pixels.
+// carries the time it shows and the seed, for whoever checks its pixels.
 function preview() {
   stopPreview();
   const canvas = byId("author-preview");
@@ -79,7 +101,7 @@ function preview() {
   previewSince = performance.now();
   const step = () => {
     const ms = Math.floor(performance.now() - previewSince);
-    const picture = pictureOf(made.decoded, ms, 1);
+    const picture = pictureOf(made.decoded, ms, seed);
     for (let row = 0; row < height; row += 1) {
       const from = (height - 1 - row) * width * 3;
       const to = row * width * 4;
@@ -92,6 +114,7 @@ function preview() {
     }
     context.putImageData(drawn, 0, 0);
     canvas.dataset.ms = String(ms);
+    canvas.dataset.seed = String(seed);
     previewTimer = setTimeout(step, PREVIEW_STEP_MS);
   };
   step();
@@ -108,7 +131,7 @@ function remake() {
     refusal = messages.ofConversion({reason: "no-canvas"});
   } else {
     try {
-      const source = textSource(canvas);
+      const source = kind === "text" ? textSource(canvas) : clockSource(canvas);
       const bytes = makeContainer(source);
       made = {bytes, decoded: readContainer(bytes), source};
     } catch (error) {
@@ -119,7 +142,8 @@ function remake() {
     }
   }
   byId("author-preview").hidden = made === null;
-  byId("author-says").textContent = made === null ? refusal : `One pass takes ${(made.decoded.header.loopMs / 1000).toFixed(2)} seconds.`;
+  const seconds = made === null ? 0 : (made.decoded.header.loopMs / 1000).toFixed(2);
+  byId("author-says").textContent = made === null ? refusal : kind === "text" ? `One pass takes ${seconds} seconds.` : `One loop takes ${seconds} seconds.`;
   if (made !== null) {
     preview();
   }
@@ -137,10 +161,19 @@ function draw() {
   byId("author-upload").disabled = made === null || locked();
 }
 
-function open() {
+// Opens the form of a text or of a clock.
+function open(which) {
+  if (sending !== null) {
+    return;
+  }
+  kind = which;
+  byId("author-title").textContent = kind === "text" ? "A text" : "A clock";
+  byId("text-form").hidden = kind !== "text";
+  byId("clock-form").hidden = kind !== "widget";
   byId("author").hidden = false;
+  seed = newSeed();
   remake();
-  byId("text-words").focus({preventScroll: true});
+  byId(kind === "text" ? "text-words" : "clock-widget").focus({preventScroll: true});
 }
 
 function close() {
@@ -151,8 +184,8 @@ function close() {
   byId("author").hidden = true;
 }
 
-// Uploads the text that was made as a new item with the lowest free id and a file name
-// made from its first words.
+// Uploads the text or the clock that was made as a new item with the lowest free id and a
+// file name made from a text's first words, or `clock-<kind>`.
 function upload(message) {
   if (made === null || locked()) {
     return;
@@ -165,7 +198,8 @@ function upload(message) {
   }
   const listed = state.animations === null ? [] : state.animations;
   const id = freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
-  const file = fileName(textName(made.source.text), new Set(listed.map((animation) => animation.file)), ENDING);
+  const base = kind === "text" ? textName(made.source.text) : `clock-${made.source.widget}`;
+  const file = fileName(base, new Set(listed.map((animation) => animation.file)), ENDING);
   const shown = byId("author-uploading");
   shown.hidden = false;
   shown.textContent = "Sending: 0%";
@@ -206,15 +240,20 @@ function upload(message) {
   draw(client.state);
 }
 
-// Starts the part of Upload that makes texts. `message` shows a text in the place for
-// messages.
+// Starts the part of Upload that makes texts and clocks. `message` shows a text in the
+// place for messages.
 export function start(options) {
   const message = options.message;
-  byId("make-text").addEventListener("click", open);
-  for (const field of byId("text-form").querySelectorAll("textarea, input, select")) {
+  byId("make-text").addEventListener("click", () => open("text"));
+  byId("make-clock").addEventListener("click", () => open("widget"));
+  for (const field of byId("author").querySelectorAll("textarea, input, select")) {
     field.addEventListener("input", remake);
     field.addEventListener("change", remake);
   }
+  byId("clock-seed").addEventListener("click", () => {
+    seed = newSeed();
+    remake();
+  });
   byId("author-upload").addEventListener("click", () => upload(message));
   byId("author-cancel").addEventListener("click", () => {
     if (sending !== null) {
