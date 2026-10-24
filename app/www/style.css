@@ -336,6 +336,57 @@ input[type="range"] {
   color: var(--teal);
 }
 
+/* The Tests group. */
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#tests-toggle {
+  width: auto;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+
+#tests-toggle::before {
+  content: "\25be  ";
+  color: var(--lesser);
+}
+
+#tests-toggle[aria-expanded="false"]::before {
+  content: "\25b8  ";
+}
+
+.group-head .pin {
+  width: 22px;
+  height: 22px;
+  color: var(--violet);
+}
+
+#tests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+#tests-grid button.test {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 15px;
+}
+
+#tests-grid button.test[aria-pressed="true"] {
+  border-color: var(--violet);
+  background: var(--violet);
+  color: var(--on-accent);
+}
+
 /* The list of animations. */
 #list-head {
   display: flex;

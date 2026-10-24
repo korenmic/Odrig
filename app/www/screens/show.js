@@ -8,6 +8,7 @@ import {Failure} from "../target.js";
 import * as messages from "../messages.js";
 import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
+import * as tests from "./tests.js";
 
 // The shortest time between two brightness commands while the slider is moved.
 const BRIGHTNESS_EVERY_MS = 200;
@@ -427,6 +428,8 @@ export function start(options) {
   selection.start({message, redraw});
   reorder.start({message, redraw, shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
+  tests.start({message, isVisible});
+  extend({draw: tests.draw});
   byId("on").addEventListener("click", () => client.switchOn());
   byId("off").addEventListener("click", () => client.switchOff());
   byId("play-all").addEventListener("click", () => client.playAll());
