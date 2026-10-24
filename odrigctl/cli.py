@@ -29,6 +29,10 @@ COMMANDS = {
     "order": ("OPERATION",),
     "upload": ("ID", "FILE"),
 }
+# What an upload came to, beside its reply: a reply that does not report success leaves the
+# show as it was.
+UPLOAD_UNCHANGED = "upload: unchanged: the target holds this file already; nothing was sent"
+UPLOAD_UNKNOWN = "upload: not known: the target did not answer; the same upload again sends nothing when the file was installed"
 TIMEOUT_SECONDS = 2.0
 REPORT_SECONDS = 0.5
 COUNTS = ("no argument", "one argument", "two arguments")
@@ -129,6 +133,7 @@ class Progress:
         self.in_place = stream.isatty()
         self.reported = clock()
         self.width = 0
+        self.all_sent = False
 
     def sent(self, sent, total, seconds):
         now = self.clock()
@@ -139,6 +144,7 @@ class Progress:
         self._write(f"upload: {sent * 100 // total}% {sent}/{total} bytes {speed} B/s")
 
     def checking(self):
+        self.all_sent = True
         self._write("upload: checking")
 
     def _write(self, text):
@@ -186,6 +192,7 @@ def main(argv=None):
         except KeyboardInterrupt:
             return 0
     data = None
+    progress = None
     if arguments.command == "upload":
         try:
             with open(words[2], "rb") as file:
@@ -208,7 +215,12 @@ def main(argv=None):
             else:
                 reply = session.exchange(" ".join(words).encode("utf-8") + b"\n")
     except client.Unreachable as unreachable:
+        if progress is not None and progress.all_sent:
+            # `upload end` went out and its reply did not come: the file may be in place.
+            print(UPLOAD_UNKNOWN, file=sys.stderr)
         print(f"error: unreachable: {unreachable}", file=sys.stderr)
         return 3
+    if arguments.command == "upload" and content.is_ok(reply):
+        print(UPLOAD_UNCHANGED if content.is_unchanged(reply) else f"upload: committed: {len(data)} bytes sent and checked by the target", file=sys.stderr)
     _print(reply)
     return 0 if content.is_ok(reply) else 1

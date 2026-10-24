@@ -72,7 +72,7 @@ Rules for every task:
   - `docs/commands.md`, `docs/core.md`, `docs/decisions.md`.
   - Requirements: 5.1, 5.2, 5.4, 5.5, 6.1 to 6.3, 6.5, 7.2
 
-- [ ] 5. The command tool and the emulator
+- [x] 5. The command tool and the emulator
   - `odrigctl/content.py`, `odrigctl/cli.py`: the CRC-32 sent, the form without it after
     `bad-argument`, the line of outcome.
   - Tests: `tests/emulator`: the same upload twice over the line port and over HTTP, the

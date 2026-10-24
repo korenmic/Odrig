@@ -24,6 +24,11 @@ def is_ok(reply):
     return json.loads(reply).get("ok") is True
 
 
+def is_unchanged(reply):
+    """Whether a reply to `upload begin` says that the target holds the file already."""
+    return json.loads(reply).get("unchanged") is True
+
+
 def error_of(reply):
     """The error code of a reply, or None for one that reports success."""
     return json.loads(reply).get("error")
@@ -47,19 +52,25 @@ def list_all(session, show, command=b"list"):
 
 
 def upload(session, item, name, data, progress=None, checking=None, busy_seconds=BUSY_SECONDS, clock=time.monotonic, sleep=time.sleep):
-    """Sends a file as an upload: `upload begin`, the file in pieces of the size the reply
-    names, each as one `upload data` line, and `upload end` with the CRC-32 of the file,
-    again every 0.2 seconds while the reply is `busy`, for `busy_seconds` at most.
+    """Sends a file as an upload: `upload begin` with the CRC-32 of the file, the file in
+    pieces of the size the reply names, each as one `upload data` line, and `upload end`
+    with the CRC-32 of the file, again every 0.2 seconds while the reply is `busy`, for
+    `busy_seconds` at most. A reply to `upload begin` that says `unchanged` ends the upload:
+    the target holds the file already, and nothing more is sent. A reply `bad-argument` to
+    it is followed by `upload begin` without the CRC-32, which every target takes.
 
     `item` and `name` go out as they are given, as text. `progress(sent, total, seconds)`
     is called after every piece that was acknowledged, with the time since `upload begin`
     was answered, and `checking()` once when all pieces are sent. Returns the reply that
-    ended the upload: the one of `upload end` that reports success, or the first reply
-    that does not. After a reply to a piece or to `upload end` that does not report
+    ended the upload: the one of `upload end` that reports success, the one of `upload
+    begin` that says `unchanged`, or the first reply that does not report success. After a reply to a piece or to `upload end` that does not report
     success, the upload is cancelled unless the reply says that it is gone.
     """
-    reply = session.exchange(f"upload begin {item} {name} {len(data)}\n".encode("utf-8"))
-    if not is_ok(reply):
+    reply = session.exchange(f"upload begin {item} {name} {len(data)} {zlib.crc32(data):08x}\n".encode("utf-8"))
+    if error_of(reply) == "bad-argument":
+        # A target that does not take the CRC-32 with `upload begin` takes the line without it.
+        reply = session.exchange(f"upload begin {item} {name} {len(data)}\n".encode("utf-8"))
+    if not is_ok(reply) or is_unchanged(reply):
         return reply
     began = clock()
     piece = json.loads(reply)["chunk"]
