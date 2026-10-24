@@ -115,7 +115,7 @@ Rules for every task:
     new item with `type` `text`; a cancelled upload.
   - Requirements: 12.1, 12.3, 12.4, 16.5
 
-- [ ] 10. The app: making a clock
+- [x] 10. The app: making a clock
   - `app/www/`: "Make a clock", its form, the preview with a new seed, the upload.
   - Tests in `tests/app/`: the preview, a new seed, an upload listed with `type` `widget`.
   - Requirements: 12.2, 12.4, 16.5
