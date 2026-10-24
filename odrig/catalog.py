@@ -506,3 +506,136 @@ def recover(storage):
         if storage.remove(name):
             removed.append(name)
     return removed
+
+
+def _state_line(storage):
+    """The line `status` prints for a storage, and its exit status."""
+    made = read(storage)
+    files = storage.names()
+    if made.state == NONE:
+        return f"catalog: none; {len(files)} animation files; import writes the catalog", 0
+    if made.state != OK:
+        advice = "; recover finishes the change" if made.detail == "interrupted" else ""
+        return f"catalog: {made.state}, {made.detail}{advice}", 1
+    named = {entry.name for entry in made.entries}
+    without = sum(1 for name in files if name not in named)
+    return (f"catalog: ok, generation {made.marker.generation}, {len(made.entries)} entries; "
+            f"{len(files)} animation files, {without} without an entry"), 0
+
+
+def _status(storage, arguments):
+    line, status = _state_line(storage)
+    print(line)
+    return status
+
+
+def _import(storage, arguments):
+    made, refused = rebuild(storage)
+    for name, reason in refused:
+        print(f"refused: {name}: {reason}")
+    print(f"imported: {len(made.entries)} animations, generation {made.marker.generation}")
+    return 1 if refused else 0
+
+
+def _add(storage, arguments):
+    status = 0
+    for path in arguments.files:
+        name = os.path.basename(path)
+        try:
+            with open(path, "rb") as file:
+                data = file.read()
+        except OSError:
+            print(f"refused: {name}: {errors.FILE_MISSING}")
+            status = 1
+            continue
+        known = read(storage)
+        replaced = known.state == OK and known.entry(name) is not None
+        try:
+            entry = add(storage, name, data)
+        except errors.Rejection as rejection:
+            print(f"refused: {name}: {rejection.reason}")
+            status = 1
+            continue
+        print(f"{'replaced' if replaced else 'added'}: {name}, {entry.bytes} bytes")
+    return status
+
+
+def _remove(storage, arguments):
+    status = 0
+    for name in arguments.names:
+        try:
+            remove(storage, name)
+        except errors.Rejection as rejection:
+            print(f"refused: {name}: {rejection.reason}")
+            status = 1
+            continue
+        print(f"removed: {name}")
+    return status
+
+
+def _check(storage, arguments):
+    found = check(storage)
+    for name, what in found:
+        print(f"differs: {name}: {what}")
+    print(f"checked: {len(read(storage).entries)} entries, {len(found)} differ")
+    return 1 if found else 0
+
+
+def _recover(storage, arguments):
+    finished = finish(storage)
+    removed = recover(storage)
+    if finished:
+        print("recovered: finished an interrupted change")
+    if removed:
+        print(f"recovered: removed {', '.join(removed)}")
+    if not finished and not removed:
+        print("recovered: nothing to do")
+    return _status(storage, arguments)
+
+
+_COMMANDS = {"status": _status, "import": _import, "add": _add, "remove": _remove, "check": _check, "recover": _recover}
+
+
+def main(argv=None):
+    """`python3 -m odrig.catalog [--folder] MOUNT COMMAND`: manages the folder `odrig` of a card
+    mounted at MOUNT on this computer, or with `--folder` the folder MOUNT itself. Prints one
+    line for each outcome. Exit status 0; 1 when a file was refused, a file differs from its
+    entry or the catalog cannot be used; 2 for a command line that is not understood."""
+    import argparse
+
+    made = argparse.ArgumentParser(
+        prog="python3 -m odrig.catalog",
+        description="Manages the catalog of the animations of a card mounted on this computer, in the card's folder odrig.",
+    )
+    made.add_argument("--folder", action="store_true", help="MOUNT is the folder odrig itself")
+    made.add_argument("mount", metavar="MOUNT", help="where the card is mounted")
+    commands = made.add_subparsers(dest="command", metavar="COMMAND", required=True)
+    commands.add_parser("status", help="say what the catalog is and how many animation files the folder holds")
+    commands.add_parser("import", help="check every animation file of the folder and write the catalog anew")
+    adding = commands.add_parser("add", help="put files into the folder, each checked and with its entry, in place of one of the same name")
+    adding.add_argument("files", metavar="FILE", nargs="+")
+    removing = commands.add_parser("remove", help="take animations out of the folder, each with its entry")
+    removing.add_argument("names", metavar="NAME", nargs="+")
+    commands.add_parser("check", help="compare each file's size and CRC-32 with its entry")
+    commands.add_parser("recover", help="finish a change that was cut, and remove what a change that was not committed left")
+    arguments = made.parse_args(argv)
+    folder = arguments.mount if arguments.folder else os.path.join(arguments.mount, "odrig")
+    if not os.path.isdir(folder):
+        made.error(f"{folder} is not a folder")
+    storage = Storage(folder)
+    try:
+        return _COMMANDS[arguments.command](storage, arguments)
+    except Unusable as unusable:
+        detail = f", {unusable.detail}" if unusable.detail and unusable.state != NONE else ""
+        if unusable.detail == "interrupted":
+            advice = "recover finishes the change"
+        elif unusable.state == NONE:
+            advice = "import writes it"
+        else:
+            advice = "import writes it anew"
+        print(f"error: the catalog is {unusable.state}{detail}; {advice}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
