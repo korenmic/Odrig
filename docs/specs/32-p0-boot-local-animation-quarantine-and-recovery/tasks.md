@@ -20,7 +20,7 @@ Rules for every task:
   `docs/commands.md` and the change log of `docs/decisions.md`. Nothing else is added.
 - Answers to questions that come up go into `docs/drifts.md`.
 
-- [ ] 1. The regression: one bad file ends the show
+- [x] 1. The regression: one bad file ends the show
   - Set the seed's `state.json` to `in_progress`.
   - `tests/core/test_quarantine.py`: a show of three animations whose second has a bad
     body, a bad header, or is missing keeps playing the first and the third, and `list`
