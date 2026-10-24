@@ -289,6 +289,7 @@ def _install_show(arguments):
     write_storage(on_port, region, before_path.read_bytes(), lambda before: storage.with_show(before, files))
     reply = board.settled(port, arguments.wait)
     print(reply)
+    print(board.outcome(reply))
     return 0 if storage.status_error(reply) is None else 1
 
 
@@ -316,6 +317,8 @@ def store_settings(port, wait, network=None, milliamps=None, settled=False, say=
     if milliamps is not None:
         print(limit.line(milliamps))
     print(reply)
+    if settled:
+        print(board.outcome(reply))
     return 0
 
 

@@ -423,14 +423,22 @@ python3 firmware/fw.py install-show build/example-show
 Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
 of the board's storage, checks what was written, restarts the board, waits until the
 board has read every installed animation to its end, and prints the board's reply to
-`status` then. The status is 0 when the reply reports a valid show and 1 when it reports
-a reason.
+`status` then and a line with the outcome:
 
-The board plays right after its restart and reads the animations while it plays. Until
-it has read them all it answers `list` with `busy`, and a fault it finds in one of them
-shows in `status` only then. So the tool waits for the first reply to `status`, asks for
-the list every half second until it is no longer refused with `busy`, and then asks for
-the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
+- `outcome: healthy`: the show is valid and every animation can be played;
+- `outcome: degraded: <n> unavailable`: the show is valid and plays, and `<n>` animations
+  had a fault and are unavailable until the next start or an upload that replaces them;
+  `list` names them with their reasons;
+- `outcome: recovery: <reason>`: the show is invalid.
+
+The status is 0 for healthy and degraded, as the board plays, and 1 for recovery.
+
+The board plays right after its restart and reads the animations while it plays. A
+firmware that reports its `readiness` is asked for its status every half second until the
+readiness is no longer `checking`. One from before seed 33 answers `list` with `busy`
+until it has read them all, and a fault it finds in one of them shows in `status` only
+then: the tool waits for the first reply to `status`, asks for the list every half second
+until it is no longer refused with `busy`, and then asks for the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
 the board reads a storage full of dense animations for some minutes while one of them
 plays, and a small show within a few seconds; see
 [Measurements on the board](#measurements-on-the-board). A board that is still reading
@@ -819,6 +827,22 @@ kind of the line, and its text.
 #log 32.115 player: drive file clip.odrg left out: size-mismatch
 #log 58.230 usb: a device went: maker 0781, product 5581, a stick
 ```
+
+**The line kept across a reset.** The firmware keeps the latest line the player logged,
+which names a reason (an invalid show, `file <name> unavailable: <reason>`,
+`drive file <name> left out: <reason>`), in memory that a software or watchdog reset
+leaves as it was and a power cut clears, with a CRC-32 of its length and its text, cut to
+95 bytes. Nothing of it is written to flash or to the card. At its next start, before the
+player starts, the firmware writes `#log <seconds> odrig: before this start: <text>` when
+that memory holds a sound line, and clears it either way: a damaged record is passed over
+and holds nothing up.
+
+**The name in `status`.** The firmware gives the core a text that names it, which
+`status` reports as `host`: WLED's release name, the date and the time of the build, its
+storage, `internal+microsd` for the microSD build and `internal+usb` otherwise, and
+`reset` with the reason of the chip's last reset as ESP-IDF tells it: `power-on`,
+`software`, `panic`, `task-watchdog`, `interrupt-watchdog`, `brownout`, `deep-sleep` or
+`other`.
 
 The lines of the kind `usb`, which only the USB stick's build writes:
 
@@ -1313,6 +1337,27 @@ of the bigger one, with its settings and without its show; `big-storage` moves i
 The last resort is the factory backup of the board: one image of the whole 16 MB flash with
 its own checksum file, kept beside this repository. No tool reads or writes it. It is
 written back by hand with esptool, at address `0x0`, after its checksum has been compared.
+
+## Capturing evidence
+
+When the board refuses an animation, restarts, or does something nobody can explain, the
+evidence is gathered before anything is changed, so that the cause can be told apart from
+what was done afterwards.
+
+1. **Say what is there.** Write down the app's version, the show (`list`, every page of it)
+   and which medium is in: `space` says whether a card or a stick is present.
+2. **Read without restarting.** Ask `status` and `fault` with `odrigctl` over the serial
+   port or HTTP, and read the log with `python -m odrigctl --port <port> --log`: a restart
+   would clear what the core keeps, and the kept line of a reset is written once. `status`
+   says `host`, which names the build and the reason of the last reset.
+3. **Keep the bytes.** Copy the animation that is unavailable, as it is on the card or as
+   `read-show` gets it from the board's storage, before anything removes or replaces it.
+   Its reason names what the decoder found in the bytes it was given; whether the storage
+   is damaged or a read went wrong on the way is found by reading the copy again
+   (`node converter/odrig.js check`).
+4. **Change one thing at a time,** and write down what each trial was meant to show and
+   what it showed. Do not alternate broad writes, removals and reinstalls without a
+   question each of them answers.
 
 ## The owner's checks
 

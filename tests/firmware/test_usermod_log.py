@@ -67,7 +67,7 @@ class TheLog(unittest.TestCase):
     def test_every_line_the_player_logs_goes_to_the_log(self):
         self.assertIn('OdrigLog::add("player", text);', self.log)
         setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
-        self.assertIn("const odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));", setup)
+        self.assertIn("odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));", setup)
 
     def test_nothing_of_the_wifi_settings_is_named_in_the_log(self):
         for text in (self.header, self.log):

@@ -582,3 +582,9 @@ are in [format.md](format.md), "Measured sizes".
   `degraded` or `recovery`, with the new members `readiness`, `checked`, `to_check`,
   `unavailable` and `checking`, and the new command `fault` reports the context of the
   latest fault of a file. Both were approved in advance by the owner.
+- 2026-10-24: Seed 33: the firmware names itself in `status` (`host`: its release, its build,
+  its storage and the reason of its last reset), keeps the latest line its player logged
+  across a software or watchdog reset in memory that a power cut clears, and writes it to
+  its log at its next start; `install-show` waits for the readiness and prints the
+  outcome, healthy, degraded or recovery. The new reply member `host` was approved in
+  advance by the owner.

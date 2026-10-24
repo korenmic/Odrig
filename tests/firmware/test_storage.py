@@ -189,7 +189,7 @@ class Commands(Temporary):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f'{LAYOUT_LINE}\n{{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}}\n')
+        self.assertEqual(result.out, f'{LAYOUT_LINE}\n{{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}}\noutcome: healthy\n')
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), support.files_of(self.show))
         self.assertEqual(storage.other_files(self.on_the_board(esptool)), storage.other_files(self.old))
 
@@ -204,14 +204,14 @@ class Commands(Temporary):
         answer = '{"ok":true,"on":true,"brightness":0,"playing":null,"animation":null,"fps":50,"error":"show-missing"}'
         result = self.install(self.esptool(), "--no-check", answer=answer)
         self.assertEqual(result.status, 1)
-        self.assertEqual(result.out, f"{LAYOUT_LINE}\n{answer}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\n{answer}\noutcome: recovery: show-missing\n")
         self.assertEqual(result.err, "")
 
     def test_the_reply_printed_is_the_one_the_board_gives_once_it_has_read_its_animations(self):
         talks = support.Talking({"status": [support.VALID], "list": [support.BUSY, support.BUSY, support.BUSY, support.LISTED]})
         with support.no_board(self.esptool(), talks=talks):
             result = support.run_main("install-show", self.show)
-        self.assertEqual((result.status, result.out, result.err), (0, f"{LAYOUT_LINE}\n{support.VALID}\n", ""))
+        self.assertEqual((result.status, result.out, result.err), (0, f"{LAYOUT_LINE}\n{support.VALID}\noutcome: healthy\n", ""))
         self.assertEqual(talks.sent, ["status", "list", "list", "list", "list", "status"])
 
     def test_a_show_that_turns_invalid_while_the_board_reads_it_is_status_1(self):
@@ -219,7 +219,28 @@ class Commands(Temporary):
         talks = support.Talking({"status": [support.VALID, invalid], "list": [support.BUSY, support.BUSY, '{"ok":false,"error":"show-invalid"}']})
         with support.no_board(self.esptool(), talks=talks):
             result = support.run_main("install-show", self.show, "--no-check")
-        self.assertEqual((result.status, result.out, result.err), (1, f"{LAYOUT_LINE}\n{invalid}\n", ""))
+        self.assertEqual((result.status, result.out, result.err), (1, f"{LAYOUT_LINE}\n{invalid}\noutcome: recovery: file-malformed dvd.odrg truncated\n", ""))
+
+    def test_the_outcome_of_a_board_that_reports_its_readiness(self):
+        checking = '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"readiness":"checking","checked":1,"to_check":1,"unavailable":0,"checking":"dvd.odrg","host":null}'
+        degraded = checking.replace('"checking","checked":1,"to_check":1,"unavailable":0,"checking":"dvd.odrg"', '"degraded","checked":2,"to_check":0,"unavailable":1,"checking":null')
+        ready = degraded.replace('"degraded"', '"ready"').replace('"unavailable":1', '"unavailable":0')
+        for final, line in ((degraded, "outcome: degraded: 1 unavailable"), (ready, "outcome: healthy")):
+            with self.subTest(line):
+                talks = support.Talking({"status": [checking, checking, final], "list": ['{"ok":true,"items":[],"next":null}']})
+                with support.no_board(self.esptool(), talks=talks):
+                    result = support.run_main("install-show", self.show)
+                self.assertEqual((result.status, result.out, result.err), (0, f"{LAYOUT_LINE}\n{final}\n{line}\n", ""))
+                self.assertEqual(talks.sent, ["status", "status", "status"])
+
+    def test_a_board_still_checking_when_the_time_is_over_is_not_known_yet(self):
+        checking = '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"readiness":"checking","checked":0,"to_check":2,"unavailable":0,"checking":"hello.odrg","host":null}'
+        talks = support.Talking({"status": [checking]})
+        with support.no_board(self.esptool(), talks=talks):
+            result = support.run_main("install-show", self.show, "--wait", "4")
+        self.assertEqual((result.status, result.out), (1, f"{LAYOUT_LINE}\n"))
+        self.assertIn("error: check-not-done: ", result.err)
+        self.assertIn("its state is not known yet", result.err)
 
     def test_a_board_that_is_still_reading_when_the_time_is_over_is_check_not_done(self):
         talks = support.Talking({"status": [support.VALID], "list": [support.BUSY]})

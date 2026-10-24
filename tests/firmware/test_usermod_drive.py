@@ -56,7 +56,7 @@ class TheDrive(unittest.TestCase):
     def test_the_drive_is_started_before_the_core_and_its_functions_are_the_cores_host(self):
         setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
         self.assertLess(setup.index("OdrigDrive::begin();"), setup.index("core = odrig_core_begin(&host);"))
-        self.assertRegex(setup, r"const odrig_host host = (\w+::\w+\()?OdrigDrive::withDrive\(OdrigFiles::host\(\)\)\)?;")
+        self.assertRegex(setup, r"odrig_host host = (\w+::\w+\()?OdrigDrive::withDrive\(OdrigFiles::host\(\)\)\)?;")
         for member, function in (("drive", "driveNumber"), ("drive_name", "driveName"), ("read_at", "readPart")):
             self.assertIn(f"made.{member} = {function};", self.drive)
 

@@ -49,7 +49,7 @@ Rules for every task:
   - `docs/core.md`, `docs/emulator.md`.
   - Requirements: 3.1, 3.2, 3.3 (the emulator)
 
-- [ ] 4. The firmware: its name, the kept fault, and the tool's outcomes
+- [x] 4. The firmware: its name, the kept fault, and the tool's outcomes
   - `firmware/usermod/odrig_files.cpp` or `odrig_usermod.cpp`: `about`;
     `firmware/usermod/odrig_log.cpp`: the kept record; `firmware/fwtool/board.py`,
     `cli.py`: `ready`, `outcome`.

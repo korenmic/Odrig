@@ -247,7 +247,7 @@ class InstallFirmware(OnASmallLayout):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\n")
+        self.assertEqual(result.out, f"{LAYOUT_LINE}\nname: {NAME}\npassword: set\nlimit: 850 mA\n{REPLY}\noutcome: healthy\n")
         self.assertEqual(esptool.commands(), ["read-flash", "erase-region", "write-flash", "read-flash", "read-flash", "write-flash", "verify-flash"])
         self.checked.assert_called_once_with(build.image_path("firmware"))
         program, data = [call for call in esptool.calls if "write-flash" in call]

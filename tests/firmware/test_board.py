@@ -72,7 +72,6 @@ class Settled(unittest.TestCase):
         with mock.patch.object(board.client, "serial_exchange", talks.exchange), mock.patch.object(board, "time", talks):
             return board.settled("/dev/cu.test", wait)
 
-    @unittest.expectedFailure
     def test_a_board_whose_list_is_given_during_the_check_is_waited_for_by_its_readiness(self):
         checking = '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"readiness":"checking","checked":0,"to_check":2,"unavailable":0,"checking":"hello.odrg","host":null}'
         ready = checking.replace('"checking","checked":0,"to_check":2', '"ready","checked":2,"to_check":0').replace('"checking":"hello.odrg"', '"checking":null')
