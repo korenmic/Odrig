@@ -20,6 +20,9 @@ def b64(data):
 
 
 def frames_of(data):
+    """The frame records of a file: a text is read whole, as one."""
+    if support.type_of(data) != "frames":
+        return 1
     return len(odrg.decode(support.frames_payload(data)).records)
 
 

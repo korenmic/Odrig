@@ -55,6 +55,13 @@ enum Reason {
     kCanvasMismatch,
     kLoopMismatch,
 
+    // A text of an ODRGX container.
+    kUnknownFont,
+    kBadSettings,
+    kBadText,
+    kDoesNotFit,
+    kBadGlyph,
+
     kReasonCount
 };
 

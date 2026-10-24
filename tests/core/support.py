@@ -526,13 +526,16 @@ def frames_payload(data):
 def header_fault(data, canvas):
     """The reason a reader refuses a runtime file for by its headers, as the core reads them
     before any frame record, or None: a container's header, the header of the ODRG file of
-    its frames and their canvas, and last the canvas against `canvas`, as `size-mismatch`."""
+    its frames and their canvas, and last the canvas against `canvas`, as `size-mismatch`.
+    A text has its canvas in the container's header alone."""
     container = None
     if odrgx.is_container(data):
         try:
             container = odrgx.read_header(data)
         except errors.Rejection as rejection:
             return rejection.reason
+        if container.type != 1:
+            return "size-mismatch" if (container.width, container.height) != tuple(canvas) else None
     inner = frames_payload(data)
     # The header alone, when it is sound, is refused as a file cut after it.
     try:
@@ -550,7 +553,42 @@ def header_fault(data, canvas):
 
 def type_of(data):
     """What `list` says a runtime file holds."""
+    if odrgx.is_container(data) and data[5] in odrgx.TYPE_NAMES:
+        return odrgx.TYPE_NAMES[data[5]]
     return "frames"
+
+
+def rendered(data, times):
+    """The pictures the core's drawing makes of a text at these times into its turn, by
+    `odrig_host render`, or the reason it is refused for."""
+    with tempfile.TemporaryDirectory() as folder:
+        path = pathlib.Path(folder) / "text.odrgx"
+        path.write_bytes(data)
+        lines = host_lines("render", str(path), *(str(time) for time in times))
+    if lines[0].startswith("rejected "):
+        return lines[0][len("rejected "):]
+    return [bytes.fromhex(line.split(" ")[3]) for line in lines]
+
+
+class _Drawn:
+    """A text. The reference knows the length of its pass, and takes the pictures of a pass
+    from the core's drawing, which tests of their own hold to the converter's pictures."""
+
+    AHEAD = 250
+
+    def __init__(self, data, loop):
+        self.data = data
+        self.total = loop
+        self.broken = None
+        self.pictures = {}
+
+    def picture_at(self, elapsed):
+        time = elapsed % self.total
+        if time not in self.pictures:
+            # The times of the refreshes to come are drawn with it, 20 ms apart.
+            times = sorted({(time + 20 * step) % self.total for step in range(self.AHEAD)})
+            self.pictures.update(zip(times, rendered(self.data, times)))
+        return self.pictures[time]
 
 
 class _Clip:
@@ -701,7 +739,10 @@ class ReferencePlayer:
             steps, reason, clip = self._judge(data)
             if reason is not None and not self.changeable:
                 raise _Invalid(f"file-malformed {name} {reason}")
-            if reason is not None:
+            if reason is not None and type_of(data) != "frames":
+                # Nothing of a text is played before its fault.
+                clip = _Clip([], reason)
+            elif reason is not None:
                 # The frames before the fault can be played. A fault after the last
                 # frame record is met by the check alone.
                 sound = found_in(data).records
@@ -736,14 +777,24 @@ class ReferencePlayer:
         self.zero = None
         self.turn = self.shown = self._animations()[0] if number is None else number
 
+    def _whole_passes(self, number, turn):
+        """A longest time given to the turn of a text, rounded up to its whole passes."""
+        clip = self.clips[self.items[number].file]
+        if not isinstance(clip, _Drawn):
+            return turn
+        return -(-turn // clip.total) * clip.total
+
     def _turn_ms(self, number):
         """How long the turn of an animation lasts: its loops, which are the show's
-        `repeat` or the fewest that last `min_seconds`, cut at its `max_seconds`."""
+        `repeat` or the fewest that last `min_seconds`, cut at its `max_seconds`, or, for a
+        text, at the whole pass in which that ends."""
         item = self.items[number]
         loop = self.clips[item.file].total
         loops = item.repeat if item.repeat is not None else -(-1000 * self.min_seconds // loop)
         turn = loops * loop
-        return turn if item.max_seconds is None else min(turn, 1000 * item.max_seconds)
+        if item.max_seconds is None or turn <= 1000 * item.max_seconds:
+            return turn
+        return self._whole_passes(number, 1000 * item.max_seconds)
 
     def _touch(self, now):
         """Takes the timestamp of a call and gives the time the call happens at."""
@@ -789,10 +840,16 @@ class ReferencePlayer:
                 self.turn = order[(order.index(self.turn) + 1) % len(order)]
         else:
             # Turn t of a cycle shows the animation at place t mod n, with its time
-            # counted from the start of the turn.
+            # counted from the start of the turn. A turn is `seconds` long, a text's
+            # rounded up to its whole passes.
             cycle = self.items[self.playing]
-            turn, elapsed = divmod(elapsed, 1000 * cycle.seconds)
-            item = self.items[cycle.cycle[turn % len(cycle.cycle)]]
+            lengths = [self._whole_passes(number, 1000 * cycle.seconds) for number in cycle.cycle]
+            elapsed %= sum(lengths)
+            place = 0
+            while elapsed >= lengths[place]:
+                elapsed -= lengths[place]
+                place += 1
+            item = self.items[cycle.cycle[place]]
             clip = self.clips[item.file]
             if clip.broken and clip.total <= elapsed:
                 self._fail(f"file-malformed {item.file} {clip.broken}")
@@ -969,6 +1026,10 @@ class ReferencePlayer:
         fault = header_fault(data, self.canvas)
         if fault is not None:
             return 1, fault, None
+        if type_of(data) != "frames":
+            # The payload is read whole in one step, and the end in another.
+            reason = found_in(data).reason
+            return (2, reason, None) if reason is not None else (3, None, _Drawn(data, odrgx.read_header(data).loop_ms))
         try:
             records = odrg.decode(frames_payload(data)).records
         except errors.Rejection as rejection:

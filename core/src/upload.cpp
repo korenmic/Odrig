@@ -5,6 +5,7 @@
 #include "crc32.h"
 #include "json_reader.h"
 #include "storage.h"
+#include "text.h"
 
 namespace odrig {
 
@@ -101,16 +102,25 @@ void upload_step(Core &core, uint64_t now) {
             reason = kSizeMismatch;
         }
         if (reason == kNone) {
-            memset(core.check_pixels, 0, checker.decoder.n);
-            upload.records_left = checker.decoder.frames;
+            // A drawn payload is read and checked whole in one step, as one record.
+            const bool drawn = is_drawn(upload.content.type);
+            if (!drawn) {
+                memset(core.check_pixels, 0, checker.decoder.n);
+            }
+            upload.records_left = drawn ? 1 : checker.decoder.frames;
             upload.total_ms = 0;
             upload.header_read = 1;
             return;
         }
     } else if (upload.records_left != 0) {
-        uint16_t duration = 0;
-        reason = checker.decoder.next(core.check_pixels, &duration);
-        upload.total_ms += duration;
+        if (is_drawn(upload.content.type)) {
+            reason = text_read(&checker.file, upload.content, nullptr);
+            upload.total_ms = upload.content.loop_ms;
+        } else {
+            uint16_t duration = 0;
+            reason = checker.decoder.next(core.check_pixels, &duration);
+            upload.total_ms += duration;
+        }
         --upload.records_left;
         if (reason == kNone) {
             return;

@@ -40,6 +40,11 @@ const char *reason_name(Reason reason) {
         case kPayloadSize: return "payload-size";
         case kCanvasMismatch: return "canvas-mismatch";
         case kLoopMismatch: return "loop-mismatch";
+        case kUnknownFont: return "unknown-font";
+        case kBadSettings: return "bad-settings";
+        case kBadText: return "bad-text";
+        case kDoesNotFit: return "does-not-fit";
+        case kBadGlyph: return "bad-glyph";
         case kNone:
         case kEnd:
         case kReasonCount:

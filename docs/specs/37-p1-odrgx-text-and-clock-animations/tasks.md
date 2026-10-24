@@ -68,7 +68,7 @@ Rules for every task:
     code point; the source strict; a decoded text gives back its source.
   - Requirements: 3.1, 3.2, 4.1 to 4.5, 5.1 to 5.3, 11.1 to 11.3
 
-- [ ] 5. A text in the core, and the shared drawing
+- [x] 5. A text in the core, and the shared drawing
   - `core/src/text.h/.cpp`: the payload's check, its pass, its drawing; `open_stream` and
     `show_at` of a drawn stream; `turn_ms` and the cycle's turns at whole passes.
     `converter/lib/draw.js`: the drawing of a text. The test host's `render`.

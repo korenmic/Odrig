@@ -108,3 +108,42 @@ export function placeAt(settings, block, canvas, t) {
   }
   return horizontal(settings.motion) ? {x: place, y: at.y} : {x: at.x, y: place};
 }
+
+// Draws a text, decoded as `odrgx.decodeText` gives it, `t` milliseconds into its pass, into
+// `picture`, three bytes for each pixel in the pixel order of docs/format.md: the
+// background, and each lit pixel of each glyph that meets the canvas in the colour, a
+// square of the font's scale.
+export function drawText(decoded, font, t, picture) {
+  const {width, height} = decoded.header;
+  const {settings, block} = decoded;
+  const colour = [(settings.color >>> 16) & 0xff, (settings.color >>> 8) & 0xff, settings.color & 0xff];
+  const background = [(settings.background >>> 16) & 0xff, (settings.background >>> 8) & 0xff, settings.background & 0xff];
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    picture.set(background, 3 * pixel);
+  }
+  const at = placeAt(settings, block, {width, height}, t);
+  const rows = font.rows;
+  const scale = font.scale;
+  for (const glyph of decoded.glyphs) {
+    const cellX = at.x + glyph.x;
+    const cellY = at.y + glyph.y;
+    const glyphWidth = font.table.widths[glyph.glyph];
+    if (cellX >= width || cellY >= height || cellX + glyphWidth * scale <= 0 || cellY + rows * scale <= 0) continue;
+    for (let row = 0; row < rows; row += 1) {
+      const bits = font.table.rows[glyph.glyph * rows + row];
+      for (let column = 0; bits !== 0 && column < glyphWidth; column += 1) {
+        if ((bits & (0x80 >> column)) === 0) continue;
+        for (let down = 0; down < scale; down += 1) {
+          for (let across = 0; across < scale; across += 1) {
+            const x = cellX + column * scale + across;
+            const y = cellY + row * scale + down;
+            if (x >= 0 && x < width && y >= 0 && y < height) {
+              picture.set(colour, 3 * ((height - 1 - y) * width + x));
+            }
+          }
+        }
+      }
+    }
+  }
+  return picture;
+}

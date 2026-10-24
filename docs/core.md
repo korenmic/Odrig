@@ -1,7 +1,7 @@
 # The core
 
 The core is the C++ library in `core/` that plays an installed show: it reads
-`mapping.json`, `show.json` and the `.odrg` files, keeps time, handles the commands of
+`mapping.json`, `show.json` and the `.odrg` and `.odrgx` files, keeps time, handles the commands of
 [commands.md](commands.md) and gives the colour of every LED of every leg. The emulator and
 the firmware run the same source files, so the two cannot behave differently.
 
@@ -14,8 +14,8 @@ object, takes its memory once at startup, and never calls itself.
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
 the [LED data](#led-data), [command lines](#command-lines), [startup](#startup),
-[a drive](#a-drive), [memory](#memory), the [benchmark](#benchmark) and the
-[test host](#the-test-host).
+[a drive](#a-drive), [texts](#texts), [memory](#memory), the [benchmark](#benchmark) and
+the [test host](#the-test-host).
 
 ## Commands
 
@@ -325,7 +325,8 @@ inside `odrig_core_poll`, after the LED data of a refresh is complete:
 - the step after the last record asks for the end of the file: nothing may follow. The
   core then knows the size of the file, which `list` reports, and the length of its loop.
 
-A file of F frame records takes F + 2 steps. At a refresh that follows the one before it
+A file of F frame records takes F + 2 steps. A text takes three: its payload is read and
+checked whole in the second step, as one record. At a refresh that follows the one before it
 without a grid time skipped, and comes no more than 2 ms after its grid time, while the
 last whole second had 30 refreshes or more, the check takes one step more than at the
 refresh before, up to 16 steps. At any other refresh,
@@ -364,6 +365,34 @@ What a late refresh costs:
 
 The check and the player may have the same file open at the same time, each through its
 own source: the player with `open` and `read`, the check with `read_at`.
+
+## Texts
+
+A text is an ODRGX container of type 2, [format.md](format.md), "The text payload". The
+core reads it as the converter wrote it, and draws it at every refresh: the layout, the
+order of the characters and the place of each glyph in the block are in the file, so the
+core has no layout of its own.
+
+- **Reading.** The payload, at most 3,612 bytes, is read and checked whole, with the
+  checks and the order of [reasons.md](reasons.md), "Texts in ODRGX": the start reads
+  its header only, the check after the start and the check of an upload read the
+  payload in one step. When its turn begins the player reads the payload into the window
+  of the DEFLATE decoder, which no frames file uses meanwhile, and closes the file. So a
+  text asks for no memory of its own, and a fault in it is met at the start of its turn.
+- **Drawing.** At each refresh the picture is the background, and each lit pixel of each
+  glyph in the colour, a square of 2 x 2 for the large font, at the place of the block
+  the effect gives at the time into the pass: [format.md](format.md), "The text
+  payload". The fonts are tables in `core/src/font_tables.cpp`, which `fonts/generate.mjs`
+  writes from `fonts/*.txt` with the converter's copy, `converter/lib/fonttables.js`:
+  1,464 bytes for the small font and 1,952 for the medium one, in the program's flash.
+  Drawing takes no division in a loop and touches each pixel of the canvas once, then
+  each lit pixel of each glyph on it.
+- **The turn.** The loop of a text is its pass, and a turn ends at the end of a pass:
+  [show.md](show.md), "The turn of an animation".
+
+The reference pictures of `tests/vectors/procedural/` are drawn by the converter's
+library; the core's suite draws each again with the test host and finds every pixel the
+same.
 
 ## A drive
 
@@ -512,7 +541,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   the mapping's; each further step decodes one frame record, which is what playback does
   for a refresh; the step after the last record asks for the end of the file and
   compares the size and the CRC-32 of what was read back with what was received. A file
-  of F frame records is checked in F + 2 refreshes. No upload is open while the check
+  of F frame records is checked in F + 2 refreshes, a text in three. No upload is open while the check
   after the start reads the installed files. The check of a drive's files gives the
   second decoders up when an upload begins and takes them again once it is closed, so
   the two never need them at the same time.
@@ -596,7 +625,8 @@ repeated exactly.
 |---|---|
 | `odrig_host session DIR [options]` | Starts the core on the files of the folder `DIR`, prints the startup lines, then obeys the lines of standard input. |
 | `odrig_host session --batch [options]` | Runs one session after the other from standard input, which holds a file set and a script for each, and prints `end` after each. |
-| `odrig_host decode FILE` | Reads one `.odrg` file with the core's decoder. Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel, then `end`; or `rejected <reason>` where the file is refused. |
+| `odrig_host decode FILE` | Reads one `.odrg` file or ODRGX container with the core's decoder. Prints `container <type> <loop> <payload>` for a container; then, for frames, `header <W> <H> <C> <F> <compressed>` and one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel; then `end`; or `rejected <reason>` where the file is refused. A text has no frame records: its payload is read and checked whole. |
+| `odrig_host render FILE MS...` | Reads a text and draws it as the player does at each of these milliseconds into its turn. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
