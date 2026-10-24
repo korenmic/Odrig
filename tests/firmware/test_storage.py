@@ -108,7 +108,9 @@ class ShowFolders(Temporary):
         return support.reason_of(self, lambda: storage.folder_files(self.show, check=check))
 
     def test_a_packed_show_is_accepted_as_it_is(self):
-        self.assertEqual(storage.folder_files(self.show), support.files_of(self.show))
+        files = storage.folder_files(self.show)
+        self.assertEqual({name: data for name, data in files.items() if name not in storage.CATALOG_NAMES}, support.files_of(self.show))
+        self.assertIn("catalog.txt", files)
 
     def test_a_saved_playlist_order_is_a_file_of_the_show(self):
         (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 2\n")
@@ -195,23 +197,23 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         lines = result.out.splitlines()
         self.assertEqual((lines[0], lines[-2], lines[-1]), (LAYOUT_LINE, '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null}', "outcome: healthy"))
-        self.assertEqual(storage.show_of(self.on_the_board(esptool)), support.files_of(self.show))
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), storage.folder_files(self.show))
         self.assertEqual(storage.other_files(self.on_the_board(esptool)), storage.other_files(self.old))
 
     def test_it_says_how_the_show_changes_before_it_writes(self):
         first = self.esptool()
         result = self.install(first)
-        files = support.files_of(self.show)
-        self.assertEqual(result.out.splitlines()[1:7], [
+        files = storage.folder_files(self.show)
+        added = sorted(name for name in files if name != "mapping.json")
+        self.assertEqual(sorted(added), sorted(["dvd.odrg", "hello.odrg", "show.json", *(name for name in files if name in storage.CATALOG_NAMES)]))
+        self.assertEqual(result.out.splitlines()[1:len(added) + 4], [
             "show: kept 0 files",
-            f"show: added dvd.odrg, {len(files['dvd.odrg'])} bytes",
-            f"show: added hello.odrg, {len(files['hello.odrg'])} bytes",
-            f"show: added show.json, {len(files['show.json'])} bytes",
+            *(f"show: added {name}, {len(files[name])} bytes" for name in added),
             f"show: replaced mapping.json, {len(files['mapping.json'])} bytes, was 16",
             "show: removed old.odrg, 1800 bytes",
         ])
         again = self.install(self.esptool(self.on_the_board(first)))
-        self.assertIn("show: kept 4 files; nothing added, replaced or removed\n", again.out)
+        self.assertIn(f"show: kept {len(files)} files; nothing added, replaced or removed\n", again.out)
 
     def test_the_boards_saved_order_is_kept_for_a_folder_without_one(self):
         order = b"odrig-order 1\ni 2\nx sunrise.odrg\n"
@@ -219,7 +221,7 @@ class Commands(Temporary):
         esptool = self.esptool()
         result = self.install(esptool)
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(support.files_of(self.show), **{"order.txt": order}))
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"order.txt": order}))
         self.assertIn("show: kept 1 files\n", result.out)
         (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 1\n")
         esptool = self.esptool()
@@ -375,7 +377,7 @@ class Commands(Temporary):
         second = self.esptool(failing_verifies=1)
         self.install(second)
         self.assertEqual(second.commands(), ["read-flash", "verify-flash", "read-flash", "write-flash", "write-flash", "verify-flash", "chip-id"])
-        self.assertEqual(storage.show_of(self.on_the_board(second)), support.files_of(self.show))
+        self.assertEqual(storage.show_of(self.on_the_board(second)), storage.folder_files(self.show))
 
     def test_a_board_that_holds_something_else_after_the_write_needs_the_recovery(self):
         esptool = self.esptool(failing_verifies=1)
@@ -390,7 +392,7 @@ class Commands(Temporary):
         with support.no_board(self.esptool(self.on_the_board(esptool), failing_verifies=1)) as reading:
             result = support.run_main("read-show", self.folder / "copy")
         self.assertEqual(result.status, 0, result.err)
-        self.assertEqual(support.files_of(self.folder / "copy"), support.files_of(self.show))
+        self.assertEqual(support.files_of(self.folder / "copy"), storage.folder_files(self.show))
         self.assertEqual(reading.commands(), ["read-flash", "verify-flash", "read-flash", "chip-id"])
         self.assertEqual(reading.wrote, [])
         self.assertIn("hello.odrg: ", result.out)

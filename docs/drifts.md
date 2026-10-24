@@ -10085,3 +10085,26 @@ as `odrigctl` treats what it cannot start with. The canvas is the installation's
 
 **Resolution.** `odrig/catalog.py`, `main`; `tests/converter/test_catalog_cli.py`;
 `docs/microsd.md`, "The catalog, made on a computer".
+
+## Seed 35: the catalog that install-show writes
+
+**Question.** The firmware tool's `install-show` is to write the internal catalog of the
+folder it installs, as a rebuild would, with the generation after the board's. Its check
+of the folder already decodes every animation, and a rebuild decodes them again; the
+board's generation is known only once the board's storage is read; and installing the
+same folder again changed nothing before. How do these go together?
+
+**Answer.** `storage.folder_files` checks the folder by the rebuild itself, on an
+in-memory storage, in the show's order and for the mapping's canvas: each animation is
+decoded once. The first file the rebuild refuses, in the show's order, is judged again by
+the check before it, so that its reason and its words stay those of the converter's
+readers; a name the show allows and the catalog does not is checked alone and left out of
+the catalog. A catalog the folder holds is made anew. Once the board's storage is read,
+the marker gets the generation after the board's, or 1; when the board's catalog has the
+same pages the board's own marker is kept, so that the same folder installed again still
+writes nothing. `--no-check` writes no catalog. The rebuild of the PC library stands for
+the core's in the tests until the core rebuilds.
+
+**Resolution.** `firmware/fwtool/storage.py`, `folder_files`, `catalog_files`,
+`with_board_generation`; `tests/firmware/test_catalog.py`; `docs/firmware.md`,
+"install-show".
