@@ -625,7 +625,14 @@ installed; the phone with mobile data on.
     `Storage` and `Type`. *Seen:* the rows of that storage and type only, each count the
     number of rows it shows, `Show all` when none matches; after a restart of the app the
     choices are kept; while a filter hides rows, holding a row lifts nothing.
-20. **Note** the phone's model, its Android version, the web view's version from the
+20. **A text and a clock.** On Upload, `Make a text`: write `שלום world`, choose
+    `Marquee` and then each other effect and motion. *Seen:* the preview moves as the
+    words say and `One pass takes` names a length; `Upload to the installation` adds a row,
+    and the LEDs show the text as the preview did. Then `Make a clock` with each kind and
+    upload one; choose `Edit` in its row's menu, change its seconds and `Save`. *Seen:* the
+    clock's hands or digits move on the LEDs, the melting watch's hands bend with its
+    face, and after the save the row is where it was.
+21. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -714,6 +721,14 @@ By programs, on a Mac:
   one or does not say, and the controls usable meanwhile; the target screen's name of
   the emulator and its last fault, asked once when the screen is opened, and neither line
   for a target that does not say.
+- Texts and clocks, in Chrome against the emulator and against stand-in targets: the
+  preview of a text and of each kind of clock is, at the time and with the seed it shows,
+  the core's own drawing of the same file; a character no font has, a block that does
+  not fit and numbers out of range said in words; a text and a clock uploaded, listed with
+  their type and holding the converter's bytes; a cancelled upload; an edit of a text and
+  of a clock saved in its place with its inclusion; another controller's change between
+  reading and saving said and not overwritten; `Edit` only for the board's own texts and
+  clocks.
 - That the web code sends the twenty-seven lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
@@ -746,6 +761,9 @@ By programs, on a Mac:
   board's and the card's. On 2026-10-15 the owner ran the APK against
   the board on its own network and saw its state and its list; on 2026-10-16 the owner
   saw the app lie under the bars, before it kept clear of them.
+- **Texts and clocks on a phone and on the LEDs.** No phone has made, previewed, uploaded
+  or edited a text or a clock, and nobody has looked at one on the LEDs: step 20 above, and
+  seed 37's board session.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

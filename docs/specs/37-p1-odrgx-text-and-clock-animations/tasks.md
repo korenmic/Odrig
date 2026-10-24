@@ -128,7 +128,7 @@ Rules for every task:
     no "Edit".
   - Requirements: 13.1 to 13.4, 16.5
 
-- [ ] 12. The documents and the decisions
+- [x] 12. The documents and the decisions
   - `docs/format.md`, `docs/show.md`, `docs/core.md`, `docs/converter.md`,
     `docs/android-app.md`, `docs/emulator.md`, as Requirement 17 says; `docs/decisions.md`:
     the runtime format, the sources and the drawing, and a line in the change log;
