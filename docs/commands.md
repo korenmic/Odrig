@@ -26,6 +26,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
+| `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
 | `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
@@ -38,6 +39,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
+| `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
 
@@ -147,6 +149,30 @@ its end while it plays. Until it has read a file whole it does not know its size
 gives its `bytes` as `null` until then. `list`, `remove`, `remove many`, `ignore` and
 `upload` are answered from the start, as `status` and `space` are.
 
+## Reading a file back
+
+```
+read 2 0
+{"ok":true,"bytes":40,"data":"T0RSWAEDAQA8ADwAMHUAABQAAAADAB4A9OzQICAg1KAXAAAAPABYAg"}
+read 2 40
+{"ok":true,"bytes":40,"data":""}
+```
+
+`read <id> <offset>` gives up to 600 bytes of the file of an animation, of the show or of
+a USB drive, from `<offset>`, so that a text or a clock can be read back and edited.
+`bytes` is the size of the file, and `data` its bytes from the offset in base64 as
+`upload data` takes it; at the end of the file it is empty. `<id>` is 1 to 65,535 and
+`<offset>` 0 to 4,294,967,295, both in decimal digits.
+
+- An offset above the size of the file is refused with `bad-argument`.
+- An id that is no animation of the show or of the drive, a cycle's too, is refused with
+  `unknown-id`.
+- A file the player has not read whole since the start is refused with `busy`: ask again
+  a moment later. An animation that is unavailable, as its file had a fault, is refused
+  with `unavailable`; while the show is invalid, `read` is refused with `show-invalid`; and
+  when the file cannot be read, or the player has no storage that can be changed, with
+  `storage-error`.
+
 ## Removing an item
 
 ```
@@ -242,6 +268,19 @@ nine bytes `123456789` is `cbf43926`.
   its turn begins again; if a cycle that is playing lists it, the cycle starts again from
   its first frame.
 
+**`upload expect <crc32>`**, after `upload begin` and before `upload end`, makes the
+upload replace the item's file only when that file has this CRC-32 now: the one the client
+read with `read`. `<crc32>` is written as for `upload end`. The reply is `{"ok":true}` when
+it has.
+
+- `stale`: the id of the upload has no animation item, or its file has another CRC-32:
+  another controller changed or removed it. The upload is discarded.
+- `bad-argument`: the item's file is longer than 16,384 bytes. The upload stays open.
+- `storage-error`: the file could not be read. The upload is discarded.
+
+While an upload is open no other controller can change the show's files, so what
+`upload expect` found holds until `upload end`.
+
 **`upload cancel`** discards the open upload. An upload on which nothing has moved for 60
 seconds is discarded too: no data arrived, and no check is running.
 
@@ -255,15 +294,16 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
-| `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
+| `show-invalid` | `play`, `list`, `read`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
-| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such. |
+| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
+| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
+| `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |

@@ -708,6 +708,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
@@ -727,6 +728,7 @@ python -m odrigctl --port build/emulator/serial status
 python -m odrigctl --port build/emulator/serial fault
 python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
+python -m odrigctl --port build/emulator/serial read 1 0
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial remove 9
 python -m odrigctl --port build/emulator/serial remove many 9,10
@@ -747,6 +749,7 @@ python -m odrigctl --tcp 127.0.0.1:8601 status
 python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
+python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
 python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
 python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
@@ -767,6 +770,7 @@ python -m odrigctl --http 127.0.0.1:8600 status
 python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
+python -m odrigctl --http 127.0.0.1:8600 read 1 0
 python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
 python -m odrigctl --http 127.0.0.1:8600 remove 9
 python -m odrigctl --http 127.0.0.1:8600 remove many 9,10

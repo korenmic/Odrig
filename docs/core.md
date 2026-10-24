@@ -104,7 +104,9 @@ The last seven members are the storage functions: three that write a file, `rena
   the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
   `order.txt` and `order.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
-  call, and reads a file with `read_at` from offset 0 on, each call where the last ended.
+  call, and reads a file with `read_at` from offset 0 on, each call where its last call for
+  that file ended; only the command `read` begins at the offset it is given. Between two
+  calls for one file there may be calls for another.
   It renames and removes no file that `open` holds or that is being written.
 - A host without storage that can be changed sets `write_open` to `NULL`. The core then
   calls none of the seven but `space`. `space` may be `NULL` too; the command `space` is
@@ -261,9 +263,9 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `mapping-conflict`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`unknown-id`, `unavailable`, `in-use`, `mapping-conflict`, `stale`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
 `storage-error`. It
-changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
+changes nothing, except that `bad-checksum`, `stale`, `bad-file` and `storage-error` discard the
 upload they are about.
 
 ## Startup
@@ -700,6 +702,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   after the start reads the installed files. The check of a drive's files gives the
   second decoders up when an upload begins and takes them again once it is closed, so
   the two never need them at the same time.
+- **`upload expect`** reads the file of the upload's item through `read_at`, 512 bytes
+  at a time into the chunk buffer, and compares its CRC-32; it takes no step of the check.
 - **`upload end`** is answered with `busy` while the check runs. Afterwards it puts the
   file in place by the sequence of its kind, or reports what the check found:
   `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
@@ -840,6 +844,7 @@ leg; and `ready`.
 | `--read-back-differs OFFSET` | `read_at` gives the byte at that offset of `upload.part` with one bit changed. |
 | `--drive DIR` | The host has a drive, plugged in at the start: its list is the files of the folder `DIR/odrig` by the rules of `drive_name`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
 | `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
+| `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
@@ -857,7 +862,7 @@ when a check fails:
 | 1 | a line that says what | An answer of the core contradicts another one: the legs and their count, a decoder that changes its answer after the end, a reply written into too little room. Also `guard` when nothing stopped it. |
 | 64 | a usage message, `bad line` or `bad batch` | The command line or the input was not understood. |
 | 70 | `allocation after startup` | The core asked the host for memory, or the program allocated with `new`, during a call after startup. |
-| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or for an offset that is neither 0 nor where its last call for that file ended. |
+| 71 | `file misuse` | The core opened a file while one was open, read or closed with none open, or asked for no byte or for more than 512 in one `read`. Or it gave `write` no byte or more than 1,500; called `write` or `write_close` with no file being written; began a file while one was being written; named a file that is none of its names; renamed or removed the file `open` holds, or renamed the one being written; or asked `read_at` for no byte, for more than 512, or, outside a command, for an offset that is neither 0 nor where its last call for that file ended. |
 | 72 | `bad reply` | A reply was not one line of printable characters with a newline, of at most 1,024 bytes, or a line handed back had more than 2,048 characters. |
 | 75 | `power cut` | The storage call that `--cut-at` names was reached. |
 
