@@ -96,7 +96,7 @@ class Change(unittest.TestCase):
         with support.example_show() as packed:
             shutil.copytree(packed, self.folder / "show")
         self.show = self.folder / "show"
-        self.files = support.files_of(self.show)
+        self.files = storage.folder_files(self.show)
         self.new = storage.with_show(self.old, self.files)
         self.found = storage.plan(self.old, self.new)
 

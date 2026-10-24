@@ -65,7 +65,7 @@ class Install(unittest.TestCase):
             self.assertRegex(done.out, r"\nstorage: committed: \d+ bytes written and compared; the board restarts\n")
             read = support.on_port("read-show", pathlib.Path(out, "copy"))
             self.assertEqual(read.status, 0, read.err)
-            self.assertEqual(support.files_of(pathlib.Path(out, "copy")), support.files_of(folder))
+            self.assertEqual(support.files_of(pathlib.Path(out, "copy")), storage.folder_files(folder))
             self.assertEqual(sorted(support.files_of(folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
         after = support.storage_image()
         kept = [path.read_bytes() for path in storage.kept_images(len(before))]
@@ -88,7 +88,7 @@ class Install(unittest.TestCase):
                 done = support.install(second)
                 self.assertEqual(done.status, 0, done.err)
                 self.assertEqual((json.loads(done.out.splitlines()[-1])["playing"], json.loads(done.out.splitlines()[-1])["animation"]), ("all", 1))
-                self.assertEqual(support.installed(), support.files_of(second))
+                self.assertEqual(support.installed(), storage.folder_files(second))
                 self.assertEqual(sorted(support.installed()), ["hello.odrg", "mapping.json", "show.json"])
 
     def test_an_invalid_show_has_the_reason_the_emulator_gives_and_plays_nothing(self):

@@ -182,11 +182,17 @@ def ensure_settings():
                 raise AssertionError(f"{command} with the tracked file failed: {done.err}")
 
 
+def installed_files(folder, *extra):
+    """The files of `/odrig` an install of a show folder leaves: the folder's files and, with
+    the check, the catalog of its animations."""
+    return storage.folder_files(folder, check="--no-check" not in extra)
+
+
 def ensure_installed(folder, *extra):
     """Makes the board hold a show folder, installing only when it holds something else.
     What this run installed last is remembered, so that the board is not asked again."""
     global _installed
-    wanted = files_of(folder)
+    wanted = installed_files(folder, *extra)
     if _installed is None:
         _installed = installed()
     if _installed != wanted:
@@ -311,7 +317,7 @@ def install(folder, *extra):
     _installed = None
     done = on_port("install-show", folder, *extra)
     if "error: " not in done.err:
-        _installed = files_of(folder)
+        _installed = installed_files(folder, *extra)
     return done
 
 

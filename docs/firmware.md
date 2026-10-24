@@ -443,8 +443,15 @@ whether it is sound is not known yet.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
-   refusal is the converter's, for example `file-missing`. `--no-check` installs any flat
-   folder of files, for trying what the board does with an invalid show.
+   refusal is the converter's, for example `file-missing`. The check is a rebuild of the
+   internal catalog of [catalog.md](catalog.md), on the computer: each animation is read
+   once, in the show's order, for the mapping's canvas, and the catalog's marker and pages
+   go into the board with the show, so that the board need not read the animations at its
+   start. A catalog the folder holds, as `read-show` copies it, is made anew. The marker
+   names the generation after the board's catalog, or 1, and is the board's own when the
+   board's catalog has the same pages: the same folder installed again changes nothing.
+   `--no-check` installs any flat folder of files, without a catalog, for trying what the
+   board does with an invalid show.
 2. The tool reads the partition table and takes the place and size of `spiffs` from it.
 3. It gets the storage as it is now into `build/firmware/storage/`: it takes the newest
    image it kept there when esptool has the chip confirm that storage has that image's

@@ -10,6 +10,7 @@ import time
 from littlefs import LittleFS, UserContext
 from littlefs.errors import LittleFSError
 
+from odrig import catalog
 from odrig import errors as show_errors
 from odrig import mapping, odrg, show
 
@@ -20,6 +21,8 @@ MAPPING_NAME = "mapping.json"
 SHOW_NAME = "show.json"
 # The saved playlist order, which a show folder may hold beside the files of the show.
 ORDER_NAME = "order.txt"
+# The files of the internal catalog: its marker and its pages.
+CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"
 NO_SPACE = -28
 KEPT_IMAGES = 8
@@ -337,24 +340,68 @@ def folder_files(folder, check=True):
             raise Failure("not-a-show-folder", f"{entry} is not a file; a show folder is flat")
     files = {entry.name: entry.read_bytes() for entry in entries}
     if check:
+        # A folder's own catalog, as `read-show` copies it, is made anew.
+        files = {name: data for name, data in files.items() if name not in CATALOG_NAMES}
         try:
             canvas = mapping.read(folder / MAPPING_NAME)
             named = show.files(show.read(folder / SHOW_NAME))
             for name in named:
                 if name not in files:
                     raise show_errors.Rejection(show_errors.FILE_MISSING, f"{folder / name}: the show names it and it is not there")
-                try:
-                    animation = odrg.decode(files[name])
-                except show_errors.Rejection as rejection:
-                    raise show_errors.Rejection(show_errors.FILE_MALFORMED, f"{folder / name}: {rejection.reason}: {rejection.detail}") from None
-                if (animation.width, animation.height) != (canvas.width, canvas.height):
-                    raise show_errors.Rejection(show_errors.SIZE_MISMATCH, f"{folder / name}: the canvas is {animation.width} x {animation.height} and the mapping's is {canvas.width} x {canvas.height}")
+            # The catalog's rebuild reads each animation once and refuses what the check
+            # refuses; the first refused in the show's order is judged again for its words. A
+            # name the catalog cannot hold is checked alone and left out of the catalog.
+            allowed = [name for name in named if catalog.name_allowed(name)]
+            made, refused = catalog_files(files, allowed, (canvas.width, canvas.height))
+            refused_names = sorted((name for name, _ in refused), key=named.index)
+            for name in refused_names[:1] + [name for name in named if name not in allowed]:
+                _check_animation(folder / name, files[name], canvas)
+            if refused:
+                raise show_errors.Rejection(show_errors.FILE_MALFORMED, f"{folder / refused_names[0]}: {dict(refused)[refused_names[0]]}")
         except show_errors.Rejection as rejection:
             raise _rejected(rejection) from None
         for name in files:
             if name not in (MAPPING_NAME, SHOW_NAME, ORDER_NAME, *named):
                 raise Failure("not-a-show-folder", f"{folder / name} is not a file of the show")
+        files.update(made)
     return files
+
+
+def _check_animation(path, data, canvas):
+    """Refuses an animation file the readers of the converter refuse, or of another canvas."""
+    try:
+        animation = odrg.decode(data)
+    except show_errors.Rejection as rejection:
+        raise show_errors.Rejection(show_errors.FILE_MALFORMED, f"{path}: {rejection.reason}: {rejection.detail}") from None
+    if (animation.width, animation.height) != (canvas.width, canvas.height):
+        raise show_errors.Rejection(show_errors.SIZE_MISMATCH, f"{path}: the canvas is {animation.width} x {animation.height} and the mapping's is {canvas.width} x {canvas.height}")
+
+
+def catalog_files(files, names, canvas, generation=1):
+    """The files of the internal catalog of the animations `names` of `files`, as a rebuild
+    writes them: the names in their order, each checked for the canvas. Returns them, and the
+    names refused with their reasons."""
+    memory = catalog.MemoryStorage({name: files[name] for name in names})
+    _, refused = catalog.rebuild(memory, names=names, canvas=canvas, generation=generation)
+    return {name: data for name, data in memory.files.items() if name in CATALOG_NAMES}, refused
+
+
+def with_board_generation(files, present):
+    """The files of a folder with the marker of their catalog made for the board, whose files
+    of `/odrig` are `present`: the board's own marker when its catalog has the same pages, so
+    that nothing changes; otherwise one of the generation after the board's, or of 1 when the
+    board has no catalog it can read."""
+    if catalog.MARKER not in files:
+        return files
+    new = catalog.parse_marker(files[catalog.MARKER])
+    try:
+        old = catalog.parse_marker(present.get(catalog.MARKER, b""))
+    except catalog.Unusable:
+        return files
+    if (old.counts, old.crcs) == (new.counts, new.crcs):
+        return dict(files, **{catalog.MARKER: present[catalog.MARKER]})
+    marker = catalog.Marker(catalog.next_generation(old.generation), new.counts, new.crcs)
+    return dict(files, **{catalog.MARKER: marker.text()})
 
 
 def write_folder(folder, files):

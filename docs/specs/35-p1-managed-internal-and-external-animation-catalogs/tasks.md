@@ -107,7 +107,7 @@ Rules for every task:
     codes, a mount given as the folder `odrig` itself, paths with spaces.
   - Prove it fails first.
 
-- [ ] 10. The firmware tool writes the internal catalog
+- [x] 10. The firmware tool writes the internal catalog
   - `fwtool/storage.py` `folder_files` adds the catalog of a checked folder, with the
     board's generation plus one; `--no-check` none.
   - Tests in `tests/firmware`: the catalog in the image; a second install of the same
