@@ -20,7 +20,7 @@ class ABadFile(unittest.TestCase):
             routes = {"http": emulator.command, support.LINES: port.ask}
             for route, ask in routes.items():
                 listed = json.loads(ask("list"))
-                self.assertEqual(listed["items"][1], {"id": 2, "file": "dvd.odrg", "bytes": None, "ignored": False, "external": False, "fault": "truncated"}, route)
+                self.assertEqual(listed["items"][1], {"id": 2, "file": "dvd.odrg", "bytes": None, "ignored": False, "external": False, "type": "frames", "fault": "truncated"}, route)
                 self.assertEqual(ask("play 2"), b'{"ok":false,"error":"unavailable"}\n', route)
                 self.assertEqual(ask("play 1"), b'{"ok":true}\n', route)
             self.assertIsNone(emulator.status()["error"])

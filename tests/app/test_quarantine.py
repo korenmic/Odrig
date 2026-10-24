@@ -24,7 +24,7 @@ class UnavailableAnimations(unittest.TestCase):
         work = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
         items = [{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"}]
         files = {"mapping.json": MAPPING, "show.json": json.dumps({"version": 1, "brightness": 128, "items": items}),
-                 "a.odrg": clip(1), "b.odrg": b"ODRX" + clip(2)[4:]}
+                 "a.odrg": clip(1), "b.odrg": b"ODRZ" + clip(2)[4:]}
         folder = emulator_support.installed(work / "show", files)
         options = []
         if drive is not None:

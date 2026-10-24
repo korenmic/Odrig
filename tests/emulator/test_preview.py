@@ -161,6 +161,19 @@ class OneAnimation(unittest.TestCase):
         self.assertEqual(started.terminate(), (0, self.said_on_starting(page)))
         self.assert_nothing_left(page)
 
+    def test_a_clock_is_uploaded_as_preview_odrgx_and_plays_with_a_seed(self):
+        data = (support.ROOT / "tests" / "vectors" / "widgets" / "valid" / "melting.odrgx").read_bytes()
+        (self.work / "Clock.ODRGX").write_bytes(data)
+        started = self.preview("Clock.ODRGX", cwd=self.work)
+        page = started.page()
+        self.assertEqual(answer(page, "list")["items"], [{"id": 1, "file": "preview.odrgx", "bytes": len(data), "ignored": False, "external": False, "type": "widget"}])
+        time.sleep(0.3)
+        status = answer(page, "status")
+        self.assertEqual((status["error"], status["animation"]), (None, 1))
+        self.assertIsInstance(status["seed"], int)
+        self.assertEqual(started.terminate(), (0, self.said_on_starting(page)))
+        self.assert_nothing_left(page)
+
     def test_a_path_with_nothing_there_and_a_folder_are_refused_before_anything_starts(self):
         for path in (self.work / "absent.odrg", self.work):
             with self.subTest(path=path.name):

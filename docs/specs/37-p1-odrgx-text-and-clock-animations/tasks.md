@@ -99,7 +99,7 @@ Rules for every task:
     gone; a long file gives `bad-argument`; every route.
   - Requirements: 10.2, 10.3, 10.5, 13.2, 13.3
 
-- [ ] 8. The emulator, the firmware and the sample pictures
+- [x] 8. The emulator, the firmware and the sample pictures
   - `emulator/host.py`, `preview/`, `firmware/usermod/odrig_drive.cpp`: `.odrgx`.
   - `tests/emulator/`: the emulator plays the reference texts and clocks, and its LEDs show
     the reference pictures; a drive's `.odrgx`.

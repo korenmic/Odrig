@@ -293,11 +293,12 @@ int32_t readPart(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, 
   return (int32_t)count;
 }
 
-// Whether a name is one of an animation file: it ends in .odrg, in any case, and does not
-// begin with a dot.
+// Whether a name is one of an animation file: it ends in .odrg or .odrgx, in any case, and
+// does not begin with a dot.
 bool isAnimation(const char *name) {
   const size_t length = strlen(name);
-  return length >= 5 && length < NAME_ROOM && name[0] != '.' && strcasecmp(name + length - 5, ".odrg") == 0;
+  if (length >= NAME_ROOM || name[0] == '.') return false;
+  return (length >= 5 && strcasecmp(name + length - 5, ".odrg") == 0) || (length >= 6 && strcasecmp(name + length - 6, ".odrgx") == 0);
 }
 
 // Puts a name into the list, which holds the first MOST_FILES names in the order of their
