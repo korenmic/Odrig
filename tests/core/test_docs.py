@@ -89,13 +89,13 @@ class CoreDocument(unittest.TestCase):
     def test_its_memory_table_adds_up_to_what_the_suite_measures(self):
         table = self.text.split("\n## Memory\n")[1].split("\n## ")[0]
         rows = re.findall(r"(?m)^\| ([^|*]+) \| [^|]+ \| ([0-9,]+) \|$", table)
-        self.assertEqual(len(rows), 16)
+        self.assertEqual(len(rows), 17)
         total = int(re.search(r"\*\*Total\*\* \| \| \*\*([0-9,]+)\*\*", table).group(1).replace(",", ""))
         self.assertEqual(sum(int(number.replace(",", "")) for _, number in rows), total)
         from .test_memory import hundred_items
 
         asked, blocks = support.start(hundred_items()).memory
-        self.assertEqual((asked, blocks), (total, 16))
+        self.assertEqual((asked, blocks), (total, 17))
         example, _ = support.start(support.example_show()).memory
         self.assertIn(f"{example:,} bytes", table)
 
@@ -141,7 +141,7 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "order get", "upload begin <id> <file> <bytes>",
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
         self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many"})

@@ -58,8 +58,9 @@ the entry links to it.
   one after the other. An item is asked for by its number.
 - **cycle**: An item of the second kind: it plays several animations one after the other,
   each for a number of seconds, and then starts over.
-- **playlist**: Every animation of a show, one after the other in the order of the show
-  file, and then from the first again. It is what a show plays by itself.
+- **playlist**: Every animation of a show, one after the other in the saved order, which
+  is the order of the show file until an animation is moved, and then from the first
+  again. It is what a show plays by itself.
 - **turn**: The time an animation has in the playlist before the next one starts: unless
   the show says otherwise, the fewest whole loops that last 30 seconds. See
   [show.md](../docs/show.md#the-turn-of-an-animation).
@@ -69,8 +70,8 @@ the entry links to it.
   See [show.md](../docs/show.md#installed-file-set).
 - **command**: One line of text sent to whatever is playing a show. The command families include:
   `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `space`, `list`,
-  `remove <id>`, `ignore` for playlist inclusion, `mapping` for assignments and the
-  diagonal check, and `upload`, which
+  `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
+  playlist, `mapping` for assignments and the diagonal check, and `upload`, which
   sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).

@@ -15,8 +15,10 @@ A show is installed as one flat folder of files:
 
 The player also keeps three files of its own in the folder while it changes the show:
 `upload.part`, `show.part` and `pending.txt`. They are gone when a change is complete, and
-the player removes what is left of them when it starts. No show names them: a name in
-`show.json` ends in `.odrg`.
+the player removes what is left of them when it starts. It keeps the saved playlist order
+in `order.txt`, see [the saved playlist order](#the-saved-playlist-order), and writes its
+next version into `order.part`. No show names them: a name in `show.json` ends in
+`.odrg`.
 
 The same folder is what the emulator runs and what is uploaded to the board. The player reads
 these files when it starts. Nothing else defines the layout or the show.
@@ -65,9 +67,11 @@ power-on.
 
 ## The playlist
 
-The playlist is every included animation item of the show, in the order of `show.json`, and after
-them the animations of a USB drive when one is plugged in, see [animations from a USB
-drive](#animations-from-a-usb-drive). It is what a show plays by itself: each animation has its turn, then the next one, and after the
+The playlist is every included animation item of the show and the animations of a USB
+drive or a microSD card when one is there, see [animations from a USB
+drive](#animations-from-a-usb-drive), in the saved order, see [the saved playlist
+order](#the-saved-playlist-order). Without a saved order it is the show's animations in the
+order of `show.json` and after them the drive's. It is what a show plays by itself: each animation has its turn, then the next one, and after the
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
@@ -113,7 +117,8 @@ show's; they do not take the place of any. Nothing is written to the drive, and 
   Folders inside `odrig` and other files are passed over.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
-  has been read, after the show's animations and the drive's before it. One that is not
+  has been read, at its place in the saved order: without one, after the show's
+  animations and the drive's before it. One that is not
   is left out and named in the log with its reason; it does not make the show invalid.
 - Each has an id: the lowest from 60001 up that the show does not use and no animation of
   the drive before it has. The same files with the same show get the same ids every time.
@@ -210,3 +215,34 @@ using this member require the updated player and converter; older readers may re
 Manual play still plays one normal turn and cycles retain every explicitly named member.
 All ignored with no external animations leaves a valid, idle black show. An ignored
 startup item is skipped forward to the next included animation, wrapping if necessary.
+
+## The saved playlist order
+
+The order of the playlist is kept in `order.txt` beside `show.json`. The player writes it
+when a command moves an animation, see [commands.md](commands.md#the-saved-playlist-order),
+and nothing else changes it; it may be missing.
+
+```
+odrig-order 1
+i 12
+x sunrise.odrg
+i 3
+```
+
+The first line is `odrig-order 1`; a file with another first line names nothing. Every
+further line ends in a line feed and is an entry: `i` and the id of an animation item of
+the show, in decimal from 1 to 65,535 without a leading zero, or `x` and the file name of an
+animation of the external storage as the drive gives it, 1 to 127 bytes. A line in another
+form is no entry and takes no place. The player takes the first 512 entries, and of two
+entries for one animation the first.
+
+- The playlist plays the animations the file names in the order of their entries, and
+  after them the ones it does not name: the show's in the order of `show.json`, then the
+  drive's in the order of their names. A new item is therefore last until it is moved.
+- An entry whose external file is not there keeps its place and is passed over; a medium
+  with that file name gives the file that place again. An entry of an id that no item has
+  is passed over too, and an upload that gives an item that id gives it that place.
+- `start` still names where the playlist begins at power-on, and `play all` begins it with
+  the first animation of the order. Cycles do not follow the order.
+- A turn in progress, the brightness and whether the LEDs are on do not change when the
+  order does; the next turn follows the new order.

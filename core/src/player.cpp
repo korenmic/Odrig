@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "odrig_core.h"
+#include "order.h"
 #include "upload.h"
 
 namespace odrig {
@@ -41,19 +42,6 @@ bool plays(const Core &core, uint32_t position) {
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
     return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored;
-}
-
-// The position after this one in the order of the playlist: the show's items, then the
-// drive's places, then the first item again.
-uint32_t following(const Core &core, uint32_t position) {
-    if (is_drive(position)) {
-        const uint32_t place = position - kDriveBase + 1;
-        return place < core.drive_count ? kDriveBase + place : 0;
-    }
-    if (position + 1 < core.item_count) {
-        return position + 1;
-    }
-    return core.drive_count != 0 ? kDriveBase : 0;
 }
 
 // Opens the file of an animation for one turn and one loop, with the pixel buffer all
@@ -148,17 +136,31 @@ uint64_t turn_ms(const Core &core, uint32_t position) {
     return longest != 0 && turn > longest ? longest : turn;
 }
 
-// The position of the animation after this one in the playlist, the first one after the
-// last; this one again when no other plays.
-uint32_t next_animation(const Core &core, uint32_t position) {
-    uint32_t at = position;
-    for (uint32_t step = 0; step <= core.item_count + core.drive_count; ++step) {
-        at = following(core, at);
-        if (plays(core, at)) {
-            return at;
+// The animation that plays with the smallest key, among the show's items alone or among
+// them and the drive's, whose key is above `above` unless `any` is set; kNothing when none.
+uint32_t lowest_playing(const Core &core, bool with_drive, uint32_t above, bool any) {
+    uint32_t best = kNothing;
+    uint32_t best_key = 0;
+    const uint32_t places = with_drive ? core.drive_count : 0;
+    for (uint32_t at = 0; at < core.item_count + places; ++at) {
+        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
+        if (!plays(core, position)) {
+            continue;
+        }
+        const uint32_t key = order_key(core, position);
+        if ((any || key > above) && (best == kNothing || key < best_key)) {
+            best = position;
+            best_key = key;
         }
     }
-    return kNothing;
+    return best;
+}
+
+// The position of the animation after this one in the playlist, in the saved order, the
+// first one after the last; this one again when no other plays.
+uint32_t next_animation(const Core &core, uint32_t position) {
+    const uint32_t after = lowest_playing(core, true, order_key(core, position), false);
+    return after != kNothing ? after : lowest_playing(core, true, 0, true);
 }
 
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
@@ -331,24 +333,12 @@ void player_set_brightness(Core &core, uint8_t value) {
 }
 
 uint32_t player_first_animation(const Core &core) {
-    uint32_t position = 0;
-    while (position < core.item_count && (core.items[position].is_cycle || core.items[position].ignored)) {
-        ++position;
-    }
-    return position;
+    const uint32_t first = lowest_playing(core, false, 0, true);
+    return first != kNothing ? first : core.item_count;
 }
 
 uint32_t player_first_in_playlist(const Core &core) {
-    const uint32_t first = player_first_animation(core);
-    if (first != core.item_count) {
-        return first;
-    }
-    for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (core.drive[place].state == kDriveInPlaylist) {
-            return kDriveBase + place;
-        }
-    }
-    return kNothing;
+    return lowest_playing(core, true, 0, true);
 }
 
 void player_drive_joined(Core &core, uint32_t place) {

@@ -223,11 +223,11 @@ class List(Content):
 
     def expected_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False), external=False) if "file" in item else item for item in listed]
 
     def test_the_example_show_is_listed_as_the_document_has_it(self):
         printed = self.run_both(support.example_show(), [support.line(T0, "list"), support.line(T0, "list 0")])
-        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
+        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
         self.assertEqual(replies(printed), [expected, expected])
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         self.assertIn(f"list\n{expected}\n", text)
@@ -269,7 +269,7 @@ class List(Content):
         self.assertGreater(len(given), 9)
         # Every reply but the last is as full as it can be: the next item would not fit.
         sizes = [len(reply) + 1 for reply in given]
-        self.assertTrue(all(size > 1024 - 91 for size in sizes[:-1]), sizes)
+        self.assertTrue(all(size > 1024 - 108 for size in sizes[:-1]), sizes)
 
     def test_a_reply_is_at_most_1024_bytes_and_one_of_exactly_1024_is_given(self):
         clip = support.clip(1, 60, 6)
@@ -411,7 +411,7 @@ class Remove(Content):
 
     def reference_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False), external=False) if "file" in item else item for item in listed]
 
     def test_removing_the_start_item_leaves_the_show_without_start(self):
         # Without a start, the show that is left plays the playlist from its first animation.
@@ -593,10 +593,11 @@ class HostWithoutStorage(Content):
         for option in ("--no-storage", "--only-space"):
             without = support.start(files, script, [option, "--trace-store", "--trace-files"])
             self.assertEqual([line for line in without.lines if not line.startswith("open ")], with_storage.lines, option)
-            # It is not asked for the four blocks that only a host with storage needs: the
-            # chunk buffer, and the decoders, the pixel buffer and the window of the check.
-            # It is asked to remove nothing, and not for the file of leftovers.
-            self.assertEqual(without.memory[1], with_storage.memory[1] - 4, option)
+            # It is not asked for the five blocks that only a host with storage needs: the
+            # chunk buffer, the decoders, the pixel buffer and the window of the check, and
+            # the keys of the saved order. It is asked to remove nothing, and not for the
+            # file of leftovers.
+            self.assertEqual(without.memory[1], with_storage.memory[1] - 5, option)
             saved = with_storage.memory[0] - without.memory[0]
             self.assertGreater(saved, 1500 + 1080 + 32768 + 2000, option)
             self.assertLess(saved, 1500 + 1080 + 32768 + 3000, option)

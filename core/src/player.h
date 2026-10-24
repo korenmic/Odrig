@@ -27,18 +27,19 @@ void player_halt(Core &core);
 // the playlist.
 void player_play_cycle(Core &core, uint32_t item);
 
-// Plays the playlist: every animation item in turn, in the order of the item table, and
-// from the first again without end. It begins with the turn of the animation item at this
+// Plays the playlist: every animation item in turn, in the saved order, and from the
+// first again without end. It begins with the turn of the animation item at this
 // position. A turn is the animation's loops, which are the number the show gives it or
 // the fewest that last the show's shortest time, and ends at the animation's longest
 // time when it has one.
 void player_play_all(Core &core, uint32_t from);
 
-// The position of the first animation item, or the number of items when there is none.
+// The position of the first included animation item in the saved order, or the number of
+// items when there is none.
 uint32_t player_first_animation(const Core &core);
 
-// The position of the first animation of the playlist: the first animation item, else the
-// first of the drive's animations, else kNothing.
+// The position of the first animation of the playlist in the saved order, an item or a
+// drive's animation, or kNothing.
 uint32_t player_first_in_playlist(const Core &core);
 
 // A file of the drive has joined the playlist. When nothing plays, the playlist starts

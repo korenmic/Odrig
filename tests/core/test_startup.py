@@ -235,8 +235,8 @@ class EachReason(unittest.TestCase):
 
     def test_out_of_memory(self):
         blocks = support.start(example()).memory[1]
-        self.assertEqual(blocks, 16)
-        for number in (10, 11, 12, 13, 14, 15, 16):
+        self.assertEqual(blocks, 17)
+        for number in (10, 11, 12, 13, 14, 15, 16, 17):
             self.check(example(), "out-of-memory", ["--alloc-fails-at", str(number)])
 
 
@@ -472,16 +472,16 @@ class TablesWithRoom(unittest.TestCase):
         items = [animation(number, "hello.odrg") for number in range(1, count + 1)]
         run = support.start(example(show_json=support.show_text(items)))
         self.assertIsNone(run.error)
-        self.assertEqual(run.memory[1], 16)
+        self.assertEqual(run.memory[1], 17)
         return run.memory[0]
 
     def test_the_tables_have_room_for_32_items_more_than_the_show_and_for_128_at_least(self):
         small = self.memory(0)
         self.assertEqual([self.memory(count) for count in (1, 2, 50, 96)], [small] * 4)
-        # An item of the table is 16 bytes and a file 48.
-        self.assertEqual(self.memory(97) - small, 64)
-        self.assertEqual(self.memory(98) - small, 2 * 64)
-        self.assertEqual(self.memory(300) - small, (300 + 32 - 128) * 64)
+        # An item of the table is 16 bytes, a file 48, and the key of the saved order 2.
+        self.assertEqual(self.memory(97) - small, 66)
+        self.assertEqual(self.memory(98) - small, 2 * 66)
+        self.assertEqual(self.memory(300) - small, (300 + 32 - 128) * 66)
 
     def test_a_show_without_items_starts_and_plays_nothing(self):
         files = example(show_json='{"version": 1, "brightness": 9, "items": []}', hello_odrg=None, dvd_odrg=None)

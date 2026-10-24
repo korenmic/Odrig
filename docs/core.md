@@ -99,8 +99,9 @@ The last seven members are the storage functions: three that write a file, `rena
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
 
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
-  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the three
-  names the core keeps for itself, `upload.part`, `show.part` and `pending.txt`.
+  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
+  the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
+  `order.txt` and `order.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where the last ended.
   It renames and removes no file that `open` holds or that is being written.
@@ -282,13 +283,16 @@ A show may have no items. It is valid, and nothing plays.
 With a host whose storage can be changed, the start also removes what an interrupted
 change left:
 
-1. Before anything is read, it removes `upload.part` and `show.part`.
+1. Before anything is read, it removes `upload.part` and `show.part`, and `mapping.part`
+   and `order.part` when a `read_at` of one byte finds them there.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
    it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
    removed, and then `pending.txt`. When a file could not be removed, `pending.txt` stays
    for the next start; when it could not be read, nothing is removed.
 3. When the mapping or the show file could not be used, `pending.txt` is left alone.
+4. When the show is valid, it reads `order.txt` with `read_at`, for the order of the show's
+   items; see [the saved order](#the-saved-order).
 
 A folder with none of the three files is asked to remove two names that are not there and
 to open one that is not there, and for nothing else.
@@ -377,8 +381,10 @@ needs it.
   differs from the one it holds, it drops what it knew of the old drive and, for a number
   other than 0, counts the new drive's files with `drive_name`, at most 256, and marks
   them to be checked.
-- The check after the start goes on with the drive's files once the installed ones are
-  read, in the order of their places, at the same pace and through the same second
+- The check after the start goes on with the drive once the installed files are read.
+  It first reads `order.txt`, to know the place of each of the drive's files in the saved
+  order, see [the saved order](#the-saved-order), and then the drive's files, in the order
+  of their places, at the same pace and through the same second
   decoders. A file that is whole and made for the canvas joins the playlist as soon as its
   check has ended. One that is not, or one for which no id is left, is left out, and the
   host's log gets `drive file <name> left out: <reason>`. The drive's check does not make
@@ -387,8 +393,8 @@ needs it.
 - A drive's animation gets the lowest id from 60001 up that no item of the show and no
   animation of the drive before it has. The same files with the same show get the same
   ids.
-- The playlist is the show's animations and then the drive's, in the order of their
-  places. A drive's animation has the turn of an animation without `repeat` and
+- The playlist is the show's animations and the drive's in the saved order; without
+  one, the show's and then the drive's, in the order of their places. A drive's animation has the turn of an animation without `repeat` and
   `max_seconds`. When nothing plays and a drive's animation joins, the playlist plays
   from it: a show without an animation of its own plays the drive's.
 - `play <id>` finds an id among the show's items and then among the drive's animations;
@@ -529,16 +535,17 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 
 ## Memory
 
-The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
-blocks, seventeen with a drive, in the order of the table: two of a fixed size for the byte entry, four for a host
-whose storage can be changed, and the others sized from the mapping and the show. No
+The core asks the host for memory only inside `odrig_core_begin`, in up to seventeen
+blocks, eighteen with a drive, in the order of the table: two of a fixed size for the byte
+entry, five for a host whose storage can be changed, and the others sized from the mapping
+and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
 with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,384 |
+| The core object | fixed | 3,552 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -554,15 +561,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,629** |
+| The saved order, with storage that can be changed | 2 for each of 132 | 264 |
+| **Total** | | **125,061** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,114 bytes. A host
-without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,121 bytes for the target file. A host with a drive is asked for
-one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,725 bytes, 98 percent. The size and the number of frames
+46,008 of them. The example show on the two-leg mapping asks for 88,538 bytes. A host
+without storage that can be changed is not asked for the chunk buffer, the three blocks
+of the check and the saved order: 77,289 bytes for the target file. A host with a drive
+is asked for one block more, after the three of the check: the drive's table, 16 bytes
+for each of 256 places, 4,096 bytes; and the block of the saved order holds 3 bytes more
+for each place, 768. With it the target file takes 129,925 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -695,3 +704,37 @@ chunk of 1,500 bytes. Cleanup yields an unfinished drive check and uses the chec
 read_at source, preserving the playback file. The drive check then restarts safely.
 A failed cleanup keeps the journal and blocks later metadata changes with storage-error
 until reboot retries cleanup, so no transaction overwrites unresolved file cleanup.
+
+## The saved order
+
+The playlist goes in the order of [show.md](show.md#the-saved-playlist-order), which the
+core reads from `order.txt`. Each animation that can play has a key, and the playlist goes
+from the smallest key up, and from the largest to the smallest again:
+
+| The animation | Its key |
+|---|---|
+| named by entry k of the file, k from 0 | k |
+| an item of the show the file does not name | 65,536 and its position in the item table |
+| a file of the drive the file does not name | 131,072 and its place in the drive's list |
+
+The core keeps, for a host whose storage can be changed, the number of the entry that
+names each item of the item table, and of each place of a drive with the low byte of the
+FNV-1a hash of its name, in one block taken at startup; it keeps no name. It reads the
+file at three moments, always with `read_at` through the second source:
+
+- at startup, once the show is read, for the items of the show;
+- when a drive is plugged in: the check of the drive reads the file before the drive's
+  files, a step taking the bytes of one read of at most 512, an unfinished line kept in
+  the core object; a file of the drive joins the playlist only after that. When the
+  second source is taken meanwhile, the reading begins again;
+- at once, as a whole, after an upload adds an item, so that an entry with the new item's
+  id gives it its place as a restart would.
+
+An entry `x <name>` is matched with a place whose hash is the same, and the host's
+`drive_name` confirms the whole name. A drive pulled out keeps the keys of its places
+until the next drive is counted, so that the playlist goes on, in the saved order, after
+the animation that left. A removed item's key leaves with it.
+
+`order get` writes the ids of the listed animations by key, finding the next key with one
+walk over the items and the places for each id. Its revision is the CRC-32 of each listed
+animation's id as two bytes and key as four, low byte first, in the order of `list`.

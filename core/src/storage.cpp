@@ -2,6 +2,7 @@
 
 #include "content.h"
 #include "json_reader.h"
+#include "order.h"
 #include "player.h"
 #include "show.h"
 
@@ -52,6 +53,9 @@ void storage_clear_parts(Core &core) {
     uint8_t probe;
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "mapping.part", 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, "mapping.part");
+    }
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kOrderPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kOrderPart);
     }
     core.host.remove(core.host.ctx, kUploadPart);
     core.host.remove(core.host.ctx, kShowPart);
@@ -170,6 +174,9 @@ bool storage_install_upload(Core &core) {
     // The show in storage is the new one from here on.
     if (is_new) {
         content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms);
+        // An old entry of the order may name the new item's id: it stands there at once,
+        // as it would after a restart.
+        order_reload(core);
         player_item_added(core);
     } else {
         content_change_file(core, position, upload.name, upload.size, upload.total_ms);

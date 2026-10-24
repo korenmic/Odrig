@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "order.h"
 #include "player.h"
 #include "storage.h"
 
@@ -35,6 +36,8 @@ const char kListCycle[] = ",\"cycle\":[";
 const char kListSeconds[] = "],\"seconds\":";
 const char kListNext[] = "],\"next\":";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
+const char kListInternal[] = ",\"external\":false";
+const char kListExternal[] = ",\"external\":true";
 
 // The bytes an item takes in a reply of `list`. A cycle is counted with its entries, or
 // with none.
@@ -42,7 +45,8 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
     uint32_t size = text_length(kListId) + digits(item.id);
     if (!item.is_cycle) {
         const FileInfo &file = core.files[item.first];
-        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + (item.ignored ? 15 : 16) + 1;
+        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + (item.ignored ? 15 : 16) +
+               text_length(kListInternal) + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -174,7 +178,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
                 continue;
             }
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
-                                  text_length(kListBytes) + digits(entry.bytes) + 1;
+                                  text_length(kListBytes) + digits(entry.bytes) + text_length(kListExternal) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -188,6 +192,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.escaped(name);
             reply.text(kListBytes);
             reply.number(entry.bytes);
+            reply.text(kListExternal);
             reply.text("}");
             continue;
         }
@@ -216,6 +221,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListBytes);
             reply.number(file.bytes);
             reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
+            reply.text(kListInternal);
         } else {
             reply.text(kListCycle);
             for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -415,6 +421,7 @@ void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes,
     item.first = core.file_count++;
     item.count = 0;
     set_file(core.files[item.first], name, bytes, total_ms);
+    order_item_added(core, core.item_count - 1);
 }
 
 void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms) {
@@ -460,6 +467,7 @@ void content_take_out(Core &core, uint32_t position) {
         }
     }
 
+    order_item_leaves(core, position);
     memmove(core.items + position, core.items + position + 1, (core.item_count - position - 1) * sizeof(ItemInfo));
     --core.item_count;
 
