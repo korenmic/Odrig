@@ -47,7 +47,11 @@ enum Reason {
     kBadPaletteIndex,
     kTrailingBytes,
 
-    kReasonCount
+    kReasonCount,
+
+    // Work that is not finished: the same call is made again later and goes on. It is
+    // passed between the parts of the core and is never the reason of anything.
+    kPendingWork
 };
 
 // The fixed name of a reason, as docs/reasons.md lists it. A value that is never reported

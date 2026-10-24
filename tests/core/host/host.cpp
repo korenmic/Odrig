@@ -59,7 +59,7 @@ int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
-        "       odrig_host decode FILE | --batch\n"
+        "       odrig_host decode [--slice BYTES] FILE | --batch\n"
         "       odrig_host session DIR | --batch [options]\n"
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
@@ -883,8 +883,10 @@ int inflate(bool in_batch) {
 // Reads one ODRG file with the core's decoder, as the core does when it checks a file.
 // Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each record with
 // the picture as three bytes for each pixel, then `end`; or, at the point where the file is
-// refused, `rejected <reason>`.
-void decode_one(Host &host, const char *name) {
+// refused, `rejected <reason>`. The decoder is called again while it settles a defect. With
+// a slice, settling takes at most that many bytes in one call, and `pending <calls>`, the
+// calls that gave kPendingWork, comes before the last line.
+void decode_one(Host &host, const char *name, uint32_t slice) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
     std::memset(&file, 0, sizeof file);
@@ -897,7 +899,11 @@ void decode_one(Host &host, const char *name) {
     odrig::Reason reason = file.open(functions, name);
     if (reason == odrig::kNone) {
         reason = decoder.open(&file, &inflate, window.data());
+        if (slice != 0) {
+            decoder.settle_slice = slice;
+        }
     }
+    unsigned long pending = 0;
     if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -905,7 +911,9 @@ void decode_one(Host &host, const char *name) {
         std::string picture;
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
-            reason = decoder.next(pixels.data(), &duration);
+            while ((reason = decoder.next(pixels.data(), &duration)) == odrig::kPendingWork) {
+                ++pending;
+            }
             if (reason != odrig::kNone) {
                 break;
             }
@@ -920,10 +928,15 @@ void decode_one(Host &host, const char *name) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            reason = decoder.finish();
+            while ((reason = decoder.finish()) == odrig::kPendingWork) {
+                ++pending;
+            }
         }
     }
     file.close();
+    if (slice != 0) {
+        std::printf("pending %lu\n", pending);
+    }
     if (reason == odrig::kNone) {
         std::printf("end\n");
     } else {
@@ -941,11 +954,11 @@ size_t last_separator(const std::string &path) {
 #endif
 }
 
-int decode(const std::string &argument) {
+int decode(const std::string &argument, uint32_t slice) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
             Host host = Host::of_memory(content);
-            decode_one(host, "file.odrg");
+            decode_one(host, "file.odrg", slice);
         }
         return 0;
     }
@@ -953,7 +966,7 @@ int decode(const std::string &argument) {
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
-    decode_one(host, name.c_str());
+    decode_one(host, name.c_str(), slice);
     return 0;
 }
 
@@ -1342,7 +1355,12 @@ int main(int argc, char **argv) {
         return inflate(true);
     }
     if (invocation == "decode" && arguments.size() == 2) {
-        return decode(arguments[1]);
+        return decode(arguments[1], 0);
+    }
+    long slice = 0;
+    if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
+        whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
+        return decode(arguments[3], static_cast<uint32_t>(slice));
     }
     if (invocation == "guard" && arguments.size() == 2 &&
         (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {

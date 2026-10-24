@@ -9007,3 +9007,47 @@ changes the firmware runs the firmware's. A failure found at a seed's end is men
 commit of its own before the push.
 
 **Resolution.** The commits of the run say which suites ran.
+
+## Seed 31: the name of the internal result `pending`
+
+**Question.** The design names the internal result `kPending`, but `core/src/storage.h`
+already has a constant `kPending`, the name of the file `pending.txt`. Rename that one, or
+name the result otherwise?
+
+**Answer.** The result is `kPendingWork`, a value of `Reason` after `kReasonCount`, with
+no name; the file's constant keeps its name, as the rules of the run ask to add and not
+rename. The documents call the result `pending`, as the spec does.
+
+**Resolution.** `core/src/reasons.h`.
+
+## Seed 31: slices of 7 bytes without a second build of the host
+
+**Question.** The design has the core's tests build a second test host with
+`-DODRIG_SETTLE_SLICE=7`. That is a second compilation of every source with the
+sanitizers, in the makefile and in `core/build.py` for Windows. Is there a lighter way that
+tests the same code?
+
+**Answer.** The size of a slice is a field of the decoder, `settle_slice`, which `open`
+sets to `kSettleSliceBytes`. The test host's `decode --slice BYTES` sets it after `open`
+and decodes as the core's whole-file check does, calling again while the decoder gives
+`pending`, and prints how many calls gave it. Every vector, 1,500 damaged copies and the
+reproducer give the same records and reasons in slices of 7 bytes, and of 1, as in one
+call. The core and its build are the same everywhere.
+
+**Resolution.** `core/src/odrg_decoder.h`, `tests/core/host/host.cpp`,
+`tests/core/test_bounded.py`.
+
+## Seed 31: empty DEFLATE blocks inside one byte of output
+
+**Question.** Settling is bounded now. Is any other call of the decoder unbounded?
+
+**Answer.** One is, and it is a gap of the spec, not of this seed's tasks: the DEFLATE
+decoder's `get` goes on through blocks that give no byte until one does, and a block with
+the fixed codes builds its tables anew. A crafted stream of many empty blocks, a few
+hundred kilobytes of them, could hold one call of `get` for seconds. Valid files from the
+converter have no empty blocks. Mending it means a limit on blocks without output, which
+changes what the format accepts (an owner's decision, docs/format.md), or a decoder that
+can stop between blocks inside a frame record, which is larger than this seed. It is
+proposed to the owner as new work and left as it is.
+
+**Resolution.** None yet; said to the owner in the run's report.

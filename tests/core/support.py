@@ -130,12 +130,14 @@ pixel. `reason` is `None` for a file read to its end, or the reason it is refuse
 """
 
 
-def _decoded(lines):
+def _decoded(lines, pending=None):
     header = None
     records = []
     for line in lines:
         word, _, rest = line.partition(" ")
-        if word == "header":
+        if word == "pending" and pending is not None:
+            pending.append(int(rest))
+        elif word == "header":
             width, height, colours, frames, compressed = (int(number) for number in rest.split())
             header = (width, height, colours, frames, bool(compressed))
         elif word == "frame":
@@ -159,6 +161,23 @@ def decode_each(files):
     """What the core's ODRG decoder makes of each of these files, given as bytes."""
     lines = iter(host_lines("decode", "--batch", stdin=batch(files)))
     results = [_decoded(lines) for _ in files]
+    if next(lines, None) is not None:
+        raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
+    return results
+
+
+def decode_in_slices(files, slice_bytes):
+    """What the core's ODRG decoder makes of each of these files when it settles a defect in
+    slices of `slice_bytes` bytes: `(Decoded, pending)` for each file, where `pending` counts
+    the calls that gave no answer yet."""
+    lines = iter(host_lines("decode", "--slice", slice_bytes, "--batch", stdin=batch(files)))
+    results = []
+    for _ in files:
+        pending = []
+        decoded = _decoded(lines, pending)
+        if len(pending) != 1:
+            raise AssertionError("odrig_host decode --slice printed no count of pending calls")
+        results.append((decoded, pending[0]))
     if next(lines, None) is not None:
         raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
     return results

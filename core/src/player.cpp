@@ -99,6 +99,9 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
     while (reason == kNone && core.frame_end <= time && core.stream_records < core.decoder.frames) {
         uint16_t duration = 0;
         reason = core.decoder.next(core.pixels, &duration);
+        if (reason != kNone) {
+            break;
+        }
         core.frame_end += duration;
         ++core.stream_records;
     }
@@ -130,6 +133,9 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) 
     while (reason == kNone && core.frame_end <= within) {
         uint16_t duration = 0;
         reason = core.decoder.next(core.pixels, &duration);
+        if (reason != kNone) {
+            break;
+        }
         core.frame_end += duration;
     }
     return reason;
@@ -259,6 +265,10 @@ bool advance(Core &core, uint64_t now) {
     }
     if (reason == kNone) {
         reason = show_at(core, animation, turn, in_turn);
+    }
+    if (reason == kPendingWork) {
+        // The file settles a defect: its reason comes at a later refresh.
+        return false;
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.

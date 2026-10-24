@@ -37,6 +37,7 @@ const char *reason_name(Reason reason) {
         case kNone:
         case kEnd:
         case kReasonCount:
+        case kPendingWork:
             break;
     }
     return "";

@@ -27,7 +27,7 @@ Rules for every task:
     removes the mark.
   - Requirements: 7.1, 7.2
 
-- [ ] 2. Settling in slices
+- [x] 2. Settling in slices
   - `core/src/odrg_decoder.h/.cpp`: the settling fields, `settle_more`, `kPending`,
     `body_read`. `core/src/reasons.h`: `kPending` without a name. `core/src/core.cpp`,
     `core/src/upload.cpp`, the drive's check: `kPending` is "going on". `core/Makefile`

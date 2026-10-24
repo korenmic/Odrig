@@ -538,7 +538,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,384 |
+| The core object | fixed | 3,408 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -548,21 +548,21 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Pixel buffer | the smaller of 3 * W * H and 65,534 | 10,800 |
 | Window of the DEFLATE decoder | 32,768 | 32,768 |
 | Chunk buffer, with storage that can be changed | 1,500 | 1,500 |
-| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,440 |
+| The check: source, DEFLATE decoder, ODRG decoder | fixed | 2,464 |
 | The check: pixel buffer | as the player's | 10,800 |
 | The check: window | 32,768 | 32,768 |
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,629** |
+| **Total** | | **124,677** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,114 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,162 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,121 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,145 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,725 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,773 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -598,6 +598,7 @@ repeated exactly.
 | `odrig_host session --batch [options]` | Runs one session after the other from standard input, which holds a file set and a script for each, and prints `end` after each. |
 | `odrig_host decode FILE` | Reads one `.odrg` file with the core's decoder. Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel, then `end`; or `rejected <reason>` where the file is refused. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
+| `odrig_host decode --slice BYTES FILE`, `decode --slice BYTES --batch` | The same, with the decoder settling a defect in slices of `BYTES` bytes, not of 32,768: it is called again while it gives `pending`, and `pending <calls>`, how many calls gave it, comes before the last line. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |
 | `odrig_host reasons` | Prints every reason name the core can report, one on a line. |

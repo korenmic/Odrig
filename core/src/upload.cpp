@@ -110,6 +110,10 @@ void upload_step(Core &core, uint64_t now) {
     } else if (upload.records_left != 0) {
         uint16_t duration = 0;
         reason = checker.decoder.next(core.check_pixels, &duration);
+        if (reason == kPendingWork) {
+            // A slice of the settling of a defect: the next step goes on with it.
+            return;
+        }
         upload.total_ms += duration;
         --upload.records_left;
         if (reason == kNone) {
@@ -119,6 +123,9 @@ void upload_step(Core &core, uint64_t now) {
         // After the last record nothing may follow, and what was read back from storage
         // must be what was received.
         reason = checker.decoder.finish();
+        if (reason == kPendingWork) {
+            return;
+        }
         if (reason == kNone) {
             const bool stored = checker.file.taken == upload.size && checker.file.crc == upload.crc;
             check_ended(core, stored ? kCheckPassed : kCheckStorageFailed, kNone);

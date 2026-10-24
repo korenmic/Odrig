@@ -66,17 +66,22 @@ void check_file(Core &core, FileInfo &info) {
         core_fail(core, kSizeMismatch, info.name, kNone);
         return;
     }
+    // Nothing waits on this check: it goes on through every slice of a settling.
     uint64_t total = 0;
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
         for (uint32_t record = 0; record < core.decoder.frames && reason == kNone; ++record) {
             uint16_t duration = 0;
-            reason = core.decoder.next(core.pixels, &duration);
+            do {
+                reason = core.decoder.next(core.pixels, &duration);
+            } while (reason == kPendingWork);
             total += duration;
         }
     }
     if (reason == kNone) {
-        reason = core.decoder.finish();
+        do {
+            reason = core.decoder.finish();
+        } while (reason == kPendingWork);
     }
     // A file that was read to its end was read whole.
     const uint32_t bytes = core.file.taken;
@@ -95,9 +100,10 @@ void check_file(Core &core, FileInfo &info) {
 enum StepOutcome { kStepGoingOn, kStepWhole, kStepFault };
 
 // One step of the check of a file through the second decoders: its header and canvas, one
-// frame record, or its end, after which nothing may follow. When the file is whole, its
-// size is the bytes the second source took and its length the sum of the durations; when
-// it has a fault, `reason` says which.
+// frame record, its end, after which nothing may follow, or one slice of the settling of a
+// defect, after which the same step is taken again. When the file is whole, its size is the
+// bytes the second source took and its length the sum of the durations; when it has a
+// fault, `reason` says which.
 StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
     Checker &checker = *core.checker;
     Reason found;
@@ -117,6 +123,9 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
     } else if (core.check_records_left != 0) {
         uint16_t duration = 0;
         found = checker.decoder.next(core.check_pixels, &duration);
+        if (found == kPendingWork) {
+            return kStepGoingOn;
+        }
         core.check_total_ms += duration;
         --core.check_records_left;
         if (found == kNone) {
@@ -124,6 +133,9 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
         }
     } else {
         found = checker.decoder.finish();
+        if (found == kPendingWork) {
+            return kStepGoingOn;
+        }
         if (found == kNone) {
             checker.file.close();
             core.check_header_read = 0;

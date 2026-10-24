@@ -28,8 +28,9 @@ void upload_touch(Core &core, uint64_t now);
 // Discards the open upload, if there is one: its bytes are removed from storage.
 void upload_discard(Core &core);
 
-// One step of the check of an uploaded file: the header, one frame record, or the end of
-// the file. Called after a refresh that followed the refresh before it without a gap.
+// One step of the check of an uploaded file: the header, one frame record, the end of the
+// file, or one slice of the settling of a defect. Called after a refresh that followed the
+// refresh before it without a gap.
 void upload_step(Core &core, uint64_t now);
 
 // The four commands on a valid show, with their arguments read. Each writes its reply.

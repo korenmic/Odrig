@@ -299,7 +299,7 @@ uint32_t drive_place_of(const Core &core, uint32_t id);
 // last whole second had kCheckLeastRate refreshes or more, or in the first second. At a
 // refresh that is both, the check takes as many steps as refreshes of that kind have
 // followed one another, at most kCheckMostSteps: a step opens a file, decodes one frame
-// record, or reads the end of a file. At any other refresh the count begins again and
+// record, reads the end of a file, or takes one slice of the settling of a defect. At any other refresh the count begins again and
 // the check takes no step, unless it took none at the kCheckLongestWait refreshes before
 // either: then it takes one, so that a host that is always late still comes to the end of
 // the check. A fault makes the show invalid with the reason the start gives for it.
