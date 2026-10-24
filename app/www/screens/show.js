@@ -6,6 +6,7 @@ import * as capacity from "../capacity.js";
 import {Refusal} from "../commands.js";
 import {Failure} from "../target.js";
 import * as messages from "../messages.js";
+import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
 
 // The shortest time between two brightness commands while the slider is moved.
@@ -215,8 +216,11 @@ function draw(state) {
     }
   }
   const animations = shownOrder(state);
-  drawRows(animations);
-  rowsState(state, animations);
+  // A row that is held keeps the rows as they are until it is let go.
+  if (!reorder.dragging()) {
+    drawRows(animations);
+    rowsState(state, animations);
+  }
   byId("none").hidden = state.animations === null || animations.length > 0;
   selection.draw(state);
   if (menuFor !== null && !animations.some((animation) => animation.id === menuFor)) {
@@ -323,6 +327,8 @@ function placeMenu() {
   menu.style.right = `${Math.max(8, window.innerWidth - box.right)}px`;
   menu.style.top = "";
   menu.style.bottom = "";
+  // On a low screen, held sideways, the menu scrolls within the room above the tabs.
+  menu.style.maxHeight = `${Math.max(120, room - 16)}px`;
   const height = menu.getBoundingClientRect().height;
   // Below the button when it fits above the tabs, else above it, and always on the screen.
   const below = box.bottom + 4;
@@ -397,6 +403,8 @@ export function isVisible() {
 export function start(options) {
   message = options.message;
   selection.start({message, redraw});
+  reorder.start({message, redraw, shownOrder});
+  extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   byId("on").addEventListener("click", () => client.switchOn());
   byId("off").addEventListener("click", () => client.switchOff());
   byId("play-all").addEventListener("click", () => client.playAll());

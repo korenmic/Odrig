@@ -82,7 +82,7 @@ Rules for every task:
   - Prove it fails first: the new tab test finds no tab Animations.
   - Requirements: 5.1 to 5.5, 6.1 to 6.6, 8.1 (the mapping editor)
 
-- [ ] 6. The app: reordering
+- [x] 6. The app: reordering
   - `app/www/screens/reorder.js`, `client.js`, `commands.js`, `messages.js`,
     `screens/show.js`.
   - Tests: rows in the saved order; a drag by touch-like pointer and by mouse, with the
