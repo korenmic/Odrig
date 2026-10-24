@@ -121,7 +121,7 @@ show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 animationsScreen.start({message});
 uploadScreen.start({message});
-authoring.start({message});
+authoring.start({message, go});
 settingsScreen.start();
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {

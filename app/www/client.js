@@ -596,6 +596,29 @@ export function ignore(id, ignored) {
   });
 }
 
+// The whole file of an animation, read from the target in pieces, as bytes.
+export function readFile(id) {
+  return requestOperation("read", async () => {
+    const parts = [];
+    let offset = 0;
+    for (;;) {
+      const {bytes, data} = await commands.read(id, offset);
+      parts.push(data);
+      offset += data.length;
+      if (data.length === 0 || offset >= bytes) {
+        break;
+      }
+    }
+    const whole = new Uint8Array(offset);
+    let at = 0;
+    for (const part of parts) {
+      whole.set(part, at);
+      at += part.length;
+    }
+    return whole;
+  });
+}
+
 export function removeMany(ids) {
   return requestOperation("remove", () => commands.removeMany(ids));
 }

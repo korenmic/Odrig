@@ -225,9 +225,17 @@ export function makeContainer(source) {
 }
 
 // What a container holds, read from its bytes: its header, as `header` with its `width`,
-// `height` and `loopMs`, and its type, as `type`.
+// `height` and `loopMs`, its type, as `type`, and `settings`, and a text's `text`. A file
+// that is no sound container is refused with its reason.
 export function readContainer(bytes) {
-  return odrgx.decode(bytes);
+  try {
+    return odrgx.decode(bytes);
+  } catch (error) {
+    if (error instanceof Rejection) {
+      throw new NotConverted(error.reason, error.detail);
+    }
+    throw error;
+  }
 }
 
 // The picture the player draws of a container that was read, `ms` milliseconds into its

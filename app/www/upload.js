@@ -59,12 +59,13 @@ function base64(bytes) {
   return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// The upload of a file as a job of the client. `next()` gives the function that sends the
-// next line and takes its reply, or null while there is none to send now. `report` is told
+// The upload of a file as a job of the client, which replaces the file of an item only
+// while it has the CRC-32 `expect` when one is given. `next()` gives the function that
+// sends the next line and takes its reply, or null while there is none to send now. `report` is told
 // the part of the file the target has received and the speed in bytes a second, `end` how
 // the upload ended: `{done: true}`, `{cancelled: true}`, or `{error}` with the Refusal or
 // the Failure that ended it. `wake` asks the client to look for the next line again.
-export function uploading({id, file, bytes}, {report, end, wake}) {
+export function uploading({id, file, bytes, expect = null}, {report, end, wake}) {
   const crc = crc32(bytes);
   let stage = "begin";
   let chunk = 0;
@@ -130,9 +131,15 @@ export function uploading({id, file, bytes}, {report, end, wake}) {
       if (stage === "begin") {
         return async () => {
           chunk = await commands.uploadBegin(id, file, bytes.length);
-          stage = "data";
+          stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
+        };
+      }
+      if (stage === "expect") {
+        return async () => {
+          await commands.uploadExpect(expect);
+          stage = "data";
         };
       }
       if (stage === "data") {

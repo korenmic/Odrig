@@ -120,7 +120,7 @@ Rules for every task:
   - Tests in `tests/app/`: the preview, a new seed, an upload listed with `type` `widget`.
   - Requirements: 12.2, 12.4, 16.5
 
-- [ ] 11. The app: editing
+- [x] 11. The app: editing
   - `app/www/`: "Edit" on a text or a clock, `read` back, the form filled, "Save" with
     `upload expect`, `stale` in words; no "Edit" for a drive's animation.
   - Tests in `tests/app/`: an edit keeps the id, the place and the inclusion; another

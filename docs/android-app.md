@@ -45,7 +45,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty-five command lines and no other, each as `POST /odrig` to the address that is set:
+twenty-seven command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -61,6 +61,8 @@ twenty-five command lines and no other, each as `POST /odrig` to the address tha
 | Confirms Delete selected | `remove many <ids>` |
 | Presses `Upload to the installation` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
 | Presses `Cancel` while it uploads | `upload cancel` |
+| Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
+| Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
 | Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
 | Saves the twenty assignments | `mapping set <revision> <pins>` |
 | Presses `Diagonal` in the Tests group, or `Stop test` | `mapping test on`, `mapping test off` |
@@ -387,6 +389,16 @@ turn of it on the installation chooses them; `New random time` shows another. A 
 `One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
 uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
 
+A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
+file back from the installation, opens its form on Upload, titled with its id and its
+file, as `Animation 5 hello.odrgx`, and fills it with what the file holds. `Save` sends
+the changed file to the same id under the same name, so the animation keeps its place in
+the list and the playlist and whether it is ignored, and says `Saved animation <id>
+<file>.`. The installation takes it only while the file it holds is the one the app read:
+when another controller changed or removed the animation meanwhile, it refuses with
+`stale`, the app says so, nothing is overwritten, and the form keeps the edits. An
+animation of the card or of a USB drive has no `Edit`: that storage is read-only here.
+
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the
 medium, and a tap plays one as it plays an installed animation; see
@@ -475,6 +487,7 @@ it is dismissed with `OK` or another takes its place.
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
 | `order-conflict` | A move used an order that another controller, an upload or the card changed. | The order changed on the installation since the app read it. The list is read again; move the animation again. |
+| `stale` | A text or a clock that was edited was changed or removed by another controller since it was read. | Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -498,8 +511,8 @@ Any other reason of the converter is said as `The animation cannot be made:` wit
 converter's own words and its reason in brackets.
 
 A removal and an upload that succeeded are said in the same place, without a code:
-`Removed animation <id> <file>.` and `Uploaded as animation <id> <file>. It plays in the
-playlist.`
+`Removed animation <id> <file>.`, `Uploaded as animation <id> <file>. It plays in the
+playlist.` and `Saved animation <id> <file>.`
 
 ## The phone and the installation's network
 
@@ -701,7 +714,7 @@ By programs, on a Mac:
   one or does not say, and the controls usable meanwhile; the target screen's name of
   the emulator and its last fault, asked once when the screen is opened, and neither line
   for a target that does not say.
-- That the web code sends the twenty-five lines above and no other, and names no address
+- That the web code sends the twenty-seven lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted

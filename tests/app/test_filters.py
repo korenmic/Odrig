@@ -59,7 +59,7 @@ class TheFilters(unittest.TestCase):
             found = support.run("filters", address=target.address, settings={"rows": 6, "moving": True}).seen
             lines = [line for _, line in target.lines]
         self.assertEqual(found["note"], "Set both filters to All to move animations: hidden rows would make the places unclear.")
-        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up (disabled)", "Move down (disabled)", "Select", "Delete"])
+        self.assertEqual(found["menu"], ["Ignore in playlist", "Move up (disabled)", "Move down (disabled)", "Edit", "Select", "Delete"])
         self.assertFalse(found["lifted"])
         self.assertEqual(found["noteAll"], "Hold a row to move it, or use Move up and Move down in its menu.")
         self.assertEqual([line for line in lines if line.startswith(b"order move")], [])
