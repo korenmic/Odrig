@@ -9087,3 +9087,88 @@ file of 3,000 frames, every wait stays within 50 ms on the Mac; the core before 
 made one wait 122.8 ms.
 
 **Resolution.** `core/src/core_state.h`, `FaultContext`; `tests/emulator/test_bounded.py`.
+
+## Seed 32: which faults still make the show invalid
+
+**Question.** The seed keeps mapping and show-file faults apart from animation faults and
+asks for a safe recovery state for the first. Which reasons quarantine one file, and what
+is the recovery state?
+
+**Answer.** `file-missing`, `size-mismatch`, `read-error` while a file is read, and every
+reason of "ODRG files" belong to one file and quarantine it. The reasons of the mapping
+file and of the show file, `duplicate-id`, `undefined-id`, `nested-cycle` and
+`out-of-memory` still make the show invalid, as they did: without a show there are no
+safe ids to act on. The invalid show is the recovery state: `status` reports the fault,
+the LEDs are dark, and the commands that need a show are refused with `show-invalid`;
+the board is put right by installing a show, as before.
+
+**Resolution.** The spec's requirements 1.1 to 1.3; `docs/show.md`.
+
+## Seed 32: the names of the additions
+
+**Question.** How does a reply mark an unavailable animation, and how is `play` of one
+refused?
+
+**Answer.** A `list` item gets the member `fault`, the name of the reason, only when the
+animation is unavailable: a reply stays as it was for a usable one, and the member adds
+the reason the app shows. `bytes` is `null` for a file not read whole. `play` of an
+unavailable animation, or of a cycle without a usable member, is refused with the new
+error code `unavailable`. A quarantine writes `file <name> unavailable: <reason>` to the
+log, beside the drive's `drive file <name> left out: <reason>`.
+
+**Resolution.** `docs/commands.md`; the spec's design, "Commands and replies".
+
+## Seed 32: what "the same content" of a drive's file is
+
+**Question.** A quarantined file must not be tried again when its medium is taken up
+again in the same boot, but a card swapped in may hold another file of the same name. The
+host gives the core no size and no identity of a card. What is the content's identity?
+
+**Answer.** The file's name on the drive, the bytes of its first read, at most 512, and
+their CRC-32: the one read the check's header step makes anyway. A remembered file is
+left out again after that read, without its body being decoded. The core remembers the
+last 16 files left out in the boot, 704 bytes; one pushed out is checked again, under the
+bounds of seed 31. Two files that agree in name and in their first 512 bytes and differ
+after them are taken for the same.
+
+**Resolution.** The spec's design, "A drive".
+
+## Seed 32: entries of a medium that is gone
+
+**Question.** The seed asks to keep known entries as unavailable when their medium
+disappears. The core knows a drive's file names only through the host, while the drive is
+in, and has no room for 256 names of 127 bytes. Keep them, or drop them?
+
+**Answer.** A pulled drive's files leave the playlist and `list` as today; the files of
+the next drive are checked and listed anew, and a remembered one is left out again. Keeping
+the entries of an absent medium needs its metadata in the core, which the managed catalog
+of seed 35 brings; it is left to that seed.
+
+**Resolution.** The spec's requirement 6.2; seed 35.
+
+## Seed 32: when the player meets a defect that settles long
+
+**Question.** Seed 31's drift log said that seed 32 makes an animation unplayable as soon
+as its first defect is found, before settling ends. Must the player stop at once?
+
+**Answer.** No. The reason a file is reported with is the one settling ends with, and the
+player keeps the picture before while it settles, a slice a refresh. The check after the
+start settles the same file sixteen slices a refresh beside it, and whichever ends first
+quarantines the file; then the player goes on with the next animation. For the
+reproducer of seed 31 that is under three seconds. A report before settling ends could
+name a reason the file does not have.
+
+**Resolution.** The spec's requirement 2.2.
+
+## Seed 32: the commands of repair during the check
+
+**Question.** `list`, `remove` and `upload begin` wait for the check after the start
+today, because it reads the files they change and owns the decoders an upload's check
+needs. How do they stay open during the check?
+
+**Answer.** `list` answers at once, with `bytes` of `null` for a file not read whole. A
+removal keeps the check at its file. An upload takes the second decoders; the check takes
+no step while an upload is open and afterwards begins its file again. A file an upload
+installed was read whole by the upload's check and is not checked again.
+
+**Resolution.** The spec's requirement 5; `docs/commands.md`.
