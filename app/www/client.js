@@ -554,6 +554,10 @@ export function mappingTest(enabled) {
   return requestOperation("mapping", () => commands.mappingTest(enabled));
 }
 
+export function mappingTestSnake(snake) {
+  return requestOperation("mapping", () => commands.mappingTestSnake(snake));
+}
+
 export function contentBusy() {
   return contentLocked || job !== null;
 }

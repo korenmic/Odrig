@@ -179,7 +179,12 @@ export async function mappingGet() {
         reply.pins.some(pin => !whole(pin, 0, 255)) : reply.pins.length !== 0)) {
     throw new Failure("bad-reply", address());
   }
-  return {editable: reply.editable, pins: reply.pins, revision: reply.revision, test: reply.test};
+  // `snake` says which test shows, null for the diagonal or none; an older target gives none.
+  const snake = reply.snake === undefined ? null : reply.snake;
+  if (!(snake === null || (reply.test === true && whole(snake, 1, 20)))) {
+    throw new Failure("bad-reply", address());
+  }
+  return {editable: reply.editable, pins: reply.pins, revision: reply.revision, test: reply.test, snake};
 }
 
 export async function mappingSet(revision, pins) {
@@ -188,6 +193,11 @@ export async function mappingSet(revision, pins) {
 
 export async function mappingTest(enabled) {
   await carriedOut(`mapping test ${enabled ? "on" : "off"}`);
+}
+
+// Shows the test of one snake, 1 to 20.
+export async function mappingTestSnake(snake) {
+  await carriedOut(`mapping test snake ${snake}`);
 }
 
 export async function ignore(id, ignored) {

@@ -38,7 +38,7 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   says how the phone's requests travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty-three command lines and no other, each as `POST /odrig` to the address that is set:
+twenty-four command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -57,6 +57,7 @@ twenty-three command lines and no other, each as `POST /odrig` to the address th
 | Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
 | Saves the twenty assignments | `mapping set <revision> <pins>` |
 | Shows or stops the diagonal | `mapping test on`, `mapping test off` |
+| Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
 

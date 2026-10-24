@@ -93,7 +93,7 @@ Rules for every task:
   - Prove it fails first: the rows are drawn in the list's order.
   - Requirements: 7.1 to 7.4
 
-- [ ] 7. The app: the Tests group and its checkbox
+- [x] 7. The app: the Tests group and its checkbox
   - `app/www/screens/tests.js`, `screens/mapping.js`, `screens/show.js`, `client.js`,
     `commands.js`, `index.html`, `style.css`.
   - Tests: the checkbox off at first and remembered across a reload; 21 entries when on,

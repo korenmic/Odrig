@@ -65,14 +65,17 @@ class MappingApp(unittest.TestCase):
 
     def test_mapping_protocol_checks_full_replies_through_the_native_bridge_contract(self):
         good = {"ok":True,"editable":True,"pins":PINS,"revision":0xffffffff,"test":True}
-        replies = [good, {**good,'pins':[1]*20}, {**good,'revision':-1}, {**good,'test':'on'}, {**good,'pins':PINS[:-1]}, {**good,'pins':[*PINS[:-1],256]}, {"ok":False,"error":"mapping-conflict"}, {**good,"editable":False,"pins":[]}, {**good,"editable":False}]
+        replies = [good, {**good,'pins':[1]*20}, {**good,'revision':-1}, {**good,'test':'on'}, {**good,'pins':PINS[:-1]}, {**good,'pins':[*PINS[:-1],256]}, {"ok":False,"error":"mapping-conflict"}, {**good,"editable":False,"pins":[]}, {**good,"editable":False},
+                   {**good,'snake':7}, {**good,'snake':21}, {**good,'snake':'7'}, {**good,'test':False,'snake':7}]
         found = browser.run('mapping-protocol',settings={'replies':replies}).seen
-        self.assertEqual(found['found'][0],{k:v for k,v in good.items() if k!='ok'})
+        self.assertEqual(found['found'][0],{**{k:v for k,v in good.items() if k!='ok'},'snake':None})
+        self.assertEqual(found['found'][9]['snake'],7)
+        self.assertEqual(found['found'][10:],[{'error':'bad-reply'}]*3)
         self.assertEqual(found['found'][1:6],[{'error':'bad-reply'}]*5)
         self.assertEqual(found['found'][6],{'error':'mapping-conflict'})
         self.assertEqual(found['found'][7]['pins'],[])
         self.assertEqual(found['found'][8],{'error':'bad-reply'})
-        self.assertEqual(found['sent'][-3:],['mapping set 123 1,2,3','mapping test on','mapping test off'])
+        self.assertEqual(found['sent'][-4:],['mapping set 123 1,2,3','mapping test on','mapping test off','mapping test snake 9'])
 
 
     def test_target_change_drops_the_old_draft(self):
