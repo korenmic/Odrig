@@ -107,6 +107,8 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 The player can take animations from a USB flash drive, when the program it runs in gives
 it one; [core.md](core.md#a-drive) says how. The drive's animations are added to the
 show's; they do not take the place of any. Nothing is written to the drive, and no command changes it.
+On the board the drive is a USB stick or a microSD card, as
+[firmware.md](firmware.md#the-external-storage) says.
 
 - The drive's animations are the files of its folder `odrig` whose names end in `.odrg`,
   in any case, and do not begin with a dot, in the order of their names, at most 256.

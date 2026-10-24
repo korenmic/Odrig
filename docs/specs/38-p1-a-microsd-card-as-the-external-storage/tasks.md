@@ -117,7 +117,7 @@ Rules for every task:
     card's build does not compile, `mounted` and `msc_host_vfs_space` undeclared.
   - Requirements: 2.6, 8.1
 
-- [ ] 7. The documents in the house style
+- [x] 7. The documents in the house style
   - `docs/microsd.md`: the card's page as the design's "The documents" has it, with the
     two session records of `docs/microsd-preflight/` folded in; then
     `docs/microsd-preflight/` goes, and every link to it.

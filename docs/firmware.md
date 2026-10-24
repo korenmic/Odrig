@@ -57,9 +57,10 @@ it:
 
 `build --trial` builds the firmware on newer software of Espressif, whose USB host knows
 hubs: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform 55.03.312-1 and
-PlatformIO 6.2.0. It is the trial of the move to that software, and nothing of it is used
-by the other commands. It lives in `build/firmware/newer/`, so the build known good and its
-tools stay as they are. The first `build --trial` fetches it; nothing of it is on a computer
+PlatformIO 6.2.0. It is the trial of the move to that software; the microSD build,
+`build --microsd`, is built on the same software, and no other command uses it. It lives
+in `build/firmware/newer/`, so the build known good and its tools stay as they are. The
+first `build --trial` or `build --microsd` fetches it; nothing of it is on a computer
 before. The sizes are those the sources state, about 700 MB in all; a line *named by its
 manifest* is a small manifest that names the real download, which is given as its release
 offers it for a Mac with Apple's processor.
@@ -105,7 +106,7 @@ build/firmware/
   WLED/            WLED's source at the pinned commit
   out/             the built images
   storage/         storage images read from the board and written to it, the newest eight
-  newer/           the newer USB software of `build --trial`
+  newer/           the newer USB software of `build --trial` and `build --microsd`
     venv/          its Python environment: PlatformIO 6.2.0, Node.js and npm
     pio/           its PlatformIO folder: the platform, Arduino-ESP32, the compilers and
                    the platform's own Python environment
@@ -113,7 +114,7 @@ build/firmware/
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
-folder. `HOME` is left as it is. For `build --trial` the two folders of PlatformIO are
+folder. `HOME` is left as it is. For `build --trial` and `build --microsd` the two folders of PlatformIO are
 `build/firmware/newer/pio` and `build/firmware/newer/pio-cache`, and `PATH` begins with
 `build/firmware/newer/venv/bin`; pip's and npm's caches are the same.
 
@@ -242,15 +243,22 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 | `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
 
-`build --microsd` builds the SPI microSD variant as `odrig-microsd.bin`, on the newer
-Arduino 3 / ESP-IDF 5.5.5 platform. It reads external animations from the card's `odrig`
-folder instead of starting a USB host, and leaves the native USB socket serial. It does
-not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its SPI profile uses
-GPIO39 for SCK, GPIO40 for MISO, GPIO41 for MOSI and GPIO42 for CS, preserving all twenty
-LED outputs. The generic driver's pin defaults remain unconfigured when a build omits
-those flags. [microSD preparation](microsd.md) describes the wiring and remaining
-hardware checks. All 122 card animations and representative playback have been verified
-in the current two-USB bench setup; one-cable and autonomous-power operation remain open.
+```
+python3 firmware/fw.py build --microsd
+```
+
+`build --microsd` builds the card's firmware, the firmware whose external storage is a
+microSD card in place of a USB stick, on [the newer USB software](#the-newer-usb-software):
+the environment `odrig_microsd`, which is `odrig_trial` with the card's flag
+`ODRIG_DRIVE_SD_SPI` and the reader's four pins, GPIO39 for SCK, GPIO40 for MISO, GPIO41
+for MOSI and GPIO42 for CS, and the image `odrig-microsd.bin`. The card's code takes the
+place of the USB host, and the chip's own socket stays a serial port. It does not go with
+`--stock`, `--probe`, `--trial` or `--standalone`, and it never replaces
+`odrig-firmware.bin`; `flash --image build/firmware/out/odrig-microsd.bin` writes it to
+the board. [microsd.md](microsd.md) has the card, the reader's wiring, what the board
+sessions gave and what is open. The image of 2026-10-22, which the board runs, has
+1,765,808 bytes and the SHA-256
+`fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder
@@ -717,7 +725,8 @@ answered.
 
 **The port.** As the board starts, the chip's own USB socket stays this serial port when
 a computer is plugged into it, and otherwise becomes the socket of a
-[USB drive](#a-usb-drive); the probe build keeps it a serial port always. Every byte the
+[USB drive](#the-external-storage); the probe build and the card's build keep it a serial
+port always. Every byte the
 board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
@@ -755,9 +764,14 @@ it as before. The suite of the board passes only with the board on the chip's ow
 socket: stock WLED, which the suite flashes and restores, and the probe build answer there
 and not on the UART.
 
-**A USB drive.** The firmware plays the animations of a USB flash drive on the chip's own
-socket, after the installed ones, as [show.md](show.md#animations-from-a-usb-drive)
-describes.
+### The external storage
+
+The firmware plays the animations of an external storage after the installed ones, as
+[show.md](show.md#animations-from-a-usb-drive) describes for a drive. In the firmware that
+`build` makes it is a USB flash drive on the chip's own socket, as the rest of this
+section says. In the card's build, `build --microsd`, it is a microSD card in a reader on
+GPIO39 to GPIO42, and nothing of the USB host is compiled: [microsd.md](microsd.md) says
+how a card is prepared, taken up and dropped, and what WLED's information says of it.
 
 - **A computer or a drive.** As the board starts, the firmware looks at the chip's own
   socket for 5 seconds. A computer plugged into it sends a start-of-frame packet each
@@ -801,7 +815,8 @@ describes.
 ### The log
 
 The firmware writes a log on the socket marked COM, between the replies to commands: a
-line for every event of the chip's own socket, and every line the player logs. A line is
+line for every event of the chip's own socket, or in the card's build of the card, and
+every line the player logs. A line is
 one line of printable ASCII: `#log`, the seconds since the start with three decimals, the
 kind of the line, and its text.
 
@@ -834,9 +849,20 @@ The lines of the kind `usb`:
   `stick not opened: a fault in reading (<error>)`, or
   `stick not opened: a fault in reading the folder odrig`.
 
+The lines of the kind `sd` are those of the card's build, `build --microsd`, which has
+no line of the kind `usb`:
+
+- A card mounted: `card opened: <n> animation files in odrig`,
+  `the card has no folder odrig`, or `card folder odrig could not be read`.
+- No card: `card not mounted; no card or unreadable file system`, once for each spell
+  without a card; and `card unavailable; files closed, waiting for a card` when a card
+  went.
+- The reader not started: `SPI did not start on the configured pins; reader disabled`,
+  or `SD pins or SPI frequency not configured safely; reader disabled`.
+
 The lines of the kind `player` are what the player logs: a file of a drive that is left
-out, `drive file <name> left out: <reason>`, and the reason the show became invalid, as
-WLED's information shows it.
+out, `drive file <name> left out: <reason>`, also for a file of the card, and the reason
+the show became invalid, as WLED's information shows it.
 
 - **Never in the way.** A line is added from any task without waiting, into a queue of 32
   lines of up to 160 bytes; a longer text is cut, and every byte outside printable ASCII
@@ -907,7 +933,7 @@ entries of the usermod:
 | `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
 | `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
 | `odrig start` | The milliseconds the core took to start. |
-| `odrig drive` | What there is of a USB drive, as [A USB drive](#a-usb-drive) says. |
+| `odrig drive` | What there is of the external storage: of a USB drive, as [The external storage](#the-external-storage) says, or in the card's build of a microSD card, as [microsd.md](microsd.md#the-log-and-wleds-information) says. |
 | `odrig update` | `refused: no second slot` on a board of the bigger layout, where an update over Wi-Fi is refused; `WLED's` on WLED's layout, where WLED's own update works. |
 
 **An update over Wi-Fi.** On a board of the bigger layout of
@@ -1897,6 +1923,24 @@ animations, all through the socket marked COM:
 - The board was left on the trial, playing the owner's show.
 - Not tried yet: a hub with its own power and a stick on the chip's own socket, without
   the Mac there.
+
+**The microSD card.** What the board gave with the card's build, `odrig-microsd.bin` of
+1,765,808 bytes, SHA-256 `fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`,
+on the bigger layout, with the owner's card of 122 animations, 16,475,328 bytes, in the
+reader. [microsd.md](microsd.md#the-board-sessions) has both sessions in full.
+
+- 2026-10-22, the Mac on the chip's own socket only: `flash --image` there, the show and
+  the settings kept; the card mounted, 60001 and 60002 listed, and `play 60001` at 41
+  refreshes a second. Then listed entries disappeared and were found again, in one open
+  session, at 4 MHz, 1 MHz and 400 kHz alike. The 4 MHz image was built again with the
+  same SHA-256 and flashed back.
+- 2026-10-23, both sockets on the Mac and the commands through the socket marked COM,
+  nothing flashed: all 122 animations listed as 60001 to 60122 after the installed one,
+  and no entry lost in 161 samples over fifteen minutes. Four of them played past a
+  loop boundary at 26 to 50 refreshes a second, the largest at 26 to 48, and the
+  playlist went on to the card's animations by itself.
+- Why the first day dropped out and the second did not is not known. The board was left
+  on that image, playing, at brightness 32.
 
 ## Live pin assignments
 

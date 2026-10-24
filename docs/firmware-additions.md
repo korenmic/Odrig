@@ -57,13 +57,12 @@ takes every line marked *No*.
 | 23 | Is built, flashed, rolled back and set up by one tool: `build`, `flash`, `restore-stock`, `big-storage`, `install-show`, `set-wifi`, `set-limit`, `read-limit`, `install-firmware`, `read-show` and the board's suites. | 04, 08, 15, 24 | `firmware/fw.py`, `firmware/fwtool/` | Written again: each command takes the other firmware too | In part: `build`, `flash` and the board's suite are in its spec |
 | 24 | Saves a complete twenty-pin permutation atomically and displays a packaged white diagonal through the shared core; the same commands reach it over HTTP and serial. | 30 | `core/src/mapping_control.cpp`, `odrig_routing.h`, `odrig_usermod.cpp` | Written again: fixed physical outputs resolve the currently assigned logical snake | Output adapter supports pin lookup; full standalone player remains pending seed 12 |
 | 25 | Persists playlist inclusion, removes installed animations atomically in batches, and reports internal plus nullable external capacity through every command route. | 29 | `core/`; read-only FAT capacity in `odrig_drive.cpp` and `firmware/usb_host_msc/` | The core for semantics; a host callback supplies external capacity | No: the full player and external drive adapter remain pending |
-| 26 | Has an experimental SPI microSD build in place of the USB-storage transport, preserving the external-animation interface and native USB serial; its profile uses SCK39, MISO40, MOSI41 and CS42. All 122 card files and representative playback are verified in the two-USB bench setup; autonomous-power operation remains open. | Owner | `odrig_drive.cpp`, `odrig_sd_config.h`, `build --microsd`; see [microSD preparation](microsd.md) | Written again | No |
+| 26 | Plays the animations of a microSD card after the installed ones, in place of a USB stick: a reader on GPIO39 to GPIO42 over SPI at 4 MHz, FAT32 or FAT16, the folder `odrig`, at most 256 files, never written, taken up and dropped while the board runs; its free and total space under `external` of `space`; its `sd` lines in the log; the chip's own USB socket a serial port always. | 20, 38 | `odrig_drive.cpp`, `odrig_sd_config.h`; `build --microsd`; see [microsd.md](microsd.md) | Written again | No: the fallback gets the card too, by the owner's rule |
 
 ## Coming
 
-- **Seed 22, a USB stick through a hub.** When it is done, the firmware reads a stick
-  through any USB hub, on newer USB software of Espressif. Its line comes here then, and
-  the fallback is built on the same USB software.
+Nothing at present. Seed 22, a USB stick through a hub, was superseded by the microSD
+card of line 26.
 
 ## Not carried
 
