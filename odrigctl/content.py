@@ -29,11 +29,12 @@ def error_of(reply):
     return json.loads(reply).get("error")
 
 
-def list_all(session, show):
-    """Asks for the items of the show, one reply after the other for as long as a reply
-    names a next position, and hands each reply to `show`. Returns whether every reply
-    reported success; it stops at one that does not."""
-    line = b"list\n"
+def list_all(session, show, command=b"list"):
+    """Asks for the items of the show, or with the command `order get` for the saved order,
+    one reply after the other for as long as a reply names a next position, and hands each
+    reply to `show`. Returns whether every reply reported success; it stops at one that
+    does not."""
+    line = command + b"\n"
     while True:
         reply = session.exchange(line)
         show(reply)
@@ -42,7 +43,7 @@ def list_all(session, show):
         following = json.loads(reply).get("next")
         if following is None:
             return True
-        line = b"list %d\n" % following
+        line = command + b" %d\n" % following
 
 
 def upload(session, item, name, data, progress=None, checking=None, busy_seconds=BUSY_SECONDS, clock=time.monotonic, sleep=time.sleep):

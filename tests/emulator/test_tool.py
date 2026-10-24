@@ -52,6 +52,7 @@ SESSION = (
     ("list",),
     ("remove", "99"),
     ("ignore", "999", "1"),
+    ("order", "move", "1", "999", "end"),
     ("status",),
 )
 
@@ -59,7 +60,8 @@ SESSION = (
 def reference_replies(files, session):
     player = ReferencePlayer(files)
     player.poll(0)
-    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words == ("ignore", "999", "1") else player.command(100, " ".join(words).encode("ascii")) for words in session]
+    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words in (("ignore", "999", "1"), ("order", "move", "1", "999", "end")) else
+            player.command(100, " ".join(words).encode("ascii")) for words in session]
 
 
 class AgainstTheEmulator(unittest.TestCase):
@@ -169,7 +171,7 @@ class Session(unittest.TestCase):
                 self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
-        self.assertEqual(codes[-9:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id"])
+        self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
         self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload"})
 
 
@@ -284,12 +286,12 @@ class Usage(unittest.TestCase):
                                       "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
         one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ")) and command not in ("play all", "remove many <ids>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping")],
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),

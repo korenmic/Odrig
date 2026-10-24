@@ -710,6 +710,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 ```
 
@@ -728,6 +729,8 @@ python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial remove 9
 python -m odrigctl --port build/emulator/serial remove many 9,10
 python -m odrigctl --port build/emulator/serial ignore 9 1
+python -m odrigctl --port build/emulator/serial order get
+python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -745,6 +748,8 @@ python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
 python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
 python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
+python -m odrigctl --tcp 127.0.0.1:8601 order get
+python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -762,6 +767,8 @@ python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
 python -m odrigctl --http 127.0.0.1:8600 remove 9
 python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
 python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
+python -m odrigctl --http 127.0.0.1:8600 order get
+python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 ```
 
 The tool prints the reply line to standard output:
@@ -1304,6 +1311,12 @@ routing in their hello event. The mapping file endpoint returns the committed fi
 
 For a serial client, `python3 -m odrigctl --port build/emulator/serial mapping get`
 reads the assignment. Use `mapping set REV PINS` to save the complete comma-separated
-pin list, and `mapping test on` or `mapping test off` for the packaged diagonal.
+pin list, `mapping test on` or `mapping test off` for the packaged diagonal, and
+`mapping test snake N` for the test of snake N.
+
+`order get` prints the saved playlist order, a reply for each part, and
+`order move REV ID BEFORE` moves one animation, with `BEFORE` an id or `end`; the tool
+sends the words as they are typed. The emulator keeps the order in `order.txt` of its show
+folder, as the board does in its storage, and plays its playlist in that order.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files remain read-only.
