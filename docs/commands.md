@@ -74,12 +74,15 @@ animation items of the show, and 0 while the show is invalid.
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"type":"frames"},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"type":"frames"},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
-`id`, its `file` and the size of that file in `bytes`. A cycle has its `id`, the ids of its
+`id`, its `file`, the size of that file in `bytes`, and last its `type`, what the file
+holds as its header says ([format.md](format.md)): `"frames"` for an ODRG file and for an
+ODRGX container of frames. A reply without `type` comes from a player before it, and its
+animations are frames. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
 `list <next>`, or `null` when the last item is in the reply. A position at or after the end
@@ -89,7 +92,7 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The animations of a USB drive come after the items of the show, in the order of their
-file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false}`.
+file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false,"type":"frames"}`.
 Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits. The positions of

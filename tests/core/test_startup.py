@@ -179,7 +179,7 @@ class EachReason(unittest.TestCase):
 
     def test_file_malformed_names_the_file_and_the_reason(self):
         hello = support.example_show()["hello.odrg"]
-        self.check(example(hello_odrg=b"ODRX" + hello[4:]), "file-malformed hello.odrg bad-magic")
+        self.check(example(hello_odrg=b"ODRZ" + hello[4:]), "file-malformed hello.odrg bad-magic")
         self.check(example(dvd_odrg=b""), "file-malformed dvd.odrg truncated")
         self.check(example(dvd_odrg=hello + b"\0"), "file-malformed dvd.odrg trailing-bytes")
         self.check(example(hello_odrg=hello[:16] + b"\x07" + hello[17:]), "file-malformed hello.odrg bad-deflate")
@@ -377,7 +377,7 @@ class Leftovers(unittest.TestCase):
 
     def test_a_line_of_pending_that_is_no_file_name_names_nothing(self):
         lines = [b"show.json", b"mapping.json", b"pending.txt", b"upload.part", b"stray.txt", b"STRAY.odrg", b"../stray.odrg", b"./stray.odrg", b"stray.odrg ", b" stray.odrg",
-                 b"stray.odrg\r", b"", b"a" * 28 + b".odrg", b"stray\x00.odrg", b"str\xc3\xa4y.odrg", b"stray.odrgx", b"/stray.odrg", b"odrg"]
+                 b"stray.odrg\r", b"", b"a" * 28 + b".odrg", b"stray\x00.odrg", b"str\xc3\xa4y.odrg", b"stray.odrgy", b"/stray.odrg", b"odrg"]
         files = example(pending_txt=b"".join(line + b"\n" for line in lines), stray_odrg=self.CLIP)
         run, left = self.started(files)
         self.assertIsNone(run.error)

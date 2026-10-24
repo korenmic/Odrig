@@ -223,11 +223,11 @@ class List(Content):
 
     def expected_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False), type="frames") if "file" in item else item for item in listed]
 
     def test_the_example_show_is_listed_as_the_document_has_it(self):
         printed = self.run_both(support.example_show(), [support.line(T0, "list"), support.line(T0, "list 0")])
-        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
+        expected = '{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"type":"frames"},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"type":"frames"},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}'
         self.assertEqual(replies(printed), [expected, expected])
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         self.assertIn(f"list\n{expected}\n", text)
@@ -411,7 +411,7 @@ class Remove(Content):
 
     def reference_items(self, files):
         listed = json.loads(files["show.json"])["items"]
-        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False)) if "file" in item else item for item in listed]
+        return [dict(item, bytes=len(files[item["file"]]), ignored=item.get("ignored", False), type="frames") if "file" in item else item for item in listed]
 
     def test_removing_the_start_item_leaves_the_show_without_start(self):
         # Without a start, the show that is left plays the playlist from its first animation.

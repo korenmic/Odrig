@@ -138,7 +138,7 @@ reason that applies.
 | `undefined-id` | A cycle, or `start`, names an id that no item has. |
 | `nested-cycle` | A cycle names an item that is a cycle. |
 | `output-not-empty` | The output folder of `pack` exists and is not empty. |
-| `file-missing` | The source `X.json` of a named `X.odrg` is not in the sources folder. |
+| `file-missing` | The source `X.json` of a named `X.odrg` or `X.odrgx` is not in the sources folder. |
 | `file-malformed` | A source is rejected as a JSON frames file. The detail gives that reason too. |
 | `size-mismatch` | A source's canvas size differs from the mapping's. |
 | `canvas-too-large`, `too-many-frames` | A source cannot be written as ODRG, as under `encode`. |
@@ -196,7 +196,7 @@ The text is the reason name, followed for most reasons by what it is about:
 | `undefined-id <id>` | A cycle, or `start`, names that id and no item has it. |
 | `nested-cycle <id>` | The cycle item with that id names an item that is a cycle. |
 | `file-missing <name>` | The named `.odrg` file does not exist. |
-| `file-malformed <name> <reason>` | The named file is rejected with that reason of "ODRG files". |
+| `file-malformed <name> <reason>` | The named file is rejected with that reason of "ODRG files" or "ODRGX files". |
 | `size-mismatch <name>` | The named file's canvas size differs from the mapping's. |
 | `read-error <name>` | The host reports a failure while the named file is read. |
 | `out-of-memory` | The host cannot supply the memory the core asks for. |

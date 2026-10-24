@@ -588,7 +588,7 @@ class Upload(Content):
                     result = support.run_tool(*target, "upload", "9", self.hello)
                     self.assertEqual((result.status, result.out), (0, OK))
                     self.assertRegex(result.err, rf"\Aupload: 100% {size}/{size} bytes \d+ B/s\nupload: checking\n\Z")
-                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
+                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False, "type": "frames"}, ("all", 9, None)))
                 finally:
                     emulator.stop()
                 self.assertEqual(support.files_of(self.folder)["hello-again.odrg"], self.before["hello.odrg"])
@@ -596,7 +596,7 @@ class Upload(Content):
                 again = support.Emulator(self.folder)
                 try:
                     target = targets(again)[transport]
-                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
+                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False, "type": "frames"}, ("all", 9, None)))
                     removed = support.run_tool(*target, "remove", "9")
                     self.assertEqual((removed.status, removed.out, removed.err), (0, OK, ""))
                     # It was the last animation of the playlist: the first one is next.
@@ -622,7 +622,7 @@ class Upload(Content):
                 self.assertRegex(lines[-2], rf"\Aupload: 100% {len(clip)}/{len(clip)} bytes \d+ B/s\Z")
                 self.assertEqual(support.files_of(self.folder)["clip.odrg"], clip)
                 listed = json.loads(support.run_tool(*target, "list").out)["items"]
-                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip), "ignored": False})
+                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip), "ignored": False, "type": "frames"})
                 self.assertEqual(support.run_tool(*target, "remove", number).status, 0)
         with support.EventStream(emulator.port) as stream:
             logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")

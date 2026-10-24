@@ -120,7 +120,7 @@ class FailureWhilePlaying(unittest.TestCase):
     def test_a_file_replaced_by_one_that_breaks_its_format(self):
         hello = support.example_show()["hello.odrg"]
         cases = (
-            (b"ODRX" + hello[4:], "bad-magic", HELLO_MS),
+            (b"ODRZ" + hello[4:], "bad-magic", HELLO_MS),
             (hello[:16] + b"\x07" + hello[17:], "bad-deflate", HELLO_MS),
             (b"", "truncated", HELLO_MS),
         )

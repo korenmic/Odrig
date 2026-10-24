@@ -81,7 +81,7 @@ typedef struct odrig_host {
 
     /* The name of the animation file at this place of the drive's list, as the drive has it,
        into buffer with a 0 after it, cut to capacity - 1 bytes. The list is the files of the
-       drive's folder `odrig` whose names end in `.odrg`, in any case, and do not begin with
+       drive's folder `odrig` whose names end in `.odrg` or `.odrgx`, in any case, and do not begin with
        a dot, in the order of their names, the first 256. Returns 1, or 0 when that drive
        has no file at that place or is not plugged in any more. */
     int (*drive_name)(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity);

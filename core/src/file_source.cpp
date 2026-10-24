@@ -66,4 +66,29 @@ int FileSource::refill() {
     return buffer[0];
 }
 
+int32_t FileSource::look(uint32_t want) {
+    while (is_open && stopped == 0 && length < want) {
+        const size_t room = kFileBufferSize - length;
+        int32_t count;
+        if (at_name != nullptr) {
+            count = host->read_at(host->ctx, at_name, taken, buffer + length, room);
+        } else {
+            count = host->read(host->ctx, buffer + length, room);
+        }
+        if (count == 0) {
+            break;
+        }
+        if (count < 0 || count > static_cast<int32_t>(room)) {
+            stopped = -kReadError;
+            return -1;
+        }
+        for (int32_t at = 0; at_name != nullptr && at < count; ++at) {
+            crc = crc_add(crc, buffer[length + at]);
+        }
+        taken += static_cast<uint32_t>(count);
+        length = static_cast<uint16_t>(length + count);
+    }
+    return length;
+}
+
 }  // namespace odrig

@@ -17,7 +17,7 @@ import tempfile
 import unittest
 import zlib
 
-from odrig import errors, jsonframes, mapping, odrg, show
+from odrig import errors, jsonframes, mapping, odrg, odrgx, show
 from odrig.generators import dense, dvd_bounce, hello_world
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -121,30 +121,35 @@ def inflate_each(streams):
     return results
 
 
-Decoded = collections.namedtuple("Decoded", "header records reason")
-Decoded.__doc__ = """What the core's ODRG decoder makes of a file.
+Decoded = collections.namedtuple("Decoded", "header records reason container", defaults=(None,))
+Decoded.__doc__ = """What the core's reader makes of an ODRG file or an ODRGX container of frames.
 
-`header` is `(W, H, C, F, compressed)`, or `None` when the header is refused. `records` holds
-`(duration, picture)` for each frame record decoded, the picture as three bytes for each
-pixel. `reason` is `None` for a file read to its end, or the reason it is refused for.
+`header` is `(W, H, C, F, compressed)` of the frames, or `None` when a header is refused.
+`records` holds `(duration, picture)` for each frame record decoded, the picture as three
+bytes for each pixel. `reason` is `None` for a file read to its end, or the reason it is
+refused for. `container` is `(type, loop, payload)` of a container whose header was read,
+and `None` for an ODRG file.
 """
 
 
 def _decoded(lines):
     header = None
+    container = None
     records = []
     for line in lines:
         word, _, rest = line.partition(" ")
-        if word == "header":
+        if word == "container":
+            container = tuple(int(number) for number in rest.split())
+        elif word == "header":
             width, height, colours, frames, compressed = (int(number) for number in rest.split())
             header = (width, height, colours, frames, bool(compressed))
         elif word == "frame":
             duration, _, picture = rest.partition(" ")
             records.append((int(duration), bytes.fromhex(picture)))
         elif word == "end":
-            return Decoded(header, tuple(records), None)
+            return Decoded(header, tuple(records), None, container)
         elif word == "rejected":
-            return Decoded(header, tuple(records), rest)
+            return Decoded(header, tuple(records), rest, container)
         else:
             break
     raise AssertionError("odrig_host decode printed no ending")
@@ -513,6 +518,41 @@ class _Invalid(Exception):
     """The installed file set is refused, with this reason text."""
 
 
+def frames_payload(data):
+    """The ODRG file a runtime file plays: an ODRG file itself, or a container's payload."""
+    return odrgx.payload_of(data) if odrgx.is_container(data) else data
+
+
+def header_fault(data, canvas):
+    """The reason a reader refuses a runtime file for by its headers, as the core reads them
+    before any frame record, or None: a container's header, the header of the ODRG file of
+    its frames and their canvas, and last the canvas against `canvas`, as `size-mismatch`."""
+    container = None
+    if odrgx.is_container(data):
+        try:
+            container = odrgx.read_header(data)
+        except errors.Rejection as rejection:
+            return rejection.reason
+    inner = frames_payload(data)
+    # The header alone, when it is sound, is refused as a file cut after it.
+    try:
+        odrg.decode(inner[:16])
+    except errors.Rejection as rejection:
+        if len(inner) < 16 or rejection.reason != "truncated":
+            return rejection.reason
+    width, height = struct.unpack_from("<HH", inner, 6)
+    if container is not None and (width, height) != (container.width, container.height):
+        return "canvas-mismatch"
+    if (width, height) != tuple(canvas):
+        return "size-mismatch"
+    return None
+
+
+def type_of(data):
+    """What `list` says a runtime file holds."""
+    return "frames"
+
+
 class _Clip:
     """The frames of one `.odrg` file, as the reference decoder gives them.
 
@@ -641,22 +681,19 @@ class ReferencePlayer:
             named = show.files(listed)
             for line in files.pop(self.PENDING)[:1500].split(b"\n")[:-1]:
                 name = line.decode("latin-1")
-                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDING) and name not in named:
+                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDINGS) and name not in named:
                     files.pop(name, None)
 
         for name in show.files(listed):
             if name not in files:
                 raise _Invalid(f"file-missing {name}")
             data = files[name]
-            # The header is judged first, then the size against the mapping, then the body.
-            # The header alone, when it is sound, is refused as a file cut after it.
-            try:
-                odrg.decode(data[:16])
-            except errors.Rejection as rejection:
-                if len(data) < 16 or rejection.reason != "truncated":
-                    raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
-            if struct.unpack_from("<HH", data, 6) != (canvas.width, canvas.height):
+            # The headers are judged first, then the size against the mapping, then the body.
+            fault = header_fault(data, (canvas.width, canvas.height))
+            if fault == "size-mismatch":
                 raise _Invalid(f"size-mismatch {name}")
+            if fault is not None:
+                raise _Invalid(f"file-malformed {name} {fault}")
             # The body is read after the start, while the show plays, by a check that
             # takes one step for the file, one for each frame record and one for its end.
             # A host whose storage cannot be changed has no second reader: there the
@@ -668,7 +705,7 @@ class ReferencePlayer:
                 # The frames before the fault can be played. A fault after the last
                 # frame record is met by the check alone.
                 sound = found_in(data).records
-                clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", data, 12)[0] else reason)
+                clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", frames_payload(data), 12)[0] else reason)
             self.clips[name] = clip
             if self.changeable:
                 self.checks.append([name, steps, reason])
@@ -929,22 +966,23 @@ class ReferencePlayer:
     def _judge(self, data):
         """What the check of an uploaded file finds: the steps it takes, and the reason
         the file is refused for, or None with the frames of the file."""
-        if len(data) < 16:
-            return 1, "truncated", None
+        fault = header_fault(data, self.canvas)
+        if fault is not None:
+            return 1, fault, None
         try:
-            odrg.decode(data[:16])
-        except errors.Rejection as rejection:
-            if rejection.reason != "truncated":
-                return 1, rejection.reason, None
-        if struct.unpack_from("<HH", data, 6) != self.canvas:
-            return 1, "size-mismatch", None
-        try:
-            records = odrg.decode(data).records
+            records = odrg.decode(frames_payload(data)).records
         except errors.Rejection as rejection:
             sound = self.sound_records.get(zlib.crc32(data))
             if sound is None:
                 sound = len(found_in(data).records)
             return sound + 2, rejection.reason, None
+        if odrgx.is_container(data):
+            # After the last record: the payload's length, then the loop.
+            container = odrgx.read_header(data)
+            if len(data) - odrgx.HEADER.size != container.payload_size:
+                return len(records) + 2, "payload-size", None
+            if sum(duration for duration, _ in records) != container.loop_ms:
+                return len(records) + 2, "loop-mismatch", None
         return len(records) + 2, None, _Clip(records)
 
     def _upload(self, arguments):
@@ -954,7 +992,7 @@ class ReferencePlayer:
             number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
             size = self._number(arguments[3], 1, 4294967295) if len(arguments) == 4 else None
             name = arguments[2].decode("latin-1") if len(arguments) == 4 else ""
-            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDING):
+            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
@@ -1051,7 +1089,8 @@ class ReferencePlayer:
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
         if item.cycle is None:
-            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
+            data = self.files[item.file]
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(data), "ignored": bool(item.ignored), "type": type_of(data)}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
 
     def _list(self, first):

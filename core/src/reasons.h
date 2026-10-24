@@ -47,6 +47,14 @@ enum Reason {
     kBadPaletteIndex,
     kTrailingBytes,
 
+    // An ODRGX container.
+    kBadContainer,
+    kUnknownType,
+    kUnknownTypeVersion,
+    kPayloadSize,
+    kCanvasMismatch,
+    kLoopMismatch,
+
     kReasonCount
 };
 

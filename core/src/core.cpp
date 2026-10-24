@@ -35,15 +35,18 @@ void fail_file(Core &core, const FileInfo &info, Reason reason) {
     }
 }
 
-// Opens one file of the show and the decoder on it, which reads the header, and compares
-// the canvas with the mapping's. The palette and the frame records are not read.
-void open_file(Core &core, const FileInfo &info) {
+// Opens one file of the show and reads its header: an ODRG file's, or a container's and
+// that of its payload, and compares the canvas with the mapping's. The palette and the
+// frame records are not read.
+void open_file(Core &core, FileInfo &info) {
     Reason reason = core.file.open(core.host, info.name);
     if (reason == kNone) {
-        reason = core.decoder.open(&core.file, &core.inflate, core.window);
-        if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+        ContentHeader header;
+        reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
+        if (reason == kNone && (header.width != core.width || header.height != core.height)) {
             reason = kSizeMismatch;
         }
+        info.type = header.type;
         core.file.close();
     }
     if (reason != kNone) {
@@ -60,12 +63,14 @@ void check_file(Core &core, FileInfo &info) {
         core_fail(core, reason, info.name, kNone);
         return;
     }
-    reason = core.decoder.open(&core.file, &core.inflate, core.window);
-    if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
+    ContentHeader header;
+    reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
+    if (reason == kNone && (header.width != core.width || header.height != core.height)) {
         core.file.close();
         core_fail(core, kSizeMismatch, info.name, kNone);
         return;
     }
+    info.type = header.type;
     uint64_t total = 0;
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
@@ -76,7 +81,7 @@ void check_file(Core &core, FileInfo &info) {
         }
     }
     if (reason == kNone) {
-        reason = core.decoder.finish();
+        reason = content_finish(&core.file, &core.decoder, header, total);
     }
     // A file that was read to its end was read whole.
     const uint32_t bytes = core.file.taken;
@@ -103,8 +108,8 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
     Reason found;
     if (!core.check_header_read) {
         checker.file.open_at(core.host, name);
-        found = checker.decoder.open(&checker.file, &checker.inflate, core.check_window);
-        if (found == kNone && (checker.decoder.width != core.width || checker.decoder.height != core.height)) {
+        found = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &core.check_content);
+        if (found == kNone && (core.check_content.width != core.width || core.check_content.height != core.height)) {
             found = kSizeMismatch;
         }
         if (found == kNone) {
@@ -123,7 +128,7 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
             return kStepGoingOn;
         }
     } else {
-        found = checker.decoder.finish();
+        found = content_finish(&checker.file, &checker.decoder, core.check_content, core.check_total_ms);
         if (found == kNone) {
             checker.file.close();
             core.check_header_read = 0;
@@ -145,6 +150,7 @@ void check_step(Core &core) {
     if (outcome == kStepWhole) {
         info.bytes = core.checker->file.taken;
         info.total_ms = core.check_total_ms;
+        info.type = core.check_content.type;
         ++core.check_at;
         core.check_done = core.check_at == core.file_count;
     } else if (outcome == kStepFault) {
@@ -195,6 +201,7 @@ void drive_step(Core &core) {
         }
         entry.bytes = core.checker->file.taken;
         entry.total_ms = core.check_total_ms;
+        entry.type = core.check_content.type;
         entry.id = id;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, place);
