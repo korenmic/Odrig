@@ -1,0 +1,10 @@
+{
+  "number": 38,
+  "slug": "38-p1-a-microsd-card-as-the-external-storage",
+  "state": "in_progress",
+  "title": "A microSD card as the external storage",
+  "priority": "P1",
+  "addedAt": "2026-10-24T08:00:00+03:00",
+  "addedCommit": "pending-local",
+  "summary": "A microSD card in a reader on GPIO39 to GPIO42 is the external storage of animations in place of the USB stick: the firmware variant build --microsd, on the newer software, plays the .odrg files of the card's folder odrig after the installed ones with ids from 60001 up, never writes the card, and keeps the board's own USB socket a serial port; Codex built it on 2026-10-21 to 2026-10-23 and the board runs it, with the card's plug-in and pull-out checks and the owner's look at the LEDs open."
+}

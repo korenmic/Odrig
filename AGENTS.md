@@ -36,7 +36,7 @@ stored with them.
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
-| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/firmware-additions.md](docs/firmware-additions.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
+| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/firmware-additions.md](docs/firmware-additions.md), [docs/microsd.md](docs/microsd.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
 | Find out what was decided, and why | [docs/decisions.md](docs/decisions.md), then [docs/drifts.md](docs/drifts.md) |
 
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
@@ -133,6 +133,7 @@ present, and do not build on them.
 - **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
   suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
   tested there.
+- **A microSD card as the external storage**, seed 38: the board runs it; the card checks are open.
 
 The state of every seed is in the `state.json` of its folder.
 
