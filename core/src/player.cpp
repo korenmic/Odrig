@@ -4,6 +4,7 @@
 
 #include "odrig_core.h"
 #include "order.h"
+#include "text.h"
 #include "upload.h"
 
 namespace odrig {
@@ -13,6 +14,7 @@ namespace {
 void close_stream(Core &core) {
     core.file.close();
     core.stream_open = 0;
+    core.stream_drawn = 0;
 }
 
 // The length of the animation at a position of the playlist, 0 while it is not known. A
@@ -32,6 +34,24 @@ uint32_t loops_of(const Core &core, uint32_t animation) {
 
 uint32_t seconds_of(const Core &core, uint32_t animation) {
     return is_drive(animation) ? 0 : core.items[animation].seconds;
+}
+
+// What the animation at a position of the playlist holds, as its header says.
+uint8_t type_of(const Core &core, uint32_t animation) {
+    if (is_drive(animation)) {
+        return core.drive[animation - kDriveBase].type;
+    }
+    return core.files[core.items[animation].first].type;
+}
+
+// The longest a turn may last, rounded up to whole passes for a text: its pass is never
+// cut off by the time a turn is given.
+uint64_t whole_passes(const Core &core, uint32_t animation, uint64_t turn) {
+    const uint64_t loop = length_of(core, animation);
+    if (type_of(core, animation) != kTypeText || loop == 0) {
+        return turn;
+    }
+    return (turn + loop - 1) / loop * loop;
 }
 
 // Whether a position of the playlist holds an animation that plays: an animation item of
@@ -80,6 +100,20 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     }
     if (header.width != core.width || header.height != core.height) {
         return kSizeMismatch;
+    }
+    if (is_drawn(header.type)) {
+        // The payload is held whole in the window, which no frames file uses meanwhile.
+        reason = text_read(&core.file, header, core.window);
+        core.file.close();
+        if (reason != kNone) {
+            return reason;
+        }
+        core.stream_open = 1;
+        core.stream_drawn = 1;
+        core.stream_item = animation;
+        core.stream_turn = turn;
+        core.stream_loop = loop;
+        return kNone;
     }
     memset(core.pixels, 0, core.decoder.n);
     core.stream_open = 1;
@@ -134,6 +168,21 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
 // its turn. While the length of the animation is not known, the time lies in its first
 // loop. Once it is known, the loop and the place in it are found by division.
 Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) {
+    if (type_of(core, animation) == kTypeText) {
+        const uint64_t pass = length_of(core, animation);
+        if (pass == 0) {
+            return kLoopMismatch;
+        }
+        if (!core.stream_open || !core.stream_drawn || core.stream_item != animation || core.stream_turn != turn) {
+            const Reason reason = open_stream(core, animation, turn, 0);
+            if (reason != kNone) {
+                return reason;
+            }
+        }
+        core.decoder.colours = 0;
+        text_draw(core.window, core.width, core.height, in_turn % pass, core.pixels);
+        return kNone;
+    }
     uint64_t length = length_of(core, animation);
     if (length == 0) {
         const Reason reason = first_loop_to(core, animation, turn, in_turn);
@@ -170,7 +219,7 @@ uint64_t turn_ms(const Core &core, uint32_t position) {
     }
     const uint64_t turn = loops * loop;
     const uint64_t longest = 1000ull * seconds_of(core, position);
-    return longest != 0 && turn > longest ? longest : turn;
+    return longest != 0 && turn > longest ? whole_passes(core, position, longest) : turn;
 }
 
 // The animation that plays with the smallest key, among the show's items alone or among
@@ -296,12 +345,11 @@ Shown advance(Core &core, uint64_t now) {
         animation = core.turn_item;
         turn = core.turn_number;
     } else {
+        // A cycle's turns are `seconds` long each, a text's rounded up to whole passes:
+        // whole rounds are taken off by division, then the turns of the round walked.
         const ItemInfo &cycle = core.items[core.playing];
-        const uint64_t turn_length = 1000ull * cycle.seconds;
-        turn = (now - core.zero) / turn_length;
-        in_turn = (now - core.zero) % turn_length;
-        animation = cycle_animation(core, cycle, turn);
-        if (animation == kNothing) {
+        const uint64_t elapsed = now - core.zero;
+        if (cycle_animation(core, cycle, 0) == kNothing) {
             // Every animation of the cycle is unavailable: the playlist plays.
             const uint32_t first = player_first_in_playlist(core);
             if (first == kNothing) {
@@ -311,6 +359,23 @@ Shown advance(Core &core, uint64_t now) {
             player_play_all(core, first);
             return kShowsBefore;
         }
+        uint64_t round = 0;
+        for (uint32_t at = 0; at < cycle.count; ++at) {
+            round += whole_passes(core, cycle_animation(core, cycle, at), 1000ull * cycle.seconds);
+        }
+        uint64_t within = elapsed % round;
+        uint32_t at = 0;
+        for (;;) {
+            animation = cycle_animation(core, cycle, at);
+            const uint64_t length = whole_passes(core, animation, 1000ull * cycle.seconds);
+            if (within < length) {
+                break;
+            }
+            within -= length;
+            ++at;
+        }
+        turn = elapsed / round * cycle.count + at;
+        in_turn = within;
     }
     if (reason == kNone) {
         reason = show_at(core, animation, turn, in_turn);

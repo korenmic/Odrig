@@ -28,14 +28,20 @@ struct ContentHeader {
     uint32_t payload;   // the container's payload in bytes, 0 for an ODRG file
 };
 
+// Whether a type is drawn by the core rather than decoded from frames.
+inline bool is_drawn(uint8_t type) {
+    return type == kTypeText;
+}
+
 // Reads the header of a file that was just opened, from its first byte: an ODRG file's
 // with the decoder, or a container's and then, for frames, the decoder's on its payload,
 // whose canvas must be the container's. The decoder is then where `next` reads the first
-// frame record.
+// frame record; for a drawn type the source is at the payload.
 Reason content_open(FileSource *file, Inflate *inflate, uint8_t *window, OdrgDecoder *decoder, ContentHeader *header);
 
 // After the last frame record of a file of frames: nothing may follow, and a container's
-// payload has the length and its frames the loop its header gives.
+// payload has the length and its frames the loop its header gives. A drawn type's payload
+// was read to its end and checked whole by its own reader: nothing is left to do.
 Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeader &header, uint64_t total_ms);
 
 // The name `list` writes for a type.
