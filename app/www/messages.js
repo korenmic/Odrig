@@ -71,6 +71,7 @@ const REFUSALS = {
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
+  stale: () => "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
   "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,

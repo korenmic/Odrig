@@ -40,6 +40,14 @@ uint32_t upload_data(Core &core, uint64_t now, uint32_t offset, const char *text
 uint32_t upload_end(Core &core, uint32_t crc, Reply &reply);
 uint32_t upload_cancel(Core &core, Reply &reply);
 
+// The largest file `upload expect` compares: the CRC-32 is read from storage while the
+// command waits.
+const uint32_t kExpectLargest = 16384;
+
+// `upload expect`: the open upload goes on only while the file of its item has this CRC-32
+// now; otherwise it is discarded with `stale`.
+uint32_t upload_expect(Core &core, uint32_t crc, Reply &reply);
+
 }  // namespace odrig
 
 #endif

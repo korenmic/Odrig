@@ -142,6 +142,21 @@ struct Reply {
         }
     }
 
+    // Writes bytes as base64 with the alphabet of RFC 4648, section 5, without padding: as
+    // `upload data` takes them.
+    void base64(const uint8_t *data, uint32_t count) {
+        const char *alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        for (uint32_t at = 0; at < count; at += 3) {
+            const uint32_t left = count - at;
+            const uint32_t group = static_cast<uint32_t>(data[at]) << 16 | (left > 1 ? static_cast<uint32_t>(data[at + 1]) << 8 : 0) |
+                                   (left > 2 ? data[at + 2] : 0);
+            const uint32_t characters = left >= 3 ? 4 : left + 1;
+            for (uint32_t one = 0; one < characters; ++one) {
+                bytes[length++] = alphabet[(group >> (18 - 6 * one)) & 0x3Fu];
+            }
+        }
+    }
+
     // Writes a text as the inside of a JSON string, as json_escaped has it.
     void escaped(const char *more) {
         length += json_escaped(more, bytes + length);

@@ -182,6 +182,16 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         }
         return upload_cancel(core, reply);
     }
+    if (words.count >= 2 && words.is(1, "expect")) {
+        uint32_t crc;
+        if (words.count != 3 || !crc_word(words, 2, &crc)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_expect(core, crc, reply);
+    }
     return refuse(reply, "bad-argument");
 }
 
@@ -312,6 +322,17 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return order_move(core, revision, id, before, reply);
         }
         return refuse(reply, "bad-argument");
+    }
+    if (words.is(0, "read")) {
+        uint32_t id;
+        uint32_t offset;
+        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return content_read(core, id, offset, reply);
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;

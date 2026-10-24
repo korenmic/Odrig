@@ -74,7 +74,8 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET\n",
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET\n"
+        "       --command-read-fails FILE OFFSET\n",
         stderr);
     return kUsage;
 }
@@ -160,6 +161,8 @@ struct Options {
     bool drive_pulled = false;      // the drive is not plugged in at the start
     std::string drive_read_fails_file;  // the file of the drive whose reading with `read`
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
+    std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
+    long command_read_fails_offset = 0;     // command fails at this offset
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
 };
 
@@ -568,8 +571,11 @@ private:
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
         host.check_name(name);
-        const bool goes_on = host.read_at_name_ == name && offset == host.read_at_end_;
-        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on)) {
+        // A file is read from its start, each call where the last for that file ended; only
+        // `read`, a command, begins where it is asked to.
+        const auto ended = host.read_at_ends_.find(name);
+        const bool goes_on = ended != host.read_at_ends_.end() && offset == ended->second;
+        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_)) {
             stop("file misuse", kFileMisuse);
         }
         std::string content;
@@ -589,6 +595,13 @@ private:
             }
             count = std::min(count, fails_at - offset);
         }
+        if (host.in_command_ && name == options.command_read_fails_file) {
+            const size_t fails_at = static_cast<size_t>(options.command_read_fails_offset);
+            if (offset >= fails_at) {
+                return -1;
+            }
+            count = std::min(count, fails_at - offset);
+        }
         const long fails = uploaded ? options.read_back_fails : -1;
         if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
             if (offset >= static_cast<size_t>(fails)) {
@@ -601,8 +614,7 @@ private:
             content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
         }
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
-        host.read_at_name_ = name;
-        host.read_at_end_ = offset + static_cast<uint32_t>(count);
+        host.read_at_ends_[name] = offset + static_cast<uint32_t>(count);
         host.call_bytes_ += count;
         return static_cast<int32_t>(count);
     }
@@ -824,9 +836,9 @@ public:
     std::string writing_name_;
     std::FILE *written_ = nullptr;
     long store_calls_ = 0;
-    std::string read_at_name_;
-    uint32_t read_at_end_ = 0;
+    std::map<std::string, uint32_t> read_at_ends_;   // where the last `read_at` of each file ended
     size_t reads_at_ = 0;
+    bool in_command_ = false;       // a command line is being carried out
 
     long alloc_calls_ = 0;
     size_t bytes_given_ = 0;
@@ -1219,7 +1231,9 @@ private:
         size_t length;
         {
             guard::InCore inside;
+            host_.in_command_ = true;
             length = odrig_core_command(core_, now, line.data(), line.size(), reply.data(), reply.size());
+            host_.in_command_ = false;
         }
         print_reply(reply.data(), length);
         trace_call();
@@ -1230,7 +1244,9 @@ private:
     void feed(uint64_t now, const std::string &bytes) {
         std::vector<uint8_t> given(bytes.begin(), bytes.end());
         guard::InCore inside;
+        host_.in_command_ = true;
         odrig_core_feed(core_, now, given.data(), given.size(), on_reply, nullptr);
+        host_.in_command_ = false;
     }
 
     static void on_reply(void *, const char *line, size_t line_length, const char *reply, size_t reply_length) {
@@ -1493,6 +1509,10 @@ int main(int argc, char **argv) {
                        whole_number(arguments[at + 3], &options.read_fails_after)) {
                 options.read_fails_file = arguments[at + 1];
                 at += 4;
+            } else if (arguments[at] == "--command-read-fails" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.command_read_fails_offset)) {
+                options.command_read_fails_file = arguments[at + 1];
+                at += 3;
             } else if (arguments[at] == "--drive" && at + 1 < arguments.size()) {
                 options.drive = arguments[at + 1];
                 at += 2;

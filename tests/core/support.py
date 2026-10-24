@@ -1051,7 +1051,9 @@ class ReferencePlayer:
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
+    READ_MOST = 600
+    EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
     REPLY_MAX = 1024
 
@@ -1087,6 +1089,8 @@ class ReferencePlayer:
             return "bad-argument"
         if name == b"upload":
             return self._upload(arguments)
+        if name == b"read":
+            return self._read(arguments)
         if name == b"play" and arguments == [b"all"]:
             if self.error is not None:
                 return "show-invalid"
@@ -1186,8 +1190,33 @@ class ReferencePlayer:
                 return len(records) + 2, "loop-mismatch", None
         return len(records) + 2, None, _Clip(records)
 
+    def _read(self, arguments):
+        """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
+        with its size. Returns an error code or the reply."""
+        number = self._number(arguments[0], 1, 65535) if len(arguments) == 2 else None
+        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
+        if number is None or offset is None:
+            return "bad-argument"
+        if self.error is not None:
+            return "show-invalid"
+        item = self.items.get(number)
+        if item is None or item.cycle is not None:
+            return "unknown-id"
+        if item.file in self.faults:
+            return "unavailable"
+        if any(check[0] == item.file for check in self.checks):
+            # The size of a file is known once a check has read it whole.
+            return "busy"
+        data = self.files[item.file]
+        if offset > len(data):
+            return "bad-argument"
+        if not self.changeable:
+            return "storage-error"
+        piece = base64.urlsafe_b64encode(data[offset:offset + self.READ_MOST]).rstrip(b"=")
+        return b'{"ok":true,"bytes":%d,"data":"%s"}\n' % (len(data), piece)
+
     def _upload(self, arguments):
-        """The four `upload` commands. Returns an error code, a reply, or None."""
+        """The `upload` commands. Returns an error code, a reply, or None."""
         verb = arguments[0] if arguments else b""
         if verb == b"begin":
             number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
@@ -1256,6 +1285,24 @@ class ReferencePlayer:
                 return b'{"ok":false,"error":"bad-file","reason":"%s"}\n' % upload["reason"].encode("ascii")
             self._install(upload)
             return None
+        if verb == b"expect":
+            if len(arguments) != 2 or not re.fullmatch(rb"[0-9a-f]{8}", arguments[1]):
+                return "bad-argument"
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is None:
+                return "no-upload"
+            item = self.items.get(self.upload["id"])
+            if item is None or item.cycle is not None:
+                self._discard()
+                return "stale"
+            data = self.files[item.file]
+            if len(data) > self.EXPECT_LARGEST:
+                return "bad-argument"
+            if zlib.crc32(data) != int(arguments[1], 16):
+                self._discard()
+                return "stale"
+            return None
         if verb == b"cancel" and len(arguments) == 1:
             if self.error is not None:
                 return "show-invalid"
@@ -1290,6 +1337,7 @@ class ReferencePlayer:
             if self.playing == self.ALL and self.turn == number:
                 # The animation whose turn it is has another file: its turn begins again.
                 self.zero = None
+                self.seed_shown = False
             played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and number in played.cycle:
                 self._play(self.playing)
