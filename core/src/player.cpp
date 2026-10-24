@@ -34,13 +34,27 @@ uint32_t seconds_of(const Core &core, uint32_t animation) {
 }
 
 // Whether a position of the playlist holds an animation that plays: an animation item of
-// the show, or a file of the drive that is in the playlist.
+// the show that is neither ignored nor unavailable, or a file of the drive that is in the
+// playlist.
 bool plays(const Core &core, uint32_t position) {
     if (is_drive(position)) {
         const uint32_t place = position - kDriveBase;
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
-    return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored;
+    return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored &&
+           item_usable(core, position);
+}
+
+// The animation a cycle shows in one of its turns: the entry of the turn, or the first
+// usable entry after it in the cycle's order; kNothing when the cycle lists none.
+uint32_t cycle_animation(const Core &core, const ItemInfo &cycle, uint64_t turn) {
+    for (uint32_t step = 0; step < cycle.count; ++step) {
+        const uint32_t animation = core.entries[cycle.first + (turn + core.cycle_start_entry + step) % cycle.count];
+        if (item_usable(core, animation)) {
+            return animation;
+        }
+    }
+    return kNothing;
 }
 
 // The position after this one in the order of the playlist: the show's items, then the
@@ -283,7 +297,17 @@ Shown advance(Core &core, uint64_t now) {
         const uint64_t turn_length = 1000ull * cycle.seconds;
         turn = (now - core.zero) / turn_length;
         in_turn = (now - core.zero) % turn_length;
-        animation = core.entries[cycle.first + (turn + core.cycle_start_entry) % cycle.count];
+        animation = cycle_animation(core, cycle, turn);
+        if (animation == kNothing) {
+            // Every animation of the cycle is unavailable: the playlist plays.
+            const uint32_t first = player_first_in_playlist(core);
+            if (first == kNothing) {
+                player_halt(core);
+                return kShowsNothing;
+            }
+            player_play_all(core, first);
+            return kShowsBefore;
+        }
     }
     if (reason == kNone) {
         reason = show_at(core, animation, turn, in_turn);
@@ -293,15 +317,12 @@ Shown advance(Core &core, uint64_t now) {
         // reason comes at a later one.
         return kShowsBefore;
     }
-    if (reason != kNone) {
+    if (reason != kNone && is_drive(animation)) {
         // Where the file was: a file that did not open was at its start.
         const bool opened = core.stream_open && core.stream_item == animation;
         char name[kFaultNameSize];
-        if (is_drive(animation)) {
-            drive_given_name(core, animation - kDriveBase, name, sizeof name);
-        }
-        note_fault(core, kWorkPlay, is_drive(animation) ? name : core.files[core.items[animation].first].name,
-                   opened ? core.stream_records : 0, opened ? core.decoder.body_read : 0, reason);
+        drive_given_name(core, animation - kDriveBase, name, sizeof name);
+        note_fault(core, kWorkPlay, name, opened ? core.stream_records : 0, opened ? core.decoder.body_read : 0, reason);
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.
@@ -313,14 +334,14 @@ Shown advance(Core &core, uint64_t now) {
         return kShowsNothing;
     }
     if (reason != kNone) {
-        // The file cannot be played: the show is invalid from this refresh on.
-        const FileInfo &file = core.files[core.items[animation].first];
-        if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
-            core_fail(core, reason, file.name, kNone);
-        } else {
-            core_fail(core, kFileMalformed, file.name, reason);
-        }
-        return kShowsNothing;
+        // The file cannot be played: it is quarantined, this refresh keeps the picture
+        // before, and the next one goes on without it.
+        const bool opened = core.stream_open && core.stream_item == animation;
+        const uint32_t record = opened ? core.stream_records : 0;
+        const uint64_t body_bytes = opened ? core.decoder.body_read : 0;
+        close_stream(core);
+        quarantine_file(core, core.items[animation].first, reason, kWorkPlay, record, body_bytes);
+        return kShowsBefore;
     }
     core.shown = animation;
     return kShowsPicture;
@@ -375,7 +396,7 @@ void player_set_brightness(Core &core, uint8_t value) {
 
 uint32_t player_first_animation(const Core &core) {
     uint32_t position = 0;
-    while (position < core.item_count && (core.items[position].is_cycle || core.items[position].ignored)) {
+    while (position < core.item_count && !plays(core, position)) {
         ++position;
     }
     return position;
@@ -424,14 +445,35 @@ void player_start(Core &core) {
     if (core.invalid) {
         return;
     }
-    if (core.has_start && core.items[core.start_item].is_cycle) {
+    if (core.has_start && core.items[core.start_item].is_cycle && item_usable(core, core.start_item)) {
         player_play_cycle(core, core.start_item);
         return;
     }
-    uint32_t from = core.has_start ? core.start_item : player_first_animation(core);
-    if (from < core.item_count && core.items[from].ignored) from = next_animation(core, from);
+    uint32_t from = core.has_start && !core.items[core.start_item].is_cycle ? core.start_item : player_first_animation(core);
+    if (from < core.item_count && !plays(core, from)) from = next_animation(core, from);
     if (from != core.item_count && from != kNothing) {
         player_play_all(core, from);
+    }
+}
+
+void player_file_failed(Core &core, uint32_t file) {
+    if (core.stream_open && !is_drive(core.stream_item) && core.items[core.stream_item].first == file) {
+        close_stream(core);
+    }
+    if (core.playing == kPlaylist && !is_drive(core.turn_item) && !plays(core, core.turn_item)) {
+        const uint32_t next = next_animation(core, core.turn_item);
+        if (next == kNothing) {
+            player_halt(core);
+        } else {
+            player_play_all(core, next);
+        }
+    } else if (core.playing != kNothing && core.playing != kPlaylist && !item_usable(core, core.playing)) {
+        const uint32_t first = player_first_in_playlist(core);
+        if (first == kNothing) {
+            player_halt(core);
+        } else {
+            player_play_all(core, first);
+        }
     }
 }
 
@@ -446,7 +488,7 @@ void player_play_cycle(Core &core, uint32_t item) {
     close_stream(core);
     core.playing = item;
     core.zero_pending = 1;
-    core.shown = core.entries[core.items[item].first];
+    core.shown = cycle_animation(core, core.items[item], 0);
 }
 
 void player_play_all(Core &core, uint32_t from) {
@@ -465,6 +507,8 @@ void player_releases_file(Core &core, uint32_t item) {
 
 void player_file_replaced(Core &core, uint32_t item) {
     if (core.playing == kNothing) {
+        // Nothing played, as no animation was usable: the playlist starts.
+        player_item_added(core);
         return;
     }
     if (core.playing == kPlaylist) {

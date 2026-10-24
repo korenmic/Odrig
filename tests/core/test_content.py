@@ -22,7 +22,7 @@ def replies(lines):
 def invalid_show():
     files = support.example_show()
     del files["dvd.odrg"]
-    return files
+    return support.with_show_fault(files)
 
 
 class Content(unittest.TestCase):
@@ -107,13 +107,13 @@ class Space(Content):
         del no_show["show.json"]
         self.assertEqual(self.space(no_show)["animations"], 0)
 
-    def test_with_a_show_that_became_invalid_while_it_played_the_animations_are_0(self):
+    def test_an_animation_that_turned_unavailable_while_it_played_is_still_counted(self):
         files = playing(support.example_show(), 2)
         script = [support.line(T0, "space"), f"poll {T0}", f"poll {T0 + 20}", support.line(T0 + 30, "space"), support.line(T0 + 30, "status")]
         lines = support.start(files, script, ["--remove-after", "dvd.odrg", "1"]).lines
         first, second, status = (json.loads(reply) for reply in replies(lines))
-        self.assertEqual((first["animations"], second["animations"]), (2, 0))
-        self.assertEqual(status["error"], "file-missing dvd.odrg")
+        self.assertEqual((first["animations"], second["animations"]), (2, 2))
+        self.assertEqual((status["error"], status["animation"]), (None, 1))
         self.assertEqual((second["free"], second["total"]), (first["free"], first["total"]))
 
     def test_space_with_any_argument_is_a_bad_argument(self):

@@ -148,9 +148,12 @@ The core is the library that plays an installed show, on the board and in the em
 [core.md](core.md). It writes no error line. When it refuses a show it holds the reason as a
 text that begins with a reason name, and the `status` command reports that text.
 
-It names an invalid show as "Shows" does, from `mapping-missing` to `size-mismatch`, and a
-rejected `.odrg` file as "ODRG files" does. It adds two reasons that only a running player
-can meet:
+It names an invalid show as "Shows" does, from `mapping-missing` to `nested-cycle`, and a
+rejected `.odrg` file as "ODRG files" does. A fault of one `.odrg` file, `file-missing`,
+`size-mismatch`, `read-error` or a reason of "ODRG files", does not make the show invalid:
+the file is quarantined, the log says `file <name> unavailable: <reason>`, and `list` gives
+the reason's name as the animation's `fault`. It adds two reasons that only a running
+player can meet:
 
 | Reason | Condition |
 |---|---|
@@ -168,16 +171,17 @@ The text is the reason name, followed for most reasons by what it is about:
 | `duplicate-id <id>` | Two items have that id. |
 | `undefined-id <id>` | A cycle, or `start`, names that id and no item has it. |
 | `nested-cycle <id>` | The cycle item with that id names an item that is a cycle. |
-| `file-missing <name>` | The named `.odrg` file does not exist. |
-| `file-malformed <name> <reason>` | The named file is rejected with that reason of "ODRG files". |
-| `size-mismatch <name>` | The named file's canvas size differs from the mapping's. |
-| `read-error <name>` | The host reports a failure while the named file is read. |
+| `read-error <name>` | The host reports a failure while `mapping.json` or `show.json` is read. |
 | `out-of-memory` | The host cannot supply the memory the core asks for. |
 
-The checks of the first ten rows are made in the order of the table and the first one that
-fails decides; the files are taken in the order in which `show.json` first names them, and
-each by its header, then its size, then its body. The last two rows are reported at the
-point where they happen.
+The checks of the first seven rows are made in the order of the table and the first one
+that fails decides. The last two rows are reported at the point where they happen.
+
+The files of the show are taken in the order in which `show.json` first names them, and
+each by its header, then its size, then its body. A file that does not exist is
+`file-missing`, one whose canvas differs from the mapping's `size-mismatch`, one the host
+cannot read `read-error`, and one rejected as an ODRG file has that reason of "ODRG
+files". Each quarantines the file and is not a text of an invalid show.
 
 Inside the core, work that is not finished yet gives the internal result `pending`: the
 decoder settling a defect in slices, or the player catching up over several refreshes;
@@ -191,6 +195,5 @@ need not be an id at all, such as `0`, `-5` or `70000`; a number beyond 32 bits 
 decoder of the converter gives for the same file. The whole text is made of lower-case
 letters, digits, `.`, `-`, `_` and spaces, so it stands in a JSON string as it is.
 
-A show can also become invalid while it plays, when a file is gone, cannot be read, or no
-longer follows the format. The text is then `file-missing <name>`, `read-error <name>`,
-`size-mismatch <name>` or `file-malformed <name> <reason>`.
+A file that is gone, cannot be read, or no longer follows the format while the show plays
+does not make the show invalid: the file is quarantined, as above.

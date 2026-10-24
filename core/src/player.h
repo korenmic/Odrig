@@ -39,7 +39,8 @@ void player_play_cycle(Core &core, uint32_t item);
 // time when it has one.
 void player_play_all(Core &core, uint32_t from);
 
-// The position of the first animation item, or the number of items when there is none.
+// The position of the first animation item of the playlist, one that is neither ignored
+// nor unavailable, or the number of items when there is none.
 uint32_t player_first_animation(const Core &core);
 
 // The position of the first animation of the playlist: the first animation item, else the
@@ -58,6 +59,12 @@ void player_drive_changed(Core &core);
 // The file of the animation item at this position is about to be replaced under its
 // name: the player closes it when it has it open. It opens again at the next refresh.
 void player_releases_file(Core &core, uint32_t item);
+
+// The file at this place of the file table was quarantined. When the playlist's turn is an
+// animation of it, the playlist goes on with the next usable animation, from its first
+// frame at the next refresh, or nothing plays. A cycle that plays goes on while it lists a
+// usable animation, and gives way to the playlist when it lists none.
+void player_file_failed(Core &core, uint32_t file);
 
 // The animation item at this position has another animation now. When it is the
 // animation whose turn it is in the playlist, its turn begins again at the next refresh.

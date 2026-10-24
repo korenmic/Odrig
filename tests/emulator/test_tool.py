@@ -550,6 +550,7 @@ class SpaceListAndRemove(Content):
 
     def test_list_stops_at_a_reply_that_is_not_ok_and_exits_with_1(self):
         (self.folder / "dvd.odrg").unlink()
+        support.with_show_fault(self.folder)
         emulator = self.started()
         for target in targets(emulator).values():
             result = support.run_tool(*target, "list")

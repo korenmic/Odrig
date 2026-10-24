@@ -357,7 +357,7 @@ class Arguments(Uploads):
 
 class EveryCode(Uploads):
     def test_with_an_invalid_show_every_upload_command_is_refused(self):
-        invalid = {"mapping.json": support.mapping_texts()["legs-2"], "show.json": support.show_text([animation(1, "gone.odrg")])}
+        invalid = support.with_show_fault({"mapping.json": support.mapping_texts()["legs-2"], "show.json": support.show_text([animation(1, "gone.odrg")])})
         lines = ["upload begin 9 new.odrg 10", "upload data 0 QUJD", "upload end 12345678", "upload cancel", "upload begin 9 new.odrg 0", "upload sideways"]
         printed = self.run_both(invalid, [support.line(T0, line) for line in lines])
         self.assertEqual(replies(printed), [refused("show-invalid")] * 4 + [refused("bad-argument")] * 2)
@@ -698,14 +698,14 @@ class Quiet(Uploads):
         self.assertEqual(self.answers("upload end"), [OK])
         self.assertGreater(script.time - T0, 400000)
 
-    def test_a_show_that_becomes_invalid_discards_the_upload(self):
+    def test_an_animation_that_turns_unavailable_leaves_the_upload_open(self):
         files = small_show([animation(1, "one.odrg")], start=1)
         clip = support.clip(64, 60, 6)
         script = Script().polls(2).line(f"upload begin 9 new.odrg {len(clip)}", f"upload data 0 {b64(clip[:5])}").polls(60).line("status", "upload cancel", f"upload data 5 {b64(clip[5:])}")
         run, left = support.start_and_keep(files, script.lines, ["--remove-after", "one.odrg", "2", "--trace-store"])
         given = replies(run.lines)
-        self.assertEqual(json.loads(given[2])["error"], "file-missing one.odrg")
-        self.assertEqual(given[3:], [refused("show-invalid")] * 2)
+        self.assertEqual((json.loads(given[2])["error"], json.loads(given[2])["playing"]), (None, None))
+        self.assertEqual(given[3:], [OK, refused("no-upload")])
         self.assertNotIn("upload.part", left)
         self.assertIn("store remove upload.part 1", run.lines)
 

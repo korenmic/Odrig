@@ -572,13 +572,14 @@ SHOW_TEXTS = {
 
 
 def judged_by_the_converter(data):
-    """What the core reports for a show file when no `.odrg` file is installed."""
+    """What the core reports for a show file when no `.odrg` file is installed: the reason
+    of a show the converter refuses, or None for a valid one, whose missing files are
+    quarantined."""
     try:
-        listed = show.loads(data)
+        show.loads(data)
     except errors.Rejection as rejection:
         return support.show_refusal(rejection)
-    names = show.files(listed)
-    return f"file-missing {names[0]}" if names else None
+    return None
 
 
 class ShowTexts(unittest.TestCase):
@@ -595,7 +596,7 @@ class ShowTexts(unittest.TestCase):
                 expected = judged_by_the_converter(as_bytes(text))
                 kinds.add((expected or "valid").split()[0])
                 self.assertEqual(reported, expected)
-        self.assertEqual(kinds, {"show-malformed", "duplicate-id", "undefined-id", "nested-cycle", "file-missing", "valid"})
+        self.assertEqual(kinds, {"show-malformed", "duplicate-id", "undefined-id", "nested-cycle", "valid"})
 
     def test_a_show_without_items_is_valid(self):
         self.assertIsNone(judged_by_the_converter(as_bytes(SHOW_TEXTS["items is empty"])))
@@ -610,7 +611,7 @@ class ShowTexts(unittest.TestCase):
                      "repeat 1", "repeat 65535", "max_seconds 1", "max_seconds 65535", "repeat and max_seconds", "repeat before the file", "min_seconds 1",
                      "min_seconds 65535", "min_seconds as the last member"):
             with self.subTest(text=name):
-                self.assertTrue(judged_by_the_converter(as_bytes(SHOW_TEXTS[name])).startswith("file-missing "))
+                self.assertIsNone(judged_by_the_converter(as_bytes(SHOW_TEXTS[name])))
 
     def test_the_ids_it_must_name_are_named(self):
         for name, expected in (
@@ -654,7 +655,7 @@ class ShowTexts(unittest.TestCase):
             kind = (expected or "valid").split()[0]
             kinds[kind] = kinds.get(kind, 0) + 1
         self.assertGreater(kinds["show-malformed"], 50)
-        self.assertGreater(kinds["file-missing"], 5)
+        self.assertGreater(kinds["valid"], 5)
         self.assertGreater(len(kinds), 3)
 
 

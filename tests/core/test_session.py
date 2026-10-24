@@ -110,8 +110,7 @@ class ScriptedSession(Playback):
         self.assertEqual(shown[37020], shown[7020])
 
     def test_on_an_invalid_show_every_reply_and_every_refresh_is_the_reference_players(self):
-        files = support.example_show()
-        del files["dvd.odrg"]
+        files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, scripted_session())
         produced, _ = refreshes([line for line in printed if line.startswith(("refresh", "data", "idle"))])
         self.assertEqual({tuple(sorted(legs.items())) for _, legs in produced}, {((1, bytes(540)), (2, bytes(540)))})
@@ -119,7 +118,7 @@ class ScriptedSession(Playback):
         codes = {json.loads(answer).get("error") for answer in answers if '"ok":false' in answer}
         self.assertEqual(codes, {"line-too-long", "unknown-command", "bad-argument", "show-invalid"})
         states = [json.loads(answer) for answer in answers if '"on"' in answer]
-        self.assertEqual({state["error"] for state in states}, {"file-missing dvd.odrg"})
+        self.assertEqual({state["error"] for state in states}, {"undefined-id 99"})
         self.assertEqual({state["playing"] for state in states}, {None})
 
     def test_the_same_session_twice_gives_the_same_lines(self):

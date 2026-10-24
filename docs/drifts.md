@@ -9172,3 +9172,21 @@ no step while an upload is open and afterwards begins its file again. A file an 
 installed was read whole by the upload's check and is not checked again.
 
 **Resolution.** The spec's requirement 5; `docs/commands.md`.
+
+## Seed 32: the tests and checks that made a show invalid with a missing file
+
+**Question.** Many tests, and step 22 of the emulator's check list by eye, made an invalid
+show by leaving out an animation file. With the quarantine such a show is valid. What do
+they use now, and what does the status of a quarantine say?
+
+**Answer.** A test that needs an invalid show adds to the show file a cycle that names an
+id no item has (`with_show_fault` of the core's and the emulator's test support), and
+expects `undefined-id 99`; a test of a missing, cut or unreadable file expects the
+quarantine. Step 22 removes `show.json` and expects `show-missing`. `status` keeps
+`"error":null` for a quarantine; a cycle that is played names its first usable animation
+as the one on the LEDs from its start; an upload that replaces an animation while nothing
+plays, because none was usable, starts the playlist. The room for an invalid show's text
+stays 96 bytes, though its longest text is 24 characters now.
+
+**Resolution.** `tests/core/support.py`, `tests/emulator/support.py`, `docs/emulator.md`,
+`core/src/player.cpp`.

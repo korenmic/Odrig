@@ -32,12 +32,11 @@ class StatusReply(Playback):
         self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6}'])
 
     def test_its_exact_bytes_when_nothing_plays_and_the_show_is_invalid(self):
-        files = support.example_show()
-        del files["hello.odrg"]
+        files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, [at(0, "off"), status_at(0)])
         self.assertEqual(
             printed[1],
-            'reply {"ok":true,"on":false,"brightness":128,"playing":null,"animation":null,"fps":0,"error":"file-missing hello.odrg","width":60,"height":6}',
+            'reply {"ok":true,"on":false,"brightness":0,"playing":null,"animation":null,"fps":0,"error":"undefined-id 99","width":60,"height":6}',
         )
 
     def test_it_is_the_reply_of_the_document(self):
@@ -70,11 +69,10 @@ class TheCanvas(Playback):
         self.assertEqual(self.canvas(files), (None, None))
 
     def test_it_is_reported_while_the_show_is_invalid_for_another_reason(self):
-        files = support.example_show()
-        del files["hello.odrg"]
+        files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, [status_at(0)])
         reply = state(printed[0])
-        self.assertEqual((reply["error"], reply["width"], reply["height"]), ("file-missing hello.odrg", 60, 6))
+        self.assertEqual((reply["error"], reply["width"], reply["height"]), ("undefined-id 99", 60, 6))
 
 
 class RefreshRate(Playback):
@@ -219,10 +217,6 @@ class StateAfterStartup(Playback):
             (with_show(support.show_text(items + [items[0]], 99, 3)), (), "duplicate-id 1", 0, 60),
             (with_show(support.show_text(items, 99, 8)), (), "undefined-id 8", 0, 60),
             (with_show(support.show_text(items + [{"id": 4, "cycle": [3], "seconds": 1}], 99, 3)), (), "nested-cycle 4", 0, 60),
-            (with_show(support.show_text(items, 99, 3)) | {"hello.odrg": b""}, (), "file-malformed hello.odrg truncated", 99, 60),
-            (without("dvd.odrg") | {"show.json": support.show_text(items, 99, 3)}, (), "file-missing dvd.odrg", 99, 60),
-            (with_show(support.show_text(items, 99, 3)) | {"dvd.odrg": support.clip(1, 2, 2)}, (), "size-mismatch dvd.odrg", 99, 60),
-            (with_show(support.show_text(items, 99, 3)), ("--read-fails", "dvd.odrg", "20"), "read-error dvd.odrg", 99, 60),
             (with_show(support.show_text(items, 99, 3)), ("--read-fails", "show.json", "20"), "read-error show.json", 0, 60),
             (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "8"), "out-of-memory", 0, 60),
             (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "12"), "out-of-memory", 0, 60),
@@ -233,6 +227,32 @@ class StateAfterStartup(Playback):
                 self.assertEqual(
                     self.started(files, options),
                     {"ok": True, "on": True, "brightness": brightness, "playing": None, "animation": None, "fps": 0, "error": error, "width": width, "height": height},
+                )
+
+    def test_a_bad_file_leaves_the_show_valid_and_playing(self):
+        items = json.loads(support.example_show()["show.json"])["items"]
+
+        def with_show(**changed):
+            files = support.example_show()
+            files["show.json"] = support.show_text(items, 99, 3)
+            for name, content in changed.items():
+                files[name.replace("_", ".")] = content
+            return files
+
+        missing = with_show()
+        del missing["dvd.odrg"]
+        # The cycle that starts plays its first usable animation.
+        cases = (
+            (with_show(hello_odrg=b""), (), 2),
+            (missing, (), 1),
+            (with_show(dvd_odrg=support.clip(1, 2, 2)), (), 1),
+            (with_show(), ("--read-fails", "dvd.odrg", "20"), 1),
+        )
+        for files, options, animation in cases:
+            with self.subTest(animation=animation, options=options):
+                self.assertEqual(
+                    self.started(files, options),
+                    {"ok": True, "on": True, "brightness": 99, "playing": 3, "animation": animation, "fps": 0, "error": None, "width": 60, "height": 6},
                 )
 
     def test_nothing_is_kept_from_one_startup_to_the_next(self):

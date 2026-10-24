@@ -198,8 +198,7 @@ class Busy(Playback):
         self.assertEqual(self.asked(later), [refused("busy")] * len(later))
 
     def test_an_invalid_show_is_show_invalid(self):
-        files = self.files()
-        del files["b.odrg"]
+        files = support.with_show_fault(self.files())
         commands = ["list", "remove 2", f"upload begin 9 new.odrg {len(self.NEW)}"]
         self.assertEqual(self.asked(commands, files), [refused("show-invalid")] * 3)
 
@@ -369,4 +368,5 @@ class AHostThatCannotChangeItsStorage(unittest.TestCase):
             self.assertIsNone(support.start(files, check_first=False).error, "with storage that can be changed, the start takes it")
             for option in self.OPTIONS:
                 with self.subTest(option=option, reason=reason):
-                    self.assertEqual(support.start(files, options=[option], check_first=False).error, f"file-malformed faulty.odrg {reason}")
+                    run = support.start(files, options=[option], check_first=False)
+                    self.assertEqual((run.error, run.logs), (None, (f"file faulty.odrg unavailable: {reason}",)))

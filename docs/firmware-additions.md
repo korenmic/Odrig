@@ -36,7 +36,7 @@ takes every line marked *No*.
 | 2 | Plays a playlist of every installed animation when the show names nothing else, each for a turn of at least 30 seconds; `play all`. | 16 | `core/` | The core | In its spec |
 | 3 | Plays at once at power-on: the start checks the headers only, and the bodies are checked while the show plays. | 14 | `core/` | The core | In its spec |
 | 4 | Answers the commands of [commands.md](commands.md), with the same replies on every route: `space`, `list`, `remove` and `upload` among them. | 02, 07 | `core/` | The core | In its spec |
-| 5 | A broken file never stops the show, and a power cut never leaves a half-changed show. | 02, 07, 14, 20 | `core/` | The core | In its spec |
+| 5 | A broken file never stops the show: it is unavailable for the boot and the other animations play; and a power cut never leaves a half-changed show. | 02, 07, 14, 20, 32 | `core/` | The core | In its spec |
 | 6 | Starts the core on the files of `/odrig`, gives it a file in pieces of at most 512 bytes, its memory from the internal memory first, and a 64-bit clock of milliseconds. | 04 | `odrig_usermod.cpp` | Written again | In its spec |
 | 7 | Storage: the seven storage functions of [core.md](core.md) on the file system, every name checked, a file written only in `/odrig`, the free space counted rather than asked of the file system. | 04, 07 | `odrig_files.cpp` | Shared file | Built |
 | 8 | Paces storage: after storage calls, no command line for the longer of 20 ms and twice the time they took. | 07 | `odrig_files.cpp`, `odrig_serial.cpp` | Shared file | Built |

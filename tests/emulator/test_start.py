@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import signal
@@ -173,12 +174,15 @@ class Start(unittest.TestCase):
         self.assertEqual(emulator.status()["brightness"], 5)
         self.assertEqual(emulator.stop().status, 0)
 
-    def test_a_show_with_a_missing_animation_reports_file_missing_with_its_name(self):
+    def test_a_show_with_a_missing_animation_plays_the_others_and_names_it_in_its_list(self):
         files = core_support.example_show()
         del files["hello.odrg"]
         emulator = self.started(support.installed(self.work / "show", files))
-        self.assertEqual(emulator.status()["error"], "file-missing hello.odrg")
-        self.assertEqual(emulator.command("play 2"), b'{"ok":false,"error":"show-invalid"}\n')
+        self.assertIsNone(emulator.status()["error"])
+        self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"unavailable"}\n')
+        self.assertEqual(emulator.command("play 2"), b'{"ok":true}\n')
+        items = json.loads(emulator.command("list"))["items"]
+        self.assertEqual(items[0], {"id": 1, "file": "hello.odrg", "bytes": None, "ignored": False, "fault": "file-missing"})
 
     def test_verbose_prints_the_diagnostic_lines_of_the_core_to_standard_error(self):
         quiet = support.Emulator(self.work)

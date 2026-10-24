@@ -93,7 +93,7 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn(found["silence"][3].replace("75", "12"), said)
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
-        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "busy", "in-use", "storage-error",
+        self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use", "storage-error",
                                 "in-use", "no-space", "no-upload", "bad-checksum", "bad-file",
                                 "mapping-conflict", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)

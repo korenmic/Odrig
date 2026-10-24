@@ -11,8 +11,8 @@
 
 namespace odrig {
 
-// The longest reason text: `file-malformed`, a file name of 32 characters and the longest
-// reason of an ODRG file, with the spaces between them, is 65 characters.
+// Room for the reason text of an invalid show: the longest, `duplicate-id` and an id of 11
+// characters, is 24 characters.
 const uint32_t kErrorTextSize = 96;
 
 // One leg of the mapping: its LEDs are `count` entries of the LED tables, from `first` on.
@@ -41,8 +41,12 @@ struct ItemInfo {
 // One `.odrg` file the show names. `bytes` is its size, known once a check has read its
 // body to its end. `total_ms` is its length, the sum of the durations of its frames, and 0
 // while it is not known: a check finds it, and so does playing the file through once.
+// `fault` is the Reason of a fault of the file in this boot, kNone while it is usable: a
+// file with a fault is quarantined, and its animations are unavailable until an upload
+// replaces it.
 struct FileInfo {
     char name[33];
+    uint8_t fault;
     uint32_t bytes;
     uint64_t total_ms;
 };
@@ -285,6 +289,18 @@ struct Core {
 
 // Keeps the context of a file's fault, in place of the one before.
 void note_fault(Core &core, uint8_t work, const char *name, uint32_t record, uint64_t body_bytes, Reason reason);
+
+// Whether a reason belongs to one `.odrg` file of the show, and not to the show itself.
+bool is_file_fault(Reason reason);
+
+// Quarantines the file at this place of the file table for the rest of the boot: its
+// animations are unavailable, the log says why, the fault's context is kept, and the
+// player goes on without them. A file that is quarantined already stays as it is.
+void quarantine_file(Core &core, uint32_t file, Reason reason, uint8_t work, uint32_t record, uint64_t body_bytes);
+
+// Whether the item at a position can be played: an animation whose file is not
+// quarantined, or a cycle that lists one.
+bool item_usable(const Core &core, uint32_t item);
 
 // Makes the show invalid with a reason text: `<reason>`, `<reason> <about>` or
 // `<reason> <about> <detail>`, and passes the text to the host's log. The first failure

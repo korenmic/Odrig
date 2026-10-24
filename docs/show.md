@@ -183,23 +183,33 @@ layout the first time the show is changed.
 ## When a show is invalid
 
 A show is invalid when `mapping.json` or `show.json` is missing or breaks its format, when an
-id is used twice, when a cycle or `start` names an id that does not exist, when a cycle names
-a cycle, or when a listed `.odrg` file is missing, breaks its format, or has a canvas size
-different from the mapping's.
+id is used twice, when a cycle or `start` names an id that does not exist, or when a cycle
+names a cycle.
 
 With an invalid show the LEDs stay dark, and the status command reports what is wrong.
 
-When it starts, the player reads the mapping, `show.json` and the header of every listed
-file, and then plays at once. What a file holds after its header it reads while the show
-plays. A fault it finds there makes the show invalid at that moment: the LEDs go dark,
-and the status command reports it from then on. A player whose storage cannot be changed
-reads every file to its end when it starts.
-
 Each of these has a fixed name, listed under "Shows" in [reasons.md](reasons.md). When a show
 is invalid in more than one way, the first in this order is reported: the mapping file, the
-format of `show.json`, an id used twice, an id that does not exist, a cycle that names a
-cycle, and then the listed files in the order `show.json` names them. The ids are checked
-over the items in file order.
+format of `show.json`, an id used twice, an id that does not exist, and a cycle that names a
+cycle. The ids are checked over the items in file order.
+
+## An animation that cannot be played
+
+When it starts, the player reads the mapping, `show.json` and the header of every listed
+file, and then plays at once. What a file holds after its header it reads while the show
+plays. A listed `.odrg` file that is missing, cannot be read, breaks its format or has a
+canvas size different from the mapping's is unavailable from the moment the player finds
+it until the next start: the show stays valid and plays its other animations.
+
+- The playlist, `start` and every cycle pass over it; a cycle that lists only
+  unavailable animations gives way to the playlist. When every animation is unavailable,
+  nothing plays and the LEDs are dark, and every command is answered.
+- `play` of it is refused with `unavailable`, and `list` shows it with the reason.
+- The file is not read again until the next start, and it is not changed or removed. An
+  upload to its id that passes its check makes it available at once; `remove` takes it
+  out of the show as any animation.
+- A player whose storage cannot be changed reads every file to its end when it starts,
+  and the same holds for what it finds there.
 
 ## Playlist inclusion
 

@@ -28,7 +28,7 @@ Rules for every task:
   - Prove it fails first: the show turns invalid and `list` is refused.
   - Requirements: 8.1
 
-- [ ] 2. Quarantine of installed files
+- [x] 2. Quarantine of installed files
   - `core/src/core_state.h`, `core.cpp`, `player.cpp`, `commands.cpp`, `content.cpp`:
     `FileInfo.fault` and `checked`, `quarantine_file`, `usable`, the player's routes,
     `player_file_failed`, `play` refused with `unavailable`, `list` with `fault` and

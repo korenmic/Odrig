@@ -67,10 +67,10 @@ class TheState(Show):
 
     def test_an_invalid_show_has_its_reason_in_the_place_of_what_plays(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
         found = support.run("state", address=address, settings={"rows": 0, "until": "The installed show is invalid"})
-        self.assertEqual(found.seen["playing"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen["playing"], "The installed show is invalid: undefined-id 99.")
         self.assertEqual((found.seen["now"], found.seen["rows"], found.seen["none"]), (None, [], None))
         self.assertEqual(found.seen["power"], "ON")
 

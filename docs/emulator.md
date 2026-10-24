@@ -328,7 +328,7 @@ From top to bottom the page has:
   reports: its refreshes in the last full second. `page` is the page's own count: the
   refreshes it drew in the last full second.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
-  reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
+  reason text exactly as the core gives it, for example `show-missing`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
   LEDs to draw, and the page says so.
 - **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
@@ -1186,9 +1186,9 @@ in a narrower window the mapping view of every other step has the arrangement of
     the emulator, start `python -m emulator build/dense/show`, and watch for ten seconds
     in the mapping view. *Seen:* `page` shows 49 or more in every second, each time.
 22. **An invalid show says why (10.1).** Stop the emulator. Copy `build/example-show` to
-    `build/example-broken`, remove `dvd.odrg` from the copy and start
+    `build/example-broken`, remove `show.json` from the copy and start
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
-    `file-missing dvd.odrg`, in the LEDs view and in the mapping view, and every LED is
+    `show-missing`, in the LEDs view and in the mapping view, and every LED is
     dark.
 
 ### What has been checked

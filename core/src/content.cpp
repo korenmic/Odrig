@@ -36,13 +36,21 @@ const char kListSeconds[] = "],\"seconds\":";
 const char kListNext[] = "],\"next\":";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
 
+// The member that ends an animation of `list` whose file is quarantined, before its reason
+// and the closing quotation mark.
+const char kListFault[] = ",\"fault\":\"";
+
 // The bytes an item takes in a reply of `list`. A cycle is counted with its entries, or
-// with none.
+// with none. An animation whose file is quarantined has `null` for its bytes, which are not
+// known, and its fault.
 uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) {
     uint32_t size = text_length(kListId) + digits(item.id);
     if (!item.is_cycle) {
         const FileInfo &file = core.files[item.first];
-        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + (item.ignored ? 15 : 16) + 1;
+        const Reason fault = static_cast<Reason>(file.fault);
+        const uint32_t bytes = fault != kNone ? 4 : digits(file.bytes);
+        const uint32_t fault_size = fault != kNone ? text_length(kListFault) + text_length(reason_name(fault)) + 1 : 0;
+        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) + fault_size + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -214,8 +222,17 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListFile);
             reply.text(file.name);
             reply.text(kListBytes);
-            reply.number(file.bytes);
+            if (file.fault != kNone) {
+                reply.text("null");
+            } else {
+                reply.number(file.bytes);
+            }
             reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
+            if (file.fault != kNone) {
+                reply.text(kListFault);
+                reply.text(reason_name(static_cast<Reason>(file.fault)));
+                reply.text("\"");
+            }
         } else {
             reply.text(kListCycle);
             for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -393,12 +410,14 @@ bool content_write_show(Core &core, const ShowChange &change) {
 
 namespace {
 
+// The file of an upload whose check has passed: a new content, which is usable.
 void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms) {
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
         file.name[length] = name[length];
     }
     file.name[length] = '\0';
+    file.fault = kNone;
     file.bytes = bytes;
     file.total_ms = total_ms;
 }

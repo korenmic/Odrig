@@ -14,7 +14,7 @@ from . import support
 # a reply over the line port comes within it here too.
 LONGEST_MS = 50
 
-TEXT = f"file-malformed huge.odrg {huge_tail.REASON}"
+TEXT = huge_tail.REASON
 
 
 class ResponsiveWithTheReproducer(unittest.TestCase):
@@ -39,7 +39,7 @@ class ResponsiveWithTheReproducer(unittest.TestCase):
     def test_status_over_the_line_port_comes_within_50_ms_through_the_start_the_playback_and_the_check(self):
         with support.Emulator(self.show(), checked=False) as emulator, support.lines(emulator) as port:
             waits = []
-            error = None
+            fault = None
             # From the start, while the player settles the reproducer and the check after
             # the start settles it too, until the check comes to its reason, and a second
             # after it.
@@ -49,13 +49,17 @@ class ResponsiveWithTheReproducer(unittest.TestCase):
                 started = time.monotonic()
                 reply = port.ask("status")
                 waits.append((time.monotonic() - started) * 1000)
-                state = json.loads(reply)
-                if state["error"] is not None and ended is None:
-                    error = state["error"]
+                self.assertIsNone(json.loads(reply)["error"])
+                started = time.monotonic()
+                listed = json.loads(port.ask("list"))
+                waits.append((time.monotonic() - started) * 1000)
+                found = [item.get("fault") for item in listed.get("items", []) if item.get("file") == "huge.odrg"]
+                if found and found[0] is not None and ended is None:
+                    fault = found[0]
                     ended = time.monotonic()
                 time.sleep(0.02)
             self.assertLessEqual(max(waits), LONGEST_MS, f"the longest wait for status: {max(waits):.1f} ms of {len(waits)}")
-            self.assertEqual(error, TEXT)
+            self.assertEqual(fault, TEXT)
             self.assertGreater(len(waits), 50)
 
 

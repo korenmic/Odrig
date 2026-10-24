@@ -22,7 +22,7 @@ CATCH_UP = 131072
 # A reproducer on a canvas of 4 x 4 whose tail settles in 32 slices, and one of 256.
 SMALL_TAIL = 1024 * 1024
 LONGER_TAIL = 8 * 1024 * 1024
-TEXT = f"file-malformed faulty.odrg {huge_tail.REASON}"
+TEXT = f"file faulty.odrg unavailable: {huge_tail.REASON}"
 
 
 def show_of_the_reproducer():
@@ -121,7 +121,7 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         run = support.start(files, script, options=["--trace-calls"], check_first=False)
         self.assertLessEqual(max(calls(run.lines)), MOST_BYTES_IN_A_CALL)
         self.assertEqual([text for text in logged(run)], [TEXT])
-        self.assertEqual(replies(run)[-1]["error"], TEXT)
+        self.assertEqual((replies(run)[-1]["error"], replies(run)[-1]["animation"]), (None, 1))
         # A status between the steps of the check is answered while it settles.
         early = support.start(files, every_20_ms(8) + [support.line(T0 + 160, "status")], check_first=False)
         self.assertIsNone(replies(early)[-1]["error"])
@@ -135,14 +135,16 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         run = support.start(files, script, options=["--trace-calls"], check_first=False)
         self.assertLessEqual(max(calls(run.lines)), MOST_BYTES_IN_A_CALL)
         self.assertEqual(logged(run), [TEXT])
-        self.assertEqual(replies(run)[-1]["error"], TEXT)
+        # The cycle lists no usable animation any more: the playlist plays the sound one.
+        self.assertEqual([replies(run)[-1][member] for member in ("error", "playing", "animation")], [None, "all", 1])
         self.assert_no_pending(run)
 
     def test_the_start_of_a_host_that_cannot_change_its_storage_reads_on_to_the_reason(self):
         files = show_with(small(), sound=2)
         run = support.start(files, every_20_ms(3) + [support.line(T0 + 60, "status")], options=["--no-storage"], check_first=False)
-        self.assertEqual(run.error, TEXT)
-        self.assertEqual(replies(run)[-1]["error"], TEXT)
+        self.assertIsNone(run.error)
+        self.assertEqual(list(run.logs), [TEXT])
+        self.assertEqual((replies(run)[-1]["error"], replies(run)[-1]["animation"]), (None, 1))
         self.assert_no_pending(run)
 
     def test_the_check_of_an_upload_answers_busy_until_it_has_settled(self):
@@ -168,8 +170,8 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
         files = show_with(small(LONGER_TAIL), sound=2)
         script = every_20_ms(40) + [support.line(T0 + 800, "status")]
         run = support.start(files, script, options=["--read-fails", "faulty.odrg", "4000"], check_first=False)
-        self.assertEqual(logged(run), ["read-error faulty.odrg"])
-        self.assertEqual(replies(run)[-1]["error"], "read-error faulty.odrg")
+        self.assertEqual(logged(run), ["file faulty.odrg unavailable: read-error"])
+        self.assertIsNone(replies(run)[-1]["error"])
         self.assert_no_pending(run)
 
     def drive_session(self, pull_at=None):
@@ -236,7 +238,8 @@ class PlaybackInSlices(unittest.TestCase):
     def test_while_a_file_settles_the_refreshes_keep_the_picture_before(self):
         # A cycle of a sound file and the reproducer, turns of 15 seconds, refreshes 40 ms
         # apart so that the player meets the fault: from 15,000 ms on it settles, one slice
-        # a refresh, and the LEDs keep the picture of 14,960 ms until the reason comes.
+        # a refresh, and the LEDs keep the picture of 14,960 ms until the reason comes, and
+        # at its refresh; then the cycle shows its usable animation in the rest of the turn.
         files = show_with(small(LONGER_TAIL), sound=400, cycle=15)
         script = [f"poll {T0 + 40 * step}" for step in range(660)]
         run = support.start(files, script, check_first=False)
@@ -248,10 +251,10 @@ class PlaybackInSlices(unittest.TestCase):
         held = dict(printed)[14960]
         self.assertNotEqual(held, tuple((leg, bytes(len(data))) for leg, data in held))
         for time, picture in printed:
-            if 15000 <= time < failed:
+            if 15000 <= time <= failed:
                 self.assertEqual(picture, held, time)
-            elif time >= failed:
-                self.assertEqual(picture, tuple((leg, bytes(len(data))) for leg, data in held), time)
+            elif time > failed:
+                self.assertNotEqual(picture, tuple((leg, bytes(len(data))) for leg, data in held), time)
 
 
 

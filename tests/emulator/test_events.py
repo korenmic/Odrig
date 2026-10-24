@@ -229,14 +229,14 @@ class OtherShows(unittest.TestCase):
             self.assertEqual((hello["legs"], hello["error"]), ([], "mapping-malformed"))
             self.assertEqual(emulator.request("GET", "/show/mapping.json").body, b'{"version": 1, "width": 60, "legs": []}\n')
 
-    def test_a_show_with_a_missing_animation_gives_its_legs_its_reason_and_dark_refreshes(self):
+    def test_an_invalid_show_gives_its_legs_its_reason_and_dark_refreshes(self):
         files = core_support.example_show()
         del files["dvd.odrg"]
-        folder = support.installed(self.work, files)
+        folder = support.installed(self.work, core_support.with_show_fault(files))
         with support.Emulator(folder) as emulator, support.EventStream(emulator.port) as stream:
             events = stream.read_until(has("frame", 10), 5)
             hello = json.loads(events[0].data)
-            self.assertEqual((hello["legs"], hello["error"]), ([[1, 1, 180], [2, 2, 180]], "file-missing dvd.odrg"))
+            self.assertEqual((hello["legs"], hello["error"]), ([[1, 1, 180], [2, 2, 180]], "undefined-id 99"))
             self.assertEqual({data for _, data in support.frames(events)}, {bytes(1080)})
 
 

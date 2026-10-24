@@ -141,7 +141,7 @@ bool available(const Core &core, uint32_t item) {
         const uint32_t place = item - kDriveBase;
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
-    return item < core.item_count && !core.items[item].is_cycle;
+    return item < core.item_count && !core.items[item].is_cycle && item_usable(core, item);
 }
 
 }  // namespace

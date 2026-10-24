@@ -96,13 +96,35 @@ class ValidShow(unittest.TestCase):
         self.assertIsNone(support.start(files).error)
 
 
+def quarantine_text(name, reason):
+    """The line of the log that quarantines a file."""
+    return f"file {name} unavailable: {reason}"
+
+
 class EachReason(unittest.TestCase):
-    """One case at least for each text of the table of invalid shows."""
+    """One case at least for each text of the table of invalid shows, and for each fault of
+    a file, which quarantines the file and leaves the show valid."""
 
     def check(self, files, text, options=(), legs=EXAMPLE_LEGS, canvas=(60, 6)):
         run = support.start(files, QUESTIONS, options)
         self.assert_invalid(run, text, legs, canvas)
         return run
+
+    def quarantined(self, files, name, reason, options=()):
+        """The file is quarantined with this reason: the show stays valid, the log of the
+        start says so, and `list` marks it."""
+        run = support.start(files, ["error", support.line(T0, "list")], options)
+        self.assert_quarantined(run, name, reason)
+        return run
+
+    def assert_quarantined(self, run, name, reason):
+        self.assertEqual(run.core, "ok")
+        self.assertIsNone(run.error)
+        self.assertIn(quarantine_text(name, reason), run.logs)
+        self.assertEqual(run.lines[0], "error none")
+        listed = json.loads(run.lines[1][len("reply "):])
+        faults = {item["file"]: item.get("fault") for item in listed["items"] if "file" in item}
+        self.assertEqual(faults[name], reason)
 
     def assert_invalid(self, run, text, legs, canvas=(60, 6)):
         """The show is invalid with this text: `status` reports it, the LEDs stay dark,
@@ -170,19 +192,19 @@ class EachReason(unittest.TestCase):
         self.check(example(show_json=show(cycle(3, [3]))), "nested-cycle 3")
         self.check(example(show_json=show(cycle(8, [1, 9]), cycle(9, [2]))), "nested-cycle 8")
 
-    def test_file_missing_names_the_file(self):
-        self.check(example(hello_odrg=None), "file-missing hello.odrg")
-        self.check(example(dvd_odrg=None), "file-missing dvd.odrg")
-        self.check(example(show_json=show(animation(3, ".odrg"))), "file-missing .odrg")
+    def test_file_missing_quarantines_the_file(self):
+        self.quarantined(example(hello_odrg=None), "hello.odrg", "file-missing")
+        self.quarantined(example(dvd_odrg=None), "dvd.odrg", "file-missing")
+        self.quarantined(example(show_json=show(animation(3, ".odrg"))), ".odrg", "file-missing")
         longest = "a" * 27 + ".odrg"
-        self.check(example(show_json=show(animation(3, longest))), f"file-missing {longest}")
+        self.quarantined(example(show_json=show(animation(3, longest))), longest, "file-missing")
 
-    def test_file_malformed_names_the_file_and_the_reason(self):
+    def test_a_malformed_file_is_quarantined_with_its_reason(self):
         hello = support.example_show()["hello.odrg"]
-        self.check(example(hello_odrg=b"ODRX" + hello[4:]), "file-malformed hello.odrg bad-magic")
-        self.check(example(dvd_odrg=b""), "file-malformed dvd.odrg truncated")
-        self.check(example(dvd_odrg=hello + b"\0"), "file-malformed dvd.odrg trailing-bytes")
-        self.check(example(hello_odrg=hello[:16] + b"\x07" + hello[17:]), "file-malformed hello.odrg bad-deflate")
+        self.quarantined(example(hello_odrg=b"ODRX" + hello[4:]), "hello.odrg", "bad-magic")
+        self.quarantined(example(dvd_odrg=b""), "dvd.odrg", "truncated")
+        self.quarantined(example(dvd_odrg=hello + b"\0"), "dvd.odrg", "trailing-bytes")
+        self.quarantined(example(hello_odrg=hello[:16] + b"\x07" + hello[17:]), "hello.odrg", "bad-deflate")
 
     def test_file_malformed_gives_the_reason_of_every_invalid_vector(self):
         vectors = sorted(VECTORS.iterdir())
@@ -199,17 +221,17 @@ class EachReason(unittest.TestCase):
             mapping = support.one_leg_mapping(width, height) if usable else support.one_leg_mapping(3, 3)
             file_sets.append({"mapping.json": mapping, "show.json": support.show_text([animation(1, "vector.odrg")]), "vector.odrg": data})
             canvases.append((width, height) if usable else (3, 3))
-        runs = support.start_each(file_sets, QUESTIONS)
+        runs = support.start_each(file_sets, ["error", support.line(T0, "list")])
         for path, run, canvas in zip(vectors, runs, canvases):
             with self.subTest(vector=path.name):
                 self.assertEqual(len(run.legs), 1)
-                self.assert_invalid(run, f"file-malformed vector.odrg {path.name.split('.')[0]}", run.legs, canvas)
+                self.assert_quarantined(run, "vector.odrg", path.name.split(".")[0])
 
-    def test_size_mismatch_names_the_file(self):
-        self.check(example(dvd_odrg=support.clip(1, 60, 5)), "size-mismatch dvd.odrg")
-        self.check(example(hello_odrg=support.clip(1, 59, 6)), "size-mismatch hello.odrg")
-        twenty_legs = tuple((number, pin, 180) for number, pin in enumerate((*range(1, 19), 21, 47), start=1))
-        self.check(example(mapping_json=support.mapping_texts()["legs-20"]), "size-mismatch hello.odrg", legs=twenty_legs, canvas=(60, 60))
+    def test_size_mismatch_quarantines_the_file(self):
+        self.quarantined(example(dvd_odrg=support.clip(1, 60, 5)), "dvd.odrg", "size-mismatch")
+        self.quarantined(example(hello_odrg=support.clip(1, 59, 6)), "hello.odrg", "size-mismatch")
+        run = self.quarantined(example(mapping_json=support.mapping_texts()["legs-20"]), "hello.odrg", "size-mismatch")
+        self.assertEqual(run.logs, (quarantine_text("hello.odrg", "size-mismatch"), quarantine_text("dvd.odrg", "size-mismatch")))
 
     def test_read_error_names_the_file(self):
         self.check(example(), "read-error mapping.json", ["--read-fails", "mapping.json", "0"], legs=())
@@ -217,21 +239,26 @@ class EachReason(unittest.TestCase):
         self.check(example(), "read-error show.json", ["--read-fails", "show.json", "0"])
         self.check(example(), "read-error show.json", ["--read-fails", "show.json", "50"])
         for offset in (0, 15, 16, 17, 400):
-            self.check(example(), "read-error hello.odrg", ["--read-fails", "hello.odrg", str(offset)])
-        self.check(example(), "read-error dvd.odrg", ["--read-fails", "dvd.odrg", "1000"])
+            self.quarantined(example(), "hello.odrg", "read-error", ["--read-fails", "hello.odrg", str(offset)])
+        self.quarantined(example(), "dvd.odrg", "read-error", ["--read-fails", "dvd.odrg", "1000"])
 
     def test_a_read_that_fails_at_the_very_end_of_a_file_is_a_read_error(self):
         files = example()
         for name in ("mapping.json", "show.json", "dvd.odrg"):
             legs = () if name == "mapping.json" else EXAMPLE_LEGS
-            self.check(files, f"read-error {name}", ["--read-fails", name, str(len(files[name]))], legs=legs)
-            self.assertIsNone(support.start(files, options=["--read-fails", name, str(len(files[name]) + 1)]).error)
+            if name.endswith(".odrg"):
+                self.quarantined(files, name, "read-error", ["--read-fails", name, str(len(files[name]))])
+            else:
+                self.check(files, f"read-error {name}", ["--read-fails", name, str(len(files[name]))], legs=legs)
+            run = support.start(files, options=["--read-fails", name, str(len(files[name]) + 1)])
+            self.assertEqual((run.error, run.logs), (None, ()))
 
     def test_a_folder_in_place_of_a_file_is_a_read_error(self):
         with support.installed(example(hello_odrg=None)) as folder:
             (support.pathlib.Path(folder) / "hello.odrg").mkdir()
             run = support.session(folder, ["error"])
-        self.assertEqual(run.error, "read-error hello.odrg")
+        self.assertIsNone(run.error)
+        self.assertEqual(run.logs, (quarantine_text("hello.odrg", "read-error"),))
 
     def test_out_of_memory(self):
         blocks = support.start(example()).memory[1]
@@ -242,7 +269,9 @@ class EachReason(unittest.TestCase):
 
 class OrderOfTheChecks(unittest.TestCase):
     def reason(self, files, options=()):
-        return support.start(files, options=options).error
+        """The reason of an invalid show, or the first line of the log of a valid one."""
+        run = support.start(files, options=options)
+        return run.error if run.error is not None or not run.logs else run.logs[0]
 
     def test_of_two_defects_the_earlier_one_in_the_order_of_the_table_is_reported(self):
         bad_show = '{"version": 2}'
@@ -257,10 +286,10 @@ class OrderOfTheChecks(unittest.TestCase):
             ("undefined-id 9", example(show_json=show(cycle(3, [9]), cycle(4, [3]), animation(5, "a.odrg")))),
             ("undefined-id 8", example(show_json=show(cycle(3, [1]), cycle(4, [3]), animation(5, "a.odrg"), start=8))),
             ("nested-cycle 4", example(show_json=show(cycle(3, [1]), cycle(4, [3]), animation(5, "a.odrg")))),
-            ("file-missing hello.odrg", example(hello_odrg=None, dvd_odrg=bad_file)),
-            ("file-malformed hello.odrg bad-version", example(hello_odrg=bad_file, dvd_odrg=None)),
-            ("file-malformed hello.odrg bad-version", example(hello_odrg=bad_file, dvd_odrg=support.clip(1, 3, 3))),
-            ("size-mismatch hello.odrg", example(hello_odrg=support.clip(1, 3, 3), dvd_odrg=bad_file)),
+            (quarantine_text("hello.odrg", "file-missing"), example(hello_odrg=None, dvd_odrg=bad_file)),
+            (quarantine_text("hello.odrg", "bad-version"), example(hello_odrg=bad_file, dvd_odrg=None)),
+            (quarantine_text("hello.odrg", "bad-version"), example(hello_odrg=bad_file, dvd_odrg=support.clip(1, 3, 3))),
+            (quarantine_text("hello.odrg", "size-mismatch"), example(hello_odrg=support.clip(1, 3, 3), dvd_odrg=bad_file)),
         )
         for expected, files in cases:
             with self.subTest(expected=expected):
@@ -279,24 +308,24 @@ class OrderOfTheChecks(unittest.TestCase):
     def test_a_file_is_checked_by_its_header_then_its_size_then_its_body(self):
         small = support.clip(1, 3, 3)
         cut_body = small[:-3]
-        self.assertEqual(self.reason(example(hello_odrg=cut_body)), "size-mismatch hello.odrg")
-        self.assertEqual(self.reason(example(hello_odrg=small[:16])), "size-mismatch hello.odrg")
-        self.assertEqual(self.reason(example(hello_odrg=small[:15])), "file-malformed hello.odrg truncated")
+        self.assertEqual(self.reason(example(hello_odrg=cut_body)), quarantine_text("hello.odrg", "size-mismatch"))
+        self.assertEqual(self.reason(example(hello_odrg=small[:16])), quarantine_text("hello.odrg", "size-mismatch"))
+        self.assertEqual(self.reason(example(hello_odrg=small[:15])), quarantine_text("hello.odrg", "truncated"))
         no_frames = small[:12] + bytes(4) + small[16:]
-        self.assertEqual(self.reason(example(hello_odrg=no_frames)), "file-malformed hello.odrg no-frames")
+        self.assertEqual(self.reason(example(hello_odrg=no_frames)), quarantine_text("hello.odrg", "no-frames"))
         right_size_cut_body = support.clip(1, 60, 6)[:-3]
-        self.assertEqual(self.reason(example(hello_odrg=right_size_cut_body)), "file-malformed hello.odrg truncated")
+        self.assertEqual(self.reason(example(hello_odrg=right_size_cut_body)), quarantine_text("hello.odrg", "truncated"))
 
     def test_a_palette_cut_short_in_a_file_of_the_wrong_size_is_a_size_mismatch(self):
         small = support.clip(1, 3, 3, compressed=False)
         self.assertNotEqual(small[10:12], b"\0\0")
-        self.assertEqual(self.reason(example(hello_odrg=small[:18])), "size-mismatch hello.odrg")
+        self.assertEqual(self.reason(example(hello_odrg=small[:18])), quarantine_text("hello.odrg", "size-mismatch"))
 
-    def test_the_first_failure_ends_the_checks(self):
+    def test_a_missing_file_does_not_end_the_checks_and_a_show_fault_does(self):
         run = support.start(example(hello_odrg=None), options=["--trace-files"])
-        self.assertEqual(run.error, "file-missing hello.odrg")
-        self.assertEqual(run.opened[-1], ("hello.odrg", 0))
-        self.assertNotIn(("dvd.odrg", 1), run.opened)
+        self.assertIsNone(run.error)
+        self.assertIn(("hello.odrg", 0), run.opened)
+        self.assertIn(("dvd.odrg", 1), run.opened)
         run = support.start(example(show_json=None), options=["--trace-files"])
         self.assertEqual(run.opened, (("mapping.json", 1), ("mapping.json", 1), ("show.json", 0)))
         run = support.start(example(mapping_json=None), options=["--trace-files"])
@@ -429,7 +458,7 @@ class Leftovers(unittest.TestCase):
     def test_beside_a_show_whose_file_is_missing_pending_is_settled(self):
         files = example(pending_txt=b"stray.odrg\n", stray_odrg=self.CLIP, dvd_odrg=None)
         run, left = self.started(files)
-        self.assertEqual(run.error, "file-missing dvd.odrg")
+        self.assertEqual((run.error, run.logs), (None, (quarantine_text("dvd.odrg", "file-missing"),)))
         self.assertEqual(sorted(left), ["hello.odrg", "mapping.json", "show.json"])
         self.assert_as_the_reference(files, left)
 

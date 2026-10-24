@@ -26,18 +26,11 @@ void append(Core &core, const char *text) {
     core.error_text[length] = '\0';
 }
 
-// Makes the show invalid for a file that cannot be used.
-void fail_file(Core &core, const FileInfo &info, Reason reason) {
-    if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
-        core_fail(core, reason, info.name, kNone);
-    } else {
-        core_fail(core, kFileMalformed, info.name, reason);
-    }
-}
-
 // Opens one file of the show and the decoder on it, which reads the header, and compares
-// the canvas with the mapping's. The palette and the frame records are not read.
-void open_file(Core &core, const FileInfo &info) {
+// the canvas with the mapping's. The palette and the frame records are not read. A file
+// that cannot be used is quarantined.
+void open_file(Core &core, uint32_t index) {
+    const FileInfo &info = core.files[index];
     Reason reason = core.file.open(core.host, info.name);
     if (reason == kNone) {
         reason = core.decoder.open(&core.file, &core.inflate, core.window);
@@ -47,26 +40,24 @@ void open_file(Core &core, const FileInfo &info) {
         core.file.close();
     }
     if (reason != kNone) {
-        note_fault(core, kWorkStart, info.name, 0, 0, reason);
-        fail_file(core, info, reason);
+        quarantine_file(core, index, reason, kWorkStart, 0, 0);
     }
 }
 
 // Decodes one file of the show from its first frame record to its last, and notes its
 // size and its total duration. The header is checked first, then the size
-// against the mapping, then the body.
-void check_file(Core &core, FileInfo &info) {
+// against the mapping, then the body. A file with a fault is quarantined.
+void check_file(Core &core, uint32_t index) {
+    FileInfo &info = core.files[index];
     Reason reason = core.file.open(core.host, info.name);
     if (reason != kNone) {
-        note_fault(core, kWorkStart, info.name, 0, 0, reason);
-        core_fail(core, reason, info.name, kNone);
+        quarantine_file(core, index, reason, kWorkStart, 0, 0);
         return;
     }
     reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone && (core.decoder.width != core.width || core.decoder.height != core.height)) {
         core.file.close();
-        note_fault(core, kWorkStart, info.name, 0, 0, kSizeMismatch);
-        core_fail(core, kSizeMismatch, info.name, kNone);
+        quarantine_file(core, index, kSizeMismatch, kWorkStart, 0, 0);
         return;
     }
     // Nothing waits on this check: it goes on through every slice of a settling.
@@ -94,12 +85,7 @@ void check_file(Core &core, FileInfo &info) {
     const uint32_t bytes = core.file.taken;
     core.file.close();
     if (reason != kNone) {
-        note_fault(core, kWorkStart, info.name, record, core.decoder.body_read, reason);
-    }
-    if (reason == kReadError) {
-        core_fail(core, kReadError, info.name, kNone);
-    } else if (reason != kNone) {
-        core_fail(core, kFileMalformed, info.name, reason);
+        quarantine_file(core, index, reason, kWorkStart, record, core.decoder.body_read);
     } else {
         info.bytes = bytes;
         info.total_ms = total;
@@ -161,10 +147,30 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
     return kStepFault;
 }
 
+// Moves the check after the start past the files it has no more to do with: those that
+// are quarantined. It is complete once it is past the last file.
+void check_passes_done(Core &core) {
+    while (core.check_at < core.file_count && core.files[core.check_at].fault != kNone) {
+        ++core.check_at;
+    }
+    core.check_done = core.check_at >= core.file_count;
+}
+
 // One step of the check after the start, on the installed file it is at. A file read to
-// its end was read whole.
+// its end was read whole; a file with a fault is quarantined, and the check goes on with
+// the next one.
 void check_step(Core &core) {
     FileInfo &info = core.files[core.check_at];
+    if (info.fault != kNone) {
+        // The player quarantined the file the check is at: it is not read again.
+        if (core.check_header_read) {
+            core.checker->file.close();
+            core.check_header_read = 0;
+        }
+        ++core.check_at;
+        check_passes_done(core);
+        return;
+    }
     Reason reason = kNone;
     uint32_t record = 0;
     const StepOutcome outcome = check_file_step(core, info.name, &reason, &record);
@@ -172,10 +178,11 @@ void check_step(Core &core) {
         info.bytes = core.checker->file.taken;
         info.total_ms = core.check_total_ms;
         ++core.check_at;
-        core.check_done = core.check_at == core.file_count;
+        check_passes_done(core);
     } else if (outcome == kStepFault) {
-        note_fault(core, kWorkStart, info.name, record, core.checker->decoder.body_read, reason);
-        fail_file(core, info, reason);
+        quarantine_file(core, core.check_at, reason, kWorkStart, record, core.checker->decoder.body_read);
+        ++core.check_at;
+        check_passes_done(core);
     }
 }
 
@@ -291,15 +298,24 @@ void start(Core &core) {
 
     // The files are opened in the order in which the show first names them. Their bodies
     // are read while the show plays, by the second decoders. A host whose storage cannot
-    // be changed has none: for it every file is read to its end here.
+    // be changed has none: for it every file is read to its end here. A file that cannot
+    // be used is quarantined, and the others are opened as ever.
+    for (uint32_t index = 0; index < core.file_count; ++index) {
+        core.files[index].fault = kNone;
+    }
     for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
         if (core.checker == nullptr) {
-            check_file(core, core.files[index]);
+            check_file(core, index);
         } else {
-            open_file(core, core.files[index]);
+            open_file(core, index);
         }
     }
-    core.check_done = core.checker == nullptr || core.file_count == 0;
+    core.check_at = 0;
+    if (core.checker == nullptr) {
+        core.check_done = 1;
+    } else {
+        check_passes_done(core);
+    }
 }
 
 }  // namespace
@@ -446,6 +462,49 @@ void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t roo
     if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, room) != 1) {
         drive_file_name(place, name);
     }
+}
+
+bool is_file_fault(Reason reason) {
+    return reason == kFileMissing || reason == kReadError || reason == kSizeMismatch || reason >= kTruncated;
+}
+
+void quarantine_file(Core &core, uint32_t file, Reason reason, uint8_t work, uint32_t record, uint64_t body_bytes) {
+    FileInfo &info = core.files[file];
+    if (info.fault != kNone) {
+        return;
+    }
+    info.fault = static_cast<uint8_t>(reason);
+    note_fault(core, work, info.name, record, body_bytes, reason);
+    if (core.host.log != nullptr) {
+        // `file <name> unavailable: <reason>`.
+        char text[80];
+        const char *parts[] = {"file ", info.name, " unavailable: ", reason_name(reason)};
+        uint32_t length = 0;
+        for (const char *part : parts) {
+            for (; *part != '\0' && length + 1 < sizeof text; ++part) {
+                text[length++] = *part;
+            }
+        }
+        text[length] = '\0';
+        core.host.log(core.host.ctx, text);
+    }
+    if (!core.starting) {
+        player_file_failed(core, file);
+    }
+}
+
+bool item_usable(const Core &core, uint32_t item) {
+    const ItemInfo &info = core.items[item];
+    if (!info.is_cycle) {
+        return core.files[info.first].fault == kNone;
+    }
+    for (uint32_t entry = 0; entry < info.count; ++entry) {
+        const ItemInfo &member = core.items[core.entries[info.first + entry]];
+        if (core.files[member.first].fault == kNone) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void note_fault(Core &core, uint8_t work, const char *name, uint32_t record, uint64_t body_bytes, Reason reason) {

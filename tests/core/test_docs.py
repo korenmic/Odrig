@@ -119,7 +119,7 @@ class CoreDocument(unittest.TestCase):
 class CommandsDocument(unittest.TestCase):
     """docs/commands.md against the core's command front-end."""
 
-    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "in-use", "mapping-conflict", "no-space", "bad-offset",
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "mapping-conflict", "no-space", "bad-offset",
              "bad-file", "storage-error"]
 
     @classmethod
@@ -189,9 +189,6 @@ class ReasonsDocument(unittest.TestCase):
                 "duplicate-id <id>",
                 "undefined-id <id>",
                 "nested-cycle <id>",
-                "file-missing <name>",
-                "file-malformed <name> <reason>",
-                "size-mismatch <name>",
                 "read-error <name>",
                 "out-of-memory",
             ],
@@ -208,7 +205,7 @@ class ReasonsDocument(unittest.TestCase):
     def test_every_text_begins_with_a_name_the_core_can_report(self):
         names = set(support.host_lines("reasons"))
         texts = re.findall(r"(?m)^\| `([a-z-]+)(?: <[a-z]+>)*` \|", self.section)
-        self.assertGreaterEqual(len(texts), 14)
+        self.assertGreaterEqual(len(texts), 11)
         for text in texts:
             self.assertIn(text, names)
 

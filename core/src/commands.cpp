@@ -258,6 +258,10 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }
+        if (!is_drive(item) && !item_usable(core, item)) {
+            // A quarantined animation, or a cycle that lists only such: nothing is read.
+            return refuse(reply, "unavailable");
+        }
         core.mapping_test = 0;
         // An animation is played as its turn of the playlist, which goes on after it.
         if (!is_drive(item) && core.items[item].is_cycle) {

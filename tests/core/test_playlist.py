@@ -233,11 +233,17 @@ class TheStart(ThePlaylist):
         self.assertEqual(self.pictures_at(files, [0, 20]), [bytes(18), bytes(18)])
 
     def test_an_invalid_show_plays_nothing(self):
+        files = support.with_show_fault(three())
+        printed = self.assert_as_the_reference(files, asked_at([0]))
+        self.assertIn('"playing":null,"animation":null', printed[-1])
+        self.assertIn('"error":"undefined-id 99"', printed[-1])
+
+    def test_a_missing_file_leaves_the_others_in_the_playlist(self):
         files = three()
         del files["ten.odrg"]
         printed = self.assert_as_the_reference(files, asked_at([0]))
-        self.assertIn('"playing":null,"animation":null', printed[-1])
-        self.assertIn('"error":"file-missing ten.odrg"', printed[-1])
+        self.assertIn('"playing":"all","animation":1', printed[-1])
+        self.assertIn('"error":null', printed[-1])
 
 
 class TheJump(ThePlaylist):
@@ -334,8 +340,7 @@ class PlayAll(ThePlaylist):
         self.assertEqual(self.replies_to(show_of([], {}), ["play all"]), [refused("unknown-id")])
 
     def test_an_invalid_show_refuses_it_with_show_invalid(self):
-        files = three()
-        del files["ten.odrg"]
+        files = support.with_show_fault(three())
         self.assertEqual(self.replies_to(files, ["play all"]), [refused("show-invalid")])
 
     WRONG = ["play all 1", "play all all", "play all ", "play  all", "play ALL", "play All", "play al", "play alll", "play all\t", "play 1 all", "play -all", "play all,"]
@@ -344,8 +349,7 @@ class PlayAll(ThePlaylist):
         self.assertEqual(self.replies_to(three(), self.WRONG), [refused("bad-argument")] * len(self.WRONG))
 
     def test_a_bad_argument_is_named_before_an_invalid_show(self):
-        files = three()
-        del files["ten.odrg"]
+        files = support.with_show_fault(three())
         self.assertEqual(self.replies_to(files, self.WRONG), [refused("bad-argument")] * len(self.WRONG))
 
     def test_a_refused_one_leaves_what_plays(self):

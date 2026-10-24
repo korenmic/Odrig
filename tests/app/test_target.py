@@ -136,12 +136,12 @@ class WhetherTheTargetAnswers(Target):
 
     def test_a_target_whose_show_is_invalid_answers_and_the_screen_says_the_reason(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
-        self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+        self.assertEqual(emulator.status()["error"], "undefined-id 99")
         found = support.run("answers", address=address)
         self.assertEqual((found.seen["link"], found.seen["failure"]), ("Answers", None))
-        self.assertEqual(found.seen["invalid"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen["invalid"], "The installed show is invalid: undefined-id 99.")
 
 
 class Requests(Target):

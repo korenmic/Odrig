@@ -67,15 +67,16 @@ class AfterAStart(unittest.TestCase):
         self.assertEqual(len(json.loads(emulator.command("list"))["items"]), 6)
         self.assertIsNone(emulator.status()["error"])
 
-    def test_a_fault_in_a_body_ends_the_show_while_it_plays(self):
+    def test_a_fault_in_a_body_makes_its_animation_unavailable_and_the_show_plays_on(self):
         files = dense_show(core_support.example_show()["mapping.json"], 60, 6, (2, 3))
         files["dense2.odrg"] = files["dense2.odrg"][:-5]
         emulator = self.started(files)
         self.assertIsNone(emulator.status()["error"])
         emulator.wait_for_the_check()
         state = emulator.status()
-        self.assertEqual((state["playing"], state["animation"], state["error"]), (None, None, "file-malformed dense2.odrg truncated"))
-        self.assertEqual(emulator.command("list"), b'{"ok":false,"error":"show-invalid"}\n')
+        self.assertEqual((state["playing"], state["error"]), ("all", None))
+        items = json.loads(emulator.command("list"))["items"]
+        self.assertEqual([item.get("fault") for item in items if item.get("file") == "dense2.odrg"], ["truncated"])
 
 
 class RecordMode(unittest.TestCase):

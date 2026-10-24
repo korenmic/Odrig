@@ -17,7 +17,7 @@ def refused(code):
 def invalid_show():
     files = support.example_show()
     del files["dvd.odrg"]
-    return files
+    return support.with_show_fault(files)
 
 
 class Commands(Playback):
@@ -189,10 +189,11 @@ class LineEndings(Commands):
         files[longest_name] = bad_index
         printed = self.assert_as_the_reference(files, [support.line(T0, "off"), support.line(T0, "status")])
         reply = printed[-1][len("reply "):]
-        # The longest reason text there is: the longest file name and the longest reason.
-        self.assertEqual(json.loads(reply)["error"], f"file-malformed {longest_name} bad-palette-index")
-        self.assertEqual(len(json.loads(reply)["error"]), 65)
-        self.assertLess(len(reply) + 1 + len("4294967295"), 192)
+        # A bad file is quarantined and the show has no error. The reason of a show fault is
+        # at most 24 characters, `duplicate-id` and an id of 11; one of 65 would still fit
+        # with the largest numbers.
+        self.assertIsNone(json.loads(reply)["error"])
+        self.assertLess(len(reply) - len("null") + len('""') + 65 + 1 + len("4294967295"), 192)
 
 
 class BytesOfATransport(Commands):

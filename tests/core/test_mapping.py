@@ -317,8 +317,8 @@ class LegList(unittest.TestCase):
     def test_the_canvas_of_the_target_file_is_60_by_60(self):
         for width, height in ((60, 30), (30, 60), (60, 61), (180, 20), (20, 180)):
             run = self.target_with(support.clip("another size", width, height, (20,)))
-            self.assertEqual(run.error, "size-mismatch clip.odrg", (width, height))
-            self.assertEqual(run.lines[0], "error size-mismatch clip.odrg")
+            self.assertIsNone(run.error, (width, height))
+            self.assertEqual(run.logs, ("file clip.odrg unavailable: size-mismatch",), (width, height))
         run = self.target_with(support.clip("the size", 60, 60, (20,)))
         self.assertIsNone(run.error)
         self.assertEqual(run.lines[:2], ["error none", "refresh 0"])

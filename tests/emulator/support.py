@@ -157,6 +157,15 @@ def installed(folder, files):
     return folder
 
 
+def with_show_fault(folder):
+    """Adds to the show file of a folder a cycle that names an id no item has: a fault of the
+    show, which makes it invalid with `undefined-id 99`. A fault of one animation file does
+    not: the file is quarantined."""
+    path = pathlib.Path(folder) / "show.json"
+    path.write_text(core_support.with_show_fault({"show.json": path.read_text(encoding="utf-8")})["show.json"], encoding="utf-8")
+    return folder
+
+
 def without_fps(reply):
     """A reply as a value, without the one member that depends on the speed of this Mac."""
     value = json.loads(reply)

@@ -257,6 +257,7 @@ class InvalidShow(unittest.TestCase):
     def test_every_command_still_reaches_the_core_and_gets_its_reply(self):
         with support.example_show() as folder:
             (folder / "dvd.odrg").unlink()
+            support.with_show_fault(folder)
             files = support.files_of(folder)
             with support.Emulator(folder) as emulator:
                 player = ReferencePlayer(files)
@@ -266,7 +267,7 @@ class InvalidShow(unittest.TestCase):
                     self.assertEqual(answer.status, 200)
                     self.assertEqual(support.without_fps(answer.body), support.without_fps(player.command(50, line.encode("ascii"))), line)
                 self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"show-invalid"}\n')
-                self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+                self.assertEqual(emulator.status()["error"], "undefined-id 99")
                 with support.lines(emulator) as port:
                     for line in ("status", "play 2", "brightness 200", "off", "on", "status", "dance"):
                         self.assertEqual(support.without_fps(port.ask(line)), support.without_fps(player.command(60, line.encode("ascii"))), line)

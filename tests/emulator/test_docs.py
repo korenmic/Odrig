@@ -263,7 +263,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertEqual(len(bodies), len(steps))
         for body in bodies:
             self.assertEqual(body.count("*Seen:*"), 1, body[:60])
-        for phrase in ("Safari", "Chrome", "1280 x 800", "756 x 900", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "file-missing dvd.odrg",
+        for phrase in ("Safari", "Chrome", "1280 x 800", "756 x 900", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "show-missing",
                        "docs/specs/03-p0-emulator/requirements.md", "docs/specs/05-p0-canvas-60-by-60/requirements.md"):
             self.assertIn(phrase, text)
         requirements = (SPECS / "03-p0-emulator" / "requirements.md").read_text(encoding="utf-8")

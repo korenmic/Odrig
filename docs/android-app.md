@@ -355,6 +355,7 @@ it is dismissed with `OK` or another takes its place.
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
 | `unknown-id` | The animation that was pressed was removed meanwhile. The list is asked for again. | Animation `<id>` is not installed any more. |
 | `unknown-id` | `Playlist from the start` on a show without an animation. | No animation is installed. |
+| `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |

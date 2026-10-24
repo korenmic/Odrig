@@ -38,7 +38,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 15)
+        self.assertEqual(len(self.codes), 16)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -105,12 +105,12 @@ class OnTheScreen(unittest.TestCase):
 
     def test_an_invalid_show_is_said_with_its_reason(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
         found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Playlist from the start", "wait": 1500}]})
-        self.assertEqual(found.seen[0]["message"], "The installed show is invalid: file-missing dvd.odrg. Nothing can be played until a show is installed over USB. (show-invalid)")
+        self.assertEqual(found.seen[0]["message"], "The installed show is invalid: undefined-id 99. Nothing can be played until a show is installed over USB. (show-invalid)")
         # The message stays while statuses come and go.
-        self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: undefined-id 99.")
 
     def test_a_target_that_does_not_know_a_command_and_one_that_refuses_with_another_code(self):
         old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("weird"), "on": OK}))

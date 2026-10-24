@@ -63,10 +63,11 @@ class Space(unittest.TestCase):
 
     def test_space_with_an_invalid_show_reports_no_animations(self):
         (self.folder / "dvd.odrg").unlink()
+        support.with_show_fault(self.folder)
         emulator = self.started()
         for route, ask in ROUTES.items():
             self.assertEqual(json.loads(ask(emulator, "space")), {"ok": True, "free": BOARD_STORAGE - 3 * STORAGE_BLOCK, "total": BOARD_STORAGE, "animations": 0, "external": {"present": False, "free": None, "total": None, "read_only": True}}, route)
-        self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+        self.assertEqual(emulator.status()["error"], "undefined-id 99")
 
     def test_space_changes_no_file_of_the_folder(self):
         before = support.files_of(self.folder)

@@ -77,7 +77,7 @@ Every function receives `ctx` as its first argument.
 | `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
-| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs two things: the reason text when the show becomes invalid, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
+| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs three things: the reason text when the show becomes invalid, `file <name> unavailable: <reason>` when it quarantines a file of the show, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
 | `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
@@ -259,7 +259,7 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `in-use`, `mapping-conflict`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+`unknown-id`, `unavailable`, `in-use`, `mapping-conflict`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
 changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
 upload they are about.
 
@@ -270,7 +270,8 @@ upload they are about.
 file it reads the header, the first 16 bytes, and compares the canvas with the mapping's.
 It decodes no frame record, so the time the start takes does not grow with the files. A
 file that is missing or cannot be read, a header that is not sound and another canvas
-make the show invalid there.
+quarantine that file, as "Unavailable animations" below says, and the start goes on with
+the next one.
 
 The bodies of the files are read after the start, while the show plays: see "The check
 after the start". A host whose storage cannot be changed has no second decoders for
@@ -293,20 +294,51 @@ change left:
 A folder with none of the three files is asked to remove two names that are not there and
 to open one that is not there, and for nothing else.
 
-A show that is wrong in any way is refused as a whole: the LEDs stay dark, `play` is
+A show whose mapping file or show file cannot be used, whose ids are wrong, or for which
+the host has too little memory is refused as a whole: the LEDs stay dark, `play` is
 answered with `show-invalid`, and `odrig_core_error` and `status` give the reason. The
 first check that fails decides. The texts are listed in [reasons.md](reasons.md), "The
-core". The other commands work as ever.
+core". The other commands work as ever. A fault of one `.odrg` file never refuses the
+show.
 
 After startup the LEDs are switched on. With a valid show, brightness is the value of
-`show.json`, and the playlist plays, from its first animation or from the animation
-`start` names; a `start` that names a cycle plays that cycle; a show without an animation
-plays nothing. With an invalid show nothing is playing, and brightness is the value of
+`show.json`, and the playlist plays, from its first usable animation or from the
+animation `start` names, or the next usable one after it; a `start` that names a cycle
+with a usable animation plays that cycle; a show without a usable animation plays
+nothing. With an invalid show nothing is playing, and brightness is the value of
 `show.json` when that file and its ids are sound, and 0 otherwise.
 
 A file can also fail while it plays, and the check after the start can find a fault in a
-body: the file is gone, cannot be read, or does not follow the format. From that refresh
-on the show is invalid in the same way, until the next startup.
+body: the file is gone, cannot be read, or does not follow the format. The file is then
+quarantined, until the next startup or an upload that replaces it.
+
+## Unavailable animations
+
+A fault of one `.odrg` file, `file-missing`, `size-mismatch`, `read-error` or a reason of
+"ODRG files" in [reasons.md](reasons.md), quarantines that file for the rest of the boot,
+wherever it is met: at the start, by the check after the start, by the whole-file check
+of a host that cannot change its storage, or by the player. Its animations are
+unavailable; the show stays valid.
+
+- The core writes `file <name> unavailable: <reason>` to the log and keeps the fault's
+  context, as "Bounded work" says.
+- The playlist, the start's choice and every cycle pass over an unavailable animation. A
+  cycle's turn whose animation is unavailable shows the first usable animation after it
+  in the cycle, its time counted from the start of the turn; a cycle that lists no usable
+  animation gives way to the playlist, from its first usable animation, and with none
+  nothing plays.
+- When the player meets the fault, that refresh keeps the LED data of the refresh before,
+  and the next one goes on: the playlist with the next usable animation from its first
+  frame. When the check meets it in the animation whose turn it is, the next refresh does
+  the same.
+- `play <id>` of an unavailable animation, or of a cycle that lists only such, is refused
+  with `unavailable`; nothing is read for it. `list` lists it with `"bytes":null` and
+  `"fault":"<reason>"`. `space` counts it among the animations.
+- The file is not opened again in this boot: not by the player, the check, `list` or
+  `play`. Nothing is written for the quarantine, and the file stays as it is. An upload
+  that replaces it and passes its check makes the animation usable at once; `ignore`
+  does not.
+- A new start checks every file again.
 
 The core keeps nothing from one startup to the next but the files of the folder. Given
 the same files, the same answers of the host and the same calls with the same timestamps,
@@ -336,16 +368,16 @@ the check is fast beside a show that leaves the host time, takes a step now and 
 beside one that does not, and still comes to its end with a host that is late for every
 refresh, at one step in ten refreshes.
 
-A fault the check finds makes the show invalid from that refresh on, with the text
-[reasons.md](reasons.md) has for it; that refresh is dark already. A file that cannot be
-read back is `read-error`, whether it is damaged or gone: `read_at` has one answer for
-both. Until the last file is read, `list`, `remove` and `upload begin` are answered with
+A fault the check finds quarantines the file from that refresh on, and the check goes on
+with the next file; that refresh shows what it shows. A file that cannot be read back is
+`read-error`, whether it is damaged or gone: `read_at` has one answer for both. A file
+the player quarantined first is not read by the check. Until the last file is read, `list`, `remove` and `upload begin` are answered with
 `busy`, and every other command works. Once the check is complete it stays so until the
 next start: a file that an upload adds was read by the upload's own check.
 
 The player can come to a fault before the check does, in the animation that is playing.
-It shows the frames before the fault, and the show turns invalid at the refresh whose
-time lies at their end or after it. A turn that ends before that, by `max_seconds` or as
+It shows the frames before the fault, and quarantines the file at the refresh whose time
+lies at their end or after it. A turn that ends before that, by `max_seconds` or as
 a turn of a cycle, ends as ever, and the fault waits for the check. Bytes that follow the
 last frame record are found by the check alone: the player never reads that far.
 
@@ -575,8 +607,8 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   `bad-file` with the reason of [reasons.md](reasons.md), "ODRG files", or
   `size-mismatch`; `storage-error` when storage could not be read or gave back other
   bytes.
-- **Discarding.** `upload cancel`, a wrong checksum, a failed check, a failed storage
-  call, and a show that becomes invalid discard the upload: `upload.part` is removed. So
+- **Discarding.** `upload cancel`, a wrong checksum, a failed check and a failed storage
+  call discard the upload: `upload.part` is removed. So
   does every call that carries a timestamp 60,000 ms or more after the last progress:
   `upload begin`, an `upload data` that was taken, or a step of the check. The core
   reads no clock for it.

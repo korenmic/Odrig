@@ -179,11 +179,12 @@ class Recording(unittest.TestCase):
     def test_play_on_an_invalid_show_is_show_invalid_and_the_leds_stay_dark(self):
         files = core_support.example_show()
         del files["dvd.odrg"]
+        files = core_support.with_show_fault(files)
         folder = self.installed(files)
         commands = [(100, "play 1"), (200, "status")]
         recording, printed = self.record(folder, 1, commands)
         self.assertEqual(printed[0], 'reply 100 {"ok":false,"error":"show-invalid"}')
-        self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["error"], "file-missing dvd.odrg")
+        self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["error"], "undefined-id 99")
         refreshes, _ = support.reference(files, tick_times(1), commands)
         self.assert_equals_reference(recording, refreshes)
         self.assertTrue(all(tick.produced and tick.data == bytes(1080) for tick in recording.ticks))

@@ -48,7 +48,6 @@ class OneBadFileEndsTheShow(unittest.TestCase):
         script += [support.line(T0 + 400, command) for command in ("status", "list", "remove 3", "status")]
         return support.start(show_with_a_bad_second(data), script)
 
-    @unittest.expectedFailure
     def test_the_show_stays_valid_and_plays_the_others(self):
         for name, (data, _) in bad_files().items():
             with self.subTest(name):
@@ -56,7 +55,6 @@ class OneBadFileEndsTheShow(unittest.TestCase):
                 self.assertEqual((state["error"], state["playing"]), (None, "all"))
                 self.assertIn(state["animation"], (1, 3))
 
-    @unittest.expectedFailure
     def test_list_and_remove_are_answered(self):
         for name, (data, reason) in bad_files().items():
             with self.subTest(name):
@@ -64,6 +62,132 @@ class OneBadFileEndsTheShow(unittest.TestCase):
                 self.assertEqual([item["id"] for item in listed["items"]], [1, 2, 3])
                 self.assertEqual(listed["items"][1]["fault"], reason)
                 self.assertEqual(removed, {"ok": True})
+
+
+
+def show_of(items, files, start=None):
+    """A show on the 3 x 2 canvas with these items and files."""
+    return {"mapping.json": support.one_leg_mapping(WIDTH, HEIGHT), "show.json": support.show_text(items, start=start), **files}
+
+
+def every_20_ms(count, start=0):
+    return [f"poll {T0 + start + 20 * step}" for step in range(count)]
+
+
+def logged(run):
+    return list(run.logs) + [line[len("log "):] for line in run.lines if line.startswith("log ")]
+
+
+class AsTheReference(unittest.TestCase):
+    """Sessions on the core and on the reference player, compared line by line, the lines
+    of the log among them."""
+
+    def compare(self, files, script, options=(), check_first=True):
+        run = support.start(files, script, options, check_first=check_first)
+        reference = support.ReferencePlayer(files, check_first=check_first)
+        expected = reference.run(script)
+        self.assertEqual(list(run.logs), reference.start_logs)
+        self.assertEqual(len(run.lines), len(expected), (run.lines[-3:], expected[-3:]))
+        for number, (line, wanted) in enumerate(zip(run.lines, expected)):
+            if line != wanted:
+                self.fail(f"line {number} differs: the core printed {line[:90]}, the reference {wanted[:90]}")
+        return run
+
+    def asked(self, time, *commands):
+        return [support.line(T0 + time, command) for command in commands]
+
+    def test_a_bad_file_at_the_start_or_found_by_the_check(self):
+        for name, (data, reason) in bad_files().items():
+            for check_first in (True, False):
+                with self.subTest(name, check_first=check_first):
+                    script = every_20_ms(30) + self.asked(600, "status", "list", "space")
+                    run = self.compare(show_with_a_bad_second(data), script, check_first=check_first)
+                    self.assertIn(f"file b.odrg unavailable: {reason}", logged(run))
+
+    def test_a_bad_body_met_by_the_player_keeps_the_picture_and_the_playlist_goes_on(self):
+        # Refreshes 40 ms apart: the check takes a step at every tenth, and the first file,
+        # of 400 frames, keeps it busy, so the player meets the fault.
+        files = show_of([{"id": 1, "file": "b.odrg"}, {"id": 2, "file": "a.odrg"}, {"id": 3, "file": "long.odrg"}],
+                        {"a.odrg": good(1), "b.odrg": cut_clip(10, 3), "long.odrg": support.clip(4, WIDTH, HEIGHT, (20,) * 400)})
+        files["show.json"] = support.show_text([{"id": 3, "file": "long.odrg"}, {"id": 1, "file": "b.odrg"}, {"id": 2, "file": "a.odrg"}], start=1)
+        script = [f"poll {T0 + 40 * step}" for step in range(40)] + self.asked(1600, "status", "list")
+        run = self.compare(files, script, check_first=False)
+        self.assertEqual(logged(run), ["file b.odrg unavailable: truncated"])
+
+    def test_every_animation_bad(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRX" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
+        script = every_20_ms(20) + self.asked(400, "status", "list", "play 1", "play all", "space")
+        run = self.compare(files, script)
+        state = replies(run)[0]
+        self.assertEqual((state["error"], state["playing"], state["animation"]), (None, None, None))
+        self.assertEqual(replies(run)[2:4], [{"ok": False, "error": "unavailable"}, {"ok": False, "error": "unknown-id"}])
+
+    def test_a_cycle_plays_its_next_usable_animation_and_gives_way_when_it_has_none(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"},
+                         {"id": 4, "cycle": [1, 2, 3], "seconds": 1}, {"id": 5, "cycle": [2], "seconds": 1}],
+                        {"a.odrg": good(1), "b.odrg": cut_clip(10, 3), "c.odrg": good(3)}, start=4)
+        script = every_20_ms(200) + self.asked(4000, "status", "play 5", "play 4", "status")
+        run = self.compare(files, script)
+        self.assertEqual(replies(run)[1], {"ok": False, "error": "unavailable"})
+
+    def test_a_cycle_whose_only_animation_turns_bad_gives_way_to_the_playlist(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 5, "cycle": [2], "seconds": 1}],
+                        {"a.odrg": good(1), "b.odrg": cut_clip(10, 3)}, start=5)
+        self.compare(files, every_20_ms(60) + self.asked(1200, "status"), check_first=False)
+
+    def test_the_start_names_a_bad_animation(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"}],
+                        {"a.odrg": good(1), "b.odrg": b"ODRX" + good(2)[4:], "c.odrg": good(3)}, start=2)
+        run = self.compare(files, every_20_ms(10) + self.asked(200, "status"))
+        self.assertEqual(replies(run)[0]["animation"], 3)
+
+    def test_show_faults_still_make_the_show_invalid(self):
+        files = show_with_a_bad_second(cut_clip(10, 3))
+        files["show.json"] = support.show_text([{"id": 1, "file": "a.odrg"}, {"id": 4, "cycle": [9], "seconds": 1}])
+        run = self.compare(files, every_20_ms(5) + self.asked(100, "status", "list"))
+        self.assertEqual(replies(run)[0]["error"], "undefined-id 9")
+        self.assertEqual(replies(run)[1], {"ok": False, "error": "show-invalid"})
+
+    def test_an_upload_that_replaces_a_bad_animation_makes_it_play(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": b"ODRX" + good(1)[4:], "b.odrg": cut_clip(10, 3)})
+        data = good(5)
+        script = every_20_ms(5) + [support.line(T0 + 100, line) for line in support.upload_lines(2, "b.odrg", data)]
+        script += every_20_ms(20, start=120) + self.asked(520, support.upload_end(data), "status", "list")
+        run = self.compare(files, script + every_20_ms(5, start=540))
+        state, listed = replies(run)[-2:]
+        self.assertEqual((state["playing"], state["animation"]), ("all", 2))
+        self.assertNotIn("fault", listed["items"][1])
+
+
+class NotReadAgain(unittest.TestCase):
+    def test_a_quarantined_file_is_opened_once_in_many_turns(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}], {"a.odrg": good(1), "b.odrg": b"ODRX" + good(2)[4:]})
+        files["show.json"] = json.dumps({"version": 1, "brightness": 128, "min_seconds": 1, "items": [{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "b.odrg"}]})
+        script = every_20_ms(500) + [support.line(T0 + 10000, command) for command in ("list", "play 2", "list")]
+        run = support.start(files, script, ["--trace-files"], check_first=False)
+        opened = [line for line in [*map(lambda pair: f"open {pair[0]} {pair[1]}", run.opened)] if " b.odrg " in line]
+        opened += [line for line in run.lines if line.startswith("open b.odrg")]
+        self.assertEqual(opened, ["open b.odrg 1"])
+
+    def test_ignoring_a_quarantined_animation_does_not_revive_it(self):
+        files = show_with_a_bad_second(cut_clip(10, 3))
+        script = every_20_ms(20) + [support.line(T0 + 400, command) for command in ("ignore 2 1", "ignore 2 0", "list", "play 2")]
+        run = support.start(files, script)
+        changed, back, listed, played = replies(run)
+        self.assertEqual((changed, back), ({"ok": True}, {"ok": True}))
+        self.assertEqual((listed["items"][1]["ignored"], listed["items"][1]["fault"]), (False, "truncated"))
+        self.assertEqual(played, {"ok": False, "error": "unavailable"})
+
+    def test_a_file_that_played_and_then_cannot_be_read_is_quarantined(self):
+        files = show_of([{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "c.odrg"}], {"a.odrg": good(1), "c.odrg": good(3)})
+        files["show.json"] = json.dumps({"version": 1, "brightness": 128, "min_seconds": 1, "items": [{"id": 1, "file": "a.odrg"}, {"id": 2, "file": "c.odrg"}]})
+        # Its first two openings read it, the check's and the player's first turn.
+        script = every_20_ms(300) + [support.line(T0 + 6000, command) for command in ("status", "list")]
+        run = support.start(files, script, ["--read-fails-after", "a.odrg", "16", "2"], check_first=False)
+        self.assertEqual(logged(run), ["file a.odrg unavailable: read-error"])
+        state, listed = replies(run)
+        self.assertEqual((state["error"], state["animation"]), (None, 2))
+        self.assertEqual(listed["items"][0]["fault"], "read-error")
 
 
 if __name__ == "__main__":

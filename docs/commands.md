@@ -17,7 +17,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. An unavailable animation is refused. |
 | `play all` | Plays the playlist, from its first animation. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
@@ -70,7 +70,7 @@ space
 ```
 
 `free` and `total` are bytes of the storage the show is in. `animations` is the number of
-animation items of the show, and 0 while the show is invalid.
+animation items of the show, unavailable ones among them, and 0 while the show is invalid.
 
 ```
 list
@@ -82,7 +82,11 @@ from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation it
 `id`, its `file` and the size of that file in `bytes`. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
-`list <next>`, or `null` when the last item is in the reply. A position at or after the end
+`list <next>`, or `null` when the last item is in the reply. An unavailable animation, one
+whose file had a fault in this boot, is listed in its place with `bytes` `null` and one
+more member, `fault`, the name of the reason:
+`{"id":2,"file":"dvd.odrg","bytes":null,"ignored":false,"fault":"bad-palette-index"}`.
+A usable animation has no `fault`. A position at or after the end
 gives no items and `null`, and so does a show without items:
 `{"ok":true,"items":[],"next":null}`. While the show is invalid, `list` is refused with
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
@@ -196,12 +200,13 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `remove` or an `upload` command was sent while the show is invalid. |
+| `show-invalid` | `play`, `list`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
 | `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
+| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, or a cycle that lists only such. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |

@@ -531,3 +531,10 @@ are in [format.md](format.md), "Measured sizes".
   while it catches up; the core keeps the context of the latest fault of a file. The
   reasons of every file are as before; the budgets are 50 ms a call and 250 ms a read on
   the board. The board's measurement is open.
+- 2026-10-24: Seed 32 (the owner's approval of 2026-10-24): a fault of one animation file,
+  missing, unreadable, malformed or of another canvas, no longer makes the show invalid.
+  The file is quarantined for the boot: the playlist, `start` and cycles pass over it,
+  `play` of it is refused with the new error code `unavailable`, and `list` gives it with
+  `"bytes":null` and the new member `fault`, the reason's name. Faults of the mapping file
+  and of the show file still make the show invalid. Nothing is written for a quarantine;
+  a new start checks every file again.

@@ -436,6 +436,15 @@ def demo_show():
     return dict(_demo_show())
 
 
+def with_show_fault(files, missing=99):
+    """The files with a cycle added to the show file that names an id no item has: a fault
+    of the show, which makes it invalid with `undefined-id <missing>`. A fault of one file
+    does not: the file is quarantined."""
+    listed = json.loads(files["show.json"])
+    listed["items"].append({"id": 65535, "cycle": [missing], "seconds": 1})
+    return {**files, "show.json": json.dumps(listed)}
+
+
 def show_text(items, brightness=128, start=None):
     """A show file with these items, each written as docs/show.md has it."""
     show = {"version": 1, "brightness": brightness, "items": list(items)}
@@ -610,6 +619,10 @@ class ReferencePlayer:
         self.next_due = None
         self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
         self.unfinished = b""   # the bytes of a transport since the last newline
+        self.faults = {}        # the reason of each quarantined file, by its name
+        self.logged = []        # the texts of the log since the last refresh was printed
+        self.start_logs = []    # the texts of the log of the start
+        self.last_sent = None   # the LED data of the latest refresh
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
         if changeable:
@@ -619,18 +632,28 @@ class ReferencePlayer:
             start = self._check(content)
         except _Invalid as invalid:
             self.error = str(invalid)
+            self.start_logs.append(self.error)
         else:
-            # A cycle named as the start plays. Otherwise the playlist plays, from the
-            # animation the start names or from its first, when the show has one.
-            if start is not None and self.items[start].cycle is not None:
+            # A cycle named as the start plays while it lists a usable animation.
+            # Otherwise the playlist plays, from the animation the start names or the next
+            # usable one after it, or from its first, when the show has one.
+            if start is not None and self.items[start].cycle is not None and self._usable(start):
                 self._play(start)
-            elif start is not None or self._animations():
-                self._play_all(start)
+            else:
+                first = start if start is not None and self.items[start].cycle is None else None
+                if first is not None and not self._usable(first):
+                    first = self._after(first)
+                elif first is None:
+                    first = self._animations()[0] if self._animations() else None
+                if first is not None:
+                    self._play_all(first)
             if check_first:
-                refused = [f"file-malformed {name} {reason}" for name, _, reason in self.checks if reason is not None]
+                for name, _, reason in list(self.checks):
+                    if reason is not None:
+                        self._quarantine(name, reason)
                 self.checks = []
-                if refused:
-                    self._fail(refused[0])
+            self.start_logs += self.logged
+            self.logged = []
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
@@ -664,8 +687,10 @@ class ReferencePlayer:
                     files.pop(name, None)
 
         for name in show.files(listed):
+            # A file that cannot be used is quarantined; the others are read as ever.
             if name not in files:
-                raise _Invalid(f"file-missing {name}")
+                self._quarantine(name, "file-missing")
+                continue
             data = files[name]
             # The header is judged first, then the size against the mapping, then the body.
             # The header alone, when it is sound, is refused as a file cut after it.
@@ -673,16 +698,19 @@ class ReferencePlayer:
                 odrg.decode(data[:16])
             except errors.Rejection as rejection:
                 if len(data) < 16 or rejection.reason != "truncated":
-                    raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
+                    self._quarantine(name, rejection.reason)
+                    continue
             if struct.unpack_from("<HH", data, 6) != (canvas.width, canvas.height):
-                raise _Invalid(f"size-mismatch {name}")
+                self._quarantine(name, "size-mismatch")
+                continue
             # The body is read after the start, while the show plays, by a check that
             # takes one step for the file, one for each frame record and one for its end.
             # A host whose storage cannot be changed has no second reader: there the
             # body is read at the start.
             steps, reason, clip = self._judge(data)
             if reason is not None and not self.changeable:
-                raise _Invalid(f"file-malformed {name} {reason}")
+                self._quarantine(name, reason)
+                continue
             if reason is not None:
                 # The frames before the fault can be played. A fault after the last
                 # frame record is met by the check alone.
@@ -692,6 +720,54 @@ class ReferencePlayer:
             if self.changeable:
                 self.checks.append([name, steps, reason])
         return listed.start
+
+    def _usable(self, number):
+        """Whether an item can be played: an animation whose file is not quarantined, or a
+        cycle that lists one."""
+        item = self.items[number]
+        if item.cycle is None:
+            return item.file not in self.faults
+        return any(self.items[member].file not in self.faults for member in item.cycle)
+
+    def _after(self, number):
+        """The usable animation after this one in the order of the show, the first one
+        after the last, or None when there is none."""
+        order = [item.id for item in self.items.values() if item.cycle is None]
+        at = order.index(number)
+        for step in range(1, len(order) + 1):
+            candidate = order[(at + step) % len(order)]
+            if self._usable(candidate):
+                return candidate
+        return None
+
+    def _quarantine(self, name, reason):
+        """Makes a file unavailable for the rest of the boot. The playlist goes on with the
+        next usable animation when the one whose turn it is has the file, from the next
+        refresh; a cycle that lists no usable animation gives way to the playlist."""
+        if name in self.faults:
+            return
+        self.faults[name] = reason
+        self.logged.append(f"file {name} unavailable: {reason}")
+        current = self.checks[0][0] if self.checks else None
+        if current != name:
+            self.checks = [check for check in self.checks if check[0] != name]
+        else:
+            # The check is at the file: its next step passes over it.
+            self.checks[0][1:] = [1, None]
+        if self.playing == self.ALL and self.turn is not None and not self._usable(self.turn):
+            following = self._after(self.turn)
+            if following is None:
+                self.playing = self.shown = self.zero = self.turn = None
+            else:
+                self._play_all(following)
+        elif self.playing not in (None, self.ALL) and not self._usable(self.playing):
+            order = self._animations()
+            if order:
+                self._play_all(order[0])
+            else:
+                self.playing = self.shown = self.zero = self.turn = None
+
+    KEEP = object()
 
     def _fail(self, reason):
         """Makes the show invalid while it runs: nothing plays from here on."""
@@ -706,11 +782,11 @@ class ReferencePlayer:
         """Starts a cycle. An animation is not played by itself: it has its turn."""
         self.playing = number
         self.zero = None
-        self.shown = self.items[number].cycle[0]
+        self.shown = next(member for member in self.items[number].cycle if self._usable(member))
 
     def _animations(self):
-        """The ids of the animation items, in the order of the show: the playlist."""
-        return [item.id for item in self.items.values() if item.cycle is None]
+        """The ids of the usable animation items, in the order of the show: the playlist."""
+        return [item.id for item in self.items.values() if item.cycle is None and item.file not in self.faults]
 
     def _play_all(self, number=None):
         """Starts the playlist with the turn of an animation, or of its first one."""
@@ -757,8 +833,8 @@ class ReferencePlayer:
                     # turn that lies before it ends the turn first.
                     longest = None if item.max_seconds is None else 1000 * item.max_seconds
                     if clip.total <= (elapsed if longest is None else min(elapsed, longest)):
-                        self._fail(f"file-malformed {item.file} {clip.broken}")
-                        return None
+                        self._quarantine(item.file, clip.broken)
+                        return self.KEEP
                     if longest is None or elapsed < longest:
                         break
                     turn = longest
@@ -772,13 +848,15 @@ class ReferencePlayer:
         else:
             # Turn t of a cycle shows the animation at place t mod n, with its time
             # counted from the start of the turn.
+            # The animation of the turn, or the first usable one after it in the cycle.
             cycle = self.items[self.playing]
             turn, elapsed = divmod(elapsed, 1000 * cycle.seconds)
-            item = self.items[cycle.cycle[turn % len(cycle.cycle)]]
+            members = [cycle.cycle[(turn + step) % len(cycle.cycle)] for step in range(len(cycle.cycle))]
+            item = self.items[next(member for member in members if self._usable(member))]
             clip = self.clips[item.file]
             if clip.broken and clip.total <= elapsed:
-                self._fail(f"file-malformed {item.file} {clip.broken}")
-                return None
+                self._quarantine(item.file, clip.broken)
+                return self.KEEP
         self.shown = item.id
         picture = clip.picture_at(elapsed)
         return picture if self.on else None
@@ -822,14 +900,19 @@ class ReferencePlayer:
                 if check[1] == 0:
                     self.checks.pop(0)
                     if check[2] is not None:
-                        self._fail(f"file-malformed {check[0]} {check[2]}")
-                        picture = None
+                        self._quarantine(check[0], check[2])
                     if self.error is not None or not self.checks:
                         break
+        if picture is self.KEEP:
+            dark = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            self.last_sent = self.last_sent if self.on and self.last_sent is not None else dark
+            return self.last_sent
         if picture is None:
-            return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            self.last_sent = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            return self.last_sent
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
-        return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+        self.last_sent = [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+        return self.last_sent
 
     CHECK_MOST_STEPS = 16
     CHECK_LONGEST_WAIT = 9
@@ -892,6 +975,8 @@ class ReferencePlayer:
                 return "show-invalid"
             if value not in self.items:
                 return "unknown-id"
+            if not self._usable(value):
+                return "unavailable"
             if self.items[value].cycle is None:
                 self._play_all(value)
             else:
@@ -1049,6 +1134,7 @@ class ReferencePlayer:
         old = self.items.get(number)
         self.files[name] = upload["data"]
         self.clips[name] = upload["clip"]
+        self.faults.pop(name, None)
         # An item that gets another animation keeps what the show says of its turn.
         self.items[number] = show.Item(number, name, None, None, old.repeat if old else None, old.max_seconds if old else None)
         if old is not None:
@@ -1061,6 +1147,9 @@ class ReferencePlayer:
             played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and number in played.cycle:
                 self._play(self.playing)
+            if self.playing is None:
+                # Nothing played, as every animation was unavailable: the playlist starts.
+                self._play_all(self._animations()[0])
         elif self.playing is None:
             # The show had no animation, and nothing played: the playlist starts.
             self._play_all()
@@ -1069,6 +1158,8 @@ class ReferencePlayer:
 
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
+        if item.cycle is None and item.file in self.faults:
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "fault": self.faults[item.file]}, separators=(",", ":"))
         if item.cycle is None:
             return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
@@ -1121,7 +1212,7 @@ class ReferencePlayer:
             goes_on = order[(order.index(number) + 1) % len(order)]
         elif self.playing == number:
             # The cycle that plays leaves: the playlist plays, from its first animation.
-            goes_on = order[0]
+            goes_on = order[0] if order else number
         item = self.items.pop(number)
         if self.start == number:
             self.start = None
@@ -1133,6 +1224,7 @@ class ReferencePlayer:
         if item.file is not None and all(other.file != item.file for other in self.items.values()):
             self.files.pop(item.file, None)
             self.clips.pop(item.file, None)
+            self.faults.pop(item.file, None)
         self.files["show.json"] = self.show_text()
 
     def _space(self):
@@ -1176,9 +1268,10 @@ class ReferencePlayer:
         word, _, rest = line.partition(" ")
         if word == "poll":
             refresh = self.poll(int(rest))
+            logs, self.logged = [f"log {text}" for text in self.logged], []
             if refresh is None:
-                return [f"idle {rest}"]
-            return [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
+                return logs + [f"idle {rest}"]
+            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
         if line == "error":
             return [f"error {self.error or 'none'}"]
         if word in ("line", "linehex", "bytes"):
