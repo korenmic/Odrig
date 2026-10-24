@@ -51,7 +51,7 @@ Rules for every task:
   - Prove it fails first: `order move` is refused with `bad-argument`.
   - Requirements: 1.6 to 1.9
 
-- [ ] 3. The snake tests in the core
+- [x] 3. The snake tests in the core
   - `core/assets/mapping-snakes.json`, `core/snakes.py`, `core/src/snakes_data.h`,
     `core/src/mapping_control.cpp`, `core/src/commands.cpp`, `core/src/core_state.h`.
   - Tests, `tests/core/test_snakes.py`: each snake's 60 pixels through the default and a

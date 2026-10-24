@@ -644,7 +644,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,656 |
+| The core object | fixed | 3,664 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -661,17 +661,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,189** |
+| **Total** | | **125,197** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,666 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,674 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,393 bytes for the target file. A host with a drive
+of the check and the saved order: 77,401 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 16 bytes
 for each of 256 places, 4,096 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 130,693 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 130,701 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -796,6 +796,12 @@ existing pixel memory. Poll uses the normal palette, brightness and LED mapping
 on that picture while ordinary show progression is paused. Exit restarts the
 saved animation; cycles retain the current entry as their first resumed turn.
 The mode is transient and no show file changes. There is no runtime allocation.
+
+The twenty snake tests are one more embedded file, `core/src/snakes_data.h`, which the
+converter encodes from `core/assets/mapping-snakes.json` by `core/snakes.py`: twenty
+frames, frame n the test of snake n. A snake test decodes the file's records 1 to n into
+the pixel buffer and shows the last one, as the diagonal shows its one frame. The core
+keeps which test shows; one that follows another keeps the selection saved by the first.
 
 ### Inclusion and batch changes
 
