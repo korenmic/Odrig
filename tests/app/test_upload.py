@@ -67,12 +67,15 @@ class Uploading(unittest.TestCase):
             events = stream.read_for(1)
         self.assertEqual(found["message"], "Uploaded as animation 4 clip.odrg. It plays in the playlist.")
         self.assertEqual((folder / "clip.odrg").read_bytes(), support.converted_by_the_command_line(self.media / "clip.gif", self.mapping).odrg)
-        self.assertIn({"id": 4, "file": "clip.odrg", "bytes": (folder / "clip.odrg").stat().st_size}, json.loads(emulator.command("list"))["items"])
+        self.assertIn({"id": 4, "file": "clip.odrg", "bytes": (folder / "clip.odrg").stat().st_size, "ignored": False}, json.loads(emulator.command("list"))["items"])
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 4])
         self.assertEqual(found["now"], "Now 4 clip.odrg")
         self.assertEqual(emulator.status()["animation"], 4)
         lines = [entry["line"].split(" ")[:2] for entry in emulator_support.of_kind(events, "log")]
         self.assertEqual([line for line in lines if line[0] == "upload"][0], ["upload", "begin"])
+        all_lines = [entry["line"] for entry in emulator_support.of_kind(events, "log")]
+        ended = max(i for i, line in enumerate(all_lines) if line.startswith("upload end "))
+        self.assertIn("space", all_lines[ended + 1:])
         self.assertTrue(found["sending"] and all(text.startswith("Sending: ") for text in found["sending"]), found["sending"])
 
     def test_a_video_is_uploaded_with_the_frames_of_the_command_line_and_colours_close_to_them(self):

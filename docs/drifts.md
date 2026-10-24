@@ -8636,3 +8636,16 @@ recovery journal, extended from 512 bytes. Failed cleanup blocks subsequent show
 mutations until restart retries it, preventing journal overwrite. Explicit false is
 preserved; omitted ignored remains omitted until changed. External capacity is an
 optional fact supplied by the host, never a new permission to write removable media.
+
+## Seed 29: mutation controls on an older target
+
+**Question.** An older list reply omits `ignored` on every animation, while the shared
+protocol now omits it only on external entries. Can the app infer editability from ids?
+
+**Answer.** No. An installed animation can have an id above60000. Keep playback controls
+but omit inclusion and deletion controls wherever the flag is absent. A missing external
+capacity object means unavailable, rather than inventing absent media. The core remains
+the authority for every mutation and capacity fact.
+
+**Resolution.** `app/www/commands.js`, the Show and Storage screens, and
+`docs/android-app.md` describe and implement this compatibility behavior.

@@ -114,7 +114,7 @@ byId("to-target").addEventListener("click", () => go("target"));
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
-showScreen.start();
+showScreen.start({message});
 storageScreen.start({message});
 mappingScreen.start();
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));

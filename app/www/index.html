@@ -25,14 +25,24 @@
 <label for="level">Set the brightness to <span id="level-number">-</span></label>
 <input id="level" type="range" min="0" max="255" step="1" value="0">
 <button id="play-all" type="button">Playlist from the start</button>
+<p id="show-space">-</p>
+<p id="show-external-space">-</p>
 <h1>Animations</h1>
 <div id="animations"></div>
 <p id="none" hidden>No animation is installed.</p>
 </section>
 <section id="storage" hidden>
 <h1>Storage</h1>
+<p>Internal storage</p>
 <p id="space">-</p>
+<p id="external-space">-</p>
 <h1>Installed</h1>
+<div class="pair">
+<button id="select-all" type="button">Select all</button>
+<button id="clear-selection" type="button">Clear selection</button>
+</div>
+<button id="delete-selected" type="button" disabled>Delete selected</button>
+<p id="bulk-progress" role="status" aria-live="polite"></p>
 <div id="installed"></div>
 <p id="installed-none" hidden>No animation is installed.</p>
 <h1>Add an animation</h1>

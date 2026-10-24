@@ -69,7 +69,7 @@ export async function status() {
 }
 
 // One part of the items of the show, in its order, from a position on: each animation
-// as `{id, file, bytes}` and each cycle as `{id, cycle: true}`, and `next`, the position
+// as `{id, file, bytes}` with optional boolean `ignored`, and each cycle as `{id, cycle: true}`, and `next`, the position
 // to ask for next, or null when the part holds the last item.
 export async function list(from = 0) {
   const reply = await carriedOut(`list ${from}`);
@@ -81,24 +81,31 @@ export async function list(from = 0) {
         item !== null &&
         typeof item === "object" &&
         whole(item.id, 1, 65535) &&
-        ((typeof item.file === "string" && whole(item.bytes, 0, MOST_BYTES)) || (Array.isArray(item.cycle) && item.file === undefined)),
+        (item.ignored === undefined || typeof item.ignored === "boolean") &&
+        ((typeof item.file === "string" && whole(item.bytes, 0, MOST_BYTES)) || (Array.isArray(item.cycle) && item.file === undefined && item.ignored === undefined)),
     );
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
   return {
-    items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes} : {id: item.id, cycle: true})),
+    items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored})} : {id: item.id, cycle: true})),
     next: reply.next,
   };
 }
 
-// The free and the total bytes of the target's storage.
+// Internal capacity and the external medium's presence and nullable capacity.
 export async function space() {
   const reply = await carriedOut("space");
   if (!whole(reply.free, 0, MOST_BYTES) || !whole(reply.total, 0, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
-  return {free: reply.free, total: reply.total};
+  const external = reply.external;
+  if (external !== undefined && (external === null || typeof external.present !== "boolean" || external.read_only !== true ||
+      !((external.free === null && external.total === null) ||
+        (external.present && whole(external.free, 0, Number.MAX_SAFE_INTEGER) && whole(external.total, external.free, Number.MAX_SAFE_INTEGER))))) {
+    throw new Failure("bad-reply", address());
+  }
+  return {free: reply.free, total: reply.total, external: external === undefined ? null : external};
 }
 
 // Removes the item with this id from the show.
@@ -178,4 +185,12 @@ export async function mappingSet(revision, pins) {
 
 export async function mappingTest(enabled) {
   await carriedOut(`mapping test ${enabled ? "on" : "off"}`);
+}
+
+export async function ignore(id, ignored) {
+  await carriedOut(`ignore ${id} ${ignored ? 1 : 0}`);
+}
+
+export async function removeMany(ids) {
+  await carriedOut(`remove many ${ids.join(",")}`);
 }

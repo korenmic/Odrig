@@ -27,7 +27,7 @@ function measure(app) {
   const controls = [...doc.querySelectorAll("button, input")].filter(displayed).map((element) => ({
     what: element.id || element.textContent.trim(),
     group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" : "screen",
-    ...box(element),
+    ...box(element.type === "checkbox" ? element.closest("label") : element),
   }));
   const texts = [...doc.querySelectorAll("p, label, h1, button, input, span")]
     .filter((element) => displayed(element) && [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim() !== ""))

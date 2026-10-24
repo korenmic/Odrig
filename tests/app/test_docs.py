@@ -72,12 +72,12 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_eighteen_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_twenty_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
-        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>",
+        self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
                                  "upload begin <id> <file> <bytes>", "upload data <offset> <base64>", "upload end <crc32>", "upload cancel", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off"])
-        self.assertIn("It sends eighteen command lines and no other", self.said)
+        self.assertIn("It sends twenty command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],

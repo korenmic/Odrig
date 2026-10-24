@@ -13,19 +13,24 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   plays, the animation on the LEDs with its id and its file name, and the refreshes a
   second. Below that are two buttons, `On` and `Off`, a slider for the brightness, the
   button `Playlist from the start`, and one button for each installed animation, in the
-  order of the playlist.
+  order of the playlist. Each installed animation has an `Include in playlist`
+  checkbox and an Included or Ignored label. Explicit Play still plays an ignored item.
+  Both Show and Storage report internal and external capacity; absent media and
+  unavailable capacity are distinct, and external storage is read-only.
 - **The storage screen** says how much of the installation's storage is free, as
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
   playlist, each with its id, its file name and its size in kilobytes, and a button
   `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
-  a GIF of the phone, and uploads it.
+  a GIF of the phone, and uploads it. Select checkboxes, `Select all` and `Clear selection`
+  mark installed animations for `Delete selected`. External entries have no mutation
+  controls. The confirmation names the count and files before anything is sent.
 - **The mapping screen** edits the twenty saved snake-to-pin assignments and controls
   the built-in diagonal for a person to check on the real LEDs.
 - **The target screen** has the address of the installation, says whether it answers, and
   says how the phone's requests travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-eighteen command lines and no other, each as `POST /odrig` to the address that is set:
+twenty command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -35,8 +40,10 @@ eighteen command lines and no other, each as `POST /odrig` to the address that i
 | Presses `Playlist from the start` | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
 | Moves the slider | `brightness <n>` |
-| Nothing: when the storage screen is shown, every ten seconds while it is, and after a removal | `space` |
+| Nothing: at boot, reconnect, return to the app, entering Show or Storage, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Presses `Remove` and then `Remove it` | `remove <id>` |
+| Changes Include in playlist | `ignore <id> <0-or-1>` |
+| Confirms Delete selected | `remove many <ids>` |
 | Presses `Upload` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
 | Presses `Cancel` while it uploads | `upload cancel` |
 | Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
@@ -46,6 +53,16 @@ eighteen command lines and no other, each as `POST /odrig` to the address that i
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
 unsupported message.
+
+Inclusion changes wait for acknowledgement before showing saved state. The list refreshes
+periodically so changes from serial or another app become visible. Older targets whose
+list lacks the inclusion flag keep playback controls but have no mutation controls.
+Deletion sends at most 32 distinct ids per batch on the existing serialized command stream.
+A refused batch preserves the remaining selection; a missing reply reports only the
+confirmed count and refreshes the list before another attempt. It never retries a lost
+delete reply automatically. Changing target clears selection and confirmation, and stale
+replies cannot change the new target's screen. Leaving the app stops unsent batches.
+Uploads and deletions disable conflicting controls until their operation has ended.
 
 The web code, `app/www/`, is plain JavaScript, HTML and CSS: a browser runs the files as
 they are. Capacitor wraps them into the Android app. One class of Java, the sender,
@@ -504,7 +521,7 @@ By programs, on a Mac:
   line of each list can be scrolled above the tabs, and with the keyboard open the field
   is in view and the tabs are hidden. Without the room the page is as before. The
   settings of the bars in the Android project, and in the APK.
-- That the web code sends the eighteen lines above and no other, and names no address
+- That the web code sends the twenty lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted

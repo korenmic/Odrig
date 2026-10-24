@@ -251,3 +251,28 @@ select:disabled {
 #mapping-error {
   color: var(--marked);
 }
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+}
+input[type="checkbox"] {
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--marked);
+}
+#confirm {
+  max-height: 60vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+#message {
+  max-height: 60vh;
+  overflow: auto;
+}

@@ -30,7 +30,7 @@ failing before fixes. No flash, phone installation or external-drive writes.
   - Verify: core, emulator and firmware suites by discovery.
   - Requirements: 3.1–3.2, 4.1–4.2.
 
-- [ ] 4. Implement shared app inclusion toggles, bulk selection and capacity views
+- [x] 4. Implement shared app inclusion toggles, bulk selection and capacity views
   - Extend validated protocol/client snapshots and mutation promises; refresh capacity
     on boot/reconnect/upload/delete and active view polling. Ignore stale target replies.
   - Add Show toggles and capacity; Storage selection, confirmation, sequential batches,

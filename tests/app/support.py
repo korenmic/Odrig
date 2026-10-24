@@ -204,7 +204,7 @@ class _Pages(webserver.Handler):
 # What `status` answers on a target where the playlist plays its first animation, what
 # `list` answers there, and a target that answers both so.
 PLAYING = (200, '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null}\n')
-LISTED = (200, '{"ok":true,"items":[{"id":1,"file":"one.odrg","bytes":1138},{"id":2,"file":"two.odrg","bytes":1612}],"next":null}\n')
+LISTED = (200, '{"ok":true,"items":[{"id":1,"file":"one.odrg","bytes":1138,"ignored":false},{"id":2,"file":"two.odrg","bytes":1612,"ignored":false}],"next":null}\n')
 SOUND = {"status": PLAYING, "list": LISTED}
 
 Run = collections.namedtuple("Run", "seen elsewhere")
