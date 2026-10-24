@@ -45,7 +45,9 @@ class TheListOfAnimations(unittest.TestCase):
         self.assertEqual(found["before"]["space"], f"Internal storage: {space['animations']} animations, free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
         self.assertEqual([row["text"] for row in found["before"]["rows"]], [f"{item['id']} {item['file']} {-(-item['bytes'] // 1000)} KB" for item in listed])
         self.assertEqual({row["badge"] for row in found["before"]["rows"]}, {"in"})
-        self.assertEqual({tuple(menu) for menu in found["menus"].values()}, {("Ignore in playlist", "Select", "Delete")})
+        self.assertEqual([menu for menu in found["menus"].values()], [["Ignore in playlist", "Move up (disabled)", "Move down", "Select", "Delete"],
+                                                                     ["Ignore in playlist", "Move up", "Move down", "Select", "Delete"],
+                                                                     ["Ignore in playlist", "Move up", "Move down (disabled)", "Select", "Delete"]])
         self.assertTrue(found["menuClosed"])
         self.assertEqual(found["buttons"], ["Animations", "Upload", "Settings", "Target"])
         self.assertEqual((found["before"]["none"], found["before"]["dimmed"]), (None, False))
@@ -82,7 +84,7 @@ class TheListOfAnimations(unittest.TestCase):
         self.assertEqual(found["question"], "Remove animation 1 one.odrg from the installation?")
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 3])
         self.assertIsNone(found["message"])
-        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space"))], [])
+        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space", "order get"))], [])
 
     def test_an_animation_a_cycle_lists_is_refused_in_words(self):
         emulator, address = self.emulator(entered(self, emulator_support.example_show()))

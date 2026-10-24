@@ -44,7 +44,7 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   says how the phone's requests travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty command lines and no other, each as `POST /odrig` to the address that is set:
+twenty-three command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -63,6 +63,8 @@ twenty command lines and no other, each as `POST /odrig` to the address that is 
 | Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
 | Saves the twenty assignments | `mapping set <revision> <pins>` |
 | Shows or stops the diagonal | `mapping test on`, `mapping test off` |
+| Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
+| Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -371,6 +373,7 @@ it is dismissed with `OK` or another takes its place.
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
+| `order-conflict` | A move used an order that another controller, an upload or the card changed. | The order changed on the installation since the app read it. The list is read again; move the animation again. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the

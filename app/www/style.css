@@ -453,6 +453,26 @@ input[type="range"] {
   line-height: 1;
 }
 
+#animations-list[data-movable="true"] .row {
+  touch-action: pan-y;
+}
+
+.row.lifted {
+  position: fixed;
+  z-index: 5;
+  margin: 0;
+  border-color: var(--teal);
+  background: var(--panel-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(69, 224, 210, 0.35);
+  pointer-events: none;
+}
+
+.placeholder {
+  margin: 8px 0;
+  border: 2px dashed var(--edge-strong);
+  border-radius: 16px;
+}
+
 .row .pick {
   display: none;
   flex: 0 0 auto;
@@ -468,6 +488,7 @@ input[type="range"] {
 }
 
 #row-menu {
+  overflow-y: auto;
   position: fixed;
   z-index: 5;
   min-width: 220px;

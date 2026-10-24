@@ -200,3 +200,21 @@ export async function ignore(id, ignored) {
 export async function removeMany(ids) {
   await carriedOut(`remove many ${ids.join(",")}`);
 }
+
+// One part of the saved playlist order, from a position on: the ids of the listed
+// animations in their order, `next`, the position to ask for next or null, and the
+// order's revision.
+export async function orderGet(from = 0) {
+  const reply = from === 0 ? await carriedOut("order get") : await carriedOut(`order get ${from}`);
+  if (!Array.isArray(reply.ids) || !reply.ids.every((id) => whole(id, 1, 65535)) || !(reply.next === null || whole(reply.next, from + 1, 65535)) ||
+      !whole(reply.revision, 0, MOST_BYTES)) {
+    throw new Failure("bad-reply", address());
+  }
+  return {ids: reply.ids, next: reply.next, revision: reply.revision};
+}
+
+// Moves the animation with this id before the one with the id `before`, or to the end
+// with "end", in the saved order whose revision the app read.
+export async function orderMove(revision, id, before) {
+  await carriedOut(`order move ${revision} ${id} ${before}`);
+}

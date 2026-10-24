@@ -16,8 +16,11 @@ const SPACE_EVERY_MS = 10000;
 // `animations` is the animation items of the newest complete list, in the order of the
 // show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
 // its cycles. `space` holds internal and external capacity from the newest reply, or null.
-// `listBusy` says whether the newest `list` request was answered `busy`.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0, listBusy: false};
+// `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
+// saved playlist order that goes with the newest list, `{ids, revision}`, or null while
+// there is none; `orderKnown` is false when the target has no saved order, an older one.
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0, listBusy: false,
+  order: null, orderVersion: 0, orderKnown: true};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -35,6 +38,11 @@ let listTimer = null;
 let listing = null;
 // The animation a status named that the list did not have, for which the list was asked.
 let askedFor = null;
+// Whether the saved order is due after a complete list, and the order that is being asked
+// for in parts: the ids so far, the position to ask for next and the revision of the
+// first part.
+let orderDue = false;
+let ordering = null;
 // Whether a list has waited while a status was sent. It goes before the next status
 // then, so that a target that answers slowly does not keep the list away.
 let listWaited = false;
@@ -180,6 +188,9 @@ async function askListPart() {
       state.listBusy = false;
       state.animations = items.filter((item) => item.cycle !== true);
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
+      orderDue = state.orderKnown;
+      ordering = null;
+      if (!state.orderKnown) state.order = null;
       listAgainLater();
     }
   } catch (error) {
@@ -202,6 +213,55 @@ async function askListPart() {
     } else {
       failed(error);
       listAgainLater();
+    }
+  }
+  changed();
+}
+
+// Asks for one part of the saved order. The order takes the place of the one before when
+// its last part has come and it holds exactly the animations of the list; otherwise the
+// list is asked for again.
+async function askOrderPart() {
+  const asked = target;
+  const part = ordering === null ? {ids: [], from: 0, revision: null} : ordering;
+  ordering = null;
+  try {
+    const reply = await commands.orderGet(part.from);
+    if (asked !== target) {
+      return;
+    }
+    heard();
+    const ids = part.ids.concat(reply.ids);
+    if (part.revision !== null && part.revision !== reply.revision) {
+      // The order changed between two parts: it is asked for whole again.
+      orderDue = true;
+    } else if (reply.next !== null) {
+      ordering = {ids, from: reply.next, revision: reply.revision};
+    } else {
+      const listed = new Set((state.animations || []).map((item) => item.id));
+      if (ids.length === listed.size && ids.every((id) => listed.has(id))) {
+        state.order = {ids, revision: reply.revision};
+        state.orderVersion += 1;
+      } else {
+        state.order = null;
+        listing = null;
+        listDue = true;
+      }
+    }
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+      state.order = null;
+      if (["unknown-command", "bad-argument"].includes(error.code)) {
+        // A target whose software has no saved order: the list stays in its own order.
+        state.orderKnown = false;
+        state.orderVersion += 1;
+      }
+    } else {
+      failed(error);
     }
   }
   changed();
@@ -239,7 +299,7 @@ async function give(request) {
     }
     request.reject?.(error);
   }
-  if (request.kind === "remove" || request.kind === "ignore") {
+  if (request.kind === "remove" || request.kind === "ignore" || request.kind === "order") {
     listing = null;
     listDue = true;
     spaceDue = true;
@@ -314,6 +374,10 @@ function due() {
     listWaited = false;
     return askListPart;
   }
+  if (orderDue || ordering !== null) {
+    orderDue = false;
+    return askOrderPart;
+  }
   if (spaceDue) {
     spaceDue = false;
     return askSpace;
@@ -358,6 +422,10 @@ export function begin() {
   state.cycles = [];
   state.space = null;
   state.listBusy = false;
+  state.order = null;
+  state.orderKnown = true;
+  orderDue = false;
+  ordering = null;
   cancelWaiting();
   statusDue = true;
   listDue = false;
@@ -511,4 +579,15 @@ export function ignore(id, ignored) {
 
 export function removeMany(ids) {
   return requestOperation("remove", () => commands.removeMany(ids));
+}
+
+// Moves an animation before another, or to the end with "end", in the saved order the
+// list is shown in. The list and the order are asked for again afterwards, whatever the
+// reply.
+export function orderMove(id, before) {
+  const revision = state.order === null ? null : state.order.revision;
+  if (revision === null) {
+    return Promise.reject(new Error("no saved order"));
+  }
+  return requestOperation("order", () => commands.orderMove(revision, id, before));
 }
