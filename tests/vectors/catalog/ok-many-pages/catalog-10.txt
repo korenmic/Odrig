@@ -1,0 +1,2 @@
+00003dde 1002 60 60 2000 frames clip-002.odrg
+0001d001 1015 60 60 15000 frames clip-015.odrg

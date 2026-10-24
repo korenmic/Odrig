@@ -29,7 +29,7 @@ Rules for every task:
     catalog joins the playlist. Each is an expected failure until the task that mends it.
   - Prove it fails first: the tests' assertions fail on today's core (recorded).
 
-- [ ] 2. The format and the PC library
+- [x] 2. The format and the PC library
   - `odrig/catalog.py`: the storage, the format's writers and readers, `page_of`,
     `entry_of`, `commit`, `finish`, `add`, `remove`, `rebuild`, `check`, `status`,
     `recover`.
