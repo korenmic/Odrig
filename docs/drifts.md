@@ -9939,3 +9939,128 @@ loop of every file; it waits for seed 35 to be joined. The seed's state then fol
 **Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14;
 the branch `seed-37-odrgx-text-and-clock-animations-unified`.
 
+
+## Seed 35: what a storage without a catalog does
+
+**Question.** The seed wants no routine reading of the library and no discovery of
+copied files, and also no automatic rebuild when a catalog is missing. The board and the
+owner's card have no catalog today. What does a start or a plug-in do with them?
+
+**Answer.** They are legacy and are read as before this spec: the start opens each file
+and the check after the start reads it, a drive is listed and its files checked before
+they play, and a file copied onto a legacy drive joins as before. Nothing writes a
+catalog by itself; `catalog rebuild` on the board, or the PC tool's `import`, makes one
+once, and from then on the storage is read from its catalog. A damaged or incompatible
+catalog is reported and its files read as legacy (internal) or not taken (a drive), so
+that nothing that plays now stops playing and no start loops.
+
+**Resolution.** The spec's requirements 2.3, 4.3 and 4.5; design, "The start" and "The
+drive".
+
+## Seed 35: the format, its pages and its commit
+
+**Question.** The seed asks for metadata work per change that does not grow with the
+library and for a fixed-size marker, and the owner for byte-identical files from the board
+and from a computer. One catalog file rewritten at each change grows with the library;
+fixed slots need a byte of memory for every installed file, which the target file does not
+have.
+
+**Answer.** Text, 16 pages, an entry's page the low four bits of its name's FNV-1a hash
+(the hash of the saved order), lines in the order they came in; a marker of 409 bytes with
+the generation and each page's count and CRC-32. A change writes its pages and marker as
+`.new` files and then the commit record `catalog.do`; finishing renames them into place
+and is repeated after a cut. A change rewrites the page of its entry, N/16 entries on
+average and at most N, which the documents say as such; no change lists the storage or
+reads another animation. On FAT, where a file cannot be renamed onto another, the host
+removes the target first, and the commit record covers the moment between.
+
+**Resolution.** The design, "The catalog format"; `docs/catalog.md`.
+
+## Seed 35: the show file and the catalog
+
+**Question.** An upload of a new item and a removal change both `show.json` and the
+catalog. Each file is replaced in one rename. Which goes first, and what does a cut between
+leave?
+
+**Answer.** An upload commits the catalog first, with the file's rename in its commit
+record, and then writes the show as before; a removal writes the show and removes the file
+as seed 34 does, and then commits the catalog. A cut between leaves an entry for a file
+the show does not name, or a file the show names without its entry: the first is not an
+animation, the second is read as legacy, and the next rebuild leaves both out. A
+replacement under its name is one commit.
+
+**Resolution.** The design, "Changes of the internal storage".
+
+## Seed 35: room in the core
+
+**Question.** With a drive the target file takes 130,701 of 131,072 bytes. The catalogs
+need about 220 bytes of state. Where is the room?
+
+**Answer.** The drive's table keeps a file's length in 32 bits: 49 days and more count as
+4,294,967,295 ms. Its 256 entries take 12 bytes each instead of 16, which frees 1,024
+bytes; the catalogs take part of them, and the measurement says what is left.
+
+**Resolution.** The design, "Memory"; `docs/core.md`'s table.
+
+## Seed 35: the board writes the card
+
+**Question.** The owner's answer 7 lets the board write the card. Which commands, which
+ids, and what of a USB drive?
+
+**Answer.** The host says whether its drive can be written: the SD card when it is
+mounted, a USB drive never. `upload begin external <file> <bytes> [<crc32>]` uploads to the
+card, and `upload end` answers the new animation's id; a file of the same name is replaced
+and keeps its id. `remove <id>` removes a card's animation; `remove many` and `ignore` stay
+for the board's own storage. A legacy card is not written until it has a catalog, and the
+new error `read-only` says so, as it does for a card that cannot be written.
+
+**Resolution.** The design, "The board writes the drive".
+
+## Seed 35: rebuild, its writes and its budget
+
+**Question.** A rebuild writes a page while it reads its files over many refreshes, and the
+host has one file being written. What of other changes meanwhile, and what are the budgets?
+
+**Answer.** While a rebuild has a page open, the commands that write storage answer `busy`;
+playing, power, brightness, `list` and the rest work. A rebuild takes the steps of the
+check after the start: up to 16 a refresh, each one read of at most 512 bytes or one frame
+record, and one at least in 10 refreshes. A drive's catalog is read in the same steps; an
+unchanged drive's marker is read once in 10 seconds; the internal catalog is read whole at
+the start (at most 132 entries, metadata only). An external rebuild drops the card's
+animations, lists the folder once and lets each file join again as it passes.
+
+**Resolution.** The design, "Rebuild" and "The drive".
+
+## Seed 35: unmanaged changes and the check
+
+**Question.** How is a file that was changed behind the catalog's back found?
+
+**Answer.** By the PC tool's `check`, which compares each file's size and CRC-32 with its
+entry, and by a rebuild, which reads every file; playback keeps seed 31's decoding and seed
+32's quarantine, which catch a file that no longer decodes. No start or refresh hashes the
+library.
+
+**Resolution.** The spec's requirement 2.5; the design, "The PC tool".
+
+## Seed 35: the PC tool's reader and seed 37's types
+
+**Question.** The PC tool must admit what the core admits. Which reader does it use, and
+what type does an entry have before seed 37?
+
+**Answer.** The project's Python reader, `odrig.odrg.decode`, whose reasons the shared
+vectors keep equal to the core's; the tests run the core and the tool on the same files.
+Every entry of an ODRG file has the type `frames`; seed 37 adds `text` and `widget` with its
+container.
+
+**Resolution.** The design, "The PC tool"; `tests/vectors/catalog/`.
+
+## Seed 35: where the app puts a new animation
+
+**Question.** The owner wants one or two small animations on the board and the rest on the
+card. What does Upload offer?
+
+**Answer.** When the card can be written, Upload offers `The card` first and `This board`
+second; otherwise it stores on the board as before. Settings shows both catalogs and their
+rebuilds; a card's row has `Delete` when the card can be written.
+
+**Resolution.** The design, "The app".
