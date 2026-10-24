@@ -22,7 +22,7 @@ Rules for every task:
   goes into its document and the change log of `docs/decisions.md`. Nothing else is added.
 - Answers to questions that come up go into `docs/drifts.md`.
 
-- [ ] 1. The regression: one removal rewrites the whole folder
+- [x] 1. The regression: one removal rewrites the whole folder
   - Set the seed's `state.json` to `in_progress`.
   - `tests/firmware/test_incremental.py`: a full storage of each layout; removing one
     animation changes at most the blocks of the files written and 4 more. Marked as an
