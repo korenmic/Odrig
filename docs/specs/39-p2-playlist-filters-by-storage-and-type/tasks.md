@@ -28,7 +28,7 @@ Rules for every task:
   - Prove it fails first: Animations has no filter Storage.
   - Requirements: 1.1 to 1.9, 2.1 to 2.3, 3.1, 3.2
 
-- [ ] 2. The APK and every suite
+- [x] 2. The APK and every suite
   - Every suite that runs without a board; `python3 app/app.py build`; `tests/apk`.
   - docs/decisions.md: a dated line. The seed stays `in_progress` for task 3.
   - Requirements: 3.3
