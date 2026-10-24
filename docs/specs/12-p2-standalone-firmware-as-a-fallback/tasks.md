@@ -119,7 +119,10 @@ Rules for every task:
     commands of the board suite gives the replies of the emulator; the port is silent
     without a command.
   - Tests in `tests/firmware/`: `main.cpp` holds no network name and no password.
-  - Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 1.7
+  - The microSD card, as the design's "The microSD card" says: `odrig_drive.cpp` with the
+    card's flag and pins, and on the board a card's animations listed after the installed
+    ones.
+  - Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 1.7, 13.1, 13.2, 13.3
 
 - [ ] 7. The probe build
   - `firmware/usermod/odrig_pulses.h` and `odrig_pulses.cpp`, moved out of

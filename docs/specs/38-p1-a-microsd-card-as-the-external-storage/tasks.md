@@ -38,7 +38,8 @@ Rules for every task:
 - The board is touched only in a session with the owner: one program at a time,
   brightness 40 or less, no eFuse, the flash never erased whole, the firmware built only
   as the tool builds it, flashed with `flash --image build/firmware/out/odrig-microsd.bin`
-  and never with `flash` alone, which writes the stick's build. Nothing is soldered.
+  or, once task 10 is done, with `flash`, which then writes the card's firmware too, and
+  never with an image of `build --stick`. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked. The
   seed's questions 7 and 8 are the owner's and are not decided here.
 
@@ -156,7 +157,7 @@ Rules for every task:
     new seed, in words.
   - Requirements: 9.4, 9.5, 9.6
 
-- [ ] 10. The firmware that `build` makes
+- [x] 10. The firmware that `build` makes
   - Only after the owner answers the seed's question 8.
   - When the answer is yes: `firmware/fwtool/` and `firmware/platformio_override.ini.in`:
     `build` and `build --probe` make the card's firmware and its probe build on the newer

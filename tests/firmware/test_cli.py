@@ -122,7 +122,7 @@ class Building(unittest.TestCase):
         def run(command, **named):
             ran.append((command, named))
             return mock.Mock(returncode=status)
-        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override"), mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1232912), mock.patch.object(build, "sha256", return_value="48e51d84"):
+        with mock.patch.object(build.toolchain, "python_environment"), mock.patch.object(build.toolchain, "newer_environment"), mock.patch.object(build.wled, "restore_and_patch") as patched, mock.patch.object(build.wled, "write_override"), mock.patch.object(build.subprocess, "run", run), mock.patch.object(build, "keep", return_value=1232912), mock.patch.object(build, "sha256", return_value="48e51d84"):
             result = support.run_main("build", *arguments)
         return result, ran, patched
 
@@ -139,7 +139,8 @@ class Building(unittest.TestCase):
         self.assertEqual(ran[0][1]["env"]["PLATFORMIO_BUILD_CACHE_DIR"], str(build.paths.PIO_CACHE))
 
     def test_the_firmware_and_the_probe_build_have_environments_of_their_own_and_get_the_patches(self):
-        for arguments, environment, image in (([], "odrig", "odrig-firmware.bin"), (["--probe"], "odrig_probe", "odrig-probe.bin")):
+        for arguments, environment, image in (([], "odrig_microsd", "odrig-firmware.bin"), (["--probe"], "odrig_microsd_probe", "odrig-probe.bin"),
+                                              (["--stick"], "odrig", "odrig-stick.bin"), (["--stick", "--probe"], "odrig_probe", "odrig-stick-probe.bin")):
             result, ran, patched = self.build(*arguments)
             self.assertEqual(result.status, 0, result.err)
             self.assertEqual(ran[0][0][-2:], ["-e", environment])

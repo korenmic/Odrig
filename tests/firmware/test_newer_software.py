@@ -9,6 +9,7 @@ from unittest import mock
 from fwtool import build, env, paths, toolchain, wled
 
 from . import ROOT, support
+from .test_docs import section
 
 PLATFORM = "https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip"
 DOCUMENT = ROOT / "docs" / "firmware.md"
@@ -140,79 +141,104 @@ class Building(unittest.TestCase):
             result = support.run_main("build", *arguments)
         return result, ran, newer, patched, overridden, kept
 
-    def test_trial_runs_the_newer_softwares_platformio_on_the_trial_environment(self):
-        for arguments, environment, image in ((["--trial"], "odrig_trial", "odrig-trial.bin"), (["--trial", "--probe"], "odrig_trial_probe", "odrig-trial-probe.bin")):
-            result, ran, newer, patched, overridden, kept = self.build(*arguments)
-            self.assertEqual(result.status, 0, result.err)
-            self.assertEqual(ran[0][0], [str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment])
-            self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.NEWER_PIO_CORE))
-            self.assertEqual(ran[0][1]["env"]["PATH"].split(os.pathsep)[0], str(paths.NEWER_VENV / "bin"))
-            newer.assert_called_once_with()
-            self.assertEqual(patched.call_args.kwargs, {"patches": paths.PATCHES})
-            overridden.assert_called_once_with()
-            self.assertEqual(kept.call_args.args, (paths.WLED / ".pio" / "build" / environment / "firmware.bin", paths.OUT / image))
-            self.assertIn(f"{image}: 1500000 bytes", result.out)
+    def test_the_firmware_and_its_probe_build_are_the_cards_on_the_newer_softwares_platformio(self):
+        for arguments, environment, image in (([], "odrig_microsd", "odrig-firmware.bin"), (["--probe"], "odrig_microsd_probe", "odrig-probe.bin")):
+            with self.subTest(arguments=arguments):
+                result, ran, newer, patched, overridden, kept = self.build(*arguments)
+                self.assertEqual(result.status, 0, result.err)
+                self.assertEqual(ran[0][0], [str(paths.NEWER_PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment])
+                self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.NEWER_PIO_CORE))
+                self.assertEqual(ran[0][1]["env"]["PATH"].split(os.pathsep)[0], str(paths.NEWER_VENV / "bin"))
+                newer.assert_called_once_with()
+                self.assertEqual(patched.call_args.kwargs, {"patches": paths.PATCHES})
+                overridden.assert_called_once_with()
+                self.assertEqual(kept.call_args.args, (paths.WLED / ".pio" / "build" / environment / "firmware.bin", paths.OUT / image))
+                self.assertIn(f"{image}: 1500000 bytes", result.out)
 
-    def test_the_build_known_good_does_not_touch_the_newer_software(self):
-        for arguments in ([], ["--probe"], ["--stock"]):
-            result, ran, newer, _, _, _ = self.build(*arguments)
-            self.assertEqual(result.status, 0, result.err)
-            self.assertEqual(ran[0][0][0], str(paths.PYTHON))
-            self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.PIO_CORE))
-            newer.assert_not_called()
+    def test_the_sticks_build_and_stock_wled_are_built_on_the_software_known_good(self):
+        for arguments, environment, image in ((["--stick"], "odrig", "odrig-stick.bin"), (["--stick", "--probe"], "odrig_probe", "odrig-stick-probe.bin"),
+                                              (["--probe", "--stick"], "odrig_probe", "odrig-stick-probe.bin"), (["--stock"], "esp32s3dev_16MB_opi", "stock-built.bin")):
+            with self.subTest(arguments=arguments):
+                result, ran, newer, _, _, kept = self.build(*arguments)
+                self.assertEqual(result.status, 0, result.err)
+                self.assertEqual(ran[0][0], [str(paths.PYTHON), "-m", "platformio", "run", "-d", str(paths.WLED), "-e", environment])
+                self.assertEqual(ran[0][1]["env"]["PLATFORMIO_CORE_DIR"], str(paths.PIO_CORE))
+                newer.assert_not_called()
+                self.assertEqual(kept.call_args.args[1], paths.OUT / image)
+                self.assertIn(f"{image}: 1500000 bytes", result.out)
 
-    def test_trial_does_not_go_with_stock_or_standalone(self):
-        for arguments in (["--trial", "--stock"], ["--trial", "--standalone"], ["--trial", "--probe", "--standalone"]):
-            result = support.run_main("build", *arguments)
+    def test_the_trial_is_gone(self):
+        result = support.run_main("build", "--trial")
+        self.assertEqual(result.status, 2)
+        self.assertIn("unrecognized arguments: --trial", result.err)
+
+    def test_stick_does_not_go_with_stock_or_standalone(self):
+        for arguments in (["--stick", "--stock"], ["--stick", "--standalone"], ["--stick", "--probe", "--standalone"]):
+            with self.subTest(arguments=arguments), mock.patch.object(build, "build") as built:
+                result = support.run_main("build", *arguments)
             self.assertEqual(result.status, 2, arguments)
-            self.assertIn("--trial does not go with", result.err)
+            self.assertIn("--stick does not go with", result.err)
+            built.assert_not_called()
 
-    def test_a_failed_trial_build_is_build_failed(self):
-        result, _, _, _, _, _ = self.build("--trial", status=1)
+    def test_a_failed_build_of_the_firmware_names_the_cards_environment(self):
+        result, _, _, _, _, _ = self.build(status=1)
         self.assertEqual(result.status, 1)
-        self.assertRegex(result.err, r"^error: build-failed: .*odrig_trial\n$")
+        self.assertRegex(result.err, r"^error: build-failed: .*odrig_microsd\n$")
 
 
 class TheImages(unittest.TestCase):
-    def test_the_trials_images_have_names_of_their_own(self):
-        self.assertEqual(build.KINDS["trial"], ("odrig_trial", "odrig-trial.bin"))
-        self.assertEqual(build.KINDS["trial-probe"], ("odrig_trial_probe", "odrig-trial-probe.bin"))
+    def test_every_kind_has_an_image_of_its_own(self):
         images = [kind.image for kind in build.KINDS.values()]
         self.assertEqual(len(images), len(set(images)))
-        self.assertEqual(build.ON_NEWER, ("trial", "trial-probe", "microsd"))
+        self.assertEqual(build.KINDS["firmware"], ("odrig_microsd", "odrig-firmware.bin"))
+        self.assertEqual(build.KINDS["probe"], ("odrig_microsd_probe", "odrig-probe.bin"))
+        self.assertEqual(build.KINDS["stick"], ("odrig", "odrig-stick.bin"))
+        self.assertEqual(build.KINDS["stick-probe"], ("odrig_probe", "odrig-stick-probe.bin"))
+        self.assertNotIn("trial", build.KINDS)
+        self.assertNotIn("trial-probe", build.KINDS)
 
-    def test_the_trial_takes_the_place_of_the_firmware_and_of_the_probe_build(self):
-        self.assertEqual(build.TRIAL_OF, {"firmware": "trial", "probe": "trial-probe"})
+    def test_the_firmware_its_probe_build_and_the_cards_image_of_its_own_name_are_built_on_the_newer_software(self):
+        self.assertEqual(build.ON_NEWER, ("firmware", "probe", "microsd"))
+        self.assertEqual(build.KINDS["microsd"].environment, build.KINDS["firmware"].environment)
+
+    def test_the_stick_takes_the_place_of_the_firmware_and_of_the_probe_build(self):
+        self.assertEqual(build.STICK_OF, {"firmware": "stick", "probe": "stick-probe"})
 
 
 class TheOverride(unittest.TestCase):
-    def test_the_trial_environment_extends_the_firmware_on_the_pinned_platform(self):
+    def test_the_cards_environment_extends_the_sticks_on_the_pinned_platform(self):
         found = environments()
-        trial = found["env:odrig_trial"]
-        self.assertEqual(trial["extends"], "env:odrig")
-        self.assertEqual(trial["platform"], PLATFORM)
-        self.assertEqual(trial["platform_packages"], "")
-        probe = found["env:odrig_trial_probe"]
-        self.assertEqual(probe["extends"], "env:odrig_trial")
-        self.assertEqual(probe["build_flags"].split("\n"), ["${env:odrig_trial.build_flags}", "-D ODRIG_PROBE"])
+        card = found["env:odrig_microsd"]
+        self.assertEqual(card["extends"], "env:odrig")
+        self.assertEqual(card["platform"], PLATFORM)
+        self.assertEqual(card["platform_packages"], "")
+        probe = found["env:odrig_microsd_probe"]
+        self.assertEqual(probe["extends"], "env:odrig_microsd")
+        self.assertEqual(probe["build_flags"].split("\n"), ["${env:odrig_microsd.build_flags}", "-D ODRIG_PROBE"])
 
-    def test_the_firmware_and_its_probe_build_keep_wleds_platform(self):
+    def test_no_environment_of_the_trial_is_left(self):
+        found = environments()
+        self.assertNotIn("env:odrig_trial", found)
+        self.assertNotIn("env:odrig_trial_probe", found)
+        self.assertNotIn("odrig_trial", wled.override_text())
+
+    def test_the_sticks_build_and_its_probe_build_keep_wleds_platform(self):
         found = environments()
         for name in ("env:odrig", "env:odrig_probe"):
             for setting in ("platform", "platform_packages"):
                 self.assertNotIn(setting, found[name], f"{name} {setting}")
 
 
-class WhatTheTrialLeavesOut(unittest.TestCase):
-    def test_the_trial_leaves_out_what_does_not_build_on_the_newer_software(self):
-        trial = environments()["env:odrig_trial"]
-        self.assertEqual(trial["lib_ignore"].split("\n"), ["esp_dmx", "IRremoteESP8266", "NeoESP32RmtHI"])
-        self.assertEqual(trial["build_unflags"].split("\n"), ["${env:odrig.build_unflags}", "-D WLED_ENABLE_DMX_INPUT"])
-        flags = trial["build_flags"].split("\n")
+class WhatTheNewerSoftwareLeavesOut(unittest.TestCase):
+    def test_the_cards_build_leaves_out_what_does_not_build_on_the_newer_software(self):
+        card = environments()["env:odrig_microsd"]
+        self.assertEqual(card["lib_ignore"].split("\n"), ["esp_dmx", "IRremoteESP8266", "NeoESP32RmtHI"])
+        self.assertEqual(card["build_unflags"].split("\n"), ["${env:odrig.build_unflags}", "-D WLED_ENABLE_DMX_INPUT"])
+        flags = card["build_flags"].split("\n")
         self.assertEqual(flags[:4], ["${env:odrig.build_flags}", "-D WLED_DISABLE_INFRARED", "-D WLED_USE_SHARED_RMT", "-D ESP32_ARDUINO_NO_RGB_BUILTIN"])
-        self.assertEqual(flags[4:], [f"-include {ROOT}/firmware/newer/odrig_newer.h"])
+        self.assertEqual(flags[4], f"-include {ROOT}/firmware/newer/odrig_newer.h")
 
-    def test_the_firmware_known_good_leaves_nothing_out(self):
+    def test_the_sticks_build_leaves_nothing_out(self):
         found = environments()
         for name in ("env:odrig", "env:odrig_probe"):
             for setting in ("lib_ignore",):
@@ -239,20 +265,23 @@ class WhatTheTrialLeavesOut(unittest.TestCase):
 
 
 class TheBoardsSuite(unittest.TestCase):
-    def test_it_takes_the_trials_images_when_told_to(self):
+    def test_it_runs_on_the_firmware_that_build_makes_with_no_choice_of_images(self):
         text = BOARD_SUPPORT.read_text(encoding="utf-8")
-        self.assertRegex(text, r'(?m)^TRIAL = os\.environ\.get\("ODRIG_BOARD_IMAGES"\) == "trial"$')
-        self.assertIn("build.TRIAL_OF", text)
+        self.assertNotIn("ODRIG_BOARD_IMAGES", text)
+        self.assertNotIn("TRIAL", text)
 
 
 class TheDocument(unittest.TestCase):
-    def test_it_says_how_the_trial_is_built_and_what_it_fetches(self):
+    def test_it_says_how_the_firmware_and_the_sticks_build_are_built_and_what_the_newer_software_fetches(self):
         text = DOCUMENT.read_text(encoding="utf-8")
-        for expected in ("python3 firmware/fw.py build --trial", "`odrig-trial.bin`", "`odrig-trial-probe.bin`", "build/firmware/newer/",
-                         "ODRIG_BOARD_IMAGES=trial", PLATFORM, "platformio-6.2.0-py3-none-any.whl",
+        for expected in ("python3 firmware/fw.py build --stick", "`odrig-stick.bin`", "`odrig-stick-probe.bin`", "`odrig_microsd_probe`",
+                         "build/firmware/newer/", PLATFORM, "platformio-6.2.0-py3-none-any.whl",
                          "https://github.com/espressif/arduino-esp32/releases/download/3.3.12/esp32-core-3.3.12-libs.tar.xz"):
             self.assertIn(expected, text)
         self.assertRegex(text, r"(?m)^  newer/ ")
+        commands = section(text, "Commands")
+        self.assertNotIn("--trial", commands)
+        self.assertNotIn("ODRIG_BOARD_IMAGES", commands)
 
 
 if __name__ == "__main__":

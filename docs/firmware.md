@@ -40,8 +40,8 @@ its web interface; `.nvmrc` of WLED 16.0.1 asks for 20.18.
 The tool refuses to work with a WLED folder that is not at the pinned commit
 (`wled-mismatch`), and with a Python below 3.10 (`setup-failed`).
 
-WLED's own build then fetches what WLED's files at the tag name. The tool chooses none of
-it:
+For `build --stick` and `build --stock`, WLED's own build then fetches what WLED's files
+at the tag name. The tool chooses none of it:
 
 | What | From |
 |---|---|
@@ -53,15 +53,15 @@ it:
 | The 67 packages of WLED's `package-lock.json`, which pack the web interface | The npm registry |
 | The Python packages `zopfli`, `wheel` and `tasmota-metrics`, which the platform installs into the tool's Python environment | PyPI |
 
-### The newer USB software
+### The newer software
 
-`build --trial` builds the firmware on newer software of Espressif, whose USB host knows
-hubs: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform 55.03.312-1 and
-PlatformIO 6.2.0. It is the trial of the move to that software; the microSD build,
-`build --microsd`, is built on the same software, and no other command uses it. It lives
-in `build/firmware/newer/`, so the build known good and its tools stay as they are. The
-first `build --trial` or `build --microsd` fetches it; nothing of it is on a computer
-before. The sizes are those the sources state, about 700 MB in all; a line *named by its
+`build` and `build --probe` build the firmware on newer software of Espressif than WLED
+16.0.1 names: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform
+55.03.312-1 and PlatformIO 6.2.0. The firmware reads its external animations from a
+microSD card on that software; the USB stick's build, `build --stick`, stays on the
+software known good, which WLED's files name. The newer software lives in
+`build/firmware/newer/`, so the build known good and its tools stay as they are. The first
+`build` fetches it; nothing of it is on a computer before. The sizes are those the sources state, about 700 MB in all; a line *named by its
 manifest* is a small manifest that names the real download, which is given as its release
 offers it for a Mac with Apple's processor.
 
@@ -80,16 +80,15 @@ offers it for a Mac with Apple's processor.
 | The platform's own Python environment, `newer/pio/penv`: `uv` first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
 | Then, by `uv`, the newest that PyPI has of `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools` and `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
 
-The hub support is in Arduino-ESP32's compiled libraries: their `sdkconfig.h` has
-`CONFIG_USB_HOST_HUBS_SUPPORTED 1` and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` for every
-memory variant of the ESP32-S3, and nothing of ESP-IDF's own source is fetched.
+Arduino's `SD` library, which reads the card, is part of Arduino-ESP32, and nothing of
+ESP-IDF's own source is fetched.
 
-WLED's libraries are copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in
-WLED's folder before the first trial build; what is missing there PlatformIO fetches at the
-versions WLED names, which on 2026-10-16 were those of the build known good. The platform takes the
-other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and CMake,
-Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the trial does
-not do.
+WLED's libraries can be copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_microsd`
+and `.pio/libdeps/odrig_microsd_probe` in WLED's folder before the first build; what is
+missing there PlatformIO fetches at the versions WLED names, which on 2026-10-16 were those
+of the build known good. The platform takes the other compiler, `toolchain-riscv32-esp`,
+only for a project with a folder `ulp`, and CMake, Ninja and ESP-IDF itself only to compile
+ESP-IDF's libraries again, which the firmware's build does not do.
 
 ## The work folder
 
@@ -106,7 +105,7 @@ build/firmware/
   WLED/            WLED's source at the pinned commit
   out/             the built images
   storage/         storage images read from the board and written to it, the newest eight
-  newer/           the newer USB software of `build --trial` and `build --microsd`
+  newer/           the newer software of `build`, `build --probe` and `build --microsd`
     venv/          its Python environment: PlatformIO 6.2.0, Node.js and npm
     pio/           its PlatformIO folder: the platform, Arduino-ESP32, the compilers and
                    the platform's own Python environment
@@ -114,7 +113,7 @@ build/firmware/
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
-folder. `HOME` is left as it is. For `build --trial` and `build --microsd` the two folders of PlatformIO are
+folder. `HOME` is left as it is. For `build`, `build --probe` and `build --microsd` the two folders of PlatformIO are
 `build/firmware/newer/pio` and `build/firmware/newer/pio-cache`, and `PATH` begins with
 `build/firmware/newer/venv/bin`; pip's and npm's caches are the same.
 
@@ -136,7 +135,7 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial | --microsd] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --microsd] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
@@ -230,6 +229,8 @@ esptool: esptool v5.4.0
 ```
 python3 firmware/fw.py build
 python3 firmware/fw.py build --probe
+python3 firmware/fw.py build --stick
+python3 firmware/fw.py build --stick --probe
 python3 firmware/fw.py build --stock
 ```
 
@@ -239,25 +240,34 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 
 | Command | Environment | Image | What it is |
 |---|---|---|---|
-| `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
-| `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
+| `build` | `odrig_microsd` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`, on [the newer software](#the-newer-software), with the code of the microSD card on GPIO39 to GPIO42 as its external storage. |
+| `build --probe` | `odrig_microsd_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
+| `build --stick` | `odrig` | `odrig-stick.bin` | The USB stick's firmware: the same on the software known good, with the USB host for a stick on the chip's own socket in place of the card. |
+| `build --stick --probe` | `odrig_probe` | `odrig-stick-probe.bin` | Its probe build. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
+
+The firmware and its probe build are built on [the newer software](#the-newer-software):
+the tool makes the newer software's Python environment first, when
+`build/firmware/newer/venv` is not there or `firmware/requirements-newer.txt` changed, and
+runs that environment's PlatformIO in WLED's folder, with WLED's files and the patches. The
+environment `odrig_microsd` is `odrig` on the newer platform, with the card's flag
+`ODRIG_DRIVE_SD_SPI` and the reader's four pins, GPIO39 for SCK, GPIO40 for MISO, GPIO41
+for MOSI and GPIO42 for CS; `odrig_microsd_probe` adds `ODRIG_PROBE`. The card's code
+takes the place of the USB host, and the chip's own socket stays a serial port.
+[microsd.md](microsd.md) has the card, the reader's wiring, what the board sessions gave
+and what is open. `build --stick` and `build --stick --probe` build the USB stick's
+firmware and its probe build on the software known good, as the firmware was built until
+2026-10-24; `--stick` goes with neither `--stock` nor `--standalone`, and
+`flash --image build/firmware/out/odrig-stick.bin` writes it to the board.
 
 ```
 python3 firmware/fw.py build --microsd
 ```
 
-`build --microsd` builds the card's firmware, the firmware whose external storage is a
-microSD card in place of a USB stick, on [the newer USB software](#the-newer-usb-software):
-the environment `odrig_microsd`, which is `odrig_trial` with the card's flag
-`ODRIG_DRIVE_SD_SPI` and the reader's four pins, GPIO39 for SCK, GPIO40 for MISO, GPIO41
-for MOSI and GPIO42 for CS, and the image `odrig-microsd.bin`. The card's code takes the
-place of the USB host, and the chip's own socket stays a serial port. It does not go with
-`--stock`, `--probe`, `--trial` or `--standalone`, and it never replaces
-`odrig-firmware.bin`; `flash --image build/firmware/out/odrig-microsd.bin` writes it to
-the board. [microsd.md](microsd.md) has the card, the reader's wiring, what the board
-sessions gave and what is open. The image of 2026-10-22, which the board runs, has
-1,765,808 bytes and the SHA-256
+`build --microsd` builds the same firmware as `build` and keeps it as `odrig-microsd.bin`,
+the name the board sessions of 2026-10-22 and 2026-10-23 used; it does not go with
+`--stock`, `--probe`, `--stick` or `--standalone`. The image of 2026-10-22, which the board
+runs, has 1,765,808 bytes and the SHA-256
 `fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
@@ -280,42 +290,30 @@ table is WLED's own file. WLED's files are not patched for it and none is compil
 `--standalone` does not go with `--stock`. The standalone firmware is being built; for
 now it is a trial program, see [Verified on the board](#verified-on-the-board).
 
-```
-python3 firmware/fw.py build --trial
-python3 firmware/fw.py build --trial --probe
-```
+WLED 16.0.1 is not made for Arduino-ESP32 3. The firmware builds on it after these
+changes, none of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of
+which the stick's build sees:
 
-`build --trial` builds the firmware on [the newer USB software](#the-newer-usb-software),
-for the trial of the move to it: the environment `odrig_trial`, which is `odrig` on the
-newer platform, and the image `odrig-trial.bin`; with `--probe`, the environment
-`odrig_trial_probe` and the image `odrig-trial-probe.bin`. The tool makes the newer
-software's Python environment first, when `build/firmware/newer/venv` is not there or
-`firmware/requirements-newer.txt` changed, and runs that environment's PlatformIO in
-WLED's folder, with WLED's files and the patches as for `build`. The trial's images never
-replace `odrig-firmware.bin` and `odrig-probe.bin`, and nothing of the build known good
-changes. `--trial` goes with neither `--stock` nor `--standalone`. `flash --image
-build/firmware/out/odrig-trial.bin` writes the trial build to the board.
-
-WLED 16.0.1 is not made for Arduino-ESP32 3. The trial builds after these changes, none
-of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of which the
-build known good sees:
-
-- Left out of the trial, as this installation uses none of it: WLED's DMX input with its
+- Left out of the firmware, as this installation uses none of it: WLED's DMX input with its
   library `esp_dmx`, the infrared remote with `IRremoteESP8266`, and WLED's own RMT driver
   `NeoESP32RmtHI`; the four RMT outputs take NeoPixelBus's RMT driver, by
   `WLED_USE_SHARED_RMT`.
 - `ESP32_ARDUINO_NO_RGB_BUILTIN` keeps Arduino-ESP32's newer RMT driver out, which ESP-IDF
   does not let start beside the older one that NeoPixelBus uses.
-- `firmware/newer/odrig_newer.h`, read first by every source of the trial, and
+- `firmware/newer/odrig_newer.h`, read first by every source of the firmware, and
   `firmware/patches/020-newer-software.patch`, whose every change is held by
   `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed, and what its checks
   stop at the start: the legacy ADC driver beside the new one, lwIP's raw API without its
   lock, and an address compared with `0U`.
 
-On 2026-10-16 both trial builds built: `odrig-trial.bin` of 1,822,304 bytes, 56.2% of the
-firmware slot, with 21.5% of the static memory, and `odrig-trial-probe.bin` of 1,748,992
-bytes. The firmware holds ESP-IDF's USB host with its hub driver and its driver of a hub's
-ports.
+On 2026-10-16 the firmware with the USB host built on the newer software, for a trial of
+a stick through a hub: 1,822,304 bytes, 56.2% of the firmware slot, with 21.5% of the
+static memory, and its probe build 1,748,992 bytes. On 2026-10-22 the firmware with the
+card built as `odrig-microsd.bin`, 1,765,808 bytes. On 2026-10-24, with the card's free and
+total space, `build` made `odrig-firmware.bin` of 1,771,808 bytes, SHA-256
+`1752f8216be641f0c60907f96a64bf2cd3669ed4e25923d34e0e795c596e19bf`, and `build --microsd`
+the same bytes; `build --probe` made `odrig-probe.bin` of 1,758,624 bytes and
+`build --stick` `odrig-stick.bin` of 1,289,264 bytes. None of them was flashed.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -610,19 +608,11 @@ USB and writes to it: it flashes the firmware, the probe build and stock WLED, a
 shows, each with a brightness of 40 or less; a brighter show is refused before the tool is
 started. It also changes the installed show with the commands of
 [commands.md](commands.md): it uploads animations and removes them again. It builds an
-image the work folder does not hold. Its last step leaves the board with the firmware and
-the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
-takes about 55 minutes. Without a board it stops with `no-board` and runs nothing.
-
-```
-ODRIG_BOARD_IMAGES=trial python3 firmware/fw.py test-board
-```
-
-With the variable `ODRIG_BOARD_IMAGES=trial` the suite runs on the trial build of the newer
-USB software: it flashes `odrig-trial.bin` and `odrig-trial-probe.bin` where it takes the
-firmware and the probe build, and builds them with `build --trial` when the work folder does
-not hold them. Its test of `install-firmware`, which writes `odrig-firmware.bin`, flashes the
-trial build after it, and the suite leaves the trial build on the board.
+image the work folder does not hold: the firmware and the probe build are those of the
+microSD card, `odrig-firmware.bin` and `odrig-probe.bin`. Its last step leaves the board
+with the firmware and the example show at brightness 32, playing, with no file of a test in
+`/odrig`. A run takes about 55 minutes. Without a board it stops with `no-board` and runs
+nothing.
 
 ### test-air
 
@@ -723,10 +713,10 @@ last one.
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
 answered.
 
-**The port.** As the board starts, the chip's own USB socket stays this serial port when
-a computer is plugged into it, and otherwise becomes the socket of a
-[USB drive](#the-external-storage); the probe build and the card's build keep it a serial
-port always. Every byte the
+**The port.** In the firmware the chip's own USB socket is this serial port for as long
+as the board runs. In the USB stick's build, as the board starts, the socket stays this
+serial port when a computer is plugged into it, and otherwise becomes the socket of a
+[USB drive](#the-external-storage); its probe build keeps it a serial port always. Every byte the
 board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
@@ -758,7 +748,7 @@ tool skips.
 
 esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
 which the bridge uses and the chip's own USB unit ignores. When the chip's own socket has
-become a drive's, it reaches the chip only in its loader's download mode, which the
+become a drive's, in the USB stick's build, it reaches the chip only in its loader's download mode, which the
 button BOOT held while the board is plugged in brings up; the socket marked COM flashes
 it as before. The suite of the board passes only with the board on the chip's own
 socket: stock WLED, which the suite flashes and restores, and the probe build answer there
@@ -768,10 +758,11 @@ and not on the UART.
 
 The firmware plays the animations of an external storage after the installed ones, as
 [show.md](show.md#animations-from-a-usb-drive) describes for a drive. In the firmware that
-`build` makes it is a USB flash drive on the chip's own socket, as the rest of this
-section says. In the card's build, `build --microsd`, it is a microSD card in a reader on
-GPIO39 to GPIO42, and nothing of the USB host is compiled: [microsd.md](microsd.md) says
-how a card is prepared, taken up and dropped, and what WLED's information says of it.
+`build` makes it is a microSD card in a reader on GPIO39 to GPIO42, and nothing of the USB
+host is compiled: [microsd.md](microsd.md) says how a card is prepared, taken up and
+dropped, and what WLED's information says of it. In the USB stick's build,
+`build --stick`, it is a USB flash drive on the chip's own socket, as the rest of this
+section says.
 
 - **A computer or a drive.** As the board starts, the firmware looks at the chip's own
   socket for 5 seconds. A computer plugged into it sends a start-of-frame packet each
@@ -815,8 +806,8 @@ how a card is prepared, taken up and dropped, and what WLED's information says o
 ### The log
 
 The firmware writes a log on the socket marked COM, between the replies to commands: a
-line for every event of the chip's own socket, or in the card's build of the card, and
-every line the player logs. A line is
+line for every event of the card, or in the USB stick's build of the chip's own socket,
+and every line the player logs. A line is
 one line of printable ASCII: `#log`, the seconds since the start with three decimals, the
 kind of the line, and its text.
 
@@ -829,7 +820,7 @@ kind of the line, and its text.
 #log 58.230 usb: a device went: maker 0781, product 5581, a stick
 ```
 
-The lines of the kind `usb`:
+The lines of the kind `usb`, which only the USB stick's build writes:
 
 - After the look for a computer: `a computer is on the port, which stays a serial port`,
   or `no computer on the port within 5 s`, with the wait of the settings.
@@ -849,8 +840,8 @@ The lines of the kind `usb`:
   `stick not opened: a fault in reading (<error>)`, or
   `stick not opened: a fault in reading the folder odrig`.
 
-The lines of the kind `sd` are those of the card's build, `build --microsd`, which has
-no line of the kind `usb`:
+The lines of the kind `sd` are those of the firmware, which reads the card and has no
+line of the kind `usb`:
 
 - A card mounted: `card opened: <n> animation files in odrig`,
   `the card has no folder odrig`, or `card folder odrig could not be read`.
@@ -879,8 +870,8 @@ the show became invalid, as WLED's information shows it.
   lines, so a command may be sent while the log is read, from another terminal.
 - **Where it is not.** The log goes to the socket marked COM only: not to the chip's own
   socket, not over Wi-Fi, and not into the board's storage. It names nothing of the Wi-Fi
-  settings. The probe build, which never starts the USB host, has the player's lines
-  only.
+  settings. The probe builds, which start neither the card's reader nor the USB host,
+  have the player's lines only.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same
@@ -933,7 +924,7 @@ entries of the usermod:
 | `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
 | `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
 | `odrig start` | The milliseconds the core took to start. |
-| `odrig drive` | What there is of the external storage: of a USB drive, as [The external storage](#the-external-storage) says, or in the card's build of a microSD card, as [microsd.md](microsd.md#the-log-and-wleds-information) says. |
+| `odrig drive` | What there is of the external storage: of the microSD card, as [microsd.md](microsd.md#the-log-and-wleds-information) says, or in the USB stick's build of a USB drive, as [The external storage](#the-external-storage) says. |
 | `odrig update` | `refused: no second slot` on a board of the bigger layout, where an update over Wi-Fi is refused; `WLED's` on WLED's layout, where WLED's own update works. |
 
 **An update over Wi-Fi.** On a board of the bigger layout of
@@ -1054,8 +1045,8 @@ The usermod cannot do this from outside: the limits are constants compiled into 
 the type of the parallel outputs is chosen inside WLED. WLED's LED settings page shows the
 new limits, which it gets from the firmware.
 
-A second patch, `firmware/patches/020-newer-software.patch`, is for the trial build on
-[the newer USB software](#the-newer-usb-software). Every change in it is held by
+A second patch, `firmware/patches/020-newer-software.patch`, is for the firmware on
+[the newer software](#the-newer-software). Every change in it is held by
 `ESP_IDF_VERSION_MAJOR >= 5`, so on the software known good WLED compiles as before:
 
 | File of WLED | Change |

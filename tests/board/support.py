@@ -44,10 +44,6 @@ ANSWERS = {"firmware": "status", "probe": "probe", "stock": "wled"}
 # The kind of image the suite leaves on the board.
 LEFT_ON_THE_BOARD = "firmware"
 
-# With ODRIG_BOARD_IMAGES=trial the suite runs on the trial build of the newer USB software
-# and its probe build, which it flashes where it takes the firmware and the probe build.
-TRIAL = os.environ.get("ODRIG_BOARD_IMAGES") == "trial"
-
 # How long the board is given to answer after a restart and to read its animations to their
 # ends, which it does while it plays. Until it has, it answers `list` with `busy`.
 START_SECONDS = 90
@@ -94,10 +90,7 @@ def on_port(*arguments):
 
 
 def built(kind):
-    """The image of one kind, built now when the work folder does not hold it; with the
-    trial's images, the trial's in place of the firmware and the probe build."""
-    if TRIAL:
-        kind = build.TRIAL_OF.get(kind, kind)
+    """The image of one kind, built now when the work folder does not hold it."""
     image = build.image_path(kind)
     try:
         return build.checked_image(image)
@@ -142,16 +135,13 @@ def flash(kind):
 
 def install_firmware(*extra):
     """Runs `install-firmware` with the built firmware and remembers that the board then
-    runs the firmware. With the trial's images the trial build is flashed after it, over
-    the settings it wrote, since `install-firmware` writes the firmware known good."""
+    runs the firmware."""
     global _running
     _running = None
     built("firmware")
     done = on_port("install-firmware", "--wait", START_SECONDS, *extra)
     if done.status == 0:
         _running = "firmware"
-        if TRIAL:
-            flash("firmware")
     return done
 
 
