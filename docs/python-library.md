@@ -2,7 +2,8 @@
 
 `odrig` is a Python package at the repository root: a library for the tests and the tools.
 It reads and writes the project's files, JSON frames, the ODRG format of
-[format.md](format.md), mapping files and shows, and it holds the generators. It converts
+[format.md](format.md) and the ODRGX containers of frames, mapping files and shows, and it
+holds the generators. It converts
 nothing and is no program of its own: the converter, which imports media, encodes, decodes,
 checks and packs, is the JavaScript tool of [converter.md](converter.md).
 
@@ -157,6 +158,13 @@ left out of that comparison, because another zlib may compress the same body to 
 bytes; they are checked by decoding them.
 
 The suite of the converter reads every vector as well, with its own decoder.
+
+`tests/vectors/containers/` holds ODRGX containers, in `valid/` beside the JSON frames they
+decode to and in `invalid/` named by their reason as above, one of "ODRGX files" or, for a
+fault of a frames payload, of "ODRG files". They are made from the ODRG vectors by
+`node tests/vectors/containers/build.mjs`, and the converter's suite checks that the files
+are what it makes. `odrig/odrgx.py` reads them for the suites of this library and of the
+core.
 
 ## Tests
 

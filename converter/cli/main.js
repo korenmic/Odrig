@@ -5,7 +5,7 @@
 
 import fs from "node:fs";
 
-import {errors, jsonframes, mapping, odrg, timeline, whole} from "../lib/index.js";
+import {errors, jsonframes, mapping, odrg, odrgx, timeline, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
@@ -81,21 +81,36 @@ async function importMedia(values) {
   files.write(values.output, jsonframes.dumps(animation));
 }
 
+// Writes an ODRG file, or an ODRGX container when the output's name ends in `.odrgx`.
 function encode(values) {
   const source = files.read(values.input);
-  const data = errors.naming(values.input, () => odrg.encode(jsonframes.loads(source), {compressed: !values.uncompressed}));
+  const container = ending(values.output) === odrgx.ENDING;
+  const data = errors.naming(values.input, () => {
+    const animation = jsonframes.loads(source);
+    const options = {compressed: !values.uncompressed};
+    return container ? odrgx.encodeFrames(animation, options) : odrg.encode(animation, options);
+  });
   files.write(values.output, data);
+}
+
+// What a runtime file holds, read by its first bytes: an ODRG file, or an ODRGX container.
+export function readRuntime(data) {
+  if (odrgx.isContainer(data)) {
+    const header = odrgx.readHeader(data);
+    return {format: "odrgx", header, ...odrgx.decodeFrames(data, header)};
+  }
+  return {format: "odrg", header: null, ...odrg.decode(data)};
 }
 
 function decode(values) {
   const data = files.read(values.input);
-  const decoded = errors.naming(values.input, () => odrg.decode(data));
+  const decoded = errors.naming(values.input, () => readRuntime(data));
   const animation = {width: decoded.width, height: decoded.height, frames: decoded.records};
   files.write(values.output, jsonframes.dumps(animation));
 }
 
-// What `check` prints for a JSON frames file ("json") or an ODRG file ("odrg") given as
-// bytes: its lines, each with a line feed.
+// What `check` prints for a JSON frames file ("json") or a runtime file ("odrg"), an ODRG
+// file or an ODRGX container, given as bytes: its lines, each with a line feed.
 export function summary(kind, data) {
   let width;
   let height;
@@ -106,9 +121,12 @@ export function summary(kind, data) {
     ({width, height, frames} = jsonframes.loads(data));
     lines.push("format: json-frames");
   } else {
-    const decoded = odrg.decode(data);
+    const decoded = readRuntime(data);
     ({width, height, records: frames} = decoded);
-    lines.push("format: odrg");
+    lines.push(`format: ${decoded.format}`);
+    if (decoded.header !== null) {
+      lines.push(`type: ${odrgx.TYPE_NAMES[decoded.header.type]}`);
+    }
     more.push(`palette: ${decoded.paletteSize}`, `compressed: ${decoded.compressed ? "yes" : "no"}`);
   }
   lines.push(
@@ -127,7 +145,7 @@ function check(values, streams) {
     const name = values.file.toLowerCase();
     if (name.endsWith(".json")) {
       kind = "json";
-    } else if (name.endsWith(".odrg")) {
+    } else if (name.endsWith(".odrg") || name.endsWith(odrgx.ENDING)) {
       kind = "odrg";
     } else {
       throw new UsageError(`the name of ${values.file} does not tell its format; give --format`, "check");

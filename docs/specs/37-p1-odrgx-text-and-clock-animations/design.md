@@ -315,7 +315,7 @@ member. `status`: `"seed":<n>` or `"seed":null`, as its last member.
   no other is allowed.
 - `encode IN.json OUT.odrgx` makes a container of a text, a clock or JSON frames;
   `decode IN.odrgx OUT.json` gives the JSON source of a text or a clock, or the JSON frames;
-  `check FILE --width W --height H` checks either kind; `pack` takes `X.json` as the source
+  `check FILE` checks either kind and says what it holds; `pack` takes `X.json` as the source
   of `X.odrgx`.
 - `index.js` exports the new modules, so the app has them.
 

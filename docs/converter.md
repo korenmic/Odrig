@@ -218,6 +218,14 @@ A source that breaks the JSON frames format is rejected with its reason from "JS
 files" in [reasons.md](reasons.md). A valid source that does not fit an ODRG file is
 rejected with `canvas-too-large` or `too-many-frames`.
 
+When the name of the output ends in `.odrgx`, the file written is an ODRGX container of
+[format.md](format.md) whose payload is the ODRG file above, with the sum of the
+durations as its loop:
+
+```
+node converter/odrig.js encode animations/hello.json build/hello.odrgx
+```
+
 ## decode
 
 ```
@@ -233,8 +241,9 @@ output file is replaced.
 node converter/odrig.js decode build/hello.odrg build/hello-again.json
 ```
 
-A file that breaks the format is rejected with one of the reasons under "ODRG files" in
-[reasons.md](reasons.md), and no output is written.
+An ODRGX container of frames is read as well: the file's first four bytes tell which it
+is, whatever its name. A file that breaks its format is rejected with one of the reasons
+under "ODRG files" or "ODRGX files" in [reasons.md](reasons.md), and no output is written.
 
 A source in which no two frames that follow each other have the same pixels comes back from
 `encode` and `decode` with the same frames, byte for byte.
@@ -246,8 +255,10 @@ node converter/odrig.js check FILE [--format json|odrg]
 ```
 
 Says whether a file is valid and what it holds. A name ending in `.json` is read as JSON
-frames and one ending in `.odrg` as ODRG, in any letter case. `--format` overrides the name
-and is needed for any other name; without it such a name is a usage error (status 2).
+frames and one ending in `.odrg` or `.odrgx` as a runtime file, an ODRG file or an ODRGX
+container as its first bytes say, in any letter case. `--format` overrides the name and is
+needed for any other name; without it such a name is a usage error (status 2). `odrg`
+reads either runtime file.
 
 ```
 node converter/odrig.js check build/hello.odrg
@@ -268,14 +279,15 @@ compressed: yes
 
 | Line | Value |
 |---|---|
-| `format` | `json-frames` or `odrg`. |
+| `format` | `json-frames`, `odrg` or `odrgx`. |
+| `type` | ODRGX only, after `format`: the content type, `frames`. |
 | `canvas` | W and H. |
 | `frames` | The number of frames the file lists: frame objects in a JSON frames file, frame records in an ODRG file. |
 | `duration_ms` | The sum of all durations. |
 | `colours` | The number of different colours that appear in the pictures. |
 | `file_bytes` | The size of the file. |
-| `palette` | ODRG only: the palette size C, 0 for a file without a palette. |
-| `compressed` | ODRG only: `yes` or `no`. |
+| `palette` | ODRG and the frames of ODRGX only: the palette size C, 0 for a file without a palette. |
+| `compressed` | ODRG and the frames of ODRGX only: `yes` or `no`. |
 
 An invalid file is rejected with its reason and nothing is printed to standard output.
 
@@ -291,8 +303,8 @@ Builds the folder that is installed on the board and run by the emulator (see
 - `mapping.json`, a byte-for-byte copy of the mapping file;
 - `show.json`, a byte-for-byte copy of the show file;
 - for every different `X.odrg` the show names, the file `X.odrg`, encoded from `X.json` in
-  the sources folder as `encode` does. `--uncompressed` writes every one of them without
-  compression.
+  the sources folder as `encode` does, and for every `X.odrgx` an ODRGX container of the
+  frames of `X.json`. `--uncompressed` writes every one of them without compression.
 
 The example show plays the two tracked test animations, Hello world and DVD bounce, in
 turn, 15 seconds each. It is for today's build and is packed with the two-leg mapping:
@@ -333,7 +345,8 @@ a web page load the same files.
 | `jsonframes.js` | JSON frames files: `loads` reads one, `dumps` writes the canonical layout. |
 | `inflate.js` | The DEFLATE decoder. |
 | `deflate.js` | The DEFLATE compressor. |
-| `odrg.js` | ODRG files: `decode` and `encode`. |
+| `odrg.js` | ODRG files: `header`, `decode` and `encode`. |
+| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decodeFrames`, `encodeFrames` and `wrap`. |
 | `mapping.js` | Mapping files: `loads`. |
 | `show.js` | Show files: `loads`. |
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |

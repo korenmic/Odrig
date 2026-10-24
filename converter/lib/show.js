@@ -21,6 +21,13 @@ export const MOST_LOOPS = 65535;
 export const MIN_SECONDS = 30;
 export const FILE_NAME = /^[a-z0-9._-]{1,32}$/;
 export const ENDING = ".odrg";
+// The endings a file of a show may have: an ODRG file or an ODRGX container.
+export const ENDINGS = [".odrg", ".odrgx"];
+
+// Whether a name follows the naming rule of a file of a show.
+export function fileNamed(name) {
+  return FILE_NAME.test(name) && ENDINGS.some((ending) => name.endsWith(ending));
+}
 
 const MEMBERS = ["version", "brightness", "items"];
 const OPTIONAL = ["start", "min_seconds"];
@@ -100,8 +107,8 @@ function itemOf(entry, what) {
     if (typeof name !== "string") {
       throw new Rejection(BAD_TYPE, `file of item ${number} is not a string`);
     }
-    if (!FILE_NAME.test(name) || !name.endsWith(ENDING)) {
-      throw malformed(`file of item ${number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in ${ENDING}`);
+    if (!fileNamed(name)) {
+      throw malformed(`file of item ${number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in ${ENDINGS.join(" or ")}`);
     }
     const repeat = entry.has("repeat") ? strictjson.integer(entry.get("repeat"), 1, MOST_LOOPS, `repeat of item ${number}`) : null;
     const maxSeconds = entry.has("max_seconds") ? strictjson.integer(entry.get("max_seconds"), 1, LONGEST_TURN, `max_seconds of item ${number}`) : null;
