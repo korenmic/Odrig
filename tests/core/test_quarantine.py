@@ -2,7 +2,9 @@ import json
 import unittest
 
 from . import support
+from . import huge_tail
 from .test_body_faults import cut_clip
+from .test_drive import a_drive
 from .test_playback import T0
 
 # A canvas of 3 x 2, on which cut_clip makes its files.
@@ -220,6 +222,56 @@ class RepairDuringTheCheck(Compared, unittest.TestCase):
         ignored, removed, listed = replies(run)
         self.assertEqual((ignored, removed), ({"ok": True}, {"ok": True}))
         self.assertEqual([item["id"] for item in listed["items"]], [1])
+
+
+
+class TheDrivesFiles(unittest.TestCase):
+    """A file of a drive left out is remembered for the boot by its name and its first read."""
+
+    LONG = 8 * 1024 * 1024
+
+    def session(self, script, drive, other=None):
+        files = {"mapping.json": support.one_leg_mapping(4, 4), "sound.odrg": support.clip(1, 4, 4), "show.json": support.show_text([{"id": 1, "file": "sound.odrg"}])}
+        with a_drive(drive) as top, a_drive(other or {}) as second:
+            script = [line.replace("SECOND", second) for line in script]
+            return support.start(files, script, ["--drive", top], check_first=False)
+
+    def left_out_at(self, run):
+        """The time after power-on of each refresh with a line of the log before it."""
+        times = []
+        for number, line in enumerate(run.lines):
+            if line.startswith("log "):
+                times.append(int(run.lines[number + 1].split()[1]) - T0)
+        return times
+
+    def test_the_same_file_taken_up_again_is_left_out_after_one_read(self):
+        bad = huge_tail.huge_tail(self.LONG, 4, 4)
+        script = every_20_ms(40) + ["drive pull"] + every_20_ms(2, start=800) + ["drive plug"] + every_20_ms(5, start=840)
+        script += [support.line(T0 + 940, "list")]
+        run = self.session(script, {"huge.odrg": bad})
+        text = f"drive file huge.odrg left out: {huge_tail.REASON}"
+        self.assertEqual(logged(run), [text, text])
+        first, again = self.left_out_at(run)
+        # The first time it settles in 256 slices; the second, its first read is enough.
+        self.assertGreater(first, 300)
+        self.assertLessEqual(again, 880)
+        self.assertEqual(replies(run)[-1]["items"][1], {"id": 60001, "file": "huge.odrg", "bytes": None, "fault": huge_tail.REASON})
+
+    def test_another_file_of_the_same_name_is_checked_anew(self):
+        bad = huge_tail.huge_tail(self.LONG, 4, 4)
+        script = every_20_ms(40) + ["drive pull", "drive plug SECOND"] + every_20_ms(10, start=800) + [support.line(T0 + 1000, "list")]
+        run = self.session(script, {"huge.odrg": bad}, {"huge.odrg": support.clip(9, 4, 4)})
+        self.assertEqual(logged(run), [f"drive file huge.odrg left out: {huge_tail.REASON}"])
+        self.assertEqual([(item["id"], item.get("fault")) for item in replies(run)[-1]["items"]], [(1, None), (60001, None)])
+
+    def test_a_drives_files_get_their_ids_at_once_and_a_left_out_one_is_unavailable(self):
+        drive = {"a.odrg": b"ODRX" + support.clip(2, 4, 4)[4:], "b.odrg": support.clip(3, 4, 4)}
+        script = every_20_ms(10) + [support.line(T0 + 200, command) for command in ("list", "play 60001", "play 60002", "remove 60001", "upload begin 60001 new.odrg 10")]
+        run = self.session(script, drive)
+        listed, played, playing, removed, uploaded = replies(run)
+        self.assertEqual([(item["id"], item.get("fault")) for item in listed["items"]], [(1, None), (60001, "bad-magic"), (60002, None)])
+        self.assertEqual((played, playing), ({"ok": False, "error": "unavailable"}, {"ok": True}))
+        self.assertEqual((removed, uploaded), ({"ok": False, "error": "in-use"}, {"ok": False, "error": "in-use"}))
 
 
 if __name__ == "__main__":

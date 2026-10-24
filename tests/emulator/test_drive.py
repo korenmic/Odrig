@@ -91,10 +91,13 @@ class AnEmulatorWithADrive(unittest.TestCase):
 
     def test_a_damaged_file_and_one_of_another_canvas_are_left_out_and_logged(self):
         wide = core_support.clip(4, 3, 3, (100,))
-        # The sound file is read last: once it is listed, the two before it have been read.
+        # The sound file is read last: once it is listed, the two before it have been read,
+        # and they are listed too, with their faults.
         support.installed(self.top / "odrig", {"broken.odrg": self.animation[:-5], "wide.odrg": wide, "z.odrg": self.animation})
         emulator = self.start("--verbose")
-        self.assertEqual(self.drives(self.listed_when(emulator, lambda items: len(self.drives(items)) == 1)), [(60001, "z.odrg")])
+        self.assertEqual(self.drives(self.listed_when(emulator, lambda items: len(self.drives(items)) == 3)), [(60001, "broken.odrg"), (60002, "wide.odrg"), (60003, "z.odrg")])
+        faults = [item.get("fault") for item in json.loads(emulator.command("list"))["items"] if item["id"] > 60000]
+        self.assertEqual(faults, ["truncated", "size-mismatch", None])
         err = emulator.stop().err
         self.assertIn("core: drive file broken.odrg left out: truncated\n", err)
         self.assertIn("core: drive file wide.odrg left out: size-mismatch\n", err)

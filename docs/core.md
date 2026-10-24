@@ -464,32 +464,41 @@ needs it.
 
 - At each refresh, before the LED data is made, the core asks `drive`. When the number
   differs from the one it holds, it drops what it knew of the old drive and, for a number
-  other than 0, counts the new drive's files with `drive_name`, at most 256, and marks
-  them to be checked.
+  other than 0, counts the new drive's files with `drive_name`, at most 256, gives each
+  its id, and marks them to be checked.
 - The check after the start goes on with the drive's files once the installed ones are
   read, in the order of their places, at the same pace and through the same second
-  decoders. A file that is whole and made for the canvas joins the playlist as soon as its
-  check has ended. One that is not, or one for which no id is left, is left out, and the
-  host's log gets `drive file <name> left out: <reason>`. The drive's check does not make
+  decoders. Its first step reads the file's first 512 bytes. A file that is whole and made
+  for the canvas joins the playlist as soon as its check has ended. One that is not, or one
+  for which no id is left, is left out, and the host's log gets
+  `drive file <name> left out: <reason>`. The drive's check does not make
   any command answer `busy`. While an upload is open it waits, and the file it was in is
   read again from its start afterwards.
-- A drive's animation gets the lowest id from 60001 up that no item of the show and no
-  animation of the drive before it has. The same files with the same show get the same
-  ids.
+- A drive's file gets its id when the drive is taken up, before it is checked: the lowest
+  from 60001 up that no item of the show and no file of the drive before it has. The same
+  files with the same show get the same ids, and a file left out keeps its id.
+- The core remembers the last 16 files of drives it left out for a fault in this boot: the
+  name the drive gave each, cut to 32 characters, the number and the CRC-32 of its first
+  bytes, at most 512, and the reason. A file of a drive taken up later with the same name
+  and the same first bytes is left out again with that reason after its first step, and
+  its body is not read. Another file of the same name is checked as any other.
 - The playlist is the show's animations and then the drive's, in the order of their
   places. A drive's animation has the turn of an animation without `repeat` and
   `max_seconds`. When nothing plays and a drive's animation joins, the playlist plays
   from it: a show without an animation of its own plays the drive's.
 - `play <id>` finds an id among the show's items and then among the drive's animations;
   `status` names a drive's animation by its id. `list` lists the drive's animations
-  after the show's items, with the file's name on the drive written as a JSON string.
-  `remove` and `upload begin` of a drive's id are answered with `in-use`.
+  after the show's items, with the file's name on the drive written as a JSON string,
+  and in their places the files left out with a fault, with `"bytes":null` and `fault`.
+  `play` of a file left out is refused with `unavailable`. `remove`, `remove many`,
+  `ignore` and `upload begin` of a drive's id are answered with `in-use`.
 - When the drive is pulled out, or another one is plugged in, its animations leave the
   playlist and `list`. When one of them was playing, the playlist goes on with the next
   animation that is left, from its first frame, or nothing plays.
 - A drive's file that cannot be opened or read, or that turns out not to be sound while it
-  plays, is left out from then on and logged in the same way. Its turn ends there, the
-  playlist goes on as after a pull, and the show stays valid.
+  plays, is left out from then on and logged in the same way. Its turn ends there, that
+  refresh keeps the picture before, the playlist goes on as after a pull, and the show
+  stays valid. One file left out never drops the drive's other files.
 
 ## The files the core writes
 
@@ -619,7 +628,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 ## Memory
 
 The core asks the host for memory only inside `odrig_core_begin`, in up to sixteen
-blocks, seventeen with a drive, in the order of the table: two of a fixed size for the byte entry, four for a host
+blocks, eighteen with a drive, in the order of the table: two of a fixed size for the byte entry, four for a host
 whose storage can be changed, and the others sized from the mapping and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
 `mapping/legs-20.json`, 60 x 60 on twenty legs, with a show of 100 items: 80 animations
@@ -627,7 +636,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,464 |
+| The core object | fixed | 3,488 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -643,15 +652,16 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,733** |
+| **Total** | | **124,757** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,218 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,242 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,201 bytes for the target file. A host with a drive is asked for
-one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,829 bytes, 98 percent. The size and the number of frames
+blocks of the check: 77,225 bytes for the target file. A host with a drive is asked for
+two blocks more, after the three of the check: the drive's table, 16 bytes for each of
+256 places, 4,096 bytes, and the boot's memory of 16 files of drives left out, 40 bytes
+each, 640 bytes. With it the target file takes 129,493 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -712,6 +722,7 @@ leg; and `ready`.
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
 | `fault` | Reads the context the core keeps of the latest fault of a file | `fault <work> <record> <bytes> <reason> <name>`, the work `start`, `play`, `upload` or `drive`; or `fault none` |
 | `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one and the list of the folder as it is now. The core sees it at its next refresh. | nothing |
+| `drive plug <folder>` | With `--drive`: as `drive plug`, with a drive that stands for this folder from then on. | nothing |
 | `drive pull` | With `--drive`: the drive is pulled out. | nothing |
 
 | Option of a session | What it does |

@@ -188,7 +188,7 @@ class TheChecksAndThePlayerGoOnWhileItSettles(unittest.TestCase):
     def test_a_drives_file_is_left_out_with_its_reason(self):
         run = self.drive_session()
         self.assertEqual(logged(run), [f"drive file huge.odrg left out: {huge_tail.REASON}"])
-        self.assertEqual([item["id"] for item in replies(run)[-1]["items"]], [1])
+        self.assertEqual([(item["id"], item.get("fault")) for item in replies(run)[-1]["items"]], [(1, None), (60001, huge_tail.REASON)])
         # The slices of the drive's file outlast the refreshes before the pull below.
         position = next(number for number, line in enumerate(run.lines) if line.startswith("log "))
         self.assertGreater(int(run.lines[position + 1].split()[1]), T0 + 20 * 8)

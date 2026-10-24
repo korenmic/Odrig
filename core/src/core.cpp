@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "crc32.h"
 #include "core_state.h"
 #include "mapping.h"
 #include "odrig_core.h"
@@ -190,8 +191,17 @@ void check_step(Core &core) {
     }
 }
 
-// The lowest id from kDriveFirstId up that no item of the show and no animation of the
-// drive has, or 0 when there is none.
+// Whether two names are the same, byte for byte.
+bool same_name(const char *one, const char *other) {
+    while (*one != 0 && *one == *other) {
+        ++one;
+        ++other;
+    }
+    return *one == *other;
+}
+
+// The lowest id from kDriveFirstId up that no item of the show and no file of the drive
+// has, or 0 when there is none.
 uint16_t free_drive_id(const Core &core) {
     for (uint32_t id = kDriveFirstId; id <= 65535; ++id) {
         bool taken = false;
@@ -199,13 +209,42 @@ uint16_t free_drive_id(const Core &core) {
             taken = core.items[item].id == id;
         }
         for (uint32_t place = 0; place < core.drive_count && !taken; ++place) {
-            taken = core.drive[place].state == kDriveInPlaylist && core.drive[place].id == id;
+            taken = core.drive[place].id == id;
         }
         if (!taken) {
             return static_cast<uint16_t>(id);
         }
     }
     return 0;
+}
+
+// The file of a drive left out in this boot that has this name and the first read of the
+// file the check is at, or null.
+const Remembered *remembered_file(const Core &core, const char *name) {
+    for (uint32_t at = 0; core.remembered != nullptr && at < kRememberedMost; ++at) {
+        const Remembered &one = core.remembered[at];
+        if (one.reason != kNone && one.first_read == core.drive_first_read && one.crc == core.drive_first_crc && same_name(one.name, name)) {
+            return &one;
+        }
+    }
+    return nullptr;
+}
+
+// Keeps a file of a drive left out for a fault, in place of the oldest one kept.
+void remember_file(Core &core, const char *name, Reason reason) {
+    if (core.remembered == nullptr || !is_file_fault(reason)) {
+        return;
+    }
+    Remembered &one = core.remembered[core.remembered_next];
+    core.remembered_next = (core.remembered_next + 1) % kRememberedMost;
+    uint32_t length = 0;
+    for (; name[length] != 0 && length + 1 < kFaultNameSize; ++length) {
+        one.name[length] = name[length];
+    }
+    one.name[length] = 0;
+    one.reason = static_cast<uint8_t>(reason);
+    one.first_read = core.drive_first_read;
+    one.crc = core.drive_first_crc;
 }
 
 // One step of the check of the drive's files, after the installed ones. A file that is
@@ -219,14 +258,38 @@ void drive_step(Core &core) {
     }
     const uint32_t place = core.drive_check_at;
     drive_file_name(place, core.drive_check_name);
+    DriveEntry &entry = core.drive[place];
+    char name[kFaultNameSize];
+    if (!core.check_header_read) {
+        // The file's first read: its first 512 bytes and their CRC-32, whatever pieces the
+        // host gives them in. A file left out in this boot is left out again after it.
+        FileSource &source = core.checker->file;
+        source.open_at(core.host, core.drive_check_name);
+        uint32_t crc = kCrcStart;
+        uint32_t count = 0;
+        int byte;
+        while (count < kFileBufferSize && (byte = source.get()) >= 0) {
+            crc = crc_add(crc, static_cast<uint8_t>(byte));
+            ++count;
+        }
+        source.close();
+        core.drive_first_read = static_cast<uint16_t>(count);
+        core.drive_first_crc = crc;
+        drive_given_name(core, place, name, sizeof name);
+        const Remembered *found = remembered_file(core, name);
+        if (found != nullptr) {
+            ++core.drive_check_at;
+            entry.state = kDriveLeftOut;
+            drive_left_out(core, place, static_cast<Reason>(found->reason));
+            return;
+        }
+    }
     Reason reason = kNone;
     uint32_t record = 0;
     const StepOutcome outcome = check_file_step(core, core.drive_check_name, &reason, &record);
-    DriveEntry &entry = core.drive[place];
     if (outcome == kStepWhole) {
-        const uint16_t id = free_drive_id(core);
         ++core.drive_check_at;
-        if (id == 0) {
+        if (entry.id == 0) {
             // Every id a drive's animation may have is taken.
             entry.state = kDriveLeftOut;
             drive_left_out(core, place, kDuplicateId);
@@ -234,15 +297,14 @@ void drive_step(Core &core) {
         }
         entry.bytes = core.checker->file.taken;
         entry.total_ms = core.check_total_ms;
-        entry.id = id;
         entry.state = kDriveInPlaylist;
         player_drive_joined(core, place);
     } else if (outcome == kStepFault) {
         ++core.drive_check_at;
         entry.state = kDriveLeftOut;
-        char name[kFaultNameSize];
         drive_given_name(core, place, name, sizeof name);
         note_fault(core, kWorkDrive, name, record, core.checker->decoder.body_read, reason);
+        remember_file(core, name, reason);
         drive_left_out(core, place, reason);
     }
 }
@@ -284,7 +346,8 @@ void start(Core &core) {
         // A host with a drive: an entry for each place of the drive's list.
         if (core.host.drive != nullptr && core.host.drive_name != nullptr) {
             core.drive = static_cast<DriveEntry *>(arena_take(core, kDriveMost * sizeof(DriveEntry)));
-            if (core.drive == nullptr) {
+            core.remembered = static_cast<Remembered *>(arena_take(core, kRememberedMost * sizeof(Remembered)));
+            if (core.drive == nullptr || core.remembered == nullptr) {
                 core_fail(core, kOutOfMemory, nullptr, kNone);
                 return;
             }
@@ -376,11 +439,17 @@ void drive_touch(Core &core) {
         entry.total_ms = 0;
         entry.id = 0;
         entry.state = kDriveToCheck;
+        entry.fault = kNone;
+    }
+    // Every file has its id at once, in the order of the list, before it is checked.
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        core.drive[place].id = free_drive_id(core);
     }
     player_drive_changed(core);
 }
 
 void drive_left_out(Core &core, uint32_t place, Reason reason) {
+    core.drive[place].fault = static_cast<uint8_t>(reason);
     if (core.host.log == nullptr) {
         return;
     }
@@ -430,6 +499,15 @@ uint32_t drive_place_of(const Core &core, uint32_t id) {
 
 bool drive_has_id(const Core &core, uint32_t id) {
     return drive_place_of(core, id) != kDriveMost;
+}
+
+uint32_t drive_place_holding(const Core &core, uint32_t id) {
+    for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
+        if (core.drive[place].id == id && id != 0) {
+            return place;
+        }
+    }
+    return kDriveMost;
 }
 
 void drive_check_yields(Core &core) {

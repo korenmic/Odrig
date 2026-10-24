@@ -65,19 +65,25 @@ uint32_t list_tail_size(uint32_t next, uint32_t total) {
     return text_length(kListNext) + (next < total ? digits(next) : 4) + 2;
 }
 
-// The number of the drive's animations in the playlist: they are listed after the items.
+// Whether a file of the drive is listed: an animation of the playlist, or a file left out
+// for a fault, which has an id.
+bool drive_is_listed(const DriveEntry &entry) {
+    return entry.state == kDriveInPlaylist || (entry.state == kDriveLeftOut && entry.id != 0);
+}
+
+// The number of the drive's listed files: they are listed after the items.
 uint32_t drive_listed(const Core &core) {
     uint32_t count = 0;
     for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
-        count += core.drive[place].state == kDriveInPlaylist ? 1 : 0;
+        count += drive_is_listed(core.drive[place]) ? 1 : 0;
     }
     return count;
 }
 
-// The place of the drive's animation that is listed at this place among them.
+// The place of the drive's file that is listed at this place among them.
 uint32_t drive_listed_place(const Core &core, uint32_t listed) {
     for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (core.drive[place].state == kDriveInPlaylist) {
+        if (drive_is_listed(core.drive[place])) {
             if (listed == 0) {
                 return place;
             }
@@ -181,8 +187,10 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
                 // The drive went while the list was written: it is no more.
                 continue;
             }
+            const bool left_out = entry.state == kDriveLeftOut;
+            const char *fault = reason_name(static_cast<Reason>(entry.fault));
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
-                                  text_length(kListBytes) + digits(entry.bytes) + 1;
+                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -195,7 +203,14 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListFile);
             reply.escaped(name);
             reply.text(kListBytes);
-            reply.number(entry.bytes);
+            if (left_out) {
+                reply.text("null");
+                reply.text(kListFault);
+                reply.text(fault);
+                reply.text("\"");
+            } else {
+                reply.number(entry.bytes);
+            }
             reply.text("}");
             continue;
         }
@@ -266,7 +281,7 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
     }
     if (position == core.item_count) {
         // An animation of the drive is the drive's: no command removes it.
-        return refuse(reply, core.drive != nullptr && drive_has_id(core, id) ? "in-use" : "unknown-id");
+        return refuse(reply, drive_place_holding(core, id) != kDriveMost ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
@@ -292,7 +307,7 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     if (core.upload.state != kUploadNone) return refuse(reply, "busy");
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
-    if (position == core.item_count) return refuse(reply, drive_has_id(core, id) ? "in-use" : "unknown-id");
+    if (position == core.item_count) return refuse(reply, drive_place_holding(core, id) != kDriveMost ? "in-use" : "unknown-id");
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");
     if ((item.ignored != 0) == ignored) return succeed(reply);
@@ -315,7 +330,7 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;
         while (position < core.item_count && core.items[position].id != ids[at]) ++position;
-        if (position == core.item_count) return refuse(reply, drive_has_id(core, ids[at]) ? "in-use" : "unknown-id");
+        if (position == core.item_count) return refuse(reply, drive_place_holding(core, ids[at]) != kDriveMost ? "in-use" : "unknown-id");
     }
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;

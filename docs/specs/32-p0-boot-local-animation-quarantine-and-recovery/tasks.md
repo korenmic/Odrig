@@ -53,7 +53,7 @@ Rules for every task:
   - `docs/commands.md`, `docs/core.md`.
   - Requirements: 3.4, 5.1 to 5.3
 
-- [ ] 4. A drive's files: ids at once, listed with their fault, remembered
+- [x] 4. A drive's files: ids at once, listed with their fault, remembered
   - `core/src/core.cpp`, `core_state.h`, `content.cpp`: ids when a drive is taken up,
     `DriveEntry.fault`, left-out files listed, the boot's memory of 16 left-out files.
   - Tests: ids before the check; a left-out file listed with `fault`; the same content

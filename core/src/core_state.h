@@ -118,13 +118,29 @@ struct Upload {
 };
 
 // What the core knows of the file at one place of a drive's list: its size and its
-// length once the check has read it whole, the id it got, and its state.
+// length once the check has read it whole, the id it got when the drive was taken up, its
+// state, and the Reason it was left out for.
 struct DriveEntry {
     uint64_t total_ms;
     uint32_t bytes;
     uint16_t id;
     uint8_t state;
+    uint8_t fault;
 };
+
+// A file of a drive that was left out for a fault in this boot: the name the drive gave it,
+// cut to 32 characters, the reason, and the number and the CRC-32 of its first bytes, at
+// most 512. A file of a drive taken up later with the same four is left out again after
+// reading those bytes.
+struct Remembered {
+    char name[kFaultNameSize];
+    uint8_t reason;
+    uint16_t first_read;
+    uint32_t crc;
+};
+
+// The most files of drives the core remembers; the oldest gives way to a new one.
+const uint32_t kRememberedMost = 16;
 
 // The states of a drive's file: to be checked; an animation of the playlist; left out.
 const uint8_t kDriveToCheck = 0;
@@ -224,6 +240,12 @@ struct Core {
     uint32_t drive_count;
     uint32_t drive_check_at;
     char drive_check_name[kDriveNameSize];
+    // The files of drives left out in this boot, the place the next one is written to, and
+    // of the drive's file the check is at, the bytes and the CRC-32 of its first read.
+    Remembered *remembered;
+    uint32_t remembered_next;
+    uint32_t drive_first_crc;
+    uint16_t drive_first_read;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -353,6 +375,9 @@ bool drive_has_id(const Core &core, uint32_t id);
 
 // The place of the drive's animation that has this id, or kDriveMost when none has.
 uint32_t drive_place_of(const Core &core, uint32_t id);
+
+// The place of the drive's file that has this id, whatever its state, or kDriveMost.
+uint32_t drive_place_holding(const Core &core, uint32_t id);
 
 // The check after the start at one refresh, after the LED data was made. `in_step` says
 // whether the refresh followed the one before it without a grid time left out, and

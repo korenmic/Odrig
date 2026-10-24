@@ -92,9 +92,12 @@ gives no items and `null`, and so does a show without items:
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
-The animations of a USB drive come after the items of the show, in the order of their
-file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false}`.
-Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
+The files of a USB drive or of the card come after the items of the show, in the order of
+their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340}`.
+A file left out for a fault is listed in its place as
+`{"id":60002,"file":"broken.odrg","bytes":null,"fault":"truncated"}`, and `play` of it is
+refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
+use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
 `<from>` and `next` count both kinds. An animation of the drive is listed once the player
@@ -204,7 +207,7 @@ succeeds.
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
-| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, or a cycle that lists only such. |
+| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |

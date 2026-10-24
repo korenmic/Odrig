@@ -251,6 +251,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (!all && item == kNothing && core.drive != nullptr && drive_has_id(core, id)) {
             item = kDriveBase + drive_place_of(core, id);
         }
+        if (!all && item == kNothing && drive_place_holding(core, id) != kDriveMost &&
+            core.drive[drive_place_holding(core, id)].state == kDriveLeftOut) {
+            // A file of the drive that was left out for a fault.
+            return refuse(reply, "unavailable");
+        }
         if (item == kNothing) {
             return refuse(reply, "unknown-id");
         }

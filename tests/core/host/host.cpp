@@ -222,8 +222,12 @@ public:
     }
 
     // The drive: plugged in, with a new number and the list of its folder `odrig` as it is
-    // now, or pulled out.
-    void plug() {
+    // now, or pulled out. A drive plugged in with a folder stands for that folder from then
+    // on.
+    void plug(const std::string &top = std::string()) {
+        if (!top.empty()) {
+            options_.drive = top;
+        }
         drive_names_.clear();
         const std::string folder = options_.drive + "/odrig";
 #ifdef _WIN32
@@ -1040,14 +1044,14 @@ private:
             print_fault();
             return true;
         }
-        if (line == "drive plug" || line == "drive pull") {
+        if (line == "drive plug" || line == "drive pull" || line.rfind("drive plug ", 0) == 0) {
             if (!host_.has_drive()) {
                 return false;
             }
-            if (line == "drive plug") {
-                host_.plug();
-            } else {
+            if (line == "drive pull") {
                 host_.pull();
+            } else {
+                host_.plug(line.size() > 11 ? line.substr(11) : std::string());
             }
             return true;
         }

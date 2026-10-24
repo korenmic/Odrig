@@ -152,8 +152,8 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (!is_new && core.items[position].is_cycle) {
         return refuse(reply, "in-use");
     }
-    if (is_new && core.drive != nullptr && drive_has_id(core, id)) {
-        // The id is an animation of the drive's.
+    if (is_new && drive_place_holding(core, id) != kDriveMost) {
+        // The id is a file of the drive's.
         return refuse(reply, "in-use");
     }
     // The file name is the item's own, or one that no item has.

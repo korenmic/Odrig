@@ -9204,3 +9204,28 @@ an upload holds the check until it ends. Seed 33 reports the check's progress it
 
 **Resolution.** `tests/emulator/support.py`, `app/www/screens/storage.js`,
 `docs/commands.md`.
+
+## Seed 32: another drive, and the first read of a drive's file
+
+**Question.** Requirement 3.2 asks to check every file of another drive anew, but the
+host gives the core a new number at every plug, for the same card as for another one; and
+the hosts give a file's bytes in pieces of any size, so the bytes of the first call of
+`read_at` are no identity. What does the core compare?
+
+**Answer.** The first step of a drive's file reads its first 512 bytes, whatever pieces
+they come in, and the core compares their number and CRC-32 with the name. Another card
+with a file of the same name and the same first 512 bytes is taken for the same content,
+as the design says; a file that differs in those bytes, on any card, is checked anew. The
+first step reads those bytes once more than before, at most 512 of them.
+
+**Resolution.** `core/src/core.cpp`, `drive_step`; `docs/core.md`, "A drive".
+
+## Seed 32: what the test host needs for another drive
+
+**Question.** A test of another card with a file of the same name needs a second drive
+in one session, and the test host knows one drive's folder.
+
+**Answer.** The input line `drive plug <folder>` plugs in a drive that stands for that
+folder from then on; `drive plug` alone plugs the same folder again, as before.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host".

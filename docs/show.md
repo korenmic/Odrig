@@ -114,9 +114,13 @@ show's; they do not take the place of any. Nothing is written to the drive, and 
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
   has been read, after the show's animations and the drive's before it. One that is not
-  is left out and named in the log with its reason; it does not make the show invalid.
-- Each has an id: the lowest from 60001 up that the show does not use and no animation of
-  the drive before it has. The same files with the same show get the same ids every time.
+  is left out, named in the log with its reason, and listed with it; it does not make the
+  show invalid, and the drive's other files play.
+- Each has an id from the moment the drive is taken up: the lowest from 60001 up that the
+  show does not use and no file of the drive before it has. The same files with the same
+  show get the same ids every time.
+- A file left out is remembered until the next start by its name and its first 512
+  bytes: taken up again, it is left out again without being read further.
 - Its turn is that of an animation without `repeat` and `max_seconds`. `play <id>` plays
   it, `status` names it, and `list` lists it after the show's items. `remove` and
   `upload begin` of its id are refused with `in-use`.

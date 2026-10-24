@@ -331,7 +331,7 @@ Shown advance(Core &core, uint64_t now) {
         core.drive[place].state = kDriveLeftOut;
         drive_left_out(core, place, reason);
         player_drive_changed(core);
-        return kShowsNothing;
+        return kShowsBefore;
     }
     if (reason != kNone) {
         // The file cannot be played: it is quarantined, this refresh keeps the picture
