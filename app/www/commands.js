@@ -146,6 +146,27 @@ export async function uploadData(offset, base64) {
   return reply.received;
 }
 
+// Lets the open upload go on only while the file of its item has this CRC-32, eight
+// hexadecimal digits: the one of the bytes the app read.
+export async function uploadExpect(crc) {
+  await carriedOut(`upload expect ${crc}`);
+}
+
+// Up to 600 bytes of the file of an animation, from an offset, as given in base64, and
+// the size of the file.
+export async function read(id, offset) {
+  const reply = await carriedOut(`read ${id} ${offset}`);
+  if (!whole(reply.bytes, 0, MOST_BYTES) || typeof reply.data !== "string" || !/^[A-Za-z0-9_-]*$/.test(reply.data) || reply.data.length % 4 === 1) {
+    throw new Failure("bad-reply", address());
+  }
+  const text = atob(reply.data.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (reply.data.length % 4)) % 4));
+  const data = new Uint8Array(text.length);
+  for (let at = 0; at < text.length; at += 1) {
+    data[at] = text.charCodeAt(at);
+  }
+  return {bytes: reply.bytes, data};
+}
+
 // Closes the upload with the CRC-32 of the whole file, eight hexadecimal digits.
 export async function uploadEnd(crc) {
   await carriedOut(`upload end ${crc}`);

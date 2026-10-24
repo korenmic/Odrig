@@ -6,6 +6,7 @@ import time
 import unittest
 
 from odrig import odrgx
+from odrigctl import client, content
 from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 
@@ -146,3 +147,64 @@ class MakingAClock(unittest.TestCase):
         self.assertIn({"id": 4, "file": "clock-digital.odrgx", "bytes": len(data), "ignored": False, "external": False, "type": "widget"},
                       json.loads(emulator.command("list"))["items"])
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 4])
+
+
+class EditingAnInstalledOne(unittest.TestCase):
+    """A show on the two-leg mapping, 60 x 6: frames, a text the playlist ignores, frames, a
+    clock."""
+
+    def emulator(self):
+        hello = encoded({**TEXT, "text": "Hello", "motion": "up", "width": 60, "height": 6})
+        clock = encoded({**CLOCK, "width": 60, "height": 6})
+        items = [{"id": 1, "file": "one.odrg"}, {"id": 5, "file": "hello.odrgx", "ignored": True}, {"id": 2, "file": "two.odrg"}, {"id": 7, "file": "clock-analog.odrgx"}]
+        files = {"mapping.json": core_support.mapping_texts()["legs-2"], "show.json": json.dumps({"version": 1, "brightness": 128, "items": items}),
+                 "one.odrg": core_support.clip(1, 60, 6), "two.odrg": core_support.clip(2, 60, 6), "hello.odrgx": hello, "clock-analog.odrgx": clock}
+        folder = emulator_support.installed(pathlib.Path(entered(self, tempfile.TemporaryDirectory()), "show"), files)
+        return entered(self, emulator_support.Emulator(folder)), folder
+
+    def test_a_saved_text_keeps_its_id_its_place_and_its_inclusion(self):
+        emulator, folder = self.emulator()
+        found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "edit": 5, "fields": [["text-words", "Hi there"]]}).seen
+        self.assertEqual(found["opened"], {"title": "Animation 5 hello.odrgx", "words": "Hello", "seconds": "30", "button": "Save"})
+        self.assertRegex(found["says"], r"\AOne pass takes [0-9.]+ seconds\.\Z")
+        self.assertEqual(found["message"], "Saved animation 5 hello.odrgx.")
+        saved = encoded({**TEXT, "text": "Hi there", "motion": "up", "width": 60, "height": 6})
+        self.assertEqual((folder / "hello.odrgx").read_bytes(), saved)
+        items = json.loads(emulator.command("list"))["items"]
+        self.assertEqual([item["id"] for item in items], [1, 5, 2, 7])
+        self.assertEqual(items[1], {"id": 5, "file": "hello.odrgx", "bytes": len(saved), "ignored": True, "external": False, "type": "text"})
+        self.assertEqual([row["id"] for row in found["rows"]], [1, 5, 2, 7])
+
+    def test_a_saved_clock_keeps_its_place(self):
+        emulator, folder = self.emulator()
+        found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "edit": 7, "fields": [["clock-seconds", "20"]]}).seen
+        self.assertEqual((found["opened"]["title"], found["opened"]["seconds"]), ("Animation 7 clock-analog.odrgx", "30"))
+        self.assertEqual(found["message"], "Saved animation 7 clock-analog.odrgx.")
+        saved = encoded({**CLOCK, "seconds": 20, "width": 60, "height": 6})
+        self.assertEqual((folder / "clock-analog.odrgx").read_bytes(), saved)
+        self.assertEqual([item["id"] for item in json.loads(emulator.command("list"))["items"]], [1, 5, 2, 7])
+
+    def test_a_change_by_another_controller_is_said_and_nothing_is_overwritten(self):
+        emulator, folder = self.emulator()
+        other = encoded({**TEXT, "text": "Other", "motion": "up", "width": 60, "height": 6})
+
+        def elsewhere():
+            with client.Session(http=f"127.0.0.1:{emulator.port}", timeout=5) as session:
+                self.assertTrue(content.is_ok(content.upload(session, 5, "hello.odrgx", other)))
+
+        found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4, "edit": 5, "fields": [["text-words", "Hi there"]], "changedElsewhere": True},
+                            steps=[elsewhere]).seen
+        self.assertEqual(found["message"], "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one. (stale)")
+        self.assertEqual((folder / "hello.odrgx").read_bytes(), other)
+        self.assertEqual(found["after"], {"title": "Animation 5 hello.odrgx", "words": "Hi there", "seconds": "30", "button": "Save"})
+        self.assertNotIn("upload.part", [path.name for path in folder.iterdir()])
+
+    def test_only_a_text_or_a_clock_of_the_boards_own_storage_has_edit(self):
+        items = [{"id": 1, "file": "hello.odrgx", "bytes": 60, "ignored": False, "external": False, "type": "text"},
+                 {"id": 2, "file": "two.odrg", "bytes": 900, "ignored": False, "external": False, "type": "frames"},
+                 {"id": 3, "file": "clock-analog.odrgx", "bytes": 40, "ignored": False, "external": False, "type": "widget"},
+                 {"id": 60001, "file": "sunrise.odrgx", "bytes": 40, "external": True, "type": "widget"}]
+        listed = (200, json.dumps({"ok": True, "items": items, "next": None}, separators=(",", ":")) + "\n")
+        with support.StandIn({**stand_in_of(60, 6), "list": listed}) as stand_in:
+            found = support.run("author-edit", address=stand_in.address, settings={"rows": 4, "menus": [1, 2, 3, 60001]}).seen
+        self.assertEqual({id: "Edit" in menu for id, menu in found["menus"].items()}, {"1": True, "2": False, "3": True, "60001": False})

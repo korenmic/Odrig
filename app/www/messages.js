@@ -60,7 +60,8 @@ const REFUSALS = {
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
   "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
-  unavailable: (line) => `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
+  unavailable: (line) => line.startsWith("read ") ? `Animation ${line.split(" ")[1]} cannot be read until it is replaced: its file has a fault. The list says which.`
+    : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
@@ -86,6 +87,11 @@ const REFUSALS = {
 export function ofNoSpace(bytes, free) {
   const room = free === null ? "more than the installation has free" : `and the installation has ${kilobytes(free)} KB free`;
   return `The animation needs ${kilobytes(bytes)} KB, ${room}. (no-space)`;
+}
+
+// What the app says when an edited animation was saved. It is no failure and has no code.
+export function ofSaved(id, file) {
+  return `Saved animation ${id} ${file}.`;
 }
 
 // What the app says when an upload succeeded. It is no failure and has no code.
