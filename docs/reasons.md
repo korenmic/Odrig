@@ -95,16 +95,17 @@ Rules: [format.md](format.md), "ODRGX".
 | `truncated` | The file ends before the 20-byte header is complete. |
 | `bad-magic` | Bytes 0 to 3 are neither `4F 44 52 58` nor, for an ODRG file, `4F 44 52 47`. |
 | `bad-container` | The container's version is not 1, or its reserved byte is not 0. |
-| `unknown-type` | The content type is not one the reader knows: 1, frames, or 2, a text. |
+| `unknown-type` | The content type is not one the reader knows: 1, frames, 2, a text, or 3, a widget. |
 | `unknown-type-version` | The version of the content type is not the one the reader knows: 1. |
 | `zero-size` | Width or height is 0. |
-| `payload-size` | The payload's length is above the most its type may have, 3,612 bytes for a text, or, once the payload was read, not the number of bytes after the header. |
+| `payload-size` | The payload's length is above the most its type may have, 3,612 bytes for a text and 20 for a widget, or, once the payload was read, not the number of bytes after the header. |
 | `canvas-mismatch` | The canvas of a frames payload differs from the container's. |
-| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations; for a text, its pass. |
+| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations; for a text, its pass; for a widget, its seconds. |
 
 The checks run in this order: the header's length, its fields in the order of their
 offsets, then the payload, whose faults are those of its type, a frames payload's those of
-"ODRG files" and a text's those of "Texts in ODRGX", then the canvas of a frames payload,
+"ODRG files", a text's those of "Texts in ODRGX" and a widget's those of "Widgets in
+ODRGX", then the canvas of a frames payload,
 the payload's length, and last the loop.
 
 ## Texts in ODRGX
@@ -128,11 +129,28 @@ The payload is checked as it is read: the canvas, the settings in the order of t
 offsets, the payload's length against them, whether the block fits, the text, each glyph,
 the end, and last the loop.
 
+## Widgets in ODRGX
+
+Rules: [format.md](format.md), "The widget payload".
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large` | The clock is for a canvas whose picture, 3 * W * H bytes, is above 65,534. |
+| `payload-size` | The payload's length in the header is not 20 bytes. |
+| `truncated` | The file ends before the 20 bytes of the payload. |
+| `unknown-widget` | The widget is not one the reader has: 1 `analog`, 2 `digital` or 3 `melting`. |
+| `bad-settings` | The reserved byte is not 0, the seconds are not 1 to 3,600, the least speed is not 1 to 3,600, or the greatest is below the least or above 3,600. |
+| `trailing-bytes` | Bytes follow the payload. |
+| `loop-mismatch` | The loop the header gives is not 1,000 times the seconds. |
+
+The payload is checked as it is read: the canvas, the payload's length, the widget, the
+other settings in the order of their offsets, the end, and last the loop.
+
 ## Sources that `encode` cannot write as ODRGX
 
 | Reason | Condition |
 |---|---|
-| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above; or a text is for a canvas above 65,534 bytes. |
+| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above; or a text or a clock is for a canvas above 65,534 bytes. |
 | `loop-mismatch` | The loop would be longer than 4,294,967,295 milliseconds. |
 | `unsupported-character` | A text holds a character that no font has: anything but the printable ASCII characters, the 27 Hebrew letters and the line feed. The detail names each, with its code point. |
 | `does-not-fit` | A text's block cannot be seen whole with its effect and motion; the detail names the effects that show it. |
@@ -145,8 +163,17 @@ frames by its member `type`.
 | Reason | Condition |
 |---|---|
 | `bad-json`, `missing-member`, `bad-type`, `bad-version`, `unknown-member` | As for JSON frames files. |
-| `unknown-type` | `type` is not `"text"`. |
+| `unknown-type` | `type` is not `"text"` or `"widget"`. |
 | `out-of-range` | A number or a name is outside its values: the canvas, `text` of not 1 to 512 bytes of UTF-8, a colour, the font, an alignment, the direction, the effect, the motion, `speed` not 1 to 240, `pause_ms` not 0 to 65,535, or below 20 for a `static` text. |
+
+## JSON sources of clocks
+
+Rules: [format.md](format.md), "The JSON source of a clock".
+
+| Reason | Condition |
+|---|---|
+| `bad-json`, `missing-member`, `bad-type`, `bad-version`, `unknown-member` | As for JSON frames files. |
+| `out-of-range` | A number or a name is outside its values: the canvas, the widget, `seconds` not 1 to 3,600, a colour, `speed_min` not 1 to 3,600, or `speed_max` below `speed_min` or above 3,600. |
 
 ## Mapping files
 

@@ -670,7 +670,7 @@ event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
-data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 
 event: frame
 data: 123460 <base64 of the refresh>
@@ -767,7 +767,7 @@ python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 | Status | Meaning |
@@ -977,7 +977,7 @@ after it. For each command the emulator prints one line to standard output, `rep
 time and the reply:
 
 ```
-reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 The whole script is checked before the core starts. A script that breaks a rule is refused

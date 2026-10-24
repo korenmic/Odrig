@@ -14,8 +14,8 @@ object, takes its memory once at startup, and never calls itself.
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
 the [LED data](#led-data), [command lines](#command-lines), [startup](#startup),
-[a drive](#a-drive), [texts](#texts), [memory](#memory), the [benchmark](#benchmark) and
-the [test host](#the-test-host).
+[a drive](#a-drive), [texts](#texts), [clocks](#clocks), [memory](#memory), the
+[benchmark](#benchmark) and the [test host](#the-test-host).
 
 ## Commands
 
@@ -325,8 +325,8 @@ inside `odrig_core_poll`, after the LED data of a refresh is complete:
 - the step after the last record asks for the end of the file: nothing may follow. The
   core then knows the size of the file, which `list` reports, and the length of its loop.
 
-A file of F frame records takes F + 2 steps. A text takes three: its payload is read and
-checked whole in the second step, as one record. At a refresh that follows the one before it
+A file of F frame records takes F + 2 steps. A text or a clock takes three: its payload is
+read and checked whole in the second step, as one record. At a refresh that follows the one before it
 without a grid time skipped, and comes no more than 2 ms after its grid time, while the
 last whole second had 30 refreshes or more, the check takes one step more than at the
 refresh before, up to 16 steps. At any other refresh,
@@ -393,6 +393,32 @@ core has no layout of its own.
 The reference pictures of `tests/vectors/procedural/` are drawn by the converter's
 library; the core's suite draws each again with the test host and finds every pixel the
 same.
+
+## Clocks
+
+A clock is an ODRGX container of type 3, a widget of 20 bytes: [format.md](format.md),
+"The widget payload". It is read and checked as a text is, with the checks and the order
+of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it plays.
+
+- **The seed.** The core keeps a 32-bit noise. Every call of `odrig_core_poll` mixes its
+  timestamp into it with MurmurHash3's finalizer, `mix`: `noise = mix(noise ^ t)`, t
+  taken modulo 2^32. When a refresh finds that a clock's turn has begun, the turn gets
+  the seed `mix(noise ^ mix(id ^ start))`, or 1 when that is 0, where `id` is the item's
+  id, or the drive's id of the animation, and `start` the time the turn began. The seed
+  is kept to the end of the turn: a later refresh, a loop that begins, `list` and
+  `status` do not change it, and every new turn, one that `play` began too, gets a new
+  one. The host gives no randomness; the times of the refreshes do, so on the board and
+  in the emulator every turn differs, while the same timestamps give the same seeds.
+  `status` reports the seed: [commands.md](commands.md).
+- **Drawing.** At each refresh the clock is drawn at the time since its turn began, not
+  since its loop began: the virtual time follows from the seed and that time alone, so
+  however the refreshes come, a time of the turn has one picture. The analog and the
+  digital clock touch each pixel once and test it against the rim, the pivot, two hands
+  and twelve marks; the melting watch first takes each pixel back to the dial through
+  its tilt and its fold. Every product fits 64 bits, and nothing is divided but by a
+  number that is fixed for the refresh.
+- **The turn.** The loop of a clock is its `seconds`, and its turn is as an animation's:
+  [show.md](show.md), "The turn of an animation".
 
 ## A drive
 
@@ -541,7 +567,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
   the mapping's; each further step decodes one frame record, which is what playback does
   for a refresh; the step after the last record asks for the end of the file and
   compares the size and the CRC-32 of what was read back with what was received. A file
-  of F frame records is checked in F + 2 refreshes, a text in three. No upload is open while the check
+  of F frame records is checked in F + 2 refreshes, a text or a clock in three. No upload is open while the check
   after the start reads the installed files. The check of a drive's files gives the
   second decoders up when an upload begins and takes them again once it is closed, so
   the two never need them at the same time.
@@ -567,7 +593,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,416 |
+| The core object | fixed | 3,440 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -583,15 +609,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,661** |
+| **Total** | | **124,685** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,146 bytes. A host
+46,008 of them. The example show on the two-leg mapping asks for 88,170 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,153 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,177 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,757 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,781 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -626,7 +652,7 @@ repeated exactly.
 | `odrig_host session DIR [options]` | Starts the core on the files of the folder `DIR`, prints the startup lines, then obeys the lines of standard input. |
 | `odrig_host session --batch [options]` | Runs one session after the other from standard input, which holds a file set and a script for each, and prints `end` after each. |
 | `odrig_host decode FILE` | Reads one `.odrg` file or ODRGX container with the core's decoder. Prints `container <type> <loop> <payload>` for a container; then, for frames, `header <W> <H> <C> <F> <compressed>` and one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel; then `end`; or `rejected <reason>` where the file is refused. A text has no frame records: its payload is read and checked whole. |
-| `odrig_host render FILE MS...` | Reads a text and draws it as the player does at each of these milliseconds into its turn. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
+| `odrig_host render [--seed N] FILE MS...` | Reads a text or a clock and draws it as the player does at each of these milliseconds into its turn, a clock with the seed N, 1 when none is given. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |
 | `odrig_host inflate --batch` | The same for any number of streams on standard input. |

@@ -215,7 +215,7 @@ class TheStart(ThePlaylist):
     def test_a_show_without_start_plays_the_playlist_from_its_first_animation(self):
         self.assertEqual(self.playing_at(three(), [0, 1000]), [("all", 1), ("all", 1)])
         printed = self.assert_as_the_reference(three(), [support.line(T0, "status")])
-        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":255,"playing":"all","animation":1,"fps":0,"error":null,"width":3,"height":2}'])
+        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":255,"playing":"all","animation":1,"fps":0,"error":null,"width":3,"height":2,"seed":null}'])
 
     def test_a_start_that_names_an_animation_begins_the_playlist_there(self):
         files = three(first={"repeat": 1}, second={"repeat": 1}, third={"repeat": 1}, start=2)

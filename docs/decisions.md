@@ -553,3 +553,8 @@ are in [format.md](format.md), "Measured sizes".
   container of frames, by the file's header. Approved by the owner in advance; a reply
   without it counts as frames. A show may name `.odrgx` files, and the player reads a
   container of frames as it reads the ODRG file it holds.
+- 2026-10-24: Seed 37 adds the reply member `seed` to `status`, as its last member: the
+  seed of the clock on the LEDs, or `null`. Approved by the owner in advance. The core
+  draws texts and clocks, with fonts and widgets built into it; `list` gives them `type`
+  `"text"` and `"widget"`, and the reason `unknown-widget` names a widget the player does
+  not have. A `status` reply is now up to 210 bytes; every reply stays within 1,024.

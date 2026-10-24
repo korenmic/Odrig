@@ -62,6 +62,9 @@ enum Reason {
     kDoesNotFit,
     kBadGlyph,
 
+    // A widget of an ODRGX container.
+    kUnknownWidget,
+
     kReasonCount
 };
 

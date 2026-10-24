@@ -244,7 +244,7 @@ integers are little-endian.
 |---:|---:|---|---|
 | 0 | 4 | Magic | The bytes `4F 44 52 58` ("ODRX"). |
 | 4 | 1 | Container version | 1. |
-| 5 | 1 | Type | The content type: 1, frames; 2, a text. |
+| 5 | 1 | Type | The content type: 1, frames; 2, a text; 3, a widget. |
 | 6 | 1 | Type version | The version of the content type: 1. |
 | 7 | 1 | Reserved | 0. |
 | 8 | 2 | Width | W, at least 1. |
@@ -360,6 +360,109 @@ writes it with two spaces of indent.
   "motion": "left",
   "speed": 20,
   "pause_ms": 1000
+}
+```
+
+### The widget payload
+
+The payload of the type 3 is a widget: a clock that the player draws, of 20 bytes.
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Widget | 1 `analog`, 2 `digital`, 3 `melting` |
+| 1 | 1 | Reserved | 0 |
+| 2 | 2 | Seconds | the loop, 1 to 3,600 |
+| 4 | 3 | Face | red, green, blue |
+| 7 | 3 | Hands | red, green, blue |
+| 10 | 3 | Rim | red, green, blue |
+| 13 | 3 | Background | red, green, blue |
+| 16 | 2 | Least speed | times real time, 1 to 3,600 |
+| 18 | 2 | Greatest speed | the least to 3,600 |
+
+The loop in the header is 1,000 times the seconds. The canvas's picture, 3 * W * H bytes,
+is at most 65,534.
+
+**The time a clock shows** is imaginary: no clock of the board or of a network is read.
+Each turn of a clock has a seed, a 32-bit number other than 0, which the player chooses
+when the turn begins: [core.md](core.md), "Clocks". From the seed, xorshift32 (x ^= x <<
+13, x ^= x >> 17, x ^= x << 5, on 32 bits) gives one number after the other, r, and the
+clock takes, in this order:
+
+| Name | From r | What it is |
+|---|---|---|
+| start | r % 43,200,000 | the virtual time at the start of the turn, in milliseconds |
+| b | least + r % (greatest - least + 1) | the base speed |
+| A | floor(min(b - least, greatest - b) * (r % 101) / 102) | the swing of the speed about b |
+| P | 6,000 + r % 14,001 | the period of the swing, in milliseconds |
+| phi | r % 1,024 | the phase of the swing, in 1,024ths of a turn |
+| tilt | 25 + r % 16 | the melting watch's tilt, in degrees |
+| fold | r % 21 | where it folds, in percent of its radius below its centre |
+| stretch | 130 + r % 41 | how far the hanging face stretches, in percent |
+| narrow | 20 + r % 31 | how fast it narrows as it hangs, in percent |
+| shear | 10 + r % 21 | how far it drifts sideways as it hangs, in percent |
+| wave | 2 + r % 3 | how high the fold waves, in half pixels |
+
+`t` milliseconds into the turn, the virtual time is
+
+```
+v(t) = start + b * t + floor(A * P * (c(phi * 65,536) - c(phi * 65,536 + floor(2^26 * (t % P) / P))) / 102,944)
+```
+
+Angles here are in 2^26ths of a turn, and `s` and `c` are the sine and the cosine of the
+sine table of 1,024 entries, in units of 1/16,384, that `fonts/generate.mjs` writes: an
+angle a is read at entry `floor(a / 65,536) % 1,024` and moved towards the next one by
+`floor((next - entry) * (a % 65,536) / 65,536)`; `c(a)` is `s(a + 2^24)`. 102,944 is 2 pi
+times 16,384, rounded. The speed of the virtual time is b plus the swing's sine, never
+below the least speed and never above the greatest. The clock shows `v(t)` modulo 12
+hours. Every division here rounds down.
+
+**Drawing a clock** at a time t of its turn, with its seed. Positions are in half pixels
+from the canvas's centre, with y growing downwards: a pixel x, y, counted from the top,
+is at `2x + 1 - W`, `2y + 1 - H`. A dial of radius R half pixels has a rim of 4 half
+pixels; inside it the pivot, the points whose squared distance from the centre is at most
+16; the hour hand, to `floor(R * 55 / 100)` and 2 half pixels to either side of its line,
+pointing at `v` modulo 12 hours; the minute hand, to `floor(R * 85 / 100)` and 1 half
+pixel to either side, at `v` modulo an hour; twelve marks, from `R - 6 - floor(R / 7)` to
+`R - 6`, 1 half pixel to either side; and the face. The rim and the face take their
+colours, and the pivot, the hands and the marks take the hands' colour.
+
+- **analog**: the background, and a dial of radius `2 * (floor(min(W, H) / 2) - 1)`.
+- **digital**: the background, and `h:mm` of `v` in the font `large`, the hour 1 to 12,
+  as wide as its advances less the spacing after the last, its left at `floor((W -
+  width) / 2)` and its top at `floor((H - 18) / 2)`; the digits in the face's colour and
+  the colon in the rim's, shown while `t % 1,000` is below 500.
+- **melting**: a pocket watch, after the seed's picture in
+  `project-seeds/37-p1-odrgx-text-and-clock-animations/`. Its dial has 66 percent of the
+  analog clock's radius, its centre lies 6 percent of that radius left of the canvas's
+  centre and 12 percent above it, and it is tilted counter-clockwise by `tilt`. Above the
+  fold the dial lies flat; below it, the face hangs straight down, stretched by `stretch`,
+  narrowing by `narrow` and drifting right by `shear` as it hangs, and darker the deeper
+  it hangs. The fold waves by `wave` along the dial, once across it, with a period of 7
+  seconds of real time. A crown and a ring of the rim's colour sit at 12 o'clock. The
+  formulas are those of `core/src/clock.cpp` and `converter/lib/draw.js`, which give the
+  same pixels.
+
+### The JSON source of a clock
+
+A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `version`
+(1), `type` (`"widget"`), `width`, `height`, `widget` (`"analog"`, `"digital"` or
+`"melting"`), `seconds` (1 to 3,600), `face`, `hands`, `rim` and `background` (colours as
+in JSON frames), `speed_min` (1 to 3,600) and `speed_max` (`speed_min` to 3,600).
+
+```json
+{
+  "version": 1,
+  "type": "widget",
+  "width": 60,
+  "height": 60,
+  "widget": "melting",
+  "seconds": 30,
+  "face": 16051408,
+  "hands": 2105376,
+  "rim": 13934615,
+  "background": 0,
+  "speed_min": 60,
+  "speed_max": 600
 }
 ```
 

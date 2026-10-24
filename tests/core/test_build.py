@@ -20,6 +20,9 @@ FLOATING_POINT = re.compile(r"\b(?:float|double)\b")
 ARRAY_IN_A_BLOCK = re.compile(r"(?m)^[ \t]+(?:const[ \t]+)?([A-Za-z_]\w*)[ \t]+(\*?)[ \t]*([A-Za-z_]\w*)\[([^\]\n]+)\];")
 CONSTANT = re.compile(r"(?m)^const[ \t]+\w+[ \t]+(k\w+)[ \t]*=[ \t]*([^;\n]+);")
 ELEMENT_BYTES = {"char": 1, "uint8_t": 1, "int8_t": 1, "uint16_t": 2, "int16_t": 2, "uint32_t": 4, "int32_t": 4, "uint64_t": 8, "int64_t": 8}
+# The structures of the core that a function holds an array of, by their size: a stroke of
+# a clock's dial is five 16-bit numbers.
+ELEMENT_BYTES["Stroke"] = 10
 NO_TYPES = ("return", "else", "case", "goto", "delete", "throw", "sizeof")
 # The most bytes an array inside a function of the core may have.
 LARGEST_LOCAL_ARRAY = 256
@@ -199,7 +202,7 @@ class Sources(unittest.TestCase):
         # The check reads the arrays the sources have: names of files and ids, the tables
         # of a Huffman code, the start of a file and of a frame record.
         self.assertGreaterEqual(len(found), 15)
-        self.assertLessEqual({("show.cpp", "file", 33), ("odrg_decoder.cpp", "header", 16), ("inflate.cpp", "offset", 32), ("commands.cpp", "text", 40)}, set(found))
+        self.assertLessEqual({("show.cpp", "file", 33), ("odrg_decoder.cpp", "header", 16), ("inflate.cpp", "offset", 32), ("commands.cpp", "text", 40), ("clock.cpp", "made", 140)}, set(found))
         # The compiler holds every function to a frame of 512 bytes, and the core object to
         # 4,096 bytes.
         makefile = (support.CORE / "Makefile").read_text(encoding="utf-8")

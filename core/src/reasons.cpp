@@ -45,6 +45,7 @@ const char *reason_name(Reason reason) {
         case kBadText: return "bad-text";
         case kDoesNotFit: return "does-not-fit";
         case kBadGlyph: return "bad-glyph";
+        case kUnknownWidget: return "unknown-widget";
         case kNone:
         case kEnd:
         case kReasonCount:

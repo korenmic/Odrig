@@ -8,7 +8,6 @@
 #include "reasons.h"
 #include "show.h"
 #include "storage.h"
-#include "text.h"
 #include "upload.h"
 
 namespace odrig {
@@ -77,7 +76,7 @@ void check_file(Core &core, FileInfo &info) {
     info.type = header.type;
     uint64_t total = 0;
     if (reason == kNone && is_drawn(header.type)) {
-        reason = text_read(&core.file, header, nullptr);
+        reason = drawn_read(&core.file, header, nullptr);
         total = header.loop_ms;
     } else if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
@@ -132,7 +131,7 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason) {
         }
     } else if (core.check_records_left != 0) {
         if (is_drawn(core.check_content.type)) {
-            found = text_read(&checker.file, core.check_content, nullptr);
+            found = drawn_read(&checker.file, core.check_content, nullptr);
             core.check_total_ms = core.check_content.loop_ms;
         } else {
             uint16_t duration = 0;

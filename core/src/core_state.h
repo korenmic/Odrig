@@ -250,6 +250,12 @@ struct Core {
     // drawn one is held in the window, its payload read whole, and its file is closed.
     uint8_t stream_open;
     uint8_t stream_drawn;
+    // The noise the timestamps of the refreshes are mixed into, and the seed of the turn of
+    // a clock: the id of its item and the start of its turn.
+    uint32_t noise;
+    uint32_t seed;
+    uint32_t seed_id;
+    uint64_t seed_start;
     uint32_t stream_item;
     uint64_t stream_turn;
     uint64_t stream_loop;

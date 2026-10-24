@@ -5,7 +5,6 @@
 #include "crc32.h"
 #include "json_reader.h"
 #include "storage.h"
-#include "text.h"
 
 namespace odrig {
 
@@ -114,7 +113,7 @@ void upload_step(Core &core, uint64_t now) {
         }
     } else if (upload.records_left != 0) {
         if (is_drawn(upload.content.type)) {
-            reason = text_read(&checker.file, upload.content, nullptr);
+            reason = drawn_read(&checker.file, upload.content, nullptr);
             upload.total_ms = upload.content.loop_ms;
         } else {
             uint16_t duration = 0;

@@ -31,6 +31,7 @@
 #include "guard.h"
 #include "inflate.h"
 #include "container.h"
+#include "clock.h"
 #include "text.h"
 #include "odrg_decoder.h"
 #include "odrig_core.h"
@@ -62,7 +63,7 @@ int usage() {
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
         "       odrig_host decode FILE | --batch\n"
-        "       odrig_host render FILE MS...\n"
+        "       odrig_host render [--seed N] FILE MS...\n"
         "       odrig_host session DIR | --batch [options]\n"
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
@@ -912,9 +913,9 @@ void decode_one(Host &host, const char *name) {
     }
     uint64_t total_ms = 0;
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
-        // A text is read and checked whole, as the core reads it.
+        // A text or a widget is read and checked whole, as the core reads it.
         std::vector<uint8_t> payload(odrig::kLargestTextPayload);
-        reason = odrig::text_read(&file, content, payload.data());
+        reason = odrig::drawn_read(&file, content, payload.data());
     } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -959,10 +960,11 @@ size_t last_separator(const std::string &path) {
 #endif
 }
 
-// Draws a text, as the player draws it, at each of a number of milliseconds into its turn.
-// Prints `picture <W> <H> <hex>` for each, with three bytes for each pixel in the pixel
-// order of docs/format.md, or `rejected <reason>` once.
-int render(const std::string &path, const std::vector<std::string> &times) {
+// Draws a text or a clock, as the player draws it, at each of a number of milliseconds into
+// its turn, a clock with a seed, 1 when none is given. Prints `picture <W> <H> <hex>` for
+// each, with three bytes for each pixel in the pixel order of docs/format.md, or
+// `rejected <reason>` once.
+int render(const std::string &path, const std::vector<std::string> &times, uint32_t seed) {
     for (const std::string &time : times) {
         if (time.empty() || time.size() > 12 || time.find_first_not_of("0123456789") != std::string::npos) {
             return usage();
@@ -990,7 +992,7 @@ int render(const std::string &path, const std::vector<std::string> &times) {
     }
     std::vector<uint8_t> payload(odrig::kLargestTextPayload);
     if (reason == odrig::kNone) {
-        reason = odrig::text_read(&file, content, payload.data());
+        reason = odrig::drawn_read(&file, content, payload.data());
     }
     file.close();
     if (reason != odrig::kNone) {
@@ -1000,7 +1002,11 @@ int render(const std::string &path, const std::vector<std::string> &times) {
     std::vector<uint8_t> pixels(3u * content.width * content.height);
     for (const std::string &time : times) {
         const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
-        odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
+        if (content.type == odrig::kTypeText) {
+            odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
+        } else {
+            odrig::clock_draw(payload.data(), seed, content.width, content.height, ms, pixels.data());
+        }
         std::printf("picture %u %u %s\n", content.width, content.height, hex(std::string(pixels.begin(), pixels.end())).c_str());
     }
     return 0;
@@ -1409,8 +1415,16 @@ int main(int argc, char **argv) {
     if (invocation == "decode" && arguments.size() == 2) {
         return decode(arguments[1]);
     }
+    if (invocation == "render" && arguments.size() >= 5 && arguments[1] == "--seed") {
+        uint64_t seed = 0;
+        if (arguments[2].empty() || arguments[2].size() > 10 || arguments[2].find_first_not_of("0123456789") != std::string::npos ||
+            (seed = std::strtoull(arguments[2].c_str(), nullptr, 10)) > 0xFFFFFFFFull) {
+            return usage();
+        }
+        return render(arguments[3], std::vector<std::string>(arguments.begin() + 4, arguments.end()), static_cast<uint32_t>(seed));
+    }
     if (invocation == "render" && arguments.size() >= 3) {
-        return render(arguments[1], std::vector<std::string>(arguments.begin() + 2, arguments.end()));
+        return render(arguments[1], std::vector<std::string>(arguments.begin() + 2, arguments.end()), 1);
     }
     if (invocation == "guard" && arguments.size() == 2 &&
         (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {

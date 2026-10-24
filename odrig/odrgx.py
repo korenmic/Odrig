@@ -15,9 +15,9 @@ ENDING = ".odrgx"
 
 # The content types that are read, by number, the version of each, and the most bytes a
 # payload of each may have.
-TYPE_NAMES = {1: "frames", 2: "text"}
-TYPE_VERSIONS = {1: 1, 2: 1}
-LARGEST_PAYLOAD = {1: 0xFFFFFFFF, 2: 3612}
+TYPE_NAMES = {1: "frames", 2: "text", 3: "widget"}
+TYPE_VERSIONS = {1: 1, 2: 1, 3: 1}
+LARGEST_PAYLOAD = {1: 0xFFFFFFFF, 2: 3612, 3: 20}
 
 
 @dataclasses.dataclass(frozen=True)

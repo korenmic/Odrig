@@ -727,7 +727,7 @@ as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
-{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over

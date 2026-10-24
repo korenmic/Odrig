@@ -30,7 +30,7 @@ struct ContentHeader {
 
 // Whether a type is drawn by the core rather than decoded from frames.
 inline bool is_drawn(uint8_t type) {
-    return type == kTypeText;
+    return type == kTypeText || type == kTypeWidget;
 }
 
 // Reads the header of a file that was just opened, from its first byte: an ODRG file's
@@ -43,6 +43,11 @@ Reason content_open(FileSource *file, Inflate *inflate, uint8_t *window, OdrgDec
 // payload has the length and its frames the loop its header gives. A drawn type's payload
 // was read to its end and checked whole by its own reader: nothing is left to do.
 Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeader &header, uint64_t total_ms);
+
+// Reads and checks the payload of a drawn type whole, from where the header left the
+// source to the end of the file, and keeps it in `into` when that is given: a text's or a
+// widget's, by its own reader.
+Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into);
 
 // The name `list` writes for a type.
 const char *type_name(uint8_t type);

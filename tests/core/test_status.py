@@ -29,7 +29,7 @@ def hello_only(brightness=255):
 class StatusReply(Playback):
     def test_its_exact_bytes(self):
         printed = self.assert_as_the_reference(support.example_show(), [status_at(0)])
-        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6}'])
+        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"seed":null}'])
 
     def test_its_exact_bytes_when_nothing_plays_and_the_show_is_invalid(self):
         files = support.example_show()
@@ -37,12 +37,12 @@ class StatusReply(Playback):
         printed = self.assert_as_the_reference(files, [at(0, "off"), status_at(0)])
         self.assertEqual(
             printed[1],
-            'reply {"ok":true,"on":false,"brightness":128,"playing":null,"animation":null,"fps":0,"error":"file-missing hello.odrg","width":60,"height":6}',
+            'reply {"ok":true,"on":false,"brightness":128,"playing":null,"animation":null,"fps":0,"error":"file-missing hello.odrg","width":60,"height":6,"seed":null}',
         )
 
     def test_it_is_the_reply_of_the_document(self):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
-        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}'
+        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}'
         self.assertIn(example, text)
         script = every_20_ms(50) + [status_at(1000)]
         printed = self.assert_as_the_reference(support.example_show(), script)
@@ -176,7 +176,7 @@ class StateAfterStartup(Playback):
     def test_a_valid_show_is_on_at_its_brightness_with_its_start_item_playing(self):
         self.assertEqual(
             self.started(support.example_show()),
-            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
         self.assertEqual(self.started(hello_only(7))["brightness"], 7)
 
@@ -185,7 +185,7 @@ class StateAfterStartup(Playback):
         files["show.json"] = support.show_text(json.loads(files["show.json"])["items"], 31)
         self.assertEqual(
             self.started(files),
-            {"ok": True, "on": True, "brightness": 31, "playing": "all", "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 31, "playing": "all", "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
     def test_a_valid_show_without_an_animation_plays_nothing(self):
@@ -193,7 +193,7 @@ class StateAfterStartup(Playback):
         files["show.json"] = support.show_text([], 31)
         self.assertEqual(
             self.started(files),
-            {"ok": True, "on": True, "brightness": 31, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 31, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
     def test_an_invalid_show_is_on_and_plays_nothing(self):
@@ -232,7 +232,7 @@ class StateAfterStartup(Playback):
                 height = None if width is None else 6
                 self.assertEqual(
                     self.started(files, options),
-                    {"ok": True, "on": True, "brightness": brightness, "playing": None, "animation": None, "fps": 0, "error": error, "width": width, "height": height},
+                    {"ok": True, "on": True, "brightness": brightness, "playing": None, "animation": None, "fps": 0, "error": error, "width": width, "height": height, "seed": None},
                 )
 
     def test_nothing_is_kept_from_one_startup_to_the_next(self):
@@ -243,7 +243,7 @@ class StateAfterStartup(Playback):
         self.assertEqual((state(first.lines[-1])["playing"], state(first.lines[-1])["animation"]), ("all", 2))
         self.assertEqual(
             state(second.lines[0]),
-            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
 

@@ -27,6 +27,7 @@ import {
   UNKNOWN_FONT,
   UNKNOWN_TYPE,
   UNKNOWN_TYPE_VERSION,
+  UNKNOWN_WIDGET,
   ZERO_SIZE,
 } from "./errors.js";
 import * as jsonframes from "./jsonframes.js";
@@ -40,11 +41,11 @@ export const HEADER_SIZE = 20;
 export const ENDING = ".odrgx";
 
 // The content types this library reads, by name and by number, and the version of each.
-export const TYPES = {frames: 1, text: 2};
-export const TYPE_NAMES = {1: "frames", 2: "text"};
-export const TYPE_VERSIONS = {1: 1, 2: 1};
+export const TYPES = {frames: 1, text: 2, widget: 3};
+export const TYPE_NAMES = {1: "frames", 2: "text", 3: "widget"};
+export const TYPE_VERSIONS = {1: 1, 2: 1, 3: 1};
 // The most bytes a payload of each type may have; frames have no limit of their own.
-export const LARGEST_PAYLOAD = {1: 0xffffffff, 2: 3612};
+export const LARGEST_PAYLOAD = {1: 0xffffffff, 2: 3612, 3: 20};
 // The version of the JSON sources of a text and of a widget.
 export const SOURCE_VERSION = 1;
 export const LONGEST_LOOP = 0xffffffff;
@@ -165,16 +166,18 @@ export function wrap(type, width, height, loopMs, payload) {
 }
 
 // What a container holds, read by its type: for frames as `decodeFrames` gives it, for a
-// text as `decodeText` does, each with `type`, the type's name.
+// text as `decodeText` does and for a widget as `decodeWidget` does, each with `type`, the
+// type's name.
 export function decode(data) {
   const header = readHeader(data);
   const name = TYPE_NAMES[header.type];
-  const decoded = name === "frames" ? decodeFrames(data, header) : decodeText(data, header);
-  return {type: name, ...decoded};
+  const reader = {frames: decodeFrames, text: decodeText, widget: decodeWidget}[name];
+  return {type: name, ...reader(data, header)};
 }
 
 // A JSON source, read by its member `type`: `{type: "frames", animation}` for JSON frames,
-// which have no `type`, and `{type: "text", text}` for a text.
+// which have no `type`, `{type: "text", text}` for a text and `{type: "widget", widget}`
+// for a clock.
 export function loadsSource(bytes) {
   const top = strictjson.loads(bytes);
   if (!(top instanceof Map)) {
@@ -197,13 +200,19 @@ export function loadsSource(bytes) {
   if (type === "text") {
     return {type, text: loadsText(top)};
   }
-  throw new Rejection(UNKNOWN_TYPE, `type is ${JSON.stringify(type)}, not "text"`);
+  if (type === "widget") {
+    return {type, widget: loadsWidget(top)};
+  }
+  throw new Rejection(UNKNOWN_TYPE, `type is ${JSON.stringify(type)}, not "text" or "widget"`);
 }
 
 // The container of a JSON source as `loadsSource` reads it.
 export function encodeSource(source, {compressed = true} = {}) {
   if (source.type === "text") {
     return encodeText(source.text);
+  }
+  if (source.type === "widget") {
+    return encodeWidget(source.widget);
   }
   return encodeFrames(source.animation, {compressed});
 }
@@ -457,10 +466,15 @@ export function encodeText(text) {
   return wrap("text", text.width, text.height, draw.passMs(text, block, canvas), payload);
 }
 
-// The picture of a decoded text `t` milliseconds into its turn, as the player draws it:
-// three bytes for each pixel in the pixel order of docs/format.md.
-export function pictureAt(decoded, t) {
-  const picture = new Uint8Array(3 * decoded.header.width * decoded.header.height);
+// The picture of a decoded text or clock `t` milliseconds into its turn, as the player
+// draws it, a clock with the seed of its turn: three bytes for each pixel in the pixel
+// order of docs/format.md.
+export function pictureAt(decoded, t, seed = 1) {
+  const {width, height} = decoded.header;
+  const picture = new Uint8Array(3 * width * height);
+  if ("widget" in decoded.settings) {
+    return draw.drawClock(decoded.settings, seed, t, {width, height}, picture);
+  }
   const font = textlayout.fontOf(textlayout.FONTS[decoded.settings.font].id);
   return draw.drawText(decoded, font, t % decoded.header.loopMs, picture);
 }
@@ -472,4 +486,90 @@ export function textOf(decoded) {
 
 function horizontalMotion(motion) {
   return motion === "left" || motion === "right";
+}
+
+// The widget payload, version 1: 20 bytes of settings of a clock.
+export const WIDGET_SIZE = 20;
+
+// The members of the JSON source of a clock, in the order in which it is written.
+export const WIDGET_MEMBERS = ["version", "type", "width", "height", "widget", "seconds", "face", "hands", "rim", "background", "speed_min", "speed_max"];
+
+// Reads a container of a widget given as bytes: `{header, settings}`, in the order in which
+// the core checks it: the canvas, the payload's length, the widget, the other settings in
+// the order of their offsets, the end and the loop.
+export function decodeWidget(data, header = readHeader(data)) {
+  refuseLargeCanvas(header.width, header.height);
+  if (header.payloadSize !== WIDGET_SIZE) {
+    throw new Rejection(PAYLOAD_SIZE, `the header gives the payload ${header.payloadSize} bytes, not ${WIDGET_SIZE}`);
+  }
+  const read = cursor(payloadOf(data));
+  const fixed = read.take(WIDGET_SIZE, "the settings of the widget");
+  if (fixed[0] < 1 || fixed[0] > draw.WIDGETS.length) {
+    throw new Rejection(UNKNOWN_WIDGET, `widget ${fixed[0]} is none this player has`);
+  }
+  if (fixed[1] !== 0) throw badSettings("the reserved byte is not 0");
+  const seconds = u16(fixed, 2);
+  if (seconds < 1 || seconds > draw.LONGEST_CLOCK) throw badSettings(`a loop of ${seconds} seconds is not 1 to ${draw.LONGEST_CLOCK}`);
+  const speedMin = u16(fixed, 16);
+  const speedMax = u16(fixed, 18);
+  if (speedMin < 1 || speedMin > draw.FASTEST_CLOCK) throw badSettings(`the least speed is ${speedMin}, not 1 to ${draw.FASTEST_CLOCK}`);
+  if (speedMax < speedMin || speedMax > draw.FASTEST_CLOCK) throw badSettings(`the greatest speed is ${speedMax}, not ${speedMin} to ${draw.FASTEST_CLOCK}`);
+  if (read.left() !== 0) {
+    throw new Rejection(TRAILING_BYTES, `${read.left()} bytes follow the settings`);
+  }
+  checkLoop(header, 1000 * seconds);
+  const settings = {
+    widget: draw.WIDGETS[fixed[0] - 1], seconds, face: colour(fixed, 4), hands: colour(fixed, 7), rim: colour(fixed, 10),
+    background: colour(fixed, 13), speedMin, speedMax,
+  };
+  return {header, settings};
+}
+
+// A clock as the JSON source has it: `{width, height, widget, seconds, face, hands, rim,
+// background, speedMin, speedMax}`.
+export function loadsWidget(top) {
+  strictjson.members(top, WIDGET_MEMBERS);
+  const width = Number(strictjson.integer(top.get("width"), 1, 65535, "width"));
+  const height = Number(strictjson.integer(top.get("height"), 1, 65535, "height"));
+  const widget = top.get("widget");
+  if (typeof widget !== "string") throw new Rejection(BAD_TYPE, "widget is not a string");
+  if (!draw.WIDGETS.includes(widget)) throw new Rejection(OUT_OF_RANGE, `widget is ${JSON.stringify(widget)}, not one of ${draw.WIDGETS.join(", ")}`);
+  const seconds = Number(strictjson.integer(top.get("seconds"), 1, draw.LONGEST_CLOCK, "seconds"));
+  const colours = {};
+  for (const name of ["face", "hands", "rim", "background"]) {
+    colours[name] = Number(strictjson.integer(top.get(name), 0, 0xffffff, name));
+  }
+  const speedMin = Number(strictjson.integer(top.get("speed_min"), 1, draw.FASTEST_CLOCK, "speed_min"));
+  const speedMax = Number(strictjson.integer(top.get("speed_max"), speedMin, draw.FASTEST_CLOCK, "speed_max"));
+  return {width, height, widget, seconds, ...colours, speedMin, speedMax};
+}
+
+// The canonical JSON source of a clock.
+export function dumpsWidget(widget) {
+  const source = {
+    version: SOURCE_VERSION, type: "widget", width: widget.width, height: widget.height, widget: widget.widget,
+    seconds: widget.seconds, face: widget.face, hands: widget.hands, rim: widget.rim, background: widget.background,
+    speed_min: widget.speedMin, speed_max: widget.speedMax,
+  };
+  return new TextEncoder().encode(`${JSON.stringify(source, null, 2)}\n`);
+}
+
+// A container of a clock, its loop `seconds` long.
+export function encodeWidget(widget) {
+  refuseLargeCanvas(widget.width, widget.height);
+  const payload = new Uint8Array(WIDGET_SIZE);
+  payload[0] = draw.WIDGETS.indexOf(widget.widget) + 1;
+  putU16(payload, 2, widget.seconds);
+  putColour(payload, 4, widget.face);
+  putColour(payload, 7, widget.hands);
+  putColour(payload, 10, widget.rim);
+  putColour(payload, 13, widget.background);
+  putU16(payload, 16, widget.speedMin);
+  putU16(payload, 18, widget.speedMax);
+  return wrap("widget", widget.width, widget.height, 1000 * widget.seconds, payload);
+}
+
+// The clock of a decoded container, as its JSON source has it.
+export function widgetOf(decoded) {
+  return {width: decoded.header.width, height: decoded.header.height, ...decoded.settings};
 }
