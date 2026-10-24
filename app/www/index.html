@@ -7,46 +7,81 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header id="top">
+<p id="app-name">odrig</p>
+<p id="top-link" class="pill" role="status">Checking</p>
+</header>
 <main>
-<section id="show" hidden>
-<div id="state">
-<p id="power" class="state">-</p>
-<p id="brightness">-</p>
-<p id="playing">-</p>
+<section id="animations" hidden>
+<div id="now-panel" class="panel">
+<div class="now-row">
+<div class="now-words">
+<p class="label">Now playing</p>
 <p id="now" hidden></p>
+<p id="playing">-</p>
+</div>
+</div>
+<div id="power-switch" class="power" role="group" aria-label="LEDs">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+<button id="on" type="button" aria-pressed="false">On</button>
+<button id="off" type="button" aria-pressed="false">Off</button>
+</div>
+<div id="state" class="facts">
+<p id="power">-</p>
+<p id="brightness">-</p>
 <p id="fps">-</p>
+</div>
+<label for="level" class="slider-label">Set the brightness to <span id="level-number">-</span></label>
+<input id="level" type="range" min="0" max="255" step="1" value="0">
+<div id="test-now" hidden>
+<p id="test-now-text" role="status"></p>
+<button id="stop-test" type="button">Stop test</button>
 </div>
 <p id="silent" hidden></p>
 <p id="silent-why" hidden></p>
-<div class="pair">
-<button id="on" type="button">On</button>
-<button id="off" type="button">Off</button>
 </div>
-<label for="level">Set the brightness to <span id="level-number">-</span></label>
-<input id="level" type="range" min="0" max="255" step="1" value="0">
-<button id="play-all" type="button">Playlist from the start</button>
+<div id="space-panel" class="panel compact">
 <p id="show-space">-</p>
 <p id="show-external-space">-</p>
-<h1>Animations</h1>
-<div id="animations"></div>
-<p id="none" hidden>No animation is installed.</p>
-</section>
-<section id="storage" hidden>
-<h1>Storage</h1>
-<p>Internal storage</p>
-<p id="space">-</p>
-<p id="external-space">-</p>
-<h1>Installed</h1>
+</div>
+<div class="pair">
+<button id="play-all" type="button">Playlist from the start</button>
+<button id="add-animation" type="button" class="primary">Add animation</button>
+</div>
+<div id="tests" class="panel" hidden>
+<div class="group-head">
+<button id="tests-toggle" type="button" aria-expanded="true" aria-controls="tests-body">Tests</button>
+<span class="pin" aria-hidden="true"></span>
+</div>
+<div id="tests-body">
+<p id="tests-note" class="small"></p>
+<div id="tests-grid"></div>
+</div>
+</div>
+<div id="list-head">
+<h1 id="list-title">Animations</h1>
+<button id="select-mode" type="button">Select</button>
+</div>
+<div id="selection-bar" hidden>
 <div class="pair">
 <button id="select-all" type="button">Select all</button>
 <button id="clear-selection" type="button">Clear selection</button>
 </div>
+<div class="pair">
 <button id="delete-selected" type="button" disabled>Delete selected</button>
+<button id="selection-done" type="button">Done</button>
+</div>
 <p id="bulk-progress" role="status" aria-live="polite"></p>
-<div id="installed"></div>
-<p id="installed-none" hidden>No animation is installed.</p>
-<h1>Add an animation</h1>
-<label id="choose" class="button" for="media">Choose a video or a GIF</label>
+</div>
+<p id="order-note" class="small" role="status" aria-live="polite"></p>
+<div id="animations-list" role="list" aria-labelledby="list-title"></div>
+<p id="none" hidden>No animation is installed.</p>
+</section>
+<section id="upload" hidden>
+<h1>Upload</h1>
+<p id="upload-space" class="small">-</p>
+<div class="panel">
+<label id="choose" class="button primary" for="media">Choose a video or a GIF</label>
 <input id="media" type="file" accept="video/*,image/gif" hidden>
 <div id="chosen" hidden>
 <p id="media-name"></p>
@@ -61,50 +96,42 @@
 <input id="start" type="text" inputmode="decimal" autocomplete="off" value="0">
 <label for="length">Length in seconds, empty for the rest of the file</label>
 <input id="length" type="text" inputmode="decimal" autocomplete="off" value="">
-<button id="make" type="button">Make the animation</button>
+<button id="make" type="button" class="primary">Make the animation</button>
 <p id="making" hidden></p>
 <button id="stop-making" type="button" hidden>Stop</button>
 <div id="made" hidden>
 <canvas id="preview"></canvas>
 <p id="made-facts"></p>
-<button id="upload" type="button">Upload</button>
+<button id="upload-made" type="button" class="primary">Upload to the installation</button>
 <p id="uploading" hidden></p>
 <button id="cancel-upload" type="button" hidden>Cancel</button>
 </div>
 </div>
+</div>
 </section>
-<section id="mapping" hidden>
-<h1>Mapping</h1>
-<p>Assign each three-column snake to an existing ESP32-S3 data pin. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
+<section id="settings" hidden>
+<h1>Settings</h1>
+<div id="mapping" class="panel">
+<h2>Mapping</h2>
+<p class="small">Assign each three-column snake to an existing ESP32-S3 data pin. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
 <p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
 <p id="mapping-error" role="alert" hidden></p>
 <div id="mapping-rows"></div>
 <div class="pair">
-<button id="mapping-save" type="button" disabled>Save</button>
+<button id="mapping-save" type="button" class="primary" disabled>Save</button>
 <button id="mapping-cancel" type="button" disabled>Cancel</button>
 </div>
 <button id="mapping-defaults" type="button" disabled>Restore defaults</button>
 <button id="mapping-reload" type="button">Reload</button>
-<h1>Check the installation</h1>
-<p>Show one white diagonal from bottom left to top right, on black. Inspect the real LEDs for one continuous line. The screen cannot verify wiring. Save the mapping before checking it.</p>
-<p id="mapping-mode" role="status" aria-live="polite">State unavailable</p>
-<p id="mapping-power"></p>
-<button id="mapping-test-on" type="button" disabled>Show diagonal</button>
-<button id="mapping-test-off" type="button" disabled>Stop diagonal</button>
-<p class="small">Stop restores the previous playback selection. Leaving this screen keeps the diagonal on the target; normal Play also stops it.</p>
-<div class="pair">
-<button id="mapping-on" type="button">On</button>
-<button id="mapping-off" type="button">Off</button>
 </div>
-<label for="mapping-level">Set the brightness to <span id="mapping-level-number">-</span></label>
-<input id="mapping-level" type="range" min="0" max="255" step="1" value="0">
 </section>
 <section id="target">
 <h1>Target</h1>
+<div class="panel">
 <label for="address">Address of the installation</label>
 <input id="address" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
 <div class="pair">
-<button id="use" type="button">Use</button>
+<button id="use" type="button" class="primary">Use</button>
 <button id="board" type="button">Board</button>
 </div>
 <p id="link" class="state">Checking</p>
@@ -113,8 +140,10 @@
 <p id="route"></p>
 <p>Join the Wi-Fi network odrig in the phone's Wi-Fi settings.</p>
 <p id="about" class="small"></p>
+</div>
 </section>
 </main>
+<div id="row-menu" role="menu" hidden></div>
 <div id="message" hidden>
 <p id="message-text"></p>
 <button id="message-close" type="button">OK</button>
@@ -127,10 +156,10 @@
 </div>
 </div>
 <nav>
-<button id="to-show" type="button">Show</button>
-<button id="to-storage" type="button">Storage</button>
-<button id="to-mapping" type="button">Mapping</button>
-<button id="to-target" type="button">Target</button>
+<button id="to-animations" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/></svg><span>Animations</span></button>
+<button id="to-upload" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5M7.5 9.5 12 5l4.5 4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Upload</span></button>
+<button id="to-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Settings</span></button>
+<button id="to-target" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Target</span></button>
 </nav>
 <script type="module" src="main.js"></script>
 </body>

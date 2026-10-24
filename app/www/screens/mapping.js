@@ -1,4 +1,5 @@
-// The target owns the saved assignment and diagnostic; edits stay local until Save.
+// Settings' mapping editor: the target owns the saved assignment; edits stay local until
+// Save.
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 
@@ -14,7 +15,6 @@ let needsReload = false;
 let problem = "";
 let note = "";
 let fresh = false;
-let levelUntil = 0;
 
 const byId = id => document.getElementById(id);
 const same = (a, b) => a.length === b.length && a.every((value, at) => value === b[at]);
@@ -103,17 +103,6 @@ function draw() {
   byId("mapping-cancel").disabled = pending || latest === null || (!dirty() && !needsReload && !changed);
   byId("mapping-reload").disabled = pending;
   byId("mapping-defaults").disabled = blocked || !defaultsAvailable() || changed || needsReload;
-  byId("mapping-test-on").disabled = blocked || latest?.test === true || dirty() || changed || needsReload;
-  byId("mapping-test-off").disabled = pending || !fresh || latest?.test !== true;
-  byId("mapping-mode").textContent = !fresh ? "State unavailable" : latest?.test ? "Diagonal is showing" : "Normal playback";
-  const status = client.state.status;
-  byId("mapping-power").textContent = status === null ? "Power state unavailable." : !status.on ? "LEDs are OFF. Use On to see the diagonal." : status.brightness === 0 ? "Brightness is 0. Raise it to see the diagonal." : `LEDs ON \u00b7 brightness ${status.brightness}`;
-  byId("mapping-on").setAttribute("aria-pressed", String(status?.on === true));
-  byId("mapping-off").setAttribute("aria-pressed", String(status?.on === false));
-  if (status !== null && performance.now() >= levelUntil) {
-    byId("mapping-level").value = String(status.brightness);
-    byId("mapping-level-number").textContent = String(status.brightness);
-  }
 }
 
 function explanation(error) {
@@ -123,7 +112,7 @@ function explanation(error) {
       "mapping-conflict": "Mapping changed on the target. Your draft is kept; Reload or Cancel before saving.",
       "storage-error": "The target could not save its mapping. Reload to check the saved assignment.",
       "busy": "The target is busy checking or uploading files. Try again after it finishes.",
-      "show-invalid": "The target has an invalid show. Fix its show before checking the diagonal.",
+      "show-invalid": "The target has an invalid show. Fix its show before changing the mapping.",
       "bad-argument": "The target cannot use this mapping or diagnostic.",
     };
     return messages[error.code] || `The target refused the request: ${error.code}.`;
@@ -201,15 +190,6 @@ export function start() {
   });
   byId("mapping-reload").addEventListener("click", () => read(true));
   byId("mapping-defaults").addEventListener("click", () => {draft = [...DEFAULTS];note = "Defaults are a draft. Save to apply them.";draw();});
-  byId("mapping-test-on").addEventListener("click", () => change(() => client.mappingTest(true)));
-  byId("mapping-test-off").addEventListener("click", () => change(() => client.mappingTest(false)));
-  byId("mapping-on").addEventListener("click", () => client.switchOn());
-  byId("mapping-off").addEventListener("click", () => client.switchOff());
-  byId("mapping-level").addEventListener("input", () => {
-    levelUntil = performance.now() + 1500;
-    byId("mapping-level-number").textContent = byId("mapping-level").value;
-  });
-  byId("mapping-level").addEventListener("change", () => client.setBrightness(Number(byId("mapping-level").value)));
   client.watch(() => {
     if (version !== client.targetVersion()) {reset();if (visible) read();}
     draw();

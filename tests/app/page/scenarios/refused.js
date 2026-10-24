@@ -1,7 +1,7 @@
 // The operator writes something that is no address.
 
 export default async function (app) {
-  await app.until(() => app.shown() === "show", "the show screen is shown");
+  await app.until(() => app.shown() === "animations", "the show screen is shown");
   app.press("Target");
   const before = {message: app.text("message-text"), kept: app.kept()};
   app.fill("address", app.settings.text);

@@ -10,7 +10,7 @@ class MappingApp(unittest.TestCase):
         folder = self.enterContext(support.installed(files() if data is None else data))
         return self.enterContext(Emulator(folder))
 
-    def test_app_swaps_saves_cancels_and_controls_persistent_diagonal(self):
+    def test_app_swaps_saves_cancels_and_restores_defaults_in_settings(self):
         target = self.opened()
         found = browser.run("mapping", address=f"127.0.0.1:{target.port}").seen
         swapped = [PINS[1],PINS[0],*PINS[2:]]
@@ -22,10 +22,11 @@ class MappingApp(unittest.TestCase):
         self.assertEqual(found['defaults'], PINS)
         self.assertEqual(json.loads(target.command('mapping get'))['pins'], swapped)
         self.assertFalse(json.loads(target.command('mapping get'))['test'])
+        self.assertEqual(found['playback'], 0)
         self.assertEqual(len(found['labels']),20)
         self.assertIn('58–60',found['labels'][-1])
         self.assertLessEqual(found['scrollWidth'],found['width'])
-        self.assertEqual([tab['text'] for tab in found['tabs']],['Show','Storage','Mapping','Target'])
+        self.assertEqual([tab['text'] for tab in found['tabs']],['Animations','Upload','Settings','Target'])
         self.assertTrue(all(tab['width']>=56 for tab in found['tabs']))
 
     def test_external_change_preserves_dirty_draft_and_requires_reload(self):

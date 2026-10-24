@@ -16,24 +16,30 @@ export default async function (app) {
   await app.until(() => app.shown() === "target", "the target screen");
   const second = look();
   view.history.back();
-  await app.until(() => app.shown() === "show", "the show screen after back");
+  await app.until(() => app.shown() === "animations", "Animations after back");
   const back = look();
   const toggled = [];
   for (let round = 0; round < 3; round += 1) {
     app.press("Target");
     await app.until(() => app.shown() === "target", "the target screen");
-    app.press("Show");
-    await app.until(() => app.shown() === "show", "the show screen");
+    app.press("Animations");
+    await app.until(() => app.shown() === "animations", "Animations");
     toggled.push(look());
   }
-  app.press("Storage");
-  await app.until(() => app.shown() === "storage", "the storage screen");
-  const storage = look();
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload", "Upload");
+  const upload = look();
+  app.press("Settings");
+  await app.until(() => app.shown() === "settings", "Settings");
+  const settings = look();
   app.press("Target");
-  await app.until(() => app.shown() === "target", "the target screen after the storage screen");
+  await app.until(() => app.shown() === "target", "the target screen after Settings");
   const across = look();
   view.history.back();
-  await app.until(() => app.shown() === "show", "the show screen after back from the target screen");
+  await app.until(() => app.shown() === "animations", "Animations after back from the target screen");
   const home = look();
-  return {began, first, second, back, toggled, storage, across, home};
+  app.press("Add animation");
+  await app.until(() => app.shown() === "upload", "Upload after Add animation");
+  const added = look();
+  return {began, first, second, back, toggled, upload, settings, across, home, added};
 }

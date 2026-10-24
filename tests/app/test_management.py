@@ -26,8 +26,12 @@ class AnimationManagement(unittest.TestCase):
             with emulator_support.Emulator(folder) as emulator:
                 found = support.run('manage', address=f'127.0.0.1:{emulator.port}', settings={'rows': 39, 'selectable': 39, 'toggle': True}, steps=[lambda: emulator.command('ignore 1 0')]).seen
                 self.assertTrue(found['before'])
+                self.assertEqual(found['menu'], ['Ignore in playlist', 'Select', 'Delete'])
                 self.assertTrue(found['pending'])
+                self.assertEqual(found['ignoredNote'], '\u2298 Ignored')
+                self.assertEqual(found['ignoredMenu'], ['Restore to playlist', 'Select', 'Delete'])
                 self.assertTrue(found['restored'])
+                self.assertEqual(found['hiddenBefore'], 0)
                 self.assertEqual(found['selected'], 39)
                 self.assertIn('39 animations', found['question'])
                 self.assertIn('a.odrg', found['question'])

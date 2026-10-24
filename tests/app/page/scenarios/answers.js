@@ -2,7 +2,7 @@
 // screen says what it found.
 
 export default async function (app) {
-  await app.until(() => app.shown() === "show", "the show screen is shown", 4000);
+  await app.until(() => app.shown() === "animations", "the show screen is shown", 4000);
   app.press("Target");
   await app.until(() => app.text("link") === "Answers", "the target screen says Answers");
   return {

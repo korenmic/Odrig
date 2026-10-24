@@ -148,7 +148,7 @@ class Uploading(unittest.TestCase):
                     self.assertRegex(found["message"], "\\A" + sentence.replace("(", "\\(").replace(")", "\\)").replace(".", "\\.") + "\\Z")
                 else:
                     self.assertEqual(found["message"], sentence)
-                self.assertEqual(found["buttons"], ["Upload"])
+                self.assertEqual(found["buttons"], ["Upload to the installation"])
 
 
 if __name__ == "__main__":

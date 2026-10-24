@@ -2,13 +2,13 @@
 // `Board` puts the board's address back.
 
 export default async function (app) {
-  await app.until(() => app.shown() === "show", "the show screen is shown");
+  await app.until(() => app.shown() === "animations", "the show screen is shown");
   app.press("Target");
   app.fill("address", app.settings.other);
   app.press("Use");
   await app.until(() => app.kept() === app.settings.other && app.raw("link") === "Answers", "an answer from the second address");
   await app.reload();
-  await app.until(() => app.shown() === "show", "the show screen after the reload");
+  await app.until(() => app.shown() === "animations", "the show screen after the reload");
   const reloaded = {field: app.byId("address").value, kept: app.kept()};
   app.press("Target");
   app.press("Board");

@@ -98,7 +98,7 @@ class OnTheStorageScreen(Counts):
         listed = (200, '{"ok":true,"items":[{"id":1,"file":"one.odrg","bytes":1138,"ignored":false},{"id":2,"file":"two.odrg","bytes":1612,"ignored":false},{"id":60001,"file":"card.odrg","bytes":52340}],"next":null}\n')
         with support.StandIn({"status": support.PLAYING, "list": listed, "space": space(2, True, 3100000000, 31900000000)}) as target:
             found = support.run("storage", address=target.address, settings={"rows": 3}).seen
-        self.assertEqual(found["before"]["space"], "2 animations, free 8.4 MB of 10.4 MB")
+        self.assertEqual(found["before"]["space"], "Internal storage: 2 animations, free 8.4 MB of 10.4 MB")
         self.assertEqual(found["before"]["externalSpace"], "External storage: 1 animation, free 3.1 GB of 31.9 GB (read-only).")
 
 

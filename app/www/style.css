@@ -1,11 +1,20 @@
+/* Aurora Glass: a midnight background with teal and violet aurora, translucent rounded
+   panels with a restrained glow, and light text. Every text keeps a contrast of 7:1 or
+   more against what lies behind it. */
 :root {
   color-scheme: dark;
-  --back: #000000;
-  --text: #e8e8e8;
-  --lesser: #b0b0b0;
-  --marked: #ffb000;
-  --button: #1c1c1c;
-  --edge: #5a5a5a;
+  --back: #050816;
+  --panel: rgba(18, 26, 56, 0.78);
+  --panel-strong: rgba(24, 34, 70, 0.94);
+  --edge: rgba(122, 214, 255, 0.24);
+  --edge-strong: rgba(69, 224, 210, 0.7);
+  --text: #eef3ff;
+  --lesser: #b9c4e4;
+  --teal: #45e0d2;
+  --violet: #b49cff;
+  --danger: #ff9a9a;
+  --on-accent: #04121a;
+  --glow: 0 0 22px rgba(69, 224, 210, 0.16);
   /* The room of the phone's bars and of its camera's cut-out at each side: as the app's
      Android shell sets it on this element, else as the web view gives it, else none, as
      in a browser. */
@@ -33,23 +42,68 @@
   -webkit-touch-callout: default;
 }
 
-html,
+html {
+  background: var(--back);
+}
+
 body {
   margin: 0;
-  background: var(--back);
+  min-height: 100vh;
+  background-color: var(--back);
+  background-image:
+    radial-gradient(ellipse 80% 45% at 15% 0%, rgba(32, 190, 178, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 95% 10%, rgba(124, 77, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 100%, rgba(60, 90, 220, 0.12), transparent 70%);
+  background-attachment: fixed;
   color: var(--text);
-  font: 18px/1.4 system-ui, sans-serif;
+  font: 17px/1.4 system-ui, sans-serif;
+}
+
+#top,
+main {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+#top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(8px + var(--bar-top)) calc(16px + var(--bar-right)) 0 calc(16px + var(--bar-left));
+}
+
+#app-name {
+  margin: 4px 0;
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: 0.5px;
+}
+
+.pill {
+  margin: 4px 0;
+  padding: 4px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 14px;
+  color: var(--lesser);
+}
+
+.pill[data-link="answers"] {
+  color: var(--teal);
 }
 
 main {
-  padding: calc(8px + var(--bar-top)) calc(8px + var(--bar-right)) calc(88px + var(--bar-bottom)) calc(8px + var(--bar-left));
+  padding: 8px calc(12px + var(--bar-right)) calc(104px + var(--bar-bottom)) calc(12px + var(--bar-left));
 }
 
-/* A band of black over the room at the top: what scrolls up goes under it. */
+/* A band of the background's colour over the room at the top: what scrolls up goes under
+   it. */
 body::before {
   content: "";
   position: fixed;
-  z-index: 1;
+  z-index: 3;
   top: 0;
   left: 0;
   right: 0;
@@ -59,14 +113,21 @@ body::before {
 
 section[hidden],
 [hidden] {
-  display: none;
+  display: none !important;
 }
 
 h1 {
-  margin: 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--lesser);
+  margin: 12px 4px 8px;
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+h2 {
+  margin: 4px 0 8px;
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--text);
 }
 
 p,
@@ -81,7 +142,24 @@ label {
 }
 
 .state {
-  font-size: 28px;
+  font-size: 26px;
+}
+
+.panel {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: var(--glow);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.panel.compact p {
+  margin: 4px 0;
+  font-size: 15px;
+  color: var(--lesser);
 }
 
 button,
@@ -89,60 +167,165 @@ input,
 select {
   display: block;
   width: 100%;
-  min-height: 56px;
+  min-height: 48px;
   margin: 8px 0;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--edge);
-  border-radius: 8px;
-  background: var(--button);
+  border-radius: 14px;
+  background: var(--panel-strong);
   color: var(--text);
   font: inherit;
-  font-size: 20px;
+  font-size: 17px;
 }
 
 button {
-  color: var(--marked);
+  color: var(--teal);
+  text-align: center;
 }
 
-.pair {
+button.primary,
+label.button.primary {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+button:disabled,
+select:disabled {
+  border-color: rgba(122, 214, 255, 0.12);
+  background: var(--panel-strong);
+  color: var(--lesser);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+label.button:focus-within {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+button[aria-pressed="true"] {
+  border-color: var(--edge-strong);
+  color: var(--teal);
+}
+
+.pair,
+.three {
   display: flex;
   gap: 8px;
 }
 
-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.pair > *,
+.three > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Now playing: the power switch, what plays, and its facts. */
+.now-row {
   display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.power {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 0 calc(8px + var(--bar-right)) var(--bar-bottom) calc(8px + var(--bar-left));
-  background: var(--back);
+  margin: 10px 0 0;
+  padding: 4px 4px 4px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--lesser);
 }
 
-/* While the phone's keyboard is open for a field, the tabs would stand over the field. */
-body.typing nav {
-  display: none;
+.power svg {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
 }
 
-nav button[aria-current="true"] {
-  border-color: var(--marked);
+.power button {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  border-radius: 999px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--lesser);
 }
 
-#message,
-#confirm {
-  position: fixed;
-  left: calc(8px + var(--bar-left));
-  right: calc(8px + var(--bar-right));
-  bottom: calc(80px + var(--bar-bottom));
+.power button[aria-pressed="true"] {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: var(--on-accent);
+  box-shadow: 0 0 18px rgba(69, 224, 210, 0.35);
+}
+
+.now-words {
+  min-width: 0;
+}
+
+.now-words p {
+  margin: 0;
+}
+
+.label {
+  font-size: 14px;
+  color: var(--lesser);
+}
+
+#now {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#playing {
+  color: var(--lesser);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--lesser);
+}
+
+.facts p {
+  margin: 4px 0;
+}
+
+.slider-label {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--lesser);
+}
+
+input[type="range"] {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--teal);
+}
+
+#test-now {
+  margin: 8px 0 0;
   padding: 8px 12px;
-  border: 1px solid var(--marked);
-  border-radius: 8px;
-  background: var(--button);
+  border: 1px solid var(--violet);
+  border-radius: 14px;
 }
 
-#state {
-  margin: 8px 0;
+#test-now p {
+  margin: 4px 0;
+  color: var(--violet);
 }
 
 .stale {
@@ -150,71 +333,247 @@ nav button[aria-current="true"] {
 }
 
 #silent {
-  color: var(--marked);
+  color: var(--teal);
 }
 
-#animations button {
-  text-align: left;
-  color: var(--text);
+/* The list of animations. */
+#list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-#animations button[aria-current="true"],
-button[aria-pressed="true"] {
-  border-color: var(--marked);
-  color: var(--marked);
-}
-
-#animations .id {
-  display: inline-block;
-  min-width: 3ch;
-  color: var(--lesser);
-}
-
-#animations .file {
-  overflow-wrap: anywhere;
-}
-
-input[type="range"] {
-  padding: 0;
-  accent-color: var(--marked);
-}
-
-#installed .row {
+#list-head button {
+  width: auto;
+  min-width: 96px;
   margin: 8px 0;
-  padding: 0 0 8px;
-  border-bottom: 1px solid var(--edge);
 }
 
-#installed .id {
-  display: inline-block;
-  min-width: 3ch;
-  color: var(--lesser);
+#order-note:empty {
+  display: none;
 }
 
-#installed .file {
-  overflow-wrap: anywhere;
-}
-
-#installed .size {
-  color: var(--lesser);
-}
-
-label.button {
-  display: block;
-  min-height: 56px;
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 60px;
   margin: 8px 0;
-  padding: 14px 12px;
+  padding: 4px 6px 4px 10px;
   border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.row[aria-current="true"] {
+  border-color: var(--edge-strong);
+  box-shadow: 0 0 16px rgba(69, 224, 210, 0.28);
+}
+
+.row button.play {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.row .name {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.row .meta {
+  display: block;
+  font-size: 14px;
+  color: var(--lesser);
+}
+
+.row.ignored .name {
+  color: var(--lesser);
+  font-style: italic;
+}
+
+.row-state {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--lesser);
+}
+
+.row[data-saving="true"] .row-state {
+  color: var(--teal);
+}
+
+.badge {
+  flex: 0 0 auto;
+  min-width: 32px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
   border-radius: 8px;
-  background: var(--button);
-  color: var(--marked);
-  font-size: 20px;
+  font-size: 14px;
   text-align: center;
 }
 
-.three {
+.badge.in {
+  color: var(--teal);
+}
+
+.badge.ex {
+  color: var(--violet);
+}
+
+.row button.more {
+  flex: 0 0 auto;
+  width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border-radius: 12px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.row .pick {
+  display: none;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.selecting .row .pick {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+}
+
+#row-menu {
+  position: fixed;
+  z-index: 5;
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: 6px 10px;
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  background: #101a3a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), var(--glow);
+}
+
+#row-menu button {
+  min-height: 44px;
+  margin: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+#row-menu button.danger {
+  color: var(--danger);
+}
+
+#row-menu button:disabled {
+  color: var(--lesser);
+}
+
+#row-menu p {
+  max-width: 260px;
+}
+
+#selection-bar {
+  margin: 8px 0;
+}
+
+#selection-bar .pair button {
+  margin: 4px 0;
+}
+
+/* The tabs. */
+nav {
+  position: fixed;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   gap: 8px;
+  padding: 8px calc(8px + var(--bar-right)) calc(8px + var(--bar-bottom)) calc(8px + var(--bar-left));
+  border-top: 1px solid var(--edge);
+  background: rgba(8, 12, 32, 0.97);
+}
+
+/* While the phone's keyboard is open for a field, the tabs would stand over the field. */
+body.typing nav {
+  display: none;
+}
+
+nav button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 60px;
+  margin: 0;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--lesser);
+  font-size: 14px;
+}
+
+nav button svg {
+  width: 26px;
+  height: 26px;
+}
+
+nav button[aria-current="true"] {
+  color: var(--teal);
+  background: rgba(69, 224, 210, 0.08);
+  box-shadow: inset 0 -3px 0 var(--teal);
+}
+
+#message,
+#confirm {
+  position: fixed;
+  z-index: 6;
+  left: calc(8px + var(--bar-left));
+  right: calc(8px + var(--bar-right));
+  bottom: calc(92px + var(--bar-bottom));
+  max-width: 704px;
+  margin: 0 auto;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 10px 14px;
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  background: #101a3a;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+#confirm {
+  overflow-wrap: anywhere;
+}
+
+/* Upload. */
+label.button {
+  display: block;
+  min-height: 48px;
+  margin: 8px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  color: var(--teal);
+  font-size: 17px;
+  text-align: center;
 }
 
 #preview {
@@ -224,54 +583,54 @@ label.button {
   image-rendering: pixelated;
   background: var(--back);
   border: 1px solid var(--edge);
+  border-radius: 12px;
 }
 
-
-nav button {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-left: 2px;
-  padding-right: 2px;
-  font-size: 16px;
+/* Settings. */
+#mapping-rows > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--edge);
 }
 
 #mapping-rows label {
-  margin-bottom: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 8px 0;
 }
 
 #mapping-rows select {
-  margin-top: 8px;
-}
-
-button:disabled,
-select:disabled {
-  color: var(--lesser);
+  flex: 0 0 auto;
+  width: 132px;
 }
 
 #mapping-error {
-  color: var(--marked);
+  color: var(--teal);
 }
 
 label.check {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
+  min-height: 48px;
 }
+
+label.check .title {
+  display: block;
+}
+
 input[type="checkbox"] {
-  width: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  height: 24px;
+  width: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  height: 26px;
   margin: 0;
   padding: 0;
-  accent-color: var(--marked);
+  accent-color: var(--teal);
 }
-#confirm {
-  max-height: 60vh;
-  overflow: auto;
-  overflow-wrap: anywhere;
-}
+
 #message {
   max-height: 60vh;
   overflow: auto;

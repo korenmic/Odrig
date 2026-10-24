@@ -7,7 +7,8 @@ ROWS = 20
 LISTED = (200, json.dumps({"ok": True, "items": [{"id": number, "file": f"animation-{number}.odrg", "bytes": 1000 * number} for number in range(1, ROWS + 1)], "next": None}) + "\n")
 SPACE = (200, '{"ok":true,"free":8372224,"total":10354688,"animations":20}\n')
 TARGET = {"status": support.PLAYING, "list": LISTED, "space": SPACE}
-BLACK = "rgb(0, 0, 0)"
+MIDNIGHT = "rgb(5, 8, 22)"
+TABS = ["Animations", "Upload", "Settings", "Target"]
 # How far a box may stand off by the rounding of a browser.
 SLACK = 0.5
 
@@ -37,23 +38,23 @@ class Layout:
             self.assertLessEqual(thing["bottom"], bottom + SLACK, f"{where}: {thing.get('what')} reaches into the room at the bottom")
 
     def screens(self):
-        for name in ("show", "showEnd", "storageTop", "storageEnd", "message"):
+        for name in ("animations", "animationsEnd", "uploadTop", "uploadEnd", "message"):
             yield name, self.seen[name]
 
     def test_the_tabs_lie_wholly_above_the_room_at_the_bottom_and_clear_of_the_sides(self):
         for name, measured in self.screens():
-            self.assertEqual([tab["what"] for tab in measured["tabs"]], ["Show", "Storage", "Mapping", "Target"], name)
+            self.assertEqual([tab["what"] for tab in measured["tabs"]], TABS, name)
             for tab in measured["tabs"]:
                 self.inside(tab, measured, name)
 
-    def test_the_tabs_black_reaches_the_bottom_and_the_sides(self):
+    def test_the_tabs_dark_reaches_the_bottom_and_the_sides(self):
         for name, measured in self.screens():
             nav = measured["nav"]
             self.assertEqual((nav["left"], nav["right"], nav["bottom"]), (0, measured["width"], measured["height"]), name)
-            self.assertEqual(nav["colour"], BLACK, name)
+            self.assertEqual(nav["colour"], "rgba(8, 12, 32, 0.97)", name)
 
     def test_the_heading_lies_below_the_room_at_the_top(self):
-        for name in ("show", "storageTop"):
+        for name in ("animations", "uploadTop"):
             measured = self.seen[name]
             self.assertEqual(measured["scrolled"], 0, name)
             self.assertGreaterEqual(min(thing["top"] for thing in measured["things"]), self.room["top"] - SLACK, name)
@@ -64,17 +65,17 @@ class Layout:
             for thing in measured["things"]:
                 self.inside(thing, measured, name, vertically=False)
 
-    def test_what_scrolls_up_goes_under_a_band_of_black_in_the_room_at_the_top(self):
-        for name in ("showEnd", "storageEnd"):
+    def test_what_scrolls_up_goes_under_a_band_of_midnight_in_the_room_at_the_top(self):
+        for name in ("animationsEnd",):
             measured = self.seen[name]
             self.assertGreater(measured["scrolled"], self.room["top"], name)
             if self.room["top"] > 0:
                 self.assertEqual(set(measured["top"]["found"]), {"body"}, name)
             band = measured["top"]["band"]
-            self.assertEqual((band["height"], band["colour"], band["position"]), (self.room["top"], BLACK, "fixed"), name)
+            self.assertEqual((band["height"], band["colour"], band["position"]), (self.room["top"], MIDNIGHT, "fixed"), name)
 
     def test_the_last_line_of_each_list_can_be_scrolled_above_the_tabs(self):
-        for name in ("showEnd", "storageEnd"):
+        for name in ("animationsEnd", "uploadEnd"):
             measured = self.seen[name]
             tabs_top = min(tab["top"] for tab in measured["tabs"])
             self.assertLessEqual(measured["last"]["bottom"], tabs_top + SLACK, name)
@@ -94,11 +95,11 @@ class Layout:
 
     def test_a_field_with_the_focus_and_no_keyboard_keeps_the_tabs_and_they_come_back_after(self):
         for name in ("focused", "after"):
-            self.assertEqual([tab["what"] for tab in self.seen[name]["tabs"]], ["Show", "Storage", "Mapping", "Target"], name)
+            self.assertEqual([tab["what"] for tab in self.seen[name]["tabs"]], TABS, name)
 
     def test_without_the_room_the_page_is_as_before(self):
         plain = self.seen["plain"]
-        self.assertEqual(plain["padding"], [8, 8, 88, 8])
+        self.assertEqual(plain["padding"], [8, 12, 104, 12])
         self.assertEqual(plain["nav"]["bottom"], plain["height"])
         self.assertEqual(min(tab["bottom"] for tab in plain["tabs"]), plain["height"] - 8)
         self.assertEqual(plain["top"]["band"]["height"], 0)
