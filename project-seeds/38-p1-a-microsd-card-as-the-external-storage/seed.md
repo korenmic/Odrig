@@ -190,4 +190,13 @@ without them, and the tasks that need them come last.
 
 ## The Owner's Answers
 
-None yet. Questions 7 and 8 above wait for the owner.
+On 2026-10-24, decided under the owner's mandate for the run of that day, which has every
+open question of seeds 28 to 39 answered and recorded rather than asked:
+
+7. The firmware must work with one cable or with two: with the board powered through
+   either USB socket, with or without a computer on the other. The board session checks
+   the two-cable arrangement of today, both sockets on the Mac, for the dropouts; one
+   cable is not a separate condition of this seed.
+8. Yes. Once the card is the external storage, `python3 firmware/fw.py build` makes the
+   microSD firmware on the newer software, and `build --probe` its probe build. The USB
+   stick's build stays available under an option of its own, on the software known good.
