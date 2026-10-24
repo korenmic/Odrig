@@ -199,8 +199,12 @@ class OrderGet(unittest.TestCase):
         self.assertEqual(len({revisions["plain"], revisions["ordered"], revisions["fewer"]}), 3)
 
     def test_it_is_refused_as_list_is(self):
-        run = support.start(animations(2), asked(0, "order get", "order get x", "order get 65536", "order get 1 2", "order", "order put"), check_first=False)
-        self.assertEqual(replies(run), [refusal("busy")] + [refusal("bad-argument")] * 5)
+        # While the player reads the installed animations after a start, both answer.
+        run = support.start(animations(2), asked(0, "list", "order get", "order get x", "order get 65536", "order get 1 2", "order", "order put"), check_first=False)
+        listed, order = replies(run)[:2]
+        self.assertIn(None, [item["bytes"] for item in listed["items"]])
+        self.assertEqual((order["ids"], order["next"]), ([1, 2], None))
+        self.assertEqual(replies(run)[2:], [refusal("bad-argument")] * 5)
         broken = {**animations(2), "show.json": "{"}
         run = support.start(broken, asked(0, "order get"))
         self.assertEqual(replies(run), [refusal("show-invalid")])
@@ -412,6 +416,36 @@ class OrderMove(unittest.TestCase):
         self.assertEqual(replies(run)[1], {"ok": True})
         self.assertEqual(replies(run)[2]["ids"], [2, 1])
         self.assertTrue(replies(run)[3]["test"])
+
+
+class UnavailableAnimations(unittest.TestCase):
+    """An animation that `list` gives with a fault has its place in the saved order as any
+    other: `order get` holds it where it stands, and it can be moved."""
+
+    def test_an_installed_animation_with_a_fault_is_in_the_order_and_can_be_moved(self):
+        files = ordered({**animations(3), "a2.odrg": b"nothing"}, "i 2", "i 3", "i 1")
+        run = support.start(files, asked(0, "list", "order get"))
+        self.assertEqual([item["id"] for item in replies(run)[0]["items"] if "fault" in item], [2])
+        self.assertEqual(order_ids(run)[0], [2, 3, 1])
+        runs, kept = moved(files, (2, "end"))
+        self.assertEqual(replies(runs[0])[0], {"ok": True})
+        self.assertEqual(order_ids(runs[0])[0], [3, 1, 2])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 3\ni 1\ni 2\n").encode())
+
+    def test_a_file_of_the_card_left_out_for_a_fault_is_in_the_order_and_can_be_moved(self):
+        drive = {"b.odrg": loop_of(4, 5), "zz.odrg": loop_of(4, 6)[:-3]}
+        files = ordered(animations(2), "x zz.odrg", "i 2", "x b.odrg", "i 1")
+        with a_drive(drive) as top:
+            options = ["--drive", top]
+            run = support.start(files, asked(0, "list", "order get"), options)
+            listed = replies(run)[0]["items"]
+            ids = {item["file"]: item["id"] for item in listed}
+            self.assertEqual([item["file"] for item in listed if "fault" in item], ["zz.odrg"])
+            self.assertEqual(order_ids(run)[0], [ids["zz.odrg"], 2, ids["b.odrg"], 1])
+            runs, kept = moved(files, (ids["zz.odrg"], "end"), options=options)
+            self.assertEqual(replies(runs[0])[0], {"ok": True})
+            self.assertEqual(order_ids(runs[0])[0], [2, ids["b.odrg"], 1, ids["zz.odrg"]])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 2\nx b.odrg\ni 1\nx zz.odrg\n").encode())
 
 
 if __name__ == "__main__":

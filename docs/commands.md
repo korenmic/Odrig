@@ -317,14 +317,15 @@ order get
 {"ok":true,"ids":[3,60002,1],"next":null,"revision":2805384113}
 ```
 
-`ids` are the ids of the animations `list` lists, the ignored ones and the external
-storage's among them, in the saved order, beginning at the position `<from>`, counted
+`ids` are the ids of the animations `list` lists, the ignored ones, the unavailable ones
+and the external storage's among them, in the saved order, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out; `<from>` is 0 to 65,535. The reply holds as many
 as fit into it, and `next` is the position of the first one left out, or `null`, as for
 `list`. `revision` is a number that changes whenever the order or the listed animations
 change, and is the same after a restart for the same files. `order get` is refused as
-`list` is: `show-invalid` while the show is invalid, and `busy` until the player has read
-every installed animation after a start.
+`list` is, with `show-invalid` while the show is invalid; while the player reads every
+installed animation after a start it answers, as `list` does, and `order move` is refused
+with `busy`.
 
 ```
 order move 2805384113 1 3

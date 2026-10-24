@@ -297,7 +297,6 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         uint32_t from = 0;
         if (words.count >= 2 && words.count <= 3 && words.is(1, "get") && (words.count == 2 || number_word(words, 2, 0, 65535, &from))) {
             if (core.invalid) return refuse(reply, "show-invalid");
-            if (!check_complete(core)) return refuse(reply, "busy");
             return order_get(core, from, reply);
         }
         uint32_t revision, id, before = 0;

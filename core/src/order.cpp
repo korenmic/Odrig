@@ -157,11 +157,15 @@ void read_whole(Core &core, uint8_t what) {
 }
 
 // Whether an animation of the playlist is listed by `list`: every animation item, and the
-// drive's animations that are in the playlist.
+// drive's animations that are in the playlist or left out for a fault with an id.
 bool listed(const Core &core, uint32_t position) {
     if (is_drive(position)) {
         const uint32_t place = position - kDriveBase;
-        return core.drive != nullptr && place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
+        if (core.drive == nullptr || place >= core.drive_count) {
+            return false;
+        }
+        const DriveEntry &entry = core.drive[place];
+        return entry.state == kDriveInPlaylist || (entry.state == kDriveLeftOut && entry.id != 0);
     }
     return position < core.item_count && !core.items[position].is_cycle;
 }
@@ -347,8 +351,9 @@ uint32_t listed_with(const Core &core, uint32_t id) {
             return core.items[position].is_cycle ? kNothing : position;
         }
     }
-    if (core.drive != nullptr && drive_has_id(core, id)) {
-        return kDriveBase + drive_place_of(core, id);
+    const uint32_t place = core.drive != nullptr ? drive_place_holding(core, id) : kDriveMost;
+    if (place < kDriveMost && listed(core, kDriveBase + place)) {
+        return kDriveBase + place;
     }
     return kNothing;
 }

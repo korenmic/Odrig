@@ -182,7 +182,7 @@ class Start(unittest.TestCase):
         self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"unavailable"}\n')
         self.assertEqual(emulator.command("play 2"), b'{"ok":true}\n')
         items = json.loads(emulator.command("list"))["items"]
-        self.assertEqual(items[0], {"id": 1, "file": "hello.odrg", "bytes": None, "ignored": False, "fault": "file-missing"})
+        self.assertEqual(items[0], {"id": 1, "file": "hello.odrg", "bytes": None, "ignored": False, "external": False, "fault": "file-missing"})
 
     def test_verbose_prints_the_diagnostic_lines_of_the_core_to_standard_error(self):
         quiet = support.Emulator(self.work)

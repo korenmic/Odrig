@@ -121,7 +121,7 @@ class TheSnakeTests(unittest.TestCase):
         self.assertEqual(answers(run), [{"ok": False, "error": "busy"}])
         upload = support.start(files(), [support.line(T0, "upload begin 99 new.odrg 100"), support.line(T0 + 1, "mapping test snake 1")])
         self.assertEqual(answers(upload)[1], {"ok": False, "error": "busy"})
-        broken = {**files(), "dvd.odrg": b"nothing"}
+        broken = {**files(), "show.json": "{"}
         run = support.start(broken, [support.line(T0, "mapping test snake 1")])
         self.assertEqual(answers(run), [{"ok": False, "error": "show-invalid"}])
 

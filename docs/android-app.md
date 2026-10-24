@@ -233,14 +233,15 @@ installation does not answer, the values are dimmed and a line says for how long
 the app goes on asking and recovers by itself. While the app is not on the screen of the
 phone it sends nothing, and the phone's screen stays on while the app is in front.
 
-Right after the installation was switched on, Animations has the state at once:
-the installation plays from its first moment, and `On`, `Off`, the slider and `Playlist
-from the start` work. The rows of the animations come a moment later. The
-installation reads what it has installed while it plays, and until it has, it answers
-the app's request for the list with `busy`. The app takes that for what it is: it shows
-no message, keeps what it knows, and asks again every second. With a few small
-animations that is over within two seconds; with the storage full of heavy ones it takes
-longer, see [firmware.md](firmware.md#measurements-on-the-board).
+Right after the installation was switched on, Animations has the state and the rows
+at once, in the saved order: the installation plays from its first moment, and `On`,
+`Off`, the slider and `Playlist from the start` work. The installation reads what it has
+installed while it plays; until it has read a file whole, its row says `size not read
+yet`, and a file in which it finds a fault turns unavailable. Moving an animation waits
+until it has read them all: the installation refuses a move with `busy` until then, and
+the app says so. With a few small animations that is over within two seconds; with the
+storage full of heavy ones it takes longer, see
+[firmware.md](firmware.md#measurements-on-the-board).
 
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, Animations says `Cycle` with its id, and `Playlist from the start` leaves it.

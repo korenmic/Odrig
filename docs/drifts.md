@@ -9447,3 +9447,42 @@ show while the list has animations, and the list says that no animation is insta
 before, when it has none.
 
 **Resolution.** `app/www/screens/filters.js`; the spec's design, "The filters".
+
+## Seeds 32 and 36: an unavailable animation in the rows of Animations
+
+**Question.** Seed 32 grays an animation whose file had a fault on the show screen, says
+its reason under it and turns its Play off; seed 36 replaces that screen with rows that
+play on a tap and have a menu, and the storage screen, which said `size not read yet`,
+with Upload, which has no list. Where do these go, and does an unavailable row keep its
+menu and its place in the order?
+
+**Answer.** In the row: its Play, the name and the line of id and size, is dimmed and
+cannot be pressed; the reason in words, and on the external storage `Fix it on a computer:
+the card is read-only here.`, stand under it across the row; the line of id and size says
+`size not read yet` while `bytes` is null. The menu stays as for any row, so an internal
+unavailable animation can be ignored, selected and deleted, and any can be moved with
+Move up and Move down, since replacing or removing it is the way out and its place in the
+playlist is the operator's. The filters count it by its storage and type as any other.
+
+**Resolution.** `app/www/screens/show.js`, `row()` and `metaOf()`; `app/www/style.css`,
+`.row.unavailable` and `.row .fault`; `tests/app/test_quarantine.py`.
+
+## Seeds 32 and 36: the saved order of unavailable animations, and during the check
+
+**Question.** Seed 36's `order get` holds "the animations `list` lists" and is "refused
+as `list` is". Seed 32 lists a file of the card left out for a fault, with an id, and
+answers `list` while the player reads the installed animations after a start, where it
+was refused with `busy` before. Does the order hold such a file, and does `order get`
+answer during the check?
+
+**Answer.** Yes to both, as the two sentences say. A file of the card left out for a
+fault stands in the order where its name does and can be moved; without it the app,
+which keeps an order only when it holds exactly the listed animations, asked for the list
+and the order again and again while a card had such a file. `order get` answers during
+the check, as `list` does, so the rows stand in the saved order from the start; `order
+move` stays refused with `busy` until the check ends, since the move reads the order file
+with the reader that the check uses.
+
+**Resolution.** `core/src/order.cpp`, `listed()` and `listed_with()`;
+`core/src/commands.cpp`, the route of `order get`; docs/commands.md, `order get`;
+tests/core/test_order.py, `UnavailableAnimations` and `test_it_is_refused_as_list_is`.
