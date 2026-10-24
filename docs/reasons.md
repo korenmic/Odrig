@@ -86,6 +86,33 @@ read whole before its value is judged, so a code cut off by the end of the data 
 
 The canvas is judged before the number of frame records.
 
+## ODRGX files
+
+Rules: [format.md](format.md), "ODRGX".
+
+| Reason | Condition |
+|---|---|
+| `truncated` | The file ends before the 20-byte header is complete. |
+| `bad-magic` | Bytes 0 to 3 are neither `4F 44 52 58` nor, for an ODRG file, `4F 44 52 47`. |
+| `bad-container` | The container's version is not 1, or its reserved byte is not 0. |
+| `unknown-type` | The content type is not one the reader knows: 1, frames. |
+| `unknown-type-version` | The version of the content type is not the one the reader knows: 1. |
+| `zero-size` | Width or height is 0. |
+| `payload-size` | The payload's length is above the most its type may have, or, once the payload was read, not the number of bytes after the header. |
+| `canvas-mismatch` | The canvas of a frames payload differs from the container's. |
+| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations. |
+
+The checks run in this order: the header's length, its fields in the order of their
+offsets, then the payload, whose faults are those of its type, a frames payload's those of
+"ODRG files", then the canvas of a frames payload, the payload's length, and last the loop.
+
+## Sources that `encode` cannot write as ODRGX
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above. |
+| `loop-mismatch` | The loop would be longer than 4,294,967,295 milliseconds. |
+
 ## Mapping files
 
 Rules: [mapping.md](mapping.md), "Rules". The two reasons hold for both kinds of mapping

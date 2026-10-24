@@ -37,6 +37,13 @@ TRAILING_BYTES = "trailing-bytes"
 
 TOO_MANY_FRAMES = "too-many-frames"
 
+BAD_CONTAINER = "bad-container"
+UNKNOWN_TYPE = "unknown-type"
+UNKNOWN_TYPE_VERSION = "unknown-type-version"
+PAYLOAD_SIZE = "payload-size"
+CANVAS_MISMATCH = "canvas-mismatch"
+LOOP_MISMATCH = "loop-mismatch"
+
 MAPPING_MISSING = "mapping-missing"
 MAPPING_MALFORMED = "mapping-malformed"
 

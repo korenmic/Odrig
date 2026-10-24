@@ -13,6 +13,8 @@ MOST_LOOPS = 65535
 MIN_SECONDS = 30
 FILE_NAME = re.compile(r"[a-z0-9._-]{1,32}")
 ENDING = ".odrg"
+# The endings a file of a show may have: an ODRG file or an ODRGX container.
+ENDINGS = (".odrg", ".odrgx")
 
 _MEMBERS = ("version", "brightness", "items")
 _OPTIONAL = ("start", "min_seconds")
@@ -102,9 +104,9 @@ def _item(entry, what):
         name = entry["file"]
         if type(name) is not str:
             raise errors.Rejection(errors.BAD_TYPE, f"file of item {number} is not a string")
-        if not FILE_NAME.fullmatch(name) or not name.endswith(ENDING):
+        if not FILE_NAME.fullmatch(name) or not name.endswith(ENDINGS):
             raise _malformed(
-                f"file of item {number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in {ENDING}"
+                f"file of item {number} is not 1 to 32 characters from a-z, 0-9, -, _ and . ending in {' or '.join(ENDINGS)}"
             )
         repeat = strictjson.integer(entry["repeat"], 1, MOST_LOOPS, what=f"repeat of item {number}") if "repeat" in entry else None
         longest = strictjson.integer(entry["max_seconds"], 1, LONGEST_TURN, what=f"max_seconds of item {number}") if "max_seconds" in entry else None

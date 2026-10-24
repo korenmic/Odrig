@@ -9202,3 +9202,18 @@ makes the show invalid, as any refused file does today, while an upload of one i
 with `bad-file` and changes nothing.
 
 **Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14.
+
+## Seed 37: The stored answers of the Python tool and the show's file names
+
+**Question.** A show may now name `.odrgx` files, and the converter and the Python library
+both say "ending in .odrg or .odrgx" of a name that breaks the rule. The converter's suite
+compares that detail with what the Python tool answered when it still converted, stored in
+`converter/tests/expected/`, where 24 answers say "ending in .odrg". The Python tool can no
+longer be run to answer again. What becomes of those answers?
+
+**Answer.** They are changed in that phrase only, in `read_shows.json` and in
+`run.json.gz`, since the Python library, which is the reference they record, now gives the
+new phrase in the same place: every other byte of each answer, and every key, stays. The
+reason, `show-malformed`, does not change.
+
+**Resolution.** `odrig/show.py`, `converter/lib/show.js`, `converter/tests/expected/`.
