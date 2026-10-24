@@ -9486,3 +9486,183 @@ with the reader that the check uses.
 **Resolution.** `core/src/order.cpp`, `listed()` and `listed_with()`;
 `core/src/commands.cpp`, the route of `order get`; docs/commands.md, `order get`;
 tests/core/test_order.py, `UnavailableAnimations` and `test_it_is_refused_as_list_is`.
+## Seed 34: where the broad write is
+
+**Question.** The seed asks that one-file maintenance not rebuild the animation folder.
+Which operation rebuilds it?
+
+**Answer.** The firmware tool's `install-show`: it reads the board's storage into an image,
+removes `/odrig` with everything in it, writes every file again and writes the blocks that
+differ, which for one removal from a storage 80 % full are 8.4 MB of WLED's layout and
+10.9 MB of the bigger one. The commands `upload`, `remove`, `remove many` and `ignore`
+already change one file and the show file through a temporary file and a rename, and
+survive a power cut at every storage call (seed 07). The seed's work is therefore on the
+image route, plus three things of the live route: an upload of unchanged bytes, the
+cleanup a change leaves unfinished, and fault tests for `remove many`, `ignore` and the
+start's cleanup.
+
+**Resolution.** The spec's requirement 1; `firmware/fwtool/storage.py`.
+
+## Seed 34: the order of the image's write, and the step that cannot be cancelled
+
+**Question.** Writing changed raw blocks is not atomic: esptool erases a sector and then
+programs it, and sorts the stretches of a call by address. Where can a write of the image
+be cancelled safely?
+
+**Answer.** A new or changed file is written into the image while every old file is still
+there, so the file system puts its bytes into blocks the old file system does not use;
+only the records of the file system, one or two blocks for one file, change blocks in use.
+The tool writes the free blocks in one esptool call and the blocks in use in a second.
+Up to the second call a cut leaves the board's file system exactly as it was: a test
+writes the free part alone and reads the old show. The second call and the comparison are
+the commit: they are not cancelled, an interrupt from the keyboard waits for their end,
+and a cut there needs the recovery. On a full storage the commit is 2 blocks, 8 KiB.
+LittleFS has no means in the tool's library to make the commit one atomic write of one
+block, and a simulation of a cut inside it found the old show, the new one, a mixture and
+an unreadable storage; so the tool does not promise more than a deterministic recovery.
+
+**Resolution.** The spec's requirement 2; the design, "The write".
+
+## Seed 34: no restart after a cut commit
+
+**Question.** Today the tool restarts the board after every failure. Should it after a cut
+commit?
+
+**Answer.** No. WLED mounts its file system with `WLED_FS.begin(true)`, which formats a
+file system it cannot mount: a board started on a half-written storage can lose its
+settings and its show. After a failure in the commit or the comparison the chip stays in
+its bootloader, and the message names `recover-storage`. esptool 5.4 resets the chip as
+`--after` says also after a failed command, so every call of the write is made with
+`--after no-reset`, and the board is restarted by a call of its own once the comparison
+passed. A power cut of the board itself cannot be prevented; then
+`recover-storage` finds the storage changed outside the change, and `--whole` writes the
+new image whole.
+
+**Resolution.** The spec's requirement 3.3; `firmware/fwtool/cli.py`.
+
+## Seed 34: what recover-storage brings back
+
+**Question.** The tool keeps the image from before and the new one. Does that make a cut
+change reversible?
+
+**Answer.** It makes it finishable. The journal names the new image and the runs of the
+change; the board's storage outside them is the image from before, which the chip
+confirms before anything is written. `recover-storage` writes the change again and
+compares it: the board then holds the new image. A change cut before its commit is given
+up, as the board holds the image from before. Going back to the image from before is not
+offered: the change was asked for, and writing the old runs back is the same kind of
+write with the same commit. When the storage outside the change differs, something else
+wrote it since (the board started and formatted it, or saved settings), and the tool
+refuses with `storage-changed`; `recover-storage --whole` writes the whole new image, the
+last resort, which brings back the settings it holds and loses what the board wrote since.
+
+**Resolution.** The spec's requirement 3.5; the design, "recover-storage".
+
+## Seed 34: comparing the written blocks only
+
+**Question.** The tool compares the whole partition after each write, 17 seconds on the
+board. Must it?
+
+**Answer.** No. Before the write the chip confirmed that the board holds the kept image,
+or the tool read the partition whole; the write changes only the runs. The chip compares
+every written run with the new image in one call, and the board is restarted when all are
+equal. An unchanged folder writes and compares nothing.
+
+**Resolution.** The spec's requirement 2.4.
+
+## Seed 34: an unchanged upload, and its CRC-32
+
+**Question.** An upload of the bytes an item already has writes the file again. How does
+the core know that it is unchanged before the bytes are sent?
+
+**Answer.** `upload begin` takes an optional fourth argument, the CRC-32 of the file, as
+`upload end` does. When the last upload of this boot installed that file as the item's,
+with that size and that CRC-32, no upload has begun since, and the item holds it still,
+the reply is `{"ok":true,"unchanged":true}` and no upload opens. The upload's record keeps
+the id, the name, the size and the CRC-32 after `upload end`, and one byte of its padding
+says that it was installed. A file the check after the start read, or an older upload
+installed, is uploaded again as today. Two files of the same size and CRC-32 are taken for
+the same, as `upload end` takes them. Old firmware answers `bad-argument` to the fourth
+argument, and `odrigctl` then sends the form without it.
+
+**Resolution.** `docs/commands.md`; the spec's requirement 5.1.
+
+## Seed 34: the cleanup at the next change
+
+**Question.** When a change committed but could not remove the file it replaced, or
+`pending.txt`, every later change is refused with `storage-error` until a restart. Is a
+restart needed?
+
+**Answer.** No. The next change first does the cleanup again: it reads `pending.txt` with
+`read_at`, removes each file it names that no item names, and then `pending.txt`. When
+that still fails, the change is refused as today and the next start tries again. The
+cleanup reads at most 1,500 bytes, within the budget of a call.
+
+**Resolution.** The spec's requirement 5.4; `core/src/storage.cpp`.
+
+## Seed 34: no CRC-32 for every file
+
+**Question.** A CRC-32 of each file would let the core answer `unchanged` for every file
+it read whole: 8 bytes an entry of the file table (4 and the alignment of the next entry),
+1,056 bytes for the target file. With seeds 31, 32 and 36 joined, the target file with a
+drive takes about 130,701 of the 131,072 bytes the core may use. Is there room?
+
+**Answer.** No. The core remembers the file the last upload installed only, in the record
+the upload has anyway: the case the seed names, a request repeated after a reply that did
+not arrive, writes nothing, and the core grows by no byte. The padding of a file's entry
+and of an item is taken by seeds 29 and 32, and making `total_ms` 32 bits would change
+what an animation of four billion frames does.
+
+**Resolution.** `core/src/core_state.h`, `Upload.installed`; `docs/core.md`, "Uploads and
+the check".
+
+## Seed 34: `remove many` without a file that goes
+
+**Question.** The fault tests found that `remove many` of an animation whose file another
+item names gives the host a `write` of 0 bytes for `pending.txt`, which the host interface
+forbids. Is mending it in the seed's scope?
+
+**Answer.** Yes: it is a durable step of a live change, and the seed asks for every one to
+be tested. Without a file that goes, `remove many` writes no `pending.txt`, as `remove`
+does not.
+
+**Resolution.** `core/src/storage.cpp`; `tests/core/test_incremental.py`.
+
+## Seed 34: the app's uploads
+
+**Question.** Must the operators' app send the CRC-32 with `upload begin`?
+
+**Answer.** No. The app uploads a new animation under a free id and a name no item has;
+an upload repeated after a lost reply is refused with `in-use` without a write. Seed 36
+redraws the app; it can take the fourth argument up when it replaces animations.
+
+**Resolution.** The app is unchanged.
+
+## Seed 34: what install-show prints, and the copies
+
+**Question.** How precise is the tool's account, and how is an affected file kept before
+it is removed?
+
+**Answer.** Before writing, `install-show` prints the number of files kept and each file
+added, replaced or removed with its bytes, then the blocks and bytes to write, the free
+ones first; afterwards one line `storage: committed: ... written and compared; the board
+restarts`, or `unchanged`, or the error. `--dry-run` prints the plan and writes nothing.
+`--keep-copies DIR` copies each file it removes or replaces, as the board holds it, into a
+new or empty folder before anything is written. `read-show` copies everything, as before.
+
+**Resolution.** The spec's requirement 4.
+
+## Seed 34: the saved order on the image route
+
+**Question.** Seed 36 keeps the playlist order the operator chose in `order.txt` of
+`/odrig`. A show folder from the converter has none, and the check of a show folder
+refuses one. What does `install-show` do with it?
+
+**Answer.** It keeps it. The seed asks to preserve the stored playlist choices unless the
+operation changes them, and installing animations does not change the order: an entry of
+an id or a file that is gone is passed over, and a new animation comes last until it is
+moved. A folder may hold its own `order.txt`, as `read-show` copies it, and that one takes
+its place. `order.part` is the core's own and goes like any file the folder does not hold.
+
+**Resolution.** `firmware/fwtool/storage.py`, `folder_files`; `firmware/fwtool/cli.py`,
+`install-show`; the spec's requirement 1.6.
