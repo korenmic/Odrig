@@ -38,9 +38,11 @@ export function encodeSource(plan, name, sourceBytes, label = sourceName(name), 
   if (sourceBytes === null || sourceBytes === undefined) {
     throw new Rejection(FILE_MISSING, `${label}: the show names ${name} and its source is not there`);
   }
+  const container = name.endsWith(odrgx.ENDING);
   let animation;
   try {
-    animation = jsonframes.loads(sourceBytes);
+    const read = container ? odrgx.loadsSource(sourceBytes) : {type: "frames", animation: jsonframes.loads(sourceBytes)};
+    animation = read.type === "frames" ? read.animation : read[read.type];
   } catch (error) {
     if (!(error instanceof Rejection)) {
       throw error;
@@ -54,8 +56,8 @@ export function encodeSource(plan, name, sourceBytes, label = sourceName(name), 
       `${label}: the canvas is ${animation.width} x ${animation.height} and the mapping's is ${canvas.width} x ${canvas.height}`,
     );
   }
-  if (name.endsWith(odrgx.ENDING)) {
-    return naming(label, () => odrgx.encodeFrames(animation, {compressed}));
+  if (container) {
+    return naming(label, () => (animation.frames === undefined ? odrgx.encodeText(animation) : odrgx.encodeFrames(animation, {compressed})));
   }
   return naming(label, () => odrg.encode(animation, {compressed}));
 }

@@ -194,7 +194,7 @@ test("what the page asks of the library gives the same in Node.js as the command
   }
   assert.ok(bytesOf(results.decoded[0]).equals(Buffer.from(source)));
   assert.ok(bytesOf(results.decoded[1]).equals(Buffer.from(source)));
-  assert.equal(results.reasons, 48);
+  assert.equal(results.reasons, 54);
   assert.equal(sourcePictures().length, 3);
   assert.equal(base64(Uint8Array.of(1, 2, 3, 4, 5)), Buffer.from([1, 2, 3, 4, 5]).toString("base64"));
   assert.equal(base64(Uint8Array.of(255)), "/w==");

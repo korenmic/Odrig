@@ -59,7 +59,7 @@ Rules for every task:
     the legacy vectors and the demo show unchanged; `list` gives `type`.
   - Requirements: 1.4 to 1.6, 2.1 to 2.3, 10.1, 15.1
 
-- [ ] 4. A text in the converter
+- [x] 4. A text in the converter
   - `converter/lib/bidi.js`, `converter/lib/textlayout.js`, the text's JSON source and
     payload in `odrgx.js`, the pass in `converter/lib/draw.js`; `encode`, `decode` and
     `check` of a text.
