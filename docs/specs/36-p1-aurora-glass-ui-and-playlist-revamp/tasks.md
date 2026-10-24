@@ -70,7 +70,7 @@ Rules for every task:
     command lists.
   - Requirements: 4.1
 
-- [ ] 5. The app: four tabs, the look, Animations' rows and menus, Upload, Settings
+- [x] 5. The app: four tabs, the look, Animations' rows and menus, Upload, Settings
   - `app/www/index.html`, `style.css`, `main.js`, `client.js`, `commands.js`,
     `messages.js`, `screens/show.js`, `screens/selection.js`, `screens/storage.js`,
     `screens/mapping.js`.

@@ -1,8 +1,8 @@
 // The page with the room of the phone's bars at each side, set on the page's root as the
-// app's Android shell sets it: the show and the storage screen scrolled to their tops and
-// to their ends, a message, and a field while the keyboard is open.
+// app's Android shell sets it: Animations and Upload scrolled to their tops and to their
+// ends, a message, and a field while the keyboard is open.
 
-import {shown, storage} from "../reading.js";
+import {shown} from "../reading.js";
 
 const SIDES = ["top", "right", "bottom", "left"];
 
@@ -17,7 +17,7 @@ function box(element) {
 
 // Whatever the screen shows: every element of the screen that has a box of its own.
 function things(app) {
-  return [...app.doc.querySelectorAll("main h1, main p, main label, main button, main input, main canvas, main #animations > *, main #installed > .row")]
+  return [...app.doc.querySelectorAll("#top p, main h1, main h2, main p, main label, main button, main input, main canvas, main #animations-list > .row")]
     .filter((element) => displayed(element) && element.getBoundingClientRect().width > 0)
     .map((element) => ({what: element.id || element.textContent.trim().slice(0, 30) || element.tagName, ...box(element)}));
 }
@@ -70,18 +70,18 @@ export default async function (app) {
     app.doc.documentElement.style.setProperty(`--safe-area-inset-${side}`, `${room[side]}px`);
   }
   await settle(app);
-  const show = measure(app, room);
+  const animations = measure(app, room);
   scrolled(app, "end");
   await settle(app);
-  const showEnd = {...measure(app, room), last: box(app.doc.querySelector("#animations > :last-child"))};
+  const animationsEnd = {...measure(app, room), last: box(app.doc.querySelector("#animations-list > .row:last-child"))};
   scrolled(app, "top");
-  app.press("Storage");
-  await app.until(() => app.shown() === "storage" && app.text("space") !== "-" && storage(app).rows.length === app.settings.rows, "the storage screen with its rows");
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload" && app.text("upload-space") !== "-", "Upload with the space");
   await settle(app);
-  const storageTop = measure(app, room);
+  const uploadTop = measure(app, room);
   scrolled(app, "end");
   await settle(app);
-  const storageEnd = {...measure(app, room), last: box(app.doc.querySelector("#installed > .row:last-of-type"))};
+  const uploadEnd = {...measure(app, room), last: box(app.byId("choose"))};
   scrolled(app, "top");
   app.press("Target");
   await app.until(() => app.shown() === "target", "the target screen");
@@ -104,5 +104,5 @@ export default async function (app) {
   await app.until(() => app.frame.contentWindow.innerHeight === Number(height), "the view's height again");
   await settle(app);
   const after = measure(app, room);
-  return {plain, show, showEnd, storageTop, storageEnd, message, focused, typing, after};
+  return {plain, animations, animationsEnd, uploadTop, uploadEnd, message, focused, typing, after};
 }

@@ -2,8 +2,8 @@ import {shown} from "../reading.js";
 
 export default async function(app) {
   await shown(app, 2);
-  app.press("Mapping");
-  await app.until(() => app.shown() === "mapping", "Mapping screen");
+  app.press("Settings");
+  await app.until(() => app.shown() === "settings", "Settings");
   if (app.settings.unsupported) {
     await app.until(() => app.says("does not support|only supports"), "unsupported mapping explanation");
     return {error: app.text("mapping-error"), count: app.doc.querySelectorAll("#mapping-rows select").length};
@@ -20,8 +20,8 @@ export default async function(app) {
     app.press("Target");
     app.fill("address", app.settings.other);
     app.press("Use");
-    await app.until(() => app.shown() === "show", "new target answers");
-    app.press("Mapping");
+    await app.until(() => app.shown() === "animations", "new target answers");
+    app.press("Settings");
     await app.until(() => app.doc.getElementById("mapping-pin-1")?.value === String(app.settings.first), "new target assignment");
     seen.after = pins();
     seen.saveDisabled = app.byId("mapping-save").disabled;
@@ -53,20 +53,13 @@ export default async function(app) {
   }
   await app.until(() => app.says("Mapping saved") && !app.byId("mapping-reload").disabled, "acknowledged save and reread");
   seen.saved = pins();
-  app.press("Show diagonal");
-  await app.until(() => app.text("mapping-mode") === "Diagonal is showing", "diagonal state");
-  seen.mode = app.text("mapping-mode");
-  app.press("Show");
-  await app.until(() => app.shown() === "show", "Show after back");
-  app.press("Mapping");
-  await app.until(() => app.text("mapping-mode") === "Diagonal is showing", "persistent target diagnostic");
-  await app.until(() => !app.byId("mapping-test-off").disabled, "ready to stop the diagonal");
-  await app.reload();
-  await shown(app, 2);
-  app.press("Mapping");
-  await app.until(() => app.text("mapping-mode") === "Diagonal is showing" && !app.byId("mapping-test-off").disabled, "target diagnostic after app restart");
-  app.press("Stop diagonal");
-  await app.until(() => app.text("mapping-mode") === "Normal playback", "normal playback restored");
+  seen.playback = [...app.doc.querySelectorAll("#settings button, #settings input")].filter((element) => ["on", "off", "level", "play-all"].includes(element.id) ||
+    /^(On|Off|Show diagonal|Stop diagonal)$/.test(element.textContent.trim())).length;
+  app.press("Animations");
+  await app.until(() => app.shown() === "animations", "Animations");
+  app.press("Settings");
+  await app.until(() => app.shown() === "settings" && app.says("Mapping saved|Saved mapping"), "Settings again");
+  await app.until(() => !app.byId("mapping-defaults").disabled, "Restore defaults available");
   app.press("Restore defaults");
   seen.defaults = pins();
   seen.width = app.doc.documentElement.clientWidth;

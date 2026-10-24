@@ -1,16 +1,21 @@
-// The operator opens the storage screen, and may remove an animation: presses its
-// `Remove`, reads the question, and answers it.
+// The operator reads the list of Animations with the sizes and the menus of its rows, and
+// may delete an animation from its menu: chooses Delete, reads the question, and answers
+// it.
 
-import {shown, storage} from "../reading.js";
+import {choose, menuOf, shown, spaceKnown, storage} from "../reading.js";
 
 export default async function (app) {
   await shown(app, app.settings.rows);
-  app.press("Storage");
-  await app.until(() => app.shown() === "storage", "the storage screen");
-  await app.until(() => app.text("space") !== "-" && storage(app).rows.length === app.settings.rows, `the space and ${app.settings.rows} rows`);
-  const seen = {before: storage(app), buttons: [...app.doc.querySelectorAll("nav button")].map((button) => button.textContent.trim())};
+  await app.until(() => spaceKnown(app) && storage(app).rows.length === app.settings.rows, `the space and ${app.settings.rows} rows`);
+  const seen = {before: storage(app), buttons: [...app.doc.querySelectorAll("nav button")].map((button) => button.textContent.trim()), menus: {}};
+  for (const row of seen.before.rows) {
+    seen.menus[row.id] = menuOf(app, row.id);
+    app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+  }
+  seen.menuClosed = app.byId("row-menu").hidden;
   if (app.settings.remove !== undefined) {
-    app.pressIn(`#installed > [data-id="${app.settings.remove}"]`, "Remove");
+    menuOf(app, app.settings.remove);
+    choose(app, "Delete");
     await app.until(() => app.text("confirm-text") !== null, "the question");
     seen.question = app.text("confirm-text");
     seen.answers = [...app.doc.querySelectorAll("#confirm button")].map((button) => button.textContent.trim());

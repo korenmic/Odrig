@@ -1,13 +1,13 @@
-// The operator picks a file on the storage screen, chooses the fit and the part, and
-// makes the animation, or stops making it.
+// The operator picks a file on Upload, chooses the fit and the part, and makes the
+// animation, or stops making it.
 
 import {shown} from "../reading.js";
 
 export default async function (app) {
   const settings = app.settings;
   await shown(app, settings.rows);
-  app.press("Storage");
-  await app.until(() => app.shown() === "storage", "the storage screen");
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload", "Upload");
   // The file is handed to the field as the phone's picker hands it.
   const blob = await (await fetch(`/m/${settings.file}`)).blob();
   const view = app.frame.contentWindow;

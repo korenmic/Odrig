@@ -38,7 +38,8 @@ let askedFor = null;
 // Whether a list has waited while a status was sent. It goes before the next status
 // then, so that a target that answers slowly does not keep the list away.
 let listWaited = false;
-// Whether the show screen, or the storage screen, is the one on the screen of the phone.
+// Whether Animations, or Upload, is the screen on the screen of the phone: both use the
+// list and the capacity.
 let showScreen = false;
 let storageScreen = false;
 let spaceDue = false;
@@ -122,7 +123,7 @@ function listAgainLater(after = LIST_EVERY_MS) {
   }, after);
 }
 
-// Capacity is asked for periodically while Show or Storage is visible.
+// Capacity is asked for periodically while Animations or Upload is visible.
 function spaceAgainLater() {
   clearTimeout(spaceTimer);
   spaceTimer = setTimeout(() => {
@@ -373,12 +374,12 @@ export function begin() {
 }
 
 // Says which screen is on the screen of the phone. The list is kept fresh while it is
-// the show screen or the storage screen, together with capacity.
+// Animations or Upload, together with capacity.
 export function showing(name) {
   const was = showScreen || storageScreen;
   const wasStorage = storageScreen;
-  showScreen = name === "show";
-  storageScreen = name === "storage";
+  showScreen = name === "animations";
+  storageScreen = name === "upload";
   if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
     listDue = true;
   }

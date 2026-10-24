@@ -69,6 +69,7 @@ const REFUSALS = {
       ? "That name or id is in use on the installation. The list is asked for again; upload again."
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
+  "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
   "storage-error": () => "The installation could not use its storage.",
   "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,

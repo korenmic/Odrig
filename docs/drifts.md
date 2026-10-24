@@ -9405,3 +9405,17 @@ active test with Stop test in the now-playing area, whether the Tests group is s
 not. No member is added to `status`.
 
 **Resolution.** The spec's design, "Tests and Settings".
+
+## Seed 36: the power control, again
+
+**Question.** The entry "Seed 36: the look's measures" made power one toggle that sends
+`on` or `off` by the state the target last reported. Building it showed that a toggle
+sends the wrong line when another controller changed the power within the last second,
+and sends nothing before the first status. Is a toggle what the operator should have?
+
+**Answer.** No: power is two buttons, On and Off, together in one rounded pill with the
+power sign, as the mockup draws one pill. Each sends what it says whatever the last
+status was, the one that is in effect is marked, and a status keeps them true. The other
+measures of that entry stand.
+
+**Resolution.** `app/www/index.html`, `#power-switch`; `app/www/screens/show.js`.
