@@ -69,10 +69,10 @@ export async function status() {
 }
 
 // One part of the items of the show, in its order, from a position on: each animation
-// as `{id, file, bytes}` with optional boolean `ignored` and optional `fault`, the reason it
-// is unavailable, and `bytes` null while the installation has not read it whole; each cycle
-// as `{id, cycle: true}`; and `next`, the position to ask for next, or null when the part
-// holds the last item.
+// as `{id, file, bytes}` with the booleans `ignored` and `external` when the target gives
+// them and `fault`, the reason it is unavailable, when it has one, and `bytes` null while
+// the installation has not read it whole; each cycle as `{id, cycle: true}`; and `next`,
+// the position to ask for next, or null when the part holds the last item.
 export async function list(from = 0) {
   const reply = await carriedOut(`list ${from}`);
   const sound =
@@ -84,14 +84,17 @@ export async function list(from = 0) {
         typeof item === "object" &&
         whole(item.id, 1, 65535) &&
         (item.ignored === undefined || typeof item.ignored === "boolean") &&
+        (item.external === undefined || typeof item.external === "boolean") &&
         (item.fault === undefined || typeof item.fault === "string") &&
-        ((typeof item.file === "string" && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) || (Array.isArray(item.cycle) && item.file === undefined && item.ignored === undefined && item.fault === undefined)),
+        ((typeof item.file === "string" && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
+          (Array.isArray(item.cycle) && item.file === undefined && item.ignored === undefined && item.external === undefined && item.fault === undefined)),
     );
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
   return {
-    items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}), ...(item.fault === undefined ? {} : {fault: item.fault})} : {id: item.id, cycle: true})),
+    items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
+      ...(item.external === undefined ? {} : {external: item.external}), ...(item.fault === undefined ? {} : {fault: item.fault})} : {id: item.id, cycle: true})),
     next: reply.next,
   };
 }
