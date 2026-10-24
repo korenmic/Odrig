@@ -26,10 +26,10 @@ Rules for every task:
 - No board, no serial port, no network of the board. Answers to questions go into
   `docs/drifts.md`.
 
-- [ ] 1. The fonts and their tables
+- [x] 1. The fonts and their tables
   - Set the seed's `state.json` to `in_progress`.
   - `fonts/small.txt` and `fonts/medium.txt`, drawn by hand: 122 glyphs each, the printable
-    ASCII characters and the Hebrew letters with their final forms. `fonts/generate.js`
+    ASCII characters and the Hebrew letters with their final forms. `fonts/generate.mjs`
     writes `core/src/font_tables.cpp` and `converter/lib/fonttables.js`, with the sine
     table of the clocks; `core/src/fonts.h`.
   - Tests: the generated files are what the sources give; every glyph's rows and width;

@@ -121,15 +121,15 @@ inside the block. Spaces have no glyph.
 | `large` | 3 | small | 7 | 2 | 10 | 2 |
 
 A glyph is a cell of `ascent + descent` rows and its own width in columns; its advance is
-its width and one column of spacing. A space advances 3 columns in `small` and 4 in
-`medium`, times the scale. Lines are a pitch apart, times the scale. Each table has the
+its width and one column of spacing. The space is a dark glyph, 2 columns wide in `small`
+and 3 in `medium`. Lines are a pitch apart, times the scale. Each table has the
 95 printable ASCII characters and the 27 Hebrew letters from U+05D0 to U+05EA, 122 glyphs,
 in the order of their code points, and version 1.
 
 The sources are `fonts/small.txt` and `fonts/medium.txt`: a header of `name`, `id`,
-`version`, `ascent`, `descent` and `space`, then for each glyph a line
+`version`, `ascent` and `descent`, then for each glyph a line
 `glyph U+XXXX` and its rows, `#` for a lit pixel and `.` for a dark one. `node
-fonts/generate.js` writes `core/src/font_tables.cpp` and `converter/lib/fonttables.js`
+fonts/generate.mjs` writes `core/src/font_tables.cpp` and `converter/lib/fonttables.js`
 from them, with the sine table of the clocks; a test of the converter's suite fails when
 either is not what the sources give.
 
@@ -353,7 +353,7 @@ changed the animation, and the form stays open with the edits. A drive's animati
   LEDs at chosen times with the reference pictures, which are kept as PNG files so that a
   person can look at them.
 - `python3 firmware/fw.py build` builds the firmware with the new sources; the font tables'
-  bytes are those `generate.js` prints, and the image's growth is recorded.
+  bytes are those `generate.mjs` prints, and the image's growth is recorded.
 
 ## Tests
 
@@ -378,8 +378,8 @@ changed the animation, and the form stays open with the edits. A drive's animati
 No new block. A text's payload, at most 3,612 bytes, and a clock's 20 bytes are held in
 the decoder's window while they play, since the stream is either a frames file or a drawn
 one. The check reads a payload byte by byte through its source. The tables are read-only
-data: 122 glyphs of each font, 1,122 bytes for `small` and 2,662 for `medium` with their
-widths and offsets, and 2,048 bytes of sine table.
+data: 122 glyphs of each font, 1,464 bytes for `small` and 1,952 for `medium` with their
+code points and widths, and 2,048 bytes of sine table.
 
 ## Decisions
 
