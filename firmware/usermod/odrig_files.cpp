@@ -99,10 +99,21 @@ void askSpace() {
   spaceKnown = true;
 }
 
-// Memory from the chip's internal memory, and from the external memory only when the
-// internal memory has none. It is never given back.
+#if ESP_IDF_VERSION_MAJOR >= 5
+// The internal memory that stays for the LED outputs, the Wi-Fi and WLED's web server, which
+// on ESP-IDF 5 take more of it: with less, WLED found its heap low and reset the network.
+constexpr size_t INTERNAL_RESERVE = 192 * 1024;
+#endif
+
+// Memory from the chip's internal memory, and from the external memory when the internal
+// memory has none, or on ESP-IDF 5 when the block would leave less than the reserve. It is
+// never given back.
 void *allocate(void *, size_t bytes) {
-  void *block = heap_caps_aligned_alloc(8, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  void *block = nullptr;
+#if ESP_IDF_VERSION_MAJOR >= 5
+  if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) >= bytes + INTERNAL_RESERVE)
+#endif
+  block = heap_caps_aligned_alloc(8, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (block == nullptr) block = heap_caps_aligned_alloc(8, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   return block;
 }

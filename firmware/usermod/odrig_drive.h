@@ -1,7 +1,6 @@
-// A USB flash drive on the chip's own USB socket, which is switched to host mode for it.
-// When a drive comes, it is mounted at /usb, the animation files of its folder odrig are
-// listed for the core, and the core reads them through the host functions made here.
-// Nothing is written to the drive.
+// Read-only removable animations. The default is a USB drive on the chip's own socket.
+// ODRIG_DRIVE_SD_SPI selects a SPI card, configured by odrig_sd_config.h, and keeps that
+// socket a serial port. Each backend lists its folder odrig and serves the core's reads.
 #pragma once
 
 #include <stdint.h>
@@ -10,10 +9,12 @@
 
 namespace OdrigDrive {
 
-// Starts the drive's task. It looks for a computer on the chip's own socket for the
+// Starts the selected reader's task. The USB backend looks for a computer for the
 // wait, and leaves the socket a serial port when one is there. Otherwise it starts the USB
 // host on the socket and takes drives up and drops them; from then on the socket is no
-// serial port to a computer until the next start.
+// serial port to a computer until the next start. The SPI backend touches no pin until
+// all four configured pins and the clock are valid. It retries mounts and checks an
+// actual card read once a second; a read fault drops the card before another mount.
 void begin();
 
 // The wait, in milliseconds: from 0 to 60,000, and 5,000 for any other value. It is set

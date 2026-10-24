@@ -8451,6 +8451,117 @@ they did before.
 `cli.test.js`, `pack.test.js`; `converter/tests/expected/cli.json.gz` and `run.json.gz`;
 `converter/cli/files.js`, `why`; `AGENTS.md` and `agent/getting-started.md`, On Windows.
 
+## Seed 22: Which newer software, and where its hubs come from
+
+**Question.** The seed names a version of Espressif's software that knows hubs, ESP-IDF
+5.5 or later, and leaves open which one and how. Arduino-ESP32's libraries come compiled,
+and the configuration they are compiled with leaves the hub support of ESP-IDF's USB host
+off, as ESP-IDF does unless it is switched on. Which software, and how does the firmware
+get hubs?
+
+**Answer.** Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform
+55.03.312-1, its newest release that is not a test release, of 2026-09-22; it needs
+PlatformIO 6.2.0. The hubs come from ESP-IDF 5.5.5's own USB host library, taken into
+`firmware/usb_host/` and compiled with its hub support on, as the driver of flash drives
+was taken into `firmware/usb_host_msc/`. The support is ESP-IDF's driver of the hub class
+of the USB standard, and nothing of it names a hub. The other way, having the platform
+compile all of Arduino-ESP32's libraries again with ESP-IDF and the option on, fetches
+ESP-IDF itself, its Python packages and some thirty components besides what this way
+fetches, and its exact list is known only when it runs. The driver of flash drives stays
+1.1.1, which Espressif gives for ESP-IDF 4.4.1 and later; 1.1.4 is on the list of
+downloads only for the case that 1.1.1 does not build. Should the owner prefer the other
+way, the list changes before anything is fetched.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The newer
+software", "The USB host library with hubs" and "What the trial fetches".
+
+## Seed 22: The newer software beside the build known good
+
+**Question.** The trial build needs PlatformIO 6.2.0 and a platform of its own, where the
+firmware's build has the PlatformIO 6.1.17 that WLED pins; and stock WLED is still built
+on the older software after the move. How do the two live in one work folder?
+
+**Answer.** The newer software has a folder of its own, `build/firmware/newer/`, with its
+Python environment, its PlatformIO folder and its build cache; pip's and npm's caches are
+shared, since they only keep what was fetched. `build --trial` and `build --trial --probe`
+build on it, into images with names of their own, so the image known good is never
+replaced. After the move the firmware and its probe build take the newer folder, and
+`build --stock` keeps the older one. The PlatformIO of the newer folder is PlatformIO's own
+6.2.0, which the platform asks for; the platform installs pioarduino's PlatformIO into a
+Python environment of its own for itself.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The tool" and
+"The move".
+
+## Seed 22: What counts as WLED building on the newer software
+
+**Question.** The seed ends the trial when WLED does not build on the newer software. How
+much change of WLED's source does the trial allow before it says so?
+
+**Answer.** A change that WLED's source needs goes into a patch file of
+`firmware/patches/`, each change held to the newer software by `ESP_IDF_VERSION_MAJOR`, so
+that the build known good stays as it is. A change of WLED's drivers of the LEDs, the
+Wi-Fi or the storage, or a library that has no version for the newer software, ends the
+trial: that is no longer WLED 16.0.1 as it is, and the owner decides.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, 1.5;
+`design.md`, "The USB host library with hubs".
+
+## Seed 22: The board's suite on the trial build
+
+**Question.** The trial asks that the board's suite pass on the trial build. The suite
+flashes the firmware and the probe build under the names the tool keeps them by, which the
+trial does not replace. How does it run on the trial build?
+
+**Answer.** The trial has a probe build too, `build --trial --probe`, and the suite takes
+the trial's two images where it takes the firmware and the probe build when the variable
+`ODRIG_BOARD_IMAGES` is `trial`. No command of the tool is added for it, and both go at the
+move.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The tool" and
+"The trial on the board"; `tests/board/support.py`.
+
+## Seed 22: The log of a device that goes, and of a device on a hub
+
+**Question.** The seed asks for a line when a hub comes and when it goes. The log says
+`a device went` for any device, and its watcher keeps only the first device open, so it
+is told only of the first that goes.
+
+**Answer.** The watcher keeps up to eight devices open, each with its numbers and its
+kind, and the line of a device that goes names it as its line of coming did:
+`a device went: maker 1a40, product 0101, a hub`. On the newer software the line of a
+device that comes behind a hub ends with `, on port <n> of a hub`. Eight is more than a hub
+with a stick brings.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, Requirement
+3; `design.md`, "The log of what comes and goes".
+
+## Seed 22: Two sticks through one hub
+
+**Question.** Through a hub two sticks can be plugged in at once. The seed says nothing of
+it.
+
+**Answer.** One stick is read at a time, as the firmware does today: a second one that
+comes is passed over until the first goes. Reading two would change seed 20's list and
+its names, which is not this seed's work.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/requirements.md`, 2.5.
+
+## Seed 22: The hub support is already in Arduino-ESP32 3.3.12
+
+**Question.** The design builds ESP-IDF 5.5.5's USB host library with its hub support on,
+as a library of the repository, because Arduino-ESP32 comes with that library compiled.
+Is the compiled one without hubs?
+
+**Answer.** No. Every memory variant of the ESP32-S3 in Arduino-ESP32 3.3.12's compiled
+libraries, `qio_opi` of this board among them, has `CONFIG_USB_HOST_HUBS_SUPPORTED 1`
+and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` in its `sdkconfig.h`, and its `libusb.a` is built
+so. The trial takes the compiled library as it is: no `firmware/usb_host/`, no source of
+ESP-IDF in the repository or fetched for it, and no flags for its options. The support is
+still the USB standard's own, with nothing for one maker or model.
+
+**Resolution.** `docs/specs/22-p2-a-usb-stick-through-a-hub/design.md`, "The USB host
+library with hubs"; `docs/firmware.md`, "The newer USB software".
 ## Seed 27: Where the room of the bars comes from, and the colour behind them
 
 **Question.** The seed asks for the room of the bars from what the phone reports, and for
@@ -8498,6 +8609,140 @@ the tests of the screens expect, and in a browser the band has no height.
 **Resolution.** `docs/specs/27-p1-the-app-clear-of-the-phones-bars/design.md`, "The style
 sheet".
 
+## Seed 38: Which file systems of a card the firmware reads
+
+**Question.** The seed says the card's file system is "FAT32 as a card comes". Arduino's
+`SD` library mounts a card with the chip's FatFs, which reads FAT16 and FAT32, and reads
+exFAT only when it was compiled with it, which the compiled libraries of Arduino-ESP32
+3.3.12 may or may not be. What does the firmware promise?
+
+**Answer.** FAT32 and FAT16: a card of 32 GB or less as it comes from the shop, or any
+card formatted FAT32 on a computer. A card above 32 GB comes as exFAT, which is not
+promised; the owner formats such a card FAT32 on a computer before use. Names are kept to
+the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`, as for the stick: another
+letter may come out as `?` and such a file cannot be opened by its name and is left out.
+The owner's card of 122 animations has such names.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+2.1 and 2.2; `design.md`, "The card".
+
+## Seed 38: The emulator and the card
+
+**Question.** Seed 20 gave the emulator an option `--drive DIR`, a folder that stands in
+for the stick. Does the emulator change for the card?
+
+**Answer.** No. The core knows "a drive": a number that changes when one comes and is 0
+while none is there, and a list of names. Whether the firmware fills that from a USB stick
+or from a card is the host's matter, and the emulator's folder stands in for either. The
+app shows the external animations the same way. Nothing of the core, the emulator or the
+app is touched by this seed; the words "drive" and "USB drive" in their documents mean the
+external storage, and `docs/show.md` gets one sentence that says so.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/design.md`,
+"What does not change".
+
+## Seed 38: Codex's pages, `docs/microsd.md` and `docs/microsd-preflight/`
+
+**Question.** Codex wrote `docs/microsd.md` and six files under `docs/microsd-preflight/`:
+two records of the board sessions of 2026-10-22 and 2026-10-23, and four checklists of its
+own. `docs/` holds the documents that define the project, and a checklist of a session
+is not one. What becomes of them?
+
+**Answer.** `docs/microsd.md` stays and becomes the card's page, in the house style: how
+to prepare a card, the reader's wiring as the owner reported it, the build, flashing, the
+log's lines, WLED's information, what the two board sessions gave, and what is open. The
+two records are folded into it, the four checklists are superseded by this spec's
+`tasks.md`, and the folder `docs/microsd-preflight/` goes, with every link to it. Until
+the documents task is done, the pages stay as Codex wrote them, so that nothing is lost
+in the meantime.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/design.md`,
+"The documents"; `tasks.md`, the documents task.
+
+## Seed 38: The dropouts of 2026-10-22 are found out, not solved
+
+**Question.** In the first board session the card's entries disappeared and were found
+again, at 4 MHz, 1 MHz and 400 kHz alike; in the second, with both USB sockets of the
+board on the Mac, nothing was lost in fifteen minutes. Does this seed undertake to solve
+the dropouts?
+
+**Answer.** It undertakes to find out whether they are still there, with the cable
+arrangement the owner names for the event, and to record what was seen, with the evidence
+kept before anything is changed: the log's lines, `status` and `list` over time, and the
+image's hash. A cause inside the card's code or its clock that the session shows is this
+seed's to mend, since the card's firmware is its subject. A cause in the wiring, the
+power or the reader is the owner's, and what follows from it becomes a new seed. Slower
+clocks are not tried again: they did not help on 2026-10-22.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirement 9; `design.md`, "The board session".
+
+## Seed 38: The seed is added in progress
+
+**Question.** The working rules have a seed added as `remaining`, and the first task of
+its spec set it to `in_progress`. This seed's first five tasks are Codex's commits of
+2026-10-22 and 2026-10-23, made before the seed existed. Which state is the seed added in?
+
+**Answer.** `in_progress`, in the commit that adds it. The spec's `tasks.md` ticks those
+five tasks and names their commits, so the rule is met in substance: the state was set by
+the commit that accounts for the work already done. `remaining` would say that nothing
+has begun, which is false.
+
+**Resolution.** `project-seeds/38-p1-a-microsd-card-as-the-external-storage/state.json`;
+`docs/specs/38-p1-a-microsd-card-as-the-external-storage/tasks.md`, tasks 1 to 5.
+
+## Seed 38: The stick's code and the hub's trial stay
+
+**Question.** The card takes the stick's place. Do the stick's code, `build --trial` and
+the trial's environments go now?
+
+**Answer.** No. The owner's decision of 2026-10-21 keeps the USB build available, and the
+one of 2026-10-24 keeps the move to the newer software, which the card's build is built
+on: `build` goes on building the firmware with the stick's code on the software known
+good, `build --trial` the hub's trial, and `build --microsd` the card's firmware, in the
+same folder `build/firmware/newer/`. Where the documents call the newer software "the
+trial", one sentence says that the microSD build uses the same software. Whether the
+card's build becomes the firmware that `build` makes, and the trial's environments and
+`ODRIG_BOARD_IMAGES=trial` go with that move, is the owner's question 8 of the seed; the
+last tasks wait for it.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirement 10; `design.md`, "What does not change" and "What needs the owner".
+
+## Seed 38: The log's kind `sd`, and `odrig drive` in WLED's information
+
+**Question.** The seed asks for "the same log" as the stick. Codex's code writes the
+card's lines with the kind `sd`, where the stick's have `usb`, and keeps WLED's
+information entry under the name `odrig drive`. Which names does the spec take?
+
+**Answer.** Those built: the lines of the card are of the kind `sd`, since they say what
+the card does and not what a USB port sees, and `odrig drive` keeps its name in WLED's
+information, with the card's states in it, so that the documents and the owner's habits
+keep one name for the external storage. The player's lines, `drive file <name> left out:
+<reason>`, stay as they are for the card.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+Requirements 3 and 5; `design.md`, "The log and WLED's information".
+
+## Seed 38: The card's free and total space
+
+**Question.** Seed 29, on `master` since 2026-10-24, gave the core an optional host
+function `drive_space`, and the stick's code answers it from the FAT volume of the USB
+driver. Codex's card code was written before and has no such function; merged as they
+are, the card's build would not compile, since the stick's function names what the card's
+build leaves out. What does the card's build answer?
+
+**Answer.** The card's numbers, from Arduino's `SD` library: `totalBytes()` and
+`usedBytes()`, which read the volume's free clusters and write nothing; free is total
+minus used. The function answers only while the card is mounted and the number asked for
+is the card's current number, with the same guard as every other call, and -1 otherwise,
+so `space` reports the card present with null capacities when the numbers cannot be read.
+This is done in the commit that merges `master` into the seed's branch, with the test
+that compiles the card's code against the stand-in card, since that commit is the first
+in which both sides exist.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/requirements.md`,
+2.6; `design.md`, "Free and total space"; `tasks.md`, task 6.
 ## Seed 26: what failed on Windows, and three points the spec had otherwise
 
 **Question.** Seed 26 makes every suite that runs on Windows pass there again. Where did

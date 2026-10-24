@@ -168,11 +168,26 @@ const char *errorNow() {
 uint32_t microsSince(int64_t from) { return (uint32_t)(esp_timer_get_time() - from); }
 #endif
 
+#ifdef ODRIG_DEBUG_LOG
+// A build for finding faults: ESP-IDF's messages go to the USB serial port as well, where
+// WLED's debug lines go, so that what the Wi-Fi and the network do can be read there.
+int debugVprintf(const char *format, va_list arguments) {
+  char line[256];
+  const int length = vsnprintf(line, sizeof(line), format, arguments);
+  if (length > 0) OdrigSerial::write(line, length < (int)sizeof(line) ? length : (int)sizeof(line) - 1);
+  return length;
+}
+#endif
+
 }  // namespace
 
 class OdrigUsermod : public Usermod {
  public:
   void setup() override {
+#ifdef ODRIG_DEBUG_LOG
+    esp_log_set_vprintf(debugVprintf);
+    esp_log_level_set("*", ESP_LOG_INFO);
+#endif
     lock = xSemaphoreCreateMutex();
     OdrigSerial::begin();
     OdrigUart::begin();

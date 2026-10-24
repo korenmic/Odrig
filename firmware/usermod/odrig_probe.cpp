@@ -8,6 +8,9 @@
 #include "esp_rom_gpio.h"
 #include "soc/lcd_cam_struct.h"
 #include "soc/pcnt_periph.h"
+#if ESP_IDF_VERSION_MAJOR >= 5
+#include "soc/gpio_periph.h"
+#endif
 
 #include "odrig_files.h"
 #include "odrig_leds.h"
