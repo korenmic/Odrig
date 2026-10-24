@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "one two three four five six seven",
+  "font": "small",
+  "color": 16764992,
+  "background": 16,
+  "align": "left",
+  "valign": "top",
+  "direction": "auto",
+  "wrap": true,
+  "effect": "static",
+  "motion": "left",
+  "speed": 20,
+  "pause_ms": 2000
+}

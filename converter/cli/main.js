@@ -81,30 +81,37 @@ async function importMedia(values) {
   files.write(values.output, jsonframes.dumps(animation));
 }
 
-// Writes an ODRG file, or an ODRGX container when the output's name ends in `.odrgx`.
+// Writes an ODRG file of JSON frames, or an ODRGX container when the output's name ends in
+// `.odrgx`, which a text is always written as.
 function encode(values) {
   const source = files.read(values.input);
   const container = ending(values.output) === odrgx.ENDING;
-  const data = errors.naming(values.input, () => {
-    const animation = jsonframes.loads(source);
-    const options = {compressed: !values.uncompressed};
-    return container ? odrgx.encodeFrames(animation, options) : odrg.encode(animation, options);
-  });
+  const read = errors.naming(values.input, () => odrgx.loadsSource(source));
+  if (read.type !== "frames" && !container) {
+    throw new UsageError(`${values.output}: a text or a widget is written as .odrgx`, "encode");
+  }
+  const options = {compressed: !values.uncompressed};
+  const data = errors.naming(values.input, () => (container ? odrgx.encodeSource(read, options) : odrg.encode(read.animation, options)));
   files.write(values.output, data);
 }
 
-// What a runtime file holds, read by its first bytes: an ODRG file, or an ODRGX container.
+// What a runtime file holds, read by its first bytes: an ODRG file, or an ODRGX container
+// with `type`, the name of its content type.
 export function readRuntime(data) {
   if (odrgx.isContainer(data)) {
-    const header = odrgx.readHeader(data);
-    return {format: "odrgx", header, ...odrgx.decodeFrames(data, header)};
+    return {format: "odrgx", ...odrgx.decode(data)};
   }
-  return {format: "odrg", header: null, ...odrg.decode(data)};
+  return {format: "odrg", type: "frames", header: null, ...odrg.decode(data)};
 }
 
+// Writes the JSON frames of frames, and the JSON source of a text.
 function decode(values) {
   const data = files.read(values.input);
   const decoded = errors.naming(values.input, () => readRuntime(data));
+  if (decoded.type === "text") {
+    files.write(values.output, odrgx.dumpsText(odrgx.textOf(decoded)));
+    return;
+  }
   const animation = {width: decoded.width, height: decoded.height, frames: decoded.records};
   files.write(values.output, jsonframes.dumps(animation));
 }
@@ -122,6 +129,9 @@ export function summary(kind, data) {
     lines.push("format: json-frames");
   } else {
     const decoded = readRuntime(data);
+    if (decoded.type === "text") {
+      return textSummary(decoded, data);
+    }
     ({width, height, records: frames} = decoded);
     lines.push(`format: ${decoded.format}`);
     if (decoded.header !== null) {
@@ -137,6 +147,23 @@ export function summary(kind, data) {
     `file_bytes: ${data.length}`,
   );
   return `${[...lines, ...more].join("\n")}\n`;
+}
+
+// What `check` prints for a container of a text.
+function textSummary(decoded, data) {
+  const lines = [
+    "format: odrgx",
+    "type: text",
+    `canvas: ${decoded.header.width}x${decoded.header.height}`,
+    `loop_ms: ${decoded.header.loopMs}`,
+    `font: ${decoded.settings.font}`,
+    `effect: ${decoded.settings.effect} ${decoded.settings.motion}`,
+    `block: ${decoded.block.width}x${decoded.block.height}`,
+    `glyphs: ${decoded.glyphs.length}`,
+    `text_bytes: ${new TextEncoder().encode(decoded.text).length}`,
+    `file_bytes: ${data.length}`,
+  ];
+  return `${lines.join("\n")}\n`;
 }
 
 function check(values, streams) {

@@ -244,7 +244,7 @@ integers are little-endian.
 |---:|---:|---|---|
 | 0 | 4 | Magic | The bytes `4F 44 52 58` ("ODRX"). |
 | 4 | 1 | Container version | 1. |
-| 5 | 1 | Type | The content type: 1, frames. |
+| 5 | 1 | Type | The content type: 1, frames; 2, a text. |
 | 6 | 1 | Type version | The version of the content type: 1. |
 | 7 | 1 | Reserved | 0. |
 | 8 | 2 | Width | W, at least 1. |
@@ -262,6 +262,106 @@ file plays; a reader that reads the payload refuses a loop that is not the paylo
 The payload of the type 1 is an ODRG file, as "ODRG" above describes it, for the canvas
 of the container. Its loop is the sum of the durations of its frames. It plays exactly as
 the ODRG file plays by itself.
+
+### The text payload
+
+The payload of the type 2 is a text: its settings, the text as it was written, and its
+layout, the glyphs and their places, which the converter made. The player draws the glyphs
+where the settings move them; it lays out nothing itself.
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Font | 1 `small`, 2 `medium`, 3 `large` |
+| 1 | 1 | Font version | the version of the font the layout was made with: 1 |
+| 2 | 1 | Effect | 0 `static`, 1 `marquee`, 2 `slide`, 3 `pan` |
+| 3 | 1 | Motion | 0 `left`, 1 `right`, 2 `up`, 3 `down` |
+| 4 | 1 | Align | 0 `left`, 1 `center`, 2 `right` |
+| 5 | 1 | Vertical align | 0 `top`, 1 `middle`, 2 `bottom` |
+| 6 | 1 | Direction | 0 `auto`, 1 `ltr`, 2 `rtl` |
+| 7 | 1 | Wrap | 0 or 1 |
+| 8 | 3 | Colour | red, green, blue |
+| 11 | 3 | Background | red, green, blue |
+| 14 | 2 | Speed | pixels a second, 1 to 240 |
+| 16 | 2 | Pause | milliseconds, 0 to 65,535, and at least 20 for `static` |
+| 18 | 2 | Text bytes | T, 1 to 512 |
+| 20 | 2 | Glyphs | G, 0 to 512 |
+| 22 | 2 | Block width | BW, at least 1 |
+| 24 | 2 | Block height | BH, at least 1 |
+| 26 | 2 | Reserved | 0 |
+| 28 | T | Text | the text, UTF-8 |
+| 28 + T | 6 G | Glyphs | each three 16-bit numbers: the glyph's place in its font's table, and x and y of the top left corner of its cell in the block, y growing downwards |
+
+P is 28 + T + 6 G, at most 3,612. The canvas's picture, 3 * W * H bytes, is at most 65,534.
+The direction and wrapping are kept so that the text can be edited; the layout already
+follows them.
+
+**The fonts.** `small` has 7 rows above the baseline and 2 below, `medium` 10 and 3, and
+`large` is `small` at twice the size: every pixel a square of 2 x 2. Each has a glyph for
+the 95 printable ASCII characters and the 27 Hebrew letters from U+05D0 to U+05EA. A glyph's
+cell is its rows by its width; it advances by its width and one column, times the scale,
+and the space is a dark glyph. Lines are a cell and one row apart. The glyphs are those of
+`fonts/` in the repository.
+
+**The layout** is made by the converter: the text split at line feeds into paragraphs; each
+paragraph put in order by the Unicode Bidirectional Algorithm, UAX #9, its direction that
+of its first strong letter unless forced; with wrapping, broken at spaces into lines no
+wider than the canvas, and a word wider than the canvas between its characters; each line
+reordered, brackets in right-to-left runs mirrored, and its glyphs placed from x 0; the
+block as wide as its widest line, each line aligned in it, and as high as its lines.
+
+**The pass.** Where the block rests: x is 0, (W - BW) / 2 or W - BW by the alignment, and y
+0, (H - BH) / 2 or H - BH by the vertical one, rounded down. `steps(d)` is the
+milliseconds of d pixels at the speed, `ceil(d * 1000 / speed)`, and `moved(t)` the pixels
+after t milliseconds, `floor(t * speed / 1000)`. A motion left or right moves x, one up
+or down moves y, and the block rests across it.
+
+| Effect | Must fit | Pass | Where the block is at t |
+|---|---|---|---|
+| `static` | the canvas | the pause | at rest |
+| `marquee` | the canvas across the motion | `steps(size + length)` | it enters at one side and leaves at the other: left from W, right from -BW, up from H, down from -BH, `moved(t)` on |
+| `slide` | the canvas | in + pause + out | it moves in from the side the motion comes from to its rest, holds the pause, and moves out at the other side |
+| `pan` | the canvas across the motion | 2 pauses + 2 `steps(T)`, at least 20 | it holds at one end, moves to the other, holds and moves back; T is the length beyond the canvas, 0 when it fits, and then it rests |
+
+Here size and length are W and BW across a horizontal motion and H and BH across a
+vertical one. A pan left starts with the block's left end at the canvas's left side, one
+right with its right end at the right side, and so for up and down.
+
+**Drawing** at a time t of the pass: the canvas takes the background, and every lit pixel of
+every glyph whose cell meets the canvas at the block's place becomes the colour, a square
+of the scale. Rows are counted from the top here: a canvas row r is the format's row
+H - r.
+
+### The JSON source of a text
+
+A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `version`
+(1), `type` (`"text"`), `width`, `height`, `text` (1 to 512 bytes of UTF-8), `font`
+(`"small"`, `"medium"` or `"large"`), `color` and `background` (colours as in JSON
+frames), `align` (`"left"`, `"center"` or `"right"`), `valign` (`"top"`, `"middle"` or
+`"bottom"`), `direction` (`"auto"`, `"ltr"` or `"rtl"`), `wrap` (`true` or `false`),
+`effect`, `motion`, `speed` (1 to 240) and `pause_ms` (0 to 65,535, at least 20 for
+`static`). It is the tracked source of a text, as JSON frames are of frames; the converter
+writes it with two spaces of indent.
+
+```json
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "שלום world",
+  "font": "small",
+  "color": 16766016,
+  "background": 0,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "marquee",
+  "motion": "left",
+  "speed": 20,
+  "pause_ms": 1000
+}
+```
 
 ### What a reader rejects
 

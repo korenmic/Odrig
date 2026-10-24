@@ -95,23 +95,58 @@ Rules: [format.md](format.md), "ODRGX".
 | `truncated` | The file ends before the 20-byte header is complete. |
 | `bad-magic` | Bytes 0 to 3 are neither `4F 44 52 58` nor, for an ODRG file, `4F 44 52 47`. |
 | `bad-container` | The container's version is not 1, or its reserved byte is not 0. |
-| `unknown-type` | The content type is not one the reader knows: 1, frames. |
+| `unknown-type` | The content type is not one the reader knows: 1, frames, or 2, a text. |
 | `unknown-type-version` | The version of the content type is not the one the reader knows: 1. |
 | `zero-size` | Width or height is 0. |
-| `payload-size` | The payload's length is above the most its type may have, or, once the payload was read, not the number of bytes after the header. |
+| `payload-size` | The payload's length is above the most its type may have, 3,612 bytes for a text, or, once the payload was read, not the number of bytes after the header. |
 | `canvas-mismatch` | The canvas of a frames payload differs from the container's. |
-| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations. |
+| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations; for a text, its pass. |
 
 The checks run in this order: the header's length, its fields in the order of their
 offsets, then the payload, whose faults are those of its type, a frames payload's those of
-"ODRG files", then the canvas of a frames payload, the payload's length, and last the loop.
+"ODRG files" and a text's those of "Texts in ODRGX", then the canvas of a frames payload,
+the payload's length, and last the loop.
+
+## Texts in ODRGX
+
+Rules: [format.md](format.md), "The text payload".
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large` | The text is for a canvas whose picture, 3 * W * H bytes, is above 65,534. |
+| `truncated` | The payload ends before its settings, its text or a glyph is complete. |
+| `unknown-font` | The text names a font, or a version of it, that the reader does not have. |
+| `bad-settings` | A setting is outside its values: the effect, the motion, the alignments, the direction, wrapping, a speed that is not 1 to 240, a `static` text shown for less than 20 ms, more than 512 glyphs, a block of no width or height, or reserved bytes that are not 0. |
+| `bad-text` | The text has not 1 to 512 bytes, or they are not UTF-8. |
+| `payload-size` | The payload's length in the header is not 28 bytes, the text and 6 bytes for each glyph. |
+| `does-not-fit` | The block cannot be seen whole: a `static` or `slide` block larger than the canvas, or a moving one larger than the canvas across its motion. |
+| `bad-glyph` | A glyph is not in its font, or its cell is not in the block. |
+| `trailing-bytes` | Bytes follow the last glyph. |
+| `loop-mismatch` | The loop the header gives is not the pass of the text. |
+
+The payload is checked as it is read: the canvas, the settings in the order of their
+offsets, the payload's length against them, whether the block fits, the text, each glyph,
+the end, and last the loop.
 
 ## Sources that `encode` cannot write as ODRGX
 
 | Reason | Condition |
 |---|---|
-| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above. |
+| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above; or a text is for a canvas above 65,534 bytes. |
 | `loop-mismatch` | The loop would be longer than 4,294,967,295 milliseconds. |
+| `unsupported-character` | A text holds a character that no font has: anything but the printable ASCII characters, the 27 Hebrew letters and the line feed. The detail names each, with its code point. |
+| `does-not-fit` | A text's block cannot be seen whole with its effect and motion; the detail names the effects that show it. |
+
+## JSON sources of texts
+
+Rules: [format.md](format.md), "The JSON source of a text". A source is told from JSON
+frames by its member `type`.
+
+| Reason | Condition |
+|---|---|
+| `bad-json`, `missing-member`, `bad-type`, `bad-version`, `unknown-member` | As for JSON frames files. |
+| `unknown-type` | `type` is not `"text"`. |
+| `out-of-range` | A number or a name is outside its values: the canvas, `text` of not 1 to 512 bytes of UTF-8, a colour, the font, an alignment, the direction, the effect, the motion, `speed` not 1 to 240, `pause_ms` not 0 to 65,535, or below 20 for a `static` text. |
 
 ## Mapping files
 

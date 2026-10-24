@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "a\nb\nc\nd\ne\nf\ng\nh",
+  "font": "medium",
+  "color": 16764992,
+  "background": 16,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "marquee",
+  "motion": "up",
+  "speed": 15,
+  "pause_ms": 2000
+}

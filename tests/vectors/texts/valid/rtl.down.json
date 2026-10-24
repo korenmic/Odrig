@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "(מחיר: 3.14)",
+  "font": "small",
+  "color": 16764992,
+  "background": 16,
+  "align": "right",
+  "valign": "middle",
+  "direction": "rtl",
+  "wrap": false,
+  "effect": "pan",
+  "motion": "down",
+  "speed": 20,
+  "pause_ms": 300
+}
