@@ -1,11 +1,14 @@
 # Animation formats
 
-An animation exists in two formats:
+An animation exists in these formats:
 
 | Format | File | Role |
 |---|---|---|
 | JSON frames | `name.json` | The tracked source of the animation. Lossless and readable. Never played by the board. |
 | ODRG | `name.odrg` | The runtime format, produced from the JSON source by the converter. This is what the player reads, on the board and in the emulator. |
+| ODRGX | `name.odrgx` | The container of the runtime: a header that names what its payload is, and the payload. A payload of frames is an ODRG file as it is. |
+
+A reader tells ODRG and ODRGX apart by the first four bytes of a file, never by its name.
 
 Both describe the same thing: a list of full-canvas pictures, each shown for a number of
 milliseconds. Converting JSON to ODRG loses nothing: the two files show the same picture at
@@ -231,6 +234,43 @@ Every rejection has a fixed name. The names are listed in [reasons.md](reasons.m
 A decoder needs the N-byte pixel buffer and, for predictor 1, two pixels' worth of running
 values. It can read the file front to back without holding a whole frame record in memory.
 A compressed file adds the DEFLATE window (up to 32,768 bytes) and the inflate state.
+
+## ODRGX
+
+A binary file: a header of 20 bytes and the payload, nothing after it. All multi-byte
+integers are little-endian.
+
+| Offset | Size | Field | Value |
+|---:|---:|---|---|
+| 0 | 4 | Magic | The bytes `4F 44 52 58` ("ODRX"). |
+| 4 | 1 | Container version | 1. |
+| 5 | 1 | Type | The content type: 1, frames. |
+| 6 | 1 | Type version | The version of the content type: 1. |
+| 7 | 1 | Reserved | 0. |
+| 8 | 2 | Width | W, at least 1. |
+| 10 | 2 | Height | H, at least 1. |
+| 12 | 4 | Loop | The length of one loop in milliseconds, 1 to 4,294,967,295. |
+| 16 | 4 | Payload | P, the number of bytes after the header. |
+
+The container's version, the content type and the type's version are three numbers of
+their own: a new version of one type changes neither the others nor the container. The
+loop is in the header so that a reader that reads the headers only knows how long every
+file plays; a reader that reads the payload refuses a loop that is not the payload's.
+
+### The frames payload
+
+The payload of the type 1 is an ODRG file, as "ODRG" above describes it, for the canvas
+of the container. Its loop is the sum of the durations of its frames. It plays exactly as
+the ODRG file plays by itself.
+
+### What a reader rejects
+
+A file that ends inside the header, a wrong magic, a container version that is not 1, a
+reserved byte that is not 0, a type or a type version the reader does not know, a width or
+height of zero, a payload longer than its type allows, a payload that the rules of its type
+reject, a frames payload of another canvas, a payload whose length is not P, and a loop
+that is not the payload's. The names are listed in [reasons.md](reasons.md), "ODRGX
+files".
 
 ## Guidance for the converter
 

@@ -10,6 +10,7 @@ export * as inflate from "./inflate.js";
 export * as jsonframes from "./jsonframes.js";
 export * as mapping from "./mapping.js";
 export * as odrg from "./odrg.js";
+export * as odrgx from "./odrgx.js";
 export * as pack from "./pack.js";
 export * as show from "./show.js";
 export * as strictjson from "./strictjson.js";

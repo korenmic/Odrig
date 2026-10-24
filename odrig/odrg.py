@@ -39,12 +39,9 @@ class Decoded:
     modes: tuple[int, ...]
 
 
-def decode(data):
-    """Reads an ODRG file given as bytes.
-
-    The result has one `(duration, picture)` for every frame record, in order: the picture
-    the pixel buffer holds after that record.
-    """
+def header(data):
+    """The checked header of an ODRG file given as bytes, its first 16 bytes:
+    `(width, height, palette_size, frame_count, compressed, n)`."""
     if len(data) < HEADER.size:
         raise errors.Rejection(errors.TRUNCATED, f"the file ends inside the {HEADER.size}-byte header")
     magic, version, flags, width, height, palette_size, frame_count = HEADER.unpack_from(data)
@@ -66,8 +63,17 @@ def decode(data):
         )
     if frame_count == 0:
         raise errors.Rejection(errors.NO_FRAMES, "the frame count is 0")
+    return width, height, palette_size, frame_count, bool(flags & COMPRESSED), n
 
-    compressed = bool(flags & COMPRESSED)
+
+def decode(data):
+    """Reads an ODRG file given as bytes.
+
+    The result has one `(duration, picture)` for every frame record, in order: the picture
+    the pixel buffer holds after that record.
+    """
+    width, height, palette_size, frame_count, compressed, n = header(data)
+    bpp = 1 if palette_size else 3
     body = _Bytes(_inflated(data[HEADER.size:]) if compressed else data[HEADER.size:])
     palette = [body.take(3, "the palette") for _ in range(palette_size)]
 

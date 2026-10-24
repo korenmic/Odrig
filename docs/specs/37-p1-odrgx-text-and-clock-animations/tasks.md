@@ -36,7 +36,7 @@ Rules for every task:
     every character of the repertoire in both fonts; the core builds the tables.
   - Requirements: 3.3, 3.4, 9.1
 
-- [ ] 2. The container in the converter
+- [x] 2. The container in the converter
   - `converter/lib/odrgx.js`: the header, the frames payload, the reasons;
     `converter/lib/show.js`, `converter/lib/pack.js` and the CLI: `.odrgx` names,
     `encode`, `decode` and `check` of a frames container, `pack` with `X.json` for
