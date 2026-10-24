@@ -15,6 +15,11 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   button `Playlist from the start`, and one button for each installed animation, in the
   order of the playlist. Each installed animation has an `Include in playlist`
   checkbox and an Included or Ignored label. Explicit Play still plays an ignored item.
+  An animation that the installation found unavailable, because its file had a fault, is
+  drawn grayed with its reason in words under it, such as `Unavailable: the file is
+  damaged (truncated).`, and its button cannot be pressed; one of the external storage
+  adds `Fix it on a computer: the card is read-only here.` The other animations and
+  every other control work as ever, also when every animation is unavailable.
   Both Show and Storage report internal and external capacity; absent media and
   unavailable capacity are distinct, and external storage is read-only. Each line
   begins with the number of animations of that storage, as
@@ -27,7 +32,8 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   `animations not known`.
 - **The storage screen** says how much of the installation's storage is free, as
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
-  playlist, each with its id, its file name and its size in kilobytes, and a button
+  playlist, each with its id, its file name and its size in kilobytes, or `size not read
+  yet` while the installation has not read the file whole, and a button
   `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
   a GIF of the phone, and uploads it. Select checkboxes, `Select all` and `Clear selection`
   mark installed animations for `Delete selected`. External entries have no mutation

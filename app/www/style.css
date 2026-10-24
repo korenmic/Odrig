@@ -164,6 +164,15 @@ button[aria-pressed="true"] {
   color: var(--marked);
 }
 
+#animations .unavailable {
+  opacity: 0.55;
+}
+
+#animations .fault {
+  margin: 4px 0 0;
+  color: var(--lesser);
+}
+
 #animations .id {
   display: inline-block;
   min-width: 3ch;

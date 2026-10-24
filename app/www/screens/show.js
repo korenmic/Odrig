@@ -55,12 +55,28 @@ function row(animation) {
   made.dataset.id = String(animation.id);
   made.dataset.file = animation.file;
   made.dataset.editable = String(typeof animation.ignored === "boolean");
+  made.dataset.fault = animation.fault ?? "";
   const play = document.createElement("button");
   play.type = "button";
   play.dataset.id = String(animation.id);
   play.textContent = `${animation.id} ${animation.file}`;
   play.addEventListener("click", () => client.play(animation.id));
   made.append(play);
+  if (typeof animation.fault === "string") {
+    // An animation whose file had a fault: grayed, its reason in words, and no Play.
+    made.classList.add("unavailable");
+    play.disabled = true;
+    const why = document.createElement("p");
+    why.className = "fault";
+    why.textContent = messages.ofFault(animation.fault);
+    made.append(why);
+    if (typeof animation.ignored !== "boolean") {
+      const where = document.createElement("p");
+      where.className = "fault";
+      where.textContent = messages.MENDED_ELSEWHERE;
+      made.append(where);
+    }
+  }
   if (typeof animation.ignored === "boolean") {
     const label = document.createElement("label");
     label.className = "check";
@@ -95,7 +111,8 @@ function drawRows(animations, onTheLeds) {
   const shown = [...place.children];
   if (shown.length !== animations.length || shown.some((made, at) =>
       made.dataset.id !== String(animations[at].id) || made.dataset.file !== animations[at].file ||
-      made.dataset.editable !== String(typeof animations[at].ignored === "boolean"))) {
+      made.dataset.editable !== String(typeof animations[at].ignored === "boolean") ||
+      made.dataset.fault !== (animations[at].fault ?? ""))) {
     place.replaceChildren(...animations.map(row));
   }
   [...place.children].forEach((made, at) => {

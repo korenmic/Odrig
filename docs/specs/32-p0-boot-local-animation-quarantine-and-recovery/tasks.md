@@ -62,7 +62,7 @@ Rules for every task:
   - `docs/show.md`, `docs/core.md`, `docs/commands.md`; the memory figures.
   - Requirements: 3.2, 4.2, 5.4, 6.1, 6.2
 
-- [ ] 5. The app and the emulator
+- [x] 5. The app and the emulator
   - `app/www/commands.js`, `app/www/screens/show.js`, `app/www/messages.js`,
     `app/www/style.css`: `fault` and `bytes` of `null` accepted; a grayed row with its
     reason and a disabled Play; the drive's note.

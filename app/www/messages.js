@@ -17,6 +17,22 @@ export function ofInvalidShow(reason) {
   return `The installed show is invalid: ${reason}.`;
 }
 
+// Why an animation is unavailable, in words, from the reason the installation gives for
+// its file, which follows in brackets.
+export function ofFault(reason) {
+  const words = {
+    "file-missing": "the file is missing",
+    "read-error": "the file cannot be read",
+    "size-mismatch": "the file is made for another canvas",
+    "duplicate-id": "no id is left for it",
+  }[reason] ?? "the file is damaged";
+  return `Unavailable: ${words} (${reason}).`;
+}
+
+// The line under an unavailable file of external storage, which the installation does not
+// change.
+export const MENDED_ELSEWHERE = "Fix it on a computer: the card is read-only here.";
+
 // The line of the show screen while the target does not answer.
 export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
