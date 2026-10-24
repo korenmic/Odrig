@@ -9007,3 +9007,39 @@ changes the firmware runs the firmware's. A failure found at a seed's end is men
 commit of its own before the push.
 
 **Resolution.** The commits of the run say which suites ran.
+
+## Seed 38: The owner's question 7, the cables at the event
+
+**Question.** The seed's question 7 was the owner's: which socket powers the board at the
+event, the chip's own or the one marked COM, and is a computer on it? The first board
+session, with the Mac on the chip's own socket only, lost the card; the second, with both
+sockets on the Mac, did not. Task 9 waits for the answer.
+
+**Answer.** Decided under the owner's mandate for the run of 2026-10-24, which has every
+open question answered and recorded rather than asked: the firmware must work with one
+cable or with two, powered through either socket, with or without a computer on the
+other; and the board session checks the two-cable arrangement of today, both sockets on
+the Mac, for fifteen minutes, as step 4 of the design's "The board session" has it. A
+dropout seen with one cable is a fault of the card's code or its clock when the session
+shows a cause there, and the owner's otherwise, as "The dropouts of 2026-10-22 are found
+out, not solved" above says. Task 9 needs no further answer.
+
+**Resolution.** `project-seeds/38-p1-a-microsd-card-as-the-external-storage/seed.md`,
+"The Owner's Answers"; `docs/microsd.md`, "What is open".
+
+## Seed 38: The card's page and the two session records
+
+**Question.** The design folds the two records of `docs/microsd-preflight/` into
+`docs/microsd.md` "in full". The records hold the Mac's mount of the card's source folder,
+the local file names of the session logs under `build/`, and the steps of Codex's own
+checklists. What of them goes into the page?
+
+**Answer.** What the board showed and how it was asked: the cables and the sockets, the
+firmware's hash, every count, time and rate, the four files played with their ids, and
+what stayed unknown. The path of the Mac's mount, the names of the local logs, which are
+in an ignored folder of another worktree, and the checklists' steps stay out: the first
+two name nothing another computer has, and the third is this spec's `tasks.md`. The page
+says the board's serial devices by the names the Mac gave them, as `docs/firmware.md`
+does.
+
+**Resolution.** `docs/microsd.md`, "The board sessions".
