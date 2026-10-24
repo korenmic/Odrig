@@ -21,7 +21,7 @@ Rules for every task:
   of `docs/decisions.md`.
 - Answers to questions that come up go into `docs/drifts.md`.
 
-- [ ] 1. The regression: a status that says nothing of the check
+- [x] 1. The regression: a status that says nothing of the check
   - Set the seed's `state.json` to `in_progress`.
   - `tests/core/test_readiness.py`: a status during the check, after it with an
     unavailable animation, and of an invalid show is to report its readiness and counts;
