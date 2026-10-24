@@ -475,6 +475,10 @@ void drive_touch(Core &core) {
     core.drive_number = number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    if (number != 0 && core.host.drive_list != nullptr) {
+        // A host that lists the folder only when asked.
+        core.host.drive_list(core.host.ctx, number);
+    }
     char name[kDriveListedName];
     while (number != 0 && core.drive_count < kDriveMost &&
            core.host.drive_name(core.host.ctx, number, core.drive_count, name, sizeof name) == 1) {

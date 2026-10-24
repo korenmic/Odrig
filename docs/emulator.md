@@ -99,7 +99,7 @@ of the Python library of [python-library.md](python-library.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -127,6 +127,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
+| `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
@@ -175,18 +176,19 @@ python -m emulator build/demo-20/show --drive build/stick
 ```
 
 - The emulator looks for the folder `DIR/odrig` once a second. When it appears, a drive
-  is plugged in: its list is made then, of the files whose names end in `.odrg` or
-  `.odrgx`, in any case, and do not begin with a dot, in the order of their names, at most 256. When the
-  folder goes, the drive is pulled out. A folder `DIR` that is not there yet is no
-  error: the drive is plugged in once `DIR/odrig` is.
-- The list is made when the folder appears and not again while it stays, as the files of
-  a drive do not change while it is plugged in. To take up files added to it, move the
-  folder `odrig` away for two seconds and back.
+  is plugged in; when it goes, the drive is pulled out. A folder `DIR` that is not there
+  yet is no error: the drive is plugged in once `DIR/odrig` is.
+- The folder is listed when the core asks, for a drive without a catalog: the files whose
+  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order
+  of their names, at most 256. It is not listed again while it stays. To take up files
+  added to it, move the folder `odrig` away for two seconds and back.
+- The core may change the drive's files, by their names, unless `--drive-read-only` is
+  given: the files a change of the drive writes go into `DIR/odrig`.
 - The core reads the drive's files after the installed ones, while the show plays. Each
   sound one joins the playlist and `list` with an id from 60001 up once it has been read;
   one that is not is left out, and with `--verbose` the reason is printed, as
   `core: drive file broken.odrg left out: truncated`.
-- Nothing is written to `DIR`. `space` counts the folder of the show only.
+- `space` counts the folder of the show only.
 - The page's header names the folder `DIR` after `drive`.
 
 `--drive` does not go with `--record`: record mode has no drive.

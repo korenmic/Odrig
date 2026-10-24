@@ -847,7 +847,8 @@ uint32_t catalog_reply(const Core &core, Reply &reply) {
     }
     write_state(external, reply);
     if (external.state != kCatalogAbsent) {
-        reply.text(",\"writable\":false");
+        reply.text(",\"writable\":");
+        reply.text(core.host.drive_writable != nullptr && core.host.drive_writable(core.host.ctx, core.drive_number) == 1 ? "true" : "false");
     }
     reply.text("},\"rebuild\":null}\n");
     return reply.length;

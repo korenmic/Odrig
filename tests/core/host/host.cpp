@@ -74,7 +74,7 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --about TEXT\n"
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --about TEXT\n"
         "       --command-read-fails FILE OFFSET\n",
         stderr);
     return kUsage;
@@ -163,6 +163,8 @@ struct Options {
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
     std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
     long command_read_fails_offset = 0;     // command fails at this offset
+    bool drive_read_only = false;   // the drive cannot be written
+    bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
     std::string about;              // the text `about` gives; without one the host has no `about`
 };
@@ -224,19 +226,28 @@ public:
         functions.drive_name = drive ? drive_name : nullptr;
         functions.drive_space = nullptr;
         functions.about = options_.about.empty() ? nullptr : about;
+        functions.drive_list = drive ? drive_list : nullptr;
+        functions.drive_bind = drive ? drive_bind : nullptr;
+        functions.drive_writable = drive ? drive_writable : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
         return functions;
     }
 
-    // The drive: plugged in, with a new number and the list of its folder `odrig` as it is
-    // now, or pulled out. A drive plugged in with a folder stands for that folder from then
-    // on.
+    // The drive: plugged in, with a new number and no list until the core asks for one or
+    // gives the names, or pulled out. A drive plugged in with a folder stands for that
+    // folder from then on.
     void plug(const std::string &top = std::string()) {
         if (!top.empty()) {
             options_.drive = top;
         }
+        drive_names_.clear();
+        drive_number_ = ++drives_plugged_;
+    }
+
+    // Lists the folder `odrig` of the drive as it is now.
+    void list_drive() {
         drive_names_.clear();
         const std::string folder = options_.drive + "/odrig";
 #ifdef _WIN32
@@ -276,7 +287,6 @@ public:
             kept.resize(256);
         }
         drive_names_ = kept;
-        drive_number_ = ++drives_plugged_;
     }
 
     void pull() {
@@ -318,13 +328,80 @@ private:
         return static_cast<Host *>(ctx)->drive_number_;
     }
 
+    static int32_t drive_list(void *ctx, uint32_t drive) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (drive == 0 || drive != host.drive_number_) {
+            return -1;
+        }
+        host.list_drive();
+        if (host.options_.trace_drive) {
+            std::printf("drive list %zu\n", host.drive_names_.size());
+        }
+        return static_cast<int32_t>(host.drive_names_.size());
+    }
+
+    static int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (name == nullptr || place >= 256) {
+            stop("file misuse", kFileMisuse);
+        }
+        if (drive == 0 || drive != host.drive_number_ || !drive_name_sound(name)) {
+            return 0;
+        }
+        if (host.drive_names_.size() <= place) {
+            host.drive_names_.resize(place + 1);
+        }
+        host.drive_names_[place] = name;
+        if (host.options_.trace_drive) {
+            std::printf("drive bind %u %s\n", place, name);
+        }
+        return 1;
+    }
+
+    static int drive_writable(void *ctx, uint32_t drive) {
+        guard::InHost lowered;
+        const Host &host = *static_cast<Host *>(ctx);
+        return drive != 0 && drive == host.drive_number_ && !host.options_.drive_read_only ? 1 : 0;
+    }
+
+    // Whether a name is one a file of the drive may have: 1 to 100 bytes of printable
+    // ASCII other than / \ : * ? " < > |, not beginning with a dot.
+    static bool drive_name_sound(const char *name) {
+        const size_t length = std::strlen(name);
+        if (length == 0 || length > 100 || name[0] == '.') {
+            return false;
+        }
+        for (const char *at = name; *at != '\0'; ++at) {
+            if (*at < 0x20 || *at > 0x7E || std::strchr("/\\:*?\"<>|", *at) != nullptr) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a name of the drive names a place, `drive/<digits>`, and not a file by its name.
+    static bool names_a_place(const char *name) {
+        const char *rest = name + 6;
+        if (*rest == '\0') {
+            return false;
+        }
+        for (; *rest != '\0'; ++rest) {
+            if (*rest < '0' || *rest > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
         if (buffer == nullptr || capacity == 0) {
             stop("file misuse", kFileMisuse);
         }
-        if (drive == 0 || drive != host.drive_number_ || place >= host.drive_names_.size()) {
+        if (drive == 0 || drive != host.drive_number_ || place >= host.drive_names_.size() || host.drive_names_[place].empty()) {
             return 0;
         }
         const std::string &name = host.drive_names_[place];
@@ -334,9 +411,12 @@ private:
         return 1;
     }
 
-    // The file of the drive a name `drive/<place>` stands for, or an empty text when the
-    // drive has no file at that place.
+    // The file of the drive a name `drive/<place>` or `drive/<name>` stands for, or an empty
+    // text when the drive has no file at that place or is not plugged in.
     std::string drive_file(const char *name) const {
+        if (!names_a_place(name)) {
+            return drive_number_ != 0 ? std::string(name + 6) : "";
+        }
         const char *place = name + 6;
         size_t at = 0;
         for (const char *digit = place; *digit != '\0'; ++digit) {
@@ -679,12 +759,27 @@ private:
         return (is_open_ && open_name_ == name) || (writing_ && writing_name_ == name);
     }
 
-    std::string path_of(const std::string &name) const { return folder_ + "/" + name; }
+    std::string path_of(const std::string &name) const {
+        if (of_the_drive(name.c_str())) {
+            return options_.drive + "/odrig/" + name.substr(6);
+        }
+        return folder_ + "/" + name;
+    }
+
+    // Whether a storage call may change a file of this name: one of the drive only while
+    // the drive can be written.
+    bool may_change(const char *name) const {
+        return !of_the_drive(name) || (drive_number_ != 0 && !options_.drive_read_only && !names_a_place(name));
+    }
 
     // The files as they are stored: in the folder, or in the set held in memory.
 
     bool begin_file(const char *name) {
-        if (from_ == kFromFiles) {
+        writing_drive_ = of_the_drive(name);
+        if (!may_change(name)) {
+            return false;
+        }
+        if (from_ == kFromFiles && !writing_drive_) {
             files_[name].clear();
             return true;
         }
@@ -694,7 +789,7 @@ private:
 
     // Adds bytes to the file being written, so that they are there when the program ends.
     bool add_bytes(const uint8_t *bytes, size_t length) {
-        if (from_ == kFromFiles) {
+        if (from_ == kFromFiles && !writing_drive_) {
             files_[writing_name_].append(reinterpret_cast<const char *>(bytes), length);
             return true;
         }
@@ -702,7 +797,7 @@ private:
     }
 
     bool end_file() {
-        if (from_ == kFromFiles) {
+        if (from_ == kFromFiles && !writing_drive_) {
             return true;
         }
         std::FILE *file = written_;
@@ -711,7 +806,10 @@ private:
     }
 
     bool rename_file(const char *from, const char *to) {
-        if (from_ == kFromFiles) {
+        if (!may_change(from) || !may_change(to) || of_the_drive(from) != of_the_drive(to)) {
+            return false;
+        }
+        if (from_ == kFromFiles && !of_the_drive(from)) {
             auto file = files_.find(from);
             if (file == files_.end()) {
                 return false;
@@ -730,7 +828,10 @@ private:
 
     // 1 when a file was removed, 0 when there was none, -1 otherwise.
     int remove_file(const char *name) {
-        if (from_ == kFromFiles) {
+        if (!may_change(name)) {
+            return -1;
+        }
+        if (from_ == kFromFiles && !of_the_drive(name)) {
             return files_.erase(name) != 0 ? 1 : 0;
         }
 #ifdef _WIN32
@@ -843,6 +944,7 @@ public:
     uint32_t drive_number_ = 0;
     uint32_t drives_plugged_ = 0;
     std::vector<std::string> drive_names_;
+    bool writing_drive_ = false;    // the file being written is one of the drive
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
@@ -1533,6 +1635,12 @@ int main(int argc, char **argv) {
                 at += 2;
             } else if (arguments[at] == "--drive-pulled") {
                 options.drive_pulled = true;
+                ++at;
+            } else if (arguments[at] == "--drive-read-only") {
+                options.drive_read_only = true;
+                ++at;
+            } else if (arguments[at] == "--trace-drive") {
+                options.trace_drive = true;
                 at += 1;
             } else if (arguments[at] == "--drive-read-fails" && at + 2 < arguments.size() &&
                        whole_number(arguments[at + 2], &options.drive_read_fails_offset)) {

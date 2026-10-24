@@ -89,6 +89,9 @@ Every function receives `ctx` as its first argument.
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
 | `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
+| `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` now, as `drive_name` describes the list, and returns the number of its animation files, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
+| `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
+| `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -727,7 +730,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,704 |
+| The core object | fixed | 3,728 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -744,17 +747,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,237** |
+| **Total** | | **125,261** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,714 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,738 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,441 bytes for the target file. A host with a drive
+of the check and the saved order: 77,465 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 129,717 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 129,741 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -815,7 +818,7 @@ leg; and `ready`.
 | `bytes <ms> <hex>` | `odrig_core_feed` with these bytes | `fed <hex of the line>` and `reply <json>` for each line |
 | `error` | `odrig_core_error` | `error <text>` or `error none` |
 | `fault` | Reads the context the core keeps of the latest fault of a file | `fault <work> <record> <bytes> <reason> <name>`, the work `start`, `play`, `upload` or `drive`; or `fault none` |
-| `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one and the list of the folder as it is now. The core sees it at its next refresh. | nothing |
+| `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one; its folder is listed when the core calls `drive_list`, as it is then. The core sees it at its next refresh. | nothing |
 | `drive plug <folder>` | With `--drive`: as `drive plug`, with a drive that stands for this folder from then on. | nothing |
 | `drive pull` | With `--drive`: the drive is pulled out. | nothing |
 
@@ -846,6 +849,8 @@ leg; and `ready`.
 | `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
+| `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
+| `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
 `space` and `read_at` are not counted and not traced. The storage functions work on the

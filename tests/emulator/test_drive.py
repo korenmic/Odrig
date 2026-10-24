@@ -40,7 +40,7 @@ class TheOption(unittest.TestCase):
         support.installed(folder, {f"{index:03d}.odrg": b"" for index in range(300)})
         self.assertEqual(len(host.drive_list(folder)), 256)
 
-    def test_the_folder_is_looked_for_once_a_second_and_its_list_is_made_when_it_appears(self):
+    def test_the_folder_is_looked_for_once_a_second_and_listed_when_the_core_asks(self):
         now = [0.0]
         drive = host.Drive(self.work, clock=lambda: now[0])
         self.assertEqual(drive.look(), 0)
@@ -48,7 +48,9 @@ class TheOption(unittest.TestCase):
         now[0] = 0.5
         self.assertEqual(drive.look(), 0)
         now[0] = 1.0
-        self.assertEqual((drive.look(), drive.name(1, 0), drive.name(1, 1)), (1, "a.odrg", None))
+        self.assertEqual((drive.look(), drive.name(1, 0)), (1, None))
+        self.assertEqual(drive.list(1), 1)
+        self.assertEqual((drive.name(1, 0), drive.name(1, 1)), ("a.odrg", None))
         support.installed(self.work / "odrig", {"b.odrg": b""})
         now[0] = 2.0
         self.assertEqual((drive.look(), drive.names), (1, ["a.odrg"]))
@@ -57,7 +59,7 @@ class TheOption(unittest.TestCase):
         self.assertEqual((drive.look(), drive.name(1, 0), drive.path("drive/0")), (0, None, None))
         support.installed(self.work / "odrig", {"b.odrg": b""})
         now[0] = 4.0
-        self.assertEqual((drive.look(), drive.names, drive.path("drive/0")), (2, ["b.odrg"], str(self.work / "odrig" / "b.odrg")))
+        self.assertEqual((drive.look(), drive.list(2), drive.names, drive.path("drive/0")), (2, 1, ["b.odrg"], str(self.work / "odrig" / "b.odrg")))
 
 
 class AnEmulatorWithADrive(unittest.TestCase):

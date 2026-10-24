@@ -60,7 +60,7 @@ Rules for every task:
     change at 16, 64 and 256 entries.
   - Prove it fails first.
 
-- [ ] 5. The hosts: listing on demand, names given, a drive that can be written
+- [x] 5. The hosts: listing on demand, names given, a drive that can be written
   - `odrig_host`: `drive_list`, `drive_bind`, `drive_writable`; `drive/<name>` in the
     file functions. The test host (`--drive-read-only`, `drive_list` traced) and the
     emulator (`emulator/host.py`, `binding.py`, `--drive-read-only`). The core calls
