@@ -38,6 +38,7 @@ SPACE = CFUNCTYPE(c_int, c_void_p, POINTER(c_uint32), POINTER(c_uint32))
 READ_AT = CFUNCTYPE(c_int32, c_void_p, c_char_p, c_uint32, POINTER(c_uint8), c_size_t)
 DRIVE = CFUNCTYPE(c_uint32, c_void_p)
 DRIVE_NAME = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, POINTER(c_char), c_size_t)
+DRIVE_SPACE = CFUNCTYPE(c_int, c_void_p, c_uint32, POINTER(c_uint64), POINTER(c_uint64))
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -47,7 +48,7 @@ class HostRecord(Structure):
     _fields_ = [
         ("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG),
         ("write_open", WRITE_OPEN), ("write", WRITE), ("write_close", WRITE_CLOSE), ("rename", RENAME), ("remove", REMOVE),
-        ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME),
+        ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME), ("drive_space", DRIVE_SPACE),
     ]
 
 
@@ -120,6 +121,7 @@ class Core:
             self._functions += (DRIVE(self._drive), DRIVE_NAME(self._drive_name))
         else:
             self._functions += (DRIVE(), DRIVE_NAME())
+        self._functions += (DRIVE_SPACE(self._drive_space) if hasattr(host, "drive_space") else DRIVE_SPACE(),)
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -192,6 +194,13 @@ class Core:
 
     def _drive(self, _ctx):
         return self._host.drive_number()
+
+    def _drive_space(self, _ctx, generation, free_bytes, total_bytes):
+        told = self._host.drive_space(generation)
+        if told is None or any(type(value) is not int or value < 0 or value > 2**64 - 1 for value in told):
+            return -1
+        free_bytes[0], total_bytes[0] = told
+        return 1
 
     def _drive_name(self, _ctx, drive, place, buffer, capacity):
         name = self._host.drive_name(drive, place)

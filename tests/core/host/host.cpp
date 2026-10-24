@@ -213,6 +213,7 @@ public:
         const bool drive = changes && !options_.drive.empty();
         functions.drive = drive ? drive_number : nullptr;
         functions.drive_name = drive ? drive_name : nullptr;
+        functions.drive_space = nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }

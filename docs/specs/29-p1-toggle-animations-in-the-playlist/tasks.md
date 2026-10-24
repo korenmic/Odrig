@@ -22,7 +22,7 @@ failing before fixes. No flash, phone installation or external-drive writes.
   - Verify: core suite by discovery, converter/library suite and packaged diagonal check.
   - Requirements: 1.2–1.5, 2.1–2.3, 4.2.
 
-- [ ] 3. Add shared capacity reporting and route every new command
+- [x] 3. Add shared capacity reporting and route every new command
   - Add optional 64-bit drive capacity callback, safe core schema, emulator filesystem
     capacity and firmware read-only FAT capacity query. Update host fixtures/layouts.
   - Extend odrigctl, emulator reference behavior and protocol routing regressions.

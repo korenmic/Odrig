@@ -142,7 +142,18 @@ uint32_t content_space(const Core &core, Reply &reply) {
     reply.number(total_bytes);
     reply.text(",\"animations\":");
     reply.number(animations);
-    reply.text("}\n");
+    const uint32_t generation = core.host.drive != nullptr && core.host.drive_name != nullptr && storage_changes(core) ? core.host.drive(core.host.ctx) : 0;
+    uint64_t external_free = 0, external_total = 0;
+    const bool known = generation != 0 && core.host.drive_space != nullptr &&
+        core.host.drive_space(core.host.ctx, generation, &external_free, &external_total) == 1 &&
+        external_free <= external_total && external_total <= 9007199254740991ull;
+    reply.text(",\"external\":{\"present\":");
+    reply.text(generation != 0 ? "true" : "false");
+    reply.text(",\"free\":");
+    if (known) reply.number(external_free); else reply.text("null");
+    reply.text(",\"total\":");
+    if (known) reply.number(external_total); else reply.text("null");
+    reply.text(",\"read_only\":true}}\n");
     return reply.length;
 }
 

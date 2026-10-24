@@ -66,7 +66,7 @@ A number in a command is written in decimal digits.
 
 ```
 space
-{"ok":true,"free":11517952,"total":13500416,"animations":2}
+{"ok":true,"free":11517952,"total":13500416,"animations":2,"external":{"present":false,"free":null,"total":null,"read_only":true}}
 ```
 
 `free` and `total` are bytes of the storage the show is in. `animations` is the number of
@@ -272,3 +272,11 @@ malformed lists return bad-argument. Single `remove <id>` retains cycle deletion
 Both mutation forms return busy during startup checking, upload or mapping test;
 show-invalid and storage-error retain their meanings. Every transport forwards these
 commands into the same core parser; no route has separate deletion/playback rules.
+
+### External storage capacity
+
+`space` retains its internal `free`, `total` and installed `animations` count, including
+ignored items. Its `external` object contains boolean `present`, `read_only:true`, and
+nullable `free` and `total` byte counts. Absent media reports false/null/null. Mounted
+media with unknown capacity reports true/null/null. Known counters support volumes
+over 4 GiB, up to 9,007,199,254,740,991 bytes. Capacity never grants write access to a drive.

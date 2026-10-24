@@ -81,3 +81,11 @@ packaged diagonal diagnostic. WLED's adapter refreshes cached RGB pointers by fi
 physical pin under its core lock; the standalone output adapter uses the same pin
 lookup contract. The complete standalone player is still pending seed 12. No new
 firmware has been flashed or checked on real LEDs for these controls yet.
+
+## Shared playlist and capacity support
+
+The shared core owns persisted inclusion and batch deletion on every route. The drive
+adapter adds only a read-only FAT capacity query, using 64-bit byte arithmetic; all
+space JSON is produced by the core. The tracked MSC VFS copy exposes this capacity
+helper; its mount/unmount and licence remain unchanged. The standalone trial still
+has no external drive adapter and does not claim complete player functionality.

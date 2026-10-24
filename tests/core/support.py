@@ -1118,7 +1118,7 @@ class ReferencePlayer:
 
     def _space(self):
         animations = 0 if self.error is not None else sum(1 for item in self.items.values() if item.cycle is None)
-        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations}
+        state = {"ok": True, "free": free_space(self.files, self.storage), "total": self.storage, "animations": animations, "external": {"present": False, "free": None, "total": None, "read_only": True}}
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def _status(self, now):

@@ -87,6 +87,7 @@ Every function receives `ctx` as its first argument.
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
+| `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -115,7 +116,7 @@ The last seven members are the storage functions: three that write a file, `rena
   function than writing, renaming and removing, because `open`, `read` and `close` hold
   the one file that plays.
 
-The last two members are the drive. A host with a drive sets both, and has storage that
+The drive and drive_name members describe the drive. A host with a drive sets both, and has storage that
 can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
 drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
 the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash. A
@@ -537,7 +538,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,376 |
+| The core object | fixed | 3,384 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -553,15 +554,15 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Items | 16 for each of 132: the items and room for 32 more, 128 at least | 2,112 |
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
-| **Total** | | **124,621** |
+| **Total** | | **124,629** |
 
 That is 95 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,008 of them. The example show on the two-leg mapping asks for 88,106 bytes. A host
+46,008 of them. The example show on the two-leg mapping asks for 88,114 bytes. A host
 without storage that can be changed is not asked for the chunk buffer and the three
-blocks of the check: 77,113 bytes for the target file. A host with a drive is asked for
+blocks of the check: 77,121 bytes for the target file. A host with a drive is asked for
 one block more, after the three of the check: the drive's table, 16 bytes for each of
-256 places, 4,096 bytes. With it the target file takes 128,717 bytes, 98 percent. The size and the number of frames
+256 places, 4,096 bytes. With it the target file takes 128,725 bytes, 98 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

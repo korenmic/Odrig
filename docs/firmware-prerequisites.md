@@ -91,3 +91,5 @@ Their folders are in `project-seeds/`; none has a spec yet.
 
 Without a seed, an OTG adapter with a power socket and only one USB-A socket would let the
 firmware as it is read a stick: the owner buys one, and seed 20's task 4 tries it.
+
+Capacity queries use the pinned MSC VFS adapter and FatFs headers already supplied by the build. No new SDK, wiring, storage layout or board action is required.

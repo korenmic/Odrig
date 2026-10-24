@@ -1749,3 +1749,5 @@ Both command transports and a complete refresh copy use the core lock, so a save
 cannot split a frame between two assignments. The standalone output adapter follows
 the same pin lookup contract. Its current main program remains a seed-12 trial,
 not a complete standalone player or evidence that app control works on that trial.
+
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never writes or formats removable media. Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.
