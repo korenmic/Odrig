@@ -80,7 +80,7 @@ Rules for every task:
   - `docs/emulator.md`, `docs/commands.md`.
   - Requirements: 5.3
 
-- [ ] 6. The documents
+- [x] 6. The documents
   - `docs/firmware.md`: "Changing what the board holds": flashing, a change by command, a
     change by image, the quarantine, the board's check and the recovery of storage, with
     the step that cannot be cancelled, what the kept images bring back and what not, and
