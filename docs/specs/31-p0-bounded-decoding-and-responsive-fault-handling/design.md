@@ -97,7 +97,7 @@ on the board.
 
 ## The reproducer
 
-`tests/vectors/make_huge_tail.py` writes the reproducer: a compressed ODRG file on a 60 x 60
+`tests/core/huge_tail.py` writes the reproducer (`python3 -m tests.core.huge_tail OUT`): a compressed ODRG file on a 60 x 60
 canvas with a palette of two colours, whose first frame record holds the index 255, and
 whose stream inflates 64 MiB of zeros after it, made with Python's `zlib`. The core's tests
 and the emulator's tests make it into a temporary folder; it is not tracked as a file, and
@@ -105,8 +105,9 @@ no tool installs it on the board.
 
 ## Tests
 
-- `tests/core/test_bounded.py`: before the change, one `poll` of a show with the reproducer
-  lasts more than 200 ms on the Mac; after it, none lasts more than 20 ms, and the file's
+- `tests/core/test_bounded.py`, with the test host's `--trace-calls`, which prints what each
+  call read of files (the host has no clock): before the change, one `poll` of a show with
+  the reproducer reads the whole file; after it, no call reads more than 4 KiB, and the file's
   reason is `bad-palette-index` in the end, as `found_in` gives it. Every vector of
   `tests/vectors` gives its reason through the host built with slices of 7 bytes. A clip
   of frames of 1 ms after a pause of ten seconds catches up over several refreshes and

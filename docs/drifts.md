@@ -8992,3 +8992,18 @@ and is taken off again. The check at the start of a host that cannot change its 
 the emulator's record mode, still reads whole files in one call: nothing waits on it.
 
 **Resolution.** The spec's design, "Budgets and their reasons"; task 5.
+
+## The serial run of 2026-10-24: which suites before a commit
+
+**Question.** Every task's rules say to run every suite before its commit, about seventeen
+minutes; the owner's run of 2026-10-24 has about forty tasks in eight hours. Every suite
+before every commit, or not?
+
+**Answer.** Every suite at the end of each seed, before its branch is pushed, and before
+each task's commit the suites of the parts the task changed, always the core's, the
+onboarding's and the documents' tests among them. A task that changes the core runs the
+core's and the emulator's suites; one that changes the app runs the app's; one that
+changes the firmware runs the firmware's. A failure found at a seed's end is mended in a
+commit of its own before the push.
+
+**Resolution.** The commits of the run say which suites ran.

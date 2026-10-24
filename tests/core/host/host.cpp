@@ -64,7 +64,7 @@ int usage() {
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
         "options of a session:\n"
-        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --check-first\n"
+        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --trace-calls  --check-first\n"
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
         "       --remove-after FILE N  --swap-after FILE N OTHER\n"
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
@@ -156,6 +156,7 @@ struct Options {
     bool drive_pulled = false;      // the drive is not plugged in at the start
     std::string drive_read_fails_file;  // the file of the drive whose reading with `read`
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
+    bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -427,6 +428,7 @@ private:
         }
         std::memcpy(buffer, host.content_.data() + host.offset_, count);
         host.offset_ += count;
+        host.call_bytes_ += count;
         return static_cast<int32_t>(count);
     }
 
@@ -591,6 +593,7 @@ private:
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
         host.read_at_name_ = name;
         host.read_at_end_ = offset + static_cast<uint32_t>(count);
+        host.call_bytes_ += count;
         return static_cast<int32_t>(count);
     }
 
@@ -787,6 +790,7 @@ private:
 public:
     bool checks_first() const { return options_.check_first; }
     bool has_drive() const { return !options_.drive.empty(); }
+    bool traces_calls() const { return options_.trace_calls; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -815,6 +819,7 @@ public:
     long alloc_calls_ = 0;
     size_t bytes_given_ = 0;
     std::vector<void *> blocks_;
+    uint64_t call_bytes_ = 0;       // what `read` and `read_at` gave since the last call's end
 };
 
 // Prints every name reason_name can return, one per line.
@@ -1108,6 +1113,7 @@ private:
             length = odrig_core_command(core_, now, line.data(), line.size(), reply.data(), reply.size());
         }
         print_reply(reply.data(), length);
+        trace_call();
     }
 
     // Bytes of a transport. Prints `fed <hex of the line>` and `reply <json>` for every
@@ -1136,6 +1142,14 @@ private:
         return true;
     }
 
+    // With `--trace-calls`, prints what the call that has just ended read of files.
+    void trace_call() {
+        if (host_.traces_calls()) {
+            std::printf("call %llu\n", static_cast<unsigned long long>(host_.call_bytes_));
+        }
+        host_.call_bytes_ = 0;
+    }
+
     // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
     void poll(uint64_t now) {
         int produced;
@@ -1143,6 +1157,7 @@ private:
             guard::InCore inside;
             produced = odrig_core_poll(core_, now);
         }
+        trace_call();
         if (!produced) {
             std::printf("idle %llu\n", static_cast<unsigned long long>(now));
             return;
@@ -1380,6 +1395,9 @@ int main(int argc, char **argv) {
                 at += 1;
             } else if (arguments[at] == "--trace-reads") {
                 options.trace_reads = true;
+                at += 1;
+            } else if (arguments[at] == "--trace-calls") {
+                options.trace_calls = true;
                 at += 1;
             } else if (arguments[at] == "--check-first") {
                 options.check_first = true;

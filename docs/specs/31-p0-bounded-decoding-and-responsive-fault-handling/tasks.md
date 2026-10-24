@@ -18,11 +18,11 @@ Rules for every task:
 - No command is added and no reply changes. The format does not change.
 - Answers to questions that come up go into `docs/drifts.md`.
 
-- [ ] 1. The reproducer and the unbounded call
+- [x] 1. The reproducer and the unbounded call
   - Set the seed's `state.json` to `in_progress`.
-  - `tests/vectors/make_huge_tail.py`; `tests/core/test_bounded.py` with the test of the
-    longest call, which fails before task 2.
-  - Prove it fails first: one `poll` with the reproducer lasts more than 200 ms.
+  - `tests/core/huge_tail.py`; the test host's `--trace-calls`; `tests/core/test_bounded.py`
+    with the test of the most a call reads, which fails before task 2.
+  - Prove it fails first: one `poll` with the reproducer reads the whole file.
   - This task's commit holds the failing test marked as an expected failure, and task 2
     removes the mark.
   - Requirements: 7.1, 7.2
