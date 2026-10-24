@@ -371,9 +371,12 @@ refresh, at one step in ten refreshes.
 A fault the check finds quarantines the file from that refresh on, and the check goes on
 with the next file; that refresh shows what it shows. A file that cannot be read back is
 `read-error`, whether it is damaged or gone: `read_at` has one answer for both. A file
-the player quarantined first is not read by the check. Until the last file is read, `list`, `remove` and `upload begin` are answered with
-`busy`, and every other command works. Once the check is complete it stays so until the
-next start: a file that an upload adds was read by the upload's own check.
+the player quarantined first is not read by the check. Every command works while the
+check goes on. `list` gives the `bytes` of a file not read whole yet as `null`. An upload
+takes the second decoders: the check takes no step while it is open and then begins the
+file it was in again. A file an upload installs was read by the upload's own check and is
+not read again; a removal keeps the check at the file it was at. Once the check is
+complete it stays so until the next start.
 
 The player can come to a fault before the check does, in the animation that is playing.
 It shows the frames before the fault, and quarantines the file at the refresh whose time

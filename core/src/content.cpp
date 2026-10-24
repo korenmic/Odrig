@@ -48,7 +48,7 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
     if (!item.is_cycle) {
         const FileInfo &file = core.files[item.first];
         const Reason fault = static_cast<Reason>(file.fault);
-        const uint32_t bytes = fault != kNone ? 4 : digits(file.bytes);
+        const uint32_t bytes = fault != kNone || !file.checked ? 4 : digits(file.bytes);
         const uint32_t fault_size = fault != kNone ? text_length(kListFault) + text_length(reason_name(fault)) + 1 : 0;
         return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) + fault_size + 1;
     }
@@ -222,7 +222,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListFile);
             reply.text(file.name);
             reply.text(kListBytes);
-            if (file.fault != kNone) {
+            if (file.fault != kNone || !file.checked) {
                 reply.text("null");
             } else {
                 reply.number(file.bytes);
@@ -410,7 +410,8 @@ bool content_write_show(Core &core, const ShowChange &change) {
 
 namespace {
 
-// The file of an upload whose check has passed: a new content, which is usable.
+// The file of an upload whose check has passed: a new content, which is usable and was
+// read whole.
 void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms) {
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
@@ -418,6 +419,7 @@ void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_m
     }
     file.name[length] = '\0';
     file.fault = kNone;
+    file.checked = 1;
     file.bytes = bytes;
     file.total_ms = total_ms;
 }
@@ -471,6 +473,7 @@ void content_take_out(Core &core, uint32_t position) {
             const uint32_t after = removed.first + 1;
             memmove(core.files + removed.first, core.files + after, (core.file_count - after) * sizeof(FileInfo));
             --core.file_count;
+            check_file_left(core, removed.first);
             for (uint32_t item = 0; item < core.item_count; ++item) {
                 if (!core.items[item].is_cycle && core.items[item].first > removed.first) {
                     --core.items[item].first;

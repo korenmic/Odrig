@@ -9190,3 +9190,17 @@ stays 96 bytes, though its longest text is 24 characters now.
 
 **Resolution.** `tests/core/support.py`, `tests/emulator/support.py`, `docs/emulator.md`,
 `core/src/player.cpp`.
+
+## Seed 32: how a client knows the check has ended
+
+**Question.** Tests and tools waited for the end of the check after the start by asking
+`list` until it was no longer `busy`. `list` is answered at once now. What tells the end?
+
+**Answer.** `list` gives `"bytes":null` for a file not read whole yet; once every listed
+animation has its size or a `fault`, the check has passed every file. The emulator's test
+support waits for that, and the app's storage screen shows `size not read yet` in place
+of a size. `remove`, `remove many`, `ignore` and `upload` are answered during the check;
+an upload holds the check until it ends. Seed 33 reports the check's progress itself.
+
+**Resolution.** `tests/emulator/support.py`, `app/www/screens/storage.js`,
+`docs/commands.md`.

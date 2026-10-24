@@ -78,7 +78,7 @@ def logged(run):
     return list(run.logs) + [line[len("log "):] for line in run.lines if line.startswith("log ")]
 
 
-class AsTheReference(unittest.TestCase):
+class Compared:
     """Sessions on the core and on the reference player, compared line by line, the lines
     of the log among them."""
 
@@ -96,6 +96,8 @@ class AsTheReference(unittest.TestCase):
     def asked(self, time, *commands):
         return [support.line(T0 + time, command) for command in commands]
 
+
+class AsTheReference(Compared, unittest.TestCase):
     def test_a_bad_file_at_the_start_or_found_by_the_check(self):
         for name, (data, reason) in bad_files().items():
             for check_first in (True, False):
@@ -188,6 +190,36 @@ class NotReadAgain(unittest.TestCase):
         state, listed = replies(run)
         self.assertEqual((state["error"], state["animation"]), (None, 2))
         self.assertEqual(listed["items"][0]["fault"], "read-error")
+
+
+
+class RepairDuringTheCheck(Compared, unittest.TestCase):
+    def files(self):
+        """A long first animation, which keeps the check busy, a second with a bad header,
+        and a third."""
+        return show_of([{"id": 1, "file": "long.odrg"}, {"id": 2, "file": "b.odrg"}, {"id": 3, "file": "c.odrg"}],
+                       {"long.odrg": support.clip(4, WIDTH, HEIGHT, (20,) * 400), "b.odrg": b"ODRX" + good(2)[4:], "c.odrg": good(3)})
+
+    def test_a_bad_animation_is_replaced_while_the_check_goes_on_and_the_check_ends(self):
+        data = good(5)
+        script = every_20_ms(10) + [support.line(T0 + 200, line) for line in support.upload_lines(2, "b.odrg", data)]
+        script += every_20_ms(10, start=220) + self.asked(420, support.upload_end(data), "list", "play 2")
+        script += every_20_ms(60, start=440) + self.asked(1640, "list", "status")
+        run = self.compare(self.files(), script, check_first=False)
+        ended, during, played, after, state = replies(run)[-5:]
+        self.assertEqual(ended, {"ok": True})
+        self.assertEqual([item.get("fault") for item in during["items"]], [None, None, None])
+        self.assertIsNone(during["items"][0]["bytes"])
+        self.assertEqual(played, {"ok": True})
+        self.assertNotIn(None, [item["bytes"] for item in after["items"]])
+        self.assertEqual(state["animation"], 2)
+
+    def test_ignore_and_remove_many_are_answered_during_the_check(self):
+        script = every_20_ms(3) + [support.line(T0 + 60, command) for command in ("ignore 3 1", "remove many 2,3", "list")]
+        run = support.start(self.files(), script, check_first=False)
+        ignored, removed, listed = replies(run)
+        self.assertEqual((ignored, removed), ({"ok": True}, {"ok": True}))
+        self.assertEqual([item["id"] for item in listed["items"]], [1])
 
 
 if __name__ == "__main__":

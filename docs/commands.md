@@ -103,9 +103,9 @@ read, and is not refused with `busy` for them. [show.md](show.md#animations-from
 says what the board does with a drive.
 
 After a start the show plays at once, and the player reads every installed animation to
-its end while it plays. Until it has, it does not know the sizes of the files, and
-`list` is refused with `busy`: ask again a moment later. `status` and `space` are
-answered from the start.
+its end while it plays. Until it has read a file whole it does not know its size: `list`
+gives its `bytes` as `null` until then. `list`, `remove`, `remove many`, `ignore` and
+`upload` are answered from the start, as `status` and `space` are.
 
 ## Removing an item
 
@@ -125,8 +125,7 @@ The item leaves the show, and the items after it move up.
 - If the item is the cycle that is playing, the playlist plays, from its first animation.
 - Anything else that plays goes on undisturbed.
 - The animation's file is deleted when no remaining item names it.
-- While an upload is open, `remove` is refused with `busy`. So it is after a start,
-  until the player has read every installed animation to its end.
+- While an upload is open, `remove` is refused with `busy`.
 
 ## Uploading an animation
 
@@ -155,8 +154,7 @@ whichever route its commands arrive by.
 - `<file>` is the name the file gets, under the naming rule of [show.md](show.md).
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
-- It is refused with `busy` when an upload is open, and after a start until the player
-  has read every installed animation to its end; with `in-use` when the id belongs to a
+- It is refused with `busy` when an upload is open; with `in-use` when the id belongs to a
   cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
@@ -204,7 +202,7 @@ succeeds.
 | `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
+| `busy` | `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, or a cycle that lists only such. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
@@ -274,7 +272,7 @@ cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-
 per command. Every id is validated first; unknown ids return unknown-id; cycles,
 external entries and animations referenced by cycles return in-use. Duplicates and
 malformed lists return bad-argument. Single `remove <id>` retains cycle deletion.
-Both mutation forms return busy during startup checking, upload or mapping test;
+Both mutation forms return busy during an upload or the mapping test;
 show-invalid and storage-error retain their meanings. Every transport forwards these
 commands into the same core parser; no route has separate deletion/playback rules.
 

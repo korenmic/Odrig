@@ -84,6 +84,12 @@ class BodyFaults(unittest.TestCase):
             if word == "data":
                 self.assertTrue(any(bytes.fromhex(rest.split()[1])), line[:40])
 
+    def assert_still_checked(self, printed):
+        """The last reply, to `list`, lists the faulty animation as usable, with its size
+        not known yet: the check has not come to it."""
+        faulty = [item for item in json.loads(printed[-1][len("reply "):])["items"] if item["id"] == 2]
+        self.assertEqual((faulty[0]["bytes"], faulty[0].get("fault")), (None, None))
+
     def assert_quarantined(self, printed, reason, playing="all"):
         """The last two replies: `status` with no error, the sound animation on the LEDs
         and this playing, and `list` with the faulty animation and its fault, or `busy`
@@ -164,7 +170,7 @@ class FoundByThePlayer(BodyFaults):
                     # Every frame decodes, and the fault lies after the last one: the
                     # player never comes to it.
                     self.assertEqual(logs, [])
-                    self.assertEqual(printed[-1], f"reply {refused('busy')}")
+                    self.assert_still_checked(printed)
                 else:
                     # The cycle lists the faulty one alone: the playlist plays from then on.
                     text = f"file faulty.odrg unavailable: {name.split('.')[0]}"
@@ -201,7 +207,7 @@ class FoundByThePlayer(BodyFaults):
         printed, logs = self.session(files, self.every_40_ms(20000))
         self.assertEqual(logs, [])
         self.assertIsNone(json.loads(printed[-2][len("reply "):])["error"])
-        self.assertEqual(printed[-1], f"reply {refused('busy')}")
+        self.assert_still_checked(printed)
 
     def test_in_a_cycle_it_is_found_when_a_turn_is_long_enough_to_come_to_it(self):
         data = cut_clip(100, 75)
@@ -210,7 +216,7 @@ class FoundByThePlayer(BodyFaults):
                 printed, logs = self.session(show_with(data, sound=self.LONG, cycle=seconds), self.every_40_ms(9000))
                 if found is None:
                     self.assertEqual(logs, [])
-                    self.assertEqual(printed[-1], f"reply {refused('busy')}")
+                    self.assert_still_checked(printed)
                 else:
                     # The cycle shows its usable animation in the faulty one's turns.
                     self.assertEqual(logs, [(found, "file faulty.odrg unavailable: truncated")])

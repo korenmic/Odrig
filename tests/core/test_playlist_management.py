@@ -161,13 +161,13 @@ class PlaylistManagement(unittest.TestCase):
         self.assertEqual(listed(run)[-1]['items'][-1]['ignored'], False)
         self.assertNotIn('ignored', json.loads(left['show.json'])['items'][-1])
 
-    def test_commands_through_byte_entry_and_startup_busy(self):
+    def test_commands_through_byte_entry_and_during_the_startup_check(self):
         files = self.files()
         run = support.start(files, [support.fed(0, b'ignore 1 1\nremove many 2,3\n'), support.line(0, 'list')])
         self.assertEqual(listed(run)[:2], [{'ok': True}] * 2)
         self.assertEqual([i['id'] for i in listed(run)[-1]['items']], [1])
         run = support.start(files, [support.line(0, 'ignore 1 1'), support.line(0, 'remove many 1,2')], check_first=False)
-        self.assertEqual(listed(run), [{'ok': False, 'error': 'busy'}] * 2)
+        self.assertEqual(listed(run), [{'ok': True}] * 2)
 
     def test_bulk_failure_before_metadata_commit_retains_old_show(self):
         from .test_powercut import storage_calls, as_bytes

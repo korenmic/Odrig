@@ -153,7 +153,7 @@ class TheCheckOfTheDrive(unittest.TestCase):
             item = "busy" if reply == refusal("busy") else [id for id, _ in listed(reply)]
             if not seen or seen[-1] != item:
                 seen.append(item)
-        self.assertEqual(seen, ["busy", [1], [1, 60001], [1, 60001, 60002]])
+        self.assertEqual(seen, [[1], [1, 60001], [1, 60001, 60002]])
 
     def test_an_upload_while_the_drive_is_checked_is_installed_and_the_check_goes_on(self):
         drive = {"a.odrg": loop_of(12, 5), "b.odrg": loop_of(12, 6)}

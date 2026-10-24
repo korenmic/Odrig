@@ -196,7 +196,7 @@ class ATargetThatStillReads(unittest.TestCase):
         self.assertGreaterEqual(len(asked), 3)
         self.assertEqual(set(asked), {b"list 0"})
 
-    def test_an_emulator_that_has_just_started_shows_its_state_at_once_and_its_rows_when_it_has_read_them(self):
+    def test_an_emulator_that_has_just_started_shows_its_state_and_its_rows_while_it_reads_them(self):
         # Four dense animations of twenty seconds and more: the core reads them for five
         # seconds at the least.
         work = entered(self, tempfile.TemporaryDirectory())
@@ -208,9 +208,10 @@ class ATargetThatStillReads(unittest.TestCase):
         files["show.json"] = json.dumps({"version": 1, "brightness": 128, "items": items})
         folder = emulator_support.installed(pathlib.Path(work, "show"), files)
         emulator = entered(self, emulator_support.Emulator(folder, checked=False))
-        self.assertEqual(json.loads(emulator.command("list")).get("error"), "busy")
+        # The list is given at once, with no sizes while the files are read.
+        self.assertIn(None, [item["bytes"] for item in json.loads(emulator.command("list"))["items"]])
         found = support.run("reads", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4})
         before, after = found.seen["before"], found.seen["after"]
-        self.assertEqual((before["power"], before["playing"], before["rows"], before["message"]), ("ON", "Playlist", [], None))
+        self.assertEqual((before["power"], before["playing"], before["message"]), ("ON", "Playlist", None))
         self.assertEqual([row["text"] for row in after["rows"]], [f"{number} dense{number}.odrg" for number in (1, 2, 3, 4)])
         self.assertIsNone(after["message"])

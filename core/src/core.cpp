@@ -89,6 +89,7 @@ void check_file(Core &core, uint32_t index) {
     } else {
         info.bytes = bytes;
         info.total_ms = total;
+        info.checked = 1;
     }
 }
 
@@ -148,9 +149,10 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
 }
 
 // Moves the check after the start past the files it has no more to do with: those that
-// are quarantined. It is complete once it is past the last file.
+// are quarantined or were read whole by an upload's check. It is complete once it is past
+// the last file.
 void check_passes_done(Core &core) {
-    while (core.check_at < core.file_count && core.files[core.check_at].fault != kNone) {
+    while (core.check_at < core.file_count && (core.files[core.check_at].fault != kNone || core.files[core.check_at].checked)) {
         ++core.check_at;
     }
     core.check_done = core.check_at >= core.file_count;
@@ -161,8 +163,9 @@ void check_passes_done(Core &core) {
 // the next one.
 void check_step(Core &core) {
     FileInfo &info = core.files[core.check_at];
-    if (info.fault != kNone) {
-        // The player quarantined the file the check is at: it is not read again.
+    if (info.fault != kNone || info.checked) {
+        // The player quarantined the file the check is at, or an upload replaced it: it is
+        // not read again.
         if (core.check_header_read) {
             core.checker->file.close();
             core.check_header_read = 0;
@@ -177,6 +180,7 @@ void check_step(Core &core) {
     if (outcome == kStepWhole) {
         info.bytes = core.checker->file.taken;
         info.total_ms = core.check_total_ms;
+        info.checked = 1;
         ++core.check_at;
         check_passes_done(core);
     } else if (outcome == kStepFault) {
@@ -302,6 +306,7 @@ void start(Core &core) {
     // be used is quarantined, and the others are opened as ever.
     for (uint32_t index = 0; index < core.file_count; ++index) {
         core.files[index].fault = kNone;
+        core.files[index].checked = 0;
     }
     for (uint32_t index = 0; index < core.file_count && !core.invalid; ++index) {
         if (core.checker == nullptr) {
@@ -428,14 +433,31 @@ bool drive_has_id(const Core &core, uint32_t id) {
 }
 
 void drive_check_yields(Core &core) {
-    if (core.drive != nullptr && check_complete(core) && core.check_header_read) {
+    if (core.checker != nullptr && core.check_header_read) {
         core.checker->file.close();
         core.check_header_read = 0;
     }
 }
 
+void check_file_left(Core &core, uint32_t file) {
+    if (check_complete(core)) {
+        return;
+    }
+    if (file < core.check_at) {
+        --core.check_at;
+    } else if (file == core.check_at && core.check_header_read) {
+        core.checker->file.close();
+        core.check_header_read = 0;
+    }
+    check_passes_done(core);
+}
+
 void check_after_start(Core &core, bool in_step, bool on_time) {
     if (core.invalid || (check_complete(core) && !drive_waits(core))) {
+        return;
+    }
+    if (!check_complete(core) && core.upload.state != kUploadNone) {
+        // The upload has the second decoders; the check waits for them.
         return;
     }
     uint8_t steps;

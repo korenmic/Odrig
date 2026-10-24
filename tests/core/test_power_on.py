@@ -56,17 +56,17 @@ class TheCheck(Playback):
     def listed_after(self, files, times):
         """Asks for a refresh and then for the list at each of these times after power-on,
         on the core and on the reference player alike. Returns the number of the refresh
-        after which the list is first given, counted from 1; none is refused after it."""
+        after which the list first gives the size of every file, counted from 1: until a
+        file is read whole its `bytes` are null."""
         script = []
         for time in times:
             script += [f"poll {T0 + time}", told(time, "list")]
         given = replies(self.assert_as_the_reference(files, script, check_first=False))
         self.assertEqual(len(given), len(times))
-        busy = given.count(refused("busy"))
-        self.assertEqual(given[:busy], [refused("busy")] * busy)
+        unknown = [any(item.get("bytes", 0) is None for item in json.loads(reply)["items"]) for reply in given]
+        busy = unknown.count(True)
+        self.assertEqual(unknown[:busy], [True] * busy)
         self.assertLess(busy, len(given), "the check did not end")
-        for reply in given[busy:]:
-            self.assertTrue(json.loads(reply)["ok"])
         return busy + 1
 
     # The check takes no step at the first refresh and then, while each refresh follows the
@@ -115,7 +115,7 @@ class TheCheck(Playback):
         for time in (*range(0, 400, 20), *range(1000, 1400, 20)):
             script += [f"poll {T0 + time}", told(time, "list")]
         given = replies(self.assert_as_the_reference(files, script, check_first=False))
-        self.assertEqual(set(given), {refused("busy")})
+        self.assertEqual({json.loads(reply)["items"][0]["bytes"] for reply in given}, {None})
         self.assertEqual(self.listed_after(files, (*range(0, 400, 20), *range(1000, 3000, 20))), 20 + 50 + 5)
 
     def test_a_refresh_two_milliseconds_late_is_on_time(self):
@@ -162,26 +162,39 @@ class Busy(Playback):
         files = files or self.files()
         return replies(self.assert_as_the_reference(files, [told(0, command) for command in commands], check_first=False))
 
-    def test_list_remove_and_upload_begin_are_busy_while_the_files_are_being_read(self):
+    def test_list_remove_and_upload_begin_are_answered_while_the_files_are_being_read(self):
         commands = ["list", "list 2", "remove 2", f"upload begin 9 new.odrg {len(self.NEW)}", f"upload begin 1 a.odrg {len(self.NEW)}"]
-        self.assertEqual(self.asked(commands), [refused("busy")] * len(commands))
+        self.assertEqual(self.asked(commands), [
+            '{"ok":true,"items":[{"id":1,"file":"a.odrg","bytes":null,"ignored":false},{"id":2,"file":"b.odrg","bytes":null,"ignored":false}],"next":null}',
+            '{"ok":true,"items":[],"next":null}', OK, '{"ok":true,"chunk":1500}', refused("busy"),
+        ])
 
-    def test_they_work_once_every_file_is_read(self):
-        # 24 steps, taken after eight refreshes.
-        commands = ["list", "remove 2", f"upload begin 9 new.odrg {len(self.NEW)}", "upload cancel", "list"]
-        script = [told(0, command) for command in commands[:3]]
-        script += [f"poll {T0 + 20 * step}" for step in range(7)] + [told(120, "list")]
-        script += [f"poll {T0 + 140}"] + [told(140, command) for command in commands]
+    def test_the_check_waits_for_an_upload_and_comes_to_its_end_after_it(self):
+        # 24 steps. An upload opened at the start holds the check until it is cancelled;
+        # then ten refreshes in a row take 55 steps.
+        script = [told(0, f"upload begin 9 new.odrg {len(self.NEW)}")]
+        script += [f"poll {T0 + 20 * step}" for step in range(10)] + [told(200, "list"), told(200, "upload cancel")]
+        script += [f"poll {T0 + 220 + 20 * step}" for step in range(10)] + [told(420, "list")]
         given = replies(self.assert_as_the_reference(self.files(), script, check_first=False))
-        self.assertEqual(given[:4], [refused("busy")] * 4)
-        self.assertEqual(len(json.loads(given[4])["items"]), 2)
-        self.assertEqual(given[5:8], [OK, '{"ok":true,"chunk":1500}', OK])
-        self.assertEqual(len(json.loads(given[8])["items"]), 1)
+        self.assertEqual(given[0], '{"ok":true,"chunk":1500}')
+        self.assertEqual([item["bytes"] for item in json.loads(given[1])["items"]], [None, None])
+        self.assertEqual(given[2], OK)
+        self.assertNotIn(None, [item["bytes"] for item in json.loads(given[3])["items"]])
+
+    def test_a_removal_during_the_check_keeps_it_at_its_file(self):
+        files = animations(a=frames(10, 1), b=frames(10, 2), c=frames(10, 3))
+        for removed in (1, 2, 3):
+            with self.subTest(removed=removed):
+                script = [f"poll {T0 + 20 * step}" for step in range(5)] + [told(80, f"remove {removed}")]
+                script += [f"poll {T0 + 100 + 20 * step}" for step in range(8)] + [told(240, "list")]
+                given = replies(self.assert_as_the_reference(files, script, check_first=False))
+                self.assertEqual(given[0], OK)
+                self.assertNotIn(None, [item["bytes"] for item in json.loads(given[1])["items"]])
 
     def test_every_other_command_is_answered_while_the_files_are_being_read(self):
         commands = ["status", "space", "play 2", "play all", "off", "on", "brightness 9", "status"]
         given = self.asked(commands + ["list"])
-        self.assertEqual(given[-1], refused("busy"))
+        self.assertEqual([item["bytes"] for item in json.loads(given[-1])["items"]], [None, None])
         for command, reply in zip(commands, given):
             self.assertTrue(json.loads(reply)["ok"], command)
         self.assertEqual(given[:-1], replies(support.start(self.files(), [told(0, command) for command in commands]).lines))
@@ -193,9 +206,9 @@ class Busy(Playback):
     def test_a_code_that_stands_earlier_is_given_and_one_that_stands_later_is_not(self):
         earlier = ["list x", "list 1 2", "remove 0", "remove", "upload begin 9 new.odrg", "upload begin 0 new.odrg 5", "upload begin 9 NEW.odrg 5"]
         self.assertEqual(self.asked(earlier), [refused("bad-argument")] * len(earlier))
-        # Without the check these are `unknown-id`, `in-use` and `no-space`.
+        # The check is no reason to refuse them.
         later = ["remove 77", "upload begin 9 a.odrg 50", "upload begin 9 new.odrg 4000000000"]
-        self.assertEqual(self.asked(later), [refused("busy")] * len(later))
+        self.assertEqual(self.asked(later), [refused("unknown-id"), refused("in-use"), refused("no-space")])
 
     def test_an_invalid_show_is_show_invalid(self):
         files = support.with_show_fault(self.files())
@@ -244,7 +257,7 @@ class PlayedBeforeItsFileIsRead(Apart):
         # Seven refreshes: the check has taken no step of the six the first file needs.
         script = asked_at(range(0, 7000, 1000)) + [told(6000, "list")]
         printed = self.assert_as_the_reference(three(), script, check_first=False)
-        self.assertEqual(printed[-1], f"reply {refused('busy')}")
+        self.assertIsNone(json.loads(printed[-1][len("reply "):])["items"][0]["bytes"])
         states = [json.loads(line[len("reply "):]) for line in printed[:-1] if line.startswith("reply ")]
         self.assertEqual([state["animation"] for state in states], [1] * 7)
 

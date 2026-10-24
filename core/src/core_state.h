@@ -43,10 +43,12 @@ struct ItemInfo {
 // while it is not known: a check finds it, and so does playing the file through once.
 // `fault` is the Reason of a fault of the file in this boot, kNone while it is usable: a
 // file with a fault is quarantined, and its animations are unavailable until an upload
-// replaces it.
+// replaces it. `checked` says that a check has read it whole in this boot, so that its
+// `bytes` are known.
 struct FileInfo {
     char name[33];
     uint8_t fault;
+    uint8_t checked;
     uint32_t bytes;
     uint64_t total_ms;
 };
@@ -337,9 +339,14 @@ void drive_touch(Core &core);
 // A file of the drive is left out: its state says so, and the host's log says why.
 void drive_left_out(Core &core, uint32_t place, Reason reason);
 
-// An upload takes the second decoders: the check of a drive's file begins that file
-// again once the upload is over.
+// An upload, or a change that reads with the second source, takes the second decoders:
+// the check after the start, or the check of a drive's file, begins the file it was in
+// again once they are free.
 void drive_check_yields(Core &core);
+
+// A file left the file table at this place: the check after the start stays at the file
+// it was at, and begins it again when it was the one that left.
+void check_file_left(Core &core, uint32_t file);
 
 // Whether an animation of the drive has this id.
 bool drive_has_id(const Core &core, uint32_t id);

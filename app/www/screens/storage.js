@@ -67,7 +67,7 @@ function row(animation) {
   file.textContent = animation.file;
   const size = document.createElement("span");
   size.className = "size";
-  size.textContent = `${kilobytes(animation.bytes)} KB`;
+  size.textContent = animation.bytes === null ? "size not read yet" : `${kilobytes(animation.bytes)} KB`;
   words.append(id, " ", file, " ", size);
   made.append(words);
   if (typeof animation.ignored !== "boolean") {

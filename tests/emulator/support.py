@@ -166,6 +166,15 @@ def with_show_fault(folder):
     return folder
 
 
+def checked(listed):
+    """Whether a reply of `list` comes after the check of every file it lists: refused
+    with `busy` it does not, and an animation not read whole yet has `"bytes":null` and no
+    `fault`. A reply that is no list, such as one refused for an invalid show, does."""
+    if listed.get("error") == "busy":
+        return False
+    return all(item.get("bytes", 0) is not None or "fault" in item for item in listed.get("items", []))
+
+
 def without_fps(reply):
     """A reply as a value, without the one member that depends on the speed of this Mac."""
     value = json.loads(reply)
@@ -277,11 +286,12 @@ class Emulator:
         return answer.body
 
     def wait_for_the_check(self):
-        """Asks for the list until it is no longer refused with `busy`. Returns how many
-        times it asked."""
+        """Asks for the list until it gives the size of every animation file the core can
+        read, which it knows once it has read the file whole: a file not read yet has
+        `"bytes":null` and no `fault`. Returns how many times it asked."""
         deadline = time.monotonic() + self.START_SECONDS
         asked = 1
-        while json.loads(self.command("list")).get("error") == "busy":
+        while not checked(json.loads(self.command("list"))):
             if time.monotonic() > deadline:
                 raise AssertionError("the core did not come to the end of its files")
             time.sleep(0.02)

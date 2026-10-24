@@ -144,10 +144,6 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (!check_complete(core)) {
-            // The check after the start has the decoders the check of an upload needs.
-            return refuse(reply, "busy");
-        }
         return upload_begin(core, now, id, name, bytes, reply);
     }
     if (words.count >= 2 && words.is(1, "data")) {
@@ -285,17 +281,13 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (!check_complete(core)) {
-            // The size of a file is known when the check after the start has read it.
-            return refuse(reply, "busy");
-        }
         return content_list(core, from, reply);
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;
         if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
         if (core.invalid) return refuse(reply, "show-invalid");
-        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test) return refuse(reply, "busy");
         return content_ignore(core, id, value != 0, reply);
     }
     if (words.is(0, "remove") && words.count == 3 && words.is(1, "many")) {
@@ -315,7 +307,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             }
         }
         if (core.invalid) return refuse(reply, "show-invalid");
-        if (!check_complete(core) || core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test) return refuse(reply, "busy");
         return content_remove_many(core, ids, count, reply);
     }
     if (words.is(0, "remove")) {
@@ -325,10 +317,6 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
-        }
-        if (!check_complete(core)) {
-            // The check after the start reads the files the removal would take away.
-            return refuse(reply, "busy");
         }
         if (core.mapping_test) return refuse(reply, "busy");
         return content_remove(core, id, reply);

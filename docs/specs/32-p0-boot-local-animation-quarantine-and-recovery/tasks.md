@@ -42,7 +42,7 @@ Rules for every task:
     `docs/firmware-additions.md`, `docs/decisions.md`.
   - Requirements: 1.1 to 1.4, 2.1 to 2.4, 3.1, 3.3, 4.1, 4.3, 4.4, 5.5, 8.2
 
-- [ ] 3. Repair while the check goes on
+- [x] 3. Repair while the check goes on
   - `core/src/commands.cpp`, `core.cpp`, `upload.cpp`, `content.cpp`: `list`, `remove`,
     `remove many`, `ignore` and `upload begin` during the check; `check_yields`; the
     check's place through removals; files an upload installed are not checked again; a

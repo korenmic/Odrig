@@ -648,7 +648,7 @@ class ReferencePlayer:
                 if first is not None:
                     self._play_all(first)
             if check_first:
-                for name, _, reason in list(self.checks):
+                for name, _, reason, _ in list(self.checks):
                     if reason is not None:
                         self._quarantine(name, reason)
                 self.checks = []
@@ -718,7 +718,7 @@ class ReferencePlayer:
                 clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", data, 12)[0] else reason)
             self.clips[name] = clip
             if self.changeable:
-                self.checks.append([name, steps, reason])
+                self.checks.append([name, steps, reason, steps])
         return listed.start
 
     def _usable(self, number):
@@ -753,7 +753,7 @@ class ReferencePlayer:
             self.checks = [check for check in self.checks if check[0] != name]
         else:
             # The check is at the file: its next step passes over it.
-            self.checks[0][1:] = [1, None]
+            self.checks[0][1:] = [1, None, 1]
         if self.playing == self.ALL and self.turn is not None and not self._usable(self.turn):
             following = self._after(self.turn)
             if following is None:
@@ -887,7 +887,7 @@ class ReferencePlayer:
         # last whole second had 30 refreshes or more, at most 16. At any other refresh it
         # takes none, or one when it took none at the nine refreshes before either. A
         # fault it finds makes the show invalid from this refresh on.
-        if self.error is None and self.checks:
+        if self.error is None and self.checks and self.upload is None:
             second = (now - self.t0) // 1000
             steady = second == 0 or self.refreshes_in[second - 1] >= self.CHECK_LEAST_RATE
             on_time = in_step and now - grid <= self.CHECK_ON_TIME_MS and steady
@@ -989,12 +989,10 @@ class ReferencePlayer:
         elif name == b"list":
             if self.error is not None:
                 return "show-invalid"
-            if self.checks:
-                return "busy"
         elif name == b"remove":
             if self.error is not None:
                 return "show-invalid"
-            if self.checks or self.upload is not None:
+            if self.upload is not None:
                 return "busy"
             if value not in self.items:
                 return "unknown-id"
@@ -1062,7 +1060,7 @@ class ReferencePlayer:
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
-            if self.checks or self.upload is not None:
+            if self.upload is not None:
                 return "busy"
             item = self.items.get(number)
             if item is not None and item.cycle is not None:
@@ -1077,6 +1075,10 @@ class ReferencePlayer:
                 return "storage-error"
             self.upload = {"id": number, "name": name, "size": size, "data": b"", "state": "receiving", "progress": self.latest}
             self.files["upload.part"] = b""
+            # The upload takes the second decoders: the check after the start begins the
+            # file it was in again afterwards.
+            if self.checks:
+                self.checks[0][1] = self.checks[0][3]
             return b'{"ok":true,"chunk":1500}\n'
         if verb == b"data":
             offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 3 else None
@@ -1135,6 +1137,13 @@ class ReferencePlayer:
         self.files[name] = upload["data"]
         self.clips[name] = upload["clip"]
         self.faults.pop(name, None)
+        # The upload's check read the new file whole: the check after the start does not
+        # read the one it replaces.
+        if old is not None and not any(other.file == old.file for other in self.items.values() if other.id != number):
+            if self.checks and self.checks[0][0] == old.file:
+                self.checks[0][1:] = [1, None, 1]
+            else:
+                self.checks = [check for check in self.checks if check[0] != old.file]
         # An item that gets another animation keeps what the show says of its turn.
         self.items[number] = show.Item(number, name, None, None, old.repeat if old else None, old.max_seconds if old else None)
         if old is not None:
@@ -1160,6 +1169,9 @@ class ReferencePlayer:
         """One item as `list` writes it."""
         if item.cycle is None and item.file in self.faults:
             return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "fault": self.faults[item.file]}, separators=(",", ":"))
+        if item.cycle is None and any(check[0] == item.file for check in self.checks):
+            # The file has not been read whole yet: its size is not known.
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored)}, separators=(",", ":"))
         if item.cycle is None:
             return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
@@ -1225,6 +1237,7 @@ class ReferencePlayer:
             self.files.pop(item.file, None)
             self.clips.pop(item.file, None)
             self.faults.pop(item.file, None)
+            self.checks = [check for check in self.checks if check[0] != item.file]
         self.files["show.json"] = self.show_text()
 
     def _space(self):

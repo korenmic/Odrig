@@ -91,8 +91,7 @@ class Recording(unittest.TestCase):
         self.assertEqual([path.name for path in self.work.iterdir() if path.name.endswith(".part")], [])
 
     def test_a_script_that_uploads_acts_on_the_folder_and_gives_the_same_recording_from_the_same_folder(self):
-        # The first second is the core's: it reads the two files of the show to their ends
-        # and takes no upload before it has.
+        # An upload opened at the start holds the check of the show's files until it ends.
         clip = core_support.clip(9, 60, 6, (20,) * 10)
         lines = core_support.upload_lines(9, "clip.odrg", clip, 100)
         commands = [(0, f"upload begin 9 clip.odrg {len(clip)}")]
@@ -108,7 +107,7 @@ class Recording(unittest.TestCase):
             recordings.append(((self.work / f"{number}.odrr").read_bytes(), printed, files))
         self.assertEqual(recordings[0], recordings[1])
         printed = recordings[0][1]
-        self.assertEqual(printed[0], 'reply 0 {"ok":false,"error":"busy"}')
+        self.assertEqual(printed[0], 'reply 0 {"ok":true,"chunk":1500}')
         self.assertIn('reply 1200 {"ok":false,"error":"busy"}', printed)
         self.assertIn('reply 1420 {"ok":true}', printed)
         self.assertIn('reply 1900 {"ok":false,"error":"in-use"}', printed)
