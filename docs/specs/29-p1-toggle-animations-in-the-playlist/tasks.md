@@ -40,7 +40,7 @@ failing before fixes. No flash, phone installation or external-drive writes.
   - Verify: app and emulator suites by discovery.
   - Requirements: 1.6, 2.4, 3.3, 4.1.
 
-- [ ] 5. Verify the combined implementation and rebuild delivery artifacts
+- [x] 5. Verify the combined implementation and rebuild delivery artifacts
   - Run every suite that works locally, retaining seed30 regressions; exercise a full
     local show in emulator, including both mapping test and new storage controls.
   - Build WLED and standalone firmware with fw.py, build/sign APK with app.py; run APK

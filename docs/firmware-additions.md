@@ -56,6 +56,7 @@ takes every line marked *No*.
 | 22 | Has a probe build, which measures the outputs and the rate on the board. | 04 | `odrig_probe.cpp`, `build --probe` | Written again | In its spec |
 | 23 | Is built, flashed, rolled back and set up by one tool: `build`, `flash`, `restore-stock`, `big-storage`, `install-show`, `set-wifi`, `set-limit`, `read-limit`, `install-firmware`, `read-show` and the board's suites. | 04, 08, 15, 24 | `firmware/fw.py`, `firmware/fwtool/` | Written again: each command takes the other firmware too | In part: `build`, `flash` and the board's suite are in its spec |
 | 24 | Saves a complete twenty-pin permutation atomically and displays a packaged white diagonal through the shared core; the same commands reach it over HTTP and serial. | 30 | `core/src/mapping_control.cpp`, `odrig_routing.h`, `odrig_usermod.cpp` | Written again: fixed physical outputs resolve the currently assigned logical snake | Output adapter supports pin lookup; full standalone player remains pending seed 12 |
+| 25 | Persists playlist inclusion, removes installed animations atomically in batches, and reports internal plus nullable external capacity through every command route. | 29 | `core/`; read-only FAT capacity in `odrig_drive.cpp` and `firmware/usb_host_msc/` | The core for semantics; a host callback supplies external capacity | No: the full player and external drive adapter remain pending |
 
 ## Coming
 
