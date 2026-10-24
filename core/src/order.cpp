@@ -315,17 +315,20 @@ void order_item_added(Core &core, uint32_t position) {
     }
 }
 
-uint32_t order_get(const Core &core, uint32_t from, Reply &reply) {
-    // The revision: each listed animation's id and key, in the order of `list`.
+namespace {
+
+// The revision of the order: the CRC-32 of each listed animation's id, as two bytes, and
+// key, as four, low byte first, in the order of `list`; and the number of them.
+uint32_t revision_of(const Core &core, uint32_t *total) {
     uint32_t crc = kCrcStart;
-    uint32_t total = 0;
+    *total = 0;
     const uint32_t places = core.drive != nullptr ? core.drive_count : 0;
     for (uint32_t at = 0; at < core.item_count + places; ++at) {
         const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
         if (!listed(core, position)) {
             continue;
         }
-        ++total;
+        ++*total;
         const uint32_t id = id_of(core, position);
         const uint32_t key = order_key(core, position);
         crc = crc_add(crc, static_cast<uint8_t>(id));
@@ -334,8 +337,220 @@ uint32_t order_get(const Core &core, uint32_t from, Reply &reply) {
             crc = crc_add(crc, static_cast<uint8_t>(key >> shift));
         }
     }
-    const uint32_t revision = crc_value(crc);
+    return crc_value(crc);
+}
 
+// The listed animation with this id, or kNothing.
+uint32_t listed_with(const Core &core, uint32_t id) {
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        if (core.items[position].id == id) {
+            return core.items[position].is_cycle ? kNothing : position;
+        }
+    }
+    if (core.drive != nullptr && drive_has_id(core, id)) {
+        return kDriveBase + drive_place_of(core, id);
+    }
+    return kNothing;
+}
+
+// Whether an item of the show with this id is a cycle.
+bool is_cycle_id(const Core &core, uint32_t id) {
+    for (uint32_t position = 0; position < core.item_count; ++position) {
+        if (core.items[position].id == id) {
+            return core.items[position].is_cycle != 0;
+        }
+    }
+    return false;
+}
+
+// The text of the next `order.txt` goes through the first kWriteRoom bytes of the chunk;
+// the entries looked for while it is written, and a name of the drive, stand after them.
+const uint32_t kWriteRoom = 1000;
+const uint32_t kMovedLine = kWriteRoom;
+const uint32_t kBeforeLine = kMovedLine + kOrderLineRoom;
+const uint32_t kNameRoom = kBeforeLine + kOrderLineRoom;
+
+struct OrderWriter {
+    void bytes(const char *text, uint32_t length) {
+        for (uint32_t at = 0; at < length && !failed; ++at) {
+            core->chunk[used++] = static_cast<uint8_t>(text[at]);
+            if (used == kWriteRoom) {
+                flush();
+            }
+        }
+    }
+
+    void flush() {
+        if (used != 0 && !failed && core->host.write(core->host.ctx, core->chunk, used) != 1) {
+            failed = true;
+        }
+        used = 0;
+    }
+
+    // One entry and its line feed, when the file has room for it.
+    void entry(const char *text, uint32_t length) {
+        if (entries < kOrderMost) {
+            bytes(text, length);
+            bytes("\n", 1);
+            ++entries;
+        }
+    }
+
+    Core *core;
+    uint32_t used;
+    uint32_t entries;
+    bool failed;
+};
+
+// The entry of a listed animation, written at `at` in the chunk: `i <id>` or `x <name>`.
+// Returns its length.
+uint32_t entry_of(Core &core, uint32_t position, uint32_t at) {
+    char *line = reinterpret_cast<char *>(core.chunk + at);
+    if (!is_drive(position)) {
+        uint32_t id = core.items[position].id;
+        char figures[5];
+        uint32_t count = 0;
+        do {
+            figures[count++] = static_cast<char>('0' + id % 10);
+            id /= 10;
+        } while (id != 0);
+        line[0] = 'i';
+        line[1] = ' ';
+        uint32_t length = 2;
+        while (count != 0) {
+            line[length++] = figures[--count];
+        }
+        return length;
+    }
+    line[0] = 'x';
+    line[1] = ' ';
+    if (core.host.drive_name(core.host.ctx, core.drive_number, position - kDriveBase, line + 2, kDriveListedName) != 1) {
+        return 0;
+    }
+    uint32_t length = 2;
+    while (line[length] != '\0') {
+        ++length;
+    }
+    return length;
+}
+
+// What the writing of the next file knows: the entries of the moved animation and of the
+// one it goes before, of these lengths in the chunk, 0 for `end`, and whether the moved one
+// was written.
+struct Move {
+    uint32_t moved_length;
+    uint32_t before_length;
+    bool placed;
+};
+
+bool same_line(const Core &core, uint32_t at, uint32_t length, const char *text, uint32_t size) {
+    return length != 0 && length == size && memcmp(core.chunk + at, text, size) == 0;
+}
+
+// Writes one entry of the next file: not the moved one where it stood, and the moved one
+// before the entry it goes before.
+void write_entry(Core &core, OrderWriter &out, Move &move, const char *text, uint32_t size) {
+    if (same_line(core, kMovedLine, move.moved_length, text, size)) {
+        return;
+    }
+    if (!move.placed && same_line(core, kBeforeLine, move.before_length, text, size)) {
+        out.entry(reinterpret_cast<const char *>(core.chunk + kMovedLine), move.moved_length);
+        move.placed = true;
+    }
+    out.entry(text, size);
+}
+
+// One whole line of the file as it is, given to the next file when it is an entry that
+// still names something that can be there: every external name, and the ids of items.
+void copy_line(Core &core, OrderWriter &out, Move &move) {
+    OrderReader &reader = core.order_reader;
+    const char *line = reader.line;
+    const uint32_t length = reader.length;
+    if (reader.header == 0) {
+        reader.header = length == sizeof kOrderHeader - 1 && memcmp(line, kOrderHeader, length) == 0 ? 1 : 2;
+        return;
+    }
+    if (reader.header != 1 || length < 3 || line[1] != ' ') {
+        return;
+    }
+    if (line[0] == 'i') {
+        const uint32_t id = entry_id(line + 2, length - 2);
+        if (id != 0 && listed_with(core, id) != kNothing && !is_drive(listed_with(core, id))) {
+            write_entry(core, out, move, line, length);
+        }
+    } else if (line[0] == 'x') {
+        for (uint32_t at = 2; at < length; ++at) {
+            if (line[at] == '\0') {
+                return;
+            }
+        }
+        write_entry(core, out, move, line, length);
+    }
+}
+
+// Writes `order.part`: the entries of `order.txt` with the move made, and after them every
+// listed animation the file did not name. False when the host could not take it.
+bool write_part(Core &core, Move &move) {
+    const odrig_host &host = core.host;
+    if (host.write_open(host.ctx, kOrderPart) != 1) {
+        return false;
+    }
+    OrderWriter out;
+    out.core = &core;
+    out.used = 0;
+    out.entries = 0;
+    out.failed = false;
+    out.bytes(kOrderHeader, sizeof kOrderHeader - 1);
+    out.bytes("\n", 1);
+
+    drive_check_yields(core);
+    FileSource &source = core.checker->file;
+    source.open_at(host, kOrderFile);
+    reader_clear(core);
+    OrderReader &reader = core.order_reader;
+    int got;
+    while ((got = source.get()) >= 0) {
+        if (got == '\n') {
+            if (!reader.over) {
+                copy_line(core, out, move);
+            }
+            reader.length = 0;
+            reader.over = 0;
+        } else if (reader.length < kOrderLineRoom - 1) {
+            reader.line[reader.length++] = static_cast<char>(got);
+        } else {
+            reader.over = 1;
+        }
+    }
+    source.close();
+    if (got == -kReadError && reader.header != 0) {
+        // A file that could be read in part is not written again from that part.
+        host.write_close(host.ctx);
+        return false;
+    }
+
+    const uint32_t places = core.drive != nullptr ? core.drive_count : 0;
+    for (uint32_t at = 0; at < core.item_count + places; ++at) {
+        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
+        if (listed(core, position) && order_key(core, position) >= kUnnamedItem) {
+            const uint32_t length = entry_of(core, position, kNameRoom);
+            if (length != 0) {
+                write_entry(core, out, move, reinterpret_cast<const char *>(core.chunk + kNameRoom), length);
+            }
+        }
+    }
+    if (!move.placed) {
+        out.entry(reinterpret_cast<const char *>(core.chunk + kMovedLine), move.moved_length);
+    }
+    out.flush();
+    return host.write_close(host.ctx) == 1 && !out.failed;
+}
+
+}  // namespace
+
+uint32_t order_get(const Core &core, uint32_t from, Reply &reply) {
+    uint32_t total = 0;
+    const uint32_t revision = revision_of(core, &total);
     reply.text("{\"ok\":true,\"ids\":[");
     // The tail: `],"next":<n>,"revision":<r>}` and a line feed, with room for any position.
     const uint32_t tail = 9 + 5 + 12 + digits(revision) + 2;
@@ -370,6 +585,47 @@ uint32_t order_get(const Core &core, uint32_t from, Reply &reply) {
     reply.number(revision);
     reply.text("}\n");
     return reply.length;
+}
+
+uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before, Reply &reply) {
+    if (core.invalid) {
+        return refuse(reply, "show-invalid");
+    }
+    if (!check_complete(core) || core.upload.state != kUploadNone) {
+        return refuse(reply, "busy");
+    }
+    const uint32_t moved = listed_with(core, id);
+    const uint32_t target = before == 0 ? kNothing : listed_with(core, before);
+    if ((moved == kNothing && !is_cycle_id(core, id)) || (before != 0 && target == kNothing && !is_cycle_id(core, before))) {
+        return refuse(reply, "unknown-id");
+    }
+    if (moved == kNothing || (before != 0 && target == kNothing)) {
+        return refuse(reply, "in-use");
+    }
+    uint32_t total = 0;
+    if (revision != revision_of(core, &total)) {
+        return refuse(reply, "order-conflict");
+    }
+    // Nothing changes when the animation already stands where it is to go.
+    const uint32_t next = listed_after(core, order_key(core, moved), false);
+    if (moved == target || next == target) {
+        return succeed(reply);
+    }
+    if (core.order_items == nullptr || core.chunk == nullptr) {
+        return refuse(reply, "storage-error");
+    }
+    Move move;
+    move.moved_length = entry_of(core, moved, kMovedLine);
+    move.before_length = target == kNothing ? 0 : entry_of(core, target, kBeforeLine);
+    move.placed = false;
+    const odrig_host &host = core.host;
+    if (move.moved_length == 0 || (target != kNothing && move.before_length == 0) || !write_part(core, move) ||
+        host.rename(host.ctx, kOrderPart, kOrderFile) != 1) {
+        host.remove(host.ctx, kOrderPart);
+        return refuse(reply, "storage-error");
+    }
+    order_reload(core);
+    return succeed(reply);
 }
 
 }  // namespace odrig

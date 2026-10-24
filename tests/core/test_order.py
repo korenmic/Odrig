@@ -240,5 +240,179 @@ class NewUploadsAndRemovals(unittest.TestCase):
         self.assertFalse(any("order" in call for call in run.stored))
 
 
+
+def revision(files, options=()):
+    """The revision `order get` reports for these files."""
+    return order_ids(support.start(files, asked(0, "order get"), options))[1].pop()
+
+
+def moved(files, *moves, options=()):
+    """A session that moves, each move `(id, before)` with the revision of the moment, and
+    its run and the files it leaves. Each move asks for the revision first."""
+    kept = dict(files)
+    runs = []
+    for what, before in moves:
+        current = revision(kept, options)
+        run, kept = support.start_and_keep(kept, asked(0, f"order move {current} {what} {before}", "order get"), options)
+        runs.append(run)
+    return runs, kept
+
+
+class OrderMove(unittest.TestCase):
+    def test_it_moves_an_animation_before_another_and_saves_the_whole_order(self):
+        runs, kept = moved(animations(3), (3, 1))
+        self.assertEqual(replies(runs[0])[0], {"ok": True})
+        self.assertEqual(order_ids(runs[0])[0], [3, 1, 2])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 3\ni 1\ni 2\n").encode())
+        self.assertNotIn("order.part", kept)
+        again = support.start(kept, every_turn(3))
+        self.assertEqual(turns(again), [3, 1, 2])
+
+    def test_it_moves_an_animation_to_the_end(self):
+        runs, kept = moved(ordered(animations(3), "i 2", "i 1"), (2, "end"))
+        self.assertEqual(order_ids(runs[0])[0], [1, 3, 2])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 1\ni 3\ni 2\n").encode())
+
+    def test_moves_of_external_animations_keep_absent_entries_in_their_places(self):
+        drive = {"b.odrg": loop_of(4, 5), "A.ODRG": loop_of(4, 6), "c d.odrg": loop_of(4, 7)}
+        files = ordered(animations(2), "x gone.odrg", "i 2", "x b.odrg", "i 1")
+        with a_drive(drive) as top:
+            options = ["--drive", top]
+            first = support.start(files, asked(0, "list"), options)
+            ids = {item["file"]: item["id"] for item in replies(first)[0]["items"]}
+            runs, kept = moved(files, (ids["A.ODRG"], 2), (1, ids["b.odrg"]), options=options)
+            self.assertEqual(order_ids(runs[0])[0], [ids["A.ODRG"], 2, ids["b.odrg"], 1, ids["c d.odrg"]])
+            self.assertEqual(order_ids(runs[1])[0], [ids["A.ODRG"], 2, 1, ids["b.odrg"], ids["c d.odrg"]])
+        self.assertEqual(kept["order.txt"], (HEADER + "x gone.odrg\nx A.ODRG\ni 2\ni 1\nx b.odrg\nx c d.odrg\n").encode())
+        # Without the card its entries keep their places, and a move keeps them.
+        runs, kept = moved(kept, (1, 2))
+        self.assertEqual(order_ids(runs[0])[0], [1, 2])
+        self.assertEqual(kept["order.txt"], (HEADER + "x gone.odrg\nx A.ODRG\ni 1\ni 2\nx b.odrg\nx c d.odrg\n").encode())
+
+    def test_entries_of_ids_no_item_has_are_dropped_when_the_file_is_written(self):
+        runs, kept = moved(ordered(animations(2), "i 7", "i 2", "i 1"), (1, 2))
+        self.assertEqual(kept["order.txt"], (HEADER + "i 1\ni 2\n").encode())
+
+    def test_a_move_that_changes_nothing_writes_nothing(self):
+        files = ordered(animations(3), "i 2", "i 3", "i 1")
+        current = revision(files)
+        for line in (f"order move {current} 2 3", f"order move {current} 1 end", f"order move {current} 3 3"):
+            with self.subTest(line=line):
+                run, kept = support.start_and_keep(files, asked(0, line), ["--trace-store"])
+                self.assertEqual(replies(run), [{"ok": True}])
+                self.assertFalse(any(text.startswith("store ") for text in run.lines))
+                self.assertEqual(kept, {name: content.encode() if isinstance(content, str) else content for name, content in files.items()})
+
+    def test_every_refusal_comes_in_the_order_of_the_table(self):
+        show = json.loads(animations(3)["show.json"])
+        show["items"].append({"id": 9, "cycle": [1, 2], "seconds": 3})
+        files = {**animations(3), "show.json": json.dumps(show)}
+        current = revision(files)
+        lines = {
+            "order move": "bad-argument",
+            f"order move {current} 1": "bad-argument",
+            f"order move x 1 2": "bad-argument",
+            f"order move {current} 0 2": "bad-argument",
+            f"order move {current} 70000 2": "bad-argument",
+            f"order move {current} 1 x": "bad-argument",
+            f"order move {current} 1 0": "bad-argument",
+            f"order move 4294967296 1 2": "bad-argument",
+            f"order move {current} 1 2 3": "bad-argument",
+            f"order move {current} 8 2": "unknown-id",
+            f"order move {current} 1 8": "unknown-id",
+            f"order move {current} 9 8": "unknown-id",
+            f"order move {current + 1 if current < 4294967295 else 0} 9 2": "in-use",
+            f"order move {current} 1 9": "in-use",
+            f"order move {current + 1 if current < 4294967295 else 0} 1 2": "order-conflict",
+        }
+        run, kept = support.start_and_keep(files, asked(0, *lines))
+        self.assertEqual(replies(run), [refusal(code) for code in lines.values()])
+        self.assertNotIn("order.txt", kept)
+
+    def test_it_is_busy_after_a_start_and_while_an_upload_is_open_and_invalid_with_an_invalid_show(self):
+        files = animations(2)
+        current = revision(files)
+        run = support.start(files, asked(0, f"order move {current} 2 1"), check_first=False)
+        self.assertEqual(replies(run), [refusal("busy")])
+        data = loop_of(4, 9)
+        run = support.start(files, asked(0, support.upload_lines(9, "nine.odrg", data)[0], f"order move {current} 2 1"))
+        self.assertEqual(replies(run)[1], refusal("busy"))
+        run = support.start({**files, "show.json": "{"}, asked(0, f"order move {current} 2 1"))
+        self.assertEqual(replies(run), [refusal("show-invalid")])
+
+    def test_a_host_whose_storage_cannot_be_changed_cannot_save_an_order(self):
+        files = animations(2)
+        current = revision(files, ["--only-space"])
+        run = support.start(files, asked(0, f"order move {current} 2 1"), ["--only-space"])
+        self.assertEqual(replies(run), [refusal("storage-error")])
+
+    def test_a_stale_revision_changes_nothing(self):
+        files = animations(2)
+        stale = revision(files)
+        data = loop_of(4, 9)
+        script = asked(0, *support.upload_lines(9, "nine.odrg", data)) + [f"poll {T0 + 20 * step}" for step in range(1, 12)]
+        script += [support.line(T0 + 300, support.upload_end(data)), support.line(T0 + 301, f"order move {stale} 2 1"), support.line(T0 + 302, "order get")]
+        run, kept = support.start_and_keep(files, script)
+        self.assertIn(refusal("order-conflict"), replies(run))
+        self.assertEqual(order_ids(run)[0], [1, 2, 9])
+        self.assertNotIn("order.txt", kept)
+
+    def test_the_turn_in_progress_power_and_brightness_stay_and_the_next_turn_follows_the_new_order(self):
+        files = animations(3)
+        current = revision(files)
+        script = every_turn(0) + asked(2100, "off", "brightness 40", "status", f"order move {current} 3 2", "status")
+        script += asked(4200, "status") + asked(8200, "status")
+        run = support.start(files, script)
+        states = [(reply["animation"], reply["on"], reply["brightness"]) for reply in replies(run) if "on" in reply]
+        self.assertEqual(states, [(1, False, 40), (1, False, 40), (3, False, 40), (2, False, 40)])
+
+    def test_a_power_cut_at_any_call_of_a_move_leaves_the_old_order_or_the_new_one(self):
+        files = ordered(animations(3), "i 2")
+        current = revision(files)
+        command = asked(0, f"order move {current} 3 2")
+        observed, whole = support.start_and_keep(files, command, ["--trace-store"])
+        first = len(observed.stored) + 1
+        calls = sum(line.startswith("store ") for line in observed.lines)
+        self.assertEqual(calls, 4)
+        # The rename is the last call: a cut at any of them leaves the old order.
+        for at in range(first, first + calls):
+            for keeps in (0, 1):
+                with self.subTest(at=at, keeps=keeps):
+                    _, left = support.start_and_keep(files, command, ["--cut-at", str(at), "--cut-keeps", str(keeps)], status=75)
+                    recovered, settled = support.start_and_keep(left, asked(0, "order get"))
+                    self.assertEqual(order_ids(recovered)[0], [2, 1, 3])
+                    self.assertNotIn("order.part", settled)
+                    self.assertEqual(settled["order.txt"], files["order.txt"].encode())
+        recovered = support.start(whole, asked(0, "order get"))
+        self.assertEqual(order_ids(recovered)[0], [3, 2, 1])
+
+    def test_a_failed_call_before_the_rename_changes_nothing_and_says_storage_error(self):
+        files = ordered(animations(3), "i 2")
+        current = revision(files)
+        command = asked(0, f"order move {current} 3 2", "order get")
+        observed = support.start(files, command, ["--trace-store"])
+        first = len(observed.stored) + 1
+        calls = sum(line.startswith("store ") for line in observed.lines)
+        for at in range(first, first + calls):
+            with self.subTest(at=at):
+                run, kept = support.start_and_keep(files, command, ["--store-fails-at", str(at)])
+                answer = replies(run)[0]
+                if answer == {"ok": True}:
+                    self.assertEqual(order_ids(run)[0], [3, 2, 1])
+                    continue
+                self.assertEqual(answer, refusal("storage-error"))
+                self.assertEqual(order_ids(run)[0], [2, 1, 3])
+                self.assertEqual(kept["order.txt"], files["order.txt"].encode())
+                self.assertNotIn("order.part", kept)
+
+    def test_it_works_while_a_test_of_the_mapping_shows(self):
+        files = support.demo_show()
+        current = revision(files)
+        run = support.start(files, asked(0, "mapping test on", f"order move {current} 2 1", "order get", "mapping get"))
+        self.assertEqual(replies(run)[1], {"ok": True})
+        self.assertEqual(replies(run)[2]["ids"], [2, 1])
+        self.assertTrue(replies(run)[3]["test"])
+
+
 if __name__ == "__main__":
     unittest.main()

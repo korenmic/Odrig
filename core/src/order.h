@@ -56,6 +56,11 @@ void order_item_added(Core &core, uint32_t position);
 // position on, as many as fit, the position of the first one left out, and the revision.
 uint32_t order_get(const Core &core, uint32_t from, Reply &reply);
 
+// The reply to `order move`: the listed animation with the id `id` goes before the one with
+// the id `before`, or last when `before` is 0, and the whole order is saved before the
+// reply. `order-conflict` when `revision` is not the order's.
+uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before, Reply &reply);
+
 }  // namespace odrig
 
 #endif

@@ -260,7 +260,8 @@ and `odrig_core_command` works as ever.
 A line that is no valid command is answered with the first code that applies, in the
 order of the table of [commands.md](commands.md): `line-too-long`, `unknown-command`,
 `bad-argument`, `show-invalid`, `no-upload`, `incomplete`, `bad-checksum`, `busy`,
-`unknown-id`, `unavailable`, `in-use`, `mapping-conflict`, `no-space`, `bad-offset`, `bad-file` and `storage-error`. It
+`unknown-id`, `unavailable`, `in-use`, `mapping-conflict`, `order-conflict`, `no-space`, `bad-offset`, `bad-file` and
+`storage-error`. It
 changes nothing, except that `bad-checksum`, `bad-file` and `storage-error` discard the
 upload they are about.
 
@@ -840,3 +841,21 @@ the animation that left. A removed item's key leaves with it.
 `order get` writes the ids of the listed animations by key, finding the next key with one
 walk over the items and the places for each id. Its revision is the CRC-32 of each listed
 animation's id as two bytes and key as four, low byte first, in the order of `list`.
+
+`order move` writes the next order into `order.part` while it reads `order.txt` through the
+second source, after the drive's check has yielded it: the header, every entry of the
+file but those of the moved animation and those of ids that no item has, the moved
+animation's entry before the entry of the animation it goes before, and after them every
+listed animation the file did not name, the internal ones first, by key, again with the
+moved one before its place; the moved one last for `end`. At most 512 entries are written.
+The text goes through the first 1,000 bytes of the chunk buffer; the two entries looked
+for and a drive's name stand after them.
+
+```
+1  write order.part
+2  rename order.part -> order.txt              <-
+```
+
+Then the core reads `order.txt` again and sets every key. A call that fails before the
+arrow removes `order.part` and answers `storage-error`; the keys are as they were. The
+start removes an `order.part` that a power cut left.

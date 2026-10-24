@@ -33,6 +33,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
 | `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
+| `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
@@ -212,6 +213,7 @@ succeeds.
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
+| `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
 | `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
@@ -312,3 +314,31 @@ as fit into it, and `next` is the position of the first one left out, or `null`,
 change, and is the same after a restart for the same files. `order get` is refused as
 `list` is: `show-invalid` while the show is invalid, and `busy` until the player has read
 every installed animation after a start.
+
+```
+order move 2805384113 1 3
+{"ok":true}
+```
+
+`order move <revision> <id> <before>` moves the listed animation with the id `<id>`, of the
+board's own storage or of the external storage, to stand right before the listed animation
+with the id `<before>`, or last when `<before>` is the word `end`. `<revision>` is the
+`revision` of `order get` the client read, 0 to 4,294,967,295; `<id>` and `<before>` are 1
+to 65,535. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
+the order before the move or the one after it. A move that changes nothing, of an
+animation that already stands right before `<before>`, or last for `end`, or before
+itself, writes nothing.
+
+- `bad-argument`: the words are not in their form.
+- `show-invalid`: the show is invalid.
+- `busy`: until the player has read every installed animation after a start, and while
+  an upload is open.
+- `unknown-id`: `<id>` or `<before>` is the id of no listed animation and of no cycle.
+- `in-use`: `<id>` or `<before>` is the id of a cycle, which has no place in the order.
+- `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
+  `order get` again.
+- `storage-error`: the order could not be saved. It is as it was.
+
+A move does not change the animation whose turn it is, its time, the brightness or
+whether the LEDs are on; the next turn follows the new order. It works while a test of
+the mapping shows. Every route carries it to the one command parser of the core.
