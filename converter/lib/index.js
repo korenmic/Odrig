@@ -5,6 +5,7 @@
 export * as deflate from "./deflate.js";
 export * as errors from "./errors.js";
 export * as fit from "./fit.js";
+export * as fonttables from "./fonttables.js";
 export * as inflate from "./inflate.js";
 export * as jsonframes from "./jsonframes.js";
 export * as mapping from "./mapping.js";

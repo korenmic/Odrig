@@ -339,6 +339,7 @@ a web page load the same files.
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |
 | `fit.js` | Fitting a picture to a canvas: `place`. |
 | `timeline.js` | The 50 frames-per-second timeline of decoded frames: `importFrames`. |
+| `fonttables.js` | The glyphs of the fonts of texts and the sine table of the clocks, `FONT_TABLES` and `SINE`, written by `node fonts/generate.mjs` from the fonts of the folder `fonts/`. |
 
 **Loading it in a page.** A page loads `converter/lib/index.js` as a module, and the
 browser fetches the other files of the folder from beside it. The folder is served as it
