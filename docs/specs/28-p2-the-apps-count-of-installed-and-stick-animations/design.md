@@ -23,6 +23,9 @@ show screen and the storage screen hand the module the state they already watch.
 
 ## The client
 
+`commands.space()` gives `animations` with free, total and external, or null when a reply
+has none; it gave only the capacity before.
+
 `state.listBusy` is a boolean, false at the start and when the address changes. A `busy`
 refusal of a `list` request sets it; a complete list and every other refusal clear it.
 Nothing else in the client changes: the same requests at the same times.

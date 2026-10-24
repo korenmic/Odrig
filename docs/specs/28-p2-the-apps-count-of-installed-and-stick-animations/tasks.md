@@ -24,7 +24,7 @@ Rules for every task:
   sends today.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked.
 
-- [ ] 1. The two numbers on the dashboard
+- [x] 1. The two numbers on the dashboard
   - Set `"state": "in_progress"` in the seed's `state.json`.
   - `app/www/client.js`: `state.listBusy`. `app/www/capacity.js`: `counts` and the words.
     `app/www/screens/show.js`, `app/www/screens/storage.js`: the numbers into the lines.

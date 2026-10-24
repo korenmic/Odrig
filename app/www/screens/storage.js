@@ -143,8 +143,9 @@ function draw(state) {
   }
   if (awaitingRefresh !== null && state.listVersion > awaitingRefresh) awaitingRefresh = null;
   byId("bulk-progress").dataset.refreshing = String(awaitingRefresh !== null);
-  byId("space").textContent = capacity.internal(state.space);
-  byId("external-space").textContent = capacity.external(state.space);
+  const counted = capacity.counts(state);
+  byId("space").textContent = capacity.internal(state.space, counted.internal);
+  byId("external-space").textContent = capacity.external(state.space, counted.external);
   drawRows(animations);
   for (const made of byId("installed").children) {
     const check = made.querySelector("input");

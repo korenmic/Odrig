@@ -16,7 +16,8 @@ const SPACE_EVERY_MS = 10000;
 // `animations` is the animation items of the newest complete list, in the order of the
 // show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
 // its cycles. `space` holds internal and external capacity from the newest reply, or null.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0};
+// `listBusy` says whether the newest `list` request was answered `busy`.
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0, listBusy: false};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -175,6 +176,7 @@ async function askListPart() {
       listing = {items, from: reply.next};
     } else {
       state.listVersion += 1;
+      state.listBusy = false;
       state.animations = items.filter((item) => item.cycle !== true);
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
       listAgainLater();
@@ -187,10 +189,12 @@ async function askListPart() {
       // The target has just started and still reads what it has installed. What is
       // known of its list stays, and the list is asked for again soon.
       heard();
+      state.listBusy = true;
       listAgainLater(LIST_WHEN_BUSY_MS);
     } else if (error instanceof commands.Refusal) {
       // The target answers and has no list to give: its show is invalid.
       heard();
+      state.listBusy = false;
       state.animations = null;
       state.cycles = [];
       listAgainLater();
@@ -352,6 +356,7 @@ export function begin() {
   state.animations = null;
   state.cycles = [];
   state.space = null;
+  state.listBusy = false;
   cancelWaiting();
   statusDue = true;
   listDue = false;

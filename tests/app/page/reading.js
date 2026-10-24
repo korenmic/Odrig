@@ -21,6 +21,8 @@ export function state(app) {
     silent: app.text("silent"),
     why: app.text("silent-why"),
     dimmed: app.byId("state").classList.contains("stale"),
+    internalLine: app.text("show-space"),
+    externalLine: app.text("show-external-space"),
   };
 }
 
@@ -40,6 +42,7 @@ export function controls(app) {
 export function storage(app) {
   return {
     space: app.text("space"),
+    externalSpace: app.text("external-space"),
     rows: [...app.doc.querySelectorAll("#installed > .row")].map((row) => ({
       id: Number(row.dataset.id),
       text: row.querySelector("p").innerText.replace(/\s+/g, " ").trim(),

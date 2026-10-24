@@ -16,7 +16,15 @@ The app has four screens, and a button for each at the bottom: `Show`, `Storage`
   order of the playlist. Each installed animation has an `Include in playlist`
   checkbox and an Included or Ignored label. Explicit Play still plays an ignored item.
   Both Show and Storage report internal and external capacity; absent media and
-  unavailable capacity are distinct, and external storage is read-only.
+  unavailable capacity are distinct, and external storage is read-only. Each line
+  begins with the number of animations of that storage, as
+  `Internal storage: 84 animations, free 6.7 MB of 13.5 MB` and
+  `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`: the board's
+  own from `space`, the external storage's from the list less those. A medium that is
+  present without animations says `0 animations`; an absent one says `absent` with no
+  number. While the board still reads its animations after a start, the external number
+  is `animations not known yet`, and while the show is invalid the internal one is
+  `animations not known`.
 - **The storage screen** says how much of the installation's storage is free, as
   `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
   playlist, each with its id, its file name and its size in kilobytes, and a button
@@ -466,7 +474,13 @@ installed; the phone with mobile data on.
     address: the keyboard opens, the tabs go away and the address stays in view; they
     come back when the keyboard closes. Note whether the phone has three buttons or
     gesture navigation.
-15. **Note** the phone's model, its Android version, the web view's version from the
+15. **The numbers of animations.** On the board's network, with the microSD card in,
+    once the list has come. *Seen:* `Internal storage:` begins with the number of the
+    board's own animations and `External storage:` with the number of the card's, and
+    both match what `python3 -m odrigctl --port … space` and `list` say. Take the card
+    out: within twenty seconds the external line says `absent (read-only).` with no
+    number; put it back: the number comes back.
+16. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites

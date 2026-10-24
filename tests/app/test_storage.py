@@ -42,7 +42,7 @@ class TheStorageScreen(unittest.TestCase):
         found = support.run("storage", address=address, settings={"rows": 3}).seen
         space = json.loads(emulator.command("space"))
         listed = json.loads(emulator.command("list"))["items"]
-        self.assertEqual(found["before"]["space"], f"Free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
+        self.assertEqual(found["before"]["space"], f"{space['animations']} animations, free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
         self.assertEqual([row["text"] for row in found["before"]["rows"]], [f"{item['id']} {item['file']} {-(-item['bytes'] // 1000)} KB" for item in listed])
         self.assertEqual({tuple(row["buttons"]) for row in found["before"]["rows"]}, {("Remove",)})
         self.assertEqual(found["buttons"], ["Show", "Storage", "Mapping", "Target"])
@@ -70,7 +70,7 @@ class TheStorageScreen(unittest.TestCase):
         self.assertEqual([line for line in lines_of(events) if line.startswith("remove")], ["remove 2"])
         space = json.loads(emulator.command("space"))
         self.assertGreater(space["free"], free)
-        self.assertEqual(found["after"]["space"], f"Free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
+        self.assertEqual(found["after"]["space"], f"{space['animations']} animations, free {space['free'] / 1e6:.1f} MB of {space['total'] / 1e6:.1f} MB")
 
     def test_a_removal_that_is_kept_sends_nothing(self):
         emulator, address = self.emulator(self.three())
@@ -97,7 +97,7 @@ class TheStorageScreen(unittest.TestCase):
                     settings = {"rows": 2, "remove": 2, "answer": "Remove it", "until": f"\\({code}\\)"}
                     found = support.run("storage", address=target.address, settings=settings).seen
                 self.assertEqual(found["message"], sentence)
-                self.assertEqual(found["before"]["space"], "Free 8.4 MB of 10.4 MB")
+                self.assertEqual(found["before"]["space"], "2 animations, free 8.4 MB of 10.4 MB")
                 self.assertEqual([line for _, line in target.lines if line.startswith(b"remove")], [b"remove 2"])
 
 if __name__ == "__main__":

@@ -113,8 +113,9 @@ function drawRows(animations, onTheLeds) {
 }
 
 function draw(state) {
-  byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space)}`;
-  byId("show-external-space").textContent = capacity.external(state.space);
+  const counted = capacity.counts(state);
+  byId("show-space").textContent = `Internal storage: ${capacity.internal(state.space, counted.internal)}`;
+  byId("show-external-space").textContent = capacity.external(state.space, counted.external);
   const status = state.status;
   if (status === null) {
     for (const id of ["power", "brightness", "playing", "fps"]) {

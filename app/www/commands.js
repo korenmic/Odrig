@@ -105,7 +105,10 @@ export async function space() {
         (external.present && whole(external.free, 0, Number.MAX_SAFE_INTEGER) && whole(external.total, external.free, Number.MAX_SAFE_INTEGER))))) {
     throw new Failure("bad-reply", address());
   }
-  return {free: reply.free, total: reply.total, external: external === undefined ? null : external};
+  if (reply.animations !== undefined && !whole(reply.animations, 0, 65535)) {
+    throw new Failure("bad-reply", address());
+  }
+  return {free: reply.free, total: reply.total, animations: reply.animations === undefined ? null : reply.animations, external: external === undefined ? null : external};
 }
 
 // Removes the item with this id from the show.
