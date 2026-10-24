@@ -23,8 +23,8 @@ a top bar with the app's name and whether the installation answers.
   number. While the board still reads its animations after a start, the external number
   is `animations not known yet`, and while the show is invalid the internal one is
   `animations not known`. Below them are `Playlist from the start` and `Add animation`,
-  which opens Upload; then, when Settings says so, the pinned Tests group; then the one
-  list of animations, in the saved order of the playlist. Each row names its file, its id
+  which opens Upload; then, when Settings says so, the pinned Tests group; then two
+  filters and the one list of animations, in the saved order of the playlist. Each row names its file, its id
   and its size, has a badge `in` (internal storage) or `ex` (external storage,
   read-only), and a small `...` button that opens its menu. Cycles are not listed.
 - **Upload** makes an animation from a video or a GIF of the phone and uploads it, with
@@ -255,6 +255,21 @@ each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`
 question names the count and the files before anything is sent; the deletion goes in
 batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
 gesture goes from Upload, Settings or the target screen to Animations.
+
+Two filters stand above the list, each a row of choices with the number of animations it
+would show beside each: `Storage` with `All`, `Internal` and `External`, and `Type` with
+`All`, `Normal`, `Text` and `Widget`. A row is shown when it matches both; each choice
+counts with the other filter as it is, as `External 12`, and a choice with 0 can still be
+chosen. Storage goes by where the installation says an animation is; Type by its type, an
+animation that names none being Normal, as every animation is until the installation's
+software has text and widget animations. When no row matches, the list says
+`No animation matches the filters.` with `Show all`, which sets both back to `All`. The
+choices stay on the phone across a restart of the app, and another phone has its own. A
+filter changes only what the list shows: not the playlist, its order, an animation's
+inclusion or what plays. While a filter hides rows, an animation cannot be moved, by a
+long press or by Move up and Move down, and the list says so; `Select all` takes the
+shown rows only, and a row a filter hides leaves the selection. The Tests group is not
+filtered. While the card is out, `External` counts 0.
 
 To move an animation in the order of the playlist, hold its row for half a second: it
 lifts, and a dashed place shows where it lands as the finger moves; near the top or the
@@ -531,7 +546,11 @@ installed; the phone with mobile data on.
     snake, and so on to `Snake 20`; `Diagonal` the diagonal; the now-playing panel names the
     test, and `Stop test` brings the playlist back. While one strip is fed from the board
     itself, keep the brightness at 40 or less.
-19. **Note** the phone's model, its Android version, the web view's version from the
+19. **The filters.** On the board's network with the card in, choose each choice of
+    `Storage` and `Type`. *Seen:* the rows of that storage and type only, each count the
+    number of rows it shows, `Show all` when none matches; after a restart of the app the
+    choices are kept; while a filter hides rows, holding a row lifts nothing.
+20. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -578,6 +597,11 @@ By programs, on a Mac:
   one cancelled moving nothing; Move up and Move down; a conflict, a refusal and a lost
   reply each said and read again without a second move; an older target without an order;
   moving off during the selection mode; a move of another controller shown.
+- The filters, in Chrome against the emulator and against stand-in targets that report
+  types: every combination of Storage and Type with its counts, the empty list and
+  `Show all`, the choices kept across a reload, moving off while a filter hides rows,
+  `Select all` and a filter change, the Tests group not filtered, a card pulled out and
+  plugged in, a row without a type, and no request more than without the filters.
 - The test animations, in Chrome against the emulator: the checkbox off at first and
   remembered across a reload, 21 entries pinned above the list, a snake test, stopping,
   the diagonal, a play that ends a test, a test of another controller named with the

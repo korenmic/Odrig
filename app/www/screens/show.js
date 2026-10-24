@@ -3,6 +3,7 @@
 
 import * as client from "../client.js";
 import * as capacity from "../capacity.js";
+import * as filters from "./filters.js";
 import {Refusal} from "../commands.js";
 import {Failure} from "../target.js";
 import * as messages from "../messages.js";
@@ -216,13 +217,16 @@ function draw(state) {
       byId("level-number").textContent = String(status.brightness);
     }
   }
-  const animations = shownOrder(state);
+  const all = shownOrder(state);
+  const animations = all.filter(filters.matches);
+  filters.draw(state);
   // A row that is held keeps the rows as they are until it is let go.
   if (!reorder.dragging()) {
     drawRows(animations);
     rowsState(state, animations);
   }
-  byId("none").hidden = state.animations === null || animations.length > 0;
+  byId("none").hidden = state.animations === null || all.length > 0;
+  byId("filter-empty").hidden = all.length === 0 || animations.length > 0;
   selection.draw(state);
   if (menuFor !== null && !animations.some((animation) => animation.id === menuFor)) {
     closeMenu();
@@ -403,6 +407,7 @@ export function isVisible() {
 // is written again every second.
 export function start(options) {
   message = options.message;
+  filters.start({redraw});
   selection.start({message, redraw});
   reorder.start({message, redraw, shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});

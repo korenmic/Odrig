@@ -401,6 +401,37 @@ input[type="range"] {
   margin: 8px 0;
 }
 
+/* The filters over the list. */
+.filter p {
+  margin: 4px 0 0;
+}
+
+.filter [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter button {
+  width: auto;
+  min-width: 48px;
+  min-height: 48px;
+  margin: 6px 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+
+.filter button[aria-pressed="true"] {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: var(--on-accent);
+}
+
+.filter .count {
+  font-weight: 650;
+}
+
 #order-note:empty {
   display: none;
 }

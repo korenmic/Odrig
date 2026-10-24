@@ -73,9 +73,17 @@
 </div>
 <p id="bulk-progress" role="status" aria-live="polite"></p>
 </div>
+<div id="filters" hidden>
+<div class="filter"><p class="small">Storage</p><div id="filter-storage" role="group" aria-label="Storage"></div></div>
+<div class="filter"><p class="small">Type</p><div id="filter-type" role="group" aria-label="Type"></div></div>
+</div>
 <p id="order-note" class="small" role="status" aria-live="polite"></p>
 <div id="animations-list" role="list" aria-labelledby="list-title"></div>
 <p id="none" hidden>No animation is installed.</p>
+<div id="filter-empty" hidden>
+<p>No animation matches the filters.</p>
+<button id="filter-reset" type="button">Show all</button>
+</div>
 </section>
 <section id="upload" hidden>
 <h1>Upload</h1>

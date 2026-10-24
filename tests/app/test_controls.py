@@ -55,7 +55,8 @@ class Buttons(Controls):
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play all", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play all"])
         self.assertEqual(emulator.status()["playing"], "all")
-        self.assertEqual(seen[0]["buttons"], ["On", "Off", "Playlist from the start", "Add animation", "Select", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
+        self.assertEqual(seen[0]["buttons"], ["On", "Off", "Playlist from the start", "Add animation", "Select", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
+                                              "Widget, 0", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
 
 
 class TheSlider(Controls):
