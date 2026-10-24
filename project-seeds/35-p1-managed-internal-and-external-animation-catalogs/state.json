@@ -1,0 +1,10 @@
+{
+  "number": 35,
+  "slug": "35-p1-managed-internal-and-external-animation-catalogs",
+  "state": "remaining",
+  "title": "Managed internal and external animation catalogs",
+  "priority": "P1",
+  "addedAt": "2026-10-24T06:22:45+03:00",
+  "addedCommit": "pending-local",
+  "summary": "Manage separate persistent internal and external animation catalogs through compatible PC Python and runtime C++ ingestion, eliminating routine full-library boot scans and reloading only changed external metadata with bounded per-refresh work."
+}
