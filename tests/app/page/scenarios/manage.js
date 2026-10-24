@@ -20,6 +20,8 @@ export default async function(app) {
     return seen;
   }
   if (app.settings.toggle) {
+    const client = await app.frame.contentWindow.eval('import("/client.js")');
+    await app.until(() => client.state.order !== null, "the saved order");
     seen.before = !ignored();
     seen.menu = menuOf(app, 1);
     choose(app, "Ignore in playlist");

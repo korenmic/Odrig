@@ -6,6 +6,7 @@ import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import {Failure} from "../target.js";
 import * as messages from "../messages.js";
+import * as filters from "./filters.js";
 import * as selection from "./selection.js";
 
 // How long a press is held before the row lifts, how far it may move before that and
@@ -40,6 +41,7 @@ export function blocked() {
   if (state.order === null) return "The order is being read.";
   if (saving !== null) return "Saving the order\u2026";
   if (selection.busy() || client.contentBusy()) return "The order can be changed again when the upload or the deletion has ended.";
+  if (filters.filtering()) return "Set both filters to All to move animations: hidden rows would make the places unclear.";
   if (selection.isSelecting()) return "Leave the selection with Done to move animations.";
   return null;
 }

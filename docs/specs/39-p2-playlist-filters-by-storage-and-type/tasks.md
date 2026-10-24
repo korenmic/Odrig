@@ -15,7 +15,7 @@ Rules for every task:
 - No command, reply member or error code is added, and nothing outside `app/www/`, the
   tests and the documents changes.
 
-- [ ] 1. The two filters
+- [x] 1. The two filters
   - Set the seed's `state.json` to `in_progress`.
   - `app/www/screens/filters.js`; `index.html`, `style.css`; `screens/show.js` (rows that
     match, the empty list); `screens/reorder.js` (off while filtered);

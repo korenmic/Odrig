@@ -4,6 +4,7 @@
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
 import * as messages from "../messages.js";
+import * as filters from "./filters.js";
 
 // The most ids one `remove many` carries.
 const BATCH = 32;
@@ -16,7 +17,6 @@ let asked = null;
 let deleting = false;
 let awaitingRefresh = null;
 let version = -1;
-let listed = null;
 let message = () => {};
 let redraw = () => {};
 
@@ -25,9 +25,9 @@ function byId(id) {
 }
 
 // Whether an animation can be selected: an internal one of a target that reports its
-// inclusion.
+// inclusion, which the filters show.
 function selectable(item) {
-  return typeof item.ignored === "boolean" && item.external !== true;
+  return typeof item.ignored === "boolean" && item.external !== true && filters.matches(item);
 }
 
 // Whether a deletion, a refresh after one, an upload or the link keeps the list's
@@ -131,16 +131,13 @@ export function draw(state) {
     selecting = false;
     deleting = false;
     awaitingRefresh = null;
-    listed = null;
     close();
     byId("bulk-progress").textContent = "";
   }
   const animations = state.animations === null ? [] : state.animations;
-  if (listed !== state.animations) {
-    listed = state.animations;
-    const ids = new Set(animations.filter(selectable).map((item) => item.id));
-    for (const id of selected) if (!ids.has(id)) selected.delete(id);
-  }
+  // A row that the list no longer has, or that a filter hides, leaves the selection.
+  const ids = new Set(animations.filter(selectable).map((item) => item.id));
+  for (const id of selected) if (!ids.has(id)) selected.delete(id);
   if (awaitingRefresh !== null && state.listVersion > awaitingRefresh) awaitingRefresh = null;
   byId("bulk-progress").dataset.refreshing = String(awaitingRefresh !== null);
   const canSelect = animations.some(selectable);

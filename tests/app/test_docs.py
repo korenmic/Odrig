@@ -127,8 +127,8 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 20)))
-        self.assertEqual(check.count("*Seen:*"), 18)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 21)))
+        self.assertEqual(check.count("*Seen:*"), 19)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
                          "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",
