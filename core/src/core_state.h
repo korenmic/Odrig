@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "container.h"
 #include "file_source.h"
 #include "inflate.h"
 #include "odrg_decoder.h"
@@ -38,17 +39,18 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` file the show names. `bytes` is its size, known once a check has read its
-// body to its end. `total_ms` is its length, the sum of the durations of its frames, and 0
-// while it is not known: a check finds it, and so does playing the file through once.
-// `fault` is the Reason of a fault of the file in this boot, kNone while it is usable: a
-// file with a fault is quarantined, and its animations are unavailable until an upload
-// replaces it. `checked` says that a check has read it whole in this boot, so that its
-// `bytes` are known.
+// One `.odrg` or `.odrgx` file the show names. `type` is what it holds, as its header says.
+// `bytes` is its size, known once a check has read its body to its end. `total_ms` is its
+// length, the sum of the durations of its frames, and 0 while it is not known: a check
+// finds it, and so does playing the file through once. `fault` is the Reason of a fault of
+// the file in this boot, kNone while it is usable: a file with a fault is quarantined, and
+// its animations are unavailable until an upload replaces it. `checked` says that a check
+// has read it whole in this boot, so that its `bytes` are known.
 struct FileInfo {
     char name[33];
     uint8_t fault;
     uint8_t checked;
+    uint8_t type;
     uint32_t bytes;
     uint64_t total_ms;
 };
@@ -114,6 +116,7 @@ struct Upload {
     uint8_t header_read;    // the first step of the check has been taken
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
+    ContentHeader content;  // what the file holds, once the check has read its header
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received
@@ -122,14 +125,15 @@ struct Upload {
     uint64_t progress;      // the time something last moved
 };
 
-// What the core knows of the file at one place of a drive's list: its size and its
-// length once the check has read it whole, the id it got when the drive was taken up, its
-// state, and the Reason it was left out for.
+// What the core knows of the file at one place of a drive's list: its size, its length and
+// its type once the check has read it whole, the id it got when the drive was taken up, its
+// state, and the Reason it was left out for. The state and the type share a byte.
 struct DriveEntry {
     uint64_t total_ms;
     uint32_t bytes;
     uint16_t id;
-    uint8_t state;
+    uint8_t state : 4;
+    uint8_t type : 4;
     uint8_t fault;
 };
 
@@ -242,6 +246,7 @@ struct Core {
     // many refreshes in a row came without a grid time left out, counted to
     // kCheckMostSteps; and at how many refreshes in a row the check took no step.
     uint32_t check_at;
+    ContentHeader check_content;
     uint32_t check_records_left;
     uint64_t check_total_ms;
     uint8_t check_done;

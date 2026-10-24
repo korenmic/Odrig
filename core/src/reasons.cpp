@@ -34,6 +34,12 @@ const char *reason_name(Reason reason) {
         case kTooMuchPadding: return "too-much-padding";
         case kBadPaletteIndex: return "bad-palette-index";
         case kTrailingBytes: return "trailing-bytes";
+        case kBadContainer: return "bad-container";
+        case kUnknownType: return "unknown-type";
+        case kUnknownTypeVersion: return "unknown-type-version";
+        case kPayloadSize: return "payload-size";
+        case kCanvasMismatch: return "canvas-mismatch";
+        case kLoopMismatch: return "loop-mismatch";
         case kNone:
         case kEnd:
         case kReasonCount:

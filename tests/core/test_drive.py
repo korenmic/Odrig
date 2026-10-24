@@ -134,7 +134,7 @@ class TheDrivesList(unittest.TestCase):
         without = support.start(SHOW, script)
         with a_drive(DRIVE) as top:
             fixed = support.start(SHOW, script, ["--drive", top, "--only-space"])
-        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False, "external": False}], "next": None})
+        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False, "external": False, "type": "frames"}], "next": None})
         self.assertEqual(replies(without)[2], refusal("unknown-id"))
         self.assertEqual(replies(fixed), replies(without))
 

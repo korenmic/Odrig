@@ -47,7 +47,7 @@ Rules for every task:
     container with its reason; `.odrgx` names in a show and in `pack`.
   - Requirements: 1.1 to 1.6, 2.1, 11.2, 11.3
 
-- [ ] 3. The container in the core
+- [x] 3. The container in the core
   - `core/src/container.h/.cpp`, `FileSource::rewind`; the start, the check after it, a
     drive's check and the upload's check through `content_open`; `open_stream` of a frames
     container; `FileInfo.type`, `DriveEntry.type`; `.odrgx` names; `list` with `type`.

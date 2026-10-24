@@ -35,6 +35,7 @@ const char kListBytes[] = "\",\"bytes\":";
 const char kListCycle[] = ",\"cycle\":[";
 const char kListSeconds[] = "],\"seconds\":";
 const char kListNext[] = "],\"next\":";
+const char kListType[] = ",\"type\":\"";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
 const char kListInternal[] = ",\"external\":false";
 const char kListExternal[] = ",\"external\":true";
@@ -54,7 +55,7 @@ uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) 
         const uint32_t bytes = fault != kNone || !file.checked ? 4 : digits(file.bytes);
         const uint32_t fault_size = fault != kNone ? text_length(kListFault) + text_length(reason_name(fault)) + 1 : 0;
         return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) +
-               text_length(kListInternal) + fault_size + 1;
+               text_length(kListInternal) + text_length(kListType) + text_length(type_name(file.type)) + 1 + fault_size + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -195,7 +196,7 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             const char *fault = reason_name(static_cast<Reason>(entry.fault));
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
                                   text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) +
-                                  text_length(kListExternal) + 1;
+                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(entry.type)) + 1 + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -214,6 +215,9 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
                 reply.number(entry.bytes);
             }
             reply.text(kListExternal);
+            reply.text(kListType);
+            reply.text(type_name(entry.type));
+            reply.text("\"");
             if (left_out) {
                 reply.text(kListFault);
                 reply.text(fault);
@@ -252,6 +256,9 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             }
             reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
             reply.text(kListInternal);
+            reply.text(kListType);
+            reply.text(type_name(file.type));
+            reply.text("\"");
             if (file.fault != kNone) {
                 reply.text(kListFault);
                 reply.text(reason_name(static_cast<Reason>(file.fault)));
@@ -436,7 +443,7 @@ namespace {
 
 // The file of an upload whose check has passed: a new content, which is usable and was
 // read whole.
-void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms) {
+void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
         file.name[length] = name[length];
@@ -446,11 +453,12 @@ void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_m
     file.checked = 1;
     file.bytes = bytes;
     file.total_ms = total_ms;
+    file.type = type;
 }
 
 }  // namespace
 
-void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms) {
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     ItemInfo &item = core.items[core.item_count++];
     item.id = static_cast<uint16_t>(id);
     item.seconds = 0;
@@ -459,11 +467,11 @@ void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes,
     item.has_ignored = 0;
     item.first = core.file_count++;
     item.count = 0;
-    set_file(core.files[item.first], name, bytes, total_ms);
+    set_file(core.files[item.first], name, bytes, total_ms, type);
     order_item_added(core, core.item_count - 1);
 }
 
-void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms) {
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     ItemInfo &item = core.items[position];
     for (uint32_t other = 0; other < core.item_count; ++other) {
         if (other != position && !core.items[other].is_cycle && core.items[other].first == item.first) {
@@ -473,7 +481,7 @@ void content_change_file(Core &core, uint32_t position, const char *name, uint32
             break;
         }
     }
-    set_file(core.files[item.first], name, bytes, total_ms);
+    set_file(core.files[item.first], name, bytes, total_ms, type);
 }
 
 void content_take_out(Core &core, uint32_t position) {

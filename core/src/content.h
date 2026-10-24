@@ -45,12 +45,12 @@ struct ShowChange {
 bool content_write_show(Core &core, const ShowChange &change);
 
 // Adds an animation item with a file of its own at the end of the tables. There is room.
-void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms);
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type = kTypeFrames);
 
 // Gives the animation item at a position another file: its name, its size and its total
 // duration. When another item names the item's old file too, the item gets an entry of
 // its own at the end of the file table.
-void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms);
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type = kTypeFrames);
 
 // Takes the item at a position out of the tables: the items after it move up, its
 // entries leave the entry table when it is a cycle, and its file leaves the file table

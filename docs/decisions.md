@@ -578,3 +578,9 @@ are in [format.md](format.md), "Measured sizes".
   choice, choices kept on the phone, and moving off while a filter hides rows. The web
   code alone does it, from `external` and `type` of `list`; no command or reply member is
   added. The owner's check on a phone with the card in is open.
+- 2026-10-24: Seed 37 adds the reply member `type` to every animation item of `list`, of
+  the show and of a drive, after `external` and before `fault`: `"frames"` for an ODRG
+  file and an ODRGX container of frames, by the file's header. Approved by the owner in
+  advance; a reply without it counts as frames. A show may name `.odrgx` files, and the
+  player reads a container of frames as it reads the ODRG file it holds; a container
+  with a fault is quarantined as an ODRG file is.

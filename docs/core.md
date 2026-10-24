@@ -74,7 +74,7 @@ Every function receives `ctx` as its first argument.
 |---|---|
 | `ctx` | Any pointer of the host's. The core only hands it back. |
 | `alloc` | `void *alloc(void *ctx, size_t bytes)`: memory of that size, aligned for any object, or `NULL` when the host has none. The core calls it only inside `odrig_core_begin`, never frees what it got, and clears each block itself. |
-| `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
+| `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` and `.odrgx` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
 | `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs three things: the reason text when the show becomes invalid, `file <name> unavailable: <reason>` when it quarantines a file of the show, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
@@ -644,7 +644,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,664 |
+| The core object | fixed | 3,696 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -661,17 +661,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,197** |
+| **Total** | | **125,229** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,674 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,706 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,401 bytes for the target file. A host with a drive
+of the check and the saved order: 77,433 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 16 bytes
 for each of 256 places, 4,096 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 130,701 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 130,733 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

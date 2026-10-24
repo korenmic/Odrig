@@ -165,7 +165,7 @@ class Busy(Playback):
     def test_list_remove_and_upload_begin_are_answered_while_the_files_are_being_read(self):
         commands = ["list", "list 2", "remove 2", f"upload begin 9 new.odrg {len(self.NEW)}", f"upload begin 1 a.odrg {len(self.NEW)}"]
         self.assertEqual(self.asked(commands), [
-            '{"ok":true,"items":[{"id":1,"file":"a.odrg","bytes":null,"ignored":false,"external":false},{"id":2,"file":"b.odrg","bytes":null,"ignored":false,"external":false}],"next":null}',
+            '{"ok":true,"items":[{"id":1,"file":"a.odrg","bytes":null,"ignored":false,"external":false,"type":"frames"},{"id":2,"file":"b.odrg","bytes":null,"ignored":false,"external":false,"type":"frames"}],"next":null}',
             '{"ok":true,"items":[],"next":null}', OK, '{"ok":true,"chunk":1500}', refused("busy"),
         ])
 

@@ -97,8 +97,8 @@ void upload_step(Core &core, uint64_t now) {
     if (!upload.header_read) {
         // The header is judged first, then the size against the mapping.
         checker.file.open_at(core.host, kUploadPart);
-        reason = checker.decoder.open(&checker.file, &checker.inflate, core.check_window);
-        if (reason == kNone && (checker.decoder.width != core.width || checker.decoder.height != core.height)) {
+        reason = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &upload.content);
+        if (reason == kNone && (upload.content.width != core.width || upload.content.height != core.height)) {
             reason = kSizeMismatch;
         }
         if (reason == kNone) {
@@ -125,7 +125,7 @@ void upload_step(Core &core, uint64_t now) {
         // After the last record nothing may follow, and what was read back from storage
         // must be what was received.
         record = checker.decoder.frames;
-        reason = checker.decoder.finish();
+        reason = content_finish(&checker.file, &checker.decoder, upload.content, upload.total_ms);
         if (reason == kPendingWork) {
             return;
         }

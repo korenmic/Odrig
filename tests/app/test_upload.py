@@ -67,7 +67,7 @@ class Uploading(unittest.TestCase):
             events = stream.read_for(1)
         self.assertEqual(found["message"], "Uploaded as animation 4 clip.odrg. It plays in the playlist.")
         self.assertEqual((folder / "clip.odrg").read_bytes(), support.converted_by_the_command_line(self.media / "clip.gif", self.mapping).odrg)
-        self.assertIn({"id": 4, "file": "clip.odrg", "bytes": (folder / "clip.odrg").stat().st_size, "ignored": False, "external": False}, json.loads(emulator.command("list"))["items"])
+        self.assertIn({"id": 4, "file": "clip.odrg", "bytes": (folder / "clip.odrg").stat().st_size, "ignored": False, "external": False, "type": "frames"}, json.loads(emulator.command("list"))["items"])
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 4])
         self.assertEqual(found["now"], "Now 4 clip.odrg")
         self.assertEqual(emulator.status()["animation"], 4)

@@ -73,11 +73,12 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     if (reason != kNone) {
         return reason;
     }
-    reason = core.decoder.open(&core.file, &core.inflate, core.window);
+    ContentHeader header;
+    reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
     if (reason != kNone) {
         return reason;
     }
-    if (core.decoder.width != core.width || core.decoder.height != core.height) {
+    if (header.width != core.width || header.height != core.height) {
         return kSizeMismatch;
     }
     memset(core.pixels, 0, core.decoder.n);
