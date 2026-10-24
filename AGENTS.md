@@ -127,8 +127,7 @@ present, and do not build on them.
   board reads no stick through a hub.
 - **A USB log on the serial port**, seed 23: what the board's own USB port sees.
 - **A bigger animation space**, seed 24: about 13.5 MB in place of 10.35 MB, by giving
-  up firmware updates over Wi-Fi; the tool and the firmware have it, and no board has been
-  moved to it yet.
+  up firmware updates over Wi-Fi; the board was moved to it on 2026-10-16; checks are open.
 - **A second firmware that does not use WLED**, seed 12, as a fallback for the event.
 - **Every suite passes on Windows again**, seed 26: today seven tests of the emulator's
   suite and two of the app's fail on Windows, and the stop of `odrigctl --log` is not
@@ -139,6 +138,7 @@ present, and do not build on them.
   through the shared app, emulator controller or serial; keep files and explicit play.
 - **App mapping and a diagonal check**, seed 30: save pin-to-snake assignments from the
   shared app and show a diagonal test line for the owner's visual check on the real LEDs.
+- **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
 
 The state of every seed is in the `state.json` of its folder.
 
