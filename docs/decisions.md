@@ -679,3 +679,7 @@ are in [format.md](format.md), "Measured sizes".
   everything that needs neither the card nor the owner's eyes, and seed 38's card sessions
   are open, as the card was not mounted. One restart for a panic after the first catalog
   rebuild is not explained. docs/firmware.md, "Verified on the board", has the record.
+- 2026-10-25: The owner's report from a phone: Settings flickered every two seconds and an
+  open selector of the mapping editor closed. The editor's read every two seconds disabled
+  all twenty selectors while it waited; it now changes nothing unless the target's mapping
+  changed.

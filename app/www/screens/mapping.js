@@ -11,6 +11,9 @@ let latest = null;
 let base = null;
 let draft = [];
 let pending = false;
+// A read in the background is under way: it neither disables nor redraws anything until
+// its reply shows that something changed.
+let polling = false;
 let needsReload = false;
 let problem = "";
 let note = "";
@@ -78,10 +81,13 @@ function rows() {
       return row;
     }));
   }
+  // Only what differs is set, so that an open picker is left as it is.
   for (let at=0; at<20; at++) {
     const select = byId(`mapping-pin-${at+1}`);
-    select.value = String(draft[at]);
-    select.disabled = pending || needsReload || conflict() || !fresh;
+    const value = String(draft[at]);
+    if (select.value !== value) select.value = value;
+    const off = pending || needsReload || conflict() || !fresh;
+    if (select.disabled !== off) select.disabled = off;
   }
 }
 
@@ -142,6 +148,30 @@ async function read(replace = false) {
   }
 }
 
+// The read every two seconds while Settings shows: the editor changes only when the target's
+// mapping did, and a reply that does not come changes nothing.
+async function poll() {
+  if (!ready || pending || polling || document.hidden) return;
+  const asked = version;
+  polling = true;
+  try {
+    const reply = await client.mappingGet();
+    if (asked !== version || pending) return;
+    const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable || !same(latest.pins, reply.pins);
+    latest = reply;
+    fresh = true;
+    if (changed && (base === null || (!dirty() && !needsReload))) adopt(reply);
+    if (changed) {
+      if (!needsReload) problem = "";
+      draw();
+    }
+  } catch (_) {
+    // The next read, or Save or Reload, says what the target answers.
+  } finally {
+    if (asked === version) polling = false;
+  }
+}
+
 async function change(carry, saved = false) {
   if (pending) return;
   const asked = version;
@@ -178,7 +208,10 @@ async function change(carry, saved = false) {
 
 export function showing(shown) {
   visible = shown;
-  if (shown) read();
+  if (shown) {
+    if (base === null) read();
+    else poll();
+  }
 }
 
 export function start() {
@@ -191,8 +224,8 @@ export function start() {
   byId("mapping-reload").addEventListener("click", () => read(true));
   byId("mapping-defaults").addEventListener("click", () => {draft = [...DEFAULTS];note = "Defaults are a draft. Save to apply them.";draw();});
   client.watch(() => {
-    if (version !== client.targetVersion()) {reset();if (visible) read();}
+    if (version !== client.targetVersion()) {reset();polling = false;if (visible) read();}
     draw();
   });
-  setInterval(() => {if (visible && !document.hidden) read();}, 2000);
+  setInterval(() => {if (visible && !document.hidden) poll();}, 2000);
 }

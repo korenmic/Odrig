@@ -29,6 +29,13 @@ class MappingApp(unittest.TestCase):
         self.assertEqual([tab['text'] for tab in found['tabs']],['Animations','Upload','Settings','Target'])
         self.assertTrue(all(tab['width']>=56 for tab in found['tabs']))
 
+    def test_background_reads_neither_close_a_picker_nor_drop_a_choice(self):
+        target = self.opened()
+        found = browser.run("mapping-steady", address=f"127.0.0.1:{target.port}").seen
+        self.assertGreaterEqual(found['tried'], 9)
+        self.assertEqual((found['disabled'], found['blurred'], found['waiting']), (0, 0, 0), found)
+        self.assertEqual(found['kept'], found['tried'], found)
+
     def test_external_change_preserves_dirty_draft_and_requires_reload(self):
         target = self.opened()
         other = PINS[::-1]

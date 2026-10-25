@@ -495,7 +495,9 @@ assignments in a local draft. Save writes the entire permutation with its base r
 Cancel adopts the latest saved assignment, Reload reads it again, and Restore defaults
 creates a draft only when the installed pin set matches those defaults. No new pin can
 be entered. Save is disabled while a request is pending or another controller has changed
-the mapping. A background read preserves the draft and asks for Reload or Cancel.
+the mapping. A background read preserves the draft and asks for Reload or Cancel. The
+read every two seconds changes the editor only when the target's mapping changed: it never
+disables a selector, so an open one stays open, and a choice made meanwhile is kept.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
