@@ -58,7 +58,7 @@ class TheLog(unittest.TestCase):
     def test_the_usb_ports_events_are_lines_of_the_log(self):
         for text in ("a computer is on the port, which stays a serial port", "no computer on the port within", "host started", "host did not start: ",
                      "a device came: %s", "maker %04x, product %04x, %s", "a hub", "a stick", "another device (class %u)", "a device went: %s",
-                     "stick opened: %u animation files in odrig", "stick not opened: ", "the stick has no folder odrig"):
+                     "stick mounted", "stick opened: %u animation files in odrig", "stick not opened: ", "the stick has no folder odrig"):
             self.assertIn(text, self.drive, text)
         self.assertIn("usb_host_client_register(", self.drive)
         self.assertIn("USB_HOST_CLIENT_EVENT_NEW_DEV", self.drive)

@@ -115,7 +115,7 @@ Rules for every task:
     core's rebuild of the same folder gives the same pages.
   - Prove it fails first.
 
-- [ ] 11. The firmware writes the card
+- [x] 11. The firmware writes the card
   - `firmware/usermod/odrig_drive.cpp`: `drive_list` on demand, `drive_bind`,
     `drive_writable` (the SD card when mounted; the USB drive 0), the file functions by
     name, `rename` onto an existing file; `odrig_files.cpp` routes `drive/` names.

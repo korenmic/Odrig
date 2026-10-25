@@ -896,8 +896,9 @@ section says.
   USB-C adapter or hub with a power input of its own, which is powered. The computer
   reaches the board on the socket marked COM, for commands and for flashing.
 - **Plugging in and pulling out** work while the board runs. A drive is taken up when it
-  comes: mounted, its folder listed once, and its files read and added to the playlist
-  one by one while the show plays. When it goes, its animations leave the playlist.
+  comes: mounted, and read from its catalog when it has one; otherwise its folder is
+  listed once, when the core asks, and its files are read and added to the playlist one
+  by one while the show plays. When it goes, its animations leave the playlist.
 - WLED's information has `odrig drive`: `looking for a computer` during the wait,
   `computer`, `none`, the number of animation files of the drive, `not readable` for a
   drive that did not mount, or `no USB host` when the host did not start.
@@ -917,6 +918,7 @@ kind of the line, and its text.
 #log 5.012 usb: no computer on the port within 5 s
 #log 5.020 usb: host started
 #log 31.407 usb: a device came: maker 0781, product 5581, a stick
+#log 31.884 usb: stick mounted
 #log 31.902 usb: stick opened: 12 animation files in odrig
 #log 32.115 player: drive file clip.odrg left out: size-mismatch
 #log 58.230 usb: a device went: maker 0781, product 5581, a stick
@@ -953,16 +955,18 @@ The lines of the kind `usb`, which only the USB stick's build writes:
   the device's descriptor; they are only written, and the firmware treats no maker and no
   product apart. The log keeps up to eight devices at once, a hub and what is plugged into
   it among them, to say when each goes; a ninth has its line of coming only.
-- A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
-  `stick not opened: no file system it reads (<error>)`,
-  `stick not opened: a fault in reading (<error>)`, or
+- A stick mounted: `stick mounted`, `the stick has no folder odrig`,
+  `stick not opened: no file system it reads (<error>)`, or
+  `stick not opened: a fault in reading (<error>)`. Its folder listed, when the core asks
+  for a stick without a catalog: `stick opened: <n> animation files in odrig`, or
   `stick not opened: a fault in reading the folder odrig`.
 
 The lines of the kind `sd` are those of the firmware, which reads the card and has no
 line of the kind `usb`:
 
-- A card mounted: `card opened: <n> animation files in odrig`,
-  `the card has no folder odrig`, or `card folder odrig could not be read`.
+- A card mounted: `card mounted`, or `the card has no folder odrig`. Its folder listed,
+  when the core asks for a card without a catalog: `card opened: <n> animation files in
+  odrig`, or `card folder odrig could not be read`.
 - No card: `card not mounted; no card or unreadable file system`, once for each spell
   without a card; and `card unavailable; files closed, waiting for a card` when a card
   went.
@@ -2159,4 +2163,4 @@ cannot split a frame between two assignments. The standalone output adapter foll
 the same pin lookup contract. Its current main program remains a seed-12 trial,
 not a complete standalone player or evidence that app control works on that trial.
 
-The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never writes or formats removable media. Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never formats removable media, never writes a USB stick, and changes only files of a card's folder `odrig`, as the core asks ([microsd.md](microsd.md#plugging-in-and-pulling-out)). Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.

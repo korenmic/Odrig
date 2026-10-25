@@ -22,7 +22,7 @@ STANDALONE = FIRMWARE / "standalone"
 # counter, the routing of a pin to it, and the LCD unit, which is the parallel driver.
 ALLOWED_IN = {
     "odrig_serial.cpp": {"hal/usb_serial_jtag_ll.h"},
-    "odrig_drive.cpp": {"dirent.h", "SD.h", "SPI.h", "soc/usb_serial_jtag_struct.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
+    "odrig_drive.cpp": {"dirent.h", "sys/stat.h", "unistd.h", "SD.h", "SPI.h", "soc/usb_serial_jtag_struct.h", "usb/msc_host.h", "usb/msc_host_vfs.h", "usb/usb_host.h"},
     "odrig_update.cpp": {"esp_ota_ops.h"},
     "odrig_probe.cpp": {"driver/pcnt.h", "esp_rom_gpio.h", "soc/gpio_periph.h", "soc/lcd_cam_struct.h", "soc/pcnt_periph.h"},
 }
@@ -542,6 +542,12 @@ class Pacing(unittest.TestCase):
         timed = self.files[self.files.index("struct Timed {"):self.files.index("// Memory from the chip's internal memory")]
         for expected in ("Timed() : startUs(esp_timer_get_time()) {}", "lastCallEndUs = endUs;", "busyUs += tookUs;"):
             self.assertIn(expected, timed)
+
+    def test_a_storage_call_made_elsewhere_is_timed_as_these_are(self):
+        header = text_of(USERMOD / "odrig_files.h")
+        self.assertIn("class StorageCall {", header)
+        self.assertIn("OdrigFiles::StorageCall::StorageCall() : startUs(esp_timer_get_time()) {}", self.files)
+        self.assertRegex(self.files, r"OdrigFiles::StorageCall::~StorageCall\(\) \{\n\s+Timed timed;\n\s+timed\.startUs = startUs;\n\}")
 
     def test_a_line_waits_twice_the_time_of_the_storage_calls_and_20_ms_at_least(self):
         self.assertIn("const int64_t SHORTEST_HOLD_US = 20000;", self.files)
