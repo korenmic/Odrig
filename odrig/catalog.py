@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-from . import errors, odrg
+from . import errors, odrg, odrgx
 
 FORMAT = 1
 CHECK = 1
@@ -27,6 +27,8 @@ LONGEST_LIST = 256
 # The canvas of the installation, which a card's animations are for.
 CANVAS = (60, 60)
 TYPES = ("frames", "text", "widget")
+# The endings of the names of animation files: an ODRG file, an ODRGX container.
+ENDINGS = (".odrg", odrgx.ENDING)
 FORBIDDEN = set('/\\:*?"<>|')
 
 # What a catalog is: none (the storage has no catalog), ok, damaged, incompatible.
@@ -74,7 +76,7 @@ def name_allowed(name):
         return False
     if name[0] in ". " or name[-1] in ". " or name.isdigit():
         return False
-    return name.lower().endswith(".odrg")
+    return name.lower().endswith(ENDINGS)
 
 
 class Unusable(Exception):
@@ -215,11 +217,24 @@ def parse_do(data):
 
 def entry_of(name, data, canvas=CANVAS):
     """The entry of an animation file of this name and these bytes, as the core's check
-    admits it. Raises `errors.Rejection` with the check's reason."""
-    decoded = odrg.decode(data)
-    if canvas is not None and (decoded.width, decoded.height) != tuple(canvas):
-        raise errors.Rejection(errors.SIZE_MISMATCH, f"the file is {decoded.width} x {decoded.height}, the canvas {canvas[0]} x {canvas[1]}")
-    return Entry(name, len(data), crc(data), decoded.width, decoded.height, sum(duration for duration, _ in decoded.records))
+    admits it: an ODRG file, of frames, its length the sum of their durations; or an ODRGX
+    container, told apart by its first four bytes, of its type and with the loop its header
+    gives, a container of frames read through its frames, one of text or a widget by its
+    header and the length its header gives the payload. With `canvas` None the canvas is not
+    compared. Raises `errors.Rejection` with the check's reason."""
+    if odrgx.is_container(data):
+        header = odrgx.read_header(data)
+        if odrgx.TYPE_NAMES[header.type] == "frames":
+            header, _ = odrgx.decode_frames(data)
+        elif len(data) - odrgx.HEADER.size != header.payload_size:
+            raise errors.Rejection(errors.PAYLOAD_SIZE, f"the header gives the payload {header.payload_size} bytes and it has {len(data) - odrgx.HEADER.size}")
+        width, height, total_ms, kind = header.width, header.height, header.loop_ms, odrgx.TYPE_NAMES[header.type]
+    else:
+        decoded = odrg.decode(data)
+        width, height, total_ms, kind = decoded.width, decoded.height, sum(duration for duration, _ in decoded.records), "frames"
+    if canvas is not None and (width, height) != tuple(canvas):
+        raise errors.Rejection(errors.SIZE_MISMATCH, f"the file is {width} x {height}, the canvas {canvas[0]} x {canvas[1]}")
+    return Entry(name, len(data), crc(data), width, height, total_ms, kind)
 
 
 class Storage:
@@ -262,13 +277,14 @@ class Storage:
 
     def names(self):
         """The animation files of the folder as a drive lists them: names ending in `.odrg`
-        in any case and not beginning with a dot, in the order of their bytes, the first 256."""
+        or `.odrgx` in any case and not beginning with a dot, in the order of their bytes, the
+        first 256."""
         try:
             with os.scandir(self.folder) as entries:
                 found = [entry.name for entry in entries if entry.is_file()]
         except OSError:
             return []
-        kept = [name for name in found if name.lower().endswith(".odrg") and not name.startswith(".")]
+        kept = [name for name in found if name.lower().endswith(ENDINGS) and not name.startswith(".")]
         return sorted(kept, key=os.fsencode)[:LONGEST_LIST]
 
 
@@ -294,7 +310,7 @@ class MemoryStorage(Storage):
         return self.files.pop(name, None) is not None
 
     def names(self):
-        kept = [name for name in self.files if name.lower().endswith(".odrg") and not name.startswith(".")]
+        kept = [name for name in self.files if name.lower().endswith(ENDINGS) and not name.startswith(".")]
         return sorted(kept, key=lambda name: name.encode("utf-8", "surrogateescape"))[:LONGEST_LIST]
 
 

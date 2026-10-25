@@ -10130,3 +10130,25 @@ checks them at its start.
 
 **Resolution.** `firmware/fwtool/storage.py`, `_check_animation`;
 `tests/firmware/test_containers.py`.
+
+## Seed 37: the type and the loop in a catalog, the PC part
+
+**Question.** Seed 35's catalogs were made before seed 37 and read every file as ODRG. Seed
+37's task 14 asks the catalogs to register the type and the loop of every file. Does the
+format have room, and what does the PC library record?
+
+**Answer.** The format has room: each line of a page holds a length in milliseconds and a
+type, `frames`, `text` or `widget`, so no line changes its form. `odrig.catalog.entry_of` reads
+a container as the core's check does, told apart by its first four bytes: one of frames by
+`odrgx.decode_frames`, one of text or a widget by `odrgx.read_header` and the length its
+header gives the payload; the entry has the header's canvas, its loop as the length and its
+type; an ODRG file stays of `frames` with the sum of its durations. Names may end in
+`.odrgx`, and a storage lists them as the drive does. `canvas=None` leaves the canvas
+uncompared, which the firmware tool's check uses before it compares the mapping's in its own
+words. This is the PC library's half; the core's reader of a catalog still takes names
+ending in `.odrg` only and writes `frames` for every entry, and is the other half of the
+task.
+
+**Resolution.** `odrig/catalog.py`, `entry_of`, `name_allowed`, `names`;
+`firmware/fwtool/storage.py`, `_check_animation`; `tests/converter/test_catalog_types.py`;
+`docs/catalog.md`.

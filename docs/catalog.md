@@ -46,17 +46,20 @@ One line for each animation:
 1a2b3c4d 52340 60 60 12000 frames sunrise.odrg
 ```
 
-The file's CRC-32, its size in bytes, its width and height, the sum of the durations of
-its frame records in milliseconds, its type (`frames` for an ODRG file), and its name. The
-page of a name is the low four bits of the FNV-1a hash of its bytes. A page's lines stand
-in the order their entries came in: a rebuild writes them in the storage's order, an
-addition puts its line last on its page, a replacement keeps its line's place, a removal
-takes its line out. A line is at most 161 bytes.
+The file's CRC-32, its size in bytes, its width and height, its length in milliseconds,
+its type and its name. An ODRG file is of `frames`, its length the sum of the durations of
+its frame records; an ODRGX container of [format.md](format.md) is of the type its header
+names, `frames`, `text` or `widget`, its canvas and its length the header's, the loop. What
+a file is, its first four bytes say, not its name. The page of a name is the low four bits
+of the FNV-1a hash of its bytes. A page's lines stand in the order their entries came in: a
+rebuild writes them in the storage's order, an addition puts its line last on its page, a
+replacement keeps its line's place, a removal takes its line out. A line is at most 161
+bytes.
 
 A name is 1 to 100 bytes of printable ASCII other than `/ \ : * ? " < > |`; it does not
 begin with `.` or a space, does not end with a space or `.`, is not made of digits alone,
-and ends in `.odrg` in any case. A name of the board's own storage follows the show's rule
-too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`.
+and ends in `.odrg` or `.odrgx` in any case. A name of the board's own storage follows the
+show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`.
 
 ### What a reader finds
 
