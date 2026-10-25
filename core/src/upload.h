@@ -16,6 +16,12 @@ const uint64_t kUploadQuietMs = 60000;
 // the file system, and this many bytes for the other files a change writes.
 const uint32_t kUploadReserve = 16384;
 
+// The name of the part of the open upload: on the drive for an upload to it, whose id is 0
+// until it is installed.
+inline const char *upload_part(const Core &core) {
+    return core.upload.id == 0 ? "drive/upload.part" : "upload.part";
+}
+
 // The number of bytes a text stands for as base64 with the alphabet of RFC 4648,
 // section 5, without padding and with the unused bits of its last character zero; 0 when
 // the text is not that, or stands for no byte or for more than kChunkSize.
@@ -36,6 +42,11 @@ void upload_step(Core &core, uint64_t now);
 // The four commands on a valid show, with their arguments read. Each writes its reply.
 // `name` ends in a zero and is a file name; `count` is what base64_size gave for the text.
 uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, uint32_t bytes, Reply &reply);
+
+// `upload begin external <file> <bytes>`: opens an upload to the drive. `busy` while an
+// upload is open or the drive's catalog is read, `read-only` when the core may not change the
+// drive, `no-space` when the drive has no room or no place for it.
+uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint32_t bytes, Reply &reply);
 
 // `upload begin` with the CRC-32 of the file: `{"ok":true,"unchanged":true}`, and no upload
 // opened, when the last upload of this boot installed this file with this id, these bytes

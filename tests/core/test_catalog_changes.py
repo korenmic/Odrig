@@ -1,5 +1,5 @@
-"""Changes of the internal storage keep its catalog: what each change writes, a cut at each of
-its storage calls, and the same changes made by the PC library."""
+"""Changes of the internal storage keep its catalog: what each change writes, a cut and a
+failure at each of its storage calls, and the same changes made by the PC library."""
 
 import json
 import unittest
@@ -10,7 +10,7 @@ from odrig import catalog, show
 from . import support
 from .test_content import animation, cycle, small_show
 from .test_incremental import T0, stored, touched, upload, written
-from .test_powercut import POWER_CUT, as_bytes
+from .test_powercut import POWER_CUT, as_bytes, storage_calls
 
 # The canvas of the two-leg mapping of `small_show`.
 CANVAS = (60, 6)
@@ -39,6 +39,17 @@ def by_the_library(files, change):
 
 def lines(*texts, at=T0):
     return [support.line(at, text) for text in texts]
+
+
+def commit_point(calls, record="catalog.do"):
+    """The number of the storage call that ends the writing of the commit record: the
+    change is made once it has returned."""
+    opened = calls.index(f"write_open {record} 1")
+    return next(at for at in range(opened, len(calls)) if calls[at].startswith("write_close")) + 1
+
+
+def script_bytes(script):
+    return "".join(f"{line}\n" for line in script).encode("ascii")
 
 
 class Changes(unittest.TestCase):
@@ -151,6 +162,70 @@ class Cuts(unittest.TestCase):
         files = cataloged(small_show(ITEMS, start=1))
         _, outcomes = self.cut_everywhere(files, lines("remove 4"))
         self.assertEqual(outcomes, {"before", "after"})
+
+
+class Failures(unittest.TestCase):
+    """A storage call that fails, at every call of a change: the core goes on, and the next
+    start finds the catalog after the change when the call came after the end of its commit
+    record or the change succeeded, and before it otherwise, every entry of a file of the
+    show agreeing with the file."""
+
+    def fail_everywhere(self, files, script):
+        calls = storage_calls(files, script)
+        point = commit_point(calls)
+        before = catalog.read(catalog.MemoryStorage(as_bytes(files))).marker.generation
+        for at in range(1, len(calls) + 1):
+            what = f"storage call {at}, `{calls[at - 1]}`, fails"
+            with support.installed(files) as folder:
+                result = support.host("session", folder, support.CHECK_FIRST, "--store-fails-at", at, stdin=script_bytes(script))
+                self.assertEqual(result.status, 0, (what, result.out[-300:]))
+                support.session(folder, lines("status"))
+                after = support.folder_files(folder)
+            made = json.loads([line for line in result.out.splitlines() if line.startswith("reply ")][-1][len("reply "):]).get("ok")
+            found = catalog.read(catalog.MemoryStorage(after))
+            self.assertEqual(found.state, "ok", what)
+            self.assertEqual(found.marker.generation, before + 1 if at > point or made else before, what)
+            named = show.files(show.loads(after["show.json"]))
+            for entry in found.entries:
+                if entry.name in named:
+                    self.assertIn(entry.name, after, what)
+                    self.assertEqual((len(after[entry.name]), zlib.crc32(after[entry.name])), (entry.bytes, entry.crc), (what, entry.name))
+            self.assertNotIn("catalog.do", sorted(after), what)
+
+    def test_an_upload_of_a_new_item(self):
+        self.fail_everywhere(cataloged(small_show(ITEMS, start=1)), upload(9, "new.odrg", support.clip(31, 60, 6)))
+
+    def test_a_replacement_under_its_name(self):
+        self.fail_everywhere(cataloged(small_show(ITEMS, start=1)), upload(2, "two.odrg", support.clip(31, 60, 6)))
+
+    def test_a_removal(self):
+        self.fail_everywhere(cataloged(small_show(ITEMS, start=1)), lines("remove 4"))
+
+
+class LeftRecord(unittest.TestCase):
+    """A commit record that a failed call left is finished before the next change writes
+    anything, so that a cut in that change cannot finish the old record on the new change's
+    files."""
+
+    def test_an_upload_after_a_failed_removal_of_the_record(self):
+        files = cataloged(small_show(ITEMS, start=1))
+        first, second = support.clip(31, 60, 6), support.clip(32, 60, 6, (20, 40))
+        script = upload(9, "new.odrg", first) + upload(10, "other.odrg", second, at=T0 + 400)
+        calls = storage_calls(files, script)
+        failing = calls.index("remove catalog.do 1") + 1
+        traced = support.start(files, script, ["--trace-store", "--store-fails-at", str(failing)])
+        later = list(traced.stored) + stored(traced)
+        part = [at for at, call in enumerate(later) if call == "write_open upload.part 1"][1]
+        self.assertIn("remove catalog.do 1", later[failing:part], "the record is finished before the next upload's part")
+        cut_at = next(at for at in range(part, len(later)) if later[at].startswith("write_close")) + 1
+        with support.installed(files) as folder:
+            result = support.host("session", folder, support.CHECK_FIRST, "--store-fails-at", failing, "--cut-at", cut_at, stdin=script_bytes(script))
+            self.assertEqual(result.status, POWER_CUT, result.out[-300:])
+            support.session(folder, lines("status"))
+            after = support.folder_files(folder)
+        found = catalog.read(catalog.MemoryStorage(after))
+        self.assertEqual(found.state, "ok")
+        self.assertEqual((found.entry("new.odrg").crc, zlib.crc32(after["new.odrg"])), (zlib.crc32(first), zlib.crc32(first)))
 
 
 class Costs(unittest.TestCase):

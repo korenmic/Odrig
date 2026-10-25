@@ -643,3 +643,11 @@ are in [format.md](format.md), "Measured sizes".
   catalog, or with one that cannot be read, is read as before. To make room, the drive's
   table keeps a file's length in 32 bits. New command `catalog`, approved in advance by the
   owner.
+- 2026-10-25: Seed 35 (the owner's answer 7 of 2026-10-24): the board writes the card. A
+  host may say that its drive can be written (`drive_writable`), lists it only when the core
+  asks (`drive_list`) and is given the names of a cataloged drive's files (`drive_bind`). A
+  drive with a catalog is read from it in bounded steps, without a listing and without
+  reading an animation, and its animations join at once; its marker is read again once in
+  10 seconds. New: `upload begin external <file> <bytes> [<crc32>]`, the reply member `id`
+  of its `upload end`, `remove <id>` of a writable card's animation, `"read_only":false` in
+  `space`, and the error code `read-only`, approved in advance by the owner.

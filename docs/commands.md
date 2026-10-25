@@ -39,6 +39,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
+| `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
 | `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
@@ -302,11 +303,12 @@ succeeds.
 | `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
-| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
+| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive, or the drive has 256 animations. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
 | `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
@@ -425,12 +427,37 @@ A drive with a catalog is `loading` from its plug-in until every page is read; i
 animations then join `list` together. One without a catalog is `none` and is listed and
 read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
 
+**`upload begin external <file> <bytes>`** and **`upload begin external <file> <bytes>
+<crc32>`** open an upload to the drive when the core may write it: its host says the drive
+can be written and the drive's catalog is `ok`. `<file>` follows the naming rule of the
+show's files and ends in `.odrg`. The rest of the upload is as for the board's own storage: `upload data`, the
+check, `upload end`. On success one commit of the drive's catalog moves the file onto its
+name with its entry, and the reply gives the animation's id: `{"ok":true,"id":60003}`. A file
+of that name on the drive is replaced and keeps its id, and where it plays it plays anew
+from its start, as an item's file replaced under its name does; a new one gets the lowest free id
+from 60,001, and its place in the saved order by its name. `busy` while an upload is open or
+the drive's catalog is read, `read-only` when the core may not write the drive, `no-space`
+when `drive_space` says the file does not fit or 256 animations are on the drive.
+
+`remove <id>` of an animation of a drive the core may write removes its file and its entry
+in one commit; its id is free again. Of any other drive it is `in-use`, as before. `space`
+reports `"read_only":false` for a drive the core may write.
+
 An upload, `remove` and `remove many` keep a catalog that is `ok`: an upload commits the
 entry of its file, with the size, the CRC-32 and the length its check found, in the same
 commit that puts the file in place; a removal takes the entries of the files that go out
 before the show file is written. Each writes the pages of its entries, the marker and the
 commit record, and no other file of the catalog. A storage without a catalog, or with one
 that is not `ok`, gets none from a change.
+
+A storage call that fails stops a change where it is. Before its commit record is whole the
+change is refused with `storage-error` and the catalog is as it was; a file it was writing
+is removed. After it the reply is as for success, and what is left is finished before the
+next change of that storage writes anything: while that fails, the change is refused with
+`storage-error`, and the upload's part that the record may move is kept. A start that cannot
+finish it reads its storage as without a catalog, `damaged` with `interrupted`, and takes the
+catalog up again once a later change has finished it; a drive that cannot be finished at its
+plug-in is `damaged`, `interrupted`, until it is plugged in again.
 
 ## The saved playlist order
 

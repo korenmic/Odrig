@@ -32,8 +32,18 @@ bool catalog_name_allowed(const char *name, uint32_t length);
 uint32_t catalog_page_of(const char *name, uint32_t length);
 
 // The start, before anything else is read: finishes the change of the internal catalog whose
-// commit record is whole, on a host that can change its storage.
+// commit record is whole, on a host that can change its storage. A record that a failed call
+// leaves makes the catalog damaged, `interrupted`, for this boot.
 void catalog_finish_internal(Core &core);
+
+// Whether a whole commit record of the storage is left that the start or the plug-in could
+// not finish.
+bool catalog_left(const Core &core, uint32_t storage);
+
+// Before a change of a storage writes anything: finishes the change whose commit record a
+// failed call left; false while it is still left, and the change is refused. A catalog that
+// the start found interrupted is kept again once its change is finished.
+bool catalog_settle(Core &core, uint32_t storage);
 
 // The start, once the show is read: reads the internal catalog with the first source, and
 // gives every file of the show it has an entry for its size and length without opening it.
@@ -56,9 +66,10 @@ struct CatalogChange {
 };
 
 // Commits a change of a storage's catalog and finishes it, with the second source and the
-// chunk buffer. A storage whose catalog is not ok is not changed: true. False on a failed
-// storage call: before the commit record nothing changed; after it the rest is finished at
-// the next start.
+// chunk buffer, once a change a failed call left is finished. A storage whose catalog is not
+// ok is not changed: true. False on a failed storage call before the commit record is whole:
+// nothing changed. After it, what a failed call leaves is finished before the next change of
+// the storage, or at the next start or plug-in.
 bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change);
 
 // The phases of reading a drive's catalog: none; its commit record; its marker; its pages;
@@ -92,6 +103,22 @@ void catalog_drive_look(Core &core);
 // The player left out a file of a drive whose catalog is read: it is remembered by its
 // name and its entry's CRC-32, so that a catalog read again leaves it out again.
 void catalog_drive_left_out(Core &core, uint32_t place, Reason reason);
+
+// Whether the core may change the drive: a host that can write it, and its catalog read.
+bool catalog_drive_writable(const Core &core);
+
+// The place an upload of this name to the drive takes: the place of the drive's file of that
+// name, else the first place a removal freed, else the next one; kDriveMost when none is left.
+uint32_t catalog_drive_place_for(const Core &core, const char *name);
+
+// Puts the upload whose check has passed onto the drive: one commit of the drive's catalog
+// moves `upload.part` onto its name with its entry; its place keeps its id when the file
+// replaces one, and gets the lowest free id otherwise. False on a failed storage call.
+bool catalog_install_external(Core &core, uint16_t *id);
+
+// Removes the drive's animation at a place: one commit takes its entry out and removes its
+// file, and the place is free. False on a failed storage call.
+bool catalog_remove_external(Core &core, uint32_t place);
 
 // The reply to `catalog`.
 uint32_t catalog_reply(const Core &core, Reply &reply);

@@ -1352,4 +1352,4 @@ pin list, `mapping test on` or `mapping test off` for the packaged diagonal, and
 sends the words as they are typed. The emulator keeps the order in `order.txt` of its show
 folder, as the board does in its storage, and plays its playlist in that order.
 
-The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files remain read-only.
+The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).

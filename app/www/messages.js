@@ -81,7 +81,7 @@ export function ofSilence(seconds) {
 }
 
 // The error codes of the command list that no command of the app can get.
-export const NOT_FOR_THE_APP = [];
+export const NOT_FOR_THE_APP = ["read-only"];
 
 const NOT_UNDERSTOOD = () => "The installation did not understand the app. Its software and this app do not match.";
 const REFUSED = () => "The installation refused the command.";

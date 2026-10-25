@@ -81,7 +81,7 @@ Rules for every task:
     back. Task 1's drive tests pass.
   - Prove it fails first.
 
-- [ ] 7. The core: the board writes the drive
+- [x] 7. The core: the board writes the drive
   - `upload begin external`, `upload end`'s `id`, `remove <id>` of a drive's animation,
     `space`'s `read_only`, the error `read-only`; docs/commands.md.
   - Tests, `tests/core/test_catalog_writes.py`: uploads to the card, a replacement keeps

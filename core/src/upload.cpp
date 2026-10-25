@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "catalog.h"
 #include "crc32.h"
 #include "json_reader.h"
 #include "storage.h"
@@ -81,7 +82,7 @@ void upload_discard(Core &core) {
         return;
     }
     core.checker->file.close();
-    core.host.remove(core.host.ctx, kUploadPart);
+    core.host.remove(core.host.ctx, upload_part(core));
     core.upload.state = kUploadNone;
 }
 
@@ -96,7 +97,7 @@ void upload_step(Core &core, uint64_t now) {
     uint32_t record = 0;
     if (!upload.header_read) {
         // The header is judged first, then the size against the mapping.
-        checker.file.open_at(core.host, kUploadPart);
+        checker.file.open_at(core.host, upload_part(core));
         reason = content_open(&checker.file, &checker.inflate, core.check_window, &checker.decoder, &core.check_content);
         if (reason == kNone && (core.check_content.width != core.width || core.check_content.height != core.height)) {
             reason = kSizeMismatch;
@@ -182,13 +183,54 @@ uint32_t upload_begin(Core &core, uint64_t now, uint32_t id, const char *name, u
     if (told && static_cast<uint64_t>(bytes) + bytes / 256 + kUploadReserve > free_bytes) {
         return refuse(reply, "no-space");
     }
-    if (!told || !storage_changes(core) || core.checker == nullptr || host.write_open(host.ctx, kUploadPart) != 1) {
+    if (!told || !storage_changes(core) || core.checker == nullptr || !catalog_settle(core, kInternal) || host.write_open(host.ctx, kUploadPart) != 1) {
         return refuse(reply, "storage-error");
     }
     // The upload's check takes the second decoders from the check of a drive's file.
     drive_check_yields(core);
     upload.state = kUploadReceiving;
     upload.id = static_cast<uint16_t>(id);
+    uint32_t length = 0;
+    for (; name[length] != '\0'; ++length) {
+        upload.name[length] = name[length];
+    }
+    upload.name[length] = '\0';
+    upload.size = bytes;
+    upload.received = 0;
+    upload.crc = kCrcStart;
+    upload.header_read = 0;
+    upload.installed = 0;
+    upload.progress = now;
+    reply.text("{\"ok\":true,\"chunk\":");
+    reply.number(kChunkSize);
+    reply.text("}\n");
+    return reply.length;
+}
+
+uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint32_t bytes, Reply &reply) {
+    Upload &upload = core.upload;
+    if (upload.state != kUploadNone || catalog_drive_loading(core)) {
+        return refuse(reply, "busy");
+    }
+    if (!catalog_drive_writable(core)) {
+        return refuse(reply, "read-only");
+    }
+    if (catalog_drive_place_for(core, name) == kDriveMost) {
+        return refuse(reply, "no-space");
+    }
+    const odrig_host &host = core.host;
+    uint64_t free_bytes = 0;
+    uint64_t total_bytes = 0;
+    if (host.drive_space != nullptr && host.drive_space(host.ctx, core.drive_number, &free_bytes, &total_bytes) == 1 &&
+        static_cast<uint64_t>(bytes) + bytes / 256 + kUploadReserve > free_bytes) {
+        return refuse(reply, "no-space");
+    }
+    upload.id = 0;
+    if (core.checker == nullptr || !catalog_settle(core, kExternal) || host.write_open(host.ctx, upload_part(core)) != 1) {
+        return refuse(reply, "storage-error");
+    }
+    drive_check_yields(core);
+    upload.state = kUploadReceiving;
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
         upload.name[length] = name[length];
@@ -326,6 +368,18 @@ uint32_t upload_end(Core &core, uint32_t crc, Reply &reply) {
         reply.text("{\"ok\":false,\"error\":\"bad-file\",\"reason\":\"");
         reply.text(reason_name(reason));
         reply.text("\"}\n");
+        return reply.length;
+    }
+    if (upload.id == 0) {
+        uint16_t id = 0;
+        if (upload.outcome != kCheckPassed || !catalog_install_external(core, &id)) {
+            upload_discard(core);
+            return refuse(reply, "storage-error");
+        }
+        upload.state = kUploadNone;
+        reply.text("{\"ok\":true,\"id\":");
+        reply.number(id);
+        reply.text("}\n");
         return reply.length;
     }
     if (upload.outcome != kCheckPassed || !storage_install_upload(core)) {

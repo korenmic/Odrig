@@ -3,6 +3,7 @@
 #include "catalog.h"
 
 #include "content.h"
+#include "json_reader.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -248,6 +249,27 @@ bool crc_word(const Words &words, uint32_t word, uint32_t *value) {
 
 // The four `upload` commands. The words are read first, then the show is asked for.
 uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
+    if (words.count >= 3 && words.is(1, "begin") && words.is(2, "external")) {
+        uint32_t bytes;
+        uint32_t crc = 0;
+        char name[33];
+        if ((words.count != 5 && words.count != 6) || words.size[3] < 1 || words.size[3] > 32 || !number_word(words, 4, 1, 0xFFFFFFFFu, &bytes) ||
+            (words.count == 6 && !crc_word(words, 5, &crc))) {
+            return refuse(reply, "bad-argument");
+        }
+        for (uint32_t at = 0; at < words.size[3]; ++at) {
+            name[at] = words.text[3][at];
+        }
+        name[words.size[3]] = '\0';
+        // A name of the show's files that a catalog's entry may have.
+        if (!is_file_name(name) || !same_text(name + words.size[3] - 5, ".odrg")) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        return upload_begin_external(core, now, name, bytes, reply);
+    }
     if (words.count >= 2 && words.is(1, "begin")) {
         uint32_t id;
         uint32_t bytes;

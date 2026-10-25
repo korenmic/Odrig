@@ -10108,3 +10108,39 @@ the core's in the tests until the core rebuilds.
 **Resolution.** `firmware/fwtool/storage.py`, `folder_files`, `catalog_files`,
 `with_board_generation`; `tests/firmware/test_catalog.py`; `docs/firmware.md`,
 "install-show".
+
+## Seed 35: the board writes the card, and a storage call that fails
+
+**Question.** A card that its host can write takes `upload begin external` and `remove`,
+and the design asks for a cut and a failure at every storage call of every change on both
+storages. What does a call that fails leave behind, and what does the next change do with
+it? Which names may an upload to the card have while the entries of the catalog have no
+type yet? The app sends neither new command before its own task: what does it make of the
+new code `read-only`?
+
+**Answer.** Before the commit record is whole, a failed call ends the change with
+`storage-error`, and a file that was being written is removed, which also ends its writing,
+as seed 34's changes do. After it the change is made and the reply is as for success. The
+finishing stops at the call that failed and leaves the record; every later change of that
+storage finishes it before it writes anything, and is refused with `storage-error` while
+it cannot; the start and the plug-in keep `upload.part` while a record is left, since the
+record may move it. A start that cannot finish the record reads the board's storage as
+without its catalog, `damaged` with `interrupted`, and the first change that finishes it
+takes the catalog up again from its marker; a card whose record cannot be finished at its
+plug-in is `damaged`, `interrupted`, and nothing of it plays until it is plugged in again.
+The core's own commit on the card sets the CRC-32 of the marker that the look every 10
+seconds compares, so that the card is not read again after each change. An upload to the
+card takes a name of the show's files that ends in `.odrg` until the entries record their
+type (seed 37's task 14), and the upload's check gives the new place its type. A file
+replaced while it plays is released before the commit and played anew from its start
+after it, as an item's file replaced under its name is. The app's
+tests count `read-only` among the codes the app cannot get (`NOT_FOR_THE_APP`) until its
+task gives it a text. Task 4's tests had the cut at every call and not the failure; the
+failure at every call of the internal changes comes with this task's.
+
+**Resolution.** `core/src/catalog.cpp` (`finish`, `catalog_settle`, `catalog_left`,
+`write_whole`, `write_page`, `catalog_install_external`, `catalog_remove_external`),
+`core/src/upload.cpp`, `core/src/content.cpp`, `core/src/commands.cpp`,
+`core/src/storage.cpp`; `tests/core/test_catalog_writes.py`,
+`tests/core/test_catalog_changes.py`; `docs/commands.md`, "Catalogs"; `docs/catalog.md`,
+"A change".

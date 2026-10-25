@@ -121,7 +121,9 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 
 The player can take animations from a USB flash drive, when the program it runs in gives
 it one; [core.md](core.md#a-drive) says how. The drive's animations are added to the
-show's; they do not take the place of any. Nothing is written to the drive, and no command changes it.
+show's; they do not take the place of any. Nothing is written to a drive without a catalog,
+and no command changes it; a drive with a catalog that its host can write takes uploads and
+removals, see [commands.md](commands.md#catalogs).
 On the board the drive is a USB stick or a microSD card, as
 [firmware.md](firmware.md#the-external-storage) says.
 

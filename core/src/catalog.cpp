@@ -284,17 +284,17 @@ Reason open_for(Core &core, const Place &place, const char *name) {
     return kNone;
 }
 
-// Renames a file that is there onto another, by their host's names.
-void rename_there(Core &core, const char *from, const char *to) {
-    if (is_there(core, from)) {
-        core.host.rename(core.host.ctx, from, to);
-    }
+// Renames a file that is there onto another, by their host's names. False when the rename
+// failed.
+bool rename_there(Core &core, const char *from, const char *to) {
+    return !is_there(core, from) || core.host.rename(core.host.ctx, from, to) == 1;
 }
 
 // An action of a commit record on a file of a storage, given by its name there, with a zero
-// after it: `upload.part` moved onto it, or it removed. Kept apart from the reading of the
-// record, whose frame has the line, as it may need room for the host's name of the file.
-__attribute__((noinline)) void act(Core &core, uint32_t storage, bool moves, const char *name, uint32_t length) {
+// after it: `upload.part` moved onto it, or it removed. False when the call failed. Kept
+// apart from the reading of the record, whose frame has the line, as it may need room for
+// the host's name of the file.
+__attribute__((noinline)) bool act(Core &core, uint32_t storage, bool moves, const char *name, uint32_t length) {
     char given[6 + kCatalogNameMost + 1];
     const char *host_name = name;
     if (storage == kExternal) {
@@ -309,10 +309,9 @@ __attribute__((noinline)) void act(Core &core, uint32_t storage, bool moves, con
         host_name = given;
     }
     if (moves) {
-        rename_there(core, kPartNames[storage], host_name);
-    } else {
-        core.host.remove(core.host.ctx, host_name);
+        return rename_there(core, kPartNames[storage], host_name);
     }
+    return core.host.remove(core.host.ctx, host_name) != -1;
 }
 
 // One action of a commit record: whether it moves `upload.part` onto the name, else removes
@@ -390,23 +389,28 @@ uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker 
 }
 
 // Finishes the change whose commit record is whole, on a place whose storage can be
-// written. True when there was one.
+// written: its actions, its pages, its marker, and the record removed, each step once the
+// one before it is done. Returns whether no whole record is left: false when a call failed,
+// and the record stays for the next attempt, which goes on where this one stopped.
 __attribute__((noinline)) bool finish(Core &core, const Place &place) {
     uint32_t mask = 0;
     uint32_t actions = 0;
     if (!read_record(core, place, &mask, &actions, kNothing, nullptr)) {
-        return false;
+        return true;
     }
     // Each action is read again on its own, and done once the record is closed.
     for (uint32_t index = 0; index < actions; ++index) {
         Action action;
         uint32_t count = 0;
-        if (read_record(core, place, &mask, &count, index, &action)) {
-            uint32_t length = 0;
-            while (action.name[length] != '\0') {
-                ++length;
-            }
-            act(core, place.storage, action.moves, action.name, length);
+        if (!read_record(core, place, &mask, &count, index, &action)) {
+            return false;
+        }
+        uint32_t length = 0;
+        while (action.name[length] != '\0') {
+            ++length;
+        }
+        if (!act(core, place.storage, action.moves, action.name, length)) {
+            return false;
         }
     }
     // The counts of the new marker, or of the marker when it was renamed already; a page
@@ -422,14 +426,14 @@ __attribute__((noinline)) bool finish(Core &core, const Place &place) {
             continue;
         }
         if (is_there(core, kNewPageNames[storage][page])) {
-            core.host.rename(core.host.ctx, kNewPageNames[storage][page], kPageNames[storage][page]);
-        } else if (found == kCatalogOk && marker.counts[page] == 0) {
-            core.host.remove(core.host.ctx, kPageNames[storage][page]);
+            if (core.host.rename(core.host.ctx, kNewPageNames[storage][page], kPageNames[storage][page]) != 1) {
+                return false;
+            }
+        } else if (found == kCatalogOk && marker.counts[page] == 0 && core.host.remove(core.host.ctx, kPageNames[storage][page]) == -1) {
+            return false;
         }
     }
-    rename_there(core, kNewMarkerNames[storage], kMarkerNames[storage]);
-    core.host.remove(core.host.ctx, kRecordNames[storage]);
-    return true;
+    return rename_there(core, kNewMarkerNames[storage], kMarkerNames[storage]) && core.host.remove(core.host.ctx, kRecordNames[storage]) != -1;
 }
 
 uint32_t text_size(const char *text) {
@@ -471,10 +475,28 @@ void put_hex(Core &core, uint32_t *length, uint32_t value, uint32_t digits) {
     }
 }
 
-// Writes the chunk buffer's first `length` bytes as a new file, by its host's name.
+// Writes the chunk buffer's first `length` bytes as a new file, by its host's name. A file
+// that is not written whole is removed, and its writing ends with it.
 bool write_whole(Core &core, const char *name, uint32_t length) {
     const odrig_host &host = core.host;
-    return host.write_open(host.ctx, name) == 1 && host.write(host.ctx, core.chunk, length) == 1 && host.write_close(host.ctx) == 1;
+    if (host.write_open(host.ctx, name) != 1) {
+        return false;
+    }
+    if (host.write(host.ctx, core.chunk, length) == 1 && host.write_close(host.ctx) == 1) {
+        return true;
+    }
+    host.remove(host.ctx, name);
+    return false;
+}
+
+// Gives up the new page being written: the page read is closed, and the new one removed when
+// it was begun.
+bool give_up_page(Core &core, const char *fresh, bool opened) {
+    core.checker->file.close();
+    if (opened) {
+        core.host.remove(core.host.ctx, fresh);
+    }
+    return false;
 }
 
 // Puts a marker's text into the chunk buffer from 0 on, and returns its length, 409.
@@ -547,16 +569,14 @@ __attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t
         if (old.counts[page] != 0) {
             const LineRead read = reader.next(core.checker->file, line, sizeof line);
             if (read == kLineFailed || (read == kLineGot && (reader.over || reader.unended))) {
-                core.checker->file.close();
-                return false;
+                return give_up_page(core, fresh, opened);
             }
             got = read == kLineGot;
         }
         if (got) {
             EntryLine entry;
             if (!parse_entry(line, reader.length, page, entry)) {
-                core.checker->file.close();
-                return false;
+                return give_up_page(core, fresh, opened);
             }
             if (adds_here && entry.name_length == added_length && same_text(entry.name, change.added)) {
                 put_entry(core, &length, change);
@@ -578,11 +598,13 @@ __attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t
             for (uint32_t at = 0; at < length; ++at) {
                 sum = crc_add(sum, core.chunk[at]);
             }
-            if ((!opened && host.write_open(host.ctx, fresh) != 1) || host.write(host.ctx, core.chunk, length) != 1) {
-                core.checker->file.close();
-                return false;
+            if (!opened && host.write_open(host.ctx, fresh) != 1) {
+                return give_up_page(core, fresh, false);
             }
             opened = true;
+            if (host.write(host.ctx, core.chunk, length) != 1) {
+                return give_up_page(core, fresh, true);
+            }
             length = 0;
         }
     }
@@ -596,7 +618,11 @@ __attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t
         *crc = 0;
         return host.remove(host.ctx, fresh) != -1;
     }
-    if ((!opened && host.write_open(host.ctx, fresh) != 1) || (length != 0 && host.write(host.ctx, core.chunk, length) != 1) || host.write_close(host.ctx) != 1) {
+    if (!opened && host.write_open(host.ctx, fresh) != 1) {
+        return false;
+    }
+    if ((length != 0 && host.write(host.ctx, core.chunk, length) != 1) || host.write_close(host.ctx) != 1) {
+        host.remove(host.ctx, fresh);
         return false;
     }
     *count = static_cast<uint16_t>(lines);
@@ -904,19 +930,55 @@ uint32_t catalog_page_of(const char *name, uint32_t length) {
 }
 
 void catalog_finish_internal(Core &core) {
-    if (!storage_changes(core) || core.host.read_at == nullptr) {
-        return;
-    }
+    CatalogState &catalog = core.catalogs[kInternal];
+    catalog.state = kCatalogNone;
+    catalog.detail = 0;
     const Place place = {kInternal, false};
-    finish(core, place);
+    if (storage_changes(core) && core.host.read_at != nullptr && !finish(core, place)) {
+        catalog.state = kCatalogDamaged;
+        catalog.detail = kDamagedInterrupted;
+    }
+}
+
+bool catalog_left(const Core &core, uint32_t storage) {
+    const CatalogState &catalog = core.catalogs[storage];
+    return catalog.state == kCatalogDamaged && catalog.detail == kDamagedInterrupted;
+}
+
+bool catalog_settle(Core &core, uint32_t storage) {
+    CatalogState &catalog = core.catalogs[storage];
+    if (catalog.state != kCatalogOk && !catalog_left(core, storage)) {
+        // Without a catalog that is kept, no change of this boot has written a record.
+        return true;
+    }
+    drive_check_yields(core);
+    const Place place = {storage, true};
+    if (!finish(core, place)) {
+        return false;
+    }
+    Marker marker;
+    if (catalog_left(core, storage) && read_marker_of(core, place, kMarkerNames[storage], marker) == kCatalogOk) {
+        // The change the start could not finish is finished: the catalog is kept from here on.
+        catalog.state = kCatalogOk;
+        catalog.detail = 0;
+        catalog.generation = marker.generation;
+        uint32_t entries = 0;
+        for (uint32_t page = 0; page < kCatalogPages; ++page) {
+            entries += marker.counts[page];
+        }
+        catalog.entries = static_cast<uint16_t>(entries);
+    }
+    return true;
 }
 
 bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change) {
+    if (!catalog_settle(core, storage)) {
+        return false;
+    }
     CatalogState &catalog = core.catalogs[storage];
     if (catalog.state != kCatalogOk) {
         return true;
     }
-    drive_check_yields(core);
     const Place place = {storage, true};
     Marker marker;
     if (read_marker_of(core, place, kMarkerNames[storage], marker) != kCatalogOk) {
@@ -932,7 +994,12 @@ bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change) {
         }
     }
     marker.generation = marker.generation == 0xFFFFFFFFu ? 1 : marker.generation + 1;
-    if (!write_whole(core, kNewMarkerNames[storage], marker_text(core, marker))) {
+    const uint32_t marker_length = marker_text(core, marker);
+    uint32_t marker_crc = kCrcStart;
+    for (uint32_t at = 0; at < marker_length; ++at) {
+        marker_crc = crc_add(marker_crc, core.chunk[at]);
+    }
+    if (!write_whole(core, kNewMarkerNames[storage], marker_length)) {
         return false;
     }
     uint32_t length = 0;
@@ -961,7 +1028,8 @@ bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change) {
     if (!write_whole(core, kRecordNames[storage], length)) {
         return false;
     }
-    // Committed: what is left of it is finished at the next start when a call fails now.
+    // Committed: when a call fails now, what is left of it is finished before the next change
+    // of the storage, or at the next start or plug-in.
     finish(core, place);
     catalog.generation = marker.generation;
     uint32_t entries = 0;
@@ -969,11 +1037,16 @@ bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change) {
         entries += marker.counts[page];
     }
     catalog.entries = static_cast<uint16_t>(entries);
+    if (storage == kExternal) {
+        // The drive's marker is now this one: the look does not take it for another.
+        core.catalog_marker_crc = crc_value(marker_crc);
+    }
     return true;
 }
 
 void catalog_read_internal(Core &core) {
     CatalogState &catalog = core.catalogs[kInternal];
+    const bool left = catalog_left(core, kInternal);
     catalog.state = kCatalogNone;
     catalog.detail = 0;
     catalog.generation = 0;
@@ -981,8 +1054,8 @@ void catalog_read_internal(Core &core) {
     uint32_t mask = 0;
     const Place place = {kInternal, false};
     uint32_t actions = 0;
-    if (!storage_changes(core) && read_record(core, place, &mask, &actions, kNothing, nullptr)) {
-        // A whole commit record that this host cannot finish.
+    if (left || (!storage_changes(core) && read_record(core, place, &mask, &actions, kNothing, nullptr))) {
+        // A whole commit record that this host cannot finish, or that the start could not.
         catalog.state = kCatalogDamaged;
         catalog.detail = kDamagedInterrupted;
     }
@@ -1049,11 +1122,14 @@ void catalog_drive_step(Core &core) {
         uint32_t mask = 0;
         uint32_t actions = 0;
         if (read_record(core, place, &mask, &actions, kNothing, nullptr)) {
-            if (core.host.drive_writable == nullptr || core.host.drive_writable(core.host.ctx, core.drive_number) != 1) {
+            // A record that cannot be finished keeps the upload's part it may move.
+            if (core.host.drive_writable == nullptr || core.host.drive_writable(core.host.ctx, core.drive_number) != 1 || !finish(core, place)) {
                 drive_unusable(core, kCatalogDamaged, kDamagedInterrupted);
                 return;
             }
-            finish(core, place);
+        }
+        if (core.host.drive_writable != nullptr && core.host.drive_writable(core.host.ctx, core.drive_number) == 1 && is_there(core, kPartNames[kExternal])) {
+            core.host.remove(core.host.ctx, kPartNames[kExternal]);
         }
         core.catalog_phase = kLoadMarker;
     } else if (core.catalog_phase == kLoadMarker) {
@@ -1156,6 +1232,117 @@ void catalog_drive_left_out(Core &core, uint32_t place, Reason reason) {
     core.checker->file.close();
     line.length = 0;
     line.over = 0;
+}
+
+bool catalog_drive_writable(const Core &core) {
+    return core.drive != nullptr && core.drive_number != 0 && core.catalogs[kExternal].state == kCatalogOk && core.catalog_phase == kLoadIdle &&
+           core.host.drive_writable != nullptr && core.host.drive_writable(core.host.ctx, core.drive_number) == 1;
+}
+
+namespace {
+
+// Whether the drive's file at a place has this name.
+bool place_has_name(const Core &core, uint32_t place, const char *name) {
+    char given[kCatalogNameMost + 1];
+    return core.host.drive_name(core.host.ctx, core.drive_number, place, given, sizeof given) == 1 && same_text(given, name);
+}
+
+// Whether a name is the one given as the context.
+bool is_named(const Core &, const char *name, uint32_t length, const void *context) {
+    const char *given = static_cast<const char *>(context);
+    uint32_t at = 0;
+    for (; at < length && given[at] == name[at]; ++at) {
+    }
+    return at == length && given[at] == '\0';
+}
+
+}  // namespace
+
+uint32_t catalog_drive_place_for(const Core &core, const char *name) {
+    uint32_t gone = kDriveMost;
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        if (core.drive[place].state == kDriveGone) {
+            gone = gone == kDriveMost ? place : gone;
+        } else if (place_has_name(core, place, name)) {
+            return place;
+        }
+    }
+    if (gone != kDriveMost) {
+        return gone;
+    }
+    return core.drive_count < kDriveMost ? core.drive_count : kDriveMost;
+}
+
+bool catalog_install_external(Core &core, uint16_t *id) {
+    const Upload &upload = core.upload;
+    uint32_t place = catalog_drive_place_for(core, upload.name);
+    if (place == kDriveMost) {
+        return false;
+    }
+    const bool replaces = place < core.drive_count && core.drive[place].state != kDriveGone;
+    if (replaces) {
+        player_releases_file(core, kDriveBase + place);
+    }
+    CatalogChange change;
+    change.added = upload.name;
+    change.added_bytes = upload.size;
+    change.added_crc = crc_value(upload.crc);
+    change.added_total_ms = upload.total_ms;
+    change.moves_part = true;
+    if (!catalog_commit(core, kExternal, change)) {
+        return false;
+    }
+    DriveEntry &entry = core.drive[place];
+    if (!replaces) {
+        if (place == core.drive_count) {
+            core.drive_count = place + 1;
+        }
+        entry.id = 0;
+        core.host.drive_bind(core.host.ctx, core.drive_number, place, upload.name);
+        order_drive_named(core, place, upload.name);
+        entry.id = free_drive_id(core);
+    }
+    entry.bytes = upload.size;
+    entry.total_ms = drive_length(upload.total_ms);
+    entry.type = core.check_content.type & 0x0F;
+    entry.fault = kNone;
+    entry.state = kDriveInPlaylist;
+    core.drive_check_at = core.drive_count;
+    if (!replaces) {
+        // An entry of the saved order may name the new file: it stands there at once.
+        order_reload(core);
+        player_drive_joined(core, place);
+    } else {
+        // What plays it plays the new file from its start.
+        player_file_replaced(core, kDriveBase + place);
+    }
+    *id = entry.id;
+    return true;
+}
+
+bool catalog_remove_external(Core &core, uint32_t place) {
+    char name[kCatalogNameMost + 1];
+    if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {
+        return false;
+    }
+    uint32_t length = 0;
+    while (name[length] != '\0') {
+        ++length;
+    }
+    player_releases_file(core, kDriveBase + place);
+    CatalogChange change;
+    change.drops = is_named;
+    change.context = name;
+    change.drop_pages = 1u << catalog_page_of(name, length);
+    change.removed_file = name;
+    if (!catalog_commit(core, kExternal, change)) {
+        return false;
+    }
+    DriveEntry &entry = core.drive[place];
+    entry.state = kDriveGone;
+    entry.id = 0;
+    player_drive_changed(core);
+    return true;
 }
 
 uint32_t catalog_reply(const Core &core, Reply &reply) {

@@ -38,7 +38,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 18)
+        self.assertEqual(len(self.codes), 19)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -48,7 +48,8 @@ class TheTable(unittest.TestCase):
                 self.assertEqual(general, code in cannot_get, f"{code}: it needs a text of its own, or a place among the codes the app cannot get")
 
     def test_the_codes_the_app_cannot_get_are_those_of_the_commands_it_does_not_send(self):
-        self.assertEqual(self.found["notForTheApp"], [])
+        # The app sends neither `upload begin external` nor `catalog rebuild`.
+        self.assertEqual(self.found["notForTheApp"], ["read-only"])
 
     def test_each_text_of_a_refusal(self):
         for code in ("line-too-long", "unknown-command", "bad-argument"):

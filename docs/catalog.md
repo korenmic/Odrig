@@ -98,7 +98,9 @@ with it: `move <from> <to>` and `remove <name>`. Its writer:
 
 Every file is written whole, through a new file, before a rename puts it in place. A writer
 that finds a whole `catalog.do` finishes it before anything else, so that a cut at any
-step comes to the catalog before the change or the one after it. A `catalog.do` that is not
+step comes to the catalog before the change or the one after it. A step that fails stops
+the finishing there: `catalog.do` stays, and the next attempt goes on from that step. While
+a whole `catalog.do` is left, no change begins and the `upload.part` it may move stays. A `catalog.do` that is not
 whole, and `.new` files without one, are traces of a change that was not committed: they
 are never read.
 

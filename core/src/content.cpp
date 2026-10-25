@@ -1,5 +1,7 @@
 #include "content.h"
 
+#include "catalog.h"
+
 #include <string.h>
 
 #include "order.h"
@@ -172,7 +174,7 @@ uint32_t content_space(const Core &core, Reply &reply) {
     if (known) reply.number(external_free); else reply.text("null");
     reply.text(",\"total\":");
     if (known) reply.number(external_total); else reply.text("null");
-    reply.text(",\"read_only\":true}}\n");
+    reply.text(catalog_drive_writable(core) ? ",\"read_only\":false}}\n" : ",\"read_only\":true}}\n");
     return reply.length;
 }
 
@@ -357,8 +359,13 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
         ++position;
     }
     if (position == core.item_count) {
-        // An animation of the drive is the drive's: no command removes it.
-        return refuse(reply, drive_place_holding(core, id) != kDriveMost ? "in-use" : "unknown-id");
+        // An animation of a drive the core may change is removed with its entry; another
+        // drive's is the drive's.
+        const uint32_t place = drive_place_holding(core, id);
+        if (place != kDriveMost && catalog_drive_writable(core)) {
+            return catalog_remove_external(core, place) ? succeed(reply) : refuse(reply, "storage-error");
+        }
+        return refuse(reply, place != kDriveMost ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
