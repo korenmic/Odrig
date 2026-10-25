@@ -223,8 +223,8 @@ bool same_name(const char *one, const char *other) {
     return *one == *other;
 }
 
-// The lowest id from kDriveFirstId up that no item of the show and no file of the drive
-// has, or 0 when there is none.
+}  // namespace
+
 uint16_t free_drive_id(const Core &core) {
     for (uint32_t id = kDriveFirstId; id <= 65535; ++id) {
         bool taken = false;
@@ -240,6 +240,8 @@ uint16_t free_drive_id(const Core &core) {
     }
     return 0;
 }
+
+namespace {
 
 // The file of a drive left out in this boot that has this name and the first read of the
 // file the check is at, or null.
@@ -273,6 +275,10 @@ void remember_file(Core &core, const char *name, Reason reason) {
 // One step of the check of the drive's files, after the installed ones. A file that is
 // whole and of the canvas becomes an animation of the playlist; one that is not is left out.
 void drive_step(Core &core) {
+    if (catalog_drive_loading(core)) {
+        catalog_drive_step(core);
+        return;
+    }
     if (order_drive_due(core)) {
         // The saved order of the drive's files is known before any of them joins the playlist.
         order_drive_step(core);
@@ -437,7 +443,7 @@ bool check_complete(const Core &core) {
 }
 
 bool drive_waits(const Core &core) {
-    return core.drive != nullptr && core.upload.state == kUploadNone && core.drive_check_at < core.drive_count;
+    return core.drive != nullptr && core.upload.state == kUploadNone && (core.drive_check_at < core.drive_count || catalog_drive_loading(core));
 }
 
 void drive_file_name(uint32_t place, char *name) {
@@ -473,6 +479,20 @@ void drive_touch(Core &core) {
         core.check_header_read = 0;
     }
     core.drive_number = number;
+    core.drive_count = 0;
+    core.drive_check_at = 0;
+    catalog_drive_plugged(core);
+    if (catalog_drive_loading(core)) {
+        // A host that is given the names: the drive's catalog is read first.
+        player_drive_changed(core);
+        order_drive_found(core);
+        return;
+    }
+    drive_take_listed(core);
+}
+
+void drive_take_listed(Core &core) {
+    const uint32_t number = core.drive_number;
     core.drive_count = 0;
     core.drive_check_at = 0;
     if (number != 0 && core.host.drive_list != nullptr) {
@@ -566,6 +586,7 @@ void drive_check_yields(Core &core) {
         core.checker->file.close();
         core.check_header_read = 0;
     }
+    catalog_drive_yields(core);
     order_drive_yields(core);
 }
 

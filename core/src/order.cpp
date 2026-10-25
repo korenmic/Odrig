@@ -117,7 +117,7 @@ void take_byte(Core &core, uint8_t byte, uint8_t what) {
         }
         reader.length = 0;
         reader.over = 0;
-    } else if (reader.length < kOrderLineRoom - 1) {
+    } else if (reader.length < kOrderLineMost) {
         reader.line[reader.length++] = static_cast<char>(byte);
     } else {
         reader.over = 1;

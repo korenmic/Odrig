@@ -152,13 +152,19 @@ struct Remembered {
     uint32_t crc;
 };
 
-// The most files of drives the core remembers; the oldest gives way to a new one.
+// The most files of drives the core remembers; the oldest gives way to a new one. A file of
+// a drive whose catalog is read is remembered by its entry's CRC-32, with this as its first
+// read.
 const uint32_t kRememberedMost = 16;
+const uint16_t kRememberedWhole = 0xFFFF;
 
-// The states of a drive's file: to be checked; an animation of the playlist; left out.
+// The states of a drive's file: to be checked; an animation of the playlist; left out; read
+// from the drive's catalog and not published yet; removed by a change of the drive.
 const uint8_t kDriveToCheck = 0;
 const uint8_t kDriveInPlaylist = 1;
 const uint8_t kDriveLeftOut = 2;
+const uint8_t kDriveStaged = 3;
+const uint8_t kDriveGone = 4;
 
 // The most files of a drive, the position in the playlist of the file at place 0, and the
 // first id a drive's animation can get.
@@ -173,8 +179,10 @@ const uint32_t kDriveListedName = 128;
 
 // The reading of `order.txt` line by line: the entries taken so far, whether its first line
 // was read and was the header, and the line so far without its line feed. A line longer
-// than the room is no entry.
-const uint32_t kOrderLineRoom = 130;
+// than kOrderLineMost is no entry. The line's room is a catalog's longest line: the reading
+// of a drive's catalog uses it too, before `order.txt` is read.
+const uint32_t kOrderLineMost = 129;
+const uint32_t kOrderLineRoom = 162;
 struct OrderReader {
     uint32_t entries;
     uint16_t length;
@@ -390,6 +398,22 @@ struct Core {
 
     // The catalogs of the internal storage and of the drive.
     CatalogState catalogs[2];
+
+    // The reading of a drive's catalog in steps: its phase, the page it is at, the place the
+    // page's entries begin at, the page's lines so far and the count the marker gives it,
+    // whether a line of it was not sound, the running CRC-32 of the page and the one the
+    // marker gives, the CRC-32 of the whole marker, and when it was last looked at.
+    uint8_t catalog_phase;
+    uint8_t catalog_page;
+    uint8_t catalog_bad_line;
+    uint8_t catalog_open;
+    uint16_t catalog_first_place;
+    uint16_t catalog_lines;
+    uint16_t catalog_expected_lines;
+    uint32_t catalog_page_crc;
+    uint32_t catalog_expected_crc;
+    uint32_t catalog_marker_crc;
+    uint64_t catalog_looked;
 };
 
 // Keeps the context of a file's fault, in place of the one before.
@@ -438,6 +462,13 @@ void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t roo
 
 // Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
 void drive_touch(Core &core);
+
+// A drive without a catalog: listed, each file given its id and its key, to be checked.
+void drive_take_listed(Core &core);
+
+// The lowest id from kDriveFirstId up that no item of the show and no file of the drive
+// has, or 0 when there is none.
+uint16_t free_drive_id(const Core &core);
 
 // A file of the drive is left out: its state says so, and the host's log says why.
 void drive_left_out(Core &core, uint32_t place, Reason reason);

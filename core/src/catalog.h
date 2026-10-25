@@ -61,6 +61,38 @@ struct CatalogChange {
 // the next start.
 bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change);
 
+// The phases of reading a drive's catalog: none; its commit record; its marker; its pages;
+// the saved order and the publication.
+const uint8_t kLoadIdle = 0;
+const uint8_t kLoadRecord = 1;
+const uint8_t kLoadMarker = 2;
+const uint8_t kLoadPages = 3;
+const uint8_t kLoadOrder = 4;
+// How long a drive's catalog stays read before its marker is looked at again, in ms.
+const uint64_t kLookEveryMs = 10000;
+
+// A drive was plugged in or pulled out: for a host that can be given the names of its
+// files, its catalog is to be read; otherwise, and without a drive, nothing is.
+void catalog_drive_plugged(Core &core);
+
+// Whether a drive's catalog is being read.
+bool catalog_drive_loading(const Core &core);
+
+// One step of reading a drive's catalog, at most one read of a page: its commit record,
+// its marker, its pages, the saved order, and the publication of every entry at once.
+void catalog_drive_step(Core &core);
+
+// The second source was taken: the page being read is read again from its start.
+void catalog_drive_yields(Core &core);
+
+// At a refresh: the marker of a drive whose catalog is read is read again once in
+// kLookEveryMs; another marker drops the drive's animations and reads the catalog again.
+void catalog_drive_look(Core &core);
+
+// The player left out a file of a drive whose catalog is read: it is remembered by its
+// name and its entry's CRC-32, so that a catalog read again leaves it out again.
+void catalog_drive_left_out(Core &core, uint32_t place, Reason reason);
+
 // The reply to `catalog`.
 uint32_t catalog_reply(const Core &core, Reply &reply);
 

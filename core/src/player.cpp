@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "catalog.h"
 #include "odrig_core.h"
 #include "clock.h"
 #include "order.h"
@@ -415,6 +416,7 @@ Shown advance(Core &core, uint64_t now) {
         close_stream(core);
         core.drive[place].state = kDriveLeftOut;
         drive_left_out(core, place, reason);
+        catalog_drive_left_out(core, place, reason);
         player_drive_changed(core);
         return kShowsBefore;
     }
@@ -699,6 +701,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     const bool was_valid = !core.invalid;
     const bool steady = second == 0 || player_fps(core, now) >= kCheckLeastRate;
     check_after_start(core, in_step, now - grid <= kCheckOnTimeMs && steady);
+    catalog_drive_look(core);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
     }

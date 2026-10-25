@@ -541,9 +541,23 @@ length and its id, and asks the host for a name only when `list` writes it or a 
 needs it.
 
 - At each refresh, before the LED data is made, the core asks `drive`. When the number
-  differs from the one it holds, it drops what it knew of the old drive and, for a number
-  other than 0, counts the new drive's files with `drive_name`, at most 256, gives each
-  its id, and marks them to be checked.
+  differs from the one it holds, it drops what it knew of the old drive. For a number
+  other than 0 and a host with `drive_bind`, it reads the drive's catalog first, as the
+  next item says; a drive without one, and every drive of a host without `drive_bind`, is
+  listed (`drive_list`, when the host has it), its files counted with `drive_name`, at
+  most 256, each given its id and marked to be checked.
+- A drive's catalog is read by the check after the start once the installed files are
+  read, one step at a time at its pace, each step one read of at most 512 bytes: a commit
+  record that is whole is finished when `drive_writable` says 1 and makes the catalog
+  damaged otherwise; then the marker; then each page, whose entries become places with
+  `drive_bind`, `order_drive_named` and the lowest free id, not yet in the playlist;
+  then `order.txt`; then every place joins the playlist at once, or is left out for an
+  entry of another canvas or a fault remembered by its name and CRC-32. A page that does
+  not agree with the marker drops every place: the catalog is damaged. While the catalog
+  is read, the second source taken by an upload makes the page be read again. Once read,
+  the marker is read again at the first refresh 10,000 ms later, and each 10,000 ms; when
+  it differs, the drive's places are dropped and the catalog is read again. A file the
+  player leaves out is remembered with its entry's CRC-32, read from its page.
 - The check after the start goes on with the drive once the installed files are read.
   It first reads `order.txt`, to know the place of each of the drive's files in the saved
   order, see [the saved order](#the-saved-order), and then the drive's files, in the order
@@ -730,7 +744,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,728 |
+| The core object | fixed | 3,792 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -747,17 +761,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,261** |
+| **Total** | | **125,325** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,738 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,802 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,465 bytes for the target file. A host with a drive
+of the check and the saved order: 77,529 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 129,741 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 129,805 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -821,6 +835,7 @@ leg; and `ready`.
 | `drive plug` | With `--drive`: a drive is plugged in, with a number one higher than the last one; its folder is listed when the core calls `drive_list`, as it is then. The core sees it at its next refresh. | nothing |
 | `drive plug <folder>` | With `--drive`: as `drive plug`, with a drive that stands for this folder from then on. | nothing |
 | `drive pull` | With `--drive`: the drive is pulled out. | nothing |
+| `drive replace <folder>` | With `--drive`: the files of the drive's folder `odrig` become those of `<folder>/odrig`, while the drive stays plugged in with its number. | nothing |
 
 | Option of a session | What it does |
 |---|---|
@@ -851,6 +866,7 @@ leg; and `ready`.
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
 | `--drive-read-only` | With `--drive`: `drive_writable` says 0, and every storage call on a name of the drive fails. |
 | `--trace-drive` | With `--drive`: prints `drive list <count>` for every `drive_list` and `drive bind <place> <name>` for every `drive_bind`. |
+| `--trace-read-at` | Prints `read_at <name> <offset> <count>` for every `read_at`: the name, where it read from and how many bytes it gave. |
 
 A storage call is one of `write_open`, `write`, `write_close`, `rename` and `remove`.
 `space` and `read_at` are not counted and not traced. The storage functions work on the

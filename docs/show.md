@@ -150,6 +150,21 @@ On the board the drive is a USB stick or a microSD card, as
   same way, and the show stays valid.
 - The drive's animations are not part of `show.json`, and `space` does not count them.
 
+A drive with a catalog, the files `catalog.txt` and `catalog-NN.txt` of its folder `odrig`
+as [catalog.md](catalog.md) states them, is read otherwise: its folder is not listed, and
+its animations are the files its catalog names, in the order of its pages, with the sizes
+and lengths the catalog gives. The player reads the catalog in steps after the installed
+animations, while the show plays, and every animation of it joins the playlist at the same
+refresh, once every page agrees with the marker; none of the drive's files is read before
+it plays. An entry made for another canvas is left out with `size-mismatch`. A file copied
+onto such a drive without its entry is not an animation. While the drive stays plugged in,
+the marker is read again once in 10 seconds; another marker drops the drive's animations
+and reads the catalog again. A damaged or incompatible catalog leaves the drive without
+animations, named in the log as `catalog external damaged` or `catalog external
+incompatible`, and the show plays on. A file the player left out is left out again when the
+catalog is read again with the same entry, by its name and CRC-32; an entry with another
+CRC-32 is a new file.
+
 ## Changing a show while it runs
 
 `remove <id>` takes an item out of the show. `upload` adds an animation item, or gives an

@@ -74,7 +74,7 @@ int usage() {
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --about TEXT\n"
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
         "       --command-read-fails FILE OFFSET\n",
         stderr);
     return kUsage;
@@ -165,6 +165,7 @@ struct Options {
     long command_read_fails_offset = 0;     // command fails at this offset
     bool drive_read_only = false;   // the drive cannot be written
     bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
+    bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
     std::string about;              // the text `about` gives; without one the host has no `about`
 };
@@ -292,6 +293,22 @@ public:
     void pull() {
         drive_number_ = 0;
         drive_names_.clear();
+    }
+
+    // The files of the drive's folder `odrig` become those of `<top>/odrig`, while the drive
+    // stays plugged in with its number: a writer that changed the drive.
+    bool replace_drive(const std::string &top) {
+        const std::string folder = options_.drive + "/odrig";
+        const std::string source = top + "/odrig";
+#ifdef _WIN32
+        std::error_code failed;
+        std::filesystem::remove_all(folder, failed);
+        std::filesystem::copy(source, folder, failed);
+        return !failed;
+#else
+        const std::string command = "rm -rf '" + folder + "' && cp -R '" + source + "' '" + folder + "'";
+        return std::system(command.c_str()) == 0;
+#endif
     }
 
     size_t bytes_given() const { return bytes_given_; }
@@ -707,6 +724,9 @@ private:
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
         host.read_at_ends_[name] = offset + static_cast<uint32_t>(count);
         host.call_bytes_ += count;
+        if (options.trace_read_at) {
+            std::printf("read_at %s %u %zu\n", name, offset, count);
+        }
         return static_cast<int32_t>(count);
     }
 
@@ -719,7 +739,7 @@ private:
         }
         const std::string given = name;
         if (!options_.drive.empty() && of_the_drive(name) && given.size() > 6 &&
-            given.find_first_not_of("0123456789", 6) == std::string::npos) {
+            (given.find_first_not_of("0123456789", 6) == std::string::npos || drive_name_sound(name + 6))) {
             return;
         }
         bool sound = !given.empty() && given.size() <= 32 &&
@@ -1245,6 +1265,9 @@ private:
             print_fault();
             return true;
         }
+        if (line.rfind("drive replace ", 0) == 0) {
+            return host_.has_drive() && host_.replace_drive(line.substr(14));
+        }
         if (line == "drive plug" || line == "drive pull" || line.rfind("drive plug ", 0) == 0) {
             if (!host_.has_drive()) {
                 return false;
@@ -1641,6 +1664,9 @@ int main(int argc, char **argv) {
                 ++at;
             } else if (arguments[at] == "--trace-drive") {
                 options.trace_drive = true;
+                ++at;
+            } else if (arguments[at] == "--trace-read-at") {
+                options.trace_read_at = true;
                 at += 1;
             } else if (arguments[at] == "--drive-read-fails" && at + 2 < arguments.size() &&
                        whole_number(arguments[at + 2], &options.drive_read_fails_offset)) {

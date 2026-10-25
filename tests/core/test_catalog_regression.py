@@ -80,7 +80,6 @@ class TheDrive(unittest.TestCase):
         with a_drive(drive) as top:
             return support.start({**SHOW, **catalog(ANIMATIONS)}, script, ["--drive", top, "--trace-calls"], check_first=False)
 
-    @unittest.expectedFailure
     def test_a_drive_with_a_catalog_has_none_of_its_animations_read_before_one_plays(self):
         # Animation 1 plays alone, so that no file of the drive is played.
         script = asked(0, "play 1") + [f"poll {grid(step)}" for step in range(400)] + asked(8100, "list")
@@ -89,7 +88,6 @@ class TheDrive(unittest.TestCase):
         self.assertEqual(sorted(listed[3:]), sorted(DRIVE))
         self.assertLess(read_bytes(run), sum(len(data) for data in DRIVE.values()))
 
-    @unittest.expectedFailure
     def test_a_file_copied_onto_a_drive_with_a_catalog_is_not_an_animation(self):
         copied = {**DRIVE, **catalog(DRIVE), "copied.odrg": loop_of(2, 7)}
         script = [f"poll {grid(step)}" for step in range(400)] + asked(8100, "list")

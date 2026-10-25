@@ -2,6 +2,8 @@
 
 #include "crc32.h"
 #include "json_reader.h"
+#include "order.h"
+#include "player.h"
 #include "storage.h"
 
 namespace odrig {
@@ -156,7 +158,7 @@ bool fixed_decimal(const char *line, uint32_t *at, uint32_t count, uint32_t *val
 
 // Reads the marker from an open source: kCatalogOk with `marker` filled, kCatalogDamaged
 // or kCatalogIncompatible.
-uint8_t read_marker(FileSource &source, Marker &marker) {
+uint8_t read_marker(FileSource &source, Marker &marker, uint32_t *whole_crc = nullptr) {
     LineReader reader;
     char line[48];
     if (reader.next(source, line, sizeof line) != kLineGot || reader.over || reader.unended) {
@@ -199,6 +201,9 @@ uint8_t read_marker(FileSource &source, Marker &marker) {
     }
     if (reader.next(source, line, sizeof line) != kLineEnd || reader.bytes != kMarkerSize || marker.generation == 0) {
         return kCatalogDamaged;
+    }
+    if (whole_crc != nullptr) {
+        *whole_crc = crc_value(reader.crc);
     }
     return kCatalogOk;
 }
@@ -374,19 +379,19 @@ __attribute__((noinline)) bool read_record(Core &core, const Place &place, uint3
 
 // Reads a marker of a place by its host's name: kCatalogOk with `marker`, kCatalogNone when
 // there is none, kCatalogDamaged or kCatalogIncompatible.
-uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker &marker) {
+uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker &marker, uint32_t *whole_crc = nullptr) {
     const Reason opened = open_for(core, place, name);
     if (opened == kFileMissing) {
         return kCatalogNone;
     }
-    const uint8_t found = opened == kNone ? read_marker(source_of(core, place), marker) : kCatalogDamaged;
+    const uint8_t found = opened == kNone ? read_marker(source_of(core, place), marker, whole_crc) : kCatalogDamaged;
     source_of(core, place).close();
     return found;
 }
 
 // Finishes the change whose commit record is whole, on a place whose storage can be
 // written. True when there was one.
-bool finish(Core &core, const Place &place) {
+__attribute__((noinline)) bool finish(Core &core, const Place &place) {
     uint32_t mask = 0;
     uint32_t actions = 0;
     if (!read_record(core, place, &mask, &actions, kNothing, nullptr)) {
@@ -675,6 +680,196 @@ void write_state(const CatalogState &catalog, Reply &reply) {
     }
 }
 
+// The external storage's state and its log line, once its catalog cannot be read: nothing
+// of the drive is an animation.
+void drive_unusable(Core &core, uint8_t state, uint8_t detail) {
+    core.checker->file.close();
+    core.catalog_open = 0;
+    core.drive_count = 0;
+    core.drive_check_at = 0;
+    core.catalog_phase = kLoadIdle;
+    CatalogState &catalog = core.catalogs[kExternal];
+    catalog.state = state;
+    catalog.detail = state == kCatalogDamaged ? detail : 0;
+    if (core.host.log != nullptr) {
+        core.host.log(core.host.ctx, state == kCatalogIncompatible ? "catalog external incompatible" : "catalog external damaged");
+    }
+    player_drive_changed(core);
+    order_drive_found(core);
+}
+
+// The file of the drive left out in this boot with this name and entry, or null.
+const Remembered *remembered_entry(const Core &core, const char *name, uint32_t crc) {
+    for (uint32_t at = 0; core.remembered != nullptr && at < kRememberedMost; ++at) {
+        const Remembered &one = core.remembered[at];
+        if (one.reason == kNone || one.first_read != kRememberedWhole || one.crc != crc) {
+            continue;
+        }
+        uint32_t index = 0;
+        while (index + 1 < kFaultNameSize && name[index] != '\0' && one.name[index] == name[index]) {
+            ++index;
+        }
+        if (one.name[index] == '\0' && (name[index] == '\0' || index + 1 == kFaultNameSize)) {
+            return &one;
+        }
+    }
+    return nullptr;
+}
+
+// An entry of the drive's catalog becomes a place, published later; a name twice makes the
+// page's lines unsound.
+__attribute__((noinline)) void stage(Core &core, const EntryLine &entry) {
+    if (core.drive_count >= kDriveMost) {
+        return;
+    }
+    const uint32_t place = core.drive_count;
+    char *name = const_cast<char *>(entry.name);
+    name[entry.name_length] = '\0';
+    if (core.host.drive_bind(core.host.ctx, core.drive_number, place, name) != 1) {
+        core.catalog_bad_line = 1;
+        return;
+    }
+    order_drive_named(core, place, name);
+    for (uint32_t other = core.catalog_first_place; core.order_hash != nullptr && other < place; ++other) {
+        char known[kCatalogNameMost + 1];
+        if (core.order_hash[other] == core.order_hash[place] && core.host.drive_name(core.host.ctx, core.drive_number, other, known, sizeof known) == 1 &&
+            same_text(known, name)) {
+            core.catalog_bad_line = 1;
+        }
+    }
+    DriveEntry &made = core.drive[place];
+    made.bytes = entry.bytes;
+    made.total_ms = drive_length(entry.total_ms);
+    made.id = free_drive_id(core);
+    made.state = kDriveStaged;
+    made.fault = kNone;
+    if (entry.width != core.width || entry.height != core.height) {
+        made.fault = kSizeMismatch;
+    } else if (const Remembered *found = remembered_entry(core, name, entry.crc)) {
+        made.fault = found->reason;
+    }
+    core.drive_count = place + 1;
+}
+
+// Reads the marker's line of the page the reading is at: false when the marker is not the
+// one read before.
+bool page_expected(Core &core) {
+    const Place place = {kExternal, true};
+    Marker marker;
+    uint32_t crc = 0;
+    if (read_marker_of(core, place, kMarkerNames[kExternal], marker, &crc) != kCatalogOk || crc != core.catalog_marker_crc) {
+        return false;
+    }
+    core.catalog_expected_lines = marker.counts[core.catalog_page];
+    core.catalog_expected_crc = marker.crcs[core.catalog_page];
+    return true;
+}
+
+// One step of the pages: the next page's line of the marker, or one read of the page.
+__attribute__((noinline)) void page_step(Core &core) {
+    FileSource &source = core.checker->file;
+    if (!core.catalog_open) {
+        if (core.catalog_page >= kCatalogPages) {
+            core.catalog_phase = kLoadOrder;
+            core.drive_check_at = core.drive_count;
+            order_drive_found(core);
+            return;
+        }
+        if (!page_expected(core)) {
+            // The marker changed while it was read: everything is read again.
+            catalog_drive_plugged(core);
+            core.drive_count = 0;
+            return;
+        }
+        core.catalog_first_place = static_cast<uint16_t>(core.drive_count);
+        core.catalog_lines = 0;
+        core.catalog_bad_line = 0;
+        core.catalog_page_crc = kCrcStart;
+        core.order_reader.length = 0;
+        core.order_reader.over = 0;
+        if (core.catalog_expected_lines == 0) {
+            ++core.catalog_page;
+            return;
+        }
+        const Place place = {kExternal, true};
+        if (open_for(core, place, kPageNames[kExternal][core.catalog_page]) != kNone) {
+            drive_unusable(core, kCatalogDamaged, kDamagedPage);
+            return;
+        }
+        core.catalog_open = 1;
+        return;
+    }
+    OrderReader &line = core.order_reader;
+    bool refilled = false;
+    for (;;) {
+        if (source.position >= source.length) {
+            if (refilled) {
+                return;
+            }
+            refilled = true;
+        }
+        const int got = source.get();
+        if (got == -kEnd) {
+            break;
+        }
+        if (got < 0) {
+            drive_unusable(core, kCatalogDamaged, kDamagedPage);
+            return;
+        }
+        core.catalog_page_crc = crc_add(core.catalog_page_crc, static_cast<uint8_t>(got));
+        if (got != '\n') {
+            if (line.length + 1 < kOrderLineRoom) {
+                line.line[line.length++] = static_cast<char>(got);
+            } else {
+                line.over = 1;
+            }
+            continue;
+        }
+        ++core.catalog_lines;
+        EntryLine entry;
+        if (line.over || !parse_entry(line.line, line.length, core.catalog_page, entry)) {
+            core.catalog_bad_line = 1;
+        } else {
+            stage(core, entry);
+        }
+        line.length = 0;
+        line.over = 0;
+    }
+    source.close();
+    core.catalog_open = 0;
+    if (line.length != 0 || line.over || core.catalog_lines != core.catalog_expected_lines || crc_value(core.catalog_page_crc) != core.catalog_expected_crc) {
+        drive_unusable(core, kCatalogDamaged, kDamagedPage);
+        return;
+    }
+    if (core.catalog_bad_line) {
+        drive_unusable(core, kCatalogDamaged, kDamagedLine);
+        return;
+    }
+    ++core.catalog_page;
+}
+
+// Every place read from the catalog becomes an animation of the playlist at once, or is
+// left out for its fault.
+void publish(Core &core) {
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        DriveEntry &entry = core.drive[place];
+        if (entry.state != kDriveStaged) {
+            continue;
+        }
+        if (entry.fault != kNone) {
+            entry.state = kDriveLeftOut;
+            drive_left_out(core, place, static_cast<Reason>(entry.fault));
+        } else {
+            entry.state = kDriveInPlaylist;
+            player_drive_joined(core, place);
+        }
+    }
+    core.drive_check_at = core.drive_count;
+    core.catalog_phase = kLoadIdle;
+    core.catalogs[kExternal].state = kCatalogOk;
+    core.catalog_looked = core.latest;
+}
+
 }  // namespace
 
 bool catalog_name_allowed(const char *name, uint32_t length) {
@@ -829,6 +1024,138 @@ void catalog_read_internal(Core &core) {
         entries += marker.counts[page];
     }
     catalog.entries = static_cast<uint16_t>(entries);
+}
+
+void catalog_drive_plugged(Core &core) {
+    CatalogState &catalog = core.catalogs[kExternal];
+    catalog.generation = 0;
+    catalog.entries = 0;
+    catalog.detail = 0;
+    core.catalog_open = 0;
+    core.catalog_page = 0;
+    const bool given_names = core.drive != nullptr && core.host.drive_bind != nullptr && core.drive_number != 0;
+    core.catalog_phase = given_names ? kLoadRecord : kLoadIdle;
+    catalog.state = core.drive_number == 0 ? kCatalogAbsent : given_names ? kCatalogLoading : kCatalogNone;
+}
+
+bool catalog_drive_loading(const Core &core) {
+    return core.drive != nullptr && core.catalog_phase != kLoadIdle;
+}
+
+void catalog_drive_step(Core &core) {
+    const Place place = {kExternal, true};
+    CatalogState &catalog = core.catalogs[kExternal];
+    if (core.catalog_phase == kLoadRecord) {
+        uint32_t mask = 0;
+        uint32_t actions = 0;
+        if (read_record(core, place, &mask, &actions, kNothing, nullptr)) {
+            if (core.host.drive_writable == nullptr || core.host.drive_writable(core.host.ctx, core.drive_number) != 1) {
+                drive_unusable(core, kCatalogDamaged, kDamagedInterrupted);
+                return;
+            }
+            finish(core, place);
+        }
+        core.catalog_phase = kLoadMarker;
+    } else if (core.catalog_phase == kLoadMarker) {
+        Marker marker;
+        const uint8_t found = read_marker_of(core, place, kMarkerNames[kExternal], marker, &core.catalog_marker_crc);
+        if (found == kCatalogNone) {
+            // A drive without a catalog is listed and checked as before.
+            core.catalog_phase = kLoadIdle;
+            catalog.state = kCatalogNone;
+            drive_take_listed(core);
+            return;
+        }
+        if (found != kCatalogOk) {
+            drive_unusable(core, found, kDamagedMarker);
+            return;
+        }
+        catalog.generation = marker.generation;
+        uint32_t entries = 0;
+        for (uint32_t page = 0; page < kCatalogPages; ++page) {
+            entries += marker.counts[page];
+        }
+        catalog.entries = static_cast<uint16_t>(entries);
+        core.catalog_page = 0;
+        core.catalog_open = 0;
+        core.catalog_phase = kLoadPages;
+    } else if (core.catalog_phase == kLoadPages) {
+        page_step(core);
+    } else if (order_drive_due(core)) {
+        order_drive_step(core);
+    } else {
+        publish(core);
+    }
+}
+
+void catalog_drive_yields(Core &core) {
+    if (core.catalog_phase == kLoadPages && core.catalog_open) {
+        // The page is read again from its start; what was taken of it is dropped.
+        core.catalog_open = 0;
+        core.drive_count = core.catalog_first_place;
+    }
+}
+
+void catalog_drive_look(Core &core) {
+    if (core.drive == nullptr || core.drive_number == 0 || core.catalog_phase != kLoadIdle || core.catalogs[kExternal].state != kCatalogOk ||
+        core.latest - core.catalog_looked < kLookEveryMs || core.upload.state != kUploadNone || !check_complete(core) || core.check_header_read) {
+        return;
+    }
+    core.catalog_looked = core.latest;
+    const Place place = {kExternal, true};
+    Marker marker;
+    uint32_t crc = 0;
+    if (read_marker_of(core, place, kMarkerNames[kExternal], marker, &crc) == kCatalogOk && crc == core.catalog_marker_crc) {
+        return;
+    }
+    // Another marker: the drive's animations go, and its catalog is read again.
+    core.drive_count = 0;
+    core.drive_check_at = 0;
+    player_drive_changed(core);
+    order_drive_found(core);
+    catalog_drive_plugged(core);
+}
+
+void catalog_drive_left_out(Core &core, uint32_t place, Reason reason) {
+    if (core.catalogs[kExternal].state != kCatalogOk || core.remembered == nullptr || !is_file_fault(reason) || core.upload.state != kUploadNone ||
+        !check_complete(core) || core.check_header_read) {
+        return;
+    }
+    // The entry's CRC-32, from the line of its name on its page.
+    char name[kCatalogNameMost + 1];
+    if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {
+        return;
+    }
+    uint32_t length = 0;
+    while (name[length] != '\0') {
+        ++length;
+    }
+    const Place where = {kExternal, true};
+    if (open_for(core, where, kPageNames[kExternal][catalog_page_of(name, length)]) != kNone) {
+        return;
+    }
+    LineReader reader;
+    OrderReader &line = core.order_reader;
+    while (reader.next(core.checker->file, line.line, kOrderLineRoom) == kLineGot) {
+        EntryLine entry;
+        if (!reader.over && parse_entry(line.line, reader.length, catalog_page_of(name, length), entry) && entry.name_length == length &&
+            same_text(entry.name, name)) {
+            Remembered &one = core.remembered[core.remembered_next];
+            core.remembered_next = (core.remembered_next + 1) % kRememberedMost;
+            uint32_t at = 0;
+            for (; name[at] != '\0' && at + 1 < kFaultNameSize; ++at) {
+                one.name[at] = name[at];
+            }
+            one.name[at] = '\0';
+            one.reason = static_cast<uint8_t>(reason);
+            one.first_read = kRememberedWhole;
+            one.crc = entry.crc;
+            break;
+        }
+    }
+    core.checker->file.close();
+    line.length = 0;
+    line.over = 0;
 }
 
 uint32_t catalog_reply(const Core &core, Reply &reply) {

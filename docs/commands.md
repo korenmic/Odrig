@@ -421,6 +421,10 @@ the start; an entry for another canvas than the mapping's makes its file unavail
 `catalog internal incompatible`) and its storage is read as without one. A change of the
 catalog that a cut interrupted after its commit is finished first.
 
+A drive with a catalog is `loading` from its plug-in until every page is read; its
+animations then join `list` together. One without a catalog is `none` and is listed and
+read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
+
 An upload, `remove` and `remove many` keep a catalog that is `ok`: an upload commits the
 entry of its file, with the size, the CRC-32 and the length its check found, in the same
 commit that puts the file in place; a removal takes the entries of the files that go out

@@ -69,7 +69,7 @@ Rules for every task:
     core asks; writes by name inside the folder; read-only refusals.
   - Prove it fails first.
 
-- [ ] 6. The core: a drive's catalog
+- [x] 6. The core: a drive's catalog
   - `catalog_drive_step`: the commit record, the marker, the pages in steps, staging,
     publication, `order.txt`; `catalog_drive_look` once in 10 seconds and the reload;
     damaged and incompatible catalogs; `Remembered` by CRC-32; seed 33's readiness.
