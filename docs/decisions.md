@@ -674,3 +674,8 @@ are in [format.md](format.md), "Measured sizes".
   types of seed 37 are in the entries. `docs/catalog.md` has the costs as measured through
   the test host. The board session, which moves the board's animations onto the card and
   keeps one or two small ones inside, and the owner's check on a phone are open.
+- 2026-10-25: The board session of the run, on the firmware of the unified branch: seeds 33
+  and 34 are completed on the board; seeds 31, 32, 35, 36 and 37 behaved as specified in
+  everything that needs neither the card nor the owner's eyes, and seed 38's card sessions
+  are open, as the card was not mounted. One restart for a panic after the first catalog
+  rebuild is not explained. docs/firmware.md, "Verified on the board", has the record.

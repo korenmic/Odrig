@@ -2195,6 +2195,57 @@ file system` at every start, so nothing of the card was tried.
   checked `install-show --keep-copies` that took the reproducer of seed 31 away wrote 9
   blocks, 36,864 bytes, the catalog with them, in 68 s, `outcome: healthy`. The app was not
   flashed.
+- **Bounded decoding (seed 31).** With no card, the reproducer, `python3 -m
+  tests.core.huge_tail` (65,263 bytes that inflate to 64 MiB of zeros after a bad record),
+  went into the board's own storage as item 130 with `install-show --no-check`, firmware
+  of ea73e23. The check reached it after the 73 others and read it for about three and a
+  half minutes (06:12:53 to 06:16:23). Meanwhile 29 samples of `status` over the chip's
+  own socket took 0.43 to 0.61 s each through the command tool, 0.43 to 0.46 s before it,
+  the refreshes stayed at 31 to 50 a second, and `host` kept `reset power-on`: no watchdog
+  reset. The check ended `degraded`, the file quarantined with `bad-palette-index` after
+  67,112,475 bytes of its body. Open: the reproducer on the card, and the time of each of
+  the core's calls on the board, which the command tool's round trip does not show.
+- **Quarantine (seed 32).** A bad file in the board's storage, and the reproducer: the
+  board started, answered at once, played the rest at 49 refreshes a second, and `list`
+  marked each with its `fault`. Open: a bad file on the card, and the owner's look at the
+  app and the LEDs.
+- **The saved order and the tests (seed 36).** The 21 line tests went: `lines-test.odrg`
+  and `rainbow-lines-01` to `-20`, id 84 by `remove` and the others by `install-show`.
+  `order move <revision> 101 1` put 101 first and `play all` began with it; 110 before
+  101 likewise. `mapping test snake 1` to `20` were each `{"ok":true}`, with `mapping get`
+  giving `"snake":<n>`, and `snake 21` was `bad-argument`; `mapping test on` and `off`
+  likewise. Open: a card entry absent and back, and Snake 1 to 20 and the diagonal seen on
+  the LEDs, which is the owner's look.
+- **Texts and clocks (seed 37).** Ten files of `tests/vectors` uploaded as ids 101 to 110:
+  the texts `hebrew.marquee`, `mixed.pan`, `finals.slide`, `english.static`, `rtl.down`,
+  `tall.up` and `multiline.wrap`, and the clocks `analog`, `digital` and `melting`. Played
+  one by one, `status` three seconds later gave 41, 50, 42, 50, 50, 50 and 32 refreshes a
+  second for the texts and 28, 48 and 23 for the clocks, each clock with its `seed`, and
+  `list` gave `"type":"text"` and `"type":"widget"`; with the firmware of ea73e23, 40, 38
+  and 23 for 101, 108 and 110. Open: the owner's look at the LEDs and at the app.
+- **The catalogs (seed 35).** With the firmware of ea73e23 `catalog` first gave
+  `"internal":{"state":"none","uncataloged":73},"external":{"state":"absent"}`. `catalog
+  rebuild internal` read the 73 files, its progress in `catalog`, and ended
+  `"state":"ok","generation":1,"entries":73`. A restart then answered `ready`, 73
+  checked, at its first reply, about two seconds after the tool's end, gave `list` with
+  every size at once, and played within four seconds, where without the catalog the
+  check had ended about 250 seconds after a restart. A checked `install-show` writes the
+  catalog too, and an unchecked one that names no catalog removes it. Open: everything of
+  the card, its catalog, uploads to it and removals from it, and the board keeping only one
+  or two small animations inside, which waits for the card.
+- **The card (seed 38).** Not mounted at any start of the run: tasks 8 and 9 are open.
+- **Not explained.** The first `catalog rebuild internal`, sent through COM while the check
+  after a start was under way, was followed by a restart whose reason `host` gave as
+  `panic`; four rebuilds after it, two of them cancelled, ran without one, and the panic's
+  text was not captured. While a rebuild runs, `status` counts the files it has still to
+  read in `to_check` (60 became 72). After a `read-limit` failed because another program
+  had the COM socket open, every restart through the chip's own socket started the chip in
+  its download mode (`rst:0x15 (USB_UART_CHIP_RESET),boot:0x0`), so that it answered on
+  neither socket; a reset through COM with the boot line released started it normally
+  (`boot:0x8`), and `flash` through COM put the firmware back.
+- **The board was left** on the firmware of ea73e23 with 73 animations, the ten texts and
+  clocks among them, the internal catalog `ok` at generation 3, the order beginning with
+  110 and 101, playing at brightness 32.
 
 ## Live pin assignments
 
