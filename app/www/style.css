@@ -709,23 +709,82 @@ label.button {
 }
 
 /* Settings. */
-#mapping-rows > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--edge);
-}
-
-#mapping-rows label {
-  flex: 1 1 auto;
-  min-width: 0;
+#mapping-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
   margin: 8px 0;
 }
 
-#mapping-rows select {
+#mapping-rows ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A pin and the snake beside it have the same height, so that they stand in line. */
+.map-pins li,
+.map-snake,
+.map-placeholder {
+  box-sizing: border-box;
+  height: 52px;
+}
+
+.map-pins li {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  border-bottom: 1px solid var(--edge);
+  color: var(--lesser);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.map-snake {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--edge);
+  touch-action: pan-y;
+}
+
+.map-snake .words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-snake .handle {
   flex: 0 0 auto;
-  width: 132px;
+  width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  touch-action: none;
+  cursor: grab;
+}
+
+.map-snake.lifted {
+  position: fixed;
+  z-index: 5;
+  margin: 0;
+  border: 1px solid var(--teal);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(69, 224, 210, 0.35);
+  pointer-events: none;
+}
+
+.map-placeholder {
+  border: 2px dashed var(--edge-strong);
+  border-radius: 12px;
+}
+
+#mapping-rows[data-locked="true"] .map-snake {
+  opacity: 0.7;
 }
 
 #mapping-error {

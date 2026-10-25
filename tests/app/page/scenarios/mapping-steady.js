@@ -1,47 +1,59 @@
 import {shown} from "../reading.js";
 
-// The mapping editor while the app reads the target in the background: a picker that is
-// open must stay open and enabled, and a pin chosen at any moment must stay chosen.
+// The mapping editor while the app reads the target in the background, every two seconds:
+// a focused handle keeps the focus, no handle is disabled, the column is not drawn again,
+// and a snake held across several reads lands where it is let go.
+const order = (app) => [...app.doc.querySelectorAll("#mapping-snakes > .map-snake")].map((item) => Number(item.dataset.snake));
+const handleOf = (app, snake) => app.doc.querySelector(`#mapping-snakes > .map-snake[data-snake="${snake}"] .handle`);
+
+function pointer(app, type, target, x, y) {
+  const view = app.frame.contentWindow;
+  target.dispatchEvent(new view.PointerEvent(type, {pointerId: 9, pointerType: "touch", isPrimary: true, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true}));
+}
+
 export default async function(app) {
   await shown(app, 2);
   app.press("Settings");
   await app.until(() => app.shown() === "settings", "Settings");
-  await app.until(() => app.doc.querySelectorAll("#mapping-rows select").length === 20 && !app.byId("mapping-pin-1").disabled, "twenty enabled snake selectors");
-  const pins = () => [...app.doc.querySelectorAll("#mapping-rows select")].map(field => Number(field.value));
-  const before = pins();
-  const first = app.byId("mapping-pin-1");
-  const seen = {disabled: 0, blurred: 0, waiting: 0, tried: 0, kept: 0};
-  // Every time a picker is disabled, or the summary says the app waits, is counted as it
-  // happens, however short it is.
+  await app.until(() => order(app).length === 20 && !handleOf(app, 1).disabled, "twenty movable snakes");
+  const seen = {disabled: 0, redrawn: 0, reading: 0, blurred: 0};
   const watcher = new MutationObserver(changes => {
     for (const change of changes) {
       if (change.type === "attributes" && change.attributeName === "disabled" && change.target.disabled) seen.disabled += 1;
-      if (change.type !== "attributes" && /Waiting for the target/.test(app.text("mapping-summary"))) seen.waiting += 1;
+      if (change.type === "childList" && change.target === app.byId("mapping-rows")) seen.redrawn += 1;
+      if (change.type !== "attributes" && /Reading mapping/.test(app.text("mapping-summary"))) seen.reading += 1;
     }
   });
-  watcher.observe(app.byId("mapping-rows"), {attributes: true, subtree: true, attributeFilter: ["disabled"]});
+  watcher.observe(app.byId("mapping-rows"), {attributes: true, childList: true, subtree: true, attributeFilter: ["disabled"]});
   watcher.observe(app.byId("mapping-summary"), {childList: true, characterData: true, subtree: true});
-  let picking = false;
-  first.addEventListener("blur", () => {if (!picking) seen.blurred += 1;});
+  // A handle with the focus keeps it through two reads.
+  const first = handleOf(app, 1);
+  first.addEventListener("blur", () => {seen.blurred += 1;});
   first.focus();
-  const started = performance.now();
-  let next = 0;
-  while (performance.now() - started < 6500) {
-    if (performance.now() - started >= next) {
-      // Every 650 ms the first snake takes the other pin: at times while a read is out.
-      const wanted = pins()[0] === before[0] ? before[1] : before[0];
-      picking = true;
-      first.value = String(wanted);
-      app.release("mapping-pin-1");
-      seen.tried += 1;
-      await app.sleep(30);
-      if (pins()[0] === wanted) seen.kept += 1;
-      first.focus();
-      picking = false;
-      next += 650;
-    }
-    await app.sleep(20);
+  await app.sleep(4500);
+  seen.focused = app.doc.activeElement === first;
+  seen.blurredByReads = seen.blurred;
+  // Snake 1 is held below snake 2 through two more reads, then let go there.
+  first.scrollIntoView({block: "center"});
+  await app.sleep(100);
+  const box = first.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  pointer(app, "pointerdown", first, x, y);
+  await app.sleep(50);
+  const held = app.doc.querySelector("#mapping-snakes > .map-snake.lifted");
+  const target = app.doc.querySelector('#mapping-snakes > .map-snake[data-snake="2"]').getBoundingClientRect();
+  const to = target.top + target.height * 0.75;
+  for (let step = 1; step <= 6; step += 1) {
+    pointer(app, "pointermove", app.doc, x, y + (to - y) * step / 6);
+    await app.sleep(30);
   }
+  await app.sleep(4500);
+  seen.stillHeld = held !== null && held.isConnected && held.classList.contains("lifted");
+  seen.whileHeld = {disabled: seen.disabled, redrawn: seen.redrawn, reading: seen.reading};
   watcher.disconnect();
+  pointer(app, "pointerup", app.doc, x, to);
+  await app.until(() => app.says("Saved: snake 1"), "the held move saved");
+  seen.order = order(app);
   return seen;
 }

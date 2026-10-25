@@ -211,14 +211,10 @@
 </div>
 <div id="mapping" class="panel">
 <h2>Mapping</h2>
-<p class="small">Assign each three-column snake to an existing ESP32-S3 data pin. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
+<p class="small">The board's data pins stand in rising order; beside each is the three-column snake it drives. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
 <p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
 <p id="mapping-error" role="alert" hidden></p>
 <div id="mapping-rows"></div>
-<div class="pair">
-<button id="mapping-save" type="button" class="primary" disabled>Save</button>
-<button id="mapping-cancel" type="button" disabled>Cancel</button>
-</div>
 <button id="mapping-defaults" type="button" disabled>Restore defaults</button>
 <button id="mapping-reload" type="button">Reload</button>
 <p class="small">To check the wiring, turn on Show test animations and use the Tests group of Animations: the diagonal and one test for each snake, through the saved mapping. Only a person looking at the LEDs can judge them.</p>

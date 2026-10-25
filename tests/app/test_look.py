@@ -149,12 +149,16 @@ class Touch(unittest.TestCase):
             self.assertNotRegex(text, r"\bon(mouse|touch|pointer|contextmenu)[a-z]*\s*=", path.name)
         self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate", "contextmenu", "resize", "focusin", "focusout", "keydown", "scroll",
                                     "pointerdown", "pointermove", "pointerup", "pointercancel", "touchmove"})
-        # A long press is only ever the lifting of a row to move it, which Move up and Move
-        # down in the row's menu do as well.
+        # A long press or a drag is only ever the lifting of a row of the playlist, which Move
+        # up and Move down in the row's menu do as well, or of a snake of the mapping, which
+        # the arrow keys on its handle move as well.
         reorder = (support.WWW / "screens" / "reorder.js").read_text(encoding="utf-8")
         self.assertIn('label: "Move up"', reorder)
         self.assertIn('label: "Move down"', reorder)
-        self.assertEqual({name.name for name in support.WWW.rglob("*.js") if "pointerdown" in name.read_text(encoding="utf-8")}, {"reorder.js"})
+        mapping = (support.WWW / "screens" / "mapping.js").read_text(encoding="utf-8")
+        self.assertIn('"ArrowUp"', mapping)
+        self.assertIn('"ArrowDown"', mapping)
+        self.assertEqual({name.name for name in support.WWW.rglob("*.js") if "pointerdown" in name.read_text(encoding="utf-8")}, {"reorder.js", "mapping.js"})
         # A right click has one listener, which stops its menu outside the fields and does
         # nothing else.
         start = (support.WWW / "main.js").read_text(encoding="utf-8")

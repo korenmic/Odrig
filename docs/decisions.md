@@ -683,3 +683,6 @@ are in [format.md](format.md), "Measured sizes".
   open selector of the mapping editor closed. The editor's read every two seconds disabled
   all twenty selectors while it waited; it now changes nothing unless the target's mapping
   changed.
+- 2026-10-25: The owner's choice: the mapping editor is a column of the twenty pins with the
+  snakes beside them, moved by dragging up or down between two others, and each move is
+  saved at once; the selectors, Save and Cancel are gone. Restore defaults saves at once.
