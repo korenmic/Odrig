@@ -23,7 +23,7 @@
 ```js
 export async function readPhoto(file);          // {width, height, grey: Uint8Array}, the picture
                                                 // turned as its orientation metadata says and
-                                                // scaled to at most 600 pixels on its long side
+                                                // scaled to at most 900 pixels on its long side
 export function analyse(picture);               // the reading below, from a picture
 export function assignment(current, reading);   // the new pins from the current ones
 ```
@@ -35,35 +35,40 @@ exports as `latest()` and `saveFromPhoto(pins)`.
 
 ## The analysis
 
-1. **Grey and threshold.** The grey of a pixel is `(2R + 5G + B) / 8`. The threshold is
-   the brightest of the grey's median plus 48, and the midpoint between the median and the
-   99.8th percentile. Pixels at or above it are bright.
-2. **Patches.** Bright pixels connected by their eight neighbours form patches; each has
-   its mass and its centre, the mean of its pixels.
-3. **Stubs.** The three LEDs of a stub may be three patches. Patches are joined by single
-   linkage: the distances at which patches merge are sorted, and the cut is at the largest
-   ratio between one merge distance and the next among cuts that leave 2 to 24 groups; the
-   groups are the stubs. A group whose mass is under a quarter of the groups' median, or
-   over four times it, is noise and is dropped, counted for the words.
-4. **The tilt.** The centres are turned about the picture's middle by the angle, from -15
-   to 15 degrees in steps of half a degree, that makes the gaps between the sorted x
-   coordinates, and those between the sorted y coordinates, most even: the least sum of
-   the two coefficients of variation.
-5. **The grids.** On each axis the centres are sorted; the gap between each pair of
-   neighbours is compared with the median of the four nearest other gaps, and the next
-   centre is `round(gap / that median)` places on, at least one. The places of a stub are
-   its x place and its y place, the y places counted from the bottom. Places are 0 to 19;
-   a span over 19 places, or two stubs at one place of an axis, is `no grid`.
-6. **The readings.** On an axis with the found stubs spanning `n` places, `20 - n`
-   places are off the ends: the offset of the first found place may be any of 0 to
-   `20 - n`. Each pair of an x offset and a y offset is a reading: position `p = x place
-   + x offset + 1` shows snake `s = y place + y offset + 1`; the positions no stub is at
-   get the numbers no stub has, in order. At most four readings are kept, the offsets 0
-   and the largest on each axis; more than one dead line gives the same readings.
-7. **The result.** `{stubs: [{x, y, position, snake}], readings: [{positions: snake or
-   null by position, filled: [{position, snake}], xEnd, yEnd}], ignored, found}`, or
-   `{refused: true, found}` for 2.6. The preview draws the stubs and the filled positions
-   of the chosen reading on the photo, scaled.
+1. **Grey and peaks.** The grey of a pixel is `(2R + 5G + B) / 8`, smoothed over its 3 x 3
+   neighbourhood. The peaks are the pixels no neighbour beats, at or above the median
+   plus 24.
+2. **The level.** The count of peaks at or above each level of brightness is taken from
+   the brightest level down to that floor. The level is the middle of the longest stretch
+   of levels over which the count stays the same, at 1 to 100 peaks; when no stretch is
+   12 levels long the count never settles, `many`, refused. The peaks at or above the
+   level are the lit LEDs, each with its glow width, the mean of its three shortest bright
+   runs along the eight directions; peaks nearer than 1.5 widths are one LED, and an LED
+   wider than 2.5 times the median width is noise, counted for the words.
+3. **The slant.** Each axis is unslanted by the fraction of the other coordinate, from
+   -0.3 to 0.3 in steps of 0.005, that makes the gaps between the sorted coordinates most
+   even.
+4. **The grids.** On each axis the LEDs are sorted; each step from the last place's value
+   is compared with the median of the four nearest other gaps, and the next LED is
+   `round(step / that median)` places on, at least one, or at the same place under 0.6 of
+   a pitch. Places are 0 to 59; when the span passes 59, the sixty places that hold the
+   most LEDs are kept and the others are noise. The y places count from the bottom.
+5. **The stubs and the sides.** LEDs one place apart on both axes chain into stubs. The
+   stubs rise to the right when the wall is seen upright and fall when it is seen from
+   the side, a quarter turn either way; the picture is then read with the wires' edge at
+   the bottom or the top, or at the left or the right, the positions along the picture's
+   columns or down its rows. On each axis of the wall the residue, 0 to 2, at which the
+   most stubs part into threes of consecutive places starts the threes.
+6. **The readings.** On an axis with the LEDs spanning `n` places, the offset of the
+   first place is the residue, or the residue plus the largest multiple of three up to
+   `59 - n`; each side's pairs of offsets are readings: position `p = (col + x offset)
+   div 3 + 1` shows the snake its LEDs vote for, `s = (row + y offset) div 3 + 1`, and
+   the positions no LED is at get the numbers no position shows, in order. The readings
+   come with the advised side first, the wires at the bottom or the left.
+7. **The result.** `{points, readings: [{side, positions: snake or null by position,
+   filled: [{position, snake}], xEnd, yEnd}], ignored, found, turned, frame}`, or
+   `{refused: true, found, why}`. The preview draws the stubs and the filled positions of
+   the chosen reading on the photo, scaled, through `frame.point`.
 
 The new pins: `assignment(current, reading)[p - 1] = current[s(p) - 1]`.
 

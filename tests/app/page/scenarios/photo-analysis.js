@@ -1,5 +1,6 @@
 // The analysis of a photo of the diagonal on photos this scenario makes, on the owner's
-// photos of the unlit wall, and on a JPEG turned by its orientation tag.
+// photos of the unlit wall and of the diagonal, and on a JPEG turned by its orientation
+// tag.
 
 const DEFAULTS = [...Array.from({length: 18}, (_, at) => at + 1), 21, 47];
 const SNAKES = 20;
@@ -96,16 +97,18 @@ function photo(app, photoModule, options = {}) {
 }
 
 // The reading's facts the test compares: the readings' positions and fills, and the pins
-// the first reading, or the one with these ends, gives from the pins the photo was made
-// with.
+// the first reading, or the one with this side and these ends, gives from the pins the
+// photo was made with.
 function facts(app, photoModule, result, pins, pick = null) {
-  if (result.refused) return {refused: true, found: result.found};
-  const chosen = pick === null ? result.readings[0] : result.readings.find((reading) => reading.xEnd === pick.xEnd && reading.yEnd === pick.yEnd);
+  if (result.refused) return {refused: true, found: result.found, why: result.why};
+  const fits = (reading) => ["side", "xEnd", "yEnd"].every((key) => pick[key] === undefined || reading[key] === pick[key]);
+  const chosen = pick === null ? result.readings[0] : result.readings.find(fits);
   return {
     points: result.points.length,
+    turned: result.turned,
     xSpan: Math.max(...result.points.map((point) => point.xPlace)),
     ySpan: Math.max(...result.points.map((point) => point.yPlace)),
-    readings: result.readings.map((reading) => ({xEnd: reading.xEnd, yEnd: reading.yEnd, filled: reading.filled, nulls: reading.positions.filter((snake) => snake === null).length})),
+    readings: result.readings.map((reading) => ({side: reading.side, xEnd: reading.xEnd, yEnd: reading.yEnd, filled: reading.filled, nulls: reading.positions.filter((snake) => snake === null).length})),
     ignored: result.ignored,
     found: result.found,
     positions: chosen ? chosen.positions : null,
@@ -128,20 +131,31 @@ export default async function(app) {
     twoDead: {pins: DEFAULTS, dead: [5, 12]},
     noise: {pins: shuffled, spots: 2, angle: -3},
     flash: {flash: true},
+    // The wall seen from its right side, the wires' edge at the left of the picture, and
+    // seen from its far edge, the wires at the top.
+    fromTheSide: {pins: shuffled, angle: 93, skew: 0.04},
+    fromTheFarEdge: {pins: shuffled, angle: 178},
   };
+  const picks = {deadEnd: {xEnd: "left", yEnd: null}, fromTheFarEdge: {side: "top"}};
   for (const [name, options] of Object.entries(cases)) {
     const picture = photo(app, photoModule, options);
     const started = performance.now();
     const result = photoModule.analyse(picture);
-    seen[name] = {...facts(app, photoModule, result, options.pins || DEFAULTS, name === "deadEnd" ? {xEnd: "left", yEnd: null} : null), ms: Math.round(performance.now() - started)};
+    seen[name] = {...facts(app, photoModule, result, options.pins || DEFAULTS, picks[name] || null), ms: Math.round(performance.now() - started)};
   }
-  // The owner's photos of the unlit wall, and the JPEG turned by its orientation tag.
+  // The owner's photos of the unlit wall and of the diagonal, and the JPEG turned by its
+  // orientation tag.
   seen.owner = {};
   for (const name of app.settings.photos) {
     const blob = await (await fetch(`/m/${name}`)).blob();
     const picture = await photoModule.readPhoto(blob);
     const result = photoModule.analyse(picture);
-    seen.owner[name] = {width: picture.width, height: picture.height, refused: result.refused === true, found: result.found};
+    seen.owner[name] = {width: picture.width, height: picture.height, refused: result.refused === true, found: result.found, why: result.why};
+    if (!result.refused) {
+      const first = result.readings[0];
+      Object.assign(seen.owner[name], {points: result.points.length, ignored: result.ignored, turned: result.turned, side: first.side, readings: result.readings.length,
+        positions: first.positions, filled: first.filled, distinct: new Set(first.positions.filter((snake) => snake !== null)).size});
+    }
   }
   const turned = await (await fetch("/m/turned.jpg")).blob();
   const picture = await photoModule.readPhoto(turned);

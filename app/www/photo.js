@@ -5,9 +5,15 @@
 export const SNAKES = 20;
 const COLUMNS = 3 * SNAKES;
 // The long side of a picture as it is analysed.
-const LONG_SIDE = 600;
-// A picture with more bright peaks than this holds no diagonal to read.
-const MOST_PEAKS = 400;
+const LONG_SIDE = 900;
+// The most lit LEDs a reading has: the sixty of the diagonal and some noise.
+const MOST_PEAKS = 100;
+// A peak counts from this far above the picture's median brightness.
+const ABOVE_MEDIAN = 24;
+// The count of peaks at or above a level of brightness stays the same over at least this
+// many levels for the peaks to be the lit LEDs: the lit LEDs are all about as bright, and
+// the lenses and the wall below them come in a few at every level.
+const LEAST_PLATEAU = 12;
 // Peaks nearer each other than this many glow widths are one LED.
 const ONE_LED = 1.5;
 // A peak whose glow is this much wider than the others' is noise.
@@ -18,6 +24,10 @@ const MOST_SLANT = 0.3;
 const SLANT_STEP = 0.005;
 // A step of less than this share of the pitch is the same place.
 const SAME_PLACE = 0.6;
+// The edge of the picture the wires are at: the bottom or the top when the wall is seen
+// upright, the left or the right when it is seen from the side. The first of each pair is
+// what the advice asks for.
+const SIDES = {upright: ["bottom", "top"], turned: ["left", "right"]};
 
 // The picture of a file, turned as its orientation metadata says and scaled to at most
 // LONG_SIDE pixels on its long side: `{width, height, grey}`.
@@ -89,32 +99,26 @@ function smoothed(picture) {
   return out;
 }
 
-// The threshold of brightness: the brighter of the median plus 48 and the midpoint
-// between the median and the 99.8th percentile.
-function threshold(grey) {
+// The median brightness of the picture.
+function medianGrey(grey) {
   const bins = new Uint32Array(256);
   for (const value of grey) bins[value] += 1;
-  const at = (fraction) => {
-    const wanted = fraction * grey.length;
-    let seen = 0;
-    for (let value = 0; value < 256; value += 1) {
-      seen += bins[value];
-      if (seen >= wanted) return value;
-    }
-    return 255;
-  };
-  const median = at(0.5);
-  return Math.max(median + 48, (median + at(0.998)) / 2);
+  let seen = 0;
+  for (let value = 0; value < 256; value += 1) {
+    seen += bins[value];
+    if (seen >= grey.length / 2) return value;
+  }
+  return 255;
 }
 
-// The bright peaks: pixels at or above the level that no neighbour of their 3 x 3 beats,
-// and that the earlier of two equal ones takes. More than MOST_PEAKS peaks end the search.
-function peaks(width, height, grey, level) {
+// The bright peaks at or above a floor: pixels that no neighbour of their 3 x 3 beats,
+// and that the earlier of two equal ones takes.
+function peaks(width, height, grey, floor) {
   const found = [];
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const value = grey[y * width + x];
-      if (value < level) continue;
+      if (value < floor) continue;
       let top = true;
       for (let dy = -1; dy <= 1 && top; dy += 1) {
         const yy = y + dy;
@@ -129,13 +133,30 @@ function peaks(width, height, grey, level) {
           }
         }
       }
-      if (top) {
-        found.push({x, y, value});
-        if (found.length > MOST_PEAKS) return null;
-      }
+      if (top) found.push({x, y, value});
     }
   }
   return found;
+}
+
+// The level of brightness that tells the lit LEDs from the lenses and the wall: the
+// middle of the longest stretch of levels, from the brightest down to the floor, over
+// which the count of peaks at or above the level stays the same, at one to MOST_PEAKS
+// peaks. Null when no stretch is LEAST_PLATEAU levels long: the count never settles, and
+// the picture holds no steady set of lit LEDs.
+function levelOf(found, floor) {
+  const counts = new Uint32Array(256);
+  for (const peak of found) counts[peak.value] += 1;
+  for (let level = 254; level >= floor; level -= 1) counts[level] += counts[level + 1];
+  let best = null;
+  for (let high = 255; high >= floor;) {
+    let low = high;
+    while (low > floor && counts[low - 1] === counts[high]) low -= 1;
+    const length = high - low + 1;
+    if (counts[high] >= 1 && counts[high] <= MOST_PEAKS && (best === null || length > best.length)) best = {length, high, low};
+    high = low - 1;
+  }
+  return best !== null && best.length >= LEAST_PLATEAU ? (best.high + best.low) >> 1 : null;
 }
 
 function median(values) {
@@ -144,9 +165,9 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-// Peaks nearer each other than `near` are one LED, at their mean, as wide as the widest.
-function oneLedEach(found, near) {
-  const parent = found.map((_, at) => at);
+// The groups of the indices 0 to count - 1 that `together(a, b)` chains.
+function chained(count, together) {
+  const parent = Array.from({length: count}, (_, at) => at);
   const root = (at) => {
     while (parent[at] !== at) {
       parent[at] = parent[parent[at]];
@@ -154,22 +175,28 @@ function oneLedEach(found, near) {
     }
     return at;
   };
-  for (let a = 0; a < found.length; a += 1) {
-    for (let b = a + 1; b < found.length; b += 1) {
-      if (Math.hypot(found[a].x - found[b].x, found[a].y - found[b].y) < near) parent[root(a)] = root(b);
+  for (let a = 0; a < count; a += 1) {
+    for (let b = a + 1; b < count; b += 1) {
+      if (together(a, b)) parent[root(a)] = root(b);
     }
   }
   const groups = new Map();
-  found.forEach((peak, at) => {
+  for (let at = 0; at < count; at += 1) {
     const key = root(at);
-    const group = groups.get(key) || {x: 0, y: 0, width: 0, count: 0};
-    group.x += peak.x;
-    group.y += peak.y;
-    group.width = Math.max(group.width, peak.width);
-    group.count += 1;
-    groups.set(key, group);
-  });
-  return [...groups.values()].map((group) => ({x: group.x / group.count, y: group.y / group.count, width: group.width}));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(at);
+  }
+  return [...groups.values()];
+}
+
+// Peaks nearer each other than `near` are one LED, at their mean, as wide as the widest.
+function oneLedEach(found, near) {
+  const groups = chained(found.length, (a, b) => Math.hypot(found[a].x - found[b].x, found[a].y - found[b].y) < near);
+  return groups.map((group) => ({
+    x: group.reduce((sum, at) => sum + found[at].x, 0) / group.length,
+    y: group.reduce((sum, at) => sum + found[at].y, 0) / group.length,
+    width: Math.max(...group.map((at) => found[at].width)),
+  }));
 }
 
 // How wide a peak's glow is: the mean of the three shortest bright runs from it along the
@@ -230,7 +257,8 @@ function unslanted(points) {
 // The places, from 0, of sorted values on a grid whose pitch is taken from the gaps
 // between neighbours: each step from the last place's value, against the median of the
 // four nearest other gaps; a step of less than SAME_PLACE of a pitch is the same place.
-// Null when the span passes the grid.
+// When the span passes the grid, the sixty places that hold the most values are kept,
+// from 0 again, and the others' places are null.
 function places(values) {
   const order = values.map((value, at) => ({value, at})).sort((a, b) => a.value - b.value);
   const gaps = order.slice(1).map((entry, at) => entry.value - order[at].value);
@@ -253,37 +281,100 @@ function places(values) {
     }
     result[order[at + 1].at] = place;
   }
-  return place >= COLUMNS ? null : result;
+  if (place < COLUMNS) return result;
+  let bestStart = 0;
+  let most = -1;
+  for (let start = 0; start + COLUMNS - 1 <= place; start += 1) {
+    const inside = result.filter((at) => at >= start && at < start + COLUMNS).length;
+    if (inside > most) {
+      most = inside;
+      bestStart = start;
+    }
+  }
+  const kept = result.map((at) => (at >= bestStart && at < bestStart + COLUMNS ? at : null));
+  const first = Math.min(...kept.filter((at) => at !== null));
+  return kept.map((at) => (at === null ? null : at - first));
 }
 
-// The residue, 0 to 2, that the first place of an axis must be shifted by for the LEDs to
-// stand in threes: the one with the most groups of exactly three consecutive places.
-function residue(placesOfAxis) {
+// The stubs: the points chained by standing one place apart on both grids. Neighbouring
+// stubs of neighbouring snakes chain into one.
+function stubsOf(points) {
+  return chained(points.length, (a, b) => Math.abs(points[a].xPlace - points[b].xPlace) === 1 && Math.abs(points[a].yPlace - points[b].yPlace) === 1);
+}
+
+// Whether the wall is seen from the side: the diagonal's stubs rise to the right when it
+// is seen upright, and fall to the right when it is turned a quarter either way.
+function isTurned(stubs, points) {
+  let rising = 0;
+  let falling = 0;
+  for (const stub of stubs) {
+    const sorted = [...stub].sort((a, b) => points[a].xPlace - points[b].xPlace);
+    for (let at = 1; at < sorted.length; at += 1) {
+      if (points[sorted[at]].yPlace > points[sorted[at - 1]].yPlace) rising += 1;
+      else falling += 1;
+    }
+  }
+  return falling > rising;
+}
+
+// The points with their places on the wall's own grids, the columns of the positions and
+// the rows of the heights, when the wires' edge is at this side of the picture.
+function framed(points, side, xSpan, ySpan) {
+  return points.map((point) => {
+    const {xPlace, yPlace} = point;
+    if (side === "bottom") return {...point, col: xPlace, row: yPlace};
+    if (side === "top") return {...point, col: xSpan - xPlace, row: ySpan - yPlace};
+    if (side === "left") return {...point, col: ySpan - yPlace, row: xPlace};
+    return {...point, col: yPlace, row: xSpan - xPlace};
+  });
+}
+
+// The places of the picture's grids of a column and a row of the wall, with the wires'
+// edge at this side: the inverse of `framed`.
+function unframed(col, row, side, xSpan, ySpan) {
+  if (side === "bottom") return {xPlace: col, yPlace: row};
+  if (side === "top") return {xPlace: xSpan - col, yPlace: ySpan - row};
+  if (side === "left") return {xPlace: row, yPlace: ySpan - col};
+  return {xPlace: xSpan - row, yPlace: col};
+}
+
+// The residue, 0 to 2, that the first place of an axis is shifted by for the LEDs to
+// stand in threes: the one at which the most stubs part into threes of consecutive
+// places, and then the most into twos.
+function residueOf(stubs, points, axis) {
   let best = 0;
   let most = -1;
   for (let r = 0; r < 3; r += 1) {
-    const groups = new Map();
-    for (const place of placesOfAxis) {
-      const key = Math.floor((place + r) / 3);
-      groups.set(key, (groups.get(key) || new Set()).add(place));
+    let score = 0;
+    for (const stub of stubs) {
+      const parts = new Map();
+      for (const at of stub) {
+        const place = points[at][axis];
+        const key = Math.floor((place + r) / 3);
+        parts.set(key, (parts.get(key) || new Set()).add(place));
+      }
+      for (const part of parts.values()) {
+        if (part.size === 3) score += 3;
+        else if (part.size === 2) score += 1;
+      }
     }
-    const threes = [...groups.values()].filter((set) => set.size === 3).length;
-    if (threes > most) {
-      most = threes;
+    if (score > most) {
+      most = score;
       best = r;
     }
   }
   return best;
 }
 
-// The reading of one pair of offsets: which snake each position shows, by the most votes
-// of its LEDs, and the positions no LED is at filled with the numbers no position shows,
-// in order. A snake two positions claim stays with the one with more votes.
-function reading(points, xOffset, yOffset, xEnd, yEnd) {
+// The reading of one side and one pair of offsets: which snake each position shows, by
+// the most votes of its LEDs, and the positions no LED is at filled with the numbers no
+// position shows, in order. A snake two positions claim stays with the one with more
+// votes.
+function reading(points, side, xOffset, yOffset, xEnd, yEnd) {
   const votes = Array.from({length: SNAKES}, () => new Map());
   for (const point of points) {
-    const position = Math.floor((point.xPlace + xOffset) / 3);
-    const snake = Math.floor((point.yPlace + yOffset) / 3) + 1;
+    const position = Math.floor((point.col + xOffset) / 3);
+    const snake = Math.floor((point.row + yOffset) / 3) + 1;
     if (position < 0 || position >= SNAKES || snake < 1 || snake > SNAKES) continue;
     votes[position].set(snake, (votes[position].get(snake) || 0) + 1);
   }
@@ -318,33 +409,41 @@ function reading(points, xOffset, yOffset, xEnd, yEnd) {
   positions.forEach((snake, at) => {
     if (snake === null) filled.push({position: at + 1, snake: free.shift()});
   });
-  return {xOffset, yOffset, xEnd, yEnd, positions, filled};
+  return {side, xOffset, yOffset, xEnd, yEnd, positions, filled};
 }
 
-// The reading of a picture: `{points, readings, ignored, found, frame}`, or `{refused:
-// true, found, why}` when the picture holds fewer than two lit LEDs (`"few"`) or they fit
-// no grid of sixty places (`"grid"`). `found` counts the bright peaks.
+// The reading of a picture: `{points, readings, ignored, found, turned, frame}`, or
+// `{refused: true, found, why}` when the picture holds no steady set of bright peaks
+// (`"many"`), fewer than two lit LEDs (`"few"`), or LEDs that fit no grid of sixty places
+// (`"grid"`). `found` counts the bright peaks at the level read, or at the floor when no
+// level is. The readings come in the order of the sides, the wires' edge at the bottom or
+// the left first, and for each side of the offsets that keep the threes whole.
 export function analyse(picture) {
   const grey = smoothed(picture);
-  const level = threshold(grey);
-  const found = peaks(picture.width, picture.height, grey, level);
-  if (found === null) return {refused: true, found: MOST_PEAKS + 1};
+  const floor = medianGrey(grey) + ABOVE_MEDIAN;
+  const all = peaks(picture.width, picture.height, grey, floor);
+  const level = levelOf(all, floor);
+  if (level === null) return {refused: true, found: all.length, why: "many"};
+  const found = all.filter((peak) => peak.value >= level);
   const widths = found.map((peak) => glowWidth(picture.width, picture.height, grey, level, peak));
   const typical = widths.length ? median(widths) : 0;
   const leds = oneLedEach(found.map((peak, at) => ({...peak, width: widths[at]})), Math.max(2, ONE_LED * typical));
   const kept = leds.filter((led) => led.width <= NOISE_WIDER * typical);
-  const ignored = leds.length - kept.length;
+  let ignored = leds.length - kept.length;
   if (kept.length < 2) return {refused: true, found: found.length, why: "few"};
   const {k, m, points: slanted} = unslanted(kept);
   const xPlaces = places(slanted.map((point) => point.u));
   // Rows count from the bottom: the larger v, the lower the place.
   const yPlaces = places(slanted.map((point) => -point.v));
-  if (xPlaces === null || yPlaces === null) return {refused: true, found: found.length, why: "grid"};
-  const points = slanted.map((point, at) => ({x: point.x, y: point.y, u: point.u, v: point.v, xPlace: xPlaces[at], yPlace: yPlaces[at]}));
-  const xSpan = Math.max(...xPlaces);
-  const ySpan = Math.max(...yPlaces);
-  const xFirst = residue(xPlaces);
-  const yFirst = residue(yPlaces);
+  // A point beyond the sixty places of either grid is noise.
+  const points = slanted.map((point, at) => ({x: point.x, y: point.y, u: point.u, v: point.v, xPlace: xPlaces[at], yPlace: yPlaces[at]}))
+    .filter((point) => point.xPlace !== null && point.yPlace !== null);
+  ignored += slanted.length - points.length;
+  if (points.length < 2) return {refused: true, found: found.length, why: "grid"};
+  const xSpan = Math.max(...points.map((point) => point.xPlace));
+  const ySpan = Math.max(...points.map((point) => point.yPlace));
+  const stubs = stubsOf(points);
+  const turned = isTurned(stubs, points);
   // The offsets that keep the threes whole: the first of each axis's possible ones and the
   // last; one reading when they are the same.
   const offsets = (first, span) => {
@@ -352,22 +451,25 @@ export function analyse(picture) {
     const last = first + 3 * Math.floor((most - first) / 3);
     return last > first ? [first, last] : [first];
   };
-  const xOffsets = offsets(xFirst, xSpan);
-  const yOffsets = offsets(yFirst, ySpan);
   const readings = [];
-  for (const xOffset of xOffsets) {
-    for (const yOffset of yOffsets) {
-      const xEnd = xOffsets.length === 1 ? null : xOffset === xOffsets[0] ? "right" : "left";
-      const yEnd = yOffsets.length === 1 ? null : yOffset === yOffsets[0] ? "highest" : "lowest";
-      readings.push(reading(points, xOffset, yOffset, xEnd, yEnd));
+  for (const side of SIDES[turned ? "turned" : "upright"]) {
+    const onWall = framed(points, side, xSpan, ySpan);
+    const xOffsets = offsets(residueOf(stubs, onWall, "col"), Math.max(...onWall.map((point) => point.col)));
+    const yOffsets = offsets(residueOf(stubs, onWall, "row"), Math.max(...onWall.map((point) => point.row)));
+    for (const xOffset of xOffsets) {
+      for (const yOffset of yOffsets) {
+        const xEnd = xOffsets.length === 1 ? null : xOffset === xOffsets[0] ? "right" : "left";
+        const yEnd = yOffsets.length === 1 ? null : yOffset === yOffsets[0] ? "highest" : "lowest";
+        readings.push(reading(onWall, side, xOffset, yOffset, xEnd, yEnd));
+      }
     }
   }
-  return {points, readings, ignored, found: found.length, frame: frameOf(points, k, m)};
+  return {points, readings, ignored, found: found.length, turned, frame: frameOf(points, k, m, xSpan, ySpan)};
 }
 
 // Where a column and a row of the wall lie in the picture: a line fitted through the
 // points' places on each axis of the unslanted frame, and the slant put back.
-function frameOf(points, k, m) {
+function frameOf(points, k, m, xSpan, ySpan) {
   const fit = (pairs) => {
     const n = pairs.length;
     const sumP = pairs.reduce((sum, [p]) => sum + p, 0);
@@ -382,14 +484,17 @@ function frameOf(points, k, m) {
   const up = fit(points.map((point) => [point.yPlace, -point.v]));
   const div = 1 - k * m;
   return {
-    // The picture's point of a position and a snake's height, from 1, with the offsets of
-    // a reading: the middle LED of the stub.
+    // The picture's point of a position and a snake's height, from 1, with the side and
+    // the offsets of a reading: the middle LED of the stub.
     point(position, snake, chosen) {
-      const u = across.start + across.slope * (3 * position - 2 - chosen.xOffset);
-      const v = -(up.start + up.slope * (3 * snake - 2 - chosen.yOffset));
+      const col = 3 * position - 2 - chosen.xOffset;
+      const row = 3 * snake - 2 - chosen.yOffset;
+      const {xPlace, yPlace} = unframed(col, row, chosen.side, xSpan, ySpan);
+      const u = across.start + across.slope * xPlace;
+      const v = -(up.start + up.slope * yPlace);
       return {x: (u + k * v) / div, y: (v + m * u) / div};
     },
-    pitch: Math.abs(across.slope),
+    pitch: (Math.abs(across.slope) + Math.abs(up.slope)) / 2,
   };
 }
 

@@ -701,3 +701,10 @@ are in [format.md](format.md), "Measured sizes".
   end offers its readings. No command, no library; `app/www/photo.js` and
   `screens/photomap.js`, about 25 KB. The owner's photo with the diagonal showing, and the
   check on a phone, are open.
+- 2026-10-25: Seed 40, after the owner's first photo of the diagonal: the level of
+  brightness that tells the lit LEDs from the lenses is where the count of bright spots
+  holds steady while the picture is scanned from the brightest level down, the owner's
+  rule, so that a lit room's reflections are the normal case; the slope of the stubs tells
+  a wall seen upright from one seen from the side; the edge the wires are at is advised,
+  bottom or left, and both edges are offered as choices. Pictures are analysed at 900
+  pixels on the long side.

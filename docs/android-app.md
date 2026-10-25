@@ -508,27 +508,36 @@ mapping changed, and never while a pin is held or moves are saved.
 
 **The mapping from a photo.** Under the mapping's column, `From a photo` takes an image
 file of the phone, a JPEG or a PNG, through the phone's own chooser: no camera is part of
-the app. The photo is taken from the front with the phone upright, the whole wall in it
-and the diagonal showing, in a room as dark as can be had; `Show the diagonal` starts the
-diagonal while it is not showing. The diagonal lights, in each snake, three LEDs whose
-height tells the snake's number, so one photo tells which snake each position drives: the
-app finds the lit LEDs as bright peaks, takes the slant out, places them on the grids of
-sixty columns and sixty rows by the pitch between neighbours, and reads for each position
-the snake its LEDs vote for. It shows the photo scaled down with a circle and the snake's
-number at each position, and the words `Position 3 shows snake 7.` for each position
-whose snake is not its own, or `Every position shows its own snake.`; `Apply` saves the
-mapping that puts every position right, with the revision last read, as a drag saves one,
-and the column shows it; `Discard` drops the photo, as leaving Settings does. The reading
-is a best effort: a snake that does not light leaves no LEDs, and its number goes to the
-position that remains, `Position 5 shows no snake; snake 12 goes there.`, drawn dashed; a
-gap at an end of the wall fits more than one reading, and the readings are offered as
-choices, `Dark strip at the left`, `Dark strip at the right`, `Lowest snake missing`,
-`Highest snake missing`, which only the wall tells apart: which end strip is dark, and
-after Apply whether the diagonal begins at the bottom left; `Other reading` applies the
-next one. Bright spots off the grid are ignored and counted; a photo with fewer than two
-lit LEDs, or with LEDs that fit no grid, is refused with the count found and the advice,
-and `Try another photo`. A photo taken from behind reads mirrored, which the app cannot
-tell; the numbered preview shows it. Nothing of the photo leaves the phone.
+the app. The photo is taken with the whole wall in it and the diagonal showing, in a room
+as dark as can be had, the edge where the wires come in at the bottom of the picture or,
+when the wall is seen from the side, at its left; `Show the diagonal` starts the diagonal
+while it is not showing. The diagonal lights, in each snake, three LEDs whose height tells
+the snake's number, so one photo tells which snake each position drives. The app finds the
+bright peaks of the picture and scans the brightness from the brightest level down, as if
+brightening the picture little by little, until the count of peaks holds steady over a
+long stretch of levels: the lit LEDs, all about as bright, come in together, and then
+nothing new comes until the lenses of the unlit LEDs and the room's reflections flood in,
+a few at every level. A lit room is the normal case; a picture whose count never settles
+is refused. The app takes the slant out, places the LEDs on the grids of sixty columns and
+sixty rows by the pitch between neighbours, tells from the slope of the stubs whether the
+wall is seen upright or from the side, and reads for each position the snake its LEDs
+vote for. It shows the photo scaled down with a circle and the snake's number at each
+position, and the words `Position 3 shows snake 7.` for each position whose snake is not
+its own, or `Every position shows its own snake.`; `Apply` saves the mapping that puts
+every position right, with the revision last read, as a drag saves one, and the column
+shows it; `Discard` drops the photo, as leaving Settings does. The reading is a best
+effort: a snake that does not light leaves no LEDs, and its number goes to the position
+that remains, `Position 5 shows no snake; snake 12 goes there.`, drawn dashed. Which edge
+the wires are at, the picture cannot tell, nor a dark end of the wall from the other end:
+the readings are offered as choices, `Wires at the bottom` or `Wires at the top` for a
+wall seen upright, `Wires at the left` or `Wires at the right` for one seen from the
+side, with `Position 1 dark`, `Position 20 dark`, `Lowest snake missing` or `Highest
+snake missing` when an end is dark, the advised edge first; only the wall tells them
+apart, and after Apply whether the diagonal begins at the bottom left; `Other reading`
+applies the next one. Bright spots off the grid are ignored and counted; a photo with no
+steady set of bright spots, with fewer than two lit LEDs, or with LEDs that fit no grid,
+is refused with the count found and the advice, and `Try another photo`. Nothing of the
+photo leaves the phone.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests

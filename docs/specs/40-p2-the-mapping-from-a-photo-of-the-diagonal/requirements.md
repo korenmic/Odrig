@@ -11,25 +11,33 @@ mapping is editable, which takes an image file of the phone through the browser'
 chooser (`image/*`). No camera is part of the app.
 
 1.2 Beside the button the app says what the photo must hold: the whole wall, the diagonal
-showing, taken from the front with the phone upright, in a room as dark as can be had.
+showing, in a room as dark as can be had, the edge where the wires come in at the bottom
+of the picture or at its left.
 While the diagonal is not showing, a button `Show the diagonal` starts it through the
 existing test; the app does not stop it by itself.
 
-1.3 The picture is read with its orientation metadata applied, scaled to at most 600
+1.3 The picture is read with its orientation metadata applied, scaled to at most 900
 pixels on its long side, and analysed in the app's own code. Nothing of it leaves the
 phone, and it is dropped when the result is discarded, applied, or the screen is left.
 
 ## 2. The reading
 
-2.1 The lit stubs of the diagonal are found as patches of pixels brighter than a threshold
-taken from the picture's own brightness, the patches grouped into stubs by their distances,
-and groups that are much smaller or much larger than the others dropped as noise.
+2.1 The lit LEDs of the diagonal are found as the bright peaks of the picture at a level
+of brightness taken from the picture itself: the count of peaks at or above each level is
+watched from the brightest level down, and the level is where the count holds steady over
+the longest stretch of levels, at one to a hundred peaks, the lit LEDs having come in
+together before the lenses of the unlit LEDs and the room's reflections. A room's light on
+the lenses is the normal case, not a fault. Peaks much wider than the others are dropped as
+noise.
 
-2.2 The stubs' centres stand on two grids of twenty places: the positions across the
-wall, left to right, and the heights, bottom to top. The pitch of each grid comes from the
-gaps between neighbouring centres, and the picture's tilt is taken out before the places
-are found. A stub at position p and height s means that the physical position p shows
-snake s.
+2.2 The LEDs stand on two grids of sixty places, the columns across the wall and the rows
+up it, in threes. The pitch of each grid comes from the gaps between neighbouring LEDs,
+and the picture's slant is taken out before the places are found. The slope of the stubs
+tells whether the wall is seen upright, the positions across the picture, or from the
+side, the positions down it; which edge of the picture the wires come in at, the picture
+cannot tell, and the reading takes the advised edge first, the bottom or the left, and
+offers the other. A stub at position p and height s means that the physical position p
+shows snake s.
 
 2.3 The new assignment gives position p the pin that drives snake s today: `pins[p-1]`
 becomes the current `pins[s-1]`. When every position shows its own snake, the assignment
@@ -44,9 +52,9 @@ to leftmost.
 the stubs fit the grid shifted by the gap either way. Every reading that fits is kept, at
 most four, and the operator chooses, 2.9 and 3.3.
 
-2.6 Fewer than two stubs, or centres that fit no grid of twenty places, is a refusal that
-says how many bright spots were found and repeats the advice of 1.2, with `Try another
-photo`.
+2.6 A picture whose count of bright peaks never holds steady, fewer than two lit LEDs, or
+LEDs that fit no grid of sixty places, is a refusal that says how many bright spots were
+found and repeats the advice of 1.2, with `Try another photo`.
 
 ## 3. The preview and the save
 
@@ -58,10 +66,12 @@ from its own number; `Every position shows its own snake.` when none does; `Posi
 shows no snake; snake s goes there.` for a dead line; and `n bright spots were ignored.`
 when noise was dropped.
 
-3.3 With more than one reading, the readings are shown as a row of choices, `Dark strip
-at the left` and `at the right` for a gap at an end of the positions, and `Lowest snake
-missing` and `Highest snake missing` for a gap at an end of the heights, each redrawing
-the preview; the app says that only the wall can tell them apart: which end strip is
+3.3 The readings are shown as a row of choices, each redrawing the preview: `Wires at
+the bottom` and `Wires at the top` for a wall seen upright, `Wires at the left` and
+`Wires at the right` for one seen from the side, the advised edge first, with `Position 1
+dark` and `Position 20 dark` for a gap at an end of the positions, and `Lowest snake
+missing` and `Highest snake missing` for a gap at an end of the heights; the app says that
+only the wall can tell them apart: which edge the wires come in at, which end strip is
 dark, and after Apply whether the diagonal begins at the bottom left.
 
 3.4 `Apply` saves the assignment with `mapping set` at the revision of the mapping last
@@ -84,8 +94,11 @@ drawn as a wall of LEDs at a permutation, seen tilted, foreshortened, blurred, w
 and uneven light, for the default mapping and several permutations, each read back
 exactly; a dead line in the middle read with its snake put in the place that remains; a
 dead line at an end offering both readings; two dead lines; a bright spot of noise
-ignored; the owner's four photos of the unlit wall beside the seed, each refused with the
-count found; a photo whose orientation metadata turns it, read upright.
+ignored; a wall seen from the side read with the wires at the left, and one seen from the
+far edge read under the wires at the top; the owner's four photos of the unlit wall beside
+the seed, each refused with the count found, and the owner's two screenshots of the
+diagonal in a lit room, read to the mapping their stubs show; a photo whose orientation
+metadata turns it, read upright.
 
 5.2 The app's suite checks the screen against the emulator: the button and its words, the
 diagonal offered and started, the preview with its numbers, the words of 3.2, the choices

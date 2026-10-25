@@ -11,6 +11,11 @@ from tests.mapping.test_core import PINS, files, set_line
 
 DEFAULTS = list(range(1, 19)) + [21, 47]
 PHOTOS = sorted(path.name for path in (support.ROOT / "project-seeds" / "40-p2-the-mapping-from-a-photo-of-the-diagonal" / "photos").glob("*.jpg"))
+UNLIT = [name for name in PHOTOS if "the-diagonal" not in name]
+LIT = [name for name in PHOTOS if "the-diagonal" in name]
+# What the owner's photo of the diagonal shows, read by eye from the stubs: position 1 at
+# the top of the picture, snake 1 at its left.
+FROM_THE_SIDE = [1, 17, 10, 8, 11, 18, 3, 7, 20, 14, 12, 13, 15, 16, 2, 6, 9, 5, 4, 19]
 
 
 def shows(pins, position):
@@ -34,12 +39,16 @@ class TheAnalysis(unittest.TestCase):
     def tearDownClass(cls):
         cls.work.cleanup()
 
-    def assert_read_back(self, name, dead=(), readings=1):
+    def assert_read_back(self, name, dead=(), readings=1, turned=False):
+        """The photo reads back the default pins, with `readings` readings for each of the
+        two sides the wires may be at."""
         found = self.seen[name]
         self.assertNotIn("refused", found, found)
         self.assertGreaterEqual(found["points"], 2 * (20 - len(dead)), found)
+        self.assertEqual(found["turned"], turned, found)
         self.assertEqual(found["readings"][0]["nulls"], len(dead), found)
-        self.assertEqual(len(found["readings"]), readings, found)
+        self.assertEqual(len(found["readings"]), 2 * readings, found)
+        self.assertEqual([reading["side"] for reading in found["readings"]], ["left", "right"] * readings if turned else ["bottom"] * readings + ["top"] * readings, found)
         self.assertEqual(found["pins"], DEFAULTS, found)
         self.assertLess(found["ms"], 2000, found)
 
@@ -63,9 +72,20 @@ class TheAnalysis(unittest.TestCase):
 
     def test_a_dead_line_at_an_end_offers_both_readings_and_one_is_right(self):
         found = self.seen["deadEnd"]
-        self.assertEqual([(reading["xEnd"], reading["yEnd"]) for reading in found["readings"]], [("right", None), ("left", None)])
+        self.assertEqual([(reading["side"], reading["xEnd"], reading["yEnd"]) for reading in found["readings"]],
+                         [("bottom", "right", None), ("bottom", "left", None), ("top", "right", None), ("top", "left", None)])
         self.assert_read_back("deadEnd", dead=[1], readings=2)
         self.assertEqual(found["readings"][1]["filled"], [{"position": 1, "snake": 10}])
+
+    def test_a_wall_seen_from_the_side_reads_back_with_the_wires_at_the_left(self):
+        self.assert_read_back("fromTheSide", turned=True)
+        self.assertEqual(self.seen["fromTheSide"]["readings"][0]["filled"], [])
+
+    def test_a_wall_seen_from_the_far_edge_reads_back_under_the_wires_at_the_top(self):
+        found = self.seen["fromTheFarEdge"]
+        self.assert_read_back("fromTheFarEdge")
+        # The first reading, the wires at the bottom, reads the picture as it is: mirrored.
+        self.assertNotEqual(found["positions"], list(range(1, 21)))
 
     def test_two_dead_lines_get_the_remaining_snakes_lowest_to_leftmost(self):
         self.assert_read_back("twoDead", dead=[5, 12])
@@ -78,19 +98,44 @@ class TheAnalysis(unittest.TestCase):
     def test_a_flash_photo_of_the_unlit_wall_is_refused_with_the_count(self):
         found = self.seen["flash"]
         self.assertTrue(found["refused"], found)
+        self.assertEqual(found["why"], "many")
         self.assertGreater(found["found"], 100)
 
     def test_the_owners_photos_of_the_unlit_wall_are_refused(self):
-        self.assertEqual(len(PHOTOS), 4)
-        for name in PHOTOS:
+        self.assertEqual(len(UNLIT), 4)
+        for name in UNLIT:
             with self.subTest(name):
                 found = self.seen["owner"][name]
                 self.assertTrue(found["refused"], found)
-                self.assertLessEqual(max(found["width"], found["height"]), 600)
+                self.assertEqual(found["why"], "many", found)
+                self.assertLessEqual(max(found["width"], found["height"]), 900)
+
+    def test_the_owners_photos_of_the_diagonal_in_a_lit_room_are_read(self):
+        """The wall lit by the room, every lens catching light, seen from the side with the
+        wires at the left: the lit LEDs are told from the lenses and read."""
+        self.assertEqual(len(LIT), 2)
+        for name in LIT:
+            with self.subTest(name):
+                found = self.seen["owner"][name]
+                self.assertFalse(found["refused"], found)
+                self.assertTrue(found["turned"], found)
+                self.assertEqual(found["side"], "left", found)
+        # The screenshot of the photo: all 57 LEDs in view, each position found, all distinct.
+        found = self.seen["owner"][LIT[0]]
+        self.assertEqual(found["points"], 57, found)
+        self.assertEqual(found["readings"], 2, found)
+        self.assertEqual(found["positions"], FROM_THE_SIDE, found)
+        self.assertEqual(found["distinct"], 20, found)
+        # The same, darkened by the owner, which loses the dimmer LEDs: what is read agrees.
+        found = self.seen["owner"][LIT[1]]
+        self.assertGreaterEqual(found["points"], 35, found)
+        for position, snake in enumerate(found["positions"], start=1):
+            if snake is not None:
+                self.assertEqual(snake, FROM_THE_SIDE[position - 1], (position, found))
 
     def test_a_png_file_is_read_and_scaled_like_a_jpeg(self):
         found = self.seen["png"]
-        self.assertEqual((found["width"], found["height"]), (600, 375), found)
+        self.assertEqual((found["width"], found["height"]), (900, 563), found)
         self.assertGreater(found["bytes"], 1000)
         self.assertNotIn("refused", found, found)
         self.assertEqual(found["pins"], DEFAULTS, found)
@@ -127,7 +172,7 @@ class TheScreen(unittest.TestCase):
         self.assertTrue(found["diagonalOffered"])
         self.assertEqual(found["marks"], 20)
         self.assertGreater(found["previewWidth"], 200)
-        self.assertEqual(found["choices"], [])
+        self.assertEqual(found["choices"], [["Wires at the bottom", "true"], ["Wires at the top", "false"]])
         self.assertTrue(found["applyShown"])
         self.assertEqual(found["discardWords"], "Discard")
         # Position 1 has pin 1, which drives snake 19 under the shuffled pins.
@@ -135,7 +180,7 @@ class TheScreen(unittest.TestCase):
         self.assertNotIn("Every position shows its own snake.", found["words"])
         self.assertEqual(found["said"], "Saved from the photo.")
         self.assertTrue(found["applyDisabled"])
-        self.assertFalse(found["otherShown"])
+        self.assertTrue(found["otherShown"])
         self.assertEqual(self.mapping(target)["pins"], PINS)
         self.assertTrue(found["droppedOnLeaving"])
 
@@ -152,9 +197,10 @@ class TheScreen(unittest.TestCase):
 
     def test_a_dead_line_at_an_end_offers_the_readings_and_the_chosen_one_is_applied(self):
         target = self.opened(SWAPPED)
-        found = support.run("photomap", address=f"127.0.0.1:{target.port}", settings={"photo": {"pins": SWAPPED, "dead": [1]}, "pick": "Dark strip at the left"}, steps=[lambda: None]).seen
-        self.assertEqual(found["choices"], [["Dark strip at the right", "true"], ["Dark strip at the left", "false"]])
-        self.assertEqual(found["picked"], ["false", "true"])
+        found = support.run("photomap", address=f"127.0.0.1:{target.port}", settings={"photo": {"pins": SWAPPED, "dead": [1]}, "pick": "Wires at the bottom \u00b7 Position 1 dark"}, steps=[lambda: None]).seen
+        self.assertEqual(found["choices"], [["Wires at the bottom \u00b7 Position 20 dark", "true"], ["Wires at the bottom \u00b7 Position 1 dark", "false"],
+                                            ["Wires at the top \u00b7 Position 20 dark", "false"], ["Wires at the top \u00b7 Position 1 dark", "false"]])
+        self.assertEqual(found["picked"], ["false", "true", "false", "false"])
         self.assertIn("Position 1 shows no snake; snake 10 goes there.", found["wordsPicked"])
         self.assertEqual(found["marks"], 20)
         self.assertEqual(found["said"], "Saved from the photo.")
@@ -166,8 +212,8 @@ class TheScreen(unittest.TestCase):
         pins = []
         found = support.run("photomap", address=f"127.0.0.1:{target.port}", settings={"photo": {"pins": PINS, "dead": [1]}, "other": True},
                             steps=[lambda: pins.append(self.mapping(target)["pins"]), lambda: pins.append(self.mapping(target)["pins"])]).seen
-        self.assertEqual(len(found["choices"]), 4)
-        self.assertEqual(found["otherPicked"], ["false", "true", "false", "false"])
+        self.assertEqual(len(found["choices"]), 8)
+        self.assertEqual(found["otherPicked"], ["false", "true"] + ["false"] * 6)
         self.assertEqual(len(pins), 2)
         self.assertNotEqual(pins[0], pins[1])
         self.assertEqual(sorted(pins[1]), sorted(PINS))

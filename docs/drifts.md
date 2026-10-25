@@ -10373,3 +10373,35 @@ picture; the file of twenty frames and its generator are gone.
 
 **Resolution.** `core/src/mapping_control.cpp`, `snake_test_draw`; docs/commands.md,
 docs/core.md, docs/android-app.md; the change log of docs/decisions.md.
+
+## Seed 40: the owner's photo in a lit room, and the edge the wires are at
+
+**Question.** The owner's first photo of the diagonal, taken in a lit room with the wall on
+its table and seen from the side, was refused: 401 bright spots, the lens of every unlit
+LED catching the room's light, which a threshold of the picture's median plus a margin
+could not part from the lit LEDs; darkening the photo by hand did not help, as the median
+darkened with it. And the stubs fell to the right, where the design expects them to rise:
+seen from the side, the positions run down the picture and the heights across it. How are
+the lit LEDs told from the lenses, and how is the picture's orientation read?
+
+**Answer.** The owner's rule: the picture is scanned from the brightest level down, as if
+brightened little by little, and the count of peaks at or above each level is watched; the
+lit LEDs, all about as bright, come in together and then nothing new comes until the lenses
+and the reflections flood in, so the level is the middle of the longest stretch of levels
+over which the count holds steady, at one to a hundred peaks. A picture with no stretch of
+twelve levels has no steady set of lit LEDs and is refused, `no steady set of lit LEDs
+among them`. Pictures with reflections are the normal case, not a fault. The slope of the
+stubs tells upright from turned: they rise to the right when the wall is seen upright and
+fall when it is seen from the side, a quarter turn either way. Which edge the wires are at,
+the picture cannot tell, so the advice asks for the wires' edge at the bottom of the
+picture or at its left, and both edges are offered as choices, the advised one first, in
+the words of the wires rather than of a dark strip at the left or the right, which a
+turned picture would confuse. The picture is analysed at 900 pixels on its long side, not
+600, so that the LEDs of a wall that fills the frame are some 15 pixels apart. The owner's
+screenshots of the app with the photo, one as taken and one darkened, are test vectors
+beside the seed, read to the mapping the stubs show by eye.
+
+**Resolution.** `app/www/photo.js`, `app/www/screens/photomap.js`; the seed's
+`photos/05-the-diagonal-from-the-side-screenshot.jpg` and `06-…-darkened-screenshot.jpg`;
+docs/android-app.md; the spec's requirements and design; the change log of
+docs/decisions.md.

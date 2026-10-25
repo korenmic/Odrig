@@ -4,7 +4,8 @@ import * as client from "../client.js";
 import * as mapping from "./mapping.js";
 import {SNAKES, analyse, assignment, readPhoto} from "../photo.js";
 
-const ADVICE = "Take the photo from the front with the phone upright, the whole wall in it and the diagonal showing, in a room as dark as can be had.";
+const ADVICE = "Take the photo with the whole wall in it and the diagonal showing, in a room as dark as can be had, the edge where the wires come in at the bottom of the picture or at its left.";
+const SIDE_WORDS = {bottom: "Wires at the bottom", top: "Wires at the top", left: "Wires at the left", right: "Wires at the right"};
 
 // The photo read last: its picture, its reading, the pins the mapping had when it was
 // read, the reading shown and the one applied last.
@@ -30,10 +31,11 @@ function setDisabled(element, disabled) {
   if (element.disabled !== disabled) element.disabled = disabled;
 }
 
-// The words of a reading's choice: where its gaps at the ends are taken to be.
+// The words of a reading's choice: the edge the wires are taken to be at, and where its
+// gaps at the ends are taken to be.
 function choiceWords(reading) {
-  const parts = [];
-  if (reading.xEnd !== null) parts.push(reading.xEnd === "left" ? "Dark strip at the left" : "Dark strip at the right");
+  const parts = [SIDE_WORDS[reading.side]];
+  if (reading.xEnd !== null) parts.push(reading.xEnd === "left" ? "Position 1 dark" : "Position 20 dark");
   if (reading.yEnd !== null) parts.push(reading.yEnd === "lowest" ? "Lowest snake missing" : "Highest snake missing");
   return parts.join(" \u00b7 ");
 }
@@ -54,7 +56,7 @@ function resultWords(result, reading) {
 }
 
 function refusalWords(result) {
-  const why = result.why === "few" ? "fewer than two lit LEDs" : "lit LEDs that fit no grid of twenty snakes";
+  const why = result.why === "many" ? "no steady set of lit LEDs among them" : result.why === "few" ? "fewer than two lit LEDs" : "lit LEDs that fit no grid of twenty snakes";
   return [`No reading: ${result.found} bright ${result.found === 1 ? "spot" : "spots"} found, and ${why}.`, ADVICE];
 }
 
