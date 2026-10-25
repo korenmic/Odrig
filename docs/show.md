@@ -142,8 +142,9 @@ On the board the drive is a USB stick or a microSD card, as
 - A file left out is remembered until the next start by its name and its first 512
   bytes: taken up again, it is left out again without being read further.
 - Its turn is that of an animation without `repeat` and `max_seconds`. `play <id>` plays
-  it, `status` names it, and `list` lists it after the show's items. `remove` and
-  `upload begin` of its id are refused with `in-use`.
+  it, `status` names it, and `list` lists it after the show's items. `upload begin` of its
+  id is refused with `in-use`, and so is `remove` of it, except on a drive with a catalog
+  that the core may write.
 - A show without an animation of its own plays the drive's animations.
 - A drive plugged in while the show plays is taken up without a restart. A drive pulled
   out is dropped: its animations leave the playlist and `list`. When one of them was
@@ -154,18 +155,26 @@ On the board the drive is a USB stick or a microSD card, as
 
 A drive with a catalog, the files `catalog.txt` and `catalog-NN.txt` of its folder `odrig`
 as [catalog.md](catalog.md) states them, is read otherwise: its folder is not listed, and
-its animations are the files its catalog names, in the order of its pages, with the sizes
-and lengths the catalog gives. The player reads the catalog in steps after the installed
+its animations are the files its catalog names, in the order of its pages, with the sizes,
+lengths and types the catalog gives. The player reads the catalog in steps after the installed
 animations, while the show plays, and every animation of it joins the playlist at the same
 refresh, once every page agrees with the marker; none of the drive's files is read before
 it plays. An entry made for another canvas is left out with `size-mismatch`. A file copied
-onto such a drive without its entry is not an animation. While the drive stays plugged in,
+onto such a drive without its entry is not an animation until `catalog rebuild external`
+has read it. While the drive stays plugged in,
 the marker is read again once in 10 seconds; another marker drops the drive's animations
 and reads the catalog again. A damaged or incompatible catalog leaves the drive without
 animations, named in the log as `catalog external damaged` or `catalog external
 incompatible`, and the show plays on. A file the player left out is left out again when the
 catalog is read again with the same entry, by its name and CRC-32; an entry with another
 CRC-32 is a new file.
+
+A drive with a catalog that its host can write, the card on the board, is changed by the
+board's commands: `upload begin external` puts a file on it with its entry, `remove` of one
+of its animations takes the file and its entry out, and `catalog rebuild external` reads
+every file of it and writes its catalog anew, as `python3 -m odrig.catalog MOUNT import`
+does on a computer, [microsd.md](microsd.md#the-catalog-made-on-a-computer).
+[commands.md](commands.md#catalogs) has the commands.
 
 ## Changing a show while it runs
 

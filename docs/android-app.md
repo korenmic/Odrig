@@ -388,8 +388,8 @@ playlist by its name, and the app says `Uploaded to the card as animation <id> <
 plays in the playlist.` The app does not compare its size with the card's free storage
 first: the installation refuses one that does not fit before anything is sent, and the app
 says so. While the card cannot be written, or is out, Upload has no choice and stores on
-the board, as before. Texts and clocks are stored on the board: the card's catalog holds
-`.odrg` files only.
+the board, as before. Texts and clocks are stored on the board, though the card may hold
+them too.
 
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,

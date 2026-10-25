@@ -668,3 +668,9 @@ are in [format.md](format.md), "Measured sizes".
   external|cancel]` and `upload --external FILE`, the design's forms, approved in advance by
   the owner on 2026-10-24; the emulator's `--drive DIR` is written by the board's commands
   once its folder has a catalog, unless `--drive-read-only`.
+- 2026-10-25: Seed 35 is built, its tasks 1 to 14: each storage keeps a catalog that the
+  board and the PC tool write alike; a start reads no cataloged animation, a cataloged card
+  is read without a listing, the board writes the card and rebuilds either catalog, and the
+  types of seed 37 are in the entries. `docs/catalog.md` has the costs as measured through
+  the test host. The board session, which moves the board's animations onto the card and
+  keeps one or two small ones inside, and the owner's check on a phone are open.

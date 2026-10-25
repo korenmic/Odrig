@@ -134,7 +134,7 @@ Rules for every task:
   - Tests in `tests/app` against the emulator and stand-ins.
   - Prove it fails first.
 
-- [ ] 14. The documents, the measurements, the APK and every suite
+- [x] 14. The documents, the measurements, the APK and every suite
   - `docs/catalog.md` with the measured costs; `docs/core.md`, `docs/show.md`,
     `docs/commands.md`, `docs/microsd.md`, `docs/firmware-additions.md`,
     `docs/emulator.md`, `docs/decisions.md`, `AGENTS.md`'s line of seed 35.

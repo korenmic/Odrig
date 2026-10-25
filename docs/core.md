@@ -288,11 +288,22 @@ last, and nothing is left to check.
 
 A show may have no items. It is valid, and nothing plays.
 
+With a catalog of the board's storage that is `ok`, [catalog.md](catalog.md), a file it has
+an entry for is neither opened nor read: its size, its length and its type come from the
+entry, and the check after the start passes it over. The start reads the marker once and
+the pages twice, first to check every page against the marker and then to take the
+entries; an entry for another canvas than the mapping's quarantines its file with
+`size-mismatch`. A file without an entry is opened and checked as above. A damaged or an
+incompatible catalog is logged and gives nothing: every file is read as without one.
+
 With a host whose storage can be changed, the start also removes what an interrupted
 change left:
 
-1. Before anything is read, it removes `upload.part` and `show.part`, and `mapping.part`
-   and `order.part` when a `read_at` of one byte finds them there.
+1. Before anything is read, it finishes the change of the catalog whose commit record is
+   whole; when a call of that fails, the record stays and the catalog is `damaged`,
+   `interrupted`, for this boot. Then it removes `upload.part`, which stays while a record
+   is left, and `show.part`, and `mapping.part` and `order.part` when a `read_at` of one
+   byte finds them there.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
    it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
@@ -303,7 +314,8 @@ change left:
    items; see [the saved order](#the-saved-order).
 
 A folder with none of the three files is asked to remove two names that are not there and
-to open one that is not there, and for nothing else.
+to open three that are not there, `catalog.do`, `pending.txt` and `catalog.txt`, and for
+nothing else.
 
 A show whose mapping file or show file cannot be used, whose ids are wrong, or for which
 the host has too little memory is refused as a whole: the LEDs stay dark, `play` is
@@ -573,6 +585,16 @@ needs it.
 - A drive's file gets its id when the drive is taken up, before it is checked: the lowest
   from 60001 up that no item of the show and no file of the drive before it has. The same
   files with the same show get the same ids, and a file left out keeps its id.
+- A drive whose host says it can be written, with a catalog that is `ok`, is changed by
+  the core: an upload to it is written as `drive/upload.part`, checked, and moved onto its
+  name with its entry in one commit of the drive's catalog; a removal takes the entry out
+  and removes the file in one commit. A replacement keeps its place and its id, and what
+  plays the file plays the new one from its start; a new file takes the first place a
+  removal freed, or the next one, and the lowest free id. The core's own commit gives the
+  marker's CRC-32 to the look, which does not read the drive again for it.
+- `catalog rebuild external` drops the drive's places, lists the folder once and reads each
+  file with the check's steps: a file joins as it is read, or is left out, and at the end
+  the drive's catalog is committed anew. A drive pulled out ends the rebuild.
 - The core remembers the last 16 files of drives it left out for a fault in this boot: the
   name the drive gave each, cut to 32 characters, the number and the CRC-32 of its first
   bytes, at most 512, and the reason. A file of a drive taken up later with the same name
@@ -595,6 +617,35 @@ needs it.
   plays, is left out from then on and logged in the same way. Its turn ends there, that
   refresh keeps the picture before, the playlist goes on as after a pull, and the show
   stays valid. One file left out never drops the drive's other files.
+
+## The catalogs
+
+The core reads and writes the catalog of the board's storage and of a drive in the format
+of [catalog.md](catalog.md), as the PC library does, with the same calls of the storage, so
+that the same changes leave the same files. A change of a catalog writes the pages it
+touches as `catalog-NN.new`, the marker as `catalog.new` and the commit record
+`catalog.do`, through the chunk buffer and the second source; it is made once the record is
+whole, and finishing it does its actions, renames its pages and its marker and removes the
+record, each step once the one before it is done. Before the record is whole a failed call
+refuses the change with `storage-error`, and a file that was being written is removed. A
+record that a failed call leaves is finished before the next change of that storage writes
+anything; while it cannot be, the change is refused with `storage-error`.
+
+An upload commits the entry of its file, with the size, the CRC-32, the length and the type
+its check found, in the same commit that moves `upload.part` onto its name; a removal takes
+the entries of the files that go out before the show file is written. A storage without a
+catalog, or with one that is not `ok`, gets none from a change.
+
+`catalog rebuild internal` reads the show's files whose names a catalog may hold, page by
+page, with the steps of the check after the start (`check_file_step`), at its pace: a file
+that passes is entered with what its check found, one that fails is quarantined. The count
+and the CRC-32 of each page wait at the end of the chunk buffer, six bytes a page from
+byte 1,400; after the last page the marker and a record for all sixteen pages are written
+and finished. The check after the start gives way while a rebuild runs, and takes up after
+it, or after a cancel, the files neither read nor quarantined. While a rebuild runs, the
+commands that write storage are `busy`; `catalog cancel`, a failed call and a drive pulled
+out end it without its commit, and the pages it wrote so far are removed, but from a drive
+that is gone, where they stay and are never read without a record.
 
 ## The files the core writes
 

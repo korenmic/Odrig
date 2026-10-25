@@ -127,8 +127,8 @@ touches (N / 16 on average, at most N), S the size of an animation.
 
 | Operation | Animation bytes | Catalog |
 |---|---|---|
-| A start | none of a cataloged file | the marker and the pages, once |
-| A drive with a catalog plugged in | none | the marker and the pages, in steps of at most 512 bytes |
+| A start | none of a cataloged file | the marker once, and the pages twice: checked, then taken |
+| A drive with a catalog plugged in | none | the marker and the pages, in steps of at most 512 bytes, and the marker again before each page |
 | An unchanged drive | none | one read of the marker, 409 bytes, in 10 seconds |
 | An addition or a replacement | S written and S read back by the check | one page of P lines read and written, the marker, the commit record |
 | A removal | the file removed | one page, the marker, the commit record |
@@ -136,3 +136,16 @@ touches (N / 16 on average, at most N), S the size of an animation.
 
 No change lists the storage, reads another animation or writes another page; a rebuild is
 the one operation that reads the whole library, and it is a command.
+
+Measured through the core's test host, with refreshes 20 ms apart:
+
+| Case | Without a catalog | With a catalog |
+|---|---|---|
+| A start of the target file: 80 animations of 2,852 bytes, 228,160 in all | 80 files opened, 40,960 bytes read at the start, and the 228,160 bytes read again by the check after it | no animation opened or read; 7,289 bytes read of a catalog of 3,849 |
+| A drive of 16, 64 and 256 animations plugged in | listed, and every file read before it plays | catalogs of 1,081, 3,097 and 11,161 bytes read in 7, 7 and 10 refreshes, at most 2,090, 1,947 and 2,266 bytes at one, 7,652, 9,674 and 17,738 bytes in all; no listing |
+| The same drive unchanged | nothing | 410 bytes once in 10 seconds |
+| An addition among 16, 64 and 256 animations | the file and the show file | 623, 707 and 1,169 bytes of the catalog written: the page (123, 207 and 669 bytes), the marker (409) and the record; 12 files opened, renamed or removed at each size |
+| A rebuild of the target file | | done in the first second; 3,849 bytes of the catalog written, the same as the PC tool's |
+
+The board's own figures are measured in its session: the first reply, the first list with
+sizes, the first picture and the card's catalog published.

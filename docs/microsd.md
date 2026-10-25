@@ -80,6 +80,22 @@ for an interrupted change that `recover` finishes it. The exit status is 0, 1 wh
 was refused, a file differs from its entry or the catalog cannot be used, and 2 for a
 command line that is not understood or a folder that is not there.
 
+### The card written by the board
+
+A card with a catalog that is `ok` is written by the board while it is in the board: the
+card is mounted, its folder `odrig` is there and no read has failed.
+`odrigctl upload --external FILE` puts an animation on it, with its entry, and prints the
+id the card gave it; `odrigctl remove <id>` of one of the card's animations takes the file
+and its entry out; `odrigctl catalog` says the state of both catalogs, and
+`odrigctl catalog rebuild external` reads every file of the card and writes its catalog
+anew, as `import` does on a computer. The app does the same from Upload's `Store on`, Settings' `Catalogs` and the
+card's rows, [android-app.md](android-app.md). A card that cannot be written, or a USB
+stick, answers `read-only` to an upload and `in-use` to a removal, as before.
+[commands.md](commands.md#catalogs) has the commands, and [catalog.md](catalog.md) the
+files. To keep one or two small animations inside as the fallback and the rest on the
+card: upload each animation to the card, remove it from the board's storage, and run
+`odrigctl catalog rebuild internal` once at the end.
+
 ## The reader and its wiring
 
 The reader is the SparkFun Shifting microSD board, a microSD socket with level shifters,
@@ -305,3 +321,9 @@ working rules.
   two, by the owner's answer of 2026-10-24.
 - The owner's look at the card's animations on the LEDs, also while the board runs with
   no computer, powered as at the event, and the app's list on a phone.
+- Seed 35's catalogs on the board: the card's catalog made on the Mac with
+  `python3 -m odrig.catalog /Volumes/<card> import`; the board's animations moved onto the
+  card with `odrigctl upload --external FILE` and `odrigctl remove <id>`, one or two small
+  fallback animations kept inside; `odrigctl catalog rebuild internal` once; the first
+  reply, the first list with sizes, the first picture and the card's catalog published,
+  measured against the start of 2026-10-23.

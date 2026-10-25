@@ -10333,3 +10333,26 @@ and editing are in seed 36's Upload and Animations (seed 37's tasks 9 to 11), an
 **Resolution.** `core/src/catalog.cpp` and `.h` (`catalog_name_allowed`, `EntryLine.type`,
 `CatalogChange.added_type`, `put_entry`), `core/src/storage.cpp`, `core/src/commands.cpp`;
 `tests/core/test_catalog_odrgx.py`; `docs/commands.md`, "Catalogs".
+
+## Seed 35: the measured costs, and two that the design put otherwise
+
+**Question.** Task 14 asks for `docs/catalog.md` with the measured costs. The design's
+table said that a start reads the marker and the pages once, and that a drive's catalog is
+read in steps of at most 512 bytes. What do the measurements say, and how are they taken
+without a board?
+
+**Answer.** They are taken through the core's test host, with refreshes 20 ms apart, on the
+target file of 80 animations and on drives of 16, 64 and 256 animations, and given in
+`docs/catalog.md` beside the table. A start reads the marker once and the pages twice: the
+core checks every page against the marker before it takes an entry, so that a damaged page
+leaves every file as without a catalog; 7,289 bytes for a catalog of 3,849. A step of a
+drive's catalog is one read of at most 512 bytes, and the marker is read again before each
+page, so that a marker changed while the pages are read starts the reading again; a refresh
+takes as many steps as the check's pace gives it, at most 2,266 bytes for 256 animations,
+in 10 refreshes. The table now says both. The board's own times are its session's, task 15.
+The app's page gave as the reason that texts and clocks stay on the board that the card's
+catalog held `.odrg` files only; with seed 37's types in the catalogs that is no longer so,
+and the page gives the app's choice alone.
+
+**Resolution.** `docs/catalog.md`, "What each operation costs"; `docs/core.md`, "Startup" and
+"The catalogs"; `docs/android-app.md`, "Using it".
