@@ -10267,3 +10267,24 @@ computer.
 
 **Resolution.** `app/www/index.html`, `app/www/screens/storage.js`, `screens/show.js`,
 `screens/catalogs.js`, `capacity.js`; `docs/android-app.md`.
+## Seed 35: a checked install of a show with ODRGX containers
+
+**Question.** On the board, `install-show` of a show that names a text and a clock refused
+the folder: `file-malformed: .../hebrew.marquee.odrgx: bad-magic: the file starts with 4f 44
+52 58, not 4f 44 52 47`. Its check read every file as ODRG; seed 37 lets a show name ODRGX
+containers. How does the check read them?
+
+**Answer.** As the library reads them, told apart by their first four bytes as format.md
+says: an ODRG file whole, as before and in the same words; a container of frames by
+`odrgx.decode_frames`, its canvas, its frames and their loop; a container of text or of a
+widget by `odrgx.read_header` and the length its header gives the payload; each with the
+mapping's canvas, else `size-mismatch`. A refused file is reported with the library's
+reason. The library has no reader of the payloads of text and widgets, which the board
+reads by its own: a payload whose settings or glyphs are wrong passes the tool's check and
+is made unavailable by the board's (seed 32), and a payload with bytes after it or cut short
+is refused here as `payload-size` where the board's reader names `trailing-bytes` or
+`truncated`. Until the catalog reads containers, they are left out of it and the board
+checks them at its start.
+
+**Resolution.** `firmware/fwtool/storage.py`, `_check_animation`;
+`tests/firmware/test_containers.py`.

@@ -12,7 +12,7 @@ from littlefs.errors import LittleFSError
 
 from odrig import catalog
 from odrig import errors as show_errors
-from odrig import mapping, odrg, show
+from odrig import mapping, odrg, odrgx, show
 
 from . import Failure, paths
 
@@ -350,8 +350,9 @@ def folder_files(folder, check=True):
                     raise show_errors.Rejection(show_errors.FILE_MISSING, f"{folder / name}: the show names it and it is not there")
             # The catalog's rebuild reads each animation once and refuses what the check
             # refuses; the first refused in the show's order is judged again for its words. A
-            # name the catalog cannot hold is checked alone and left out of the catalog.
-            allowed = [name for name in named if catalog.name_allowed(name)]
+            # name the catalog cannot hold, and an ODRGX container, which the catalog does not
+            # read, are checked alone and left out of the catalog.
+            allowed = [name for name in named if catalog.name_allowed(name) and not odrgx.is_container(files[name])]
             made, refused = catalog_files(files, allowed, (canvas.width, canvas.height))
             refused_names = sorted((name for name, _ in refused), key=named.index)
             for name in refused_names[:1] + [name for name in named if name not in allowed]:
@@ -368,13 +369,25 @@ def folder_files(folder, check=True):
 
 
 def _check_animation(path, data, canvas):
-    """Refuses an animation file the readers of the converter refuse, or of another canvas."""
+    """Refuses an animation file that the library's readers refuse, as the board's check
+    reads it, or of another canvas: an ODRG file whole; an ODRGX container, told apart by its
+    first four bytes, of frames by its frames and their loop, of text or a widget by its
+    header and the length its header gives the payload."""
     try:
-        animation = odrg.decode(data)
+        if odrgx.is_container(data):
+            header = odrgx.read_header(data)
+            if odrgx.TYPE_NAMES[header.type] == "frames":
+                header, _ = odrgx.decode_frames(data)
+            elif len(data) - odrgx.HEADER.size != header.payload_size:
+                raise show_errors.Rejection(show_errors.PAYLOAD_SIZE, f"the header gives the payload {header.payload_size} bytes and it has {len(data) - odrgx.HEADER.size}")
+            width, height = header.width, header.height
+        else:
+            animation = odrg.decode(data)
+            width, height = animation.width, animation.height
     except show_errors.Rejection as rejection:
         raise show_errors.Rejection(show_errors.FILE_MALFORMED, f"{path}: {rejection.reason}: {rejection.detail}") from None
-    if (animation.width, animation.height) != (canvas.width, canvas.height):
-        raise show_errors.Rejection(show_errors.SIZE_MISMATCH, f"{path}: the canvas is {animation.width} x {animation.height} and the mapping's is {canvas.width} x {canvas.height}")
+    if (width, height) != (canvas.width, canvas.height):
+        raise show_errors.Rejection(show_errors.SIZE_MISMATCH, f"{path}: the canvas is {width} x {height} and the mapping's is {canvas.width} x {canvas.height}")
 
 
 def catalog_files(files, names, canvas, generation=1):
