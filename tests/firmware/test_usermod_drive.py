@@ -12,6 +12,36 @@ def text_of(path):
     return path.read_text(encoding="utf-8")
 
 
+def builds(text, sd):
+    """The lines of the drive's source that one backend compiles: the card's with
+    ODRIG_DRIVE_SD_SPI, the stick's without it. Other conditions are kept as they are."""
+    kept, stack = [], []
+    for line in text.splitlines():
+        stripped = line.strip()
+        chosen = re.fullmatch(r"#(ifdef|ifndef)\s+ODRIG_DRIVE_SD_SPI", stripped)
+        if chosen:
+            stack.append(("sd", (chosen.group(1) == "ifdef") == sd))
+            continue
+        if stripped.startswith("#if"):
+            stack.append(("other", True))
+        elif stripped.startswith("#else") and stack and stack[-1][0] == "sd":
+            stack[-1] = ("sd", not stack[-1][1])
+            continue
+        elif stripped.startswith("#endif"):
+            if stack.pop()[0] == "sd":
+                continue
+        if all(taking for _, taking in stack):
+            kept.append(line)
+    return "\n".join(kept) + "\n"
+
+
+def function_body(text, name):
+    """The definition of a function, from its first line to the end of its block."""
+    found = re.search(rf"(?m)^[\w:*& ]+[ *&]{name}\(", text)
+    rest = text[found.start():]
+    return rest[:rest.index("\n}\n")]
+
+
 class TheDrive(unittest.TestCase):
     """The usermod's code for a USB drive, read in its sources."""
 
@@ -20,10 +50,40 @@ class TheDrive(unittest.TestCase):
         cls.drive = text_of(USERMOD / "odrig_drive.cpp")
         cls.usermod = text_of(USERMOD / "odrig_usermod.cpp")
 
-    def test_nothing_is_written_to_the_drive_and_it_is_never_formatted(self):
-        self.assertIn("mount.format_if_mount_failed = false;", self.drive)
-        self.assertEqual(re.findall(r'fopen\([^,]+, "([^"]*)"\)', self.drive), ["rb"])
-        self.assertNotRegex(self.drive, r"\b(fwrite|fputs|fprintf|unlink|rename|remove|mkdir|rmdir|f_mkfs|truncate)\(")
+    def test_the_stick_is_never_written_and_never_formatted(self):
+        stick = builds(self.drive, sd=False)
+        self.assertIn("mount.format_if_mount_failed = false;", stick)
+        self.assertEqual(re.findall(r'fopen\([^,]+, "([^"]*)"\)', stick), ["rb"])
+        self.assertNotRegex(stick, r"(?<![\w.])(fwrite|fputs|fprintf|fsync|unlink|rename|remove|mkdir|rmdir|f_mkfs|truncate)\(")
+        self.assertIn("int driveWritable(void *, uint32_t) { return 0; }", stick)
+
+    def test_the_card_is_never_formatted_and_is_changed_only_by_the_names_the_core_gives_in_its_folder(self):
+        card = builds(self.drive, sd=True)
+        self.assertIn("SD.begin(ODRIG_SD_CS, cardBus, ODRIG_SD_FREQUENCY, MOUNT, 3, false)", card)
+        self.assertEqual(sorted(re.findall(r'fopen\([^,]+, "([^"]*)"\)', card)), ["rb", "wb"])
+        self.assertNotRegex(card, r"(?<![\w.])(fputs|fprintf|mkdir|rmdir|f_mkfs|truncate)\(")
+        for function in ("beginDriveFile", "renameDriveFile", "removeDriveFile"):
+            self.assertIn("changedPath(", function_body(card, function), function)
+        self.assertIn("return cardMounted && !cardFailed && cardFolder && !namesAPlace(name) && drivePath(name, path);", function_body(card, "changedPath"))
+        made = function_body(card, "drivePath")
+        self.assertIn("if (namesAPlace(name)) return pathAt(placeOf(name), path);", made)
+        self.assertIn("if (number == 0 || !isDriveName(given)) return false;", made)
+        named = function_body(card, "isDriveName")
+        for expected in ("length > LONGEST_DRIVE_NAME", "name[0] == '.'", 'strchr("/\\\\:*?\\"<>|", c)', "c < 0x20 || c > 0x7e"):
+            self.assertIn(expected, named)
+        self.assertIn("const size_t LONGEST_DRIVE_NAME = 100;", self.drive)
+
+    def test_a_rename_on_the_card_removes_the_file_that_has_the_new_name_only_once_the_old_one_is_there(self):
+        renamed = function_body(builds(self.drive, sd=True), "renameDriveFile")
+        steps = [renamed.index(step) for step in ("stat(pathFrom, &found) != 0", "unlink(pathTo)", "rename(pathFrom, pathTo)")]
+        self.assertEqual(steps, sorted(steps))
+
+    def test_every_change_of_the_card_is_timed_as_the_storage_calls_are(self):
+        card = builds(self.drive, sd=True)
+        for function in ("dropDriveFile", "beginDriveFile", "addDriveBytes", "endDriveFile", "renameDriveFile", "removeDriveFile"):
+            body = function_body(card, function)
+            first = [line.strip() for line in body.splitlines()[1:] if line.strip()][0]
+            self.assertEqual(first, "OdrigFiles::StorageCall call;", function)
 
     def test_its_list_is_the_animation_files_of_the_folder_odrig_the_first_256_in_the_order_of_their_bytes(self):
         self.assertIn('const char FOLDER[] = "/usb/odrig";', self.drive)
@@ -41,15 +101,27 @@ class TheDrive(unittest.TestCase):
             body = body[:body.index("\n}\n")]
             self.assertIn("placeOf(name)", body, function)
             self.assertRegex(body, r"files\.(open|read_at)\(ctx, name", function)
+        for function, member in (("beginFile", "write_open"), ("renameFile", "rename"), ("removeFile", "remove")):
+            body = self.drive[self.drive.index(f" {function}(void *"):]
+            body = body[:body.index("\n}\n")]
+            self.assertIn("placeOf(", body, function)
+            self.assertIn(f"files.{member}(ctx, ", body, function)
 
-    def test_a_list_is_made_while_the_number_is_0_and_published_with_the_guard_held(self):
+    def test_a_list_is_made_only_when_the_core_asks_and_with_the_guard_held(self):
+        for start, end in (("void plugIn(uint8_t address) {", "void pullOut() {"), ("void mountCard() {", "// One worker pass.")):
+            mounted = self.drive[self.drive.index(start):self.drive.index(end)]
+            self.assertNotIn("listFolder()", mounted, start)
+            self.assertLess(mounted.index("Guarded held;"), mounted.index("listed = 0;"), start)
+        listing = function_body(self.drive, "driveList")
+        self.assertIn("if (drive == 0 || drive != number) return -1;", listing)
+        self.assertLess(listing.index("Guarded held;"), listing.index("listFolder()"))
+        self.assertEqual(self.drive.count("listFolder()"), 2)
         plug = self.drive[self.drive.index("void plugIn(uint8_t address) {"):self.drive.index("void pullOut() {")]
-        self.assertLess(plug.index("listFolder()"), plug.index("Guarded held;"))
         self.assertLess(plug.index("Guarded held;"), plug.index("number = ++plugged;"))
         pull = self.drive[self.drive.index("void pullOut() {"):self.drive.index("void driverEvent(")]
         self.assertLess(pull.index("Guarded held;"), pull.index("number = 0;"))
         self.assertLess(pull.index("number = 0;"), pull.index("msc_host_vfs_unregister"))
-        for function in ("driveNumber", "driveName"):
+        for function in ("driveNumber", "driveName", "driveList", "driveBind"):
             body = self.drive[self.drive.index(f" {function}(void *"):]
             self.assertIn("Guarded held;", body[:body.index("\n}\n")], function)
 
@@ -57,8 +129,11 @@ class TheDrive(unittest.TestCase):
         setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
         self.assertLess(setup.index("OdrigDrive::begin();"), setup.index("core = odrig_core_begin(&host);"))
         self.assertRegex(setup, r"odrig_host host = (\w+::\w+\()?OdrigDrive::withDrive\(OdrigFiles::host\(\)\)\)?;")
-        for member, function in (("drive", "driveNumber"), ("drive_name", "driveName"), ("read_at", "readPart")):
+        for member, function in (("drive", "driveNumber"), ("drive_name", "driveName"), ("read_at", "readPart"), ("drive_list", "driveList"),
+                                 ("drive_bind", "driveBind"), ("drive_writable", "driveWritable"), ("write_open", "beginFile"), ("write", "addBytes"),
+                                 ("write_close", "endFile"), ("rename", "renameFile"), ("remove", "removeFile")):
             self.assertIn(f"made.{member} = {function};", self.drive)
+        self.assertIn("if (given.write_open != nullptr) {", self.drive)
 
     def test_the_drives_task_looks_for_a_computer_before_it_installs_the_usb_host(self):
         begin = self.drive[self.drive.index("void OdrigDrive::begin() {"):]

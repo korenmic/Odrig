@@ -3,10 +3,10 @@
 The installation's external storage of animations is a microSD card in a small reader
 wired to four pins of the board. The firmware reads the `.odrg` and `.odrgx` files of the card's
 folder `odrig` and plays them after the installed ones, with ids from 60001 up, as
-[show.md](show.md#animations-from-a-usb-drive) describes for a drive. The card is never
-written. The core, the emulator and the app see a drive, whether the firmware fills it
-from a card or from a USB stick: the emulator's option `--drive DIR` stands in for the
-card.
+[show.md](show.md#animations-from-a-usb-drive) describes for a drive. The board changes
+files of that folder only, and only as its core asks. The core, the emulator and the app
+see a drive, whether the firmware fills it from a card or from a USB stick: the
+emulator's option `--drive DIR` stands in for the card.
 
 This page covers [what the card is for](#what-the-card-is-for),
 [preparing a card](#preparing-a-card), [the reader and its wiring](#the-reader-and-its-wiring),
@@ -41,9 +41,11 @@ card is missing, and plays the rest from the card.
 - **The names.** Keep names to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`.
   Another letter, a Hebrew one for instance, may come out as `?`; such a file cannot be
   opened by its name and is left out, with its line in the log.
-- **Never written.** The firmware mounts the card without the option to format it,
-  opens its files for reading only, and no command changes it. Nothing is installed
-  from it into the board's storage.
+- **Never formatted.** The firmware mounts the card without the option to format it,
+  and makes and removes no folder. It changes only files of the folder `odrig`, by the
+  names its core gives them, and only while the card has that folder and no read of the
+  card has failed: a card without the folder is not written, so make the folder on a
+  computer. Nothing is installed from the card into the board's storage.
 
 ### The catalog, made on a computer
 
@@ -153,15 +155,27 @@ task of the firmware, `odrig-drive`, makes one step a second:
 
 - **No card mounted.** It tries to mount one. That fails for an empty reader and for a
   file system the chip does not read alike, which the firmware cannot tell apart. When a
-  card mounts, its folder `odrig` is listed once, and the core gets a new drive number:
-  it reads the card's files while the show plays and adds each sound one to the playlist
-  as it finishes reading it. For 16 MB that takes minutes, and `list` answers `busy`
+  card mounts, the core gets a new drive number. A card with a catalog is read from its
+  catalog, as [catalog.md](catalog.md) describes, and its folder is not listed. The folder
+  `odrig` of a card without one is listed once, when the core asks: the core reads the
+  card's files while the show plays and adds each sound one to the playlist as it
+  finishes reading it. For 16 MB that takes minutes, and `list` answers `busy`
   meanwhile; that is no fault.
 - **A card mounted.** It reads the card's first sector. When that read fails, or a read
   of a file has failed since the last step, the card's files are closed, the card is
   unmounted, and the core gets the drive number 0: the card's animations leave the
   playlist and `list`. When one of them was playing, the playlist moves on to the next
   animation it has. The next step, a second later, tries to mount again.
+
+**Changes of the card.** The core changes a file of the card by its name in the folder
+`odrig`. A file written counts as whole once its bytes and its directory entry are on the
+card and it holds every byte it was given. FAT gives no file a name that another file has,
+so a rename onto a file that is there removes that file first, once the file to be renamed
+is known to be there: a cut between the two leaves that file under its old name, and the
+catalog's change renames it again when it is finished. A file the player reads that a
+change replaces or removes is closed first: its reads fail, and the card stays mounted. A
+write that fails is no fault of the card, and a card whose read failed is not written
+until it is mounted again. Each change is paced as the board's own storage calls are.
 
 A card put back is taken up again with a new drive number, and its animations get their
 ids afresh. A card that goes while one of its files is read can hold that read until the
@@ -175,13 +189,15 @@ kind `sd`:
 
 ```
 #log 1.204 sd: card not mounted; no card or unreadable file system
-#log 9.311 sd: card opened: 122 animation files in odrig
+#log 9.311 sd: card mounted
+#log 9.392 sd: card opened: 122 animation files in odrig
 #log 12.840 player: drive file clip.odrg left out: size-mismatch
 #log 74.502 sd: card unavailable; files closed, waiting for a card
 ```
 
-- `card opened: <n> animation files in odrig`, `the card has no folder odrig`, or
-  `card folder odrig could not be read`, when a card is mounted.
+- `card mounted`, or `the card has no folder odrig`, when a card is mounted.
+- `card opened: <n> animation files in odrig`, or `card folder odrig could not be read`,
+  when the core has the folder of a card without a catalog listed.
 - `card not mounted; no card or unreadable file system`, once for each spell without a
   card.
 - `card unavailable; files closed, waiting for a card`, when a card went.
@@ -195,7 +211,8 @@ of the card that is left out. Every byte outside printable ASCII is written as `
 WLED's information says under `odrig drive`: `SD not configured` when the build names no
 pins, `no SD reader` when the reader could not be started, `looking for SD` before the
 first look, `not readable` while no card is mounted, `none` for the second after a card
-went, and `<n> files` for a mounted card.
+went, and `<n> files` for a mounted card: the files listed, or named from its catalog, so
+far.
 
 ## The board sessions
 

@@ -343,6 +343,14 @@ bool OdrigFiles::holding() {
   return held;
 }
 
+OdrigFiles::StorageCall::StorageCall() : startUs(esp_timer_get_time()) {}
+
+// Timed by a Timed that began when the call did.
+OdrigFiles::StorageCall::~StorageCall() {
+  Timed timed;
+  timed.startUs = startUs;
+}
+
 #ifdef ODRIG_PROBE
 OdrigFiles::StoreTimes OdrigFiles::takeStoreTimes() {
   portENTER_CRITICAL(&paceGuard);

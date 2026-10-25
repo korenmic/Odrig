@@ -10174,3 +10174,37 @@ the rebuild's files read and to read while it runs, and the file it reads.
 shared with the rebuild), `core/src/commands.cpp` (the routes, `busy`, readiness);
 `tests/core/test_catalog_rebuild.py`; `docs/commands.md`, "Catalogs"; `docs/core.md`,
 "Readiness" and "Memory".
+## Seed 35: the firmware writes the card
+
+**Question.** Task 11 has the firmware list the drive's folder only when the core asks,
+give places the names the core binds, say whether the card can be written, and make the
+core's changes by `drive/<name>`, with `odrig_files.cpp` routing the `drive/` names. Where
+does the routing go, which drives get the three functions, what does a card without its
+folder do, how is the one file being written kept across two storages, and what of the
+file the player reads when a change replaces it?
+
+**Answer.** The routing of `drive/` names was in `odrig_drive.cpp` already, whose
+`withDrive` wraps the installed files' functions for the reads; it wraps the five that
+change files too, when the installed files have them, and `odrig_files.cpp` only lends its
+timing: `OdrigFiles::StorageCall` times a change of the card as its own calls are timed,
+so that the command lines are paced after it. Both backends have `drive_list`,
+`drive_bind` and `drive_writable`, so that a stick with a catalog is read from it too; the
+stick's `drive_writable` says 0 and its changes fail. The card is written while it is
+mounted, has its folder `odrig` and no read of it has failed: the board makes no folder,
+so a card without one stays as it is. Beginning a file in one storage gives up and removes
+the one being written in the other, as the core's header has it for one storage. A rename
+onto a file that is there removes that file first, as FAT renames onto none, once the file
+to be renamed is there; when the target is the same file in another case, nothing is
+removed. A change of the file the player holds closes it first, as FAT frees the clusters
+of a removed file under a reader: its reads fail, as the installed files' do with no file
+open, and the card stays mounted; the file `read_at` holds is closed at every change and at
+every list. A write is whole only when the card holds every byte given, so a failed write
+makes the end fail as well. Mounting a drive logs `card mounted` or `stick mounted`, or
+that it has no folder `odrig`; the lines with the number of files come when the folder is
+listed.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `odrig_drive.h`, `odrig_files.h`,
+`odrig_files.cpp`; `tests/firmware/test_usermod_sd.py`, `test_usermod_drive.py`,
+`test_usermod_files.py`, `test_usermod_log.py`; `docs/microsd.md`, `docs/firmware.md`,
+`docs/firmware-additions.md`, line 26.
+

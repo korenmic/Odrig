@@ -101,7 +101,9 @@ it stands now.
   cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
   on the board".
 - The external storage of animations is a microSD card in a reader on GPIO39 to GPIO42,
-  read and never written, in place of a USB stick. The firmware that
+  in place of a USB stick. The board reads it, and writes only files of its folder `odrig`,
+  as its core keeps the card's catalog (the owner, 2026-10-24, seed 35); a USB stick is
+  never written. The firmware that
   `python3 firmware/fw.py build` makes reads the card and is built on the newer software
   of Espressif, Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5; the USB stick's build stays
   available as `build --stick`, on the software WLED 16.0.1 names. The fallback of seed 12
@@ -656,3 +658,9 @@ are in [format.md](format.md), "Measured sizes".
   with `storage`, `read` and `to_read`, approved in advance by the owner on 2026-10-24. A
   rebuild reads the files with the check's steps and commits at the end; the changes of
   storage are `busy` while it runs, and readiness counts its files.
+- 2026-10-25: Seed 35: the firmware writes the card. It lists the card's folder only when
+  the core asks, gives places the names the core reads from the card's catalog, says that a
+  mounted card with its folder `odrig` and no failed read can be written, and makes the
+  core's changes of the files of that folder by their names, a rename onto a file removing
+  that file first, as FAT needs. A USB stick is read from its catalog too, and never
+  written. No command is added.
