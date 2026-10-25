@@ -34,13 +34,20 @@ export function internal(space, count) {
   return `${count === null ? "animations not known" : animations(count)}, free ${capacity}`;
 }
 
+// Whether the target may write the medium of its external storage: one is present and
+// `space` says it is not read-only.
+export function cardWritable(space) {
+  return space !== null && space.external?.present === true && space.external.read_only === false;
+}
+
 export function external(space, count) {
   const drive = space?.external;
   if (!drive) return "External storage: capacity unavailable (read-only).";
   if (!drive.present) return "External storage: absent (read-only).";
+  const locked = cardWritable(space) ? "" : " (read-only)";
   const number = count === undefined ? "" : `${count === null ? "animations not known yet" : animations(count)}, `;
-  if (drive.free === null) return `External storage: ${number}capacity unavailable (read-only).`;
+  if (drive.free === null) return `External storage: ${number}capacity unavailable${locked}.`;
   const unit = drive.total >= 1000000000 ? 1000000000 : 1000000;
   const name = unit === 1000000000 ? "GB" : "MB";
-  return `External storage: ${number}free ${(drive.free / unit).toFixed(1)} ${name} of ${(drive.total / unit).toFixed(1)} ${name} (read-only).`;
+  return `External storage: ${number}free ${(drive.free / unit).toFixed(1)} ${name} of ${(drive.total / unit).toFixed(1)} ${name}${locked}.`;
 }

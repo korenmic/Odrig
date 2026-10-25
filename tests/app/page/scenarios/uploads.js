@@ -1,5 +1,5 @@
-// The operator makes an animation from a file on Upload and uploads it, or cancels the
-// upload; and then may play it from Animations.
+// The operator makes an animation from a file on Upload, may choose where it is stored,
+// and uploads it, or cancels the upload; and then may play it from Animations.
 
 import {playRow, rows, shown, spaceKnown, storage} from "../reading.js";
 
@@ -18,8 +18,15 @@ export default async function (app) {
   await app.until(() => app.text("media-name") !== null, "the name of the file");
   app.press("Make the animation");
   await app.until(() => app.text("made-facts") !== null, "the animation", 30000);
+  // The choice of the storage, each button with whether it is chosen, or null without one.
+  const store = app.text("store-on") === null ? null
+    : [...app.doc.querySelectorAll("#store-on button")].map((button) => `${button.textContent}${button.getAttribute("aria-pressed") === "true" ? " (chosen)" : ""}`);
+  const cardSpace = app.text("upload-card-space");
+  if (settings.store !== undefined) {
+    app.press(settings.store);
+  }
   app.press("Upload to the installation");
-  const seen = {};
+  const seen = {store, cardSpace};
   if (settings.cancel === true) {
     await app.until(() => /Sending: [0-9]+%, /.test(app.text("uploading") || ""), "the upload under way", 10000);
     app.press("Cancel");

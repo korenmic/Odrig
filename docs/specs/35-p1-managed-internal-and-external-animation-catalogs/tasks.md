@@ -128,7 +128,7 @@ Rules for every task:
     the emulator wrote is read by the PC tool and the other way round.
   - Prove it fails first.
 
-- [ ] 13. The app
+- [x] 13. The app
   - Upload's choice of storage, Settings' catalogs with rebuild, progress and cancel, a
     writable card's Delete; `docs/android-app.md`.
   - Tests in `tests/app` against the emulator and stand-ins.

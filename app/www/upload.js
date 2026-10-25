@@ -60,12 +60,14 @@ function base64(bytes) {
 }
 
 // The upload of a file as a job of the client, which replaces the file of an item only
-// while it has the CRC-32 `expect` when one is given. `next()` gives the function that
-// sends the next line and takes its reply, or null while there is none to send now. `report` is told
-// the part of the file the target has received and the speed in bytes a second, `end` how
-// the upload ended: `{done: true}`, `{cancelled: true}`, or `{error}` with the Refusal or
-// the Failure that ended it. `wake` asks the client to look for the next line again.
-export function uploading({id, file, bytes, expect = null}, {report, end, wake}) {
+// while it has the CRC-32 `expect` when one is given. With `external` the file goes to the
+// external storage, which gives it its id: `id` is not sent then. `next()` gives the
+// function that sends the next line and takes its reply, or null while there is none to
+// send now. `report` is told the part of the file the target has received and the speed in
+// bytes a second, `end` how the upload ended: `{done: true, id}`, with the id the target
+// gave or null, `{cancelled: true}`, or `{error}` with the Refusal or the Failure that
+// ended it. `wake` asks the client to look for the next line again.
+export function uploading({id, file, bytes, expect = null, external = false}, {report, end, wake}) {
   const crc = crc32(bytes);
   let stage = "begin";
   let chunk = 0;
@@ -130,7 +132,7 @@ export function uploading({id, file, bytes, expect = null}, {report, end, wake})
       }
       if (stage === "begin") {
         return async () => {
-          chunk = await commands.uploadBegin(id, file, bytes.length);
+          chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length);
           stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
@@ -153,8 +155,9 @@ export function uploading({id, file, bytes, expect = null}, {report, end, wake})
         };
       }
       return async () => {
+        let given;
         try {
-          await commands.uploadEnd(crc);
+          given = await commands.uploadEnd(crc);
         } catch (error) {
           if (error instanceof commands.Refusal && error.code === "busy") {
             // The target still checks the file: the end is sent again a moment later.
@@ -164,7 +167,7 @@ export function uploading({id, file, bytes, expect = null}, {report, end, wake})
           }
           throw error;
         }
-        finish({done: true});
+        finish({done: true, id: given});
       };
     },
   };

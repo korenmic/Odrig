@@ -10227,3 +10227,43 @@ the emulator wrote is read by the PC tool and the other way round.
 
 **Resolution.** `odrigctl/cli.py`; `tests/emulator/test_catalog.py`,
 `tests/emulator/test_tool.py`; `docs/emulator.md`, "The command tool".
+## Seed 35: the app's task built beside the core's
+
+**Question.** Task 13, the app, is built at the same time as tasks 7 and 8, which give the
+core the upload to the card, the removal from it, `space`'s `read_only` and the rebuild.
+What does the app follow, and what does it run against?
+
+**Answer.** The forms the design and the core's line fixed for those tasks: `catalog` with
+`internal`, `external` and `rebuild`, `catalog rebuild internal|external` and `catalog
+cancel`, `upload begin external <file> <bytes>` with its `upload end` giving `id`,
+`remove <id>` of a card's animation, `"read_only":false`, and the code `read-only`. The
+app's tests run them against stand-in targets that answer so, and `catalog`'s states
+against the emulator as well. The app gives `read-only` its sentences already; the table
+of codes in `docs/commands.md`, and with it the count of `tests/app/test_messages.py`,
+gain the code with task 7.
+
+**Resolution.** `app/www/commands.js`, `app/www/screens/catalogs.js`,
+`tests/app/test_catalog.py`; `docs/android-app.md`.
+
+## Seed 35: where the app's choices stand, and their words
+
+**Question.** The design names `Store on: The card / This board` on Upload, `Rebuild` and
+`Cancel` in Settings, and the progress `Reading the animations: 12 of 84`. Upload makes
+texts and clocks as well as animations of videos, Settings has the mapping's `Cancel`
+already, and Animations says `Reading the animations: ...` during a rebuild. Where do the
+choices stand, and what do they say?
+
+**Answer.** `Store on` stands with the animation that was made, above `Upload to the
+installation`, as it is the choice of that upload; texts and clocks are stored on the
+board, as the card's catalog holds `.odrg` files only. Settings' buttons name what they
+do, `Rebuild the board's catalog`, `Rebuild the card's catalog` and `Cancel the
+rebuild`, and the question's `Rebuild` and `Not now`; the progress is `Rebuilding the
+catalog of the board: 12 of 84 animations read.`, so that it is not Animations' line. The
+app does not judge a card's free storage before an upload: the card's file system rounds
+as the board knows, and the board refuses with `no-space` before a byte is sent. A card's
+storage line and its badge say `read-only` only while the installation cannot write it,
+and a file with a fault on a card it can write is deleted from its menu, not mended on a
+computer.
+
+**Resolution.** `app/www/index.html`, `app/www/screens/storage.js`, `screens/show.js`,
+`screens/catalogs.js`, `capacity.js`; `docs/android-app.md`.

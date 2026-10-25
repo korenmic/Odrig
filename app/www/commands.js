@@ -150,14 +150,15 @@ export async function list(from = 0) {
   };
 }
 
-// Internal capacity and the external medium's presence and nullable capacity.
+// Internal capacity and the external medium's presence, whether the target may write it
+// (`read_only`), and its nullable capacity.
 export async function space() {
   const reply = await carriedOut("space");
   if (!whole(reply.free, 0, MOST_BYTES) || !whole(reply.total, 0, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
   const external = reply.external;
-  if (external !== undefined && (external === null || typeof external.present !== "boolean" || external.read_only !== true ||
+  if (external !== undefined && (external === null || typeof external.present !== "boolean" || typeof external.read_only !== "boolean" ||
       !((external.free === null && external.total === null) ||
         (external.present && whole(external.free, 0, Number.MAX_SAFE_INTEGER) && whole(external.total, external.free, Number.MAX_SAFE_INTEGER))))) {
     throw new Failure("bad-reply", address());
@@ -177,6 +178,16 @@ export async function remove(id) {
 // one `upload data` may carry.
 export async function uploadBegin(id, file, bytes) {
   const reply = await carriedOut(`upload begin ${id} ${file} ${bytes}`);
+  if (!whole(reply.chunk, 1, MOST_BYTES)) {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.chunk;
+}
+
+// Opens the upload of a file of some bytes to the external storage, which gives the
+// animation its id when the upload ends. Gives the most bytes one `upload data` may carry.
+export async function uploadBeginExternal(file, bytes) {
+  const reply = await carriedOut(`upload begin external ${file} ${bytes}`);
   if (!whole(reply.chunk, 1, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }
@@ -214,9 +225,15 @@ export async function read(id, offset) {
   return {bytes: reply.bytes, data};
 }
 
-// Closes the upload with the CRC-32 of the whole file, eight hexadecimal digits.
+// Closes the upload with the CRC-32 of the whole file, eight hexadecimal digits. Gives the
+// id of the animation when the reply names it, as one of the external storage does, or
+// null.
 export async function uploadEnd(crc) {
-  await carriedOut(`upload end ${crc}`);
+  const reply = await carriedOut(`upload end ${crc}`);
+  if (!(reply.id === undefined || whole(reply.id, 1, 65535))) {
+    throw new Failure("bad-reply", address());
+  }
+  return reply.id === undefined ? null : reply.id;
 }
 
 // Gives up the open upload.
@@ -302,4 +319,57 @@ export async function orderGet(from = 0) {
 // with "end", in the saved order whose revision the app read.
 export async function orderMove(revision, id, before) {
   await carriedOut(`order move ${revision} ${id} ${before}`);
+}
+
+// The states of a catalog, why a damaged one is damaged, and the two storages.
+const CATALOG_STATES = ["none", "ok", "loading", "damaged", "incompatible", "absent"];
+const DAMAGES = ["marker", "page", "line", "interrupted"];
+const STORAGES = ["internal", "external"];
+
+// One storage's catalog as `catalog` reports it, with null for what the reply leaves out,
+// or null when the reply is not sound. The internal one counts the show's files it has no
+// entry for; the external one says whether the drive can be written.
+function catalogOf(part, internal) {
+  const sound =
+    part !== null &&
+    typeof part === "object" &&
+    CATALOG_STATES.includes(part.state) &&
+    (part.detail === undefined || DAMAGES.includes(part.detail)) &&
+    (part.generation === undefined || whole(part.generation, 0, MOST_BYTES)) &&
+    (part.entries === undefined || whole(part.entries, 0, 65535)) &&
+    (internal ? whole(part.uncataloged, 0, 65535) : part.writable === undefined || typeof part.writable === "boolean");
+  if (!sound) {
+    return null;
+  }
+  const common = {state: part.state, detail: part.detail ?? null, generation: part.generation ?? null, entries: part.entries ?? null};
+  return internal ? {...common, uncataloged: part.uncataloged} : {...common, writable: part.writable ?? null};
+}
+
+// The catalog of each storage, and the rebuild under way as `{storage, read, toRead}`, the
+// storage "internal" or "external", or null while none runs.
+export async function catalog() {
+  const reply = await carriedOut("catalog");
+  const internal = catalogOf(reply.internal, true);
+  const external = catalogOf(reply.external, false);
+  const rebuild = reply.rebuild;
+  const sound =
+    internal !== null &&
+    external !== null &&
+    (rebuild === null ||
+      (typeof rebuild === "object" && STORAGES.includes(rebuild.storage) && whole(rebuild.read, 0, 65535) && whole(rebuild.to_read, 0, 65535)));
+  if (!sound) {
+    throw new Failure("bad-reply", address());
+  }
+  return {internal, external, rebuild: rebuild === null ? null : {storage: rebuild.storage, read: rebuild.read, toRead: rebuild.to_read}};
+}
+
+// Starts the rebuild of the catalog of a storage, "internal" or "external": the target
+// reads every animation of it whole while the show plays.
+export async function catalogRebuild(storage) {
+  await carriedOut(`catalog rebuild ${storage}`);
+}
+
+// Ends the rebuild under way; the catalog stays as it was.
+export async function catalogCancel() {
+  await carriedOut("catalog cancel");
 }

@@ -54,6 +54,11 @@ export function isEditable(animation) {
   return !isExternal(animation) && typeof animation.ignored === "boolean";
 }
 
+// Whether an animation is on a card the target may write, so that the app may delete it.
+function onWritableCard(animation) {
+  return isExternal(animation) && capacity.cardWritable(client.state.space);
+}
+
 // A size in kilobytes of 1,000 bytes, rounded up, so that a small file is never 0.
 export function kilobytes(bytes) {
   return String(Math.ceil(bytes / 1000));
@@ -100,6 +105,7 @@ function row(animation) {
   made.dataset.file = animation.file;
   made.dataset.external = String(isExternal(animation));
   made.dataset.editable = String(isEditable(animation));
+  made.dataset.writable = String(onWritableCard(animation));
   made.dataset.fault = animation.fault ?? "";
   if (isEditable(animation)) {
     const pick = document.createElement("label");
@@ -129,7 +135,7 @@ function row(animation) {
   const badge = document.createElement("span");
   badge.className = `badge ${isExternal(animation) ? "ex" : "in"}`;
   badge.textContent = isExternal(animation) ? "ex" : "in";
-  const where = isExternal(animation) ? "External storage, read-only" : "Internal storage";
+  const where = !isExternal(animation) ? "Internal storage" : onWritableCard(animation) ? "External storage" : "External storage, read-only";
   badge.setAttribute("role", "img");
   badge.setAttribute("aria-label", where);
   badge.title = where;
@@ -157,7 +163,9 @@ function row(animation) {
     why.className = "fault";
     why.textContent = messages.ofFault(animation.fault);
     made.append(why);
-    if (isExternal(animation)) {
+    // A file of a card the app cannot write is mended on a computer; one it can write is
+    // deleted from its menu, or uploaded again under its name.
+    if (isExternal(animation) && !onWritableCard(animation)) {
       const mended = document.createElement("p");
       mended.className = "fault";
       mended.textContent = messages.MENDED_ELSEWHERE;
@@ -176,7 +184,8 @@ function drawRows(animations) {
     shown.length === animations.length &&
     shown.every((made, at) => made.dataset.id === String(animations[at].id) && made.dataset.file === animations[at].file &&
       made.dataset.external === String(isExternal(animations[at])) && made.dataset.editable === String(isEditable(animations[at])) &&
-      made.dataset.fault === (animations[at].fault ?? "") && made.querySelector(".meta").textContent === metaOf(animations[at]));
+      made.dataset.writable === String(onWritableCard(animations[at])) && made.dataset.fault === (animations[at].fault ?? "") &&
+      made.querySelector(".meta").textContent === metaOf(animations[at]));
   if (!same) {
     place.replaceChildren(...animations.map(row));
   }
@@ -303,6 +312,8 @@ function actions(animation) {
   }
   if (isEditable(animation)) {
     items.push({label: "Select", act: () => selection.enter(animation.id), disabled: !free});
+    items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
+  } else if (onWritableCard(animation)) {
     items.push({label: "Delete", act: () => selection.askOne(animation), disabled: !free, danger: true});
   } else if (isExternal(animation)) {
     items.push({note: "External storage is read-only: this animation cannot be ignored or deleted from the app."});
