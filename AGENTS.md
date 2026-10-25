@@ -48,8 +48,9 @@ the getting-started page has the command of each.
 ## Rules you may not break
 
 1. **Your own branch, your own clone.** Never commit on `master` directly, and never work
-   in a checkout that another contributor uses. Before a commit,
-   `git branch --show-current` names your branch.
+   in a checkout that another contributor uses, nor switch its branch: the emulator serves
+   the app of the checkout it runs from, and the APK is built from the same files, one
+   code. Before a commit, `git branch --show-current` names your branch.
 2. **One task, one commit.** The commit also ticks the task's checkbox in its `tasks.md`.
 3. **Stage named paths only.** Never `git add -A`, `git add .`, `git add -u` or
    `git commit -a`. After a commit, read `git show --stat`.

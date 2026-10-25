@@ -657,6 +657,12 @@ line with `#controller` at its end.
 The emulator serves `app/www/` from the repository it runs in. Where that folder is not
 there, the frame is empty.
 
+The Controller view is the app itself: the files of `app/www/` as they are in the checkout
+the emulator runs from, the same files the APK is built from. A difference between what
+the Controller view shows and what the phone shows is a fault, by the working rules, "One
+app, in the emulator and on the phone"; the first thing to check is that the emulator and
+the APK come from one commit.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,

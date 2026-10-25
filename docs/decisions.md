@@ -708,3 +708,9 @@ are in [format.md](format.md), "Measured sizes".
   a wall seen upright from one seen from the side; the edge the wires are at is advised,
   bottom or left, and both edges are offered as choices. Pictures are analysed at 900
   pixels on the long side.
+- 2026-10-26: The owner's policy, written into the working rules after an emulator run
+  from a checkout left on a worker branch showed an older app than the phone's: the app
+  is one body of code, served by the emulator as it is in its checkout and built into the
+  APK from the same files; a difference between the Controller view and the APK is a
+  fault, not a version; the APK is built from the commit the owner runs and its report
+  names that commit; a coding agent never switches the owner's checkout.
