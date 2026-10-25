@@ -10356,3 +10356,20 @@ and the page gives the app's choice alone.
 
 **Resolution.** `docs/catalog.md`, "What each operation costs"; `docs/core.md`, "Startup" and
 "The catalogs"; `docs/android-app.md`, "Using it".
+
+## Seed 36: the snake test seen on the installation
+
+**Question.** With the twenty snakes wired, the owner found the test of a snake, one white
+line of 20 pixels in each of its three columns, too sparse to judge the snake by: most of
+its LEDs stayed dark. What should it show?
+
+**Answer.** The owner's choice: a white block of 3 x 3 pixels that runs the length of the
+snake, from the bottom of its three columns to their top and back, one row every 40 ms,
+so that every LED of the snake lights in turn and the direction of each strip is seen as
+the block passes. Within one snake a block three wide can move along the snake's length
+only, so "back and forth" is up and down the columns. It is drawn at each refresh from
+the time since the player started, as a clock is, and keeps no state and no embedded
+picture; the file of twenty frames and its generator are gone.
+
+**Resolution.** `core/src/mapping_control.cpp`, `snake_test_draw`; docs/commands.md,
+docs/core.md, docs/android-app.md; the change log of docs/decisions.md.

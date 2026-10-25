@@ -689,3 +689,8 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-25: The owner's correction of the mapping editor: the snakes stand still at the
   left and the pins at the right are dragged; each new place a dragged pin passes into is
   saved at once, while the finger is still down, not when it is lifted.
+- 2026-10-25: The owner's change after seeing the snake tests on the installation: the test of
+  a snake is a white block of 3 x 3 pixels that runs the snake's three columns from the
+  bottom to the top and back, one row every 40 ms, so that every LED of the snake lights in
+  turn; the line of 20 pixels a column of seed 36 is gone, and with it the embedded file of
+  twenty frames. The diagonal stays as it was.

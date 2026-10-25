@@ -363,9 +363,10 @@ the active test. Upload and remove return `busy`, but mapping saves, list, space
 status, power and brightness remain available. The test changes no show entry.
 
 `mapping test snake <n>` shows the test of snake n, n from 1 to 20, until
-`mapping test off` or a valid ordinary play command: one white line one pixel wide from
-the bottom of the snake's first column to the top of its third, 20 pixels in each of its
-three columns, through the saved mapping, with every other LED dark. While it shows,
+`mapping test off` or a valid ordinary play command: one white block of 3 x 3 pixels that
+runs the length of the snake's three columns, from their bottom to their top and back, one
+row every 40 milliseconds, through the saved mapping, with every other LED dark; one way
+up lights every LED of the snake once. While it shows,
 `mapping get` reports `"test":true` and `"snake":<n>`; for the diagonal and while no test
 shows, `"snake":null`. Entry, busy refusals, power, brightness and restart are as for the
 diagonal. A test that starts while another one shows takes its place, and stopping it

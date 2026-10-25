@@ -5,6 +5,7 @@
 #include "catalog.h"
 #include "odrig_core.h"
 #include "clock.h"
+#include "mapping_control.h"
 #include "order.h"
 #include "text.h"
 #include "upload.h"
@@ -680,6 +681,9 @@ int player_poll(Core &core, uint64_t now_ms) {
     ++core.count_running;
 
     Shown shows = core.mapping_test && !core.invalid ? kShowsPicture : kShowsNothing;
+    if (shows == kShowsPicture && core.mapping_snake != 0) {
+        snake_test_draw(core, now);
+    }
     if (!core.mapping_test && !core.invalid && core.playing != kNothing) {
         if (core.zero_pending) {
             core.zero = grid;

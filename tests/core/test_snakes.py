@@ -1,6 +1,4 @@
 import json
-import subprocess
-import sys
 import unittest
 import zlib
 
@@ -9,6 +7,11 @@ from .test_playback import T0, refreshes
 
 PINS = list(range(1, 19)) + [21, 47]
 REVISION = zlib.crc32(bytes(PINS))
+# The test's block: 3 x 3 pixels, up one row every 40 ms from the bottom row to the top,
+# 57 rows, and back.
+BLOCK = 3
+STEP_MS = 40
+TRAVEL = 60 - BLOCK
 
 
 def answers(run):
@@ -32,9 +35,16 @@ def lit(leg, led):
     return column, row
 
 
-def snake_pixel(snake, column, row):
-    """Whether the test of a snake lights the pixel at this column and row."""
-    return column == 3 * snake - 2 + (row - 1) // 20
+def block_at(ms):
+    """The lowest row of the block, from 0, `ms` after the first poll."""
+    phase = (ms // STEP_MS) % (2 * TRAVEL)
+    return phase if phase <= TRAVEL else 2 * TRAVEL - phase
+
+
+def snake_pixel(snake, at, column, row):
+    """Whether the test of a snake, with its block's lowest row at `at`, lights the pixel at
+    this column and row, from 1."""
+    return 3 * snake - 2 <= column <= 3 * snake and at + 1 <= row <= at + BLOCK
 
 
 def pictures(run):
@@ -43,18 +53,21 @@ def pictures(run):
 
 
 class TheSnakeTests(unittest.TestCase):
-    def assert_snake(self, legs, snake, level=32):
+    def assert_snake(self, legs, snake, ms, level=32):
+        """The picture of a poll `ms` after the first: the block of the snake's test at the
+        place of that time, white at the level, and every other LED dark."""
         self.assertEqual(len(legs), 20)
+        at = block_at(ms)
         count = 0
         for leg, data in legs.items():
             for led in range(180):
                 column, row = lit(leg, led)
-                want = level if snake_pixel(snake, column, row) else 0
+                want = level if snake_pixel(snake, at, column, row) else 0
                 count += want != 0
-                self.assertEqual(data[led * 3:led * 3 + 3], bytes([want]) * 3, (snake, leg, led))
-        self.assertEqual(count, 60)
+                self.assertEqual(data[led * 3:led * 3 + 3], bytes([want]) * 3, (snake, leg, led, at))
+        self.assertEqual(count, BLOCK * BLOCK)
 
-    def test_each_snake_shows_its_own_diagonal_across_its_three_columns_and_nothing_else(self):
+    def test_each_snake_shows_its_own_block_in_its_three_columns_and_nothing_else(self):
         script = []
         for snake in range(1, 21):
             script += [support.line(T0 + 40 * snake, f"mapping test snake {snake}"), f"poll {T0 + 40 * snake + 20}"]
@@ -64,7 +77,28 @@ class TheSnakeTests(unittest.TestCase):
         self.assertEqual(len(shown), 20)
         for snake, legs in enumerate(shown, start=1):
             with self.subTest(snake=snake):
-                self.assert_snake(legs, snake)
+                self.assert_snake(legs, snake, 40 * snake + 20)
+
+    def test_the_block_runs_from_the_bottom_of_the_snake_to_its_top_and_back_and_lights_every_led_of_it(self):
+        # Polls at the grid's pace through one way up and down, 4,560 ms, and one more.
+        polls = 2 * TRAVEL * STEP_MS // 20 + 1
+        script = [f"poll {T0}", support.line(T0 + 1, "mapping test snake 5")] + [f"poll {T0 + 20 * k}" for k in range(1, polls + 1)]
+        run = support.start(files(), script)
+        shown = pictures(run)[1:]
+        self.assertEqual(len(shown), polls)
+        places = []
+        lit_ever = set()
+        for k, legs in enumerate(shown, start=1):
+            self.assert_snake(legs, 5, 20 * k)
+            places.append(block_at(20 * k))
+            lit_ever |= {(leg, led) for leg, data in legs.items() for led in range(180) if any(data[led * 3:led * 3 + 3])}
+        # One row at a time, every place from the bottom to the top, the top once in a way,
+        # and back to the bottom; every LED of the snake lit at some time, and no other LED.
+        self.assertTrue(all(abs(after - before) <= 1 for before, after in zip(places, places[1:])))
+        self.assertEqual((places[0], min(places), max(places), places.index(TRAVEL), places[-1]), (0, 0, TRAVEL, 2 * TRAVEL - 1, 0))
+        # The top is reached once in a way: two polls fall into each 40 ms place.
+        self.assertEqual(sum(1 for before, after in zip([None] + places, places) if after == TRAVEL and before != TRAVEL), 1)
+        self.assertEqual(lit_ever, {(5, led) for led in range(180)})
 
     def test_the_test_follows_the_saved_mapping(self):
         swapped = PINS.copy()
@@ -73,7 +107,7 @@ class TheSnakeTests(unittest.TestCase):
         run = support.start(files(), [f"poll {T0}", support.line(T0 + 1, line), support.line(T0 + 2, "mapping test snake 1"), f"poll {T0 + 20}", support.line(T0 + 21, "mapping get")])
         self.assertEqual(answers(run)[:2], [{"ok": True}, {"ok": True}])
         self.assertEqual(answers(run)[2]["pins"], swapped)
-        self.assert_snake(pictures(run)[1], 1)
+        self.assert_snake(pictures(run)[1], 1, 20)
 
     def test_mapping_get_says_which_test_shows(self):
         script = [support.line(T0, "mapping get"), support.line(T0 + 1, "mapping test on"), support.line(T0 + 2, "mapping get"), support.line(T0 + 3, "mapping test snake 7"),
@@ -100,7 +134,7 @@ class TheSnakeTests(unittest.TestCase):
     def test_power_and_brightness_stay_under_their_controls(self):
         script = [f"poll {T0}", support.line(T0 + 1, "mapping test snake 2"), support.line(T0 + 2, "brightness 7"), f"poll {T0 + 20}", support.line(T0 + 21, "off"), f"poll {T0 + 40}"]
         shown = pictures(support.start(files(), script))
-        self.assert_snake(shown[1], 2, level=(255 * 7 + 127) // 255)
+        self.assert_snake(shown[1], 2, 20, level=(255 * 7 + 127) // 255)
         self.assertTrue(all(not any(data) for data in shown[2].values()))
 
     def test_while_a_test_shows_uploads_and_removals_are_busy_and_no_file_changes(self):
@@ -131,15 +165,6 @@ class TheSnakeTests(unittest.TestCase):
         self.assertEqual(answers(run)[:-1], [{"ok": False, "error": "bad-argument"}] * len(lines))
         self.assertFalse(answers(run)[-1]["test"])
         self.assertEqual(left, files())
-
-    def test_the_embedded_pictures_are_the_converters_output_of_their_tracked_source(self):
-        done = subprocess.run([sys.executable, str(support.ROOT / "core" / "snakes.py"), "--check"], capture_output=True, text=True)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        source = json.loads((support.ROOT / "core" / "assets" / "mapping-snakes.json").read_text())
-        self.assertEqual((source["width"], source["height"], len(source["frames"])), (60, 60, 20))
-        for snake, frame in enumerate(source["frames"], start=1):
-            white = [(at % 60 + 1, at // 60 + 1) for at, colour in enumerate(frame["pixels"]) if colour != 0]
-            self.assertEqual(sorted(white), sorted((3 * snake - 2 + (row - 1) // 20, row) for row in range(1, 61)))
 
 
 if __name__ == "__main__":

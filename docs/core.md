@@ -957,10 +957,10 @@ on that picture while ordinary show progression is paused. Exit restarts the
 saved animation; cycles retain the current entry as their first resumed turn.
 The mode is transient and no show file changes. There is no runtime allocation.
 
-The twenty snake tests are one more embedded file, `core/src/snakes_data.h`, which the
-converter encodes from `core/assets/mapping-snakes.json` by `core/snakes.py`: twenty
-frames, frame n the test of snake n. A snake test decodes the file's records 1 to n into
-the pixel buffer and shows the last one, as the diagonal shows its one frame. The core
+The test of a snake is drawn, not decoded, as a clock is: at each refresh the core clears
+the pixel buffer, three bytes a pixel and no palette, and lights a white block of 3 x 3
+pixels in the snake's three columns, `(now - t0) / 40 ms` rows up from the bottom and back
+down from the top, 57 rows each way, with no state kept but the snake's number. The core
 keeps which test shows; one that follows another keeps the selection saved by the first.
 
 ### Inclusion and batch changes

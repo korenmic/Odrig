@@ -11,6 +11,9 @@ uint32_t mapping_set(Core &core, uint32_t revision, const char *pins, uint32_t l
 // Shows the diagonal, with `snake` 0, or snake n's test, or stops the test that shows.
 uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply);
 void mapping_test_stop(Core &core);
+// Draws the test of the snake that shows into the pixel buffer, for a refresh at this time:
+// its block at the place of the time since the player started.
+void snake_test_draw(Core &core, uint64_t now);
 
 }  // namespace odrig
 

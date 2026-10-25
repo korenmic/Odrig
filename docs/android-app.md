@@ -509,9 +509,10 @@ mapping changed, and never while a pin is held or moves are saved.
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
 · 21`, which can be folded, with `Diagonal` and `Snake 1` to `Snake 20`. The diagonal
-shows one white line on black from bottom left to top right; the test of snake n one white
-line one pixel wide from the bottom of the snake's first column to the top of its third,
-with every other LED dark. Each goes through the saved mapping and keeps the target's
+shows one white line on black from bottom left to top right; the test of snake n a white
+block of 3 x 3 pixels that runs up and down the snake's three columns, one row every 40
+milliseconds, lighting each of its LEDs in turn, with every other LED dark. Each goes
+through the saved mapping and keeps the target's
 power and brightness. A test is never a row of the list: it cannot be ignored, selected,
 deleted or moved, and no playlist, start, cycle or order includes it. While a test shows,
 from this phone or another controller, the now-playing panel says `Test: Snake 3 is

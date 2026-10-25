@@ -10,9 +10,12 @@ namespace odrig {
 namespace {
 
 #include "diagonal_data.h"
-#include "snakes_data.h"
 
 const uint32_t kSnakes = 20;
+// The test of a snake: a white block of 3 x 3 pixels that runs from the bottom of the snake's
+// three columns to their top and back, one row every kSnakeStepMs milliseconds.
+const uint32_t kSnakeBlock = 3;
+const uint64_t kSnakeStepMs = 40;
 const char kMappingPart[] = "mapping.part";
 const char kMappingFile[] = "mapping.json";
 
@@ -121,10 +124,9 @@ int32_t asset_read(void *ctx, uint8_t *out, size_t capacity) {
 }
 void asset_close(void *) {}
 
-// Decodes the picture of a test into the pixel buffer: the diagonal's one frame, or the
-// frame of snake n of the snakes' file, which holds one for each snake in their order.
-bool decode_test(Core &core, uint32_t snake) {
-    Asset asset = {snake == 0 ? kDiagonal : kSnakeTests, snake == 0 ? static_cast<uint32_t>(sizeof kDiagonal) : static_cast<uint32_t>(sizeof kSnakeTests), 0};
+// Decodes the diagonal's one frame into the pixel buffer.
+bool decode_diagonal(Core &core) {
+    Asset asset = {kDiagonal, static_cast<uint32_t>(sizeof kDiagonal), 0};
     odrig_host host = {};
     host.ctx = &asset;
     host.open = asset_open;
@@ -134,13 +136,10 @@ bool decode_test(Core &core, uint32_t snake) {
     if (reason == kNone) reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
-        const uint32_t records = snake == 0 ? 1 : snake;
-        for (uint32_t record = 0; record < records && reason == kNone; ++record) {
-            uint16_t duration = 0;
-            reason = core.decoder.next(core.pixels, &duration);
-        }
+        uint16_t duration = 0;
+        reason = core.decoder.next(core.pixels, &duration);
     }
-    if (reason == kNone && snake == 0) reason = core.decoder.finish();
+    if (reason == kNone) reason = core.decoder.finish();
     core.file.close();
     return reason == kNone;
 }
@@ -250,11 +249,25 @@ uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     }
     core.mapping_test = 1;
     core.mapping_snake = static_cast<uint8_t>(snake);
-    if (!decode_test(core, snake)) {
+    if (snake == 0 && !decode_diagonal(core)) {
         mapping_test_stop(core);
         return refuse(reply, "storage-error");
     }
     return succeed(reply);
+}
+
+void snake_test_draw(Core &core, uint64_t now) {
+    const uint32_t travel = core.height - kSnakeBlock;
+    const uint64_t step = (now - core.t0) / kSnakeStepMs;
+    const uint32_t phase = static_cast<uint32_t>(step % (2u * travel));
+    const uint32_t at = phase <= travel ? phase : 2u * travel - phase;
+    const uint32_t left = (core.mapping_snake - 1u) * kSnakeBlock;
+    // The picture has three bytes a pixel and no palette, as a drawn animation has.
+    core.decoder.colours = 0;
+    memset(core.pixels, 0, 3u * core.width * core.height);
+    for (uint32_t row = at; row < at + kSnakeBlock; ++row) {
+        memset(core.pixels + 3u * (row * core.width + left), 255, 3u * kSnakeBlock);
+    }
 }
 
 }  // namespace odrig
