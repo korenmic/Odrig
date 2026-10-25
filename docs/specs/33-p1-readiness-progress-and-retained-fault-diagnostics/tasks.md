@@ -64,7 +64,7 @@ Rules for every task:
   - `docs/android-app.md`; the state stays `in_progress` for task 6.
   - Requirements: 6.1 to 6.3, 8.4, 8.5
 
-- [ ] 6. The board
+- [x] 6. The board
   - In the run's board session, with the firmware of the run at brightness 40 or less:
     the time to the first reply, the first list, the first picture and the end of the
     check, measured apart; `host` read; a quarantine, a reset by `restart`, and the

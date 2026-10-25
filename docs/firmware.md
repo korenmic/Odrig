@@ -2153,6 +2153,34 @@ reader. [microsd.md](microsd.md#the-board-sessions) has both sessions in full.
 - Why the first day dropped out and the second did not is not known. The board was left
   on that image, playing, at brightness 32.
 
+**The run of 2026-10-25.** What the board gave with the firmware of the run, built by
+`python3 firmware/fw.py build` from the branch `seeds-28-to-39-unified`: first from
+8aa68b9, which held seeds 28 to 34, 36, 37 and the rest of 38, `odrig-firmware.bin` of
+1,801,536 bytes, SHA-256 `d57fea4f3b7f24ce158eb09c4778456d5e141461a81c82014157813a88effd22`,
+then from ea73e23, which holds seed 35 too, 1,821,168 bytes, SHA-256
+`868bce6ff06910d780c45ad3088d7255059af1e26ba49bbed975a5b346f7d262`, each written with
+`flash --image` through the socket marked COM, the show and the settings kept, at
+brightness 32. The board held 84 installed animations and no card: `space` gave
+`"external":{"present":false,...}` and the log `sd: card not mounted; no card or unreadable
+file system` at every start, so nothing of the card was tried.
+
+- **Readiness (seed 33).** With the firmware of 8aa68b9, restarted by `read-limit` through
+  COM: the first reply came within a second of the tool's end, already
+  `"readiness":"checking"` with `"to_check":84`; `list` was answered during the check, all
+  84 animations, 35 of them still with `"bytes":null`; the first refreshes were counted
+  within two seconds; the check ended `ready` about 250 seconds after the restart (02:06:30
+  to 02:10:40). `host` gave `odrig_ESP32-S3_16MB_opi Oct 25 2026 02:01:23 internal+microsd
+  reset power-on`. A file that is no ODRG file, `broken-test.odrg`, installed with
+  `--no-check`, was quarantined: `install-show` printed `outcome: degraded: 1 unavailable`,
+  `list` gave it `"bytes":null` and `"fault":"bad-palette-size"`, `play 120` was refused
+  with `unavailable`, and `fault` gave
+  `{"work":"start","file":"broken-test.odrg","record":0,"bytes":0,"reason":"bad-palette-size"}`.
+  A restart through the chip's own socket (`host` then said `reset other`) left on COM
+  `#log 0.368 odrig: before this start: file broken-test.odrg unavailable:
+  bad-palette-size` before the player's own line of that start. The install that took the
+  file away printed `outcome: healthy`. With the firmware of ea73e23 `status`, `host` and
+  `fault` were the same, and the reproducer of seed 31 ended `degraded`.
+
 ## Live pin assignments
 
 The shared core durably commits a whole pin permutation through the mapping command

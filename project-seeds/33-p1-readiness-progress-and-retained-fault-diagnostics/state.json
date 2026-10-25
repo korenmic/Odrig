@@ -1,10 +1,11 @@
 {
   "number": 33,
   "slug": "33-p1-readiness-progress-and-retained-fault-diagnostics",
-  "state": "in_progress",
+  "state": "completed",
   "title": "Readiness progress and retained fault diagnostics",
   "priority": "P1",
   "addedAt": "2026-10-24T05:39:38+03:00",
   "addedCommit": "pending-local",
+  "completedAt": "2026-10-25T06:25:00+02:00",
   "summary": "Expose truthful readiness, validation progress and content counts while preserving bounded firmware/reset/file diagnostics, so slow checks and future failures can be understood without blocking controls or deleting evidence."
 }

@@ -131,7 +131,6 @@ present, and do not build on them.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
 - **Bounded decoding and responsive fault handling**, seed 31: no bad file may freeze the board.
 - **Boot-local animation quarantine and recovery**, seed 32: boot completes; bad files grayed.
-- **Readiness progress and retained fault diagnostics**, seed 33: a truthful start-up state.
 - **Incremental and interruption-safe content updates**, seed 34: one file changed, not all.
 - **Managed internal and external animation catalogs**, seed 35: built; the board session and the owner's phone check are open.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
