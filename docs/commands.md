@@ -420,8 +420,8 @@ catalog
   the storage, the files it has read and those it has still to read.
 
 At the start the core reads the internal catalog. Every file of the show that it has an
-entry for has its size in `list` at once and is neither opened nor read by the check after
-the start; an entry for another canvas than the mapping's makes its file unavailable with
+entry for has its size and its type in `list` at once and is neither opened nor read by the
+check after the start; an entry for another canvas than the mapping's makes its file unavailable with
 `size-mismatch`. A damaged or incompatible catalog is logged (`catalog internal damaged`,
 `catalog internal incompatible`) and its storage is read as without one. A change of the
 catalog that a cut interrupted after its commit is finished first.
@@ -452,7 +452,7 @@ read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
 **`upload begin external <file> <bytes>`** and **`upload begin external <file> <bytes>
 <crc32>`** open an upload to the drive when the core may write it: its host says the drive
 can be written and the drive's catalog is `ok`. `<file>` follows the naming rule of the
-show's files and ends in `.odrg`. The rest of the upload is as for the board's own storage: `upload data`, the
+show's files. The rest of the upload is as for the board's own storage: `upload data`, the
 check, `upload end`. On success one commit of the drive's catalog moves the file onto its
 name with its entry, and the reply gives the animation's id: `{"ok":true,"id":60003}`. A file
 of that name on the drive is replaced and keeps its id, and where it plays it plays anew
@@ -466,7 +466,8 @@ in one commit; its id is free again. Of any other drive it is `in-use`, as befor
 reports `"read_only":false` for a drive the core may write.
 
 An upload, `remove` and `remove many` keep a catalog that is `ok`: an upload commits the
-entry of its file, with the size, the CRC-32 and the length its check found, in the same
+entry of its file, with the size, the CRC-32, the length and the type its check found (of a
+text or a clock the loop its header gives), in the same
 commit that puts the file in place; a removal takes the entries of the files that go out
 before the show file is written. Each writes the pages of its entries, the marker and the
 commit record, and no other file of the catalog. A storage without a catalog, or with one

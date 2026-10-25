@@ -97,6 +97,7 @@ bool place_upload(Core &core, const char *dropped) {
     change.added_bytes = upload.size;
     change.added_crc = crc_value(upload.crc);
     change.added_total_ms = upload.total_ms;
+    change.added_type = core.check_content.type;
     change.moves_part = true;
     if (dropped != nullptr) {
         change.drops = is_the_name;

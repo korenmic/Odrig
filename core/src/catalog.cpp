@@ -214,6 +214,7 @@ struct EntryLine {
     uint32_t bytes;
     uint16_t width;
     uint16_t height;
+    uint8_t type;
     uint64_t total_ms;
     const char *name;
     uint32_t name_length;
@@ -230,7 +231,13 @@ bool parse_entry(const char *line, uint32_t length, uint32_t page, EntryLine &en
         !word(line, &at, " ") || !decimal(line, &at, 20, 0xFFFFFFFFFFFFFFFFull, &entry.total_ms) || !word(line, &at, " ")) {
         return false;
     }
-    if (!word(line, &at, "frames ") && !word(line, &at, "text ") && !word(line, &at, "widget ")) {
+    if (word(line, &at, "frames ")) {
+        entry.type = kTypeFrames;
+    } else if (word(line, &at, "text ")) {
+        entry.type = kTypeText;
+    } else if (word(line, &at, "widget ")) {
+        entry.type = kTypeWidget;
+    } else {
         return false;
     }
     entry.bytes = static_cast<uint32_t>(bytes);
@@ -538,7 +545,9 @@ void put_entry(Core &core, uint32_t *length, const CatalogChange &change) {
     put_number(core, length, core.height);
     put(core, length, " ");
     put_number(core, length, change.added_total_ms);
-    put(core, length, " frames ");
+    put(core, length, " ");
+    put(core, length, type_name(change.added_type));
+    put(core, length, " ");
     put(core, length, change.added);
     put(core, length, "\n");
 }
@@ -667,6 +676,7 @@ bool read_internal_page(Core &core, uint32_t page, const Marker &marker, bool ap
             }
             info.bytes = entry.bytes;
             info.total_ms = entry.total_ms;
+            info.type = entry.type;
             if (entry.width != core.width || entry.height != core.height) {
                 quarantine_file(core, file, kSizeMismatch, kWorkStart, 0, 0);
             }
@@ -766,6 +776,7 @@ __attribute__((noinline)) void stage(Core &core, const EntryLine &entry) {
     DriveEntry &made = core.drive[place];
     made.bytes = entry.bytes;
     made.total_ms = drive_length(entry.total_ms);
+    made.type = entry.type & 0x0F;
     made.id = free_drive_id(core);
     made.state = kDriveStaged;
     made.fault = kNone;
@@ -910,9 +921,14 @@ bool catalog_name_allowed(const char *name, uint32_t length) {
         }
         digits_only = digits_only && c >= '0' && c <= '9';
     }
-    const char *end = name + length - 5;
-    const char tail[] = ".odrg";
-    for (uint32_t at = 0; at < 5; ++at) {
+    // The name ends in `.odrg` or `.odrgx`, in any case.
+    const uint32_t ending = (name[length - 1] == 'x' || name[length - 1] == 'X') ? 6 : 5;
+    const char tail[] = ".odrgx";
+    if (length < ending + 1) {
+        return false;
+    }
+    const char *end = name + length - ending;
+    for (uint32_t at = 0; at < ending; ++at) {
         const char c = end[at] >= 'A' && end[at] <= 'Z' ? static_cast<char>(end[at] - 'A' + 'a') : end[at];
         if (c != tail[at]) {
             return false;
@@ -1288,6 +1304,7 @@ bool catalog_install_external(Core &core, uint16_t *id) {
     change.added_bytes = upload.size;
     change.added_crc = crc_value(upload.crc);
     change.added_total_ms = upload.total_ms;
+    change.added_type = core.check_content.type;
     change.moves_part = true;
     if (!catalog_commit(core, kExternal, change)) {
         return false;

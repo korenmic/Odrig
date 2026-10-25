@@ -135,7 +135,7 @@ present, and do not build on them.
 - **Incremental and interruption-safe content updates**, seed 34: one file changed, not all.
 - **Managed internal and external animation catalogs**, seed 35: no full check at every start.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
-- **ODRGX text and clock animations**, seed 37: built; the board, the owner's look and seed 35's catalogs are open.
+- **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 

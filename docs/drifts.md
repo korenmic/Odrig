@@ -10310,3 +10310,26 @@ task.
 **Resolution.** `odrig/catalog.py`, `entry_of`, `name_allowed`, `names`;
 `firmware/fwtool/storage.py`, `_check_animation`; `tests/converter/test_catalog_types.py`;
 `docs/catalog.md`.
+
+## Seeds 35 and 37: the core records the type and the loop
+
+**Question.** With the PC library's half in (it reads a container as the core's check does
+and writes each entry's type and loop), the core still took only `.odrg` names on a page
+and wrote `frames` for every entry, so that a catalog that `install-show` writes for a show
+with texts or clocks would be read by the board as damaged. What does the core write, read
+and give for each kind of file, and may the card hold texts and clocks?
+
+**Answer.** The core writes the type its check found and, for a text or a clock, the loop
+its header gives as the length; it reads the type back with the entry and gives it to the
+show's file and to the drive's place, so that `list` has it at once, without a scan. A
+name on a page may end in `.odrg` or `.odrgx`, in any case, as the PC library's rule says,
+and `upload begin external` takes either: the card may hold texts and clocks, and the app
+keeps sending them to the board, as its task chose. A rebuild takes `.odrgx` files from
+here on. The rest of seed 37's task 14 stands on what the branch holds: a refused text or
+clock is quarantined at the start (seed 37's tests of texts and clocks), the forms of making
+and editing are in seed 36's Upload and Animations (seed 37's tasks 9 to 11), and seed
+39's filter goes by `type` of `list` (seed 39's task 1).
+
+**Resolution.** `core/src/catalog.cpp` and `.h` (`catalog_name_allowed`, `EntryLine.type`,
+`CatalogChange.added_type`, `put_entry`), `core/src/storage.cpp`, `core/src/commands.cpp`;
+`tests/core/test_catalog_odrgx.py`; `docs/commands.md`, "Catalogs".

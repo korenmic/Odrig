@@ -144,7 +144,7 @@ Rules for every task:
     is left with.
   - Requirements: 18.1 to 18.3
 
-- [ ] 14. After combining with seeds 32, 35, 36 and 39
+- [x] 14. After combining with seeds 32, 35, 36 and 39
   - Done by the session that combines the branches: seed 35's catalogs register the type
     and the loop of every file; seed 32's quarantine takes a refused text or clock; the
     forms of tasks 9 to 11 move into seed 36's upload and animation screens; seed 39's

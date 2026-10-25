@@ -124,7 +124,6 @@ class Refusals(unittest.TestCase):
     def test_in_their_order(self):
         self.assertEqual(self.begin(card(CARD), line="upload begin external New.odrg 100")["error"], "bad-argument")
         self.assertEqual(self.begin(card(CARD), line="upload begin external new.txt 100")["error"], "bad-argument")
-        self.assertEqual(self.begin(card(CARD), line="upload begin external new.odrgx 100")["error"], "bad-argument")
         self.assertEqual(self.begin(card(CARD), line="upload begin external new.odrg")["error"], "bad-argument")
         self.assertEqual(self.begin(card(CARD), ["--drive-read-only"])["error"], "read-only")
         self.assertEqual(self.begin(CARD)["error"], "read-only")

@@ -47,18 +47,21 @@ bool catalog_left(const Core &core, uint32_t storage);
 bool catalog_settle(Core &core, uint32_t storage);
 
 // The start, once the show is read: reads the internal catalog with the first source, and
-// gives every file of the show it has an entry for its size and length without opening it.
+// gives every file of the show it has an entry for its size, length and type without opening
+// it.
 void catalog_read_internal(Core &core);
 
-// A change of a storage's catalog: the entry `added` (a name, with its size, CRC-32 and
-// length, for the mapping's canvas) put in the place of the entry of its name or added; the
-// entries whose names `drops` gives true for taken out, on the pages of `drop_pages`; and the
-// actions of the commit record, `move upload.part <added>` and `remove <removed_file>`.
+// A change of a storage's catalog: the entry `added` (a name, with its size, CRC-32, length,
+// the loop of a text or a clock, and type, for the mapping's canvas) put in the place of the
+// entry of its name or added; the entries whose names `drops` gives true for taken out, on
+// the pages of `drop_pages`; and the actions of the commit record, `move upload.part
+// <added>` and `remove <removed_file>`.
 struct CatalogChange {
     const char *added = nullptr;
     uint32_t added_bytes = 0;
     uint32_t added_crc = 0;
     uint64_t added_total_ms = 0;
+    uint8_t added_type = kTypeFrames;
     bool (*drops)(const Core &core, const char *name, uint32_t length, const void *context) = nullptr;
     const void *context = nullptr;
     uint32_t drop_pages = 0;

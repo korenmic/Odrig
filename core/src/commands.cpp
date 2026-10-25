@@ -3,7 +3,6 @@
 #include "catalog.h"
 
 #include "content.h"
-#include "json_reader.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -298,8 +297,7 @@ uint32_t upload(Core &core, uint64_t now, const Words &words, Reply &reply) {
             name[at] = words.text[3][at];
         }
         name[words.size[3]] = '\0';
-        // A name of the show's files that a catalog's entry may have.
-        if (!is_file_name(name) || !same_text(name + words.size[3] - 5, ".odrg")) {
+        if (!is_file_name(name)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
