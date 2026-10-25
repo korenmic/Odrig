@@ -1,15 +1,17 @@
-// Settings' mapping editor. The target's twenty output pins stand in a column in rising
-// order, and beside each pin stands the snake it carries. A snake is dragged by its handle,
-// or held, up or down and let go between two others: the pins keep their places, the
-// snakes between move one place, and the new assignment is saved on the target at once.
+// Settings' mapping editor. The twenty snakes stand in a fixed column, snake 1 at the top,
+// and beside each stands the data pin that drives it. A pin is dragged by its handle, or
+// held, up or down between two others: the snakes keep their places, the pins between move
+// one place, and every time the dragged pin passes into another place the new assignment is
+// saved on the target at once, while the finger is still down.
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
+import {crc32} from "../crc32.js";
 
 const DEFAULTS = [...Array.from({length: 18}, (_, at) => at + 1), 21, 47];
 const SNAKES = 20;
-// How long a press on a snake is held before it lifts (its handle lifts it at once), how
-// far it may move before that and still be a press, how near the top or the tabs the
-// pointer scrolls the page, and how far it scrolls in one frame.
+// How long a press on a pin is held before it lifts (its handle lifts it at once), how far
+// it may move before that and still be a press, how near the top or the tabs the pointer
+// scrolls the page, and how far it scrolls in one frame.
 const LIFT_MS = 450;
 const SLOP = 8;
 const EDGE = 56;
@@ -20,19 +22,20 @@ let ready = false;
 let version = -1;
 // The target's last reply to `mapping get`.
 let latest = null;
-// A save, or a read the operator asked for, is under way.
+// A read the operator asked for is under way.
 let pending = false;
 // The read every two seconds is under way: it changes nothing until its reply shows that
 // the target's mapping changed.
 let polling = false;
-// The order of the snakes shown while a move is saved.
-let saving = null;
+// The saving of moves: the assignment the target confirmed last and its revision, the one
+// wanted now, whether a call is out, and the pin that was moved.
+let live = null;
 let problem = "";
 let note = "";
 let fresh = false;
 // The press that may become a drag, and once lifted the placeholder and the marks.
 let press = null;
-// The snake whose handle had the focus when the list was drawn again.
+// The pin whose handle had the focus when the column was drawn again.
 let focused = null;
 // A click right after a drag is no press on a handle.
 let swallowClick = false;
@@ -40,22 +43,12 @@ let swallowClick = false;
 const byId = id => document.getElementById(id);
 const same = (a, b) => a.length === b.length && a.every((value, at) => value === b[at]);
 const editable = () => latest?.editable === true && latest.pins.length === SNAKES;
-// The target's pins in rising order: the places of the column.
-const places = () => [...latest.pins].sort((a, b) => a - b);
-// The snakes in the order of the pins they are on.
-const orderOf = pins => [...pins].sort((a, b) => a - b).map(pin => pins.indexOf(pin) + 1);
-const shownOrder = () => saving !== null ? saving : editable() ? orderOf(latest.pins) : [];
+// The pins of snakes 1 to 20 that the column shows.
+const shownPins = () => live !== null ? live.wanted ?? live.confirmed : editable() ? latest.pins : [];
 const locked = () => pending || !fresh || !editable();
-const defaultsAvailable = () => editable() && same(places(), [...DEFAULTS].sort((a, b) => a - b));
-
-// The pins of snakes 1 to 20 when the snakes stand in this order beside these pins.
-function pinsOf(order, pins) {
-  const assigned = new Array(SNAKES);
-  order.forEach((snake, at) => {
-    assigned[snake - 1] = pins[at];
-  });
-  return assigned;
-}
+const defaultsAvailable = () => editable() && same([...latest.pins].sort((a, b) => a - b), [...DEFAULTS].sort((a, b) => a - b));
+// The revision of an assignment: the CRC-32 of its twenty pin bytes, snake 1 first.
+const revisionOf = pins => parseInt(crc32(Uint8Array.from(pins)), 16);
 
 // Sets a text, or a state, only when it differs, so that nothing under a finger changes.
 function setText(element, text) {
@@ -76,68 +69,66 @@ function reset() {
   latest = null;
   pending = false;
   polling = false;
-  saving = null;
+  live = null;
   problem = "";
   note = "";
   fresh = false;
   focused = null;
-  const place = byId("mapping-rows");
-  place.replaceChildren();
-  place.dataset.key = "";
+  const column = byId("mapping-rows");
+  column.replaceChildren();
+  column.dataset.key = "";
 }
 
-function card(snake, pin) {
+function card(pin, snake) {
   const item = document.createElement("li");
-  item.className = "map-snake";
-  item.dataset.snake = String(snake);
+  item.className = "map-pin";
   item.dataset.pin = String(pin);
   const handle = document.createElement("button");
   handle.type = "button";
   handle.className = "handle";
   handle.textContent = "\u2261";
-  handle.setAttribute("aria-label", `Move snake ${snake}, now on GPIO ${pin}; the arrow keys move it one place`);
+  handle.setAttribute("aria-label", `Move GPIO ${pin}, now driving snake ${snake}; the arrow keys move it one place`);
   const words = document.createElement("span");
   words.className = "words";
-  words.textContent = `Snake ${snake} \u00b7 columns ${snake * 3 - 2}\u2013${snake * 3}`;
+  words.textContent = `GPIO ${pin}`;
   item.append(handle, words);
   return item;
 }
 
 function rows() {
-  const place = byId("mapping-rows");
+  const column = byId("mapping-rows");
   if (!editable()) {
-    if (place.childElementCount !== 0) place.replaceChildren();
-    place.dataset.key = "";
+    if (column.childElementCount !== 0) column.replaceChildren();
+    column.dataset.key = "";
     return;
   }
-  // Nothing is drawn again under a finger that holds a snake.
+  // Nothing is drawn again under a finger that holds a pin.
   if (press !== null && press.lifted) return;
-  const order = shownOrder();
-  const pins = places();
-  const key = `${pins.join(",")}|${order.join(",")}`;
-  if (place.dataset.key !== key) {
-    place.dataset.key = key;
-    const column = document.createElement("ol");
-    column.className = "map-pins";
-    column.replaceChildren(...pins.map((pin) => {
+  const pins = shownPins();
+  const key = pins.join(",");
+  if (column.dataset.key !== key) {
+    column.dataset.key = key;
+    const snakes = document.createElement("ol");
+    snakes.className = "map-snakes";
+    snakes.replaceChildren(...pins.map((_, at) => {
       const item = document.createElement("li");
-      item.textContent = `GPIO ${pin}`;
+      item.textContent = `Snake ${at + 1} \u00b7 columns ${at * 3 + 1}\u2013${at * 3 + 3}`;
       return item;
     }));
-    const snakes = document.createElement("ol");
-    snakes.id = "mapping-snakes";
-    snakes.className = "map-snakes";
-    snakes.replaceChildren(...order.map((snake, at) => card(snake, pins[at])));
-    place.replaceChildren(column, snakes);
+    const moving = document.createElement("ol");
+    moving.id = "mapping-pins";
+    moving.className = "map-moving";
+    moving.replaceChildren(...pins.map((pin, at) => card(pin, at + 1)));
+    column.replaceChildren(snakes, moving);
     if (focused !== null) {
-      place.querySelector(`.map-snake[data-snake="${focused}"] .handle`)?.focus();
+      column.querySelector(`.map-pin[data-pin="${focused}"] .handle`)?.focus();
     }
   }
-  // While a move is saved no snake can be taken, but the handles stay enabled: a disabled
-  // one would lose the focus.
-  place.dataset.locked = String(locked());
+  // While moves are saved after a pin is let go no pin can be taken, but the handles stay
+  // enabled: a disabled one would lose the focus.
+  column.dataset.locked = String(locked() || (live !== null && press === null));
   const off = !fresh || !editable();
-  for (const handle of place.querySelectorAll(".handle")) setDisabled(handle, off);
+  for (const handle of column.querySelectorAll(".handle")) setDisabled(handle, off);
 }
 
 function draw() {
@@ -145,22 +136,22 @@ function draw() {
   rows();
   let summary = "Reading mapping\u2026";
   if (latest !== null && editable()) {
-    summary = saving !== null ? "Saving the mapping\u2026" : pending ? "Reading mapping\u2026" :
-      "Drag a snake by \u2261, or hold it, up or down and let it go between two others. The pins keep their places, and each move is saved at once.";
+    summary = live !== null && live.sending ? "Saving the mapping\u2026" : pending ? "Reading mapping\u2026" :
+      "Drag a pin by \u2261, or hold it, up or down between two others. The snakes keep their places, and the mapping is saved each time the pin takes a new place.";
   }
   setText(byId("mapping-summary"), note || summary);
   const error = problem || (latest !== null && !editable() ? "This editor only supports the 60 \u00d7 60 installation with twenty three-column snakes." : "");
   setText(byId("mapping-error"), error);
   setHidden(byId("mapping-error"), error === "");
-  setDisabled(byId("mapping-defaults"), locked() || !defaultsAvailable() || same(latest.pins, DEFAULTS));
-  setDisabled(byId("mapping-reload"), pending);
+  setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
+  setDisabled(byId("mapping-reload"), pending || live !== null);
 }
 
 function explanation(error) {
   if (error instanceof Refusal) {
     const messages = {
       "unknown-command": "This target does not support mapping controls yet.",
-      "mapping-conflict": "The mapping changed on the target meanwhile. Its saved assignment is shown; move the snake again if it is still needed.",
+      "mapping-conflict": "The mapping changed on the target meanwhile. Its saved assignment is shown; move the pin again if it is still needed.",
       "storage-error": "The target could not save its mapping. Its saved assignment is shown.",
       "busy": "The target is busy checking or uploading files. Try again after it finishes.",
       "show-invalid": "The target has an invalid show. Fix its show before changing the mapping.",
@@ -171,21 +162,22 @@ function explanation(error) {
   return "No confirmed reply. The saved assignment was read again; check it before moving again.";
 }
 
-// A read the operator asked for, or the first one: it says that it reads.
-async function read() {
+// Reads the target's mapping; `quiet` leaves the editor as it is until the reply, and keeps
+// what the last move said went wrong.
+async function read(quiet = false) {
   if (!ready || pending || document.hidden) return;
   const asked = version;
   pending = true;
-  draw();
+  if (!quiet) draw();
   try {
     const reply = await client.mappingGet();
     if (asked !== version) return;
     latest = reply;
     fresh = true;
-    problem = "";
+    if (!quiet) problem = "";
   } catch (error) {
     if (asked !== version) return;
-    problem = explanation(error);
+    if (!quiet) problem = explanation(error);
     fresh = false;
   } finally {
     if (asked === version) {
@@ -196,14 +188,15 @@ async function read() {
 }
 
 // The read every two seconds while Settings shows: the editor changes only when the target's
-// mapping did, never while a snake is held, and a reply that does not come changes nothing.
+// mapping did, never while a pin is held or moves are saved, and a reply that does not come
+// changes nothing.
 async function poll() {
-  if (!ready || pending || polling || press !== null || document.hidden) return;
+  if (!ready || pending || polling || press !== null || live !== null || document.hidden) return;
   const asked = version;
   polling = true;
   try {
     const reply = await client.mappingGet();
-    if (asked !== version || pending) return;
+    if (asked !== version || pending || live !== null) return;
     const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable || !same(latest.pins, reply.pins);
     latest = reply;
     fresh = true;
@@ -218,58 +211,79 @@ async function poll() {
   }
 }
 
-// Saves the snakes in this order beside these pins, on the revision they were read with,
-// and shows the order meanwhile.
-async function save(order, revision, pins, moved) {
-  if (pending) return;
-  const asked = version;
-  pending = true;
-  saving = order;
-  problem = "";
-  note = "";
-  draw();
-  try {
-    await client.mappingSet(revision, pinsOf(order, pins));
-    if (asked !== version) return;
-    const reply = await client.mappingGet();
-    if (asked !== version) return;
-    latest = reply;
-    fresh = true;
-    note = moved === null ? "Saved: the default assignment." : `Saved: snake ${moved} is on GPIO ${reply.pins[moved - 1]}.`;
-  } catch (error) {
-    if (asked !== version) return;
-    problem = explanation(error);
-    // A failed save may have reached the target. Read once; never repeat it.
-    try {
-      const reply = await client.mappingGet();
-      if (asked !== version) return;
-      latest = reply;
-      fresh = true;
-    } catch (_) {
-      fresh = false;
-    }
-  } finally {
-    if (asked === version) {
-      saving = null;
-      pending = false;
-      draw();
-    }
+// Asks for an assignment to be saved: at once, or as soon as the call that is out has been
+// answered, so that only the latest of several quick moves waits.
+function want(pins, moved) {
+  if (live === null) {
+    live = {confirmed: [...latest.pins], revision: latest.revision, wanted: null, sending: false, version, moved};
   }
+  live.wanted = [...pins];
+  live.moved = moved;
+  problem = "";
+  pump();
 }
 
-// Moves a snake to a place of the column and saves.
-function moveTo(snake, at) {
-  if (locked()) return;
-  const order = shownOrder();
-  const rest = order.filter((other) => other !== snake);
-  rest.splice(Math.max(0, Math.min(at, rest.length)), 0, snake);
-  if (same(rest, order)) return;
-  save(rest, latest.revision, places(), snake);
+async function pump() {
+  if (live === null || live.sending) return;
+  const asked = version;
+  while (live !== null && live.wanted !== null && !same(live.wanted, live.confirmed)) {
+    const pins = live.wanted;
+    live.sending = true;
+    draw();
+    try {
+      await client.mappingSet(live.revision, pins);
+      if (asked !== version || live === null) return;
+      live.confirmed = pins;
+      live.revision = revisionOf(pins);
+      const snake = pins.indexOf(live.moved) + 1;
+      note = live.moved === null ? "Saved: the default assignment." : `Saved: GPIO ${live.moved} drives snake ${snake}.`;
+    } catch (error) {
+      if (asked !== version || live === null) return;
+      problem = explanation(error);
+      note = "";
+      // A failed save may have reached the target: the drag ends, and the target is read once,
+      // never asked again.
+      live = null;
+      cancel();
+      await read(true);
+      return;
+    }
+    if (live !== null) live.sending = false;
+  }
+  if (live !== null && (press === null || !press.lifted)) finish();
+  else draw();
+}
+
+// After the last move is saved and the pin let go, the target is read once and shown.
+async function finish() {
+  live = null;
+  await read(true);
+}
+
+// Moves a pin to a place of the column and saves.
+function moveTo(pin, at) {
+  if (locked() || live !== null) return;
+  const pins = shownPins();
+  const rest = pins.filter((other) => other !== pin);
+  rest.splice(Math.max(0, Math.min(at, rest.length)), 0, pin);
+  if (same(rest, pins)) return;
+  note = "";
+  want(rest, pin);
 }
 
 function cards() {
-  const list = byId("mapping-snakes");
-  return list === null ? [] : [...list.querySelectorAll(":scope > .map-snake")];
+  const list = byId("mapping-pins");
+  return list === null ? [] : [...list.querySelectorAll(":scope > .map-pin")];
+}
+
+// The pins of snakes 1 to 20 as the column stands with the held pin at the placeholder.
+function heldPins() {
+  const pins = [];
+  for (const child of byId("mapping-pins").children) {
+    if (child === press.placeholder) pins.push(Number(press.item.dataset.pin));
+    else if (child !== press.item && child.classList.contains("map-pin")) pins.push(Number(child.dataset.pin));
+  }
+  return pins;
 }
 
 // Where the page may be scrolled to by a drag: between the bar at the top and the tabs.
@@ -294,8 +308,8 @@ function lift() {
   item.style.left = `${box.left}px`;
   item.style.width = `${box.width}px`;
   item.style.top = `${box.top}px`;
-  // Where the other snakes stand, in the page, with the placeholder in the held one's
-  // place: the held snake lands before the first of them whose middle lies below it.
+  // Where the other pins stand, in the page, with the placeholder in the held one's place:
+  // the held pin lands before the first of them whose middle lies below it.
   press.marks = cards().filter((other) => other !== item).map((other) => {
     const at = other.getBoundingClientRect();
     return {item: other, middle: at.top + window.scrollY + at.height / 2};
@@ -305,26 +319,33 @@ function lift() {
     try {
       navigator.vibrate(15);
     } catch (_) {
-      // A web view without vibration lifts the snake all the same.
+      // A web view without vibration lifts the pin all the same.
     }
   }
   scrolling();
 }
 
-// Puts the placeholder where a snake held at this height would land.
+// Puts the placeholder where a pin held at this height would land, and saves the
+// assignment as soon as it stands in another place.
 function place(y) {
   press.item.style.top = `${y - press.offset}px`;
   const inPage = y + window.scrollY;
   const mark = press.marks.find((other) => inPage < other.middle);
-  const list = byId("mapping-snakes");
+  const list = byId("mapping-pins");
+  let moved = false;
   if (mark === undefined) {
-    if (list.lastElementChild !== press.placeholder) list.append(press.placeholder);
+    if (list.lastElementChild !== press.placeholder) {
+      list.append(press.placeholder);
+      moved = true;
+    }
   } else if (press.placeholder.nextElementSibling !== mark.item) {
     list.insertBefore(press.placeholder, mark.item);
+    moved = true;
   }
+  if (moved) want(heldPins(), Number(press.item.dataset.pin));
 }
 
-// Scrolls the page while the held snake is near the top or the tabs, one step a frame.
+// Scrolls the page while the held pin is near the top or the tabs, one step a frame.
 function scrolling() {
   if (press === null || !press.lifted) return;
   const {top, bottom} = edges();
@@ -358,7 +379,7 @@ function swallow() {
   }, 0);
 }
 
-// Puts a held snake back where it was, and moves nothing.
+// Lets a held pin go where it stands; what its moves saved stays saved.
 function cancel() {
   if (press === null) return;
   if (press.lifted) {
@@ -368,27 +389,17 @@ function cancel() {
     clearTimeout(press.timer);
   }
   press = null;
-  draw();
+  if (live !== null && !live.sending) finish();
+  else draw();
 }
 
 function drop() {
-  const held = press;
-  const snake = Number(held.item.dataset.snake);
-  // The place is the number of snakes before the placeholder.
-  let at = 0;
-  for (let other = held.placeholder.previousElementSibling; other !== null; other = other.previousElementSibling) {
-    if (other !== held.item && other.classList.contains("map-snake")) at += 1;
-  }
   settle();
   press = null;
   swallow();
-  const order = held.order.filter((other) => other !== snake);
-  order.splice(at, 0, snake);
-  if (same(order, held.order)) {
-    draw();
-    return;
-  }
-  save(order, held.revision, held.pins, snake);
+  // The pin stays where it was let go: its last place was saved, or is being saved.
+  if (live !== null && !live.sending) finish();
+  else draw();
 }
 
 export function showing(shown) {
@@ -404,13 +415,12 @@ export function start() {
   ready = true;
   const column = byId("mapping-rows");
   column.addEventListener("pointerdown", (event) => {
-    const item = event.target instanceof Element ? event.target.closest("#mapping-snakes > .map-snake") : null;
-    if (item === null || press !== null || locked() || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const item = event.target instanceof Element ? event.target.closest("#mapping-pins > .map-pin") : null;
+    if (item === null || press !== null || locked() || live !== null || (event.pointerType === "mouse" && event.button !== 0)) return;
     note = "";
-    press = {pointerId: event.pointerId, item, x: event.clientX, y: event.clientY, lastY: event.clientY, lifted: false,
-      order: shownOrder(), revision: latest.revision, pins: places()};
+    press = {pointerId: event.pointerId, item, x: event.clientX, y: event.clientY, lastY: event.clientY, lifted: false};
     if (event.target.closest(".handle") !== null) {
-      // The handle lifts the snake at once.
+      // The handle lifts the pin at once.
       event.preventDefault();
       lift();
     } else {
@@ -424,7 +434,7 @@ export function start() {
     press.lastY = event.clientY;
     if (!press.lifted) {
       if (Math.abs(event.clientX - press.x) > SLOP || Math.abs(event.clientY - press.y) > SLOP) {
-        // The finger moves before the snake lifts: it scrolls the page.
+        // The finger moves before the pin lifts: it scrolls the page.
         clearTimeout(press.timer);
         press = null;
       }
@@ -445,7 +455,7 @@ export function start() {
   document.addEventListener("pointercancel", (event) => {
     if (press !== null && event.pointerId === press.pointerId) cancel();
   });
-  // While a snake is held the page does not scroll under the finger.
+  // While a pin is held the page does not scroll under the finger.
   document.addEventListener("touchmove", (event) => {
     if (press !== null && press.lifted) event.preventDefault();
   }, {passive: false});
@@ -458,26 +468,26 @@ export function start() {
       event.preventDefault();
     }
   }, true);
-  // On a handle the arrow keys move its snake one place and save.
+  // On a handle the arrow keys move its pin one place and save.
   column.addEventListener("keydown", (event) => {
     const handle = event.target instanceof Element ? event.target.closest(".handle") : null;
     if (handle === null || (event.key !== "ArrowUp" && event.key !== "ArrowDown") || press !== null) return;
     event.preventDefault();
-    const snake = Number(handle.closest(".map-snake").dataset.snake);
-    const at = shownOrder().indexOf(snake);
-    focused = snake;
-    moveTo(snake, at + (event.key === "ArrowUp" ? -1 : 1));
+    const pin = Number(handle.closest(".map-pin").dataset.pin);
+    const at = shownPins().indexOf(pin);
+    focused = pin;
+    moveTo(pin, at + (event.key === "ArrowUp" ? -1 : 1));
   });
   column.addEventListener("focusout", () => {
     setTimeout(() => {
       const handle = document.activeElement instanceof Element ? document.activeElement.closest("#mapping-rows .handle") : null;
-      focused = handle === null ? null : Number(handle.closest(".map-snake").dataset.snake);
+      focused = handle === null ? null : Number(handle.closest(".map-pin").dataset.pin);
     }, 0);
   });
   byId("mapping-defaults").addEventListener("click", () => {
-    if (locked() || !defaultsAvailable()) return;
+    if (locked() || live !== null || !defaultsAvailable()) return;
     note = "";
-    save(orderOf(DEFAULTS), latest.revision, places(), null);
+    want(DEFAULTS, null);
   });
   byId("mapping-reload").addEventListener("click", () => {
     note = "";

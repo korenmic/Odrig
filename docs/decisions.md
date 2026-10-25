@@ -686,3 +686,6 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-25: The owner's choice: the mapping editor is a column of the twenty pins with the
   snakes beside them, moved by dragging up or down between two others, and each move is
   saved at once; the selectors, Save and Cancel are gone. Restore defaults saves at once.
+- 2026-10-25: The owner's correction of the mapping editor: the snakes stand still at the
+  left and the pins at the right are dragged; each new place a dragged pin passes into is
+  saved at once, while the finger is still down, not when it is lifted.

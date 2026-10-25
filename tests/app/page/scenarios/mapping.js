@@ -1,28 +1,25 @@
 import {shown} from "../reading.js";
 
-// The snakes in the order the column shows them, and the pin of each snake, snake 1 first.
-const order = (app) => [...app.doc.querySelectorAll("#mapping-snakes > .map-snake")].map((item) => Number(item.dataset.snake));
-function pins(app) {
-  const places = [...app.doc.querySelectorAll("#mapping-rows .map-pins li")].map((item) => Number(item.textContent.replace("GPIO ", "")));
-  const assigned = new Array(20).fill(null);
-  order(app).forEach((snake, at) => {
-    assigned[snake - 1] = places[at];
-  });
-  return assigned;
-}
-const handleOf = (app, snake) => app.doc.querySelector(`#mapping-snakes > .map-snake[data-snake="${snake}"] .handle`);
-const cardOf = (app, snake) => app.doc.querySelector(`#mapping-snakes > .map-snake[data-snake="${snake}"]`);
+// The pins of snakes 1 to 20 as the column beside the snakes shows them.
+const pins = (app) => [...app.doc.querySelectorAll("#mapping-pins > .map-pin")].map((item) => Number(item.dataset.pin));
+const handleOf = (app, pin) => app.doc.querySelector(`#mapping-pins > .map-pin[data-pin="${pin}"] .handle`);
+const cardOf = (app, pin) => app.doc.querySelector(`#mapping-pins > .map-pin[data-pin="${pin}"]`);
 
 function pointer(app, type, target, x, y) {
   const view = app.frame.contentWindow;
   target.dispatchEvent(new view.PointerEvent(type, {pointerId: 7, pointerType: "touch", isPrimary: true, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true}));
 }
 
-// Takes a snake by its handle, or holds its words when `hold` is set, and lets it go just
-// below the middle of another snake's card: it lands after that one. Between the steps a
-// function of the scenario may run while the snake is held.
-async function drag(app, snake, below, seen, {hold = false, whileHeld = null} = {}) {
-  const grip = hold ? cardOf(app, snake).querySelector(".words") : handleOf(app, snake);
+function key(app, pin, name) {
+  handleOf(app, pin).focus();
+  handleOf(app, pin).dispatchEvent(new (app.frame.contentWindow.KeyboardEvent)("keydown", {key: name, bubbles: true, cancelable: true}));
+}
+
+// Takes a pin by its handle, or holds its words when `hold` is set, and moves it to just
+// below the middle of another pin's card, where it lands after that one. `whileHeld` runs
+// before the move and `afterMove` after it, both while the pin is still held.
+async function drag(app, pin, below, seen, {hold = false, whileHeld = null, afterMove = null} = {}) {
+  const grip = hold ? cardOf(app, pin).querySelector(".words") : handleOf(app, pin);
   grip.scrollIntoView({block: "center"});
   await app.sleep(100);
   const box = grip.getBoundingClientRect();
@@ -30,15 +27,16 @@ async function drag(app, snake, below, seen, {hold = false, whileHeld = null} = 
   const y = box.top + box.height / 2;
   pointer(app, "pointerdown", grip, x, y);
   await app.sleep(hold ? 600 : 50);
-  seen.lifted = app.doc.querySelector("#mapping-snakes > .map-snake.lifted") !== null;
+  seen.lifted = app.doc.querySelector("#mapping-pins > .map-pin.lifted") !== null;
+  if (whileHeld !== null) await whileHeld();
   const target = cardOf(app, below).getBoundingClientRect();
   const to = target.top + target.height * 0.75;
   for (let step = 1; step <= 8; step += 1) {
     pointer(app, "pointermove", app.doc, x, y + (to - y) * step / 8);
     await app.sleep(30);
   }
-  seen.placeholder = app.doc.querySelector("#mapping-snakes > .map-placeholder") !== null;
-  if (whileHeld !== null) await whileHeld();
+  seen.placeholder = app.doc.querySelector("#mapping-pins > .map-placeholder") !== null;
+  if (afterMove !== null) await afterMove();
   pointer(app, "pointerup", app.doc, x, to);
 }
 
@@ -48,13 +46,13 @@ export default async function(app) {
   await app.until(() => app.shown() === "settings", "Settings");
   if (app.settings.unsupported) {
     await app.until(() => app.says("does not support|only supports"), "unsupported mapping explanation");
-    return {error: app.text("mapping-error"), count: app.doc.querySelectorAll("#mapping-snakes > .map-snake").length};
+    return {error: app.text("mapping-error"), count: app.doc.querySelectorAll("#mapping-pins > .map-pin").length};
   }
-  await app.until(() => order(app).length === 20 && !handleOf(app, 1).disabled, "twenty movable snakes");
+  await app.until(() => pins(app).length === 20 && !handleOf(app, pins(app)[0]).disabled, "twenty movable pins");
   const seen = {
     before: pins(app),
-    places: [...app.doc.querySelectorAll("#mapping-rows .map-pins li")].map((item) => item.textContent),
-    labels: [...app.doc.querySelectorAll("#mapping-snakes .words")].map((item) => item.textContent),
+    snakes: [...app.doc.querySelectorAll("#mapping-rows .map-snakes li")].map((item) => item.textContent),
+    words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => item.textContent),
     buttons: [...app.doc.querySelectorAll("#mapping button")].map((button) => button.textContent.trim()).filter((text) => text !== "≡"),
   };
   if (app.settings.layoutOnly) {
@@ -73,17 +71,18 @@ export default async function(app) {
     seen.after = pins(app);
     return seen;
   }
+  const [one, two, three, four, five] = seen.before;
   if (app.settings.conflict) {
-    // Another controller changes the mapping while snake 1 is held: the move is refused,
-    // said, and the target's assignment shown.
-    await drag(app, 1, 3, seen, {whileHeld: () => app.step()});
+    // Another controller changes the mapping after a pin is taken: its first new place is
+    // refused, said, the drag ends, and the target's assignment is shown.
+    await drag(app, one, three, seen, {whileHeld: () => app.step()});
     await app.until(() => app.says("changed on the target"), "the conflict said");
     await app.until(() => pins(app)[0] === app.settings.first, "the target's assignment");
     seen.after = pins(app);
     return seen;
   }
   if (app.settings.uncertain) {
-    await drag(app, 1, 2, seen);
+    await drag(app, one, two, seen);
     await app.until(() => app.says("No confirmed reply") && !app.byId("mapping-reload").disabled, "uncertain save reconciled");
     seen.uncertain = app.text("mapping-error");
     seen.after = pins(app);
@@ -91,41 +90,42 @@ export default async function(app) {
     seen.kept = pins(app);
     return seen;
   }
-  // Snake 1 by its handle to just below snake 3: snakes 2 and 3 move up one place.
-  await drag(app, 1, 3, seen);
-  seen.dragOrder = order(app);
-  await app.until(() => app.says("Saved: snake 1 is on GPIO"), "the move saved at once");
+  // Snake 1's pin by its handle to just below snake 3's: saved while the finger is down.
+  await drag(app, one, three, seen, {afterMove: async () => {
+    await app.until(() => app.says(`Saved: GPIO ${one} drives snake 3`), "the move saved while held");
+    seen.stillLifted = app.doc.querySelector("#mapping-pins > .map-pin.lifted") !== null;
+    await app.step();
+  }});
+  await app.until(() => !app.byId("mapping-reload").disabled && app.doc.querySelector("#mapping-pins > .map-pin.lifted") === null, "the pin let go");
   seen.dragged = pins(app);
   seen.dragNote = app.text("mapping-summary");
-  // Snake 1 held by its words, up to just below snake 2: it lands second.
-  await drag(app, 1, 2, seen, {hold: true});
-  await app.until(() => order(app)[1] === 1 && app.says("Saved: snake 1"), "the held move saved");
+  // The same pin held by its words, up to just below snake 1's pin, where it lands second.
+  await drag(app, one, two, seen, {hold: true});
+  await app.until(() => pins(app)[1] === one && app.says(`Saved: GPIO ${one} drives snake 2`) && !app.byId("mapping-reload").disabled, "the held move saved");
   seen.held = pins(app);
-  // The arrow keys on a handle: snake 1 one place up, then snake 2 one place down.
-  handleOf(app, 1).focus();
-  handleOf(app, 1).dispatchEvent(new (app.frame.contentWindow.KeyboardEvent)("keydown", {key: "ArrowUp", bubbles: true, cancelable: true}));
-  await app.until(() => order(app)[0] === 1 && app.says("Saved: snake 1"), "arrow up saved");
+  // The arrow keys on a handle: one place up.
+  key(app, one, "ArrowUp");
+  await app.until(() => pins(app)[0] === one && app.says(`Saved: GPIO ${one} drives snake 1`) && !app.byId("mapping-reload").disabled, "arrow up saved");
   seen.keyed = pins(app);
-  seen.focusKept = app.doc.activeElement === handleOf(app, 1);
-  // A snake dropped where it was moves nothing and sends nothing.
-  await drag(app, 5, 4, seen);
+  seen.focusKept = app.doc.activeElement === handleOf(app, one);
+  // A pin let go where it was moves nothing and sends nothing.
+  await drag(app, five, four, seen);
   await app.sleep(300);
   seen.unmoved = pins(app);
-  handleOf(app, 1).focus();
-  handleOf(app, 1).dispatchEvent(new (app.frame.contentWindow.KeyboardEvent)("keydown", {key: "ArrowDown", bubbles: true, cancelable: true}));
-  await app.until(() => order(app)[1] === 1 && app.says("Saved: snake 1"), "arrow down saved");
+  key(app, one, "ArrowDown");
+  await app.until(() => pins(app)[1] === one && app.says(`Saved: GPIO ${one} drives snake 2`) && !app.byId("mapping-reload").disabled, "arrow down saved");
   seen.keyedDown = pins(app);
   await app.until(() => !app.byId("mapping-defaults").disabled, "Restore defaults available");
   app.press("Restore defaults");
-  await app.until(() => app.says("Saved: the default assignment"), "defaults saved at once");
+  await app.until(() => app.says("Saved: the default assignment") && !app.byId("mapping-reload").disabled, "defaults saved at once");
   seen.defaults = pins(app);
   seen.playback = [...app.doc.querySelectorAll("#settings button, #settings input")].filter((element) => ["on", "off", "level", "play-all"].includes(element.id) ||
     /^(On|Off|Show diagonal|Stop diagonal)$/.test(element.textContent.trim())).length;
   seen.width = app.doc.documentElement.clientWidth;
   seen.scrollWidth = app.doc.documentElement.scrollWidth;
-  const first = app.doc.querySelector("#mapping-rows .map-pins li").getBoundingClientRect();
-  const beside = app.doc.querySelector("#mapping-snakes > .map-snake").getBoundingClientRect();
-  seen.inLine = Math.abs(first.top - beside.top) < 1 && Math.abs(first.height - beside.height) < 1;
+  const left = app.doc.querySelector("#mapping-rows .map-snakes li").getBoundingClientRect();
+  const right = app.doc.querySelector("#mapping-pins > .map-pin").getBoundingClientRect();
+  seen.inLine = Math.abs(left.top - right.top) < 1 && Math.abs(left.height - right.height) < 1 && left.left < right.left;
   seen.tabs = [...app.doc.querySelectorAll("nav button")].map(button => {const box=button.getBoundingClientRect();return {text:button.textContent,width:box.width};});
   return seen;
 }

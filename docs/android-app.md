@@ -71,7 +71,7 @@ thirty-two command lines and no other, each as `POST /odrig` to the address that
 | Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
 | Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
-| Lets a snake go in a new place of the mapping, or presses Restore defaults | `mapping set <revision> <pins>` |
+| Drags a pin of the mapping into another place, presses an arrow key on its handle, or presses Restore defaults | `mapping set <revision> <pins>` |
 | Presses `Diagonal` in the Tests group, or `Stop test` | `mapping test on`, `mapping test off` |
 | Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
@@ -488,22 +488,23 @@ installation cannot write this card; a computer can make its catalog.`, as
 in the place for messages. An installation whose software keeps no catalogs says `This
 installation's software keeps no catalogs.` and is not asked again.
 
-**Mapping.** The installation's twenty data pins stand in a column in rising order, and
-beside each pin stands the snake it drives: `Snake n · columns a–b`, left to right when
-viewed from the front, each snake starting at the bottom and running up, down, up. Only
-the installed 60x60 geometry is editable. A snake is moved by dragging its handle `≡` up
-or down, or by holding it as a row of the playlist is held, and letting it go between two
-others: the pins keep their places, the snakes between move one place, and the whole
-permutation is saved at once with the revision it was read with, with no Save to press.
-While it is saved the column shows the new order and no snake can be taken; then the
-summary says `Saved: snake n is on GPIO p.`. The arrow keys on a handle move its snake one
+**Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
+right when viewed from the front, each starting at the bottom and running up, down, up;
+beside each snake stands the data pin that drives it, `GPIO p`. Only the installed 60x60
+geometry is editable. A pin is moved by dragging its handle `≡` up or down, or by holding
+it as a row of the playlist is held: the snakes keep their places, and the pins between
+move one place. Every time the dragged pin passes into another place, the whole
+permutation is saved at once with the revision it was read with, while the finger is
+still down, so that the LEDs follow the drag; the summary says `Saved: GPIO p drives snake
+n.`. Several quick places are saved one after another, the latest last; after the pin is
+let go the assignment is read once and shown. The arrow keys on a handle move its pin one
 place and save it the same way. When another controller changed the mapping meanwhile the
-move is refused, said, and the target's assignment shown; when no reply confirms a save,
-the assignment is read once again and never sent twice. Restore defaults saves the
-default assignment at once, offered only when the installed pin set matches those
-defaults; Reload reads the assignment again. No new pin can be entered. The read every
-two seconds changes the column only when the target's mapping changed, and never while a
-snake is held.
+save is refused, said, the drag ends and the target's assignment is shown; when no reply
+confirms a save, the drag ends, the assignment is read once again and nothing is sent
+twice. Restore defaults saves the default assignment at once, offered only when the
+installed pin set matches those defaults; Reload reads the assignment again. No new pin
+can be entered. The read every two seconds changes the column only when the target's
+mapping changed, and never while a pin is held or moves are saved.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests

@@ -711,7 +711,7 @@ label.button {
 /* Settings. */
 #mapping-rows {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 8px;
   margin: 8px 0;
 }
@@ -722,40 +722,37 @@ label.button {
   list-style: none;
 }
 
-/* A pin and the snake beside it have the same height, so that they stand in line. */
-.map-pins li,
-.map-snake,
+/* A snake and the pin beside it have the same height, so that they stand in line. */
+.map-snakes li,
+.map-pin,
 .map-placeholder {
   box-sizing: border-box;
   height: 52px;
 }
 
-.map-pins li {
+.map-snakes li {
   display: flex;
   align-items: center;
-  padding-right: 4px;
-  border-bottom: 1px solid var(--edge);
-  color: var(--lesser);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.map-snake {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--edge);
-  touch-action: pan-y;
-}
-
-.map-snake .words {
   min-width: 0;
   overflow: hidden;
+  border-bottom: 1px solid var(--edge);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.map-snake .handle {
+.map-pin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  padding-right: 8px;
+  border-bottom: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  touch-action: pan-y;
+}
+
+.map-pin .handle {
   flex: 0 0 auto;
   width: 44px;
   min-height: 44px;
@@ -767,7 +764,7 @@ label.button {
   cursor: grab;
 }
 
-.map-snake.lifted {
+.map-pin.lifted {
   position: fixed;
   z-index: 5;
   margin: 0;
@@ -783,7 +780,7 @@ label.button {
   border-radius: 12px;
 }
 
-#mapping-rows[data-locked="true"] .map-snake {
+#mapping-rows[data-locked="true"] .map-pin {
   opacity: 0.7;
 }
 

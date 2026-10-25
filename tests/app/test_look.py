@@ -150,8 +150,8 @@ class Touch(unittest.TestCase):
         self.assertEqual(listened, {"click", "input", "change", "visibilitychange", "popstate", "contextmenu", "resize", "focusin", "focusout", "keydown", "scroll",
                                     "pointerdown", "pointermove", "pointerup", "pointercancel", "touchmove"})
         # A long press or a drag is only ever the lifting of a row of the playlist, which Move
-        # up and Move down in the row's menu do as well, or of a snake of the mapping, which
-        # the arrow keys on its handle move as well.
+        # up and Move down in the row's menu do as well, or of a pin of the mapping, which the
+        # arrow keys on its handle move as well.
         reorder = (support.WWW / "screens" / "reorder.js").read_text(encoding="utf-8")
         self.assertIn('label: "Move up"', reorder)
         self.assertIn('label: "Move down"', reorder)
