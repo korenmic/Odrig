@@ -234,7 +234,7 @@ class TheCommandLine(unittest.TestCase):
 
     def test_the_targets_are_a_serial_port_a_tcp_address_and_an_http_address(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log", "--external"})
 
     def test_the_line_is_the_same_whichever_way_it_travels(self):
         made = cli.parser()

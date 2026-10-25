@@ -122,7 +122,7 @@ Rules for every task:
   - Tests in `tests/firmware`; `python3 firmware/fw.py build` and `build --microsd` build.
   - Prove it fails first.
 
-- [ ] 12. The command tool and the emulator
+- [x] 12. The command tool and the emulator
   - `odrigctl catalog`, `odrigctl upload --external`; the emulator's documents.
   - Tests in `tests/emulator`: the commands through the emulator's routes; a card folder
     the emulator wrote is read by the PC tool and the other way round.

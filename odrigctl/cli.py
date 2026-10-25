@@ -25,6 +25,7 @@ COMMANDS = {
     "space": (),
     "list": (),
     "read": ("ID", "OFFSET"),
+    "catalog": ("[OPERATION]",),
     "remove": ("ID",),
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
@@ -64,7 +65,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -72,8 +73,9 @@ def parser():
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
+    made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, the ID and the FILE of upload")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -82,6 +84,8 @@ def checked(made, arguments):
     with another number of arguments than it takes, or with a line end in one, ends the
     program as a usage error, and so do `--log` with a command or with `--http` and no
     command without `--log`."""
+    if arguments.external and arguments.command != "upload":
+        made.error("--external goes with upload")
     if arguments.log:
         if arguments.http is not None:
             made.error("--log goes with --port or --tcp")
@@ -90,6 +94,17 @@ def checked(made, arguments):
         return []
     if arguments.command is None:
         made.error("a command is needed, or --log")
+    if arguments.command == "upload" and arguments.external:
+        if len(arguments.arguments) != 1:
+            made.error("upload --external takes one argument: FILE")
+        if "\n" in arguments.arguments[0]:
+            made.error("a command is one line")
+        return ["upload", "external", arguments.arguments[0]]
+    if arguments.command == "catalog":
+        words = arguments.arguments
+        if words not in ([], ["cancel"], ["rebuild", "internal"], ["rebuild", "external"]):
+            made.error("catalog takes no argument, rebuild internal, rebuild external, or cancel")
+        return [arguments.command, *words]
     if arguments.command == "remove" and len(arguments.arguments) == 2 and arguments.arguments[0] == "many":
         if any("\n" in word or "\r" in word for word in arguments.arguments):
             made.error("a command is one line")

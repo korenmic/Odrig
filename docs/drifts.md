@@ -10208,3 +10208,22 @@ listed.
 `test_usermod_files.py`, `test_usermod_log.py`; `docs/microsd.md`, `docs/firmware.md`,
 `docs/firmware-additions.md`, line 26.
 
+## Seed 35: the command tool's catalog and the card's upload
+
+**Question.** The design names `odrigctl catalog [rebuild internal|rebuild external|cancel]`
+and `odrigctl upload --external FILE`. How does the tool's table of commands hold a command
+whose operation may be left out, how is `--external` told from an id, and does the tool
+wait for a rebuild to end?
+
+**Answer.** `catalog` takes `[OPERATION]` in the table and the synopsis: none, `rebuild
+internal`, `rebuild external` or `cancel`, each sent as it is, anything else a usage error
+of status 2 that says what it takes. `--external` is an option of the tool that goes with
+`upload` only and takes the file alone; the upload is the one of `upload ID FILE` with the
+word `external` in the place of the id, so that `upload begin external <name> <bytes>
+<crc32>` goes out, and the reply of `upload end` with the card's id is printed as it comes.
+The tool does not wait for a rebuild: its reply comes at once, and `catalog` shows the
+progress. The tests run the commands through the emulator by each transport, and a card
+the emulator wrote is read by the PC tool and the other way round.
+
+**Resolution.** `odrigctl/cli.py`; `tests/emulator/test_catalog.py`,
+`tests/emulator/test_tool.py`; `docs/emulator.md`, "The command tool".

@@ -664,3 +664,7 @@ are in [format.md](format.md), "Measured sizes".
   core's changes of the files of that folder by their names, a rename onto a file removing
   that file first, as FAT needs. A USB stick is read from its catalog too, and never
   written. No command is added.
+- 2026-10-25: Seed 35: the command tool takes `catalog [rebuild internal|rebuild
+  external|cancel]` and `upload --external FILE`, the design's forms, approved in advance by
+  the owner on 2026-10-24; the emulator's `--drive DIR` is written by the board's commands
+  once its folder has a catalog, unless `--drive-read-only`.

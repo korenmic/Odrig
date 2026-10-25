@@ -713,11 +713,13 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] catalog [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -733,7 +735,10 @@ python -m odrigctl --port build/emulator/serial fault
 python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
 python -m odrigctl --port build/emulator/serial read 1 0
+python -m odrigctl --port build/emulator/serial catalog
+python -m odrigctl --port build/emulator/serial catalog rebuild internal
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial upload --external build/hello-card.odrg
 python -m odrigctl --port build/emulator/serial remove 9
 python -m odrigctl --port build/emulator/serial remove many 9,10
 python -m odrigctl --port build/emulator/serial ignore 9 1
@@ -754,7 +759,10 @@ python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
 python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
+python -m odrigctl --tcp 127.0.0.1:8601 catalog
+python -m odrigctl --tcp 127.0.0.1:8601 catalog cancel
 python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
+python -m odrigctl --tcp 127.0.0.1:8601 upload --external build/hello-card.odrg
 python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
 python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
@@ -775,7 +783,10 @@ python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
 python -m odrigctl --http 127.0.0.1:8600 read 1 0
+python -m odrigctl --http 127.0.0.1:8600 catalog
+python -m odrigctl --http 127.0.0.1:8600 catalog rebuild external
 python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
+python -m odrigctl --http 127.0.0.1:8600 upload --external build/hello-card.odrg
 python -m odrigctl --http 127.0.0.1:8600 remove 9
 python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
 python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
@@ -918,6 +929,23 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 `odrigctl.content.upload(session, item, name, data, progress)` run the two commands that
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
+
+**`catalog`** prints the reply of `catalog`: the state of the catalog of the target's own
+storage and of its drive, and a rebuild's progress. **`catalog rebuild internal`** and
+**`catalog rebuild external`** start a rebuild of one of them, and **`catalog cancel`** ends
+one; each prints the reply, which comes at once: the rebuild goes on in the target, and
+`catalog` asked again shows how far it is. Another operation is status 2, and nothing is
+sent.
+
+**`upload --external FILE`** sends an animation to the target's drive, a card the core may
+write, as `upload ID FILE` sends one with an id: the same pieces, progress and replies, with
+`upload begin external <name> <bytes> <crc32>` in the place of `upload begin`, and the reply
+of `upload end` gives the id the card's animation got, `{"ok":true,"id":60003}`. A target
+whose drive cannot be written answers `read-only`, which is status 1. With the emulator,
+`--drive DIR` without `--drive-read-only` is such a drive once `DIR/odrig` has a catalog:
+the PC tool's `python3 -m odrig.catalog DIR import` writes one, and so does `catalog rebuild
+external`. What the emulator wrote there the PC tool reads, and a change the PC tool makes
+there the emulator takes up within ten seconds, when it reads the marker again.
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.

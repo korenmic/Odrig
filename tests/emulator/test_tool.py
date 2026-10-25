@@ -14,7 +14,7 @@ import unittest
 import zlib
 from unittest import mock
 
-from odrig import mapping
+from odrig import mapping, show
 from odrigctl import cli, client, content
 from tests.core import support as core_support
 from tests.core.support import ReferencePlayer
@@ -46,6 +46,7 @@ SESSION = (
     ("play", "3"),
     ("status",),
     ("read", "1", "0"),
+    ("catalog",),
     ("play", "99"),
     ("play", "abc"),
     ("brightness", "256"),
@@ -59,11 +60,17 @@ SESSION = (
 )
 
 
+def catalog_reply(files):
+    """The reply to `catalog` of a target whose storage has no catalog and which has no drive."""
+    named = len(set(show.files(show.loads(files["show.json"]))))
+    return b'{"ok":true,"internal":{"state":"none","uncataloged":%d},"external":{"state":"absent"},"rebuild":null}\n' % named
+
+
 def reference_replies(files, session):
     player = ReferencePlayer(files)
     player.poll(0)
     return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words in (("ignore", "999", "1"), ("order", "move", "1", "999", "end")) else
-            player.command(100, " ".join(words).encode("ascii")) for words in session]
+            catalog_reply(files) if words == ("catalog",) else player.command(100, " ".join(words).encode("ascii")) for words in session]
 
 
 class AgainstTheEmulator(unittest.TestCase):
@@ -288,16 +295,21 @@ class Usage(unittest.TestCase):
                                       "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
         one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog")) and command not in ("play all", "remove many <ids>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order")],
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
-                           (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line")):
+                           (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line"),
+                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
+                           (["upload", "--external"], "upload --external takes one argument: FILE"),
+                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
             result = support.run_tool("--port", "a", *argv)
             self.assertEqual(result.status, 2)
             self.assertIn(said, result.err)
@@ -318,6 +330,10 @@ class Usage(unittest.TestCase):
             (["list"], b"list\n"),
             (["remove", "12"], b"remove 12\n"),
             (["remove", "x y"], b"remove x y\n"),
+            (["catalog"], b"catalog\n"),
+            (["catalog", "rebuild", "internal"], b"catalog rebuild internal\n"),
+            (["catalog", "rebuild", "external"], b"catalog rebuild external\n"),
+            (["catalog", "cancel"], b"catalog cancel\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 
@@ -328,7 +344,7 @@ class Usage(unittest.TestCase):
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log", "--external"})
 
 
 class StandIn:
