@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 from fwtool import Failure, paths, storage
-from odrig import odrgx
+from odrig import catalog, odrgx
 from tests.converter.test_catalog_format import animation
 
 from . import ROOT, support
@@ -48,6 +48,13 @@ class Containers(unittest.TestCase):
     def test_a_checked_folder_takes_containers_of_text_of_a_widget_and_of_frames(self):
         files = storage.folder_files(self.show)
         self.assertEqual({name: data for name, data in files.items() if name not in storage.CATALOG_NAMES}, support.files_of(self.show))
+
+    def test_the_catalog_records_the_type_and_the_loop_of_each(self):
+        made = catalog.read(catalog.MemoryStorage(storage.folder_files(self.show)))
+        self.assertEqual(made.state, "ok")
+        self.assertEqual(sorted((entry.name, entry.type, entry.total_ms) for entry in made.entries), [
+            ("analog.odrgx", "widget", 30000), ("film.odrgx", "frames", 200), ("hebrew.marquee.odrgx", "text", 3967), ("sun.odrg", "frames", 200),
+        ])
 
     def test_install_show_puts_them_on_the_board(self):
         table = support.partition_table(support.small_layout())
@@ -93,7 +100,9 @@ class Containers(unittest.TestCase):
         self.assertEqual(refused.reason, "file-malformed")
         self.assertRegex(refused.detail, rf"\A{self.show / 'sun.odrg'}: truncated: ")
         (self.show / "sun.odrg").write_bytes(film())
-        self.assertEqual(storage.folder_files(self.show)["sun.odrg"], film())
+        files = storage.folder_files(self.show)
+        self.assertEqual(files["sun.odrg"], film())
+        self.assertEqual(catalog.read(catalog.MemoryStorage(files)).entry("sun.odrg").type, "frames")
 
 
 if __name__ == "__main__":
