@@ -20,7 +20,7 @@ class MappingApp(unittest.TestCase):
         self.assertEqual(found['snakes'][0], 'Snake 1 \u00b7 columns 1\u20133')
         self.assertIn('Snake 20 \u00b7 columns 58\u201360', found['snakes'][-1])
         self.assertEqual(found['words'], [f"GPIO {pin}" for pin in PINS])
-        self.assertEqual(found['buttons'], ['Restore defaults', 'Reload'])
+        self.assertEqual(found['buttons'], ['Restore defaults', 'Reload', 'Show the diagonal', 'From a photo'])
         self.assertTrue(found['lifted'])
         self.assertTrue(found['placeholder'])
         # Saved on the target while the finger still held the pin.

@@ -53,7 +53,7 @@ export default async function(app) {
     before: pins(app),
     snakes: [...app.doc.querySelectorAll("#mapping-rows .map-snakes li")].map((item) => item.textContent),
     words: [...app.doc.querySelectorAll("#mapping-pins .words")].map((item) => item.textContent),
-    buttons: [...app.doc.querySelectorAll("#mapping button")].map((button) => button.textContent.trim()).filter((text) => text !== "≡"),
+    buttons: [...app.doc.querySelectorAll("#mapping button")].filter((button) => button.getClientRects().length > 0).map((button) => button.textContent.trim()).filter((text) => text !== "≡"),
   };
   if (app.settings.layoutOnly) {
     seen.width = app.doc.documentElement.clientWidth;

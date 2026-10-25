@@ -694,3 +694,10 @@ are in [format.md](format.md), "Measured sizes".
   bottom to the top and back, one row every 40 ms, so that every LED of the snake lights in
   turn; the line of 20 pixels a column of seed 36 is gone, and with it the embedded file of
   twenty frames. The diagonal stays as it was.
+- 2026-10-25: Seed 40 is built, its tasks 1 to 3: the app reads a photo of the wall with the
+  diagonal showing, finds the lit LEDs as bright peaks, places them on the grids of sixty
+  columns and rows, reads which snake each position drives, shows it on the photo and
+  applies it on one tap; a dead line's snake goes where a place remains, and a gap at an
+  end offers its readings. No command, no library; `app/www/photo.js` and
+  `screens/photomap.js`, about 25 KB. The owner's photo with the diagonal showing, and the
+  check on a phone, are open.

@@ -35,7 +35,7 @@ Rules for every task:
   - Prove it fails first: Settings has no button From a photo.
   - Requirements: 1.1, 1.2, 3.1 to 3.4, 5.2, 5.3
 
-- [ ] 3. The APK and every suite
+- [x] 3. The APK and every suite
   - Every suite that runs without a board; `python3 app/app.py build`; `tests/apk`.
   - docs/decisions.md: a dated line. The seed stays `in_progress` for task 4.
   - Requirements: 5.3, 5.4
