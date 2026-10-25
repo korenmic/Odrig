@@ -219,7 +219,7 @@ SOUND = {"status": PLAYING, "list": LISTED}
 Run = collections.namedtuple("Run", "seen elsewhere")
 
 # The media the suite converts, as a scenario fetches them.
-MEDIA_TYPES = {".gif": "image/gif", ".mp4": "video/mp4"}
+MEDIA_TYPES = {".gif": "image/gif", ".mp4": "video/mp4", ".jpg": "image/jpeg", ".png": "image/png"}
 CONVERTER_TOOL = ROOT / "converter" / "odrig.js"
 
 

@@ -14,7 +14,7 @@ Rules for every task:
 - No command, reply member or error code is added, and nothing outside `app/www/`, the
   tests and the documents changes.
 
-- [ ] 1. The analysis
+- [x] 1. The analysis
   - Set the seed's `state.json` to `in_progress`.
   - `app/www/photo.js`: `readPhoto`, `analyse`, `assignment`.
   - Tests, `tests/app/test_photo.py` and `tests/app/page/scenarios/photo-analysis.js`,
