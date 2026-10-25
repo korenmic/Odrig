@@ -2180,6 +2180,21 @@ file system` at every start, so nothing of the card was tried.
   bad-palette-size` before the player's own line of that start. The install that took the
   file away printed `outcome: healthy`. With the firmware of ea73e23 `status`, `host` and
   `fault` were the same, and the reproducer of seed 31 ended `degraded`.
+- **Content changes (seed 34).** With the firmware of 8aa68b9: `odrigctl remove 84` was
+  answered in 0.95 s; `odrigctl upload 101 hebrew.marquee.odrgx`, 113 bytes, `committed`
+  in 2.7 s; the same upload again `unchanged: the target holds this file already; nothing
+  was sent`, `{"ok":true,"unchanged":true}`, in 0.69 s. `install-show --no-check
+  --keep-copies` of a folder without the other 20 line tests and with a bad file wrote 18
+  blocks, 73,728 bytes, 2 free first and then 16 in use, committed and compared, 280 s in
+  all with the board's check after it, and kept 22 copies; the install that took the bad
+  file away wrote 5 blocks, 20,480 bytes. `read-show` gave the manifests before (84
+  animations), between (93 items, with the texts, the clocks and `order.txt`) and after
+  (73 items). With the firmware of ea73e23, which keeps the catalog: `remove 107` in 2.2 s,
+  the catalog's generation from 1 to 2 and its entries from 73 to 72; the upload of the
+  same file in 2.4 s, generation 3, 73 entries; the same upload again `unchanged`; a
+  checked `install-show --keep-copies` that took the reproducer of seed 31 away wrote 9
+  blocks, 36,864 bytes, the catalog with them, in 68 s, `outcome: healthy`. The app was not
+  flashed.
 
 ## Live pin assignments
 

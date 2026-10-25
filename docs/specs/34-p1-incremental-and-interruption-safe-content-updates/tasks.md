@@ -89,7 +89,7 @@ Rules for every task:
     `in_progress` for task 7.
   - Requirements: 7.3, 7.4
 
-- [ ] 7. The board
+- [x] 7. The board
   - In the run's board session, at brightness 40 or less: one animation removed and one
     added by command (`odrigctl remove`, `odrigctl upload`, the same upload again), and by
     `install-show` with `--keep-copies`; the time and the bytes of each, the manifests
