@@ -56,9 +56,22 @@ ranked by height, give the whole permutation.
   give the physical positions 1 to 20; ranked by height, from the bottom, the snake number
   each position drives. The new pins are the position's current pins, in snake order: the
   pin at position p becomes the pin of the snake that p shows.
-- Exactly twenty patches with all horizontal ranks and all height ranks distinct, else the
-  app refuses, says how many it found, and advises: a darker room, a lower exposure, the
-  whole wall in the frame, the phone upright, from the front.
+- The reading is a best effort, never all or nothing. A snake whose strips do not light,
+  a dead line, leaves no stub: the app sorts every stub it found and puts the missing
+  snake in the place that remains. The patches' centres stand on two grids of twenty
+  places each, the positions across and the heights up, whose pitch the app takes from the
+  gaps between neighbouring centres; a gap of about two pitches is a place with no stub,
+  and the snake whose number no stub has goes to the position no stub is at. With more
+  than one dead line, the remaining numbers go to the remaining positions in order, lowest
+  to leftmost, and the app says so. A patch far from both grids is noise and is dropped.
+- A gap at an end of a grid cannot be placed by the pitch alone: the stubs found fit the
+  grid shifted either way. The app then shows every reading that fits, each on the photo,
+  and asks the operator which end strip of the wall is dark; for a gap at an end of the
+  heights, which the operator cannot see, it says that after Apply the diagonal must
+  begin at the bottom left, and offers the other reading with one tap.
+- Fewer than two stubs found, or patches whose centres fit no grid of twenty places, is a
+  refusal: the app says how many it found and advises a darker room, a lower exposure,
+  the whole wall in the frame, the phone upright, from the front.
 - The result is saved only on the operator's tap, with the revision the mapping was read
   with, through the same path as the mapping editor's save: a conflict or a refusal is
   said as there. A saved mapping is shown in the editor as usual.
@@ -74,15 +87,18 @@ ranked by height, give the whole permutation.
    numbered by the snake it reads from the height, and the words of the result: for
    example `Position 3 shows snake 7`, for every position whose snake differs from its
    own number, or `Every position shows its own snake` when the mapping is right.
-3. One button, Apply, saves the mapping, and the editor's column shows the saved pins;
-   Discard drops the result. Applying while another controller changed the mapping is
-   refused and said, as in the editor.
-4. When the app finds fewer or more than twenty stubs, or two at the same horizontal or
-   height rank, it says the count it found and the advice of the constraints, and offers
-   to try another photo.
-5. The analysis works alike in the APK, the browser and the emulator's Controller view.
-6. The page of the app describes the feature, its one-photo idea, what the photo must
-   hold, and what it cannot tell.
+3. With a stub missing, the result says `Position 5 shows no snake; snake 12 goes there`,
+   the position marked on the photo; with a gap at an end, the readings that fit are each
+   shown and one is chosen before Apply.
+4. One button, Apply, saves the mapping, and the editor's column shows the saved pins;
+   Discard drops the result; after an Apply that followed a gap at an end of the heights,
+   Other reading applies the other one. Applying while another controller changed the
+   mapping is refused and said, as in the editor.
+5. When the app finds fewer than two stubs, or patches that fit no grid, it says the
+   count it found and the advice of the constraints, and offers to try another photo.
+6. The analysis works alike in the APK, the browser and the emulator's Controller view.
+7. The page of the app describes the feature, its one-photo idea, what the photo must
+   hold, the best effort with a dead line, and what it cannot tell.
 
 ## Definition Of Done
 
@@ -91,8 +107,10 @@ ranked by height, give the whole permutation.
    diagonal's picture rendered as a wall of LEDs, warped as a phone from an angle would
    see it, blurred and with noise and uneven light, for the default mapping and for
    several permutations, each read back exactly and applied; a photo with a stub missing
-   and one with two stubs merged refused with the right count; a photo turned by its
-   orientation metadata read right; and a conflict on Apply said.
+   in the middle read with the missing snake put in the place that remains, one with a
+   stub missing at an end offering both readings, one with two dead lines; the owner's
+   four photos of the unlit wall, beside the seed, each refused with the count found; a
+   photo turned by its orientation metadata read right; and a conflict on Apply said.
 2. A new APK is built, and the owner takes a photo of the installation with the diagonal
    showing and checks the result on a phone; that photo, with the owner's leave, joins
    the test vectors.
@@ -110,8 +128,9 @@ of done.
 None. The owner asked for this seed to be answered without a question pass; the
 decisions it needed are taken in the constraints: one photo of the diagonal rather than a
 sequence of tests, the analysis in the app's own code rather than a library, a numbered
-preview and a tap before the save rather than a save on its own, and a refusal with the
-count found rather than a guess when the stubs are not twenty.
+preview and a tap before the save rather than a save on its own, a best effort that puts
+a dead line's snake in the place that remains, a choice offered for a gap at an end, and
+a refusal with the count found only when the stubs fit no grid at all.
 
 ## The Owner's Answers
 
@@ -119,4 +138,6 @@ On 2026-10-25 the owner asked whether the app could reorder the snakes' pins by 
 from an image file, a picture taken by the phone's camera, with no camera integrated
 into the app, and asked for the feasibility, the added size and the time before building
 it: it is possible with about 30 KB more in the app and about a day's work plus the
-owner's trials with real photos. The owner then asked for the seed.
+owner's trials with real photos. The owner then asked for the seed, and on the same day
+hardened it: the sorting must be a best effort; a line that does not work must not stop
+the sorting of the others, and its snake goes wherever remains.
