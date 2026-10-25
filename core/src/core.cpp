@@ -107,14 +107,8 @@ void check_file(Core &core, uint32_t index) {
     }
 }
 
-// What one step of the check of a file came to.
-enum StepOutcome { kStepGoingOn, kStepWhole, kStepFault };
+}  // namespace
 
-// One step of the check of a file through the second decoders: its header and canvas, one
-// frame record, its end, after which nothing may follow, or one slice of the settling of a
-// defect, after which the same step is taken again. When the file is whole, its size is the
-// bytes the second source took and its length the sum of the durations; when it has a
-// fault, `reason` says which, and `record` the frame record it was at.
 StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32_t *record) {
     Checker &checker = *core.checker;
     Reason found;
@@ -170,6 +164,8 @@ StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32
     *reason = found;
     return kStepFault;
 }
+
+namespace {
 
 // Moves the check after the start past the files it has no more to do with: those that
 // are quarantined or were read whole by an upload's check. It is complete once it is past
@@ -481,6 +477,7 @@ void drive_touch(Core &core) {
     core.drive_number = number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    catalog_drive_went(core);
     catalog_drive_plugged(core);
     if (catalog_drive_loading(core)) {
         // A host that is given the names: the drive's catalog is read first.
@@ -604,10 +601,10 @@ void check_file_left(Core &core, uint32_t file) {
 }
 
 void check_after_start(Core &core, bool in_step, bool on_time) {
-    if (core.invalid || (check_complete(core) && !drive_waits(core))) {
+    if (core.invalid || (check_complete(core) && !drive_waits(core) && !catalog_rebuilding(core))) {
         return;
     }
-    if (!check_complete(core) && core.upload.state != kUploadNone) {
+    if ((!check_complete(core) || catalog_rebuilding(core)) && core.upload.state != kUploadNone) {
         // The upload has the second decoders; the check waits for them.
         return;
     }
@@ -622,8 +619,10 @@ void check_after_start(Core &core, bool in_step, bool on_time) {
         steps = core.check_idle >= kCheckLongestWait ? 1 : 0;
     }
     core.check_idle = steps != 0 ? 0 : static_cast<uint8_t>(core.check_idle + 1);
-    for (uint8_t step = 0; step < steps && !core.invalid && (!check_complete(core) || drive_waits(core)); ++step) {
-        if (!check_complete(core)) {
+    for (uint8_t step = 0; step < steps && !core.invalid && (!check_complete(core) || drive_waits(core) || catalog_rebuilding(core)); ++step) {
+        if (catalog_rebuilding(core)) {
+            catalog_rebuild_step(core);
+        } else if (!check_complete(core)) {
             check_step(core);
         } else {
             drive_step(core);

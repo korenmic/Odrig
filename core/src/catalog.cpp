@@ -1345,6 +1345,350 @@ bool catalog_remove_external(Core &core, uint32_t place) {
     return true;
 }
 
+namespace {
+
+// Where each page's count and CRC-32 wait while a rebuild runs: six bytes a page.
+const uint32_t kRebuildPages = 1400;
+
+void keep_page(Core &core, uint32_t page, uint16_t count, uint32_t crc) {
+    uint8_t *at = core.chunk + kRebuildPages + 6 * page;
+    at[0] = static_cast<uint8_t>(count);
+    at[1] = static_cast<uint8_t>(count >> 8);
+    for (uint32_t byte = 0; byte < 4; ++byte) {
+        at[2 + byte] = static_cast<uint8_t>(crc >> (8 * byte));
+    }
+}
+
+void kept_page(const Core &core, uint32_t page, uint16_t *count, uint32_t *crc) {
+    const uint8_t *at = core.chunk + kRebuildPages + 6 * page;
+    *count = static_cast<uint16_t>(at[0] | at[1] << 8);
+    *crc = 0;
+    for (uint32_t byte = 0; byte < 4; ++byte) {
+        *crc |= static_cast<uint32_t>(at[2 + byte]) << (8 * byte);
+    }
+}
+
+// The check after the start takes up the show's files that are neither checked nor faulted.
+void check_takes_up(Core &core) {
+    core.check_at = 0;
+    while (core.check_at < core.file_count && (core.files[core.check_at].fault != kNone || core.files[core.check_at].checked)) {
+        ++core.check_at;
+    }
+    core.check_done = core.check_at >= core.file_count ? 1 : 0;
+}
+
+// Ends a rebuild without its commit: the page being written is given up and removed; the
+// check after the start, or a drive's own check, takes up the files the rebuild did not read.
+void rebuild_ends(Core &core) {
+    const uint32_t storage = core.rebuild - 1;
+    if (core.checker != nullptr) {
+        core.checker->file.close();
+    }
+    core.check_header_read = 0;
+    if (core.rebuild_open) {
+        core.host.remove(core.host.ctx, kNewPageNames[storage][core.rebuild_page]);
+    }
+    // The new pages already written go too: without their record they are never read.
+    for (uint32_t page = 0; page < core.rebuild_page && page < kCatalogPages; ++page) {
+        uint16_t count = 0;
+        uint32_t crc = 0;
+        kept_page(core, page, &count, &crc);
+        if (count != 0) {
+            core.host.remove(core.host.ctx, kNewPageNames[storage][page]);
+        }
+    }
+    core.rebuild = 0;
+    core.rebuild_open = 0;
+    if (storage == kInternal) {
+        check_takes_up(core);
+    } else {
+        core.drive_check_at = 0;
+    }
+}
+
+// Whether the file or place `at` is one the rebuild reads on its page.
+bool rebuild_takes(const Core &core, uint32_t storage, uint32_t at, uint32_t page) {
+    if (storage == kInternal) {
+        const FileInfo &info = core.files[at];
+        uint32_t length = 0;
+        while (info.name[length] != '\0') {
+            ++length;
+        }
+        return info.fault == kNone && catalog_name_allowed(info.name, length) && catalog_page_of(info.name, length) == page;
+    }
+    return core.drive[at].state == kDriveToCheck && core.order_hash != nullptr && (core.order_hash[at] & 15u) == page;
+}
+
+// Writes one line of the page being made: its new file is opened at its first line.
+bool rebuild_line(Core &core, uint32_t storage, const char *name, uint32_t crc, uint32_t bytes, uint64_t total_ms, uint8_t type) {
+    const odrig_host &host = core.host;
+    if (!core.rebuild_open) {
+        if (host.write_open(host.ctx, kNewPageNames[storage][core.rebuild_page]) != 1) {
+            return false;
+        }
+        core.rebuild_open = 1;
+    }
+    uint32_t length = 0;
+    put_hex(core, &length, crc, 8);
+    put(core, &length, " ");
+    put_number(core, &length, bytes);
+    put(core, &length, " ");
+    put_number(core, &length, core.width);
+    put(core, &length, " ");
+    put_number(core, &length, core.height);
+    put(core, &length, " ");
+    put_number(core, &length, total_ms);
+    put(core, &length, " ");
+    put(core, &length, type_name(type));
+    put(core, &length, " ");
+    put(core, &length, name);
+    put(core, &length, "\n");
+    for (uint32_t at = 0; at < length; ++at) {
+        core.rebuild_crc = crc_add(core.rebuild_crc, core.chunk[at]);
+    }
+    ++core.rebuild_lines;
+    return host.write(host.ctx, core.chunk, length) == 1;
+}
+
+// The page is done: its file closed, or a stale new page removed when it has no line.
+bool rebuild_close_page(Core &core, uint32_t storage) {
+    const odrig_host &host = core.host;
+    if (core.rebuild_open) {
+        core.rebuild_open = 0;
+        if (host.write_close(host.ctx) != 1) {
+            host.remove(host.ctx, kNewPageNames[storage][core.rebuild_page]);
+            return false;
+        }
+        keep_page(core, core.rebuild_page, core.rebuild_lines, crc_value(core.rebuild_crc));
+    } else {
+        keep_page(core, core.rebuild_page, 0, 0);
+        if (host.remove(host.ctx, kNewPageNames[storage][core.rebuild_page]) == -1) {
+            return false;
+        }
+    }
+    ++core.rebuild_page;
+    core.rebuild_at = 0;
+    core.rebuild_lines = 0;
+    core.rebuild_crc = kCrcStart;
+    return true;
+}
+
+// The last page is done: the marker and the commit record for every page, and the finishing.
+bool rebuild_commit(Core &core, uint32_t storage) {
+    const Place place = {storage, true};
+    Marker marker;
+    const uint8_t old = read_marker_of(core, place, kMarkerNames[storage], marker);
+    const uint32_t generation = old == kCatalogOk ? (marker.generation == 0xFFFFFFFFu ? 1 : marker.generation + 1) : 1;
+    // The page summaries are taken from the chunk before the marker's text overwrites it.
+    uint32_t entries = 0;
+    for (uint32_t page = 0; page < kCatalogPages; ++page) {
+        kept_page(core, page, &marker.counts[page], &marker.crcs[page]);
+        entries += marker.counts[page];
+    }
+    marker.generation = generation;
+    const uint32_t marker_length = marker_text(core, marker);
+    uint32_t marker_crc = kCrcStart;
+    for (uint32_t at = 0; at < marker_length; ++at) {
+        marker_crc = crc_add(marker_crc, core.chunk[at]);
+    }
+    if (!write_whole(core, kNewMarkerNames[storage], marker_length)) {
+        return false;
+    }
+    uint32_t length = 0;
+    put(core, &length, "odrig-catalog-do 1 generation ");
+    put_hex(core, &length, generation, 8);
+    put(core, &length, "\npages ffff\n");
+    uint32_t crc = kCrcStart;
+    for (uint32_t at = 0; at < length; ++at) {
+        crc = crc_add(crc, core.chunk[at]);
+    }
+    put(core, &length, "crc ");
+    put_hex(core, &length, crc_value(crc), 8);
+    put(core, &length, "\n");
+    if (!write_whole(core, kRecordNames[storage], length)) {
+        return false;
+    }
+    finish(core, place);
+    CatalogState &catalog = core.catalogs[storage];
+    catalog.state = kCatalogOk;
+    catalog.detail = 0;
+    catalog.generation = generation;
+    catalog.entries = static_cast<uint16_t>(entries);
+    if (storage == kInternal) {
+        // A file whose name the catalog cannot hold is checked as without a catalog.
+        check_takes_up(core);
+    }
+    if (storage == kExternal) {
+        // The drive's marker is now this one: the look does not take it for another.
+        core.catalog_marker_crc = crc_value(marker_crc);
+        core.catalog_looked = core.latest;
+        core.drive_check_at = core.drive_count;
+        order_reload(core);
+    }
+    return true;
+}
+
+// A storage call of the rebuild failed: it ends, and the catalog stays as it was.
+void rebuild_failed(Core &core) {
+    if (core.host.log != nullptr) {
+        core.host.log(core.host.ctx, "catalog rebuild failed: storage-error");
+    }
+    rebuild_ends(core);
+}
+
+}  // namespace
+
+uint32_t catalog_rebuild(Core &core, uint32_t storage, Reply &reply) {
+    if (core.upload.state != kUploadNone || core.rebuild != 0 || core.mapping_test || catalog_drive_loading(core)) {
+        return refuse(reply, "busy");
+    }
+    if (!storage_changes(core) || core.checker == nullptr || core.host.read_at == nullptr) {
+        return refuse(reply, "read-only");
+    }
+    if (storage == kExternal &&
+        (core.drive == nullptr || core.drive_number == 0 || core.host.drive_writable == nullptr || core.host.drive_list == nullptr ||
+         core.host.drive_bind == nullptr || core.host.drive_writable(core.host.ctx, core.drive_number) != 1)) {
+        return refuse(reply, "read-only");
+    }
+    // A change that a failed call left is finished first: its record must not finish later
+    // on the pages the rebuild writes.
+    if (!catalog_settle(core, storage)) {
+        return refuse(reply, "storage-error");
+    }
+    drive_check_yields(core);
+    core.checker->file.close();
+    core.check_header_read = 0;
+    uint32_t total = 0;
+    if (storage == kInternal) {
+        // The check after the start gives way: the rebuild reads every file.
+        core.check_done = 1;
+        for (uint32_t file = 0; file < core.file_count; ++file) {
+            const FileInfo &info = core.files[file];
+            uint32_t length = 0;
+            while (info.name[length] != '\0') {
+                ++length;
+            }
+            total += info.fault == kNone && catalog_name_allowed(info.name, length) ? 1 : 0;
+        }
+    } else {
+        // The drive's animations go; its folder is listed once, and each file joins again
+        // as the rebuild reads it.
+        core.drive_count = 0;
+        player_drive_changed(core);
+        drive_take_listed(core);
+        core.drive_check_at = core.drive_count;
+        core.catalogs[kExternal].state = kCatalogNone;
+        total = core.drive_count;
+    }
+    core.rebuild = static_cast<uint8_t>(1 + storage);
+    core.rebuild_page = 0;
+    core.rebuild_open = 0;
+    core.rebuild_at = 0;
+    core.rebuild_read = 0;
+    core.rebuild_total = static_cast<uint16_t>(total);
+    core.rebuild_lines = 0;
+    core.rebuild_crc = kCrcStart;
+    return succeed(reply);
+}
+
+uint32_t catalog_cancel(Core &core, Reply &reply) {
+    if (core.rebuild != 0) {
+        rebuild_ends(core);
+    }
+    return succeed(reply);
+}
+
+void catalog_drive_went(Core &core) {
+    if (core.rebuild == 1 + kExternal) {
+        // The drive is gone: its page is given up as it is, and is never read without a
+        // record.
+        if (core.rebuild_open) {
+            core.host.write_close(core.host.ctx);
+            core.rebuild_open = 0;
+        }
+        rebuild_ends(core);
+    }
+}
+
+void catalog_rebuild_step(Core &core) {
+    const uint32_t storage = core.rebuild - 1;
+    if (core.rebuild_page >= kCatalogPages) {
+        if (!rebuild_commit(core, storage)) {
+            rebuild_failed(core);
+            return;
+        }
+        core.rebuild = 0;
+        return;
+    }
+    const uint32_t count = storage == kInternal ? core.file_count : core.drive_count;
+    while (core.rebuild_at < count && !rebuild_takes(core, storage, core.rebuild_at, core.rebuild_page)) {
+        ++core.rebuild_at;
+    }
+    if (core.rebuild_at >= count) {
+        if (!rebuild_close_page(core, storage)) {
+            rebuild_failed(core);
+        }
+        return;
+    }
+    const uint32_t at = core.rebuild_at;
+    const char *name = core.files[at < core.file_count ? at : 0].name;
+    if (storage == kExternal) {
+        drive_file_name(at, core.drive_check_name);
+        name = core.drive_check_name;
+    }
+    Reason reason = kNone;
+    uint32_t record = 0;
+    const StepOutcome outcome = check_file_step(core, name, &reason, &record);
+    if (outcome == kStepGoingOn) {
+        return;
+    }
+    ++core.rebuild_read;
+    ++core.rebuild_at;
+    if (outcome == kStepFault) {
+        if (storage == kInternal) {
+            quarantine_file(core, at, reason, kWorkStart, record, core.checker->decoder.body_read);
+        } else {
+            core.drive[at].state = kDriveLeftOut;
+            drive_left_out(core, at, reason);
+        }
+        return;
+    }
+    const uint32_t bytes = core.checker->file.taken;
+    const uint32_t crc = crc_value(core.checker->file.crc);
+    const uint64_t total = core.check_total_ms;
+    const uint8_t type = core.check_content.type;
+    bool written = true;
+    if (storage == kInternal) {
+        FileInfo &info = core.files[at];
+        info.bytes = bytes;
+        info.total_ms = total;
+        info.type = type;
+        info.checked = kCheckedFromCatalog;
+        written = rebuild_line(core, storage, info.name, crc, bytes, total, type);
+    } else {
+        DriveEntry &entry = core.drive[at];
+        entry.bytes = bytes;
+        entry.total_ms = drive_length(total);
+        entry.type = type & 0x0F;
+        entry.state = kDriveInPlaylist;
+        player_drive_joined(core, at);
+        char given[kCatalogNameMost + 1];
+        uint32_t length = 0;
+        if (core.host.drive_name(core.host.ctx, core.drive_number, at, given, sizeof given) == 1) {
+            while (given[length] != '\0') {
+                ++length;
+            }
+            // A file whose name a catalog cannot hold plays now, and is not in the catalog.
+            if (catalog_name_allowed(given, length)) {
+                written = rebuild_line(core, storage, given, crc, bytes, total, type);
+            }
+        }
+    }
+    if (!written) {
+        rebuild_failed(core);
+    }
+}
+
 uint32_t catalog_reply(const Core &core, Reply &reply) {
     reply.text("{\"ok\":true,\"internal\":");
     write_state(core.catalogs[kInternal], reply);
@@ -1364,7 +1708,16 @@ uint32_t catalog_reply(const Core &core, Reply &reply) {
         reply.text(",\"writable\":");
         reply.text(core.host.drive_writable != nullptr && core.host.drive_writable(core.host.ctx, core.drive_number) == 1 ? "true" : "false");
     }
-    reply.text("},\"rebuild\":null}\n");
+    reply.text("},\"rebuild\":");
+    if (core.rebuild == 0) {
+        reply.text("null}\n");
+        return reply.length;
+    }
+    reply.text(core.rebuild == 1 + kInternal ? "{\"storage\":\"internal\",\"read\":" : "{\"storage\":\"external\",\"read\":");
+    reply.number(core.rebuild_read);
+    reply.text(",\"to_read\":");
+    reply.number(core.rebuild_total > core.rebuild_read ? core.rebuild_total - core.rebuild_read : 0);
+    reply.text("}}\n");
     return reply.length;
 }
 

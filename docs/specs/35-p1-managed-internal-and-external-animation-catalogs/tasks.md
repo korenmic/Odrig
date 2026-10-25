@@ -90,7 +90,7 @@ Rules for every task:
     of the card leave the same files, byte for byte.
   - Prove it fails first.
 
-- [ ] 8. The core: rebuild and import
+- [x] 8. The core: rebuild and import
   - `catalog rebuild internal|external`, `catalog cancel`, the progress in `catalog`,
     `busy` for changes while a page is written; the check after the start and the legacy
     drive check give way to a rebuild and take up what it left.

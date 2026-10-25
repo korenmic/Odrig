@@ -414,6 +414,19 @@ struct Core {
     uint32_t catalog_expected_crc;
     uint32_t catalog_marker_crc;
     uint64_t catalog_looked;
+
+    // A rebuild of a catalog: 0 for none, 1 + the storage's catalog it makes; the page it
+    // writes, whether that page's new file is open, the file or the place it is at, the files
+    // read and those to read, and the page's lines and running CRC-32. Each page's count and
+    // CRC-32 wait at the end of the chunk buffer, from kRebuildPages on.
+    uint8_t rebuild;
+    uint8_t rebuild_page;
+    uint8_t rebuild_open;
+    uint16_t rebuild_at;
+    uint16_t rebuild_read;
+    uint16_t rebuild_total;
+    uint16_t rebuild_lines;
+    uint32_t rebuild_crc;
 };
 
 // Keeps the context of a file's fault, in place of the one before.
@@ -446,6 +459,16 @@ const uint32_t kCheckLeastRate = 30;
 
 // Whether the check after the start has read every file of the show to its end.
 bool check_complete(const Core &core);
+
+// What one step of the check of a file came to.
+enum StepOutcome { kStepGoingOn, kStepWhole, kStepFault };
+
+// One step of the check of a file through the second decoders: its header and canvas, one
+// frame record, its end, after which nothing may follow, or one slice of the settling of a
+// defect, after which the same step is taken again. When the file is whole, its size is the
+// bytes the second source took and its length the sum of the durations; when it has a
+// fault, `reason` says which, and `record` the frame record it was at.
+StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32_t *record);
 
 // Whether a file of the drive waits for the check, which may take it while no upload holds
 // the second decoders.

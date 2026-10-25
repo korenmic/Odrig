@@ -651,3 +651,8 @@ are in [format.md](format.md), "Measured sizes".
   10 seconds. New: `upload begin external <file> <bytes> [<crc32>]`, the reply member `id`
   of its `upload end`, `remove <id>` of a writable card's animation, `"read_only":false` in
   `space`, and the error code `read-only`, approved in advance by the owner.
+- 2026-10-25: Seed 35: a rebuild of a catalog on the board. New: `catalog rebuild internal`,
+  `catalog rebuild external`, `catalog cancel`, and the reply member `rebuild` of `catalog`
+  with `storage`, `read` and `to_read`, approved in advance by the owner on 2026-10-24. A
+  rebuild reads the files with the check's steps and commits at the end; the changes of
+  storage are `busy` while it runs, and readiness counts its files.

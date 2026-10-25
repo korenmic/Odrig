@@ -10144,3 +10144,33 @@ failure at every call of the internal changes comes with this task's.
 `core/src/storage.cpp`; `tests/core/test_catalog_writes.py`,
 `tests/core/test_catalog_changes.py`; `docs/commands.md`, "Catalogs"; `docs/catalog.md`,
 "A change".
+
+## Seed 35: a rebuild on the board
+
+**Question.** `catalog rebuild internal|external` reads every animation with the check's
+steps and commits the catalog at the end, and `catalog cancel` ends it. Where do the
+pages' counts and CRC-32s wait while the rebuild goes page by page, what is left on the
+storage by a cancel, a failed call or a drive pulled out, which files does a rebuild of
+the board's storage take while the catalog cannot hold every name the show may have, and
+what does the check after the start do after it?
+
+**Answer.** The count and the CRC-32 of each page wait at the end of the chunk buffer, six
+bytes a page from byte 1,400, which nothing else uses while a rebuild runs, as every
+command that writes storage is `busy` meanwhile; the core object grows by 16 bytes for the
+rebuild's own fields, measured: the target file 125,341 bytes, 129,821 with a drive. A
+cancel, a storage call that fails and a drive pulled out end the rebuild without its
+commit: the page being written and the pages written before it are removed, and on a drive
+that is gone they stay, never read without a record. A rebuild first finishes a change
+that a failed call left, as every change does, and is `storage-error` when it cannot. A
+rebuild of the board's storage takes the show's files whose names a catalog may hold; the
+check after the start gives way while it runs and takes up after it, or after a cancel,
+every file that is neither read nor quarantined. A rebuild of the drive drops its places,
+lists the folder once and gives each file its id and its place in the saved order as a
+plug-in without a catalog does; a file joins as it is read. Readiness is `checking` with
+the rebuild's files read and to read while it runs, and the file it reads.
+
+**Resolution.** `core/src/catalog.cpp` (`catalog_rebuild`, `catalog_cancel`,
+`catalog_rebuild_step`, `catalog_drive_went`), `core/src/core.cpp` (`check_file_step`
+shared with the rebuild), `core/src/commands.cpp` (the routes, `busy`, readiness);
+`tests/core/test_catalog_rebuild.py`; `docs/commands.md`, "Catalogs"; `docs/core.md`,
+"Readiness" and "Memory".

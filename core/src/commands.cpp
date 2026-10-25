@@ -29,6 +29,18 @@ Readiness readiness_of(const Core &core) {
     if (core.invalid) {
         return counts;
     }
+    if (catalog_rebuilding(core)) {
+        // A rebuild's files: those it read and those it has still to read.
+        counts.checked = core.rebuild_read;
+        counts.to_check = core.rebuild_total > core.rebuild_read ? core.rebuild_total - core.rebuild_read : 1;
+        for (uint32_t item = 0; item < core.item_count; ++item) {
+            const ItemInfo &info = core.items[item];
+            if (!info.is_cycle && core.files[info.first].fault != kNone) {
+                ++counts.unavailable;
+            }
+        }
+        return counts;
+    }
     for (uint32_t file = 0; file < core.file_count; ++file) {
         const FileInfo &info = core.files[file];
         if (info.checked || info.fault != kNone) {
@@ -45,7 +57,10 @@ Readiness readiness_of(const Core &core) {
     }
     for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
         const uint8_t state = core.drive[place].state;
-        if (state == kDriveToCheck) {
+        if (state == kDriveGone) {
+            continue;
+        }
+        if (state == kDriveToCheck || state == kDriveStaged) {
             ++counts.to_check;
         } else {
             ++counts.checked;
@@ -55,8 +70,30 @@ Readiness readiness_of(const Core &core) {
     return counts;
 }
 
-// Writes the name of the file the check is at, as a JSON string, or null.
+// Writes the name of the file the check is at, as a JSON string, or null: of a rebuild the
+// file it is at, and `catalog` while a drive's catalog is read.
 void checking_of(const Core &core, Reply &reply) {
+    if (!core.invalid && catalog_rebuilding(core)) {
+        const uint32_t at = core.rebuild_at;
+        char name[kFaultNameSize];
+        if (core.rebuild == 1 + kInternal && at < core.file_count) {
+            reply.text("\"");
+            reply.text(core.files[at].name);
+            reply.text("\"");
+            return;
+        }
+        if (core.rebuild == 1 + kExternal && at < core.drive_count) {
+            drive_given_name(core, at, name, sizeof name);
+            reply.text("\"");
+            reply.escaped(name);
+            reply.text("\"");
+            return;
+        }
+    }
+    if (!core.invalid && catalog_drive_loading(core) && check_complete(core)) {
+        reply.text("\"catalog\"");
+        return;
+    }
     if (!core.invalid && !check_complete(core) && core.check_at < core.file_count) {
         reply.text("\"");
         reply.text(core.files[core.check_at].name);
@@ -368,15 +405,25 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         uint32_t revision;
         if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision)) {
+            if (catalog_rebuilding(core)) return refuse(reply, "busy");
             return mapping_set(core, revision, words.text[3], words.size[3], reply);
         }
         return refuse(reply, "bad-argument");
     }
     if (words.is(0, "catalog")) {
-        if (words.count != 1) {
-            return refuse(reply, "bad-argument");
+        if (words.count == 1) {
+            return catalog_reply(core, reply);
         }
-        return catalog_reply(core, reply);
+        if (words.count == 2 && words.is(1, "cancel")) {
+            return catalog_cancel(core, reply);
+        }
+        if (words.count == 3 && words.is(1, "rebuild") && (words.is(2, "internal") || words.is(2, "external"))) {
+            if (core.invalid) {
+                return refuse(reply, "show-invalid");
+            }
+            return catalog_rebuild(core, words.is(2, "internal") ? kInternal : kExternal, reply);
+        }
+        return refuse(reply, "bad-argument");
     }
     if (words.is(0, "status")) {
         if (words.count != 1) {
@@ -471,6 +518,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         uint32_t revision, id, before = 0;
         if (words.count == 5 && words.is(1, "move") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) && number_word(words, 3, 1, 65535, &id) &&
             (words.is(4, "end") || number_word(words, 4, 1, 65535, &before))) {
+            if (!core.invalid && catalog_rebuilding(core)) return refuse(reply, "busy");
             return order_move(core, revision, id, before, reply);
         }
         return refuse(reply, "bad-argument");
@@ -490,7 +538,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         uint32_t id, value;
         if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
         if (core.invalid) return refuse(reply, "show-invalid");
-        if (core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_ignore(core, id, value != 0, reply);
     }
     if (words.is(0, "remove") && words.count == 3 && words.is(1, "many")) {
@@ -510,7 +558,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             }
         }
         if (core.invalid) return refuse(reply, "show-invalid");
-        if (core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_remove_many(core, ids, count, reply);
     }
     if (words.is(0, "remove")) {
@@ -521,11 +569,11 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_remove(core, id, reply);
     }
     if (words.is(0, "upload")) {
-        if (core.mapping_test) return refuse(reply, "busy");
+        if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");
         return upload(core, now, words, reply);
     }
     return refuse(reply, "unknown-command");

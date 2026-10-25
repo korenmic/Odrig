@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "commands.h"
+#include "container.h"
 #include "core_state.h"
 
 namespace odrig {
@@ -119,6 +120,26 @@ bool catalog_install_external(Core &core, uint16_t *id);
 // Removes the drive's animation at a place: one commit takes its entry out and removes its
 // file, and the place is free. False on a failed storage call.
 bool catalog_remove_external(Core &core, uint32_t place);
+
+// `catalog rebuild internal` and `catalog rebuild external`: reads every animation of the
+// storage with the check's steps and commits its catalog anew at the end. `busy` while an
+// upload is open, a test shows, a rebuild runs or the drive's catalog is read; `read-only` on
+// a host that cannot change the storage.
+uint32_t catalog_rebuild(Core &core, uint32_t storage, Reply &reply);
+
+// `catalog cancel`: ends a rebuild, and the catalog stays as it was.
+uint32_t catalog_cancel(Core &core, Reply &reply);
+
+// Whether a rebuild runs.
+inline bool catalog_rebuilding(const Core &core) {
+    return core.rebuild != 0;
+}
+
+// One step of a rebuild, in the schedule of the check after the start.
+void catalog_rebuild_step(Core &core);
+
+// The drive went or another came: a rebuild of its catalog ends.
+void catalog_drive_went(Core &core);
 
 // The reply to `catalog`.
 uint32_t catalog_reply(const Core &core, Reply &reply);

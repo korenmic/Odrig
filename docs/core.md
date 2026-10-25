@@ -471,7 +471,9 @@ with its input line `fault`.
 `status` says how far the check after the start is, from the core's own tables: the files
 whose check has ended, by being read whole or by a fault, and those still to read, of the
 show (a file once however many items name it) and of a drive; the animations unavailable;
-and the name of the file the check is at. From these it gives the readiness: `checking`
+and the name of the file the check is at. While a rebuild runs, the files it has read and
+those it has still to read take their place, and the file it reads; while a drive's catalog
+is read, the file is `catalog`. From these it gives the readiness: `checking`
 while a file is still to read, `degraded` when none is and an animation is unavailable,
 `ready` otherwise, and `recovery` for an invalid show. Nothing is decoded for it. The
 command `fault` gives the fault's context of "Bounded work". [commands.md](commands.md)
@@ -744,7 +746,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,792 |
+| The core object | fixed | 3,808 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -761,17 +763,17 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,325** |
+| **Total** | | **125,341** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,802 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,818 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,529 bytes for the target file. A host with a drive
+of the check and the saved order: 77,545 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 129,805 bytes, 99 percent. The size and the number of frames
+each place, 768. With it the target file takes 129,821 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

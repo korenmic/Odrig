@@ -28,6 +28,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
+| `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
+| `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
 | `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
@@ -69,11 +71,11 @@ A number in a command is written in decimal digits.
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 | `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
-| `readiness` | `checking` while the player still reads files after a start, `degraded` when it has read them all and one or more animations are unavailable, `ready` when it has read them all and none is, and `recovery` while the show is invalid. What plays is said by `playing` and `animation`, whatever the readiness. |
-| `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. |
-| `to_check` | The files it has still to read. No time is given for them. |
+| `readiness` | `checking` while the player still reads files after a start, while a rebuild reads them and while a drive's catalog is read, `degraded` when it has read them all and one or more animations are unavailable, `ready` when it has read them all and none is, and `recovery` while the show is invalid. What plays is said by `playing` and `animation`, whatever the readiness. |
+| `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. While a rebuild runs, the files it has read. |
+| `to_check` | The files it has still to read, or that a rebuild has still to read. No time is given for them. |
 | `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
-| `checking` | The name of the file the player reads now, or `null`. |
+| `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
 | `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
 
@@ -300,7 +302,7 @@ succeeds.
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
+| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
@@ -414,7 +416,8 @@ catalog
   catalog; the start opens them and the check after the start reads them, as without a
   catalog.
 - `writable`: whether the core may write the drive, when one is plugged in.
-- `rebuild`: `null` while no rebuild runs.
+- `rebuild`: `null` while no rebuild runs; during one, `{"storage":"internal","read":12,"to_read":72}`:
+  the storage, the files it has read and those it has still to read.
 
 At the start the core reads the internal catalog. Every file of the show that it has an
 entry for has its size in `list` at once and is neither opened nor read by the check after
@@ -422,6 +425,25 @@ the start; an entry for another canvas than the mapping's makes its file unavail
 `size-mismatch`. A damaged or incompatible catalog is logged (`catalog internal damaged`,
 `catalog internal incompatible`) and its storage is read as without one. A change of the
 catalog that a cut interrupted after its commit is finished first.
+
+**`catalog rebuild internal`** reads every file of the show whose name a catalog may hold,
+page by page, with the steps of the check after the start, and writes the board's catalog
+anew at the end in one commit, generation one more than the old one's, or 1: the same
+files the PC tool's rebuild writes of the same files. A file that passes gets its size and
+length at once; one that fails is quarantined, as by the check. The check after the start
+gives way while it runs and takes up after it the files it did not read. **`catalog
+rebuild external`** does the same for the drive: its places go, the folder is listed once,
+and each file joins the playlist as it is read, or is left out; at the end the drive's
+catalog is `ok`. Both answer `{"ok":true}` when the rebuild begins, and `catalog` shows its
+progress. Refused with `bad-argument` for another word, `show-invalid`, `busy` while an
+upload is open, a test shows, a rebuild runs or the drive's catalog is read, `read-only` on
+a host that cannot change its storage, and for `external` without a drive the core may
+write, and `storage-error` when a change that a failed call left cannot be finished first.
+While a rebuild runs, every command that writes storage is `busy`. A storage call that
+fails ends it, logged as `catalog rebuild failed: storage-error`, with the catalog as it
+was; a drive pulled out ends it too. **`catalog cancel`** ends a rebuild: the pages it
+wrote are removed, the catalog is as it was, and what the files read taught the core stays.
+It is `{"ok":true}` also without a rebuild.
 
 A drive with a catalog is `loading` from its plug-in until every page is read; its
 animations then join `list` together. One without a catalog is `none` and is listed and
