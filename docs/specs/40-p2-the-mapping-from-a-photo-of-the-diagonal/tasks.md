@@ -24,7 +24,7 @@ Rules for every task:
   - Prove it fails first: the module does not exist; the scenario's import fails.
   - Requirements: 1.3, 2.1 to 2.6, 4.1, 4.2, 5.1
 
-- [ ] 2. The screen
+- [x] 2. The screen
   - `app/www/screens/photomap.js`; `index.html`, `style.css`, `main.js`;
     `screens/mapping.js` exports `latest()` and `saveFromPhoto(pins)`.
   - Tests, `tests/app/test_photo.py` and `tests/app/page/scenarios/photomap.js`: the

@@ -14,7 +14,7 @@ function shows(pins, p) {
 // a dark room, the diagonal's stubs of the mapping, the dead positions dark, turned and
 // slanted, blurred and grainy. `flash` lights every lens as a flash does; `spots` adds
 // bright spots off the grid. Gives the canvas.
-function photoCanvas(app, {pins = DEFAULTS, dead = [], spots = 0, angle = 0, skew = 0, squeeze = 1, blur = 1.2, grain = 6, flash = false, width = 640, height = 400} = {}) {
+export function photoCanvas(app, {pins = DEFAULTS, dead = [], spots = 0, angle = 0, skew = 0, squeeze = 1, blur = 1.2, grain = 6, flash = false, width = 640, height = 400} = {}) {
   const doc = app.doc;
   const pitch = 8;
   const side = 60 * pitch;

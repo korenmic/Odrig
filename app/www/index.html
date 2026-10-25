@@ -217,6 +217,27 @@
 <div id="mapping-rows"></div>
 <button id="mapping-defaults" type="button" disabled>Restore defaults</button>
 <button id="mapping-reload" type="button">Reload</button>
+<div id="photo-take" hidden>
+<h3>From a photo</h3>
+<p class="small">One photo of the wall with the diagonal showing tells which snake each position drives: the app reads it and offers the mapping that puts every position right. A snake that does not light is put where a place remains.</p>
+<p id="photo-advice" class="small"></p>
+<button id="show-diagonal" type="button" hidden>Show the diagonal</button>
+<button id="from-photo" type="button" class="primary">From a photo</button>
+<input id="photo" type="file" accept="image/*" hidden>
+<p id="photo-error" role="alert" hidden></p>
+</div>
+<div id="photo-result" hidden>
+<canvas id="photo-preview"></canvas>
+<ul id="photo-words"></ul>
+<p id="photo-said" role="status" hidden></p>
+<p id="photo-choices-note" class="small" hidden>The photo fits more than one reading. Only the wall tells them apart: which end strip is dark, and after Apply whether the diagonal begins at the bottom left.</p>
+<div id="photo-choices" class="choices" hidden></div>
+<div class="pair">
+<button id="photo-apply" type="button" class="primary">Apply</button>
+<button id="photo-discard" type="button">Discard</button>
+</div>
+<button id="photo-other" type="button" hidden>Other reading</button>
+</div>
 <p class="small">To check the wiring, turn on Show test animations and use the Tests group of Animations: the diagonal and one test for each snake, through the saved mapping. Only a person looking at the LEDs can judge them.</p>
 </div>
 </section>

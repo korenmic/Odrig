@@ -236,7 +236,7 @@ async function pump() {
       live.confirmed = pins;
       live.revision = revisionOf(pins);
       const snake = pins.indexOf(live.moved) + 1;
-      note = live.moved === null ? "Saved: the default assignment." : `Saved: GPIO ${live.moved} drives snake ${snake}.`;
+      note = live.moved === null ? "Saved: the default assignment." : live.moved === "photo" ? "Saved from the photo." : `Saved: GPIO ${live.moved} drives snake ${snake}.`;
     } catch (error) {
       if (asked !== version || live === null) return;
       problem = explanation(error);
@@ -400,6 +400,25 @@ function drop() {
   // The pin stays where it was let go: its last place was saved, or is being saved.
   if (live !== null && !live.sending) finish();
   else draw();
+}
+
+// The mapping as the target last gave it, or null.
+export function mapping() {
+  return latest;
+}
+
+// Whether a save is under way.
+export function saving() {
+  return live !== null;
+}
+
+// Saves an assignment read from a photo as a drag saves one; false when none can be saved
+// now.
+export function saveFromPhoto(pins) {
+  if (locked() || live !== null) return false;
+  note = "";
+  want(pins, "photo");
+  return true;
 }
 
 export function showing(shown) {
