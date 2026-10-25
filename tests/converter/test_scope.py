@@ -15,7 +15,7 @@ LIBRARY = {
 }
 # The tools, which run no converter logic, and what of the library they may read with.
 TOOLS = ("emulator", "odrigctl", "preview", "firmware/fwtool")
-READING = {"odrig", "odrig.errors", "odrig.files", "odrig.strictjson", "odrig.mapping", "odrig.show", "odrig.odrg", "odrig.catalog"}
+READING = {"odrig", "odrig.errors", "odrig.files", "odrig.strictjson", "odrig.mapping", "odrig.show", "odrig.odrg", "odrig.odrgx", "odrig.catalog"}
 
 # Modules that open a network connection or a serial port.
 FORBIDDEN_MODULES = (
