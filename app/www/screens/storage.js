@@ -1,5 +1,6 @@
 // Upload: making an animation from a video or a GIF of the phone for the canvas of the
-// target, and uploading it as a new animation.
+// target, and uploading it as a new animation, to the card when the target may write it
+// and the operator keeps that choice, else to the board's own storage.
 
 import * as capacity from "../capacity.js";
 import * as client from "../client.js";
@@ -28,9 +29,22 @@ let made = null;
 let previewTimer = null;
 // The upload under way, or null.
 let sending = null;
+// Where an upload goes while the card can be written: "card", as at first, or "board".
+let storeOn = "card";
 
 function byId(id) {
   return document.getElementById(id);
+}
+
+function say(id, text) {
+  const place = byId(id);
+  place.textContent = text === null ? "" : text;
+  place.hidden = text === null;
+}
+
+function chooseStore(where) {
+  storeOn = where;
+  draw(client.state);
 }
 
 // Whether an upload cannot begin now: one is under way, a deletion runs, or the target
@@ -40,9 +54,18 @@ function locked() {
 }
 
 function draw(state) {
+  const writable = capacity.cardWritable(state.space);
   byId("upload-space").textContent = `Internal storage: ${capacity.internal(state.space, undefined)}`;
+  say("upload-card-space", writable ? capacity.external(state.space, undefined) : null);
+  byId("store-on").hidden = !writable;
+  for (const where of ["card", "board"]) {
+    const button = byId(`store-${where}`);
+    button.setAttribute("aria-pressed", String(storeOn === where));
+    button.disabled = sending !== null;
+  }
   byId("upload-made").disabled = locked();
   byId("upload-space").classList.toggle("stale", state.link === "no-answer");
+  byId("upload-card-space").classList.toggle("stale", state.link === "no-answer");
 }
 
 // Milliseconds of a field, or null for an empty field where `empty` allows it. A text
@@ -112,20 +135,23 @@ function forget() {
   byId("uploading").hidden = true;
 }
 
-// Uploads the animation that was made, as a new item with the lowest free id and a file
-// name made from the media's name.
+// Uploads the animation that was made, with a file name made from the media's name: to
+// the card, which gives it its id, when the target may write the card and the operator
+// keeps that choice; otherwise as a new item of the board's own storage with the lowest
+// free id, when it fits there.
 function upload(message) {
   if (made === null || locked()) {
     return;
   }
   const state = client.state;
   const bytes = made.bytes;
-  if (state.space !== null && !fits(bytes.length, state.space.free)) {
+  const external = storeOn === "card" && capacity.cardWritable(state.space);
+  if (!external && state.space !== null && !fits(bytes.length, state.space.free)) {
     message(messages.ofNoSpace(bytes.length, state.space.free));
     return;
   }
   const listed = state.animations === null ? [] : state.animations;
-  const id = freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
+  const id = external ? null : freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
   const file = fileName(made.file.name, new Set(listed.map((animation) => animation.file)));
   const shown = byId("uploading");
   shown.hidden = false;
@@ -133,7 +159,7 @@ function upload(message) {
   byId("upload-made").hidden = true;
   byId("cancel-upload").hidden = false;
   sending = uploading(
-    {id, file, bytes},
+    {id, file, bytes, external},
     {
       report(part, speed) {
         shown.textContent = `Sending: ${Math.floor(part * 100)}%, ${Math.round(speed / 1000)} KB a second`;
@@ -144,13 +170,16 @@ function upload(message) {
         byId("cancel-upload").hidden = true;
         if (how.done) {
           shown.hidden = true;
-          message(messages.ofUploaded(id, file));
+          message(messages.ofUploaded(external ? how.id : id, file, external));
         } else if (how.cancelled) {
           shown.textContent = "Cancelled.";
         } else {
           shown.hidden = true;
           const error = how.error;
-          if (error instanceof Refusal && error.code === "no-space") {
+          if (error instanceof Refusal && error.code === "no-space" && external) {
+            const card = client.state.space === null ? null : client.state.space.external;
+            message(messages.ofNoSpace(bytes.length, card === null || card.free === null ? null : card.free, "the card"));
+          } else if (error instanceof Refusal && error.code === "no-space") {
             message(messages.ofNoSpace(bytes.length, client.state.space === null ? null : client.state.space.free));
           } else if (error instanceof Refusal) {
             message(messages.ofRefusal(error, client.state.status === null ? null : client.state.status.error));
@@ -257,5 +286,7 @@ export function start(options) {
       running.stop();
     }
   });
+  byId("store-card").addEventListener("click", () => chooseStore("card"));
+  byId("store-board").addEventListener("click", () => chooseStore("board"));
   client.watch(draw);
 }

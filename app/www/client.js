@@ -623,6 +623,19 @@ export function removeMany(ids) {
   return requestOperation("remove", () => commands.removeMany(ids));
 }
 
+// The catalogs of the target, the rebuild of one of them and its cancel.
+export function catalog() {
+  return requestOperation("catalog", () => commands.catalog());
+}
+
+export function catalogRebuild(storage) {
+  return requestOperation("catalog", () => commands.catalogRebuild(storage));
+}
+
+export function catalogCancel() {
+  return requestOperation("catalog", () => commands.catalogCancel());
+}
+
 // Moves an animation before another, or to the end with "end", in the saved order the
 // list is shown in. The list and the order are asked for again afterwards, whatever the
 // reply.

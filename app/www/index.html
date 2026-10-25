@@ -89,6 +89,7 @@
 <section id="upload" hidden>
 <h1>Upload</h1>
 <p id="upload-space" class="small">-</p>
+<p id="upload-card-space" class="small" hidden></p>
 <div class="panel">
 <label id="choose" class="button primary" for="media">Choose a video or a GIF</label>
 <input id="media" type="file" accept="video/*,image/gif" hidden>
@@ -111,6 +112,14 @@
 <div id="made" hidden>
 <canvas id="preview"></canvas>
 <p id="made-facts"></p>
+<div id="store-on" hidden>
+<p>Store on</p>
+<div class="pair" role="group" aria-label="Store on">
+<button id="store-card" type="button" aria-pressed="true">The card</button>
+<button id="store-board" type="button" aria-pressed="false">This board</button>
+</div>
+<p class="small">The board's own storage keeps one or two animations to fall back on; the others belong on the card.</p>
+</div>
 <button id="upload-made" type="button" class="primary">Upload to the installation</button>
 <p id="uploading" hidden></p>
 <button id="cancel-upload" type="button" hidden>Cancel</button>
@@ -180,6 +189,25 @@
 <h1>Settings</h1>
 <div class="panel">
 <label class="check" for="show-tests"><input id="show-tests" type="checkbox"><span><span class="title">Show test animations</span><span class="small">20 snake tests + diagonal</span></span></label>
+</div>
+<div id="catalogs" class="panel">
+<h2>Catalogs</h2>
+<p class="small">A catalog says what a storage holds, so that the installation need not read every animation at its start or when the card goes in. A rebuild reads every animation of the storage whole and writes its catalog anew.</p>
+<p id="catalog-summary" role="status" aria-live="polite">Reading the catalogs&hellip;</p>
+<p id="catalog-internal" hidden></p>
+<button id="rebuild-internal" type="button" hidden>Rebuild the board's catalog</button>
+<p id="catalog-external" hidden></p>
+<p id="catalog-external-note" class="small" hidden>The installation cannot write this card; a computer can make its catalog.</p>
+<button id="rebuild-external" type="button" hidden>Rebuild the card's catalog</button>
+<div id="rebuild-question" hidden>
+<p id="rebuild-question-text"></p>
+<div class="pair">
+<button id="rebuild-yes" type="button" class="primary">Rebuild</button>
+<button id="rebuild-no" type="button">Not now</button>
+</div>
+</div>
+<p id="rebuild-progress" role="status" aria-live="polite" hidden></p>
+<button id="rebuild-cancel" type="button" hidden>Cancel the rebuild</button>
 </div>
 <div id="mapping" class="panel">
 <h2>Mapping</h2>

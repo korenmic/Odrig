@@ -19,7 +19,8 @@ a top bar with the app's name and whether the installation answers.
   read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
   `Internal storage: 84 animations, free 6.7 MB of 13.5 MB` and
-  `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`: the board's
+  `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`, without
+  `(read-only)` while the installation can write its card: the board's
   own from `space`, the external storage's by `external` of `list`. A medium that is
   present without animations says `0 animations`; an absent one says `absent` with no
   number. While the board still reads its animations after a start, the external number
@@ -29,23 +30,28 @@ a top bar with the app's name and whether the installation answers.
   filters and the one list of animations, in the saved order of the playlist. Each row
   names its file, its id and its size, or `size not read yet` while the installation has
   not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
-  read-only), and a small `...` button that opens its menu. Cycles are not listed. An
+  read-only unless the installation can write its card), and a small `...` button that
+  opens its menu. Cycles are not listed. An
   animation that the installation found unavailable, because its file had a fault, is
   drawn grayed with its reason in words under it, such as `Unavailable: the file is
-  damaged (truncated).`, and a tap on it plays nothing; one of the external storage adds
-  `Fix it on a computer: the card is read-only here.` Its menu works as any other's. The
+  damaged (truncated).`, and a tap on it plays nothing; one of a card that the
+  installation cannot write adds `Fix it on a computer: the card is read-only here.` Its
+  menu works as any other's. The
   other animations and every other control work as ever, also when every animation is
   unavailable.
 - **Upload** makes an animation from a video or a GIF of the phone, or makes a text or a
-  clock, and uploads it, with the free internal storage above it.
-- **Settings** has the checkbox `Show test animations` and the mapping editor: the twenty
+  clock, and uploads it, with the free internal storage above it. While the installation
+  can write its card, an animation of a video or a GIF goes to the card unless
+  `This board` is chosen, and the card's free storage is there too.
+- **Settings** has the checkbox `Show test animations`, the catalogs of the board's own
+  storage and of the card with a rebuild of each, and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, names the
   installation and the last fault it met in a file, and says how the phone's requests
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty-seven command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-two command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -60,6 +66,7 @@ twenty-seven command lines and no other, each as `POST /odrig` to the address th
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
 | Confirms Delete selected | `remove many <ids>` |
 | Presses `Upload to the installation` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
+| Presses `Upload to the installation` with `The card` chosen | `upload begin external <file> <bytes>`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
 | Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
 | Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
@@ -70,6 +77,9 @@ twenty-seven command lines and no other, each as `POST /odrig` to the address th
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
 | Opens the target screen while the installation answers | `fault` |
+| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel | `catalog` |
+| Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
+| Presses `Cancel the rebuild` | `catalog cancel` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -278,16 +288,19 @@ plays, Animations says `Cycle` with its id, and `Playlist from the start` leaves
 A tap on a row plays its animation. Its `...` button opens the row's menu and plays
 nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
 playlist` when it is ignored, `Move up`, `Move down`, `Select` and `Delete`; the menu of an
-animation of the external storage has `Move up` and `Move down` and says that external
-storage is read-only. An ignored row says `Ignored` with a sign and its name is muted; it
+animation of the external storage has `Move up` and `Move down`, and `Delete` while the
+installation can write its card; otherwise it says that external storage is read-only. An ignored row says `Ignored` with a sign and its name is muted; it
 keeps its place in the order and the playlist passes over it. A change of inclusion shows
 `Saving...` on the row until the installation has confirmed it.
 
-`Delete` asks `Remove animation <id> <file> from the installation?`; `Remove it` removes
-it, and `Keep it` sends nothing. Afterwards the app says `Removed animation <id> <file>.`,
-and the list and the free storage are asked for again. An animation that a cycle plays,
-or that a USB stick holds, cannot be removed: the installation refuses it, and the app
-says why. `Select`, in the menu or above the list, starts the selection mode: a checkbox on
+`Delete` asks `Remove animation <id> <file> from the installation?`, or for an animation
+of the card `Remove animation <id> <file>? Its file is deleted from the card.`; `Remove it`
+removes it, and `Keep it` sends nothing. Afterwards the app says `Removed animation <id>
+<file>.`, and the list and the free storage are asked for again. An animation that a cycle
+plays, or that a USB stick or a card the installation cannot write holds, cannot be
+removed: the installation refuses it, and the app says why. A file of a card the
+installation can write that has a fault is deleted from its menu, or uploaded again under
+its name, which keeps its id. `Select`, in the menu or above the list, starts the selection mode: a checkbox on
 each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The
 question names the count and the files before anything is sent; the deletion goes in
 batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
@@ -365,6 +378,19 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   the list of Animations and in the playlist until it is moved, and plays when it is
   tapped.
 
+While the installation can write its card, `space` says so with `"read_only":false`, and
+Upload has `Store on` above `Upload to the installation`, with `The card`, chosen at
+first, and `This board`, and the card's free storage under the board's: the card holds the
+animations, and the board's own storage keeps one or two to fall back on. An animation for
+the card goes as `upload begin external <file> <bytes>` with the same file name, then its
+pieces and its end as above; the card gives it its id, from 60001 up, and its place in the
+playlist by its name, and the app says `Uploaded to the card as animation <id> <file>. It
+plays in the playlist.` The app does not compare its size with the card's free storage
+first: the installation refuses one that does not fit before anything is sent, and the app
+says so. While the card cannot be written, or is out, Upload has no choice and stores on
+the board, as before. Texts and clocks are stored on the board: the card's catalog holds
+`.odrg` files only.
+
 To make a text, press `Make a text` on Upload. A form opens under it: the text, written
 with English letters, digits, signs and Hebrew letters, and line feeds; its font,
 `Small`, `Medium` or `Large`; its colour and its background; its effect, `Still`,
@@ -404,7 +430,8 @@ too, with the badge `ex`, each with its id from 60001 up and its file's name on 
 medium, and a tap plays one as it plays an installed animation; see
 [show.md](show.md#animations-from-a-usb-drive). They come a moment after the drive is
 plugged in, once the installation has read them, and go about ten seconds after it is
-pulled out, when the app asks for the list again. The app has no code of its own for
+pulled out, when the app asks for the list again. Besides Upload's choice and a row's
+`Delete` while the installation can write the card, the app has no code of its own for
 them.
 
 To point the app at an emulator, write the emulator's address on the target screen and
@@ -430,6 +457,36 @@ last line of a list can be scrolled above the tabs. While the phone's keyboard i
 for a field, the tabs are hidden, so that they do not stand over the field, and the field
 stays in view; they come back when the keyboard closes. In a browser there are no bars,
 and the page keeps no room.
+
+**Catalogs.** A catalog says what a storage holds, so that the installation reads no
+animation at its start, or when the card goes in, for the files it has a catalog of; see
+[catalog.md](catalog.md). Settings' panel `Catalogs` has a line for each storage, from
+`catalog`, which the app asks when Settings is opened and every two seconds while it is
+shown:
+
+| The catalog | The line |
+|---|---|
+| `ok` | `Board: 84 animations, cataloged.`, with `; 2 more not cataloged yet` before the full stop for files of the show it has no entry for; `Card: 122 animations, cataloged.` |
+| `none` | `Board: not cataloged yet; its 84 animations are read whole at every start.`; `Card: not cataloged yet; its animations are read whole each time it goes in.` |
+| `loading` | `Card: reading its catalog.` |
+| `damaged` | `Board: catalog damaged (a page); its animations are read whole at every start until a rebuild.`, the part named `its marker`, `a page`, `a line` or `a change was cut off`; `Card: catalog damaged (...); its animations play only after a rebuild.` |
+| `incompatible` | `Board: catalog of another version; ...`, and the card's, as for a damaged one |
+| `absent` | `Card: none in the installation.` |
+
+`Rebuild the board's catalog` and `Rebuild the card's catalog` ask first, as `Rebuild the
+catalog of the board? The installation reads every animation of the board whole, which
+takes a while; it plays on meanwhile.`; `Rebuild` sends `catalog rebuild internal` or
+`catalog rebuild external`, and `Not now` sends nothing. A rebuild of a storage without a
+catalog is its first catalog. While a rebuild runs, from this phone or another controller,
+the panel says `Rebuilding the catalog of the board: 12 of 84 animations read.` with
+`Cancel the rebuild`, which ends it and leaves the catalog as it was; both buttons are off
+meanwhile. Animations says how far the installation has read, as after a start, and every
+control works; when the rebuild has ended, the list is asked for again. The card's rebuild
+needs a card the installation can write; for one it cannot, the panel says `The
+installation cannot write this card; a computer can make its catalog.`, as
+[microsd.md](microsd.md#the-catalog-made-on-a-computer) has it. A refused rebuild is said
+in the place for messages. An installation whose software keeps no catalogs says `This
+installation's software keeps no catalogs.` and is not asked again.
 
 **Mapping.** Twenty selectors name snakes 1-20 and their three columns, left to right
 when viewed from the front. Each snake starts at the bottom and runs up, down, up.
@@ -477,11 +534,15 @@ it is dismissed with `OK` or another takes its place.
 | `unknown-id` | The animation that was pressed was removed meanwhile. The list is asked for again. | Animation `<id>` is not installed any more. |
 | `unknown-id` | `Playlist from the start` on a show without an animation. | No animation is installed. |
 | `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
-| `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open. | The installation is busy. Try again in a moment. |
+| `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
+| `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
+| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose This board to store the animation on the board. |
+| `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
+| `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
@@ -512,7 +573,8 @@ converter's own words and its reason in brackets.
 
 A removal and an upload that succeeded are said in the same place, without a code:
 `Removed animation <id> <file>.`, `Uploaded as animation <id> <file>. It plays in the
-playlist.` and `Saved animation <id> <file>.`
+playlist.`, `Uploaded to the card as animation <id> <file>. It plays in the playlist.` and
+`Saved animation <id> <file>.`
 
 ## The phone and the installation's network
 
@@ -632,7 +694,16 @@ installed; the phone with mobile data on.
     upload one; choose `Edit` in its row's menu, change its seconds and `Save`. *Seen:* the
     clock's hands or digits move on the LEDs, the melting watch's hands bend with its
     face, and after the save the row is where it was.
-21. **Note** the phone's model, its Android version, the web view's version from the
+21. **The card and the catalogs.** With firmware that writes the card, and the card in.
+    On Upload, make an animation: `Store on` has `The card` chosen; upload it. *Seen:*
+    `Uploaded to the card as animation ...`, its row with `ex`, and it plays on the LEDs
+    when tapped. Choose `Delete` in its menu and `Remove it`. *Seen:* the row goes, and the
+    card's free storage grows. In Settings, `Rebuild the card's catalog` and `Rebuild`.
+    *Seen:* the count of the progress grows, Animations says how far the reading is, and the
+    LEDs play on; `Cancel the rebuild` ends it, and a second rebuild that runs to its end
+    leaves `Card: <n> animations, cataloged.` Keep the brightness at 40 or less while one
+    strip is fed from the board itself.
+22. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -729,7 +800,15 @@ By programs, on a Mac:
   of a clock saved in its place with its inclusion; another controller's change between
   reading and saving said and not overwritten; `Edit` only for the board's own texts and
   clocks.
-- That the web code sends the twenty-seven lines above and no other, and names no address
+- The catalogs and the card, in Chrome against stand-in targets and against the
+  emulator: each state of each catalog in words; a rebuild asked about, answered `Not now`,
+  refused, cancelled and run to its end, with its progress and Animations working
+  meanwhile; a target without catalogs asked once; the emulator's board without a catalog
+  and with one the PC tool wrote; an upload to a card the installation can write, with
+  `This board` chosen instead, each refusal in words, and no choice for a card it cannot
+  write; `Delete` of a card's animation, one with a fault among them, and none on a card
+  that cannot be written; the storage lines and the badges of both kinds of card.
+- That the web code sends the thirty-two lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -761,6 +840,11 @@ By programs, on a Mac:
   board's and the card's. On 2026-10-15 the owner ran the APK against
   the board on its own network and saw its state and its list; on 2026-10-16 the owner
   saw the app lie under the bars, before it kept clear of them.
+- **Seed 35 against the board and on a phone.** The app's upload to the card, its
+  `Delete` of a card's animation and its rebuilds were tried against stand-in targets that
+  answer as [commands.md](commands.md) says, and its catalog lines against the emulator
+  too; nobody has uploaded to the card, deleted from it or rebuilt a catalog from a phone:
+  step 21 above, and the seed's board session.
 - **Texts and clocks on a phone and on the LEDs.** No phone has made, previewed, uploaded
   or edited a text or a clock, and nobody has looked at one on the LEDs: step 20 above, and
   seed 37's board session.

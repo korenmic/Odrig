@@ -112,11 +112,15 @@ const REFUSALS = {
     line.startsWith("upload ")
       ? "That name or id is in use on the installation. The list is asked for again; upload again."
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
+  "read-only": (line) =>
+    line.startsWith("catalog ") ? "That storage cannot be written now, so its catalog cannot be rebuilt." :
+    line.startsWith("upload ") ? "The card cannot be written now. Choose This board to store the animation on the board." :
+    `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
   stale: () => "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
-  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
+  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,
   "bad-checksum": NOT_WHOLE,
   incomplete: NOT_WHOLE,
@@ -124,10 +128,11 @@ const REFUSALS = {
   "no-upload": () => "The installation dropped the upload, after the app was away for a minute or more. Upload again.",
 };
 
-// What the app says of an animation that does not fit into the free storage. The free
-// bytes are null when the app does not know them.
-export function ofNoSpace(bytes, free) {
-  const room = free === null ? "more than the installation has free" : `and the installation has ${kilobytes(free)} KB free`;
+// What the app says of an animation that does not fit into the free storage, of the
+// installation or, as `where` says, of the card. The free bytes are null when the app
+// does not know them.
+export function ofNoSpace(bytes, free, where = "the installation") {
+  const room = free === null ? `more than ${where} has free` : `and ${where} has ${kilobytes(free)} KB free`;
   return `The animation needs ${kilobytes(bytes)} KB, ${room}. (no-space)`;
 }
 
@@ -136,9 +141,13 @@ export function ofSaved(id, file) {
   return `Saved animation ${id} ${file}.`;
 }
 
-// What the app says when an upload succeeded. It is no failure and has no code.
-export function ofUploaded(id, file) {
-  return `Uploaded as animation ${id} ${file}. It plays in the playlist.`;
+// What the app says when an upload succeeded, to the board's own storage or to the card,
+// whose reply gives the id, null when it gives none. It is no failure and has no code.
+export function ofUploaded(id, file, external = false) {
+  if (!external) {
+    return `Uploaded as animation ${id} ${file}. It plays in the playlist.`;
+  }
+  return id === null ? `Uploaded ${file} to the card. It plays in the playlist.` : `Uploaded to the card as animation ${id} ${file}. It plays in the playlist.`;
 }
 
 // What the app says when an animation cannot be made from a file, by the reason: its own,
@@ -158,9 +167,12 @@ export function ofConversion(failure) {
   return `${text} (${failure.reason})`;
 }
 
-// The question before an animation is removed.
+// The question before an animation is removed: from the board, or from the card, whose
+// file is deleted.
 export function ofRemoval(animation) {
-  return `Remove animation ${animation.id} ${animation.file} from the installation?`;
+  return animation.external === true
+    ? `Remove animation ${animation.id} ${animation.file}? Its file is deleted from the card.`
+    : `Remove animation ${animation.id} ${animation.file} from the installation?`;
 }
 
 // What the app says when an animation was removed. It is no failure and has no code.
