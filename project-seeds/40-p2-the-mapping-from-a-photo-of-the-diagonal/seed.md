@@ -97,6 +97,14 @@ ranked by height, give the whole permutation.
    showing and checks the result on a phone; that photo, with the owner's leave, joins
    the test vectors.
 
+## Reference Photos
+
+`photos/` beside this seed holds four of the owner's photos of the installation on its
+table, unpowered, from four sides, with a README that says where each was taken from and
+which edge is the canvas's bottom. None shows the diagonal: with each of them the analysis
+must refuse. A photo with the diagonal showing is the owner's to take, in the definition
+of done.
+
 ## Open Questions
 
 None. The owner asked for this seed to be answered without a question pass; the
