@@ -2236,16 +2236,20 @@ file system` at every start, so nothing of the card was tried.
 - **The card (seed 38).** Not mounted at any start of the run: tasks 8 and 9 are open.
 - **Not explained.** The first `catalog rebuild internal`, sent through COM while the check
   after a start was under way, was followed by a restart whose reason `host` gave as
-  `panic`; four rebuilds after it, two of them cancelled, ran without one, and the panic's
-  text was not captured. While a rebuild runs, `status` counts the files it has still to
+  `panic`; five rebuilds after it, two of them cancelled and two begun as that one was,
+  through either socket while the check of a start without a catalog was under way, ran
+  without one, and the panic's text was not captured. While a rebuild runs, `status` counts the files it has still to
   read in `to_check` (60 became 72). After a `read-limit` failed because another program
   had the COM socket open, every restart through the chip's own socket started the chip in
   its download mode (`rst:0x15 (USB_UART_CHIP_RESET),boot:0x0`), so that it answered on
   neither socket; a reset through COM with the boot line released started it normally
   (`boot:0x8`), and `flash` through COM put the firmware back.
 - **The board was left** on the firmware of ea73e23 with 73 animations, the ten texts and
-  clocks among them, the internal catalog `ok` at generation 3, the order beginning with
-  110 and 101, playing at brightness 32.
+  clocks among them, the internal catalog `ok` at generation 1 after a last rebuild, the
+  order beginning with 101, playing at brightness 32. Long reads of the storage through
+  COM broke off at 5 to 8 percent several times late in the session, where they had not
+  before; through the chip's own socket they did not, and its restart was followed by a
+  reset through COM.
 
 ## Live pin assignments
 
