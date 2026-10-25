@@ -137,6 +137,7 @@ present, and do not build on them.
 - **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
 - **ODRGX text and clock animations**, seed 37: text and clocks as animations.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
+- **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 
 The state of every seed is in the `state.json` of its folder.
 

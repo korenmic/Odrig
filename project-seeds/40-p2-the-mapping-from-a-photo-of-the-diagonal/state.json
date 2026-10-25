@@ -1,0 +1,10 @@
+{
+  "number": 40,
+  "slug": "40-p2-the-mapping-from-a-photo-of-the-diagonal",
+  "state": "remaining",
+  "title": "The mapping from a photo of the diagonal",
+  "priority": "P2",
+  "addedAt": "2026-10-25T19:05:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The app reads a photo of the installation showing the diagonal, finds the twenty lit stubs, works out which snake each position drives, shows the result on the photo and saves the mapping on one tap; in the app's web code alone, with no library."
+}
