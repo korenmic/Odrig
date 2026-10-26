@@ -1,0 +1,10 @@
+{
+  "number": 41,
+  "slug": "41-p1-sub-folder-playlists-from-the-card",
+  "state": "remaining",
+  "title": "Sub-folder playlists from the card",
+  "priority": "P1",
+  "addedAt": "2026-10-26T05:09:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The sub-folders of the card's folder odrig are playlists of their own, the root playlist plays its own items and then each folder once, an operator picks a folder from the app as the playlist that plays now, and a playlist repeats for 24 hours of running time before the next one starts; in the core, the firmware's and the emulator's listing, and the app."
+}

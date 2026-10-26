@@ -138,6 +138,7 @@ present, and do not build on them.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
+- **Sub-folder playlists from the card**, seed 41: a folder of the card as the playlist, a day each.
 
 The state of every seed is in the `state.json` of its folder.
 
