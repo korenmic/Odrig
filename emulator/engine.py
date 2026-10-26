@@ -1,6 +1,7 @@
-"""The one caller of the core once it has started, the loop that keeps real time, and
-what the engine knows of the animation on the LEDs: the start of its loop and of its
-turn, from the core's opens of the played file, and its length."""
+"""The one caller of the core once it has started, the loop that keeps real time, what
+the engine knows of the animation on the LEDs, the start of its loop and of its turn from
+the core's opens of the played file and its length, and the seek that moves playback by
+moving the clock."""
 
 import re
 import threading
@@ -97,6 +98,7 @@ class Engine:
         self._seek_since_open = False
         self._restarting = False
         self._opened = None
+        self._seen = {}
         # The page is told of the position once something is known of it.
         self._told = self.playback.event()
         if host is not None:
@@ -162,6 +164,62 @@ class Engine:
             self._status_now(self.now_ms())
             self._publish()
 
+    def seek(self, target):
+        """Moves playback to a point of the loop of the animation on the LEDs, in
+        milliseconds from its start: forward by a move of the clock, back by a restart of
+        the animation, the engine's own `play`, and then a move. Returns the reply of the
+        route: the position moved to, the starts, the length and the clock's move, or the
+        refusal."""
+        with self._lock:
+            playback = self.playback
+            if isinstance(target, bool) or not isinstance(target, int):
+                return {"ok": False, "error": "bad-argument"}
+            if playback.animation is None or playback.start is None:
+                return {"ok": False, "error": "nothing-plays"}
+            if playback.cycle():
+                return {"ok": False, "error": "cycle"}
+            if playback.length is None:
+                return {"ok": False, "error": "length-unknown"}
+            if target < 0 or target > playback.length - 2 * GRID_MS:
+                return {"ok": False, "error": "beyond-length"}
+            now = self.now_ms()
+            moved = 0
+            position = (now - playback.start) % playback.length
+            if target < position:
+                line = b"play %d" % playback.animation
+                reply = self.core.command(now, line)
+                self.hub.log(now, "seek", line, False, reply)
+                self._restarting = True
+                moved += self._move(GRID_MS)
+                position = self.now_ms() - playback.start
+            move = ((target - position) // GRID_MS) * GRID_MS
+            if move > 0:
+                moved += self._move(move)
+            self._seek_since_open = True
+            self._take_lengths()
+            self._publish()
+            return {
+                "ok": True,
+                "animation": playback.animation,
+                "start": playback.start,
+                "turn": playback.turn,
+                "length": playback.length,
+                "position": (self.now_ms() - playback.start) % playback.length,
+                "moved": moved,
+            }
+
+    def _move(self, ms):
+        """Moves the clock forward by a whole number of grid steps and asks the core for
+        the refresh of the new time. Returns the move."""
+        self.start_ns -= ms * 1_000_000
+        now = self.now_ms()
+        self._opened = None
+        if self.core.poll(now):
+            self.hub.refresh(now, self.core.frame())
+        if self._opened is not None:
+            self._take_open(now)
+        return ms
+
     def take_lengths(self):
         """Takes in the lengths found since, and tells the page of a change."""
         with self._lock:
@@ -190,12 +248,15 @@ class Engine:
             playback.stream, playback.path = name, path
             playback.start = playback.turn = grid
             playback.length, playback.source = self.lengths.known(path)
+            if playback.length is None and path in self._seen:
+                playback.length, playback.source = self._seen[path], "seen"
             if playback.length is None:
                 self.lengths.request(path)
             self._status_now(now)
         else:
             if playback.length is None and not self._seek_since_open:
                 playback.length, playback.source = grid - playback.start, "seen"
+                self._seen[path] = playback.length
             playback.start = grid
         self._answered_at_open = self._answered
         self._seek_since_open = False

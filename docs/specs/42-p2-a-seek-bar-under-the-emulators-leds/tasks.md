@@ -31,7 +31,7 @@ Rules for every task:
   - Requirements: 2.1 to 2.7, 4.1, 4.2, 5.2 (the status), 5.4, 6.1 (the events and the
     lengths)
 
-- [ ] 2. The seek and its route
+- [x] 2. The seek and its route
   - `emulator/engine.py`: `seek`, the restart with its grid step, the move rounded down,
     the refusals, the log line with the transport `seek`, the reply.
     `emulator/httpd.py`: `POST /seek`, 411 and 405.

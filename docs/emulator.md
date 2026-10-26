@@ -273,6 +273,7 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `POST /odrig` without a `Content-Length` that is a whole number | Status 411. The core is not called. |
 | `GET /`, `GET /<name>` for a file of `emulator/web/` | The page and its files. See [The page](#the-page). |
 | `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
+| `POST /seek` | The page's seek, see [Seeking](#seeking): the body is `{"ms": <point>}`, the point of the loop in milliseconds, and the answer is `{"ok":true,"animation":1,"start":40020,"turn":40020,"length":5100,"position":3000,"moved":2980}` or `{"ok":false,"error":"<reason>"}`, status 200 in both cases, with `Allow: POST` and 405 for another method and 411 without a `Content-Length` that is a whole number, as `/odrig`. It is no command of the core: the command list is unchanged. |
 | Any other path | Status 404. |
 
 - The body is the command line, with or without a final newline. A body of up to 4,096
@@ -684,6 +685,20 @@ length. Reading a catalog or running the converter never delays a refresh.
 What the emulator knows goes to the page as the `position` event of the
 [event stream](#the-event-stream).
 
+A seek names a point of the loop, from 0 to the length less two grid steps, and the
+emulator moves playback there with what it has. When the point is at or after the
+position, it moves its own clock forward by the difference, rounded down to whole grid
+steps, and asks the core for a refresh: the core shows the frame of that time, as it
+does after a late refresh, and nothing is replayed. When the point is before the
+position, the emulator first restarts the animation with a `play <id>` of its own, which
+the log shows with the transport `seek`, moves its clock one grid step so that the core
+takes the refresh that begins the turn, and then moves to the point. A move of the clock
+is running time for the core: the turn and whatever else the core counts in time advance
+by it, and the clock never goes back. The answer to a seek is refused with
+`nothing-plays` while no animation is on the LEDs, `cycle` while a cycle plays,
+`length-unknown` while the length is unknown, `beyond-length` for a point out of reach,
+and `bad-argument` for a body that is not `{"ms": <whole number>}`.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
@@ -713,7 +728,7 @@ data: 123460 <base64 of the refresh>
 | Event | What it carries |
 |---|---|
 | `hello` | First on every connection. `drive` is the folder of `--drive`, or `null` without it. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
-| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp`, `http` or, for a restart the emulator made for a seek, `seek`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
 | `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |

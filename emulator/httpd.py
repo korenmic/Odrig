@@ -1,6 +1,6 @@
 """The HTTP server on the page address: the files of the page, the files of the operators'
-app for the page's controller view, commands as `POST /odrig`, the event stream for the
-page, and the mapping file of the show."""
+app for the page's controller view, commands as `POST /odrig`, the page's seek as
+`POST /seek`, the event stream for the page, and the mapping file of the show."""
 
 import http.server
 import os
@@ -9,7 +9,7 @@ import socket
 import sys
 import threading
 
-from . import failure
+from . import failure, hub
 
 ADDRESS = "127.0.0.1"
 # Every IPv4 address of this computer: where the server listens when it is to be reached
@@ -21,6 +21,7 @@ NOWHERE = "192.0.2.1"
 # such leave, and there it would let a second server take a port that is in use.
 REUSE_ADDRESS = sys.platform != "win32"
 COMMAND_PATH = "/odrig"
+SEEK_PATH = "/seek"
 EVENTS_PATH = "/events"
 MAPPING_PATH = "/show/mapping.json"
 MAPPING_NAME = "mapping.json"
@@ -99,6 +100,8 @@ def stream(connection, write, keep_alive_seconds=KEEP_ALIVE_SECONDS):
             return
 
 WHOLE_NUMBER = re.compile(r"[0-9]+")
+# The body of a seek: the point of the loop in milliseconds.
+SEEK_BODY = re.compile(rb"\s*\{\s*\"ms\"\s*:\s*(-?[0-9]+)\s*\}\s*")
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -124,6 +127,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.command_line()
             else:
                 self.empty(405, {"Allow": "POST"})
+        elif path == SEEK_PATH:
+            if self.command == "POST":
+                self.seek()
+            else:
+                self.empty(405, {"Allow": "POST"})
         elif self.command == "GET" and path == EVENTS_PATH:
             self.events()
         elif self.command == "GET" and path == MAPPING_PATH:
@@ -144,22 +152,42 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
-    def command_line(self):
+    def body(self):
+        """The first bytes of the request's body, or `None` after a 411 or a connection
+        that ended inside the body."""
         length = self.headers.get("Content-Length")
         if length is None or not WHOLE_NUMBER.fullmatch(length.strip()):
             self.empty(411)
-            return
+            return None
         left = int(length.strip())
         kept = b""
         while left > 0:
             piece = self.rfile.read(min(left, CHUNK))
             if not piece:
                 self.close_connection = True
-                return
+                return None
             left -= len(piece)
             if len(kept) < BODY_KEPT:
                 kept += piece[:BODY_KEPT - len(kept)]
-        reply = self.server.engine.line(kept, "http")
+        return kept
+
+    def command_line(self):
+        kept = self.body()
+        if kept is None:
+            return
+        self.json(self.server.engine.line(kept, "http"))
+
+    def seek(self):
+        """The page's seek: the body names the point in milliseconds, the engine moves
+        playback, and the reply is its answer."""
+        kept = self.body()
+        if kept is None:
+            return
+        found = SEEK_BODY.fullmatch(kept)
+        reply = self.server.engine.seek(int(found.group(1))) if found else {"ok": False, "error": "bad-argument"}
+        self.json(hub.compact(reply).encode("ascii") + b"\n")
+
+    def json(self, reply):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
