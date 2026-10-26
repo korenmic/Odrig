@@ -37,7 +37,8 @@ a top bar with the app's name and whether the installation answers.
   that folder's own files and the rows of its sub-folders. A folder with no file of its
   own keeps its row, `0 animations` and its way in. The heading is marked while the
   level's playlist is current, and so is the folder row that leads to the current
-  playlist at every level above it. Each row
+  playlist at every level above it. The list comes back to the root when the target
+  changes, when the card goes out and when the folder shown is gone from the list. Each row
   names its file, its id and its size, or `size not read yet` while the installation has
   not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
   read-only unless the installation can write its card), and a small `...` button that

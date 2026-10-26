@@ -30,6 +30,8 @@ let message = () => {};
 let redraw = () => {};
 let shownOrder = () => [];
 let groupOf = () => "";
+// The rows of the level the screen shows, which the note under the list speaks of.
+let levelRows = (state) => state.animations || [];
 
 function byId(id) {
   return document.getElementById(id);
@@ -156,7 +158,8 @@ export function draw(state) {
   const why = blocked();
   const list = byId("animations-list");
   list.dataset.movable = String(why === null);
-  const animations = state.animations || [];
+  // The note speaks of the level shown: nothing moves at a level with one row or none.
+  const animations = levelRows(state);
   byId("order-note").textContent = animations.length < 2 ? "" : why === null ? "Hold a row to move it, or use Move up and Move down in its menu." : why;
   if (press !== null && why !== null && why !== "Saving the order\u2026") {
     cancel();
@@ -295,6 +298,7 @@ export function start(options) {
   redraw = options.redraw;
   shownOrder = options.shownOrder;
   groupOf = options.groupOf;
+  if (options.levelRows) levelRows = options.levelRows;
   const list = byId("animations-list");
   list.addEventListener("pointerdown", (event) => {
     const row = rowAt(event.target);

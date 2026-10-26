@@ -598,7 +598,7 @@ export function start(options) {
   message = options.message;
   filters.start({redraw});
   selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
-  reorder.start({message, redraw, shownOrder, groupOf: folderOf});
+  reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: (state) => shownOrder(state).filter((animation) => folderOf(animation) === opened)});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});
   extend({draw: tests.draw});

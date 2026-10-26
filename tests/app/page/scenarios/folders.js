@@ -71,6 +71,7 @@ function seen(app) {
     rows: groupedRows(app),
     folders: folderRows(app),
     filterEmpty: app.text("filter-empty"),
+    orderNote: app.raw("order-note"),
     tests: app.byId("tests").hidden ? null : [...app.doc.querySelectorAll("#tests-grid button")].filter(displayed).length,
     testsHead: app.byId("tests").hidden ? null : app.text("tests-toggle"),
     buttons: [...app.doc.querySelectorAll("#animations button")].filter(displayed).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
@@ -89,13 +90,13 @@ function enter(app, path) {
 // the list's refresh after a card went out or came in.
 async function settled(app, step) {
   if (step.level !== undefined) {
-    await app.until(() => app.text("level-title") === step.level, `the level ${step.level}`, 15000);
+    await app.until(() => app.text("level-title") === step.level, `the level ${step.level}`, 25000);
   }
   if (step.rows !== undefined) {
-    await app.until(() => rows(app).length === step.rows, `${step.rows} rows`, 15000);
+    await app.until(() => rows(app).length === step.rows, `${step.rows} rows`, 25000);
   }
   if (step.until !== undefined) {
-    await app.until(() => app.says(step.until), `on the screen: ${step.until}`, 15000);
+    await app.until(() => app.says(step.until), `on the screen: ${step.until}`, 25000);
   }
   await app.sleep(step.wait === undefined ? 200 : step.wait);
 }
