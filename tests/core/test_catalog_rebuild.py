@@ -152,9 +152,11 @@ class External(unittest.TestCase):
         _, refused = catalog.rebuild(storage, canvas=CANVAS)
         self.assertEqual([name for name, _ in refused], ["night/bad.odrg"])
         self.assertEqual(catalog_files(left), catalog_files(storage.files))
-        listed = [(item["file"], item.get("fault")) for item in replies(run)[-1]["items"] if item.get("external")]
+        items = replies(run)[-1]["items"]
+        listed = [(item["file"], item.get("fault")) for item in items if "file" in item and item.get("external")]
         self.assertEqual(listed, [("sun.odrg", None), ("a b/c.odrg", None), ("a-b/d.odrg", None), ("night/bad.odrg", "truncated"), ("night/comet.odrg", None),
                                   ("night/deep/x.odrg", None)])
+        self.assertEqual([item["playlist"] for item in items if "playlist" in item], ["a b", "a-b", "night", "night/deep"])
 
     def test_a_file_copied_onto_a_card_with_a_catalog_joins_after_a_rebuild(self):
         drive = {**card({"sun.odrg": loop_of(2, 5), "moon.odrg": loop_of(3, 6)}), "copied.odrg": loop_of(2, 7)}

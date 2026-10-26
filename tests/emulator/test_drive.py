@@ -113,6 +113,20 @@ class AnEmulatorWithADrive(unittest.TestCase):
         self.assertEqual(json.loads(emulator.command("play 60002")), {"ok": True})
         self.assertEqual(emulator.status()["animation"], 60002)
 
+    def test_the_folders_of_the_drive_are_listed_as_playlists_over_http_and_the_line_port(self):
+        folder = support.installed(self.top / "odrig", {"b.odrg": self.animation})
+        support.installed(folder / "night", {"comet.odrg": self.animation})
+        support.installed(folder / "night" / "deep", {"x.odrg": self.animation})
+        emulator = support.entered(self, support.Emulator(self.folder, "--drive", self.top, tcp_port=0))
+        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 5)
+        shows = [item for item in items if item[0] < 60001]
+        self.assertEqual(items, shows + [(60004, None), (60005, None), (60001, "b.odrg"), (60002, "night/comet.odrg"), (60003, "night/deep/x.odrg")])
+        reply = json.loads(emulator.command("list"))
+        self.assertEqual([item for item in reply["items"] if "playlist" in item],
+                         [{"id": 60004, "playlist": "night", "external": True}, {"id": 60005, "playlist": "night/deep", "external": True}])
+        with support.Lines(emulator.tcp) as port:
+            self.assertEqual(json.loads(port.ask("list")), reply)
+
     def test_a_damaged_file_and_one_of_another_canvas_are_left_out_and_logged(self):
         wide = core_support.clip(4, 3, 3, (100,))
         # The sound file is read last: once it is listed, the two before it have been read,

@@ -723,6 +723,7 @@ void drive_unusable(Core &core, uint8_t state, uint8_t detail) {
     core.catalog_open = 0;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     core.catalog_phase = kLoadIdle;
     CatalogState &catalog = core.catalogs[kExternal];
     catalog.state = state;
@@ -816,6 +817,7 @@ __attribute__((noinline)) void page_step(Core &core) {
             // The marker changed while it was read: everything is read again.
             catalog_drive_plugged(core);
             core.drive_count = 0;
+            tree_clear(core);
             return;
         }
         core.catalog_first_place = static_cast<uint16_t>(core.drive_count);
@@ -886,8 +888,10 @@ __attribute__((noinline)) void page_step(Core &core) {
 }
 
 // Every place read from the catalog becomes an animation of the playlist at once, or is
-// left out for its fault.
+// left out for its fault; the tree is built from them first, since the pages name a
+// folder's files in any order.
 void publish(Core &core) {
+    tree_build(core);
     for (uint32_t place = 0; place < core.drive_count; ++place) {
         DriveEntry &entry = core.drive[place];
         if (entry.state != kDriveStaged) {
@@ -1207,6 +1211,7 @@ void catalog_drive_yields(Core &core) {
         // The page is read again from its start; what was taken of it is dropped.
         core.catalog_open = 0;
         core.drive_count = core.catalog_first_place;
+        tree_clear(core);
     }
 }
 
@@ -1225,6 +1230,7 @@ void catalog_drive_look(Core &core) {
     // Another marker: the drive's animations go, and its catalog is read again.
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     player_drive_changed(core);
     order_drive_found(core);
     catalog_drive_plugged(core);
@@ -1340,6 +1346,10 @@ bool catalog_install_external(Core &core, uint16_t *id) {
         core.host.drive_bind(core.host.ctx, core.drive_number, place, upload.name);
         order_drive_named(core, place, upload.name);
         entry.id = free_drive_id(core);
+        // The file goes into the drive's folder itself: the root's.
+        if (core.drive_folder != nullptr) {
+            core.drive_folder[place] = 0;
+        }
     }
     entry.bytes = upload.size;
     entry.total_ms = drive_length(upload.total_ms);
@@ -1380,6 +1390,7 @@ bool catalog_remove_external(Core &core, uint32_t place) {
     DriveEntry &entry = core.drive[place];
     entry.state = kDriveGone;
     entry.id = 0;
+    tree_place_gone(core, place);
     player_drive_changed(core);
     return true;
 }

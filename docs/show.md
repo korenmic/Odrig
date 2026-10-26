@@ -127,9 +127,18 @@ removals, see [commands.md](commands.md#catalogs).
 On the board the drive is a USB stick or a microSD card, as
 [firmware.md](firmware.md#the-external-storage) says.
 
-- The drive's animations are the files of its folder `odrig` whose names end in `.odrg` or `.odrgx`,
-  in any case, and do not begin with a dot, in the order of their names, at most 256.
-  Folders inside `odrig` and other files are passed over.
+- The drive's animations are the animation files of its folder `odrig` and of its
+  sub-folders to three levels down: those whose names end in `.odrg` or `.odrgx`, in any
+  case, and do not begin with a dot; other files are passed over. They are listed depth
+  first, a folder's files in the order of their names and then its sub-folders in the
+  order of their names, at most 256 files and 32 sub-folders, as
+  [microsd.md](microsd.md#preparing-a-card) says; a file in a sub-folder is known by its
+  path from `odrig`, `night/comet.odrg`, in `list`, in the saved order and in the catalog.
+- The sub-folders make a tree, the folder `odrig` its root: a sub-folder with an animation
+  file at any depth below it is a playlist of its own, and `list` gives it after the show's
+  items and before the files, in the order of the listing, with its path and an id from the
+  same pool as the files', given after theirs:
+  `{"id":60007,"playlist":"night","external":true}`.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
   has been read, at its place in the saved order: without one, after the show's

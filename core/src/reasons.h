@@ -27,6 +27,9 @@ enum Reason {
     kFileMalformed,
     kSizeMismatch,
 
+    // A file of a drive, whose folder would be past the most the tree holds.
+    kTooManyFolders,
+
     // An ODRG file.
     kTruncated,
     kBadMagic,

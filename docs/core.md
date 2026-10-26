@@ -586,6 +586,20 @@ needs it.
 - A drive's file gets its id when the drive is taken up, before it is checked: the lowest
   from 60001 up that no item of the show and no file of the drive before it has. The same
   files with the same show get the same ids, and a file left out keeps its id.
+- The drive's sub-folders make a tree, built from the names of the places once every file
+  has its id: a table of at most 32 folders beside the root, in the listing's order, each
+  with a place at or below it, its depth and the index after its last descendant, so that
+  a folder's subtree is one range of the table; and for each place the index of its
+  folder. A listed drive's tree is built at once; a cataloged drive's when its places are
+  published, since its pages name a folder's files in any order: a folder is put before
+  the folders below it and among its siblings by the bytes of its name, one part of the
+  path at a time, not by the bytes of the whole paths. A place whose folder would be the
+  33rd sub-folder, which only a catalog can name, is left out with `too-many-folders`. The
+  folders get ids after the files', from the same pool, in the order of the table, and
+  `list` gives each as `{"id":<id>,"playlist":"<path>","external":true}` after the show's
+  items and before the files. The tree is dropped with the places; a removal takes the
+  folders left without a file out of it, the others keeping their ids and their order; a
+  file uploaded to the drive lies in the drive's folder itself, the root's.
 - A drive whose host says it can be written, with a catalog that is `ok`, is changed by
   the core: an upload to it is written as `drive/upload.part`, checked, and moved onto its
   name with its entry in one commit of the drive's catalog; a removal takes the entry out
@@ -798,7 +812,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,808 |
+| The core object | fixed | 3,840 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -815,17 +829,19 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,341** |
+| **Total** | | **125,373** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,818 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,850 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,545 bytes for the target file. A host with a drive
+of the check and the saved order: 77,577 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
-out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 129,821 bytes, 99 percent. The size and the number of frames
+out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
+each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
+8 bytes and 104 bytes of room for the current playlist's path, 368.
+With it the target file takes 130,477 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

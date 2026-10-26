@@ -25,7 +25,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
+| `list`, `list <from>` | Lists the items of the show, the playlists of the card's folders, and the animations of a USB drive or a card. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
@@ -136,14 +136,22 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The files of a USB drive or of the card come after the items of the show, in the order of
-their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+the drive's listing, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+A file in a sub-folder of the card's folder `odrig` has its path from `odrig` as its
+`file`: `{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}`.
+The sub-folders themselves come between the items of the show and the files, in the
+order of the listing, depth first, each as a playlist item with its path:
+`{"id":60007,"playlist":"night","external":true}`, then
+`{"id":60008,"playlist":"night/deep","external":true}`. Their ids come after the files',
+from the same pool, in the order of the items. [show.md](show.md#animations-from-a-usb-drive)
+says what a folder of the card is to the player.
 A file left out for a fault is listed in its place as
 `{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
-character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
-`<from>` and `next` count both kinds. An animation of the drive is listed once the player
+character outside printable ASCII as `\u` and four hexadecimal digits, and so is
+`playlist`. The positions of `<from>` and `next` count the three kinds. An animation of the drive is listed once the player
 has read it whole; while the drive is read, `list` answers without the ones still to be
 read, and is not refused with `busy` for them. [show.md](show.md#animations-from-a-usb-drive)
 says what the board does with a drive.

@@ -86,7 +86,7 @@ Rules for every task:
   - Suites: firmware, onboarding.
   - Requirements: 1.2, 1.3, 1.4, 1.5, 2.2, 6.1, 8.1, 10.3
 
-- [ ] 3. The tree in the core and the folder items of `list`
+- [x] 3. The tree in the core and the folder items of `list`
   - `core/src/core_state.h`, `core/src/order.cpp`: the order block gains the folder byte
     per place, the folder table and the path room; `tree_build` in two passes, called from
     `drive_take_listed` and `publish`, the insertion in the listing's order, `end`, the

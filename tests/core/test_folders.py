@@ -1,0 +1,152 @@
+"""The tree of a card's folders: its order on a legacy and on a cataloged card, the folders'
+ids after the files', the folder items of `list`, the paths in the saved order and in the
+catalog, and the limits of the table."""
+
+import json
+import unittest
+
+from odrig import catalog
+
+from . import support
+from .test_catalog_drive import card, polls
+from .test_catalog_writes import a_card, folder_of
+from .test_drive import SHOW, a_drive, asked, logged, refusal, replies, with_drive
+from .test_order import HEADER
+from .test_playback import T0
+from .test_playlist import CANVAS, loop_of
+
+# A card of nested folders. Listed depth first: `A.ODRG`, `b.odrg`, `a b/c.odrg`,
+# `night/comet.odrg`, `night/deep/x.odrg`, `night/deep/deeper/y.odrg`; its folders in the
+# tree's order: `a b`, `night`, `night/deep`, `night/deep/deeper`.
+NESTED = {"b.odrg": loop_of(2, 5), "A.ODRG": loop_of(3, 6), "night/comet.odrg": loop_of(2, 7), "night/deep/x.odrg": loop_of(2, 8), "a b/c.odrg": loop_of(2, 9),
+          "night/deep/deeper/y.odrg": loop_of(2, 10)}
+TREE = ["a b", "night", "night/deep", "night/deep/deeper"]
+
+
+def folders(reply):
+    """The id and the path of each folder item of a reply of `list`."""
+    return [(item["id"], item["playlist"]) for item in reply["items"] if "playlist" in item]
+
+
+def files(reply):
+    return [(item["id"], item["file"]) for item in reply["items"] if "file" in item]
+
+
+def on_cataloged_card(card_files, script, options=()):
+    """A session with a cataloged card plugged in at the start, read at refreshes before the
+    script's first command."""
+    with a_drive(card_files) as top:
+        return support.start(SHOW, polls(0, 400) + script, ["--drive", top, *options], check_first=False)
+
+
+def listing(time):
+    """A refresh and `list` from every position of 0 to 79 on, so that the replies hold the
+    chain of pages of `list` from the first on: `paged` follows it."""
+    return asked(time, *(f"list {start}" for start in range(80)))
+
+
+def paged(answers):
+    """The items of every page of `list`, from the replies of `listing`."""
+    items = []
+    position = 0
+    while position is not None:
+        items += answers[position]["items"]
+        position = answers[position]["next"]
+    return items
+
+
+class TheTree(unittest.TestCase):
+    def test_a_legacy_card_lists_its_folders_after_the_shows_items_with_ids_after_the_files(self):
+        reply = replies(with_drive(SHOW, NESTED, asked(0, "list")))[0]
+        self.assertEqual([item["id"] for item in reply["items"]], [1, 60007, 60008, 60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
+        self.assertEqual(folders(reply), list(zip(range(60007, 60011), TREE)))
+        self.assertEqual(files(reply), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg"), (60003, "a b/c.odrg"), (60004, "night/comet.odrg"),
+                                        (60005, "night/deep/x.odrg"), (60006, "night/deep/deeper/y.odrg")])
+        self.assertEqual(reply["items"][1], {"id": 60007, "playlist": "a b", "external": True})
+
+    def test_a_cataloged_card_lists_the_same_tree_whatever_the_order_of_its_pages(self):
+        reply = replies(on_cataloged_card(card(NESTED), asked(8100, "list")))[0]
+        self.assertEqual(folders(reply), list(zip(range(60007, 60011), TREE)))
+        self.assertEqual(sorted(name for _, name in files(reply)), sorted(["four.odrg", *NESTED]))
+        self.assertEqual([item["id"] for item in reply["items"]][:5], [1, 60007, 60008, 60009, 60010])
+        self.assertEqual(sorted(id for id, _ in files(reply)), [1, *range(60001, 60007)])
+
+    def test_the_positions_of_list_count_the_folders(self):
+        run = with_drive(SHOW, NESTED, asked(0, "list 1", "list 3", "list 5", "list 11"))
+        first, third, fifth, beyond = replies(run)
+        self.assertEqual([item["id"] for item in first["items"]], [60007, 60008, 60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
+        self.assertEqual([item["id"] for item in third["items"]], [60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
+        self.assertEqual(files(fifth), files(first))
+        self.assertEqual(beyond, {"ok": True, "items": [], "next": None})
+
+    def test_a_page_holds_folder_items_of_the_longest_paths(self):
+        # Ten files whose paths are 100 bytes, in three folders each, thirty folders in all.
+        drive = {}
+        for number in range(10):
+            drive[f"{number:02d}{'a' * 28}/{'b' * 30}/{'c' * 31}/x.odrg"] = loop_of(2, number)
+        run = with_drive(SHOW, drive, listing(0))
+        answers = replies(run)
+        lines = [line[len("reply "):] for line in run.lines if line.startswith("reply ")]
+        self.assertTrue(all(len(line.encode()) + 1 <= 1024 for line in lines))
+        self.assertGreater(answers[0]["next"], 1)
+        whole = paged(answers)
+        self.assertEqual(len([item for item in whole if "playlist" in item]), 30)
+        self.assertEqual(len(whole), 1 + 30 + 10)
+        self.assertEqual([item["playlist"] for item in whole[1:4]], [f"00{'a' * 28}", f"00{'a' * 28}/{'b' * 30}", f"00{'a' * 28}/{'b' * 30}/{'c' * 31}"])
+        self.assertEqual([item["id"] for item in whole], [1, *range(60011, 60041), *range(60001, 60011)])
+
+    def test_a_33rd_sub_folder_named_by_a_catalog_is_left_out_with_too_many_folders(self):
+        names = [f"f{number:02d}/x.odrg" for number in range(33)]
+        storage = catalog.MemoryStorage({name: loop_of(2, number) for number, name in enumerate(names)})
+        made, refused = catalog.rebuild(storage, names=names, canvas=CANVAS)
+        self.assertEqual((refused, made.marker.counts and sum(made.marker.counts)), ([], 33))
+        run = on_cataloged_card(storage.files, listing(8100))
+        items = paged(replies(run))
+        self.assertEqual(len([item for item in items if "playlist" in item]), 32)
+        left_out = [item for item in items if item.get("fault") == "too-many-folders"]
+        self.assertEqual(len(left_out), 1)
+        self.assertEqual([line for line in logged(run) if "too-many-folders" in line], [f"drive file {left_out[0]['file']} left out: too-many-folders"])
+        self.assertEqual(len([item for item in items if "file" in item and "fault" not in item]), 1 + 32)
+
+    def test_a_folder_without_a_file_is_no_folder_of_the_tree(self):
+        with a_drive(NESTED) as top:
+            support.pathlib.Path(top, "odrig", "empty", "deeper").mkdir(parents=True)
+            run = support.start(SHOW, asked(0, "list"), ["--drive", top])
+        self.assertEqual(folders(replies(run)[0]), list(zip(range(60007, 60011), TREE)))
+
+
+class ThePathsInTheSavedOrderAndTheCatalog(unittest.TestCase):
+    def test_order_move_of_a_file_in_a_folder_writes_its_path(self):
+        with a_drive(NESTED) as top:
+            first = support.start(SHOW, asked(0, "order get"), ["--drive", top])
+            revision = replies(first)[0]["revision"]
+            self.assertEqual(replies(first)[0]["ids"], [1, 60001, 60002, 60003, 60004, 60005, 60006])
+            run, kept = support.start_and_keep(SHOW, asked(0, f"order move {revision} 60004 60001", "order get"), ["--drive", top])
+        self.assertEqual(replies(run), [{"ok": True}, {"ok": True, "ids": [1, 60004, 60001, 60002, 60003, 60005, 60006], "next": None, "revision": replies(run)[1]["revision"]}])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 1\nx night/comet.odrg\nx A.ODRG\nx b.odrg\nx a b/c.odrg\nx night/deep/x.odrg\nx night/deep/deeper/y.odrg\n").encode())
+
+    def test_remove_of_a_file_in_a_folder_removes_that_file_and_an_emptied_folder_leaves_the_tree(self):
+        card_files = card(NESTED)
+        ids = {name: id for id, name in files(replies(on_cataloged_card(card_files, asked(8100, "list")))[0])}
+        with a_card(card_files) as top:
+            script = polls(0, 400) + asked(8100, f"remove {ids['night/comet.odrg']}", "list", f"remove {ids['a b/c.odrg']}", "list")
+            run = support.start(SHOW, script, ["--drive", top], check_first=False)
+            left = folder_of(top)
+        done, after_first, done_again, after_second = replies(run)
+        self.assertEqual((done, done_again), ({"ok": True}, {"ok": True}))
+        self.assertEqual(folders(after_first), list(zip(range(60007, 60011), TREE)))
+        self.assertNotIn("night/comet.odrg", [name for _, name in files(after_first)])
+        self.assertEqual(folders(after_second), [(60008, "night"), (60009, "night/deep"), (60010, "night/deep/deeper")])
+        self.assertNotIn("night/comet.odrg", left)
+        self.assertNotIn("a b/c.odrg", left)
+        self.assertEqual(sorted(name for name in left if name.lower().endswith(".odrg")), ["A.ODRG", "b.odrg", "night/deep/deeper/y.odrg", "night/deep/x.odrg"])
+        found = catalog.read(catalog.MemoryStorage(left))
+        self.assertEqual(sorted(entry.name for entry in found.entries), ["A.ODRG", "b.odrg", "night/deep/deeper/y.odrg", "night/deep/x.odrg"])
+
+    def test_upload_begin_external_takes_a_bare_file_name(self):
+        run = on_cataloged_card(card(NESTED), asked(8100, "upload begin external night/new.odrg 100", "upload begin external new.odrg 100", "upload cancel"))
+        self.assertEqual((replies(run)[0], replies(run)[1]["ok"]), (refusal("bad-argument"), True))
+
+
+if __name__ == "__main__":
+    unittest.main()

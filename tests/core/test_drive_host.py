@@ -31,8 +31,12 @@ class Listing(unittest.TestCase):
         with a_drive(drive) as top:
             run = support.start(SHOW, ["drive plug"] + polls(0, 500) + asked(10100, "list"), ["--drive", top, "--trace-drive", "--drive-pulled"])
         self.assertEqual(drive_lines(run), ["drive list 5"])
-        self.assertEqual(listed(replies(run)[0]), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg"), (60003, "a b/c.odrg"), (60004, "night/comet.odrg"),
-                                                   (60005, "night/deep/x.odrg")])
+        items = replies(run)[0]["items"]
+        self.assertEqual([(item["id"], item["file"]) for item in items if "file" in item],
+                         [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg"), (60003, "a b/c.odrg"), (60004, "night/comet.odrg"), (60005, "night/deep/x.odrg")])
+        # The folders of the tree come after the show's items, with ids after the files'.
+        self.assertEqual([(item["id"], item["playlist"]) for item in items if "playlist" in item], [(60006, "a b"), (60007, "night"), (60008, "night/deep")])
+        self.assertEqual([item["id"] for item in items][:4], [1, 60006, 60007, 60008])
 
     def test_each_plug_in_is_listed_again(self):
         with a_drive(DRIVE) as top:

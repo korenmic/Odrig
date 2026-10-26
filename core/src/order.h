@@ -52,6 +52,25 @@ void order_item_leaves(Core &core, uint32_t position);
 // An item was added at the end of the item table: the file does not name it yet.
 void order_item_added(Core &core, uint32_t position);
 
+// Builds the tree of the drive's folders from the names of its places, once every place
+// has its name and its id: the table in the listing's order, each place's folder byte,
+// and the folders' ids after the files', in table order. A place whose folder would be
+// past the table is left out with kTooManyFolders: one of a listed drive at once, with
+// its log line; a staged one by its fault, when it is published.
+void tree_build(Core &core);
+
+// Drops the tree: no folder, no place in one, the root current.
+void tree_clear(Core &core);
+
+// A place left the drive: the folders left without a place at or below them leave the
+// table, the others keep their ids and their order.
+void tree_place_gone(Core &core, uint32_t place);
+
+// The path of a folder of the table, from the drive's folder, into `into` with a 0 after
+// it: the name of its place cut to its depth. Returns its length, 0 for the root and when
+// the host gives no name.
+uint32_t tree_folder_path(const Core &core, uint32_t folder, char *into, uint32_t room);
+
 // The reply to `order get`: the ids of the listed animations in the saved order, from a
 // position on, as many as fit, the position of the first one left out, and the revision.
 uint32_t order_get(const Core &core, uint32_t from, Reply &reply);
