@@ -43,7 +43,7 @@ Rules for every task:
   - Prove it fails first: the engine has no `seek`.
   - Requirements: 3.1 to 3.8, 4.3, 4.4, 5.2 (the transport), 5.3, 6.1 (the seeks)
 
-- [ ] 3. The bar on the page
+- [x] 3. The bar on the page
   - `emulator/web/index.html`, `style.css`, `app.js`: the row between the drawing and
     the note, the drawing fitted to its host's room, the numbers from the frames and the
     `position` event, the drag, the press, the fetch of `seek`, the note of the clock's

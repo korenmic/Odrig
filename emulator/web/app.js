@@ -1,6 +1,7 @@
 /* The page: the event stream, the header, the reason band, the log, the three views, the
-   readout and the count of refreshes drawn. The page sends no command: in the controller
-   view the operators' app runs in a frame, and the lines are the app's. */
+   seek bar, the readout and the count of refreshes drawn. The page sends no command; its
+   one control, the seek bar, asks the emulator to move playback, which is no command. In
+   the controller view the operators' app runs in a frame, and the lines are the app's. */
 
 (function () {
   "use strict";
@@ -15,9 +16,10 @@
     return document.getElementById(id);
   }
 
-  var stage = byId("stage");
   var host = byId("drawing");
   var note = byId("note");
+  var seek = byId("seek");
+  var seekBar = byId("seek-bar");
   var entries = byId("entries");
   var logBox = byId("log");
   var pane = byId("controller");
@@ -31,6 +33,13 @@
   var drawn = 0;
   var second = Math.floor(performance.now() / 1000);
   var statusError = null;
+  /* Where the animation on the LEDs stands, as the last position event said it, the
+     timestamp of the newest frame, the point under a held pointer, and until when the
+     word on the clock's move is shown. */
+  var position = null;
+  var latestMs = null;
+  var held = null;
+  var noteUntil = 0;
 
   /* The view the address of the page names: `#mapping`, `#controller`, or the LEDs. */
   function named() {
@@ -57,6 +66,85 @@
       drawing.paint(newest);
       drawn += 1;
     }
+    seekDraw();
+  }
+
+  /* `m:ss`, and from one hour `h:mm:ss`. */
+  function clockWords(ms) {
+    var seconds = Math.floor(ms / 1000);
+    var minutes = Math.floor(seconds / 60) % 60;
+    var hours = Math.floor(seconds / 3600);
+    var rest = String(seconds % 60).padStart(2, "0");
+    return hours > 0 ? hours + ":" + String(minutes).padStart(2, "0") + ":" + rest : minutes + ":" + rest;
+  }
+
+  /* The seek bar from the last position event and the newest frame's timestamp. */
+  function seekDraw() {
+    if (!position || position.animation === null || latestMs === null) {
+      seek.hidden = true;
+      return;
+    }
+    seek.hidden = false;
+    var length = position.length;
+    var elapsed = Math.max(0, latestMs - position.start);
+    var shown = held !== null ? held : length ? elapsed % length : elapsed;
+    byId("seek-name").textContent = "animation " + position.animation;
+    byId("seek-fill").style.width = length ? (100 * shown / length) + "%" : "0%";
+    byId("seek-knob").style.left = length ? (100 * shown / length) + "%" : "0%";
+    byId("seek-time").textContent = clockWords(shown) + (length ? " / " + clockWords(length) : "");
+    seekBar.classList.toggle("draggable", Boolean(length));
+    seekBar.setAttribute("aria-valuemax", String(length || 0));
+    seekBar.setAttribute("aria-valuenow", String(shown));
+    byId("seek-note").textContent = performance.now() < noteUntil ? byId("seek-note").textContent : length ? "" : "length unknown";
+  }
+
+  /* The point of the loop under the pointer, in milliseconds, within what a seek takes. */
+  function pointAt(event) {
+    var box = seekBar.getBoundingClientRect();
+    var share = box.width > 0 ? Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)) : 0;
+    return Math.max(0, Math.min(position.length - 40, Math.round(share * position.length)));
+  }
+
+  function sendSeek(point) {
+    fetch("seek", {method: "POST", body: JSON.stringify({ms: point})}).then(function (answer) {
+      return answer.json();
+    }).then(function (reply) {
+      if (reply.ok && reply.moved > 0) {
+        byId("seek-note").textContent = "clock +" + Math.round(reply.moved / 1000) + " s";
+        noteUntil = performance.now() + 3000;
+      }
+    }).catch(function () {
+      /* The emulator is gone or did not answer; the event stream says so. */
+    });
+  }
+
+  function onSeekDown(event) {
+    if (!position || !position.length) return;
+    try {
+      seekBar.setPointerCapture(event.pointerId);
+    } catch (error) {
+      /* A pointer the browser does not hold, as a test makes one; the bar follows it all the same. */
+    }
+    held = pointAt(event);
+    seekDraw();
+  }
+
+  function onSeekMove(event) {
+    if (held === null) return;
+    held = pointAt(event);
+    seekDraw();
+  }
+
+  function onSeekUp(event) {
+    if (held === null) return;
+    var point = pointAt(event);
+    held = null;
+    sendSeek(point);
+  }
+
+  function onPosition(event) {
+    position = JSON.parse(event.data);
+    seekDraw();
   }
 
   function bytesOf(encoded) {
@@ -80,7 +168,7 @@
     host.hidden = Boolean(text);
   }
 
-  /* Builds the drawing for the size the stage has now. */
+  /* Builds the drawing for the room its host has now. */
   function build() {
     drawing = null;
     if (!hello || !mapping) {
@@ -92,7 +180,7 @@
     }
     say("");
     var board = view === "mapping" ? OdrigBoard : null;
-    var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight, board);
+    var f = OdrigLayout.fit(mapping, host.clientWidth, host.clientHeight, board);
     drawing = OdrigView.build(host, mapping, hello.legs, f, board);
     if (newest) {
       drawing.paint(newest);
@@ -221,6 +309,7 @@
 
   function onFrame(event) {
     var space = event.data.indexOf(" ");
+    latestMs = Number(event.data.slice(0, space));
     newest = bytesOf(event.data.slice(space + 1));
     if (!waiting) {
       waiting = true;
@@ -315,6 +404,11 @@
   source.addEventListener("status", onStatus);
   source.addEventListener("log", onLog);
   source.addEventListener("frame", onFrame);
+  source.addEventListener("position", onPosition);
+  seekBar.addEventListener("pointerdown", onSeekDown);
+  seekBar.addEventListener("pointermove", onSeekMove);
+  seekBar.addEventListener("pointerup", onSeekUp);
+  seekBar.addEventListener("pointercancel", function () { held = null; seekDraw(); });
 
   host.addEventListener("pointermove", onPointer);
   host.addEventListener("pointerleave", function () {
@@ -328,7 +422,7 @@
   });
   window.addEventListener("hashchange", function () { show(named()); });
   show(view);
-  /* The drawing is made again whenever the stage changes its size. */
+  /* The drawing is made again whenever its host changes its room. */
   var sizing = false;
   function resized() {
     if (!sizing) {
@@ -340,7 +434,7 @@
     }
   }
   if (window.ResizeObserver) {
-    new ResizeObserver(resized).observe(stage);
+    new ResizeObserver(resized).observe(host);
   }
   window.addEventListener("resize", resized);
   setInterval(roll, 250);

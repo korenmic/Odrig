@@ -320,10 +320,11 @@ warning: --lan: anyone on the local network can send commands to this emulator a
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
 plain files in `emulator/web/`, loads nothing from another host, and works without a
-network connection. The page itself only shows: it sends no command. Every change on it
-comes from the [event stream](#the-event-stream), so a command sent by any tool is seen
-at once. Its third view holds the operators' app, which does send commands, as it does on
-a phone.
+network connection. The page itself only shows: it sends no command, and its one
+control, the seek bar, asks the emulator to move playback, which is no command. Every
+change on it comes from the [event stream](#the-event-stream), so a command sent by any
+tool is seen at once. Its third view holds the operators' app, which does send commands,
+as it does on a phone.
 
 From top to bottom the page has:
 
@@ -340,6 +341,13 @@ From top to bottom the page has:
 - **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
   each described below, with a readout at its top right that names what the pointer is
   on: `leg 2, pin 2, LED 61 (1,2)`.
+- **The seek bar**, under the drawing in every view that shows it: the id of the
+  animation on the LEDs, a bar of where it is in its loop, and `m:ss / m:ss`, the time
+  played and the loop's length, `h:mm:ss` from one hour. It says `length unknown` while
+  the length is not known, and shows nothing while nothing plays or a cycle plays.
+  Dragging the bar, or pressing on it, moves playback to that point, see
+  [Seeking](#seeking); for three seconds after it the row says by how much the
+  emulator's clock moved, `clock +12 s`.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
