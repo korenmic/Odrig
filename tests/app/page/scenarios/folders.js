@@ -1,5 +1,6 @@
-// The operator sees the groups of the card's folders on Animations, chooses a playlist by
-// its button or plays a row, and the card goes out and comes back.
+// The operator walks the card's folders on Animations as a file explorer: enters a
+// folder, goes back, chooses a playlist by the level's button or plays a row, moves and
+// selects within the level, and the card goes out and comes back.
 
 import {choose, menuOf, playRow, rowOf, rows, shown, state} from "../reading.js";
 
@@ -9,8 +10,8 @@ function pointer(app, type, target, x, y) {
 }
 
 // Holds a row, waits for it to lift, drags it to a height, and lets it go there, or back
-// where it began when `back` is set. Gives where the placeholder stood: the group and the
-// id of the row after it, or "end" of its group.
+// where it began when `back` is set. Gives where the placeholder stood: the row after it,
+// or "end" of the level.
 async function drag(app, id, toY, back = false) {
   const play = rowOf(app, id).querySelector(".play");
   play.scrollIntoView({block: "center"});
@@ -29,7 +30,7 @@ async function drag(app, id, toY, back = false) {
   let next = placeholder === null ? null : placeholder.nextElementSibling;
   if (next !== null && Number(next.dataset.id) === id) next = next.nextElementSibling;
   const before = next !== null && next.classList.contains("row") ? Number(next.dataset.id) : "end";
-  const landing = placeholder === null ? null : {group: placeholder.previousElementSibling?.dataset.group ?? null, before};
+  const landing = placeholder === null ? null : {lifted: app.doc.querySelector("#animations-list > .row.lifted") !== null, before};
   if (back) {
     pointer(app, "pointermove", app.doc, x, y);
     await app.sleep(30);
@@ -38,18 +39,25 @@ async function drag(app, id, toY, back = false) {
   return landing;
 }
 
-// The heads of the groups as the screen shows them, the root's first: the path, the id,
-// the heading's text, whether it is on the screen, whether it is marked as the current
-// playlist's, and its button's name.
-function heads(app) {
-  return [...app.doc.querySelectorAll("#root-head, #animations-list > .folder-head")].map((head) => ({
-    group: head.dataset.group ?? "",
-    id: head.dataset.id === undefined ? null : Number(head.dataset.id),
-    title: head.querySelector("h2").textContent,
-    shown: head.getClientRects().length > 0,
-    marked: head.getAttribute("aria-current") === "true",
-    button: head.querySelector("button").getAttribute("aria-label") || head.querySelector("button").textContent.trim(),
+const displayed = (element) => element.getClientRects().length > 0;
+
+// The folder rows of the level shown: the path, the id, the name, the count line and
+// whether the row is marked as leading to the current playlist.
+function folderRows(app) {
+  return [...app.doc.querySelectorAll("#animations-list > .folder-row")].map((row) => ({
+    path: row.dataset.path,
+    id: Number(row.dataset.id),
+    name: row.querySelector(".name").textContent,
+    meta: row.querySelector(".meta").textContent,
+    marked: row.getAttribute("aria-current") === "true",
+    shown: displayed(row),
   }));
+}
+
+// The level's head: its title, whether Back is shown, whether it is marked, its button.
+function levelOf(app) {
+  const back = app.byId("level-back");
+  return {title: app.text("level-title"), back: displayed(back), marked: app.byId("level-head").getAttribute("aria-current") === "true", button: app.text("play-all")};
 }
 
 function groupedRows(app) {
@@ -59,19 +67,44 @@ function groupedRows(app) {
 function seen(app) {
   return {
     ...state(app),
-    heads: heads(app),
+    level: levelOf(app),
     rows: groupedRows(app),
-    tests: app.byId("tests").hidden ? null : [...app.doc.querySelectorAll("#tests-grid button")].filter((button) => button.getClientRects().length > 0).length,
+    folders: folderRows(app),
+    filterEmpty: app.text("filter-empty"),
+    tests: app.byId("tests").hidden ? null : [...app.doc.querySelectorAll("#tests-grid button")].filter(displayed).length,
     testsHead: app.byId("tests").hidden ? null : app.text("tests-toggle"),
-    buttons: [...app.doc.querySelectorAll("#animations button")].filter((button) => button.getClientRects().length > 0).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
+    buttons: [...app.doc.querySelectorAll("#animations button")].filter(displayed).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
   };
+}
+
+function enter(app, path) {
+  const found = app.doc.querySelector(`#animations-list > .folder-row[data-path="${path}"]`);
+  if (found === null) {
+    throw new Error(`no folder row ${path}`);
+  }
+  found.click();
+}
+
+// Waits for the level a step names, and for its rows when the step counts them: up to
+// the list's refresh after a card went out or came in.
+async function settled(app, step) {
+  if (step.level !== undefined) {
+    await app.until(() => app.text("level-title") === step.level, `the level ${step.level}`, 15000);
+  }
+  if (step.rows !== undefined) {
+    await app.until(() => rows(app).length === step.rows, `${step.rows} rows`, 15000);
+  }
+  if (step.until !== undefined) {
+    await app.until(() => app.says(step.until), `on the screen: ${step.until}`, 15000);
+  }
+  await app.sleep(step.wait === undefined ? 200 : step.wait);
 }
 
 export default async function (app) {
   const settings = app.settings;
   await shown(app, settings.rows);
-  if (settings.heads !== undefined) {
-    await app.until(() => heads(app).length === settings.heads, `${settings.heads} groups`, 15000);
+  if (settings.folders !== undefined) {
+    await app.until(() => folderRows(app).length === settings.folders, `${settings.folders} folder rows`, 15000);
   }
   if (settings.until !== undefined) {
     await app.until(() => app.says(settings.until), `on the screen: ${settings.until}`, 8000);
@@ -84,71 +117,67 @@ export default async function (app) {
   }
   await app.sleep(settings.wait || 200);
   const found = {first: seen(app), steps: []};
-  for (const step of settings.presses ?? []) {
-    if (step.row !== undefined) {
+  for (const step of settings.steps ?? []) {
+    if (step.enter !== undefined) {
+      enter(app, step.enter);
+    } else if (step.back) {
+      app.press("Back");
+    } else if (step.top) {
+      app.pressIn("#level-head", "Play this folder");
+    } else if (step.row !== undefined) {
       playRow(app, step.row);
-    } else {
-      app.pressIn(step.pressIn, "Play this folder");
+    } else if (step.menus !== undefined) {
+      // The menu of each of these rows, its actions as they are offered.
+      const menus = {};
+      for (const id of step.menus) {
+        menus[id] = menuOf(app, id);
+        app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+      }
+      found.steps.push({menus});
+      continue;
+    } else if (step.menu !== undefined) {
+      const [id, words, expected] = step.menu;
+      menuOf(app, id);
+      choose(app, words);
+      await app.until(() => rows(app).map((row) => row.id).join() === expected.join(), "the order after the menu's move", 8000);
+      await app.until(() => rowOf(app, id).dataset.saving !== "true", "the move saved", 8000);
+    } else if (step.drag !== undefined) {
+      // A row dragged to the top of another row, or to the bottom of the list, and let go.
+      const {id, to, expected} = step.drag;
+      const target = to === "bottom" ? () => app.byId("animations-list").getBoundingClientRect().bottom - 4 : () => rowOf(app, to).getBoundingClientRect().top + 4;
+      const landing = await drag(app, id, target);
+      await app.until(() => rows(app).map((row) => row.id).join() === expected.join() && rowOf(app, id).dataset.saving !== "true", "the drag saved", 8000);
+      found.steps.push({landing, ...seen(app)});
+      continue;
+    } else if (step.back_drag !== undefined) {
+      // A row dragged away and brought back where it began: nothing moves.
+      const {id, to} = step.back_drag;
+      const landing = await drag(app, id, () => rowOf(app, to).getBoundingClientRect().top + 4, true);
+      await app.sleep(800);
+      found.steps.push({landing, ...seen(app)});
+      continue;
+    } else if (step.filter !== undefined) {
+      const [filter, words] = step.filter;
+      [...app.doc.querySelectorAll(`#filter-${filter} button`)].filter((button) => button.textContent.trim().split(" ")[0] === words)[0].click();
+      await app.sleep(100);
+      found.steps.push({...seen(app), filters: {
+        storage: [...app.doc.querySelectorAll("#filter-storage button")].map((button) => button.textContent.trim()),
+        type: [...app.doc.querySelectorAll("#filter-type button")].map((button) => button.textContent.trim()),
+      }});
+      continue;
+    } else if (step.select) {
+      app.press("Select");
+      app.press("Select all");
+      const selected = [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));
+      app.press("Done");
+      found.steps.push({selected, ...seen(app)});
+      continue;
+    } else if (step.step) {
+      // The card is pulled out, or plugged in again, by the test.
+      await app.step();
     }
-    await app.until(() => app.says(step.until), `on the screen: ${step.until}`, 8000);
-    await app.sleep(200);
+    await settled(app, step);
     found.steps.push(seen(app));
-  }
-  if (settings.menus !== undefined) {
-    // The menu of each of these rows, its actions as they are offered.
-    found.menus = {};
-    for (const id of settings.menus) {
-      found.menus[id] = menuOf(app, id);
-      app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
-    }
-  }
-  if (settings.menu !== undefined) {
-    const [id, words, expected] = settings.menu;
-    menuOf(app, id);
-    choose(app, words);
-    await app.until(() => rows(app).map((row) => row.id).join() === expected.join(), "the order after the menu's move", 8000);
-    await app.until(() => rowOf(app, id).dataset.saving !== "true", "the move saved", 8000);
-    found.afterMenu = groupedRows(app);
-  }
-  if (settings.drag !== undefined) {
-    // A row dragged to the top of another row, which may be of another group, and let go.
-    const {id, to, expected} = settings.drag;
-    found.landing = await drag(app, id, () => rowOf(app, to).getBoundingClientRect().top + 4);
-    await app.until(() => rows(app).map((row) => row.id).join() === expected.join() && rowOf(app, id).dataset.saving !== "true", "the drag saved", 8000);
-    found.afterDrag = groupedRows(app);
-  }
-  if (settings.back !== undefined) {
-    // A row dragged away and brought back where it began: nothing moves.
-    const {id, to} = settings.back;
-    found.backLanding = await drag(app, id, () => rowOf(app, to).getBoundingClientRect().top + 4, true);
-    await app.sleep(800);
-    found.afterBack = groupedRows(app);
-  }
-  if (settings.filter !== undefined) {
-    const [filter, words] = settings.filter;
-    const buttons = [...app.doc.querySelectorAll(`#filter-${filter} button`)].filter((button) => button.textContent.trim().split(" ")[0] === words);
-    buttons[0].click();
-    await app.sleep(100);
-    found.filtered = seen(app);
-    [...app.doc.querySelectorAll(`#filter-${filter} button`)].filter((button) => button.textContent.trim().split(" ")[0] === "All")[0].click();
-    await app.sleep(100);
-  }
-  if (settings.select) {
-    app.press("Select");
-    app.press("Select all");
-    found.selected = [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));
-    app.press("Done");
-  }
-  if (settings.card) {
-    // The card is pulled out, and plugged in again.
-    await app.step();
-    await app.until(() => heads(app).length === 1 && rows(app).length === settings.card.outRows, "the card pulled out", 15000);
-    await app.sleep(200);
-    found.out = seen(app);
-    await app.step();
-    await app.until(() => heads(app).length === settings.card.heads && app.says(settings.card.until), "the card back", 20000);
-    await app.sleep(200);
-    found.back = seen(app);
   }
   return found;
 }

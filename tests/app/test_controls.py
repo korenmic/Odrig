@@ -40,7 +40,7 @@ class Buttons(Controls):
 
     def test_an_animation_of_the_list_is_played_and_the_playlist_goes_back_to_its_start(self):
         emulator, address = self.emulator()
-        presses = [{"row": 2, "until": "Now 2 dvd\\.odrg"}, {"press": "Play this folder", "pressIn": "#root-head", "until": "Now 1 hello\\.odrg"}]
+        presses = [{"row": 2, "until": "Now 2 dvd\\.odrg"}, {"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play all", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play 2", "play all"])
         self.assertEqual([(step["playing"], step["now"], [row["id"] for row in step["rows"] if row["marked"]]) for step in seen],
@@ -51,7 +51,7 @@ class Buttons(Controls):
     def test_from_a_cycle_the_playlist_button_goes_to_the_playlist_and_no_button_plays_a_cycle(self):
         emulator, address = self.emulator(emulator_support.example_show)
         self.assertEqual(emulator.status()["playing"], 3)
-        presses = [{"press": "Play this folder", "pressIn": "#root-head", "until": "Now 1 hello\\.odrg Playlist"}]
+        presses = [{"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg Playlist"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play all", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play all"])
         self.assertEqual(emulator.status()["playing"], "all")

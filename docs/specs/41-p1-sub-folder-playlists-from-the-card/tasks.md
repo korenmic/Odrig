@@ -245,7 +245,7 @@ Rules for every task:
     session open. The seed stays `in_progress` for task 11.
   - Requirements: 8.1, 8.2, 10.5
 
-- [ ] 11. The app's explorer: the levels, the folder rows, the heading with `Back`, the level's button and the marks
+- [x] 11. The app's explorer: the levels, the folder rows, the heading with `Back`, the level's button and the marks
   - `app/www/screens/show.js` (the level kept in the screen, the level head with `Back`,
     the title and `#play-all` sending `play all` or `play <id>`, the level's rows and
     folder rows, the marks of the head and of the folder rows, `#none` and

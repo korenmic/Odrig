@@ -1,6 +1,7 @@
-"""The playlists of the card's folders on Animations: the groups in the order they play, the
-heading of each with its count and its button, the mark of the current playlist's group,
-and the line that says what plays with the time left."""
+"""The card's folders on Animations, as a file explorer shows them: one level at a time, the
+root's rows and the folder rows with their counts, entering a folder and Back, the heading
+of a level with its button, the marks of the current playlist, and the line that says what
+plays with the time left."""
 
 import json
 import pathlib
@@ -34,8 +35,6 @@ LISTED = {"ok": True, "items": [
     {"id": 60006, "file": "only/sub/y.odrg", "bytes": 1000, "external": True}], "next": None}
 ORDER = (200, json.dumps({"ok": True, "ids": [1, 2, 60001, 60002, 60003, 60004, 60005, 60006], "next": None, "revision": 3}))
 SPACE = (200, '{"ok":true,"free":8372224,"total":10354688,"animations":2,"external":{"present":true,"free":1000000,"total":2000000,"read_only":true}}\n')
-HEADS = [("", None, "Root \u00b7 4"), ("night", 60007, "night \u00b7 2"), ("night/deep", 60008, "night/deep \u00b7 1"), ("only", 60009, "only \u00b7 0"),
-         ("only/sub", 60010, "only/sub \u00b7 1")]
 
 
 def status(playing, animation, left=83520):
@@ -50,44 +49,68 @@ def target(playing, animation, left=83520, **more):
     return support.StandIn({"status": status(playing, animation, left), "list": (200, json.dumps(LISTED) + "\n"), "order": ORDER, "space": SPACE, "play": OK, **more})
 
 
-def summary(found):
-    return [(head["group"], head["id"], head["title"]) for head in found["heads"]]
+def folders(found):
+    return [(folder["path"], folder["id"], folder["meta"]) for folder in found["folders"]]
 
 
-class TheGroups(unittest.TestCase):
-    def test_the_groups_stand_in_the_order_they_play_with_their_counts_and_buttons(self):
+def ids(found):
+    return [row["id"] for row in found["rows"]]
+
+
+def marked(found):
+    """What is marked on the screen: the level's head, the folder rows and the rows."""
+    return {"level": found["level"]["marked"], "folders": [folder["path"] for folder in found["folders"] if folder["marked"]], "rows": [row["id"] for row in found["rows"] if row["marked"]]}
+
+
+class TheLevels(unittest.TestCase):
+    def test_the_root_holds_its_own_rows_and_a_row_for_each_folder_of_the_card(self):
         with target(60007, 60003) as stand_in:
-            found = support.run("folders", address=stand_in.address, settings={"rows": 8, "heads": 5}).seen["first"]
-        self.assertEqual(summary(found), HEADS)
-        self.assertEqual([head["shown"] for head in found["heads"]], [True] * 5)
-        self.assertEqual([head["button"] for head in found["heads"]], ["Play this folder", "Play folder night", "Play folder night/deep", "Play folder only", "Play folder only/sub"])
-        self.assertEqual([(row["id"], row["group"]) for row in found["rows"]],
-                         [(1, ""), (2, ""), (60001, ""), (60002, ""), (60003, "night"), (60004, "night"), (60005, "night/deep"), (60006, "only/sub")])
-        self.assertEqual([head["group"] for head in found["heads"] if head["marked"]], ["night"])
-        self.assertEqual([row["id"] for row in found["rows"] if row["marked"]], [60003])
+            found = support.run("folders", address=stand_in.address, settings={"rows": 4, "folders": 2}).seen["first"]
+        self.assertEqual(found["level"], {"title": "Root", "back": False, "marked": False, "button": "Play this folder"})
+        self.assertEqual([(row["id"], row["group"]) for row in found["rows"]], [(1, ""), (2, ""), (60001, ""), (60002, "")])
+        self.assertEqual(folders(found), [("night", 60007, "2 animations"), ("only", 60009, "0 animations")])
+        self.assertEqual([folder["name"] for folder in found["folders"]], ["night", "only"])
+        self.assertEqual(marked(found), {"level": False, "folders": ["night"], "rows": []})
         self.assertEqual(found["playing"], "Playlist night \u00b7 23 h 12 min left")
         self.assertEqual(found["buttons"][:4], ["On", "Off", "Add animation", "Select"])
-        self.assertEqual([name for name in found["buttons"] if name.startswith("Play")],
-                         ["Play this folder", "Play 1 one.odrg", "Play 2 two.odrg", "Play 60001 a.odrg", "Play 60002 b.odrg", "Play folder night", "Play 60003 night/comet.odrg",
-                          "Play 60004 night/zeta.odrg", "Play folder night/deep", "Play 60005 night/deep/x.odrg", "Play folder only", "Play folder only/sub", "Play 60006 only/sub/y.odrg"])
+        self.assertEqual([name for name in found["buttons"] if name.startswith(("Play", "Open", "Back"))],
+                         ["Play this folder", "Play 1 one.odrg", "Play 2 two.odrg", "Play 60001 a.odrg", "Play 60002 b.odrg", "Open folder night", "Open folder only"])
+
+    def test_a_tap_enters_a_folder_and_back_goes_up_to_the_root(self):
+        steps = [{"enter": "night", "level": "night", "rows": 2}, {"enter": "night/deep", "level": "night/deep", "rows": 1}, {"back": True, "level": "night", "rows": 2},
+                 {"back": True, "level": "Root", "rows": 4}, {"enter": "only", "level": "only", "rows": 0}, {"enter": "only/sub", "level": "only/sub", "rows": 1}]
+        with target(60008, 60005) as stand_in:
+            found = support.run("folders", address=stand_in.address, settings={"rows": 4, "folders": 2, "steps": steps}).seen
+        night, deep, night_again, root, only, sub = found["steps"]
+        self.assertEqual((night["level"], ids(night), folders(night)), ({"title": "night", "back": True, "marked": False, "button": "Play this folder"}, [60003, 60004], [("night/deep", 60008, "1 animation")]))
+        self.assertEqual([(row["id"], row["group"]) for row in night["rows"]], [(60003, "night"), (60004, "night")])
+        self.assertEqual((deep["level"]["title"], deep["level"]["back"], ids(deep), folders(deep)), ("night/deep", True, [60005], []))
+        self.assertEqual((night_again["level"]["title"], ids(night_again)), ("night", [60003, 60004]))
+        self.assertEqual((root["level"]["title"], root["level"]["back"], ids(root)), ("Root", False, [1, 2, 60001, 60002]))
+        self.assertEqual((only["level"]["title"], ids(only), folders(only)), ("only", [], [("only/sub", 60010, "1 animation")]))
+        self.assertEqual((sub["level"]["title"], ids(sub)), ("only/sub", [60006]))
+        # `night/deep` is current: marked at the root on `night`, in `night` on `night/deep`, and in `night/deep` on the head.
+        self.assertEqual(marked(found["first"]), {"level": False, "folders": ["night"], "rows": []})
+        self.assertEqual(marked(night), {"level": False, "folders": ["night/deep"], "rows": []})
+        self.assertEqual(marked(deep), {"level": True, "folders": [], "rows": [60005]})
 
     def test_the_line_names_the_root_a_folder_the_root_in_its_place_and_an_unknown_folder(self):
         cases = [
-            (("all", 1, 86400), "Playlist \u00b7 24 h 0 min left", ""),
-            (("all", 1, None), "Playlist", ""),
-            ((60008, 60005, 3661), "Playlist night/deep \u00b7 1 h 1 min left", "night/deep"),
-            ((60007, 1, 83520), "Playlist night, the root plays for now \u00b7 23 h 12 min left", "night"),
-            ((60007, 60005, 83520), "Playlist night \u00b7 23 h 12 min left", "night"),
-            ((60009, 60001, 59), "Playlist only, the root plays for now \u00b7 0 h 0 min left", "only"),
-            ((60099, 1, 83520), "Playlist 60099 \u00b7 23 h 12 min left", None),
+            (("all", 1, 86400), "Playlist \u00b7 24 h 0 min left", {"level": True, "folders": []}),
+            (("all", 1, None), "Playlist", {"level": True, "folders": []}),
+            ((60008, 60005, 3661), "Playlist night/deep \u00b7 1 h 1 min left", {"level": False, "folders": ["night"]}),
+            ((60007, 1, 83520), "Playlist night, the root plays for now \u00b7 23 h 12 min left", {"level": False, "folders": ["night"]}),
+            ((60007, 60005, 83520), "Playlist night \u00b7 23 h 12 min left", {"level": False, "folders": ["night"]}),
+            ((60009, 60001, 59), "Playlist only, the root plays for now \u00b7 0 h 0 min left", {"level": False, "folders": ["only"]}),
+            ((60099, 1, 83520), "Playlist 60099 \u00b7 23 h 12 min left", {"level": False, "folders": []}),
         ]
-        for (playing, animation, left), words, marked in cases:
+        for (playing, animation, left), words, marks in cases:
             with self.subTest(playing=playing, animation=animation, left=left):
                 with target(playing, animation, left) as stand_in:
-                    found = support.run("folders", address=stand_in.address, settings={"rows": 8, "heads": 5, "wait": 1500 if playing == 60099 else 0}).seen["first"]
+                    found = support.run("folders", address=stand_in.address, settings={"rows": 4, "folders": 2, "wait": 1500 if playing == 60099 else 0}).seen["first"]
                     lists = [line for _, line in stand_in.lines if line.startswith(b"list")]
                 self.assertEqual(found["playing"], words)
-                self.assertEqual([head["group"] for head in found["heads"] if head["marked"]], [] if marked is None else [marked])
+                self.assertEqual({key: marked(found)[key] for key in marks}, marks)
                 if playing == 60099:
                     # A playlist the list does not hold: the list is asked for again at once.
                     self.assertGreaterEqual(len(lists), 2)
@@ -96,25 +119,24 @@ class TheGroups(unittest.TestCase):
         flat = {"ok": True, "items": [{"id": 1, "file": "one.odrg", "bytes": 1000, "ignored": False}, {"id": 3, "cycle": [1], "seconds": 5}], "next": None}
         with support.StandIn({"status": status(3, 1), "list": (200, json.dumps(flat) + "\n"), "space": SPACE}) as stand_in:
             found = support.run("folders", address=stand_in.address, settings={"rows": 1}).seen["first"]
-        self.assertEqual((found["playing"], summary(found)), ("Cycle 3", [("", None, "Root \u00b7 1")]))
-        self.assertEqual([head["marked"] for head in found["heads"]], [False])
+        self.assertEqual((found["playing"], found["level"], folders(found)), ("Cycle 3", {"title": "Root", "back": False, "marked": False, "button": "Play this folder"}, []))
         with support.StandIn({"status": status("all", 1), "list": (200, json.dumps(flat) + "\n"), "space": SPACE}) as stand_in:
             found = support.run("folders", address=stand_in.address, settings={"rows": 1}).seen["first"]
-        self.assertEqual((found["playing"], [head["marked"] for head in found["heads"]]), ("Playlist", [True]))
+        self.assertEqual((found["playing"], found["level"]["marked"]), ("Playlist", True))
 
-    def test_the_tests_group_stays_above_the_groups_untouched(self):
+    def test_the_tests_group_stays_above_the_list_untouched(self):
         mapping = (200, json.dumps({"ok": True, "editable": True, "pins": list(range(1, 19)) + [21, 47], "revision": 1, "test": False, "snake": None}))
         with target(60007, 60003, mapping=mapping) as stand_in:
-            found = support.run("folders", address=stand_in.address, settings={"rows": 8, "heads": 5, "tests": True}).seen["first"]
-        self.assertEqual((found["tests"], found["testsHead"]), (21, "Tests \u00b7 21"))
-        self.assertEqual(summary(found), HEADS)
+            found = support.run("folders", address=stand_in.address, settings={"rows": 4, "folders": 2, "tests": True, "steps": [{"enter": "night", "level": "night", "rows": 2}]}).seen
+        self.assertEqual((found["first"]["tests"], found["first"]["testsHead"]), (21, "Tests \u00b7 21"))
+        self.assertEqual((found["steps"][0]["tests"], found["steps"][0]["testsHead"]), (21, "Tests \u00b7 21"))
 
 
 class AgainstTheEmulator(unittest.TestCase):
     def card(self, zeta=False):
         """The example show with a card of nested folders: `a.odrg` loose, `night/comet.odrg`
         and with `zeta` `night/zeta.odrg`, `night/deep/x.odrg`, `only/sub/y.odrg`, and an
-        empty folder that is no group."""
+        empty folder that is no folder of the list."""
         folder = entered(self, emulator_support.example_show())
         top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
         animation = (folder / "hello.odrg").read_bytes()
@@ -128,103 +150,51 @@ class AgainstTheEmulator(unittest.TestCase):
         while len(json.loads(emulator.command("list"))["items"]) < (11 if zeta else 10) and time.monotonic() < deadline:
             time.sleep(0.1)
         items = json.loads(emulator.command("list"))["items"]
-        folders = {item["playlist"]: item["id"] for item in items if "playlist" in item}
-        return emulator, top, folders
+        folders_ = {item["playlist"]: item["id"] for item in items if "playlist" in item}
+        return emulator, top, folders_
 
-    def test_play_this_folder_on_a_folder_and_on_the_root_and_a_row_outside_the_folder(self):
-        emulator, _, folders = self.card()
-        night = folders["night"]
-        presses = [
-            {"pressIn": '[data-group="night"]', "until": "Playlist night \u00b7 2[34] h [0-9]+ min left"},
+    def test_play_this_folder_inside_a_folder_and_at_the_root_and_a_row_outside_the_folder(self):
+        emulator, _, folders_ = self.card()
+        night = folders_["night"]
+        steps = [
+            {"enter": "night", "level": "night", "rows": 1},
+            {"top": True, "until": "Playlist night \u00b7 2[34] h [0-9]+ min left"},
+            {"back": True, "level": "Root", "rows": 3},
             {"row": 1, "until": "Playlist night, the root plays for now \u00b7 2[34] h [0-9]+ min left"},
-            {"pressIn": "#root-head", "until": "Now 1 hello\\.odrg Playlist \u00b7 2[34] h [0-9]+ min left"},
+            {"top": True, "until": "Now 1 hello\\.odrg Playlist \u00b7 2[34] h [0-9]+ min left"},
         ]
-        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 6, "heads": 5, "presses": presses}).seen
-        self.assertEqual(summary(found["first"]), [("", None, "Root \u00b7 3"), ("night", night, "night \u00b7 1"), ("night/deep", folders["night/deep"], "night/deep \u00b7 1"),
-                                                   ("only", folders["only"], "only \u00b7 0"), ("only/sub", folders["only/sub"], "only/sub \u00b7 1")])
-        # The example show begins with its cycle: no group is marked until a playlist is chosen.
-        self.assertEqual((found["first"]["playing"], [head["marked"] for head in found["first"]["heads"]]), ("Cycle 3", [False] * 5))
-        chosen, jumped, root = found["steps"]
-        self.assertEqual([head["group"] for head in chosen["heads"] if head["marked"]], ["night"])
-        self.assertEqual([row["id"] for row in chosen["rows"] if row["marked"]], [60002])
-        self.assertEqual([head["group"] for head in jumped["heads"] if head["marked"]], ["night"])
-        self.assertEqual([row["id"] for row in jumped["rows"] if row["marked"]], [1])
-        self.assertEqual([head["group"] for head in root["heads"] if head["marked"]], [""])
-        status = emulator.status()
-        self.assertEqual((status["playing"], status["animation"]), ("all", 1))
+        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "steps": steps}).seen
+        # The example show begins with its cycle: no playlist is marked, the row on the LEDs is.
+        self.assertEqual(found["first"]["playing"], "Cycle 3")
+        self.assertEqual(ids(found["first"]), [1, 2, 60001])
+        self.assertEqual(folders(found["first"]), [("night", night, "1 animation"), ("only", folders_["only"], "0 animations")])
+        self.assertEqual(marked(found["first"]), {"level": False, "folders": [], "rows": [1]})
+        entered_night, chosen, root, jumped, root_chosen = found["steps"]
+        self.assertEqual((ids(entered_night), folders(entered_night)), ([60002], [("night/deep", folders_["night/deep"], "1 animation")]))
+        self.assertEqual(marked(chosen), {"level": True, "folders": [], "rows": [60002]})
+        self.assertEqual(marked(root), {"level": False, "folders": ["night"], "rows": []})
+        self.assertEqual(marked(jumped), {"level": False, "folders": ["night"], "rows": [1]})
+        self.assertEqual(marked(root_chosen), {"level": True, "folders": [], "rows": [1]})
+        status_ = emulator.status()
+        self.assertEqual((status_["playing"], status_["animation"]), ("all", 1))
 
-    def test_the_card_out_and_in(self):
-        emulator, top, folders = self.card()
-        self.assertEqual(json.loads(emulator.command(f"play {folders['night']}")), {"ok": True})
+    def test_the_card_out_brings_the_list_to_the_root_and_the_card_in_shows_the_folders_again(self):
+        emulator, top, folders_ = self.card()
+        self.assertEqual(json.loads(emulator.command(f"play {folders_['night']}")), {"ok": True})
 
         def pull():
             shutil.move(str(top / "odrig"), str(top / "away"))
 
         def plug():
             shutil.move(str(top / "away"), str(top / "odrig"))
-        settings = {"rows": 6, "heads": 5, "until": "Playlist night", "card": {"outRows": 2, "heads": 5, "until": "Playlist night"}}
-        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings=settings, steps=[pull, plug]).seen
-        self.assertEqual(found["out"]["playing"], "Playlist")
-        self.assertEqual(summary(found["out"]), [("", None, "Root \u00b7 2")])
-        self.assertEqual([head["marked"] for head in found["out"]["heads"]], [True])
-        # The root plays in the folder's place until the turn in progress ends.
-        self.assertRegex(found["back"]["playing"], r"\APlaylist night(, the root plays for now)? \u00b7 2[34] h [0-9]+ min left\Z")
-        self.assertEqual([head["group"] for head in found["back"]["heads"]], ["", "night", "night/deep", "only", "only/sub"])
-        self.assertEqual([head["group"] for head in found["back"]["heads"] if head["marked"]], ["night"])
-
-
-class MovesFiltersAndSelectionWithGroups(AgainstTheEmulator):
-    def order_of(self, emulator):
-        reply = json.loads(emulator.command("order get"))
-        return reply["ids"], reply["revision"]
-
-    def test_move_up_and_move_down_stay_within_a_group(self):
-        emulator, _, folders = self.card(zeta=True)
-        address = f"127.0.0.1:{emulator.port}"
-        # `night` holds comet, 60002, and zeta, 60003: comet cannot move up, zeta cannot
-        # move down, and comet moved down goes last in the saved order yet after zeta in
-        # its group.
-        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menus": [60002, 60003, 1]}).seen
-        self.assertEqual(found["menus"]["60002"][:2], ["Move up (disabled)", "Move down"])
-        self.assertEqual(found["menus"]["60003"][:2], ["Move up", "Move down (disabled)"])
-        self.assertEqual(found["menus"]["1"][:3], ["Ignore in playlist", "Move up (disabled)", "Move down"])
-        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menu": [60002, "Move down", [1, 2, 60001, 60003, 60002, 60004, 60005]]}).seen
-        self.assertEqual([(row["id"], row["group"]) for row in found["afterMenu"]][3:5], [(60003, "night"), (60002, "night")])
-        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60003, 60004, 60005, 60002])
-        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menu": [60002, "Move up", [1, 2, 60001, 60002, 60003, 60004, 60005]]}).seen
-        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60002, 60003, 60004, 60005])
-
-    def test_a_drag_lands_within_the_group_and_a_drop_in_place_sends_nothing(self):
-        emulator, _, folders = self.card(zeta=True)
-        address = f"127.0.0.1:{emulator.port}"
-        _, revision = self.order_of(emulator)
-        # Zeta dragged to the top of the list stops at the top of its group, before comet.
-        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "drag": {"id": 60003, "to": 1, "expected": [1, 2, 60001, 60003, 60002, 60004, 60005]}}).seen
-        self.assertEqual(found["landing"], {"group": "night", "before": 60002})
-        self.assertEqual([(row["id"], row["group"]) for row in found["afterDrag"]][3:5], [(60003, "night"), (60002, "night")])
-        ids, moved = self.order_of(emulator)
-        self.assertEqual(ids, [1, 2, 60001, 60003, 60002, 60004, 60005])
-        self.assertNotEqual(moved, revision)
-        # Comet, last of its group, dragged below every other row stays last of its group and
-        # sends nothing; a row brought back where it began sends nothing either.
-        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "drag": {"id": 60002, "to": 60005, "expected": [1, 2, 60001, 60003, 60002, 60004, 60005]},
-                                                                  "back": {"id": 60003, "to": 60005}}).seen
-        self.assertEqual(found["landing"]["before"], "end")
-        self.assertEqual([row["id"] for row in found["afterBack"]], [1, 2, 60001, 60003, 60002, 60004, 60005])
-        self.assertEqual(self.order_of(emulator), (ids, moved))
-
-    def test_the_filters_hide_a_group_with_rows_and_never_a_folder_without_one_and_selection_takes_rows(self):
-        emulator, _, folders = self.card()
-        address = f"127.0.0.1:{emulator.port}"
-        found = support.run("folders", address=address, settings={"rows": 6, "heads": 5, "filter": ["storage", "Internal"], "select": True}).seen
-        filtered = found["filtered"]
-        self.assertEqual([(head["group"], head["shown"]) for head in filtered["heads"]], [("", True), ("night", False), ("night/deep", False), ("only", True), ("only/sub", False)])
-        self.assertEqual([row["id"] for row in filtered["rows"]], [1, 2])
-        self.assertEqual(found["selected"], [1, 2])
-        self.assertEqual(found["first"]["externalLine"].split(",")[0], "External storage: 4 animations")
-        found = support.run("folders", address=address, settings={"rows": 6, "heads": 5, "filter": ["storage", "External"]}).seen
-        self.assertEqual([(head["group"], head["shown"]) for head in found["filtered"]["heads"]], [("", True), ("night", True), ("night/deep", True), ("only", True), ("only/sub", True)])
-        self.assertEqual([row["id"] for row in found["filtered"]["rows"]], [60001, 60002, 60003, 60004])
+        steps = [{"enter": "night", "level": "night", "rows": 1}, {"step": True, "level": "Root", "rows": 2, "wait": 500}, {"step": True, "until": "Playlist night", "rows": 3, "wait": 500}]
+        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "until": "Playlist night", "steps": steps}, steps=[pull, plug]).seen
+        inside, out, back = found["steps"]
+        self.assertEqual((inside["level"]["title"], marked(inside)["level"]), ("night", True))
+        self.assertEqual((out["level"]["title"], out["level"]["back"], ids(out), folders(out), out["playing"]), ("Root", False, [1, 2], [], "Playlist"))
+        self.assertEqual(marked(out), {"level": True, "folders": [], "rows": [1]})
+        self.assertRegex(back["playing"], r"\APlaylist night(, the root plays for now)? \u00b7 2[34] h [0-9]+ min left\Z")
+        self.assertEqual(([folder["path"] for folder in back["folders"]], marked(back)["folders"]), (["night", "only"], ["night"]))
 
 
 if __name__ == "__main__":

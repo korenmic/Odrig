@@ -850,17 +850,18 @@ input[type="checkbox"] {
   overflow: auto;
 }
 
-/* The groups of the list: the root's head before it and a folder's head among the rows,
-   each with its path and count and its button; the current playlist's head is marked. */
+/* The level of the explorer: its head with Back, the path and the level's button, and the
+   row of a sub-folder among the rows, entered with a tap; the head of the current
+   playlist and the folder rows that lead to it are marked. */
 .folder-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin: 8px 0;
 }
 
 .folder-head h2 {
+  flex: 1 1 auto;
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -870,13 +871,52 @@ input[type="checkbox"] {
   width: auto;
   flex: 0 0 auto;
   margin: 0;
-  min-height: 44px;
-}
-
-#play-all {
   min-height: 48px;
 }
 
 .folder-head[aria-current="true"] h2 {
   color: var(--teal);
+}
+
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 60px;
+  margin: 8px 0;
+  padding: 4px 14px 4px 10px;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+}
+
+.folder-row .folder-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.folder-row .name {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.folder-row .meta {
+  display: block;
+  font-size: 14px;
+  color: var(--lesser);
+}
+
+.folder-row .chevron {
+  flex: 0 0 auto;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--lesser);
+}
+
+.folder-row[aria-current="true"] {
+  border-color: var(--edge-strong);
+  box-shadow: 0 0 16px rgba(69, 224, 210, 0.28);
 }
