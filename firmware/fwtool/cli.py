@@ -39,6 +39,8 @@ def parser():
     kind.add_argument("--stock", dest="kind", action="store_const", const="stock", default="firmware", help="build WLED's own environment, unchanged")
     kind.add_argument("--probe", dest="kind", action="store_const", const="probe", help="build the probe build, which also reports measurements")
     builder.add_argument("--standalone", action="store_true", help="build the standalone firmware, which holds nothing of WLED; with --probe, its probe build")
+    builder.add_argument("--trial", action="store_true", help="build the firmware on the newer USB software, for its trial; with --probe, the trial's probe build")
+    builder.add_argument("--microsd", action="store_true", help="build the SPI microSD variant on the newer software; its pins must be configured before use")
     builder.add_argument("--verbose", action="store_true", help="show every command of the build")
     flash = commands.add_parser("flash", help="write a built image to the board over USB")
     flash.add_argument("--port", metavar="P", help="the board's USB serial port")
@@ -96,7 +98,14 @@ def _setup(arguments):
 
 
 def _build(arguments):
-    kind = {"firmware": "standalone", "probe": "standalone-probe"}[arguments.kind] if arguments.standalone else arguments.kind
+    if arguments.microsd:
+        kind = "microsd"
+    elif arguments.standalone:
+        kind = {"firmware": "standalone", "probe": "standalone-probe"}[arguments.kind]
+    elif arguments.trial:
+        kind = build.TRIAL_OF[arguments.kind]
+    else:
+        kind = arguments.kind
     image, size = build.build(kind, arguments.verbose)
     print(f"{image}: {size} bytes, SHA-256 {build.sha256(image)}")
     return 0
@@ -412,8 +421,15 @@ def parsed(argv):
     """The arguments of a command line. What does not go together is a usage error."""
     made = parser()
     arguments = made.parse_args(argv)
+    if arguments.command == "build" and arguments.microsd:
+        if arguments.kind != "firmware" or arguments.trial or arguments.standalone:
+            made.error("--microsd does not go with --stock, --probe, --trial or --standalone")
     if arguments.command == "build" and arguments.standalone and arguments.kind == "stock":
         made.error("--standalone does not go with --stock: the standalone firmware holds nothing of WLED")
+    if arguments.command == "build" and arguments.trial and arguments.kind == "stock":
+        made.error("--trial does not go with --stock: stock WLED is built on the software it comes with")
+    if arguments.command == "build" and arguments.trial and arguments.standalone:
+        made.error("--trial does not go with --standalone: the trial is of the firmware with WLED")
     return arguments
 
 

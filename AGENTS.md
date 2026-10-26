@@ -36,7 +36,7 @@ stored with them.
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
-| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/firmware-additions.md](docs/firmware-additions.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
+| Change the firmware, or do anything with the board | [docs/firmware.md](docs/firmware.md), [docs/firmware-prerequisites.md](docs/firmware-prerequisites.md), [docs/firmware-additions.md](docs/firmware-additions.md), [docs/microsd.md](docs/microsd.md), [docs/wifi.md](docs/wifi.md), and "If you have a board" in the working rules |
 | Find out what was decided, and why | [docs/decisions.md](docs/decisions.md), then [docs/drifts.md](docs/drifts.md) |
 
 `docs/drifts.md` is long: it holds every question that was settled on the way. Search it
@@ -136,6 +136,7 @@ present, and do not build on them.
 - **Managed internal and external animation catalogs**, seed 35: no full check at every start.
 - **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
 - **ODRGX text and clock animations**, seed 37: text and clocks as animations.
+- **A microSD card as the external storage**, seed 38: the board runs it; the card checks are open.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 

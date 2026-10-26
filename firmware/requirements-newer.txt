@@ -1,0 +1,29 @@
+# The Python packages of the newer USB software: the PlatformIO its platform asks for, with
+# what it needs at the versions WLED's own requirements.txt pins, and Node.js, with which
+# WLED's build packs its pages. All go into build/firmware/newer/venv.
+ajsonrpc==1.2.0
+anyio==4.8.0
+bottle==0.13.2
+certifi==2025.1.31
+chardet==5.2.0
+charset-normalizer==3.4.1
+click==8.1.8
+colorama==0.4.6
+h11==0.16.0
+idna==3.10
+marshmallow==3.26.1
+nodejs-wheel==20.18.0
+nodejs-wheel-binaries==20.18.0
+packaging==24.2
+platformio==6.2.0
+pyelftools==0.32
+pyserial==3.5
+requests==2.33.0
+semantic-version==2.10.0
+sniffio==1.3.1
+starlette==0.45.3
+tabulate==0.9.0
+typing-extensions==4.12.2
+urllib3==2.5.0
+uvicorn==0.34.0
+wsproto==1.2.0

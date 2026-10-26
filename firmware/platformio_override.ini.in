@@ -1,7 +1,9 @@
 ; The build environments of the firmware. `python3 firmware/fw.py build` writes this file
 ; into WLED's folder as platformio_override.ini, with the repository's path filled in.
 ; Everything not named here is inherited from WLED's own environment esp32s3dev_16MB_opi:
-; the board, the platform, the partition table and the flash settings.
+; the board, the platform, the partition table and the flash settings. The trial and
+; microSD environments take the platform of the newer USB software, which that software's
+; own PlatformIO builds, in build/firmware/newer/.
 
 [env:odrig]
 extends = env:esp32s3dev_16MB_opi
@@ -25,3 +27,32 @@ build_flags = ${common.build_flags} ${esp32s3.build_flags}
 extends = env:odrig
 build_flags = ${env:odrig.build_flags}
   -D ODRIG_PROBE
+
+[env:odrig_trial]
+extends = env:odrig
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312-1/platform-espressif32.zip
+platform_packages =
+lib_ignore = esp_dmx
+  IRremoteESP8266
+  NeoESP32RmtHI
+build_unflags = ${env:odrig.build_unflags}
+  -D WLED_ENABLE_DMX_INPUT
+build_flags = ${env:odrig.build_flags}
+  -D WLED_DISABLE_INFRARED
+  -D WLED_USE_SHARED_RMT
+  -D ESP32_ARDUINO_NO_RGB_BUILTIN
+  -include @REPO@/firmware/newer/odrig_newer.h
+
+[env:odrig_trial_probe]
+extends = env:odrig_trial
+build_flags = ${env:odrig_trial.build_flags}
+  -D ODRIG_PROBE
+
+[env:odrig_microsd]
+extends = env:odrig_trial
+build_flags = ${env:odrig_trial.build_flags}
+  -D ODRIG_DRIVE_SD_SPI
+  -D ODRIG_SD_SCK=39
+  -D ODRIG_SD_MISO=40
+  -D ODRIG_SD_MOSI=41
+  -D ODRIG_SD_CS=42
