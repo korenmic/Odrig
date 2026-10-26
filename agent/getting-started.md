@@ -181,7 +181,7 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null,"left":86399}
 ```
 
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,

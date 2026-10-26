@@ -326,6 +326,10 @@ more than the 1,779,280 of the same seeds without them, 55.4% of the firmware sl
 and of the sine, 1,464 for `small`, 1,952 for `medium` and 2,048 for the sine, which stay
 in the flash; the static memory is the same, 70,012 bytes, 21.4%. It was not flashed.
 
+With the folders of the card, the window and the saved playlist of seed 41, `build` made
+`odrig-firmware.bin` of 1,827,264 bytes on 2026-10-26, SHA-256
+`5b487c68492a25e133f604a2cf666e4c866ed2b1fef33ed307317f0b67ecffd3`. It was not flashed.
+
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
 standard output names the image:
@@ -830,7 +834,7 @@ as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
-{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86400}
 ```
 
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over

@@ -231,7 +231,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 7.6, 8.1, 10.4
 
-- [ ] 10. Every suite, the firmware and the APK, the vocabulary and the decision
+- [x] 10. Every suite, the firmware and the APK, the vocabulary and the decision
   - Every suite that runs without a board and without a phone, all passing;
     `python3 firmware/fw.py build`, the binary and its SHA-256 recorded in
     `docs/firmware.md`; `python3 app/app.py build` and `tests/apk`.

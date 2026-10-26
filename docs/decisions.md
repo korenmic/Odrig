@@ -208,7 +208,13 @@ are in [format.md](format.md), "Measured sizes".
   show gives it a repeat count, a longest duration, or another shortest time. Playing an
   animation by its ID is a jump in the playlist, which goes on after it. A cycle plays
   only when the show names it as its start or a command names it. See
-  [show.md](show.md).
+  [show.md](show.md). With a card whose folder `odrig` has sub-folders, each folder is a
+  playlist of its own: the root playlist plays the show's animations and the loose files
+  and then each folder once, a folder's plays its own files and then its sub-folders'
+  once, the playlist chosen by `play` is current for 24 hours of the board's running time
+  and then the next in the tree's order is, calendar time never considered, the choice is
+  kept across a restart, and the saved order names a card file by its path from `odrig`
+  (the owner, 2026-10-26, seed 41).
 - Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
   characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
 - An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
@@ -714,3 +720,14 @@ are in [format.md](format.md), "Measured sizes".
   APK from the same files; a difference between the Controller view and the APK is a
   fault, not a version; the APK is built from the commit the owner runs and its report
   names that commit; a coding agent never switches the owner's checkout.
+- 2026-10-26: The owner's ruling for seed 41: the sub-folders of the card's folder `odrig`
+  are playlists of their own, chosen from the app as the playlist that plays now, the
+  root among them; a chosen playlist is a persistent decision, kept across a restart; a
+  playlist plays for 24 hours of running time and then the next one starts, calendar time
+  never considered; a playlist plays its own items first and then each of its sub-folders
+  once. Seed 41 is built, its tasks 1 to 10: the path rule and the depth-first listing of
+  the firmware, the emulator, the test host and the PC tool; the core's tree of folders,
+  the exhausting order, the 24-hour window, the saved file `playlist.txt`; the folder
+  items of `list`, `playing` as a folder's id and `left` of `status`; and the app's groups
+  with `Play this folder`. The firmware is built and not flashed; the owner's session with
+  the board and a phone is open.
