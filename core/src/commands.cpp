@@ -203,6 +203,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The seconds left in the current playlist's window, the last member.
+    reply.text(",\"left\":");
+    reply.number(player_window_left(core));
     reply.text("}\n");
     return reply.length;
 }
@@ -471,7 +474,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         uint32_t item = kNothing;
         if (all) {
             tree_choose(core, 0);
-            player_playlist_chosen(core);
+            player_playlist_chosen(core, core.latest);
             item = player_first_in_playlist(core);
         }
         for (uint32_t position = 0; !all && item == kNothing && position < core.item_count; ++position) {
@@ -493,7 +496,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             folder = tree_folder_with_id(core, id);
             if (folder != kFolderMost) {
                 tree_choose(core, folder);
-                player_playlist_chosen(core);
+                player_playlist_chosen(core, core.latest);
                 item = player_first_in_playlist(core);
             }
         }

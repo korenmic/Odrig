@@ -150,7 +150,7 @@ Rules for every task:
   - Requirements: 3.1, 3.2, 3.3, 4.6 (the root in place), 5.4 (`playing`), 8.1, 9.2, 10.1,
     10.2
 
-- [ ] 6. The window, the rotation and `left`
+- [x] 6. The window, the rotation and `left`
   - `core/src/player.cpp`, `core/src/clock.cpp`: `kWindowMs`, `window_started` at the
     first timestamp, the judging at a turn's end, at a refresh during a cycle or nothing,
     and in `mapping_test_stop`; the rotation to the next of the table and to the root, and

@@ -87,6 +87,19 @@ has nothing to play, the card out or not yet read or every file of its folders
 unavailable, the root plays in its place, and the current playlist takes over at the end
 of the turn in progress, from its first animation, as soon as it has something to play.
 
+A current playlist plays for a window of 24 hours of the board's running time from the
+moment it became current, the time the LEDs are off and the time a cycle or a jump plays
+included; calendar time is never considered. When the window has passed, the turn in
+progress ends as it would, and the next playlist in the tree's order becomes current with
+a window of its own, the root after the last: a card of the folders `a`, `b` and `b/c`
+plays the root for a day, then `a`, `b`, `b/c`, and the root again. A window that ends
+while a cycle plays changes which playlist is current and not what plays; the cycle goes
+on until a command ends it. A window that ends while a mapping test shows is taken when
+the test ends. While the tree is not known, the card out or not yet read, the window's
+end makes the root current with a fresh window. With no folder on the card the root is
+the only playlist and its window changes nothing that plays. `status` says the seconds
+left in the window as `left`.
+
 At power-on a show plays the playlist, from its first animation, or from the animation
 `start` names. Only a `start` that names a cycle plays something else: that cycle.
 

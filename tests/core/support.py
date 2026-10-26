@@ -445,13 +445,14 @@ def demo_show():
     return dict(_demo_show())
 
 
-# The members of a reply of `status` that say how far the check is.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host")
+# The members of a reply of `status` that say how far the check is, with the seconds left
+# in the current playlist's window, which runs with the time.
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "left")
 
 
 def without_readiness(state):
-    """A reply of `status`, as a value, without the members that say how far the check is,
-    for tests of the others."""
+    """A reply of `status`, as a value, without the members that say how far the check is
+    and the window's seconds left, for tests of the others."""
     return {name: value for name, value in state.items() if name not in READINESS}
 
 
@@ -692,6 +693,7 @@ class ReferencePlayer:
     """
 
     GRID = 20
+    WINDOW = 86_400_000     # the window of a current playlist, in ms
     PARTS = ("upload.part", "show.part")
     PENDING = "pending.txt"
     CHUNK = 1500
@@ -741,6 +743,7 @@ class ReferencePlayer:
         self.zero = None        # the time zero of that item, once a refresh has set it
         self.shown = None       # the id of the animation item the latest refresh chose
         self.t0 = None          # the power-on moment
+        self.window_started = None  # when the current playlist, the root, became current
         self.latest = None
         self.next_due = None
         self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
@@ -942,7 +945,7 @@ class ReferencePlayer:
     def _touch(self, now):
         """Takes the timestamp of a call and gives the time the call happens at."""
         if self.t0 is None:
-            self.t0 = self.latest = self.next_due = now
+            self.t0 = self.latest = self.next_due = self.window_started = now
         self.latest = max(self.latest, now)
         # An upload on which nothing has moved for a minute is discarded.
         if self.upload is not None and self.latest - self.upload["progress"] >= self.QUIET:
@@ -980,6 +983,10 @@ class ReferencePlayer:
                         break
                 elapsed -= turn
                 self.zero += turn
+                if self.zero >= self.window_started + self.WINDOW:
+                    # The window passed during the turn: the root is current again from
+                    # the turn's end, with a fresh window, and nothing else changes.
+                    self.window_started = self.zero
                 self.turn = order[(order.index(self.turn) + 1) % len(order)]
         else:
             # Turn t of a cycle shows the animation at place t mod n, with its time
@@ -1025,6 +1032,9 @@ class ReferencePlayer:
         now = self._touch(now)
         if not self.legs or now < self.next_due:
             return None
+        if self.playing != self.ALL and now >= self.window_started + self.WINDOW:
+            # The window passed while a cycle or nothing plays: judged at the refresh.
+            self.window_started = now
         grid = self.t0 + (now - self.t0) // self.GRID * self.GRID
         self.next_due = grid + self.GRID
         self.refreshes_in[(now - self.t0) // 1000] += 1
@@ -1124,6 +1134,8 @@ class ReferencePlayer:
                 return "show-invalid"
             if not self._animations():
                 return "unknown-id"
+            # The root chosen: its window begins anew, at the command's time.
+            self.window_started = self.latest
             self._play_all()
             return None
         value = None
@@ -1483,8 +1495,10 @@ class ReferencePlayer:
         readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
         state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
                      checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
-        # The seed of the clock on the LEDs, the last member.
+        # The seed of the clock on the LEDs, then the seconds left in the window of the
+        # current playlist, the root, the last member.
         state["seed"] = self.seed if self.seed_shown and self.error is None and self.playing is not None else None
+        state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def feed(self, now, data):

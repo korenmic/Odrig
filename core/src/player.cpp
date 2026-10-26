@@ -340,10 +340,25 @@ uint32_t next_in(const Core &core, Range range, uint32_t position) {
     return after != kNothing ? after : first_in(core, range);
 }
 
+// When the current playlist's window ends: the moment it became current and the window,
+// less what was spent in it before that moment.
+uint64_t window_end(const Core &core) {
+    const uint64_t spent = core.window_spent < kWindowMs ? core.window_spent : kWindowMs;
+    return core.window_started + (kWindowMs - spent);
+}
+
 // Whether the root plays in the current playlist's place: it does while the current
 // playlist has nothing to play.
 void judge_in_place(Core &core) {
     core.in_place = core.tree_known && core.current != 0 && first_in(core, current_range(core)) == kNothing ? 1 : 0;
+}
+
+// The window has passed at a moment: the next playlist of the tree is current from then,
+// with a window of its own, the root after the last and while the tree is not known.
+void rotate(Core &core, uint64_t at) {
+    const uint32_t next = core.tree_known && core.current < core.folder_count ? core.current + 1u : 0;
+    tree_choose(core, next);
+    player_playlist_chosen(core, at);
 }
 
 // The position of the animation after this one in the playlist: the next in the
@@ -414,15 +429,31 @@ __attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_
                 round += all_known ? turn_ms(core, position) : 0;
             }
             if (all_known && round != 0 && elapsed >= round) {
-                core.zero += elapsed / round * round;
-                elapsed %= round;
-                ++core.turn_number;
-                continue;
+                // Only rounds that end before the window does, so that the turn at which
+                // the window passes is met, with the root alone too.
+                uint64_t rounds = elapsed / round;
+                const uint64_t end = window_end(core);
+                const uint64_t before_end = end > core.zero ? (end - core.zero - 1) / round : 0;
+                rounds = rounds < before_end ? rounds : before_end;
+                if (rounds != 0) {
+                    core.zero += rounds * round;
+                    elapsed -= rounds * round;
+                    ++core.turn_number;
+                    continue;
+                }
             }
         }
         core.zero += turn;
         elapsed -= turn;
-        if (core.resume_item != kNothing && plays(core, core.resume_item)) {
+        if (core.zero >= window_end(core)) {
+            // The window passed during the turn: the next playlist is current from the
+            // turn's end, and plays from its first animation; its round is summed anew.
+            // The root alone, current again, goes on as it was.
+            const uint32_t before = core.current;
+            rotate(core, core.zero);
+            rounds_taken = false;
+            core.turn_item = core.current != before ? player_first_in_playlist(core) : next_animation(core, core.turn_item);
+        } else if (core.resume_item != kNothing && plays(core, core.resume_item)) {
             // The turn a jump cut plays again, from its first frame.
             core.turn_item = core.resume_item;
             core.resume_item = kNothing;
@@ -565,6 +596,8 @@ uint64_t clock_touch(Core &core, uint64_t now_ms) {
         core.t0 = now_ms;
         core.latest = now_ms;
         core.next_due = now_ms;
+        // The window of the playlist current at power-on runs from the first timestamp.
+        core.window_started = now_ms;
     }
     if (now_ms < core.latest) {
         return core.latest;
@@ -590,9 +623,26 @@ uint32_t player_first_in_playlist(const Core &core) {
     return first != kNothing ? first : first_in(core, root_range(core));
 }
 
-void player_playlist_chosen(Core &core) {
+void player_playlist_chosen(Core &core, uint64_t at) {
+    core.window_started = at;
+    core.window_spent = 0;
     core.resume_item = kNothing;
     judge_in_place(core);
+}
+
+bool player_window_passed(Core &core, uint64_t now) {
+    if (now < window_end(core)) {
+        return false;
+    }
+    const uint32_t before = core.current;
+    rotate(core, now);
+    return core.current != before;
+}
+
+uint32_t player_window_left(const Core &core) {
+    const uint64_t since = core.latest > core.window_started ? core.latest - core.window_started : 0;
+    const uint64_t spent = core.window_spent + since;
+    return spent < kWindowMs ? static_cast<uint32_t>((kWindowMs - spent) / 1000) : 0;
 }
 
 void player_jump(Core &core, uint32_t item) {
@@ -632,6 +682,8 @@ void player_start(Core &core) {
     core.shown = kNothing;
     core.resume_item = kNothing;
     core.in_place = 0;
+    core.window_started = 0;
+    core.window_spent = 0;
     player_set_brightness(core, core.brightness);
     if (core.invalid) {
         return;
@@ -794,6 +846,14 @@ int player_poll(Core &core, uint64_t now_ms) {
     }
     // A drive plugged in or pulled out is taken up or dropped before the picture is made.
     drive_touch(core);
+    // The window's end while a cycle or nothing plays: the next playlist is current, and
+    // what plays goes on; under a test it waits for the test's end.
+    if (!core.mapping_test && !core.invalid && core.playing != kPlaylist && player_window_passed(core, now) && core.playing == kNothing) {
+        const uint32_t first = player_first_in_playlist(core);
+        if (first != kNothing) {
+            player_play_all(core, first);
+        }
+    }
     // The latest grid time at or before now is used; every earlier one is skipped.
     const uint64_t grid = core.t0 + (now - core.t0) / kGridStep * kGridStep;
     core.next_due = grid + kGridStep;

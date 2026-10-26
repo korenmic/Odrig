@@ -10,6 +10,10 @@ namespace odrig {
 // The grid: a refresh is due at the power-on moment and every 20 ms after it.
 const uint32_t kGridStep = 20;
 
+// The window of a current playlist: 24 hours of running time from the moment it became
+// current, after which the next playlist of the tree is current.
+const uint64_t kWindowMs = 86400000;
+
 // The most bytes of a body the player decodes at one refresh, a record's boundary after
 // it: twelve dense records of 60 x 60. It always decodes one record; what is left is
 // decoded at the next refresh, from where it stopped.
@@ -47,9 +51,19 @@ uint32_t player_first_animation(const Core &core);
 // of the root's in its place: an item or a drive's animation, or kNothing.
 uint32_t player_first_in_playlist(const Core &core);
 
-// A playlist was chosen, by a command or by the rotation: nothing resumes after a jump,
-// and whether the root plays in its place is judged now.
-void player_playlist_chosen(Core &core);
+// A playlist was chosen at a moment, by a command or by the rotation: its window begins
+// there, nothing resumes after a jump, and whether the root plays in its place is judged
+// now.
+void player_playlist_chosen(Core &core, uint64_t at);
+
+// Takes the window's end at a moment, while a cycle or nothing plays or a test showed:
+// when the window has passed, the next playlist of the tree is current from that moment,
+// the root after the last and while the tree is not known. True when another playlist is
+// current now: the root alone, current again, changes nothing that plays.
+bool player_window_passed(Core &core, uint64_t now);
+
+// The whole seconds left in the current playlist's window, 0 once it has passed.
+uint32_t player_window_left(const Core &core);
 
 // Plays the playlist from the turn of the animation at this position, a jump: inside the
 // playlist in use it goes on from the jumped animation; outside, the animation whose turn

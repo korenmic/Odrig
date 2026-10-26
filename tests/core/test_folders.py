@@ -13,7 +13,7 @@ from .test_catalog_writes import a_card, folder_of
 from .test_drive import DONE, SHOW, a_drive, asked, logged, refusal, replies, statuses, with_drive
 from .test_order import HEADER, ordered
 from .test_playback import T0
-from .test_playlist import CANVAS, loop_of
+from .test_playlist import CANVAS, loop_of, show_of
 
 # A card of nested folders. Listed depth first: `A.ODRG`, `b.odrg`, `a b/c.odrg`,
 # `night/comet.odrg`, `night/deep/x.odrg`, `night/deep/deeper/y.odrg`; its folders in the
@@ -266,6 +266,77 @@ class TheExhaustingOrder(unittest.TestCase):
         script = asked(0, "play 60008") + asked(20, "status") + ["drive pull"] + asked(40, "status") + ["drive plug"] + polls(60, 300) + asked(6100, "status")
         run = with_drive(SHOW, NESTED, script)
         self.assertEqual(statuses(run), [(60008, 60004), ("all", 1), (60008, 60004)])
+
+
+WINDOW = 86_400_000
+# The test card with a turn of 5,000 ms in `night`, so that a turn of its playlist is in
+# progress when a window ends: `night` is `night/comet.odrg`, 5,000 ms, then
+# `night/deep/x.odrg` and `night/deep/deeper/y.odrg`, 4,000 ms each, 13,000 ms a round.
+WINDOWED = {**NESTED, "night/comet.odrg": loop_of(5, 7)}
+
+
+def status_lines(run):
+    return [reply for reply in replies(run) if "on" in reply]
+
+
+def left_of(run):
+    return [(reply["playing"], reply["animation"], reply["left"]) for reply in status_lines(run)]
+
+
+class TheWindow(unittest.TestCase):
+    def test_left_counts_the_seconds_down_and_is_0_from_the_windows_end_to_the_turns_end(self):
+        # The turn of the chosen playlist's first animation begins at the refresh after the
+        # choice, at 20 ms; the window began at the choice, at 0.
+        times = (0, 1000, 60_000, WINDOW - 100, WINDOW + 100, WINDOW + 2_900, WINDOW + 3_100)
+        run = with_drive(SHOW, WINDOWED, asked(0, "play 60008") + asked(20) + [line for time in times for line in asked(time, "status")])
+        self.assertEqual(replies(run)[0], DONE)
+        # The round of `night` begins at 86,398,020; the turn of `night/comet.odrg` runs to
+        # 86,403,020, past the window's end, and `night/deep` is current from there.
+        self.assertEqual(left_of(run), [(60008, 60004, 86399), (60008, 60004, 86399), (60008, 60005, 86340), (60008, 60004, 0), (60008, 60004, 0), (60008, 60004, 0),
+                                        (60009, 60005, 86399)])
+
+    def test_the_rotation_goes_through_the_tree_and_to_the_root_after_the_last(self):
+        # `night/deep` from 86,403,020 for a window, its round 8,000 ms; `night/deep/deeper`
+        # from 172,803,020, its turn 4,000 ms; the root from 259,203,020, whose round of
+        # 31,000 ms is in its first turn, the show's own, when the window ends at
+        # 345,603,020: the root plays to 345,604,020, then `a b`; then `night` again.
+        times = (WINDOW + 3_100, 2 * WINDOW + 3_100, 3 * WINDOW + 3_100, 4 * WINDOW + 3_100, 4 * WINDOW + 4_100, 5 * WINDOW + 3_100, 5 * WINDOW + 4_100)
+        run = with_drive(SHOW, WINDOWED, asked(0, "play 60008") + asked(20) + [line for time in times for line in asked(time, "status")])
+        self.assertEqual(left_of(run), [(60009, 60005, 86399), (60010, 60006, 86399), ("all", 1, 86399), ("all", 1, 0), (60007, 60003, 86399), (60007, 60003, 0),
+                                        (60008, 60004, 86399)])
+
+    def test_a_gap_of_many_windows_is_taken_at_one_refresh(self):
+        run = with_drive(SHOW, WINDOWED, asked(0, "play 60008") + asked(20) + asked(5 * WINDOW + 4_100, "status") + asked(5 * WINDOW + 9_100, "status"))
+        self.assertEqual(left_of(run), [(60008, 60004, 86399), (60008, 60005, 86394)])
+
+    def test_a_window_that_ends_during_a_cycle_changes_the_current_playlist_and_not_what_plays(self):
+        cycled = show_of([{"id": 1, "file": "four.odrg"}, {"id": 3, "cycle": [1], "seconds": 2}], {"four.odrg": loop_of(4, 1)}, min_seconds=4)
+        with a_drive(WINDOWED) as top:
+            script = asked(0, "play 60008") + asked(1000, "play 3") + asked(WINDOW + 100, "status") + asked(WINDOW + 200, "play 60005") + asked(WINDOW + 300, "status")
+            run = support.start(cycled, script, ["--drive", top])
+        self.assertEqual(left_of(run), [(3, 1, 86400), (60009, 60005, 86399)])
+
+    def test_a_window_that_ends_under_a_mapping_test_is_taken_when_the_test_ends(self):
+        demo = support.demo_show()
+        drive = {"night/comet.odrg": support.clip(7, 60, 60, (1000,) * 5)}
+        with a_drive(drive) as top:
+            first = support.start(demo, asked(0, "list"), ["--drive", top])
+            night = folders(replies(first)[0])[0][0]
+            script = asked(0, f"play {night}") + asked(1000, "mapping test on") + asked(WINDOW + 100, "status") + asked(WINDOW + 200, "mapping test off", "status")
+            run = support.start(demo, script, ["--drive", top])
+        self.assertEqual([reply for reply in replies(run) if "on" not in reply], [DONE] * 3)
+        self.assertEqual([(playing, left) for playing, _, left in left_of(run)], [(None, 0), ("all", 86400)])
+        self.assertNotEqual(status_lines(run)[1]["animation"], None)
+
+    def test_the_root_alone_is_not_changed_by_the_window(self):
+        # The flat card's round is 14,000 ms: the turn of `A.ODRG`, 6,000 ms, runs from
+        # 86,398,000 across the window's end, and the root is current again from its end.
+        script = asked(0) + asked(WINDOW - 100, "status") + asked(WINDOW + 100, "status") + asked(WINDOW + 4_100, "status")
+        run = with_drive(SHOW, {"b.odrg": loop_of(2, 5), "A.ODRG": loop_of(3, 6)}, script)
+        self.assertEqual(left_of(run), [("all", 60001, 0), ("all", 60001, 0), ("all", 60002, 86399)])
+        # Without a card the turns of 4,000 ms end at the window's end exactly.
+        without = support.start(SHOW, script)
+        self.assertEqual(left_of(without), [("all", 1, 0), ("all", 1, 86399), ("all", 1, 86395)])
 
 
 if __name__ == "__main__":

@@ -361,6 +361,10 @@ struct Core {
     // current playlist cut, which plays again after the jumped turn; kNothing for none.
     uint8_t in_place;
     uint32_t resume_item;
+    // The current playlist's window: the moment it became current, a timestamp, and the
+    // milliseconds spent in the window before that moment, from the saved file.
+    uint64_t window_started;
+    uint32_t window_spent;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
