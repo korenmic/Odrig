@@ -1,5 +1,6 @@
 // Animations: what the installation does, power and brightness, the capacity of each
-// storage, and the one list of animations, each row with its storage badge and its menu.
+// storage, and the one list of animations in groups, the root's and one for each folder
+// of the card, each row with its storage badge and its menu.
 
 import * as client from "../client.js";
 import * as capacity from "../capacity.js";
@@ -70,15 +71,99 @@ function metaOf(animation) {
   return `${animation.id} \u00b7 ${animation.bytes === null ? "size not read yet" : `${kilobytes(animation.bytes)} KB`}`;
 }
 
-// What plays, in words: the playlist, a cycle by its id, or nothing.
-function playing(status) {
+// The folder of an animation of the card, read from its path: the part before its last
+// `/`, or the root, "", for a loose file and for every animation of the board.
+export function folderOf(animation) {
+  return isExternal(animation) && animation.file.includes(`/`) ? animation.file.slice(0, animation.file.lastIndexOf(`/`)) : "";
+}
+
+// Whether a file of the card lies in a folder of the tree or in one below it.
+function under(file, path) {
+  return file.startsWith(`${path}/`);
+}
+
+// The time left in the window of the current playlist, in words.
+export function timeLeft(left) {
+  return `${Math.floor(left / 3600)} h ${Math.floor((left % 3600) / 60)} min left`;
+}
+
+// What plays, in words: the root playlist, or a folder's by its path, each with the time
+// left in its window, the root playing in a folder's place said so; a cycle by its id;
+// or nothing.
+function playing(status, state) {
   if (status.error !== null) {
     return messages.ofInvalidShow(status.error);
   }
-  if (status.playing === "all") {
-    return "Playlist";
+  if (status.playing === null) {
+    return "Nothing plays";
   }
-  return status.playing === null ? "Nothing plays" : `Cycle ${status.playing}`;
+  if (status.playing === "all") {
+    return state.folders.length > 0 && status.left !== null ? `Playlist \u00b7 ${timeLeft(status.left)}` : "Playlist";
+  }
+  if (state.cycles.includes(status.playing)) {
+    return `Cycle ${status.playing}`;
+  }
+  const folder = state.folders.find((item) => item.id === status.playing);
+  if (folder !== undefined) {
+    const shown = status.animation === null || state.animations === null ? undefined : state.animations.find((animation) => animation.id === status.animation);
+    const elsewhere = shown !== undefined && !(isExternal(shown) && under(shown.file, folder.playlist));
+    const words = `Playlist ${folder.playlist}${elsewhere ? ", the root plays for now" : ""}`;
+    return status.left === null ? words : `${words} \u00b7 ${timeLeft(status.left)}`;
+  }
+  // A number the list has neither as a cycle nor as a folder: a folder of a card just put
+  // in, while the list is asked for again; a cycle, for a target without the time left.
+  return status.left === null ? `Cycle ${status.playing}` : `Playlist ${status.playing} \u00b7 ${timeLeft(status.left)}`;
+}
+
+// The group whose playlist is current: "" for the root, a folder's path, or null while a
+// cycle or nothing plays.
+function markedGroup(status, state) {
+  if (status === null || status.playing === null) {
+    return null;
+  }
+  if (status.playing === "all") {
+    return "";
+  }
+  const folder = state.folders.find((item) => item.id === status.playing);
+  return folder === undefined ? null : folder.playlist;
+}
+
+// The groups of the list in the order they play: the root's, with the animations of the
+// board and the loose files of the card, then one for each folder of the list, each with
+// its rows and those of them the filters show. A group with rows and none shown is hidden
+// with its head; one without a row of its own keeps its head and its count 0.
+function grouped(state, all) {
+  const root = {path: "", id: null, rows: [], shown: []};
+  const groups = [root, ...state.folders.map((folder) => ({path: folder.playlist, id: folder.id, rows: [], shown: []}))];
+  const byPath = new Map(groups.map((group) => [group.path, group]));
+  for (const animation of all) {
+    const group = byPath.get(folderOf(animation)) ?? root;
+    group.rows.push(animation);
+    if (filters.matches(animation)) {
+      group.shown.push(animation);
+    }
+  }
+  for (const group of groups) {
+    group.hidden = group.rows.length > 0 && group.shown.length === 0;
+  }
+  return groups;
+}
+
+// The head of a folder's group: its path with the count of its rows, and its button.
+function head(group) {
+  const made = document.createElement("div");
+  made.className = "folder-head";
+  made.dataset.group = group.path;
+  made.dataset.id = String(group.id);
+  const title = document.createElement("h2");
+  title.textContent = `${group.path} \u00b7 ${group.rows.length}`;
+  const play = document.createElement("button");
+  play.type = "button";
+  play.textContent = "Play this folder";
+  play.setAttribute("aria-label", `Play folder ${group.path}`);
+  play.addEventListener("click", () => client.play(group.id));
+  made.append(title, play);
+  return made;
 }
 
 // The animation on the LEDs: its id, and its file name when the list has it.
@@ -175,20 +260,38 @@ function row(animation) {
   return made;
 }
 
-// Shows the rows anew only when the list is another one, so that a press is never lost
-// to a reply that arrives.
-function drawRows(animations) {
-  const place = byId("animations-list");
-  const shown = [...place.querySelectorAll(":scope > .row")];
-  const same =
-    shown.length === animations.length &&
-    shown.every((made, at) => made.dataset.id === String(animations[at].id) && made.dataset.file === animations[at].file &&
-      made.dataset.external === String(isExternal(animations[at])) && made.dataset.editable === String(isEditable(animations[at])) &&
-      made.dataset.writable === String(onWritableCard(animations[at])) && made.dataset.fault === (animations[at].fault ?? "") &&
-      made.querySelector(".meta").textContent === metaOf(animations[at]));
-  if (!same) {
-    place.replaceChildren(...animations.map(row));
+// What tells a row of the list from another, as the list holds it and as the rows would
+// be drawn now.
+function rowKey(animation) {
+  return [animation.id, animation.file, isExternal(animation), isEditable(animation), onWritableCard(animation), animation.fault ?? "", metaOf(animation)].join("|");
+}
+
+function keyOfChild(child) {
+  if (child.classList.contains("folder-head")) {
+    return `#${child.dataset.group}|${child.dataset.id}`;
   }
+  if (!child.classList.contains("row")) {
+    return "?";
+  }
+  return [child.dataset.id, child.dataset.file, child.dataset.external, child.dataset.editable, child.dataset.writable, child.dataset.fault,
+    child.querySelector(".meta").textContent].join("|");
+}
+
+// Shows the heads and the rows anew only when the list is another one, so that a press
+// is never lost to a reply that arrives: the root's rows, then each folder's head and the
+// rows the filters show of it.
+function drawRows(groups) {
+  const place = byId("animations-list");
+  const wanted = groups.flatMap((group) => [...(group.path === "" ? [] : [`#${group.path}|${group.id}`]), ...group.shown.map(rowKey)]);
+  const shown = [...place.children].map(keyOfChild);
+  if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
+    return;
+  }
+  place.replaceChildren(...groups.flatMap((group) => [...(group.path === "" ? [] : [head(group)]), ...group.shown.map((animation) => {
+    const made = row(animation);
+    made.dataset.group = group.path;
+    return made;
+  })]));
 }
 
 // Whether the target can be asked to change something now.
@@ -196,9 +299,25 @@ export function answers() {
   return client.state.link === "answers";
 }
 
-function rowsState(state, animations) {
+function rowsState(state, animations, groups) {
   const onTheLeds = state.status === null || state.status.playing === null ? null : state.status.animation;
   const version = client.targetVersion();
+  // The heads: the count of each group, whether it is shown, and the mark of the current
+  // playlist's group.
+  const marked = markedGroup(state.status, state);
+  const root = groups[0];
+  byId("root-title").textContent = `Root \u00b7 ${root.rows.length}`;
+  byId("root-head").hidden = root.hidden;
+  byId("root-head").setAttribute("aria-current", String(marked === ""));
+  for (const made of byId("animations-list").querySelectorAll(":scope > .folder-head")) {
+    const group = groups.find((item) => item.path === made.dataset.group);
+    if (group === undefined) {
+      continue;
+    }
+    made.querySelector("h2").textContent = `${group.path} \u00b7 ${group.rows.length}`;
+    made.hidden = group.hidden;
+    made.setAttribute("aria-current", String(marked === group.path));
+  }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);
     if (animation === undefined) {
@@ -238,7 +357,7 @@ function draw(state) {
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
     byId("brightness").textContent = `Brightness ${status.brightness}`;
-    byId("playing").textContent = playing(status);
+    byId("playing").textContent = playing(status, state);
     say("now", now(status, state.animations));
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
@@ -251,11 +370,12 @@ function draw(state) {
   }
   const all = shownOrder(state);
   const animations = all.filter(filters.matches);
+  const groups = grouped(state, all);
   filters.draw(state);
   // A row that is held keeps the rows as they are until it is let go.
   if (!reorder.dragging()) {
-    drawRows(animations);
-    rowsState(state, animations);
+    drawRows(groups);
+    rowsState(state, animations, groups);
   }
   byId("none").hidden = state.animations === null || all.length > 0;
   byId("filter-empty").hidden = all.length === 0 || animations.length > 0;

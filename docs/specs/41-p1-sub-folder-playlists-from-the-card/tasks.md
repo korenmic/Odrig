@@ -199,7 +199,7 @@ Rules for every task:
   - Suites: core, firmware, onboarding.
   - Requirements: 4.4, 4.5, 4.6, 4.7, 5.6, 6.3, 8.1, 10.1
 
-- [ ] 8. The app's groups, button, line and mark
+- [x] 8. The app's groups, button, line and mark
   - `app/www/commands.js` (the validators), `app/www/client.js` (`state.folders`, the
     list asked for an unknown `playing`), `app/www/screens/show.js` (the groups, the Root
     head with `#play-all` `Play this folder`, the folder heads, the counts, the hidden

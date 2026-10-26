@@ -849,3 +849,34 @@ input[type="checkbox"] {
   max-height: 60vh;
   overflow: auto;
 }
+
+/* The groups of the list: the root's head before it and a folder's head among the rows,
+   each with its path and count and its button; the current playlist's head is marked. */
+.folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.folder-head h2 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.folder-head button {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 44px;
+}
+
+#play-all {
+  min-height: 48px;
+}
+
+.folder-head[aria-current="true"] h2 {
+  color: var(--teal);
+}
