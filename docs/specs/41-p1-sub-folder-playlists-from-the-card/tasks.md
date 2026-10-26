@@ -65,7 +65,7 @@ Rules for every task:
   - Suites: converter's Python suite, core, emulator, onboarding.
   - Requirements: 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 6.2, 6.3, 6.4, 6.5, 8.1, 10.2
 
-- [ ] 2. The firmware lists the card's folders
+- [x] 2. The firmware lists the card's folders
   - `firmware/usermod/odrig_drive.cpp`: `isDriveName` the path rule; `listFolder` the
     iterative depth-first walk with the pending-folders table taken in `begin()`, one
     directory open at a time, the counting rule and the limits, and the log line with the

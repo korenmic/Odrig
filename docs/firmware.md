@@ -888,9 +888,11 @@ section says.
   `.odrg` files, made for the board's canvas as the installed ones are. Names are kept
   to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`: the firmware's file
   system reads names in the code page 850, so Hebrew letters, for one, come out as `?`,
-  and such a file cannot be opened by its name and is left out. Folders inside
-  `odrig` and other files are passed over; at most 256 files are taken, the first in the
-  order of their names.
+  and such a file cannot be opened by its name and is left out. Other files are passed
+  over. Sub-folders of `odrig` are listed too, to three levels down, depth first: a
+  folder's files in the order of their names, then each of its sub-folders in the order
+  of their names; at most 256 files and 32 sub-folders are taken, the first in that
+  order, and [microsd.md](microsd.md#preparing-a-card) has the rule in full.
 - **The adapter and the sockets.** The chip's own socket gives a plugged device no power:
   plugged in directly, a drive is not seen. Between that socket and the drive goes a
   USB-C adapter or hub with a power input of its own, which is powered. The computer
@@ -959,14 +961,18 @@ The lines of the kind `usb`, which only the USB stick's build writes:
   `stick not opened: no file system it reads (<error>)`, or
   `stick not opened: a fault in reading (<error>)`. Its folder listed, when the core asks
   for a stick without a catalog: `stick opened: <n> animation files in odrig`, or
-  `stick not opened: a fault in reading the folder odrig`.
+  `stick opened: <n> animation files in <m> folders of odrig` when sub-folders were
+  taken, with `; <k> files and <f> folders passed over` at its end when something was
+  left out; or `stick not opened: a fault in reading the folder odrig`.
 
 The lines of the kind `sd` are those of the firmware, which reads the card and has no
 line of the kind `usb`:
 
 - A card mounted: `card mounted`, or `the card has no folder odrig`. Its folder listed,
   when the core asks for a card without a catalog: `card opened: <n> animation files in
-  odrig`, or `card folder odrig could not be read`.
+  odrig`, or `card opened: <n> animation files in <m> folders of odrig`, with `; <k>
+  files and <f> folders passed over` at its end when something was left out; or `card
+  folder odrig could not be read`.
 - No card: `card not mounted; no card or unreadable file system`, once for each spell
   without a card; and `card unavailable; files closed, waiting for a card` when a card
   went.

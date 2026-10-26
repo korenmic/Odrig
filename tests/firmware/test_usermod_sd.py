@@ -317,8 +317,36 @@ int main(int argc, char **argv) {
     uint8_t byte;
     assert(host.read_at(nullptr, "drive/256", 0, &byte, 1) == -1);
     assert(logged("sd: card mounted") && logged("sd: card opened: 4 animation files in odrig"));
+  } else if (mode == "folders") {
+    assert(host.drive_list(nullptr, generation) == 8);
+    const char *expected[] = {"A.ODRG", "b.odrg", "a b/q.odrg", "a-b/r.odrg", "night/comet.odrg", "night/deep/x.odrg", "night/deep/deeper/y.odrg", "only/sub/k.odrg"};
+    for (unsigned at = 0; at < 8; ++at) assert(named(host, generation, at) == expected[at]);
+    assert(named(host, generation, 8).empty());
+    uint8_t byte;
+    assert(host.open(nullptr, "drive/4") == 1 && host.read(nullptr, &byte, 1) == 1 && byte == 'c');
+    host.close(nullptr);
+    assert(host.read_at(nullptr, "drive/night/deep/x.odrg", 0, &byte, 1) == 1 && byte == 'x');
+    assert(host.read_at(nullptr, "drive/night/../b.odrg", 0, &byte, 1) == -1);
+    assert(logged("sd: card opened: 8 animation files in 7 folders of odrig; 0 files and 4 folders passed over"));
+  } else if (mode == "many-folders") {
+    assert(host.drive_list(nullptr, generation) == 37);
+    for (unsigned at = 0; at < 5; ++at) {
+      char expected[32]; snprintf(expected, sizeof expected, "r%03u.odrg", at);
+      assert(named(host, generation, at) == expected);
+    }
+    for (unsigned at = 5; at < 37; ++at) {
+      char expected[32]; snprintf(expected, sizeof expected, "f%02u/x.odrg", at - 5);
+      assert(named(host, generation, at) == expected);
+    }
+    assert(named(host, generation, 37).empty());
+    assert(logged("sd: card opened: 37 animation files in 32 folders of odrig; 8 files and 0 folders passed over"));
+  } else if (mode == "nested-folders") {
+    assert(host.drive_list(nullptr, generation) == 31);
+    assert(named(host, generation, 0) == "a/b00/x.odrg" && named(host, generation, 30) == "a/b30/x.odrg" && named(host, generation, 31).empty());
+    assert(logged("sd: card opened: 31 animation files in 32 folders of odrig; 9 files and 0 folders passed over"));
   } else if (mode == "limit") {
     assert(host.drive_list(nullptr, generation) == 256);
+    assert(logged("sd: card opened: 256 animation files in odrig; 44 files and 0 folders passed over"));
     for (unsigned at = 0; at < 256; ++at) {
       char expected[32]; snprintf(expected, sizeof expected, "q%03u.odrg", at);
       assert(named(host, generation, at) == expected);
@@ -382,10 +410,13 @@ int main(int argc, char **argv) {
     const std::string longest = std::string(95, 'n') + ".odrg";
     assert(host.drive_bind(nullptr, generation, 255, longest.c_str()) == 1 && named(host, generation, 255) == longest);
     const std::string tooLong = "n" + longest;
-    const char *wrong[] = {"", ".b.odrg", "a/b.odrg", "a\\b.odrg", "a:b.odrg", "a*b.odrg", "a?b.odrg", "a\"b.odrg", "a<b.odrg",
-                           "a>b.odrg", "a|b.odrg", "a\tb.odrg", "a\x7f" "b.odrg", "a\xc3\xa9.odrg", tooLong.c_str()};
+    const char *wrong[] = {"", ".b.odrg", "a\\b.odrg", "a:b.odrg", "a*b.odrg", "a?b.odrg", "a\"b.odrg", "a<b.odrg",
+                           "a>b.odrg", "a|b.odrg", "a\tb.odrg", "a\x7f" "b.odrg", "a\xc3\xa9.odrg", tooLong.c_str(),
+                           "/b.odrg", "a//b.odrg", "a/", "../b.odrg", "a/.b/c.odrg", "a/b/c/d/e.odrg"};
     for (const char *name : wrong) assert(host.drive_bind(nullptr, generation, 4, name) == 0);
     assert(named(host, generation, 4).empty());
+    assert(host.drive_bind(nullptr, generation, 4, "night/comet.odrg") == 1 && named(host, generation, 4) == "night/comet.odrg");
+    assert(host.drive_bind(nullptr, generation, 4, "a/b/c/d.odrg") == 1 && named(host, generation, 4) == "a/b/c/d.odrg");
     assert(host.drive_bind(nullptr, generation + 1, 4, "b.odrg") == 0 && host.drive_bind(nullptr, 0, 4, "b.odrg") == 0);
     assert(host.drive_bind(nullptr, generation, 256, "b.odrg") == 0);
     // A place given another name: the file read_at held for it is taken again; that of
@@ -615,10 +646,11 @@ class SpiCard(unittest.TestCase):
                 (root / "odrig").mkdir()
             given = {"A.ODRG": b"A" * 8192, "b.odrg": b"abcdef"} if files is None else files
             for path, content in given.items():
-                target = root / "odrig" / path
+                target = root.joinpath("odrig", *path.split("/"))
                 if content is None:
-                    target.mkdir()
+                    target.mkdir(parents=True, exist_ok=True)
                 else:
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(content)
             done = subprocess.run([str(self.built(pins, frequency)), name], cwd=trial, capture_output=True, text=True)
             self.assertEqual(done.returncode, 0, done.stderr)
@@ -647,6 +679,16 @@ class SpiCard(unittest.TestCase):
     def test_names_are_filtered_sorted_and_do_not_allow_traversal(self):
         self.case("names", {"b.odrg": b"b", "A.ODRG": b"a", "c.odrgx": b"c", "D.ODRGX": b"d", ".hidden.odrgx": b"h", "e.odrgx.txt": b"x",
                             "other.txt": b"x", "nested.odrg": None})
+
+    def test_the_folders_are_walked_depth_first_to_three_levels_and_the_limits_count_them(self):
+        files = {"b.odrg": b"b", "A.ODRG": b"a", "night/comet.odrg": b"c", "night/deep/x.odrg": b"x", "night/deep/deeper/y.odrg": b"y",
+                 "night/deep/deeper/more/z.odrg": b"z", "a b/q.odrg": b"q", "a-b/r.odrg": b"r", ".h/s.odrg": b"s", "System Volume Information/t.odrg": b"t",
+                 "bad./u.odrg": b"u", "night/.hidden.odrg": b"h", "only/sub/k.odrg": b"k", "empty": None}
+        self.case("folders", files)
+        many = {f"r{at:03}.odrg": b"x" for at in range(5)}
+        many.update({f"f{at:02}/x.odrg": b"x" for at in range(40)})
+        self.case("many-folders", many)
+        self.case("nested-folders", {f"a/b{at:02}/x.odrg": b"x" for at in range(40)})
 
     def test_only_the_first_256_names_are_published(self):
         self.case("limit", {f"q{at:03}.odrg": b"x" for at in reversed(range(300))})
