@@ -295,6 +295,10 @@ line.
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, Animations says `Cycle` with its id, and `Play this folder` leaves it.
 
+An upload to the card puts the file in the card's folder `odrig` itself, the group
+`Root`; a folder item is no animation, so it is not counted in the storage lines, not
+offered by the filters and not taken by `Select all`.
+
 The line that says what plays names the current playlist and the time left in its window
 of 24 hours of running time, from `status`: `Playlist · 23 h 12 min left` for the root
 while the card has folders, `Playlist night · 23 h 12 min left` for a folder by its
@@ -346,7 +350,10 @@ tabs the list scrolls. Letting go saves the order on the installation; the row s
 `Saving...` until the installation's order comes back. Letting go where it began, or a
 cancelled touch, moves nothing. `Move up` and `Move down` in the row's menu do the same
 without holding. A mouse drags as a finger does, in a browser and in the emulator's
-Controller view. Internal and external animations stand in one order, which the
+Controller view. A row moves within its group only: the dashed place stays among the
+rows of its group, `Move up` is off for the first row of a group and `Move down` for the
+last, and a row let go where it began, or at its group's edge where it already stands,
+sends nothing. Internal and external animations stand in one order, which the
 installation keeps; an external animation keeps its place by its file name while its
 medium is out. The order cannot be changed, and the list says why, while the installation
 does not answer, keeps no order (older software, whose list stays in its show's order), a
@@ -822,7 +829,9 @@ By programs, on a Mac:
   order they play with their headings and counts, the group `Root` and its button, a
   folder without a file of its own, the mark of the current playlist's group, the forms
   of the line that says what plays, `Play this folder` on a folder and on the root, the
-  Tests group left alone, and the card out and in.
+  Tests group left alone, the card out and in, a drag and `Move up` and `Move down`
+  within a group only and nothing sent for a drop in place, the filters hiding a group
+  with rows and never a folder without one, `Select all` and the counts on rows only.
 - The test animations, in Chrome against the emulator: the checkbox off at first and
   remembered across a reload, 21 entries pinned above the list, a snake test, stopping,
   the diagonal, a play that ends a test, a test of another controller named with the

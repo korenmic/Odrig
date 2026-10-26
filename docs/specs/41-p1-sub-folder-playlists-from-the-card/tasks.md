@@ -219,7 +219,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.7, 8.1, 10.4
 
-- [ ] 9. The app's moves, filters, selection and counts with groups
+- [x] 9. The app's moves, filters, selection and counts with groups
   - `app/www/screens/reorder.js` (moves within a group), `show.js` (a group hidden by the
     filters), `selection.js` and `capacity.js` checked unchanged.
   - Tests: `tests/app/test_folders.py`: dragging and Move up and Move down within a group

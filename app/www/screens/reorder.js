@@ -1,6 +1,7 @@
 // Moving animations in the saved order: a long press lifts a row, dragging moves a
 // placeholder where it would land, and letting go saves the move on the target. Move up
-// and Move down in a row's menu do the same without a long press.
+// and Move down in a row's menu do the same without a long press. A row moves within its
+// group, the root's or a folder's, and never into another.
 
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -28,6 +29,7 @@ let saving = null;
 let message = () => {};
 let redraw = () => {};
 let shownOrder = () => [];
+let groupOf = () => "";
 
 function byId(id) {
   return document.getElementById(id);
@@ -78,13 +80,25 @@ function moved(ids, id, before) {
   return rest;
 }
 
-// Saves a move on the target, and shows it as saving until the target's order comes.
+// The ids of the rows of one animation's group, in the order the list shows them.
+function groupIds(id) {
+  const animations = shownOrder(client.state);
+  const own = animations.find((item) => item.id === id);
+  const group = own === undefined ? "" : groupOf(own);
+  return animations.filter((item) => groupOf(item) === group).map((item) => item.id);
+}
+
+// Saves a move on the target, and shows it as saving until the target's order comes. A
+// move that leaves the row's group in its order saves nothing.
 export async function move(id, before) {
   if (blocked() !== null) return;
   const version = client.targetVersion();
   const ids = shownOrder(client.state).map((item) => item.id);
   const next = moved(ids, id, before);
-  if (next.every((other, at) => other === ids[at])) return;
+  const group = new Set(groupIds(id));
+  const was = ids.filter((other) => group.has(other));
+  const becomes = next.filter((other) => group.has(other));
+  if (becomes.every((other, at) => other === was[at])) return;
   saving = {ids: next, id, version, waits: null};
   redraw();
   try {
@@ -104,10 +118,10 @@ export async function move(id, before) {
   }
 }
 
-// The id of the row before which a row goes when it moves one place up or down, or
-// "end".
+// The id of the row before which a row goes when it moves one place up or down within
+// its group, or "end" for the last place; null at the group's edge.
 function neighbour(id, step) {
-  const ids = shownOrder(client.state).map((item) => item.id);
+  const ids = groupIds(id);
   const at = ids.indexOf(id);
   if (step < 0) return at > 0 ? ids[at - 1] : null;
   if (at < 0 || at >= ids.length - 1) return null;
@@ -180,9 +194,10 @@ function lift() {
   row.style.left = `${box.left}px`;
   row.style.width = `${box.width}px`;
   row.style.top = `${box.top}px`;
-  // Where the other rows stand, in the page, with the placeholder in the held row's place:
-  // the held row lands before the first of them whose middle lies below it.
-  press.marks = rows().filter((other) => other !== row).map((other) => {
+  // Where the other rows of the held row's group stand, in the page, with the placeholder
+  // in the held row's place: the held row lands before the first of them whose middle lies
+  // below it, and after the last of them otherwise.
+  press.marks = rows().filter((other) => other !== row && other.dataset.group === row.dataset.group).map((other) => {
     const at = other.getBoundingClientRect();
     return {row: other, middle: at.top + window.scrollY + at.height / 2};
   });
@@ -197,7 +212,7 @@ function lift() {
   scrolling();
 }
 
-// Puts the placeholder where a row held at this height would land.
+// Puts the placeholder where a row held at this height would land, within its group.
 function place(y) {
   const held = press.row;
   held.style.top = `${y - press.offset}px`;
@@ -206,7 +221,8 @@ function place(y) {
   const before = mark === undefined ? null : mark.row;
   const list = byId("animations-list");
   if (before === null) {
-    if (list.lastElementChild !== press.placeholder) list.append(press.placeholder);
+    const last = press.marks.length === 0 ? null : press.marks[press.marks.length - 1].row;
+    if (last !== null && last.nextElementSibling !== press.placeholder) last.after(press.placeholder);
   } else if (press.placeholder.nextElementSibling !== before) {
     list.insertBefore(press.placeholder, before);
   }
@@ -255,12 +271,15 @@ export function cancel() {
   redraw();
 }
 
+// Lets the held row go where the placeholder stands: before the next row of its group,
+// or last when none follows in the group.
 function drop() {
   const placeholder = press.placeholder;
   const id = Number(press.row.dataset.id);
   let next = placeholder.nextElementSibling;
-  while (next !== null && (next === press.row || !next.classList.contains("row"))) next = next.nextElementSibling;
-  const before = next === null ? "end" : Number(next.dataset.id);
+  while (next !== null && next === press.row) next = next.nextElementSibling;
+  const sameGroup = next !== null && next.classList.contains("row") && next.dataset.group === press.row.dataset.group;
+  const before = sameGroup ? Number(next.dataset.id) : "end";
   settle();
   press = null;
   swallowClick = true;
@@ -275,6 +294,7 @@ export function start(options) {
   message = options.message;
   redraw = options.redraw;
   shownOrder = options.shownOrder;
+  groupOf = options.groupOf;
   const list = byId("animations-list");
   list.addEventListener("pointerdown", (event) => {
     const row = rowAt(event.target);

@@ -111,20 +111,21 @@ class TheGroups(unittest.TestCase):
 
 
 class AgainstTheEmulator(unittest.TestCase):
-    def card(self):
-        """The example show with a card of nested folders: `a.odrg` loose, `night/comet.odrg`,
-        `night/deep/x.odrg`, `only/sub/y.odrg`, and an empty folder that is no group."""
+    def card(self, zeta=False):
+        """The example show with a card of nested folders: `a.odrg` loose, `night/comet.odrg`
+        and with `zeta` `night/zeta.odrg`, `night/deep/x.odrg`, `only/sub/y.odrg`, and an
+        empty folder that is no group."""
         folder = entered(self, emulator_support.example_show())
         top = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
         animation = (folder / "hello.odrg").read_bytes()
         emulator_support.installed(top / "odrig", {"a.odrg": animation})
-        emulator_support.installed(top / "odrig" / "night", {"comet.odrg": animation})
+        emulator_support.installed(top / "odrig" / "night", {"comet.odrg": animation, **({"zeta.odrg": animation} if zeta else {})})
         emulator_support.installed(top / "odrig" / "night" / "deep", {"x.odrg": animation})
         emulator_support.installed(top / "odrig" / "only" / "sub", {"y.odrg": animation})
         (top / "odrig" / "empty").mkdir()
         emulator = entered(self, emulator_support.Emulator(folder, "--drive", top))
         deadline = time.monotonic() + 15
-        while len(json.loads(emulator.command("list"))["items"]) < 10 and time.monotonic() < deadline:
+        while len(json.loads(emulator.command("list"))["items"]) < (11 if zeta else 10) and time.monotonic() < deadline:
             time.sleep(0.1)
         items = json.loads(emulator.command("list"))["items"]
         folders = {item["playlist"]: item["id"] for item in items if "playlist" in item}
@@ -170,6 +171,60 @@ class AgainstTheEmulator(unittest.TestCase):
         self.assertRegex(found["back"]["playing"], r"\APlaylist night(, the root plays for now)? \u00b7 2[34] h [0-9]+ min left\Z")
         self.assertEqual([head["group"] for head in found["back"]["heads"]], ["", "night", "night/deep", "only", "only/sub"])
         self.assertEqual([head["group"] for head in found["back"]["heads"] if head["marked"]], ["night"])
+
+
+class MovesFiltersAndSelectionWithGroups(AgainstTheEmulator):
+    def order_of(self, emulator):
+        reply = json.loads(emulator.command("order get"))
+        return reply["ids"], reply["revision"]
+
+    def test_move_up_and_move_down_stay_within_a_group(self):
+        emulator, _, folders = self.card(zeta=True)
+        address = f"127.0.0.1:{emulator.port}"
+        # `night` holds comet, 60002, and zeta, 60003: comet cannot move up, zeta cannot
+        # move down, and comet moved down goes last in the saved order yet after zeta in
+        # its group.
+        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menus": [60002, 60003, 1]}).seen
+        self.assertEqual(found["menus"]["60002"][:2], ["Move up (disabled)", "Move down"])
+        self.assertEqual(found["menus"]["60003"][:2], ["Move up", "Move down (disabled)"])
+        self.assertEqual(found["menus"]["1"][:3], ["Ignore in playlist", "Move up (disabled)", "Move down"])
+        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menu": [60002, "Move down", [1, 2, 60001, 60003, 60002, 60004, 60005]]}).seen
+        self.assertEqual([(row["id"], row["group"]) for row in found["afterMenu"]][3:5], [(60003, "night"), (60002, "night")])
+        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60003, 60004, 60005, 60002])
+        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "menu": [60002, "Move up", [1, 2, 60001, 60002, 60003, 60004, 60005]]}).seen
+        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60002, 60003, 60004, 60005])
+
+    def test_a_drag_lands_within_the_group_and_a_drop_in_place_sends_nothing(self):
+        emulator, _, folders = self.card(zeta=True)
+        address = f"127.0.0.1:{emulator.port}"
+        _, revision = self.order_of(emulator)
+        # Zeta dragged to the top of the list stops at the top of its group, before comet.
+        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "drag": {"id": 60003, "to": 1, "expected": [1, 2, 60001, 60003, 60002, 60004, 60005]}}).seen
+        self.assertEqual(found["landing"], {"group": "night", "before": 60002})
+        self.assertEqual([(row["id"], row["group"]) for row in found["afterDrag"]][3:5], [(60003, "night"), (60002, "night")])
+        ids, moved = self.order_of(emulator)
+        self.assertEqual(ids, [1, 2, 60001, 60003, 60002, 60004, 60005])
+        self.assertNotEqual(moved, revision)
+        # Comet, last of its group, dragged below every other row stays last of its group and
+        # sends nothing; a row brought back where it began sends nothing either.
+        found = support.run("folders", address=address, settings={"rows": 7, "heads": 5, "drag": {"id": 60002, "to": 60005, "expected": [1, 2, 60001, 60003, 60002, 60004, 60005]},
+                                                                  "back": {"id": 60003, "to": 60005}}).seen
+        self.assertEqual(found["landing"]["before"], "end")
+        self.assertEqual([row["id"] for row in found["afterBack"]], [1, 2, 60001, 60003, 60002, 60004, 60005])
+        self.assertEqual(self.order_of(emulator), (ids, moved))
+
+    def test_the_filters_hide_a_group_with_rows_and_never_a_folder_without_one_and_selection_takes_rows(self):
+        emulator, _, folders = self.card()
+        address = f"127.0.0.1:{emulator.port}"
+        found = support.run("folders", address=address, settings={"rows": 6, "heads": 5, "filter": ["storage", "Internal"], "select": True}).seen
+        filtered = found["filtered"]
+        self.assertEqual([(head["group"], head["shown"]) for head in filtered["heads"]], [("", True), ("night", False), ("night/deep", False), ("only", True), ("only/sub", False)])
+        self.assertEqual([row["id"] for row in filtered["rows"]], [1, 2])
+        self.assertEqual(found["selected"], [1, 2])
+        self.assertEqual(found["first"]["externalLine"].split(",")[0], "External storage: 4 animations")
+        found = support.run("folders", address=address, settings={"rows": 6, "heads": 5, "filter": ["storage", "External"]}).seen
+        self.assertEqual([(head["group"], head["shown"]) for head in found["filtered"]["heads"]], [("", True), ("night", True), ("night/deep", True), ("only", True), ("only/sub", True)])
+        self.assertEqual([row["id"] for row in found["filtered"]["rows"]], [60001, 60002, 60003, 60004])
 
 
 if __name__ == "__main__":

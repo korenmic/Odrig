@@ -563,7 +563,7 @@ export function start(options) {
   message = options.message;
   filters.start({redraw});
   selection.start({message, redraw});
-  reorder.start({message, redraw, shownOrder});
+  reorder.start({message, redraw, shownOrder, groupOf: folderOf});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});
   extend({draw: tests.draw});
