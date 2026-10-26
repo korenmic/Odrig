@@ -365,6 +365,11 @@ struct Core {
     // milliseconds spent in the window before that moment, from the saved file.
     uint64_t window_started;
     uint32_t window_spent;
+    // The saved file: when it was last written, whether a change waits to be written, and
+    // whether the file exists.
+    uint64_t playlist_saved;
+    uint8_t save_due;
+    uint8_t file_present;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

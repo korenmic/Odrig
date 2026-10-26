@@ -49,8 +49,11 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
 what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `play`, `on`, `off` and `brightness` change is not kept
-across a restart. What `remove` and `upload` change is: they change the installed show.
+the cycle its `start` names. What `on`, `off` and `brightness` change is not kept across a
+restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
+current, a folder of the card or the root, is kept with the time spent in its window, see
+[show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
+installed show.
 
 Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
 

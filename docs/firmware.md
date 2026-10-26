@@ -477,9 +477,10 @@ whether it is sound is not known yet.
    `show: added new.odrg, 120000 bytes`, `show: replaced mapping.json, 184 bytes, was 16`,
    `show: removed bad.odrg, 65262 bytes`; for a folder that the board holds already,
    `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
-   `order.txt` of [show.md](show.md#the-saved-playlist-order), may be a file of the folder;
-   a folder without one keeps the board's, as installing animations does not change the
-   order the operator chose.
+   `order.txt` of [show.md](show.md#the-saved-playlist-order), and the saved playlist,
+   `playlist.txt` of [core.md](core.md#the-saved-playlist), may be files of the folder;
+   a folder without them keeps the board's, as installing animations does not change the
+   order or the playlist the operator chose.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -1405,7 +1406,8 @@ renames it onto its name; for a new name or a removal it also writes the show fi
 until the old file is gone; [core.md](core.md), "The files the core writes", has every
 step. A power cut at any step leaves the old show or the new one, whole; the change is
 committed by one rename. Moving an animation in the saved order writes `order.part` and
-renames it onto `order.txt` the same way. What one change writes:
+renames it onto `order.txt` the same way, and the choice of a playlist writes
+`playlist.part` and renames it onto `playlist.txt`. What one change writes:
 
 | Change | What is written | Bytes |
 |---|---|---|

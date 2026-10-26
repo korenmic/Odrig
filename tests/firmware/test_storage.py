@@ -228,6 +228,15 @@ class Commands(Temporary):
         self.install(esptool)
         self.assertEqual(storage.show_of(self.on_the_board(esptool))["order.txt"], b"odrig-order 1\ni 1\n")
 
+    def test_the_boards_saved_playlist_is_kept_for_a_folder_without_one(self):
+        playlist = b"odrig-playlist 1\nnight\n5400000\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/playlist.txt": playlist}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"playlist.txt": playlist}))
+        self.assertIn("show: kept 1 files\n", result.out)
+
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()
         result = self.install(esptool, "--dry-run")

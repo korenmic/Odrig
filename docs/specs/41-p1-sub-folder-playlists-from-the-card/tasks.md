@@ -173,7 +173,7 @@ Rules for every task:
   - Suites: core, emulator, onboarding.
   - Requirements: 4.2, 4.3, 5.4 (`left`), 8.1, 9.1, 9.3, 10.1, 10.2
 
-- [ ] 7. The saved file and power-on
+- [x] 7. The saved file and power-on
   - `core/src/playlist.cpp` and `playlist.h`, new: `playlist.txt` read at start, written as
     `playlist.part` and renamed at a choice, a rotation and every 900,000 ms while the tree
     has a folder, deferred while an upload receives or a rebuild holds a page, never while

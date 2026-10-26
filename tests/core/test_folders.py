@@ -9,7 +9,7 @@ from odrig import catalog
 
 from . import support
 from .test_catalog_drive import card, polls
-from .test_catalog_writes import a_card, folder_of
+from .test_catalog_writes import a_card, folder_of, upload_external
 from .test_drive import DONE, SHOW, a_drive, asked, logged, refusal, replies, statuses, with_drive
 from .test_order import HEADER, ordered
 from .test_playback import T0
@@ -337,6 +337,104 @@ class TheWindow(unittest.TestCase):
         # Without a card the turns of 4,000 ms end at the window's end exactly.
         without = support.start(SHOW, script)
         self.assertEqual(left_of(without), [("all", 1, 0), ("all", 1, 86399), ("all", 1, 86395)])
+
+
+def store_calls(run):
+    """The storage calls of a session after its start, as `--trace-store` prints them."""
+    return [line[len("store "):] for line in run.lines if line.startswith("store ")]
+
+
+def playlist_writes(run):
+    """The storage calls of the saved playlist's file, in order: the part opened and renamed."""
+    return [call for call in store_calls(run) if "playlist" in call]
+
+
+WRITE = ["write_open playlist.part 1", "rename playlist.part playlist.txt 1"]
+
+
+class TheSavedFile(unittest.TestCase):
+    def test_a_choice_writes_the_file_at_once_and_every_15_minutes_while_a_folder_is_current(self):
+        with a_drive(NESTED) as top:
+            run, kept = support.start_and_keep(SHOW, asked(0, "play 60008") + asked(20) + asked(899_000) + asked(900_000) + asked(1_800_000) + asked(1_900_000),
+                                               ["--drive", top, "--trace-store"])
+        self.assertEqual(kept["playlist.txt"], b"odrig-playlist 1\nnight\n1800000\n")
+        self.assertNotIn("playlist.part", kept)
+        self.assertEqual(playlist_writes(run), WRITE * 3)
+
+    def test_the_root_chosen_is_saved_too_and_a_flat_card_or_none_writes_nothing(self):
+        with a_drive(NESTED) as top:
+            run, kept = support.start_and_keep(SHOW, asked(0, "play 60008") + asked(20, "play all") + asked(40), ["--drive", top, "--trace-store"])
+        self.assertEqual(kept["playlist.txt"], b"odrig-playlist 1\n\n0\n")
+        self.assertEqual(playlist_writes(run), WRITE * 2)
+        flat = with_drive(SHOW, {"b.odrg": loop_of(2, 5)}, asked(0, "play all") + asked(2_000_000, "play 60001", "play all"), options=["--trace-store"])
+        none = support.start(SHOW, asked(0, "play all") + asked(2_000_000, "play all"), ["--trace-store"])
+        self.assertEqual((playlist_writes(flat), playlist_writes(none)), ([], []))
+
+    def test_a_write_waits_while_an_upload_receives_its_bytes(self):
+        data = loop_of(2, 9)
+        script = asked(0, *support.upload_lines(5, "new.odrg", data)[:1]) + asked(20, "play 60008") + asked(40) + asked(60, "upload cancel") + asked(80)
+        with a_drive(NESTED) as top:
+            run = support.start(SHOW, script, ["--drive", top, "--trace-store"])
+        calls = store_calls(run)
+        self.assertEqual(playlist_writes(run), WRITE)
+        self.assertLess(calls.index("remove upload.part 1"), calls.index("write_open playlist.part 1"))
+
+    def test_a_restart_plays_the_saved_folder_with_the_saved_time(self):
+        with a_drive(NESTED) as top:
+            _, kept = support.start_and_keep(SHOW, asked(0, "play 60008") + asked(20) + asked(1_000_000), ["--drive", top])
+            self.assertEqual(kept["playlist.txt"], b"odrig-playlist 1\nnight\n1000000\n")
+            # At power-on the card is not read: the root plays in the folder's place, and the
+            # folder, current again, takes over at the end of the turn in progress.
+            second = support.start(kept, asked(0, "status") + polls(20, 300) + asked(6100, "status") + asked(10_100, "status"), ["--drive", top], check_first=False)
+        self.assertEqual(left_of(second), [("all", 1, 85400), (60008, 60004, 85393), (60008, 60005, 85389)])
+
+    def test_the_card_out_and_in_keeps_the_choice_and_the_window(self):
+        script = asked(0, "play 60008") + asked(20) + ["drive pull"] + asked(40, "status") + ["drive plug"] + polls(60, 100) + asked(6100, "status")
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual(left_of(run), [("all", 1, 86399), (60008, 60004, 86393)])
+
+    def test_a_card_without_the_saved_folder_makes_the_root_current_and_saves_it(self):
+        kept = {**SHOW, "playlist.txt": b"odrig-playlist 1\nnight\n5400000\n"}
+        with a_drive({"b.odrg": loop_of(2, 5), "day/sun.odrg": loop_of(2, 6)}) as top:
+            run, left = support.start_and_keep(kept, asked(0, "status") + polls(20, 300) + asked(6100, "status"), ["--drive", top, "--trace-store"], check_first=False)
+        first, second = left_of(run)
+        self.assertEqual(first, ("all", 1, 81000))
+        # The root is current from the refresh at which the card was read, with a fresh window,
+        # and the playlist goes on: the card's file after the show's.
+        self.assertEqual(second[:2], ("all", 60001))
+        self.assertGreater(second[2], 86390)
+        self.assertRegex(left["playlist.txt"].decode(), r"^odrig-playlist 1\n\n[0-9]+\n$")
+        self.assertEqual(playlist_writes(run), WRITE)
+
+    def test_the_removal_of_the_current_folders_last_file_makes_the_root_current_and_saves_it(self):
+        card_files = card({**NESTED, "solo/only.odrg": loop_of(2, 11)})
+        ids = {name: id for id, name in files(replies(on_cataloged_card(card_files, asked(8100, "list")))[0])}
+        solo = [id for id, path in folders(replies(on_cataloged_card(card_files, asked(8100, "list")))[0]) if path == "solo"][0]
+        with a_card(card_files) as top:
+            script = polls(0, 400) + asked(8100, f"play {solo}", "status") + asked(8120, f"remove {ids['solo/only.odrg']}", "status", "list") + asked(8140)
+            run, left = support.start_and_keep(SHOW, script, ["--drive", top, "--trace-store"], check_first=False)
+        before, after = status_lines(run)
+        self.assertEqual((before["playing"], before["animation"]), (solo, ids["solo/only.odrg"]))
+        self.assertEqual((after["playing"], after["left"]), ("all", 86400))
+        self.assertNotIn("solo", [path for _, path in folders(replies(run)[-1])])
+        # Written at the refresh after the removal, 20 ms into the fresh window.
+        self.assertEqual(left["playlist.txt"], b"odrig-playlist 1\n\n20\n")
+
+    def test_a_power_cut_during_the_write_leaves_the_old_choice_or_the_new_one(self):
+        for at in range(1, 4):
+            with self.subTest(at=at):
+                with a_drive(NESTED) as top:
+                    _, kept = support.start_and_keep(SHOW, asked(0, "play 60008") + asked(20), ["--drive", top])
+                    options = ["--drive", top, "--cut-at", str(at), "--cut-keeps", "0"]
+                    _, cut = support.start_and_keep(kept, asked(0, "play 60007") + asked(20), options, status=75)
+                    again, left = support.start_and_keep(cut, asked(0, "status") + polls(20, 300) + asked(6100, "status"), ["--drive", top], check_first=False)
+                self.assertNotIn("playlist.part", left)
+                self.assertIn(left["playlist.txt"], (b"odrig-playlist 1\nnight\n0\n", b"odrig-playlist 1\na b\n0\n"))
+                self.assertIn(left_of(again)[-1][0], (60007, 60008))
+
+    def test_the_start_of_a_show_without_a_drive_makes_no_call_for_the_file(self):
+        run = support.start(SHOW, asked(0, "status"), ["--trace-store", "--trace-read-at"])
+        self.assertFalse(any("playlist" in line for line in run.lines))
 
 
 if __name__ == "__main__":

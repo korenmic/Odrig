@@ -7,6 +7,7 @@
 #include "clock.h"
 #include "mapping_control.h"
 #include "order.h"
+#include "playlist.h"
 #include "text.h"
 #include "upload.h"
 
@@ -359,6 +360,7 @@ void rotate(Core &core, uint64_t at) {
     const uint32_t next = core.tree_known && core.current < core.folder_count ? core.current + 1u : 0;
     tree_choose(core, next);
     player_playlist_chosen(core, at);
+    playlist_changed(core);
 }
 
 // The position of the animation after this one in the playlist: the next in the
@@ -596,8 +598,10 @@ uint64_t clock_touch(Core &core, uint64_t now_ms) {
         core.t0 = now_ms;
         core.latest = now_ms;
         core.next_due = now_ms;
-        // The window of the playlist current at power-on runs from the first timestamp.
+        // The window of the playlist current at power-on runs from the first timestamp,
+        // and so does the time to the first periodic write of the saved file.
         core.window_started = now_ms;
+        core.playlist_saved = now_ms;
     }
     if (now_ms < core.latest) {
         return core.latest;
@@ -682,8 +686,6 @@ void player_start(Core &core) {
     core.shown = kNothing;
     core.resume_item = kNothing;
     core.in_place = 0;
-    core.window_started = 0;
-    core.window_spent = 0;
     player_set_brightness(core, core.brightness);
     if (core.invalid) {
         return;
@@ -897,6 +899,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     const bool steady = second == 0 || player_fps(core, now) >= kCheckLeastRate;
     check_after_start(core, in_step, now - grid <= kCheckOnTimeMs && steady);
     catalog_drive_look(core);
+    playlist_touch(core, now);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
     }

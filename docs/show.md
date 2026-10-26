@@ -101,7 +101,11 @@ the only playlist and its window changes nothing that plays. `status` says the s
 left in the window as `left`.
 
 At power-on a show plays the playlist, from its first animation, or from the animation
-`start` names. Only a `start` that names a cycle plays something else: that cycle.
+`start` names. Only a `start` that names a cycle plays something else: that cycle. The
+playlist that was current is current again, with the time spent in its window, from the
+board's own file `playlist.txt`: the root plays as said, and a folder of the card plays
+from its first animation once the card is read, the root in its place until then. A
+restart loses at most the last 15 minutes of the window.
 
 A cycle has no turn in the playlist, wherever it stands among the items.
 

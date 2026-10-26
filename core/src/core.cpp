@@ -8,6 +8,7 @@
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
+#include "playlist.h"
 #include "reasons.h"
 #include "show.h"
 #include "storage.h"
@@ -352,6 +353,12 @@ void drive_step(Core &core) {
 }
 
 void start(Core &core) {
+    // The current playlist's window and its saved file, before the file is read.
+    core.window_started = 0;
+    core.window_spent = 0;
+    core.playlist_saved = 0;
+    core.save_due = 0;
+    core.file_present = 0;
     // A change of the catalog that was committed is finished before the parts of a change
     // are cleared away: its upload's part may be the file it puts in place.
     catalog_finish_internal(core);
@@ -440,6 +447,7 @@ void start(Core &core) {
     }
     if (!core.invalid) {
         order_start(core);
+        playlist_start(core);
     }
 }
 

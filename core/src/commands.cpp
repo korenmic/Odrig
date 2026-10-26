@@ -7,6 +7,7 @@
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
+#include "playlist.h"
 #include "show.h"
 #include "upload.h"
 
@@ -475,6 +476,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (all) {
             tree_choose(core, 0);
             player_playlist_chosen(core, core.latest);
+            playlist_changed(core);
             item = player_first_in_playlist(core);
         }
         for (uint32_t position = 0; !all && item == kNothing && position < core.item_count; ++position) {
@@ -497,6 +499,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             if (folder != kFolderMost) {
                 tree_choose(core, folder);
                 player_playlist_chosen(core, core.latest);
+                playlist_changed(core);
                 item = player_first_in_playlist(core);
             }
         }

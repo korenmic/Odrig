@@ -256,7 +256,7 @@ class StateAfterStartup(Playback):
                     {"ok": True, "on": True, "brightness": 99, "playing": 3, "animation": animation, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
                 )
 
-    def test_nothing_is_kept_from_one_startup_to_the_next(self):
+    def test_a_jump_off_and_brightness_are_not_kept_from_one_startup_to_the_next(self):
         files = support.example_show()
         with support.installed(files) as folder:
             first = support.session(folder, [at(0, "off"), at(0, "brightness 3"), at(0, "play 2"), status_at(0)])

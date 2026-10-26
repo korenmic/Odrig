@@ -694,6 +694,11 @@ tables. The core keeps three names in the folder for itself:
 | `show.part` | The next `show.json`, until it is renamed. |
 | `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
 
+The saved order and the saved playlist have files of their own, `order.txt` and
+`playlist.txt`, each written as `order.part` or `playlist.part` and renamed: see [the saved
+order](#the-saved-order) and [the saved playlist](#the-saved-playlist). No show names any
+of these: a name in `show.json` ends in `.odrg` or `.odrgx`.
+
 There are four kinds of change. Each line is one call to the host; "write X" is
 `write_open`, one or more `write` of at most 1,500 bytes, and `write_close`.
 
@@ -833,7 +838,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,856 |
+| The core object | fixed | 3,872 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -850,19 +855,19 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,389** |
+| **Total** | | **125,405** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,866 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,593 bytes for the target file. A host with a drive
+of the check and the saved order: 77,609 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
 each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
 8 bytes and 104 bytes of room for the current playlist's path, 368.
-With it the target file takes 130,493 bytes, 99 percent. The size and the number of frames
+With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -1064,3 +1069,29 @@ for and a drive's name stand after them.
 Then the core reads `order.txt` again and sets every key. A call that fails before the
 arrow removes `order.part` and answers `storage-error`; the keys are as they were. The
 start removes an `order.part` that a power cut left.
+
+## The saved playlist
+
+The current playlist and the time spent in its window live in `playlist.txt`, beside
+`order.txt`, on a host with a drive whose storage can be changed. Its text is three lines:
+`odrig-playlist 1`, the playlist's path from the drive's folder or an empty line for the
+root, and the milliseconds spent in its window, as `odrig-playlist 1`, `night/deep`,
+`5400000`. An absent file, or one that is not of this form, means the root with a fresh
+window.
+
+The core reads it at the start, once the show is read and after `order.txt`, through the
+second source, and keeps the path and the time: the root is current until the tree is
+known, and plays in the folder's place meanwhile; when the tree is built the folder of the
+path is current again, or the root when the card has no playlist of that path, with a
+fresh window, saved as such. The removal of the current folder's last file makes the root
+current the same way.
+
+The file is written as `playlist.part`, one `write` of at most 130 bytes from a buffer on
+the stack, `write_close` and `rename`, when the current playlist changes by a choice or by
+the rotation, and at most once in 900,000 ms while the tree has a folder, from the
+refresh, so that a restart loses at most 15 minutes of the window. A write while an upload
+receives its bytes, or while a rebuild holds a page open, waits for the next refresh that
+is free. Nothing is written while the tree has no folder and no file exists: a show
+without a card, or with a flat card, makes no storage call more than before. When the
+host fails the part is removed and nothing is refused. The start probes `playlist.part`
+with `read_at` and removes it when it is there, as it does `order.part`.

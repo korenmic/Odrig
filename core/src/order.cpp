@@ -435,7 +435,12 @@ void tree_build(Core &core) {
         if (found != kFolderMost) {
             core.current = static_cast<uint8_t>(found);
         } else {
+            // The card has no playlist of the saved path: the root is current, with a
+            // fresh window, and is saved as such at the next refresh.
             core.playlist_path[0] = '\0';
+            core.window_started = core.latest;
+            core.window_spent = 0;
+            core.save_due = 1;
         }
     }
 }
@@ -463,9 +468,13 @@ void tree_place_gone(Core &core, uint32_t place) {
             }
         }
         if (core.current == folder) {
-            // The current playlist is gone: the root is current.
+            // The current playlist is gone: the root is current, with a fresh window,
+            // saved at the next refresh.
             core.current = 0;
             core.playlist_path[0] = '\0';
+            core.window_started = core.latest;
+            core.window_spent = 0;
+            core.save_due = 1;
         } else if (core.current > folder) {
             --core.current;
         }
