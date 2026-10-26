@@ -66,7 +66,7 @@ A number in a command is written in decimal digits.
 |---|---|
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Current brightness, 0 to 255. |
-| `playing` | What is being played: `"all"` for the playlist, the id of a cycle, or `null`. |
+| `playing` | What is being played: `"all"` for the root playlist, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |

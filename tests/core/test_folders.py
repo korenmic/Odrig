@@ -11,7 +11,7 @@ from . import support
 from .test_catalog_drive import card, polls
 from .test_catalog_writes import a_card, folder_of
 from .test_drive import DONE, SHOW, a_drive, asked, logged, refusal, replies, statuses, with_drive
-from .test_order import HEADER
+from .test_order import HEADER, ordered
 from .test_playback import T0
 from .test_playlist import CANVAS, loop_of
 
@@ -163,10 +163,11 @@ def played(run):
 
 
 class PlayOfAFolder(unittest.TestCase):
-    def test_play_of_a_folder_plays_its_first_animation_and_goes_on_in_the_saved_order(self):
+    def test_play_of_a_folder_plays_its_first_animation_and_goes_on_within_the_folder(self):
         run = with_drive(SHOW, NESTED, asked(0, "play 60008") + every(100, 40000, "status"))
         self.assertEqual(replies(run)[0], DONE)
-        self.assertEqual(played(run)[:5], [60004, 60005, 60006, 1, 60001])
+        self.assertEqual(played(run)[:5], [60004, 60005, 60006, 60004, 60005])
+        self.assertEqual({playing for playing, _ in statuses(run)}, {60008})
 
     def test_play_all_plays_the_root_and_a_folder_plays_again_from_its_first(self):
         script = asked(0, "play 60007") + asked(20, "status") + asked(40, "play all") + asked(60, "status") + asked(80, "play 60008") + asked(100, "status")
@@ -182,7 +183,8 @@ class PlayOfAFolder(unittest.TestCase):
         reply, done = replies(run)[:2]
         self.assertEqual(folders(reply)[-1], (60012, "solo"))
         self.assertEqual([item.get("fault") for item in reply["items"] if item.get("file") == "solo/bad.odrg"], ["bad-magic"])
-        self.assertEqual((done, statuses(run)), (DONE, [("all", 1)]))
+        # The folder is current and named, and the root's first animation plays in its place.
+        self.assertEqual((done, statuses(run)), (DONE, [(60012, 1)]))
 
     def test_a_folders_id_is_unknown_while_the_card_is_out(self):
         run = with_drive(SHOW, NESTED, asked(0, "list") + ["drive pull"] + asked(40, "play 60008", "list"))
@@ -199,6 +201,71 @@ class PlayOfAFolder(unittest.TestCase):
         on_card = on_cataloged_card(card(NESTED), asked(8100, "remove 60008", "list"))
         self.assertEqual(replies(on_card)[0], refusal("in-use"))
         self.assertEqual(folders(replies(on_card)[1]), list(zip(range(60007, 60011), TREE)))
+
+
+class TheExhaustingOrder(unittest.TestCase):
+    def test_a_folder_with_one_animation_plays_it_again_and_again(self):
+        run = with_drive(SHOW, {"b.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(2, 7)}, asked(0, "play 60003") + every(100, 15000, "status"))
+        self.assertEqual(replies(run)[0], DONE)
+        self.assertEqual(set(animation for _, animation in statuses(run)), {60002})
+
+    def test_the_root_plays_its_own_animations_in_the_saved_order_then_each_folder_once_then_again(self):
+        # The saved order puts `night/comet.odrg` first and `b.odrg` second. The root begins
+        # with the show's first animation at power-on, as always, goes on with its own
+        # animations by their keys, then each folder's once in the tree's order, and comes
+        # back to its own, `b.odrg` first by the saved order; `night/comet.odrg` plays in
+        # its folder's turn, not first.
+        installed = ordered(SHOW, "x night/comet.odrg", "x b.odrg")
+        with a_drive(NESTED) as top:
+            run = support.start(installed, every(100, 45000, "status"), ["--drive", top])
+        self.assertEqual(played(run)[:9], [1, 60001, 60003, 60004, 60005, 60006, 60002, 1, 60001])
+
+    def test_a_folder_exhausts_its_own_animations_then_its_nested_folders_then_again(self):
+        run = with_drive(SHOW, NESTED, asked(0, "play 60008") + every(100, 20000, "status"))
+        self.assertEqual(played(run)[:5], [60004, 60005, 60006, 60004, 60005])
+
+    def test_the_order_within_a_folder_follows_the_saved_order(self):
+        drive = {**NESTED, "night/zeta.odrg": loop_of(2, 11)}
+        installed = ordered(SHOW, "x night/zeta.odrg")
+        with a_drive(drive) as top:
+            run = support.start(installed, asked(0, "list", "play 60009") + every(100, 25000, "status"), ["--drive", top])
+        reply = replies(run)[0]
+        self.assertEqual(folders(reply)[1], (60009, "night"))
+        self.assertEqual([id for id, name in files(reply) if name in ("night/comet.odrg", "night/zeta.odrg")], [60004, 60005])
+        self.assertEqual(played(run)[:5], [60005, 60004, 60006, 60007, 60005])
+
+    def test_a_jump_inside_the_current_playlist_goes_on_from_the_jumped_animation(self):
+        script = asked(0, "play 60008") + asked(20, "status") + asked(100, "play 60006") + [line for time in range(200, 15000, 100) for line in asked(time, "status")]
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual(played(run)[:5], [60004, 60006, 60004, 60005, 60006])
+
+    def test_a_jump_outside_plays_its_turn_and_the_cut_turn_again_from_its_first_frame(self):
+        times = range(1100, 20000, 100)
+        script = asked(0, "play 60008") + asked(20, "status") + asked(1000, "play 1") + [line for time in times for line in asked(time, "status")]
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual(played(run)[:5], [60004, 1, 60004, 60005, 60006])
+        # The jumped turn begins at the refresh after the jump, at 1,100 ms, and lasts its
+        # 4,000 ms; the cut turn begins again when it ends.
+        self.assertEqual([time for time, (_, animation) in zip(times, statuses(run)[1:]) if animation == 1][-1], 5000)
+        self.assertEqual(statuses(run)[1:][times.index(5100)], (60008, 60004))
+
+    def test_the_root_plays_in_the_folders_place_while_the_card_is_out_and_the_folder_takes_over_at_the_turns_end(self):
+        # The card out at 40 ms: the show's own animation plays its turn of 4,000 ms from
+        # there. The card back at 60 ms is listed and read during that turn, and the folder
+        # takes over when the turn ends.
+        script = asked(0, "play 60008") + ["drive pull"] + asked(40, "status") + ["drive plug"] + polls(60, 100)
+        script += [line for time in range(2100, 9000, 100) for line in asked(time, "status")]
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual(replies(run)[0], DONE)
+        self.assertEqual(statuses(run)[0], ("all", 1))
+        animations = [animation for _, animation in statuses(run)[1:]]
+        self.assertEqual((animations[:20], animations[20]), ([1] * 20, 60004))
+        self.assertEqual(statuses(run)[-1], (60008, 60005))
+
+    def test_status_names_the_current_folder_while_the_card_is_in(self):
+        script = asked(0, "play 60008") + asked(20, "status") + ["drive pull"] + asked(40, "status") + ["drive plug"] + polls(60, 300) + asked(6100, "status")
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual(statuses(run), [(60008, 60004), ("all", 1), (60008, 60004)])
 
 
 if __name__ == "__main__":

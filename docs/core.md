@@ -600,6 +600,16 @@ needs it.
   items and before the files. The tree is dropped with the places; a removal takes the
   folders left without a file out of it, the others keeping their ids and their order; a
   file uploaded to the drive lies in the drive's folder itself, the root's.
+- The playlist is walked by the exhausting key of each animation: the index of its folder
+  in the table, 0 for an item of the show, then its key in the saved order. The range
+  walked is the current playlist's, the folders of its subtree, or the root's, the whole
+  table, while the current one has nothing to play; which it is is judged where a turn
+  ends, so that the current playlist takes over at the end of the turn in progress, from
+  its first animation. The current playlist is kept as its path and its index in the
+  table, found again from the path whenever the tree is built, and the root stands for a
+  path the tree has not. A jump by `play` outside the range keeps the animation whose turn
+  it cut, which plays again after the jumped turn. `status` names the current folder's id
+  as `playing` while the tree holds it.
 - A drive whose host says it can be written, with a catalog that is `ok`, is changed by
   the core: an upload to it is written as `drive/upload.part`, checked, and moved onto its
   name with its entry in one commit of the drive's catalog; a removal takes the entry out

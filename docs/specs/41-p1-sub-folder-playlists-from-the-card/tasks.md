@@ -127,7 +127,7 @@ Rules for every task:
   - Suites: core, onboarding.
   - Requirements: 4.1, 5.1, 5.2, 8.1, 10.1
 
-- [ ] 5. The exhausting order and the current playlist
+- [x] 5. The exhausting order and the current playlist
   - `core/src/player.cpp`: the exhausting key, `next_in` and `first_in` over a range, the
     root in place with `in_place` re-judged at every turn end and the take-over from the
     current playlist's first animation, the round of the range in `playlist_turn`,

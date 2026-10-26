@@ -423,6 +423,21 @@ void tree_build(Core &core) {
         core.folders[folder].id = free_drive_id(core);
     }
     core.tree_known = 1;
+    // The current playlist's folder, found from its path; a path that no folder of the
+    // tree has makes the root current.
+    core.current = 0;
+    if (core.playlist_path[0] != '\0') {
+        uint32_t parts = 1;
+        for (const char *at = core.playlist_path; *at != '\0'; ++at) {
+            parts += *at == '/' ? 1 : 0;
+        }
+        const uint32_t found = find_folder(core, core.playlist_path, parts);
+        if (found != kFolderMost) {
+            core.current = static_cast<uint8_t>(found);
+        } else {
+            core.playlist_path[0] = '\0';
+        }
+    }
 }
 
 void tree_place_gone(Core &core, uint32_t place) {
@@ -448,7 +463,9 @@ void tree_place_gone(Core &core, uint32_t place) {
             }
         }
         if (core.current == folder) {
+            // The current playlist is gone: the root is current.
             core.current = 0;
+            core.playlist_path[0] = '\0';
         } else if (core.current > folder) {
             --core.current;
         }

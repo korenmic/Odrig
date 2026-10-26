@@ -75,6 +75,18 @@ order of `show.json` and after them the drive's. It is what a show plays by itse
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
+With a card of sub-folders there is a playlist for each folder, and one of them is
+current: the root's, the folder `odrig` with the show's animations and the loose files, or
+a sub-folder's, see [animations from a USB drive](#animations-from-a-usb-drive). A
+playlist plays its own animations in the saved order, each for its turn, then each of its
+sub-folders' playlists once the same way, depth first, and then its own animations again:
+the root exhausts the show's animations and the loose files, then each folder of the card
+once, and starts over. A file that is left out, unavailable or still to be read is passed
+over, and so is an ignored animation of the show, as always. While the current playlist
+has nothing to play, the card out or not yet read or every file of its folders
+unavailable, the root plays in its place, and the current playlist takes over at the end
+of the turn in progress, from its first animation, as soon as it has something to play.
+
 At power-on a show plays the playlist, from its first animation, or from the animation
 `start` names. Only a `start` that names a cycle plays something else: that cycle.
 
@@ -111,7 +123,10 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 
 - `play <id>` of an animation item plays the playlist from that animation: its turn
   begins, with its first frame, and afterwards the playlist goes on with the animation
-  after it. No command plays one animation without end.
+  after it. No command plays one animation without end. With a folder current, a jump to
+  an animation of that folder or of one below it goes on from the jumped animation in the
+  playlist's order; a jump to any other animation plays its turn, and then the animation
+  whose turn the jump cut plays again, from its first frame, and the playlist goes on.
 - `play <id>` of a cycle shows each listed animation in order for `seconds`, then starts
   over, and repeats forever. Each turn starts its animation from the first frame. While
   a cycle plays, the playlist does not.

@@ -356,6 +356,11 @@ struct Core {
     uint8_t folder_count;
     uint8_t tree_known;
     uint8_t current;
+    // Whether the root plays in the current playlist's place, since that has nothing to
+    // play: judged where a turn ends. And the animation whose turn a jump outside the
+    // current playlist cut, which plays again after the jumped turn; kNothing for none.
+    uint8_t in_place;
+    uint32_t resume_item;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

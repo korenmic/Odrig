@@ -126,6 +126,12 @@ class AnEmulatorWithADrive(unittest.TestCase):
                          [{"id": 60004, "playlist": "night", "external": True}, {"id": 60005, "playlist": "night/deep", "external": True}])
         with support.Lines(emulator.tcp) as port:
             self.assertEqual(json.loads(port.ask("list")), reply)
+        # The folder's playlist chosen: `playing` names it, and its first animation plays.
+        self.assertEqual(json.loads(emulator.command("play 60004")), {"ok": True})
+        status = emulator.status()
+        self.assertEqual((status["playing"], status["animation"]), (60004, 60002))
+        self.assertEqual(json.loads(emulator.command("play all")), {"ok": True})
+        self.assertEqual(emulator.status()["playing"], "all")
 
     def test_a_damaged_file_and_one_of_another_canvas_are_left_out_and_logged(self):
         wide = core_support.clip(4, 3, 3, (100,))

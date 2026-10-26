@@ -146,7 +146,12 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"brightness\":");
     reply.number(core.brightness);
     reply.text(",\"playing\":");
-    reply.id_or_null(core, core.playing);
+    if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
+        // The playlist of a folder of the drive, while the drive is in and holds it.
+        reply.number(core.folders[core.current].id);
+    } else {
+        reply.id_or_null(core, core.playing);
+    }
     reply.text(",\"animation\":");
     reply.id_or_null(core, core.playing == kNothing ? kNothing : core.shown);
     reply.text(",\"fps\":");
@@ -460,8 +465,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        // An item of the show, else an animation of the drive.
-        uint32_t item = all ? player_first_in_playlist(core) : kNothing;
+        // The root for `play all`; else an item of the show, an animation of the drive or
+        // a folder of the drive's tree.
+        uint32_t folder = all ? 0 : kFolderMost;
+        uint32_t item = kNothing;
+        if (all) {
+            tree_choose(core, 0);
+            player_playlist_chosen(core);
+            item = player_first_in_playlist(core);
+        }
         for (uint32_t position = 0; !all && item == kNothing && position < core.item_count; ++position) {
             if (core.items[position].id == id) {
                 item = position;
@@ -477,14 +489,12 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         // A folder of the drive's tree: its playlist becomes current, and it plays from
         // its first animation, or the root does in its place.
-        uint32_t folder = all ? 0 : kFolderMost;
         if (!all && item == kNothing) {
             folder = tree_folder_with_id(core, id);
             if (folder != kFolderMost) {
-                item = player_first_in_folder(core, folder);
-                if (item == kNothing) {
-                    item = player_first_in_playlist(core);
-                }
+                tree_choose(core, folder);
+                player_playlist_chosen(core);
+                item = player_first_in_playlist(core);
             }
         }
         if (item == kNothing && (all || folder == kFolderMost)) {
@@ -495,19 +505,19 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             // A quarantined animation, or a cycle that lists only such: nothing is read.
             return refuse(reply, "unavailable");
         }
-        if (folder != kFolderMost) {
-            tree_choose(core, folder);
-        }
         if (item == kNothing) {
             // A folder chosen while nothing plays anywhere: the choice stands.
             return succeed(reply);
         }
         core.mapping_test = 0;
-        // An animation is played as its turn of the playlist, which goes on after it.
+        // An animation is played as its turn of the playlist, which goes on after it: a
+        // jump, unless a playlist was chosen and plays from its first.
         if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
-        } else {
+        } else if (folder != kFolderMost) {
             player_play_all(core, item);
+        } else {
+            player_jump(core, item);
         }
         return succeed(reply);
     }

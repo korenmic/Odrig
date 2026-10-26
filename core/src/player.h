@@ -43,13 +43,18 @@ void player_play_all(Core &core, uint32_t from);
 // unavailable, or the number of items when there is none.
 uint32_t player_first_animation(const Core &core);
 
-// The position of the first animation of the playlist in the saved order, an item or a
-// drive's animation, or kNothing.
+// The position of the first animation of the current playlist in the exhausting order, or
+// of the root's in its place: an item or a drive's animation, or kNothing.
 uint32_t player_first_in_playlist(const Core &core);
 
-// The position of the first animation that plays at or below a folder of the drive's tree,
-// in the saved order, or kNothing; the root's is the playlist's.
-uint32_t player_first_in_folder(const Core &core, uint32_t folder);
+// A playlist was chosen, by a command or by the rotation: nothing resumes after a jump,
+// and whether the root plays in its place is judged now.
+void player_playlist_chosen(Core &core);
+
+// Plays the playlist from the turn of the animation at this position, a jump: inside the
+// playlist in use it goes on from the jumped animation; outside, the animation whose turn
+// the jump cut plays again after it, from its first frame.
+void player_jump(Core &core, uint32_t item);
 
 // A file of the drive has joined the playlist. When nothing plays, the playlist starts
 // with it.
