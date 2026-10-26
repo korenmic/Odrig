@@ -39,6 +39,10 @@ READ_AT = CFUNCTYPE(c_int32, c_void_p, c_char_p, c_uint32, POINTER(c_uint8), c_s
 DRIVE = CFUNCTYPE(c_uint32, c_void_p)
 DRIVE_NAME = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, POINTER(c_char), c_size_t)
 DRIVE_SPACE = CFUNCTYPE(c_int, c_void_p, c_uint32, POINTER(c_uint64), POINTER(c_uint64))
+ABOUT = CFUNCTYPE(c_int, c_void_p, POINTER(c_char), c_size_t)
+DRIVE_LIST = CFUNCTYPE(c_int32, c_void_p, c_uint32)
+DRIVE_BIND = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, c_char_p)
+DRIVE_WRITABLE = CFUNCTYPE(c_int, c_void_p, c_uint32)
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -49,6 +53,8 @@ class HostRecord(Structure):
         ("ctx", c_void_p), ("alloc", ALLOC), ("open", OPEN), ("read", READ), ("close", CLOSE), ("log", LOG),
         ("write_open", WRITE_OPEN), ("write", WRITE), ("write_close", WRITE_CLOSE), ("rename", RENAME), ("remove", REMOVE),
         ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME), ("drive_space", DRIVE_SPACE),
+        ("about", ABOUT),
+        ("drive_list", DRIVE_LIST), ("drive_bind", DRIVE_BIND), ("drive_writable", DRIVE_WRITABLE),
     ]
 
 
@@ -122,6 +128,11 @@ class Core:
         else:
             self._functions += (DRIVE(), DRIVE_NAME())
         self._functions += (DRIVE_SPACE(self._drive_space) if hasattr(host, "drive_space") else DRIVE_SPACE(),)
+        self._functions += (ABOUT(self._about) if hasattr(host, "about") else ABOUT(),)
+        if hasattr(host, "write_open") and getattr(host, "drive", None) is not None and hasattr(host, "drive_list"):
+            self._functions += (DRIVE_LIST(self._drive_list), DRIVE_BIND(self._drive_bind), DRIVE_WRITABLE(self._drive_writable))
+        else:
+            self._functions += (DRIVE_LIST(), DRIVE_BIND(), DRIVE_WRITABLE())
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)
@@ -201,6 +212,23 @@ class Core:
             return -1
         free_bytes[0], total_bytes[0] = told
         return 1
+
+    def _about(self, _ctx, buffer, capacity):
+        text = self._host.about()
+        if text is None or capacity == 0:
+            return 0
+        data = text.encode("ascii", "replace")[:capacity - 1] + b"\0"
+        ctypes.memmove(buffer, data, len(data))
+        return 1
+    def _drive_list(self, _ctx, drive):
+        count = self._host.drive_list(drive)
+        return -1 if count is None else count
+
+    def _drive_bind(self, _ctx, drive, place, name):
+        return 1 if self._host.drive_bind(drive, place, name.decode("ascii", "replace")) else 0
+
+    def _drive_writable(self, _ctx, drive):
+        return 1 if self._host.drive_writable(drive) else 0
 
     def _drive_name(self, _ctx, drive, place, buffer, capacity):
         name = self._host.drive_name(drive, place)

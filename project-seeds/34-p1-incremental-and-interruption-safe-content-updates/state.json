@@ -1,10 +1,11 @@
 {
   "number": 34,
   "slug": "34-p1-incremental-and-interruption-safe-content-updates",
-  "state": "remaining",
+  "state": "completed",
   "title": "Incremental and interruption-safe content updates",
   "priority": "P1",
   "addedAt": "2026-10-24T05:39:38+03:00",
   "addedCommit": "pending-local",
+  "completedAt": "2026-10-25T06:30:00+02:00",
   "summary": "Change only necessary content and metadata for individual maintenance, preserve unrelated payloads and settings, and provide verified transaction, cancellation and recovery behavior without routine broad storage or firmware rewrites."
 }

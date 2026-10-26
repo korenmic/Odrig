@@ -1,11 +1,14 @@
 # Animation formats
 
-An animation exists in two formats:
+An animation exists in these formats:
 
 | Format | File | Role |
 |---|---|---|
 | JSON frames | `name.json` | The tracked source of the animation. Lossless and readable. Never played by the board. |
 | ODRG | `name.odrg` | The runtime format, produced from the JSON source by the converter. This is what the player reads, on the board and in the emulator. |
+| ODRGX | `name.odrgx` | The container of the runtime: a header that names what its payload is, and the payload. A payload of frames is an ODRG file as it is. |
+
+A reader tells ODRG and ODRGX apart by the first four bytes of a file, never by its name.
 
 Both describe the same thing: a list of full-canvas pictures, each shown for a number of
 milliseconds. Converting JSON to ODRG loses nothing: the two files show the same picture at
@@ -231,6 +234,246 @@ Every rejection has a fixed name. The names are listed in [reasons.md](reasons.m
 A decoder needs the N-byte pixel buffer and, for predictor 1, two pixels' worth of running
 values. It can read the file front to back without holding a whole frame record in memory.
 A compressed file adds the DEFLATE window (up to 32,768 bytes) and the inflate state.
+
+## ODRGX
+
+A binary file: a header of 20 bytes and the payload, nothing after it. All multi-byte
+integers are little-endian.
+
+| Offset | Size | Field | Value |
+|---:|---:|---|---|
+| 0 | 4 | Magic | The bytes `4F 44 52 58` ("ODRX"). |
+| 4 | 1 | Container version | 1. |
+| 5 | 1 | Type | The content type: 1, frames; 2, a text; 3, a widget. |
+| 6 | 1 | Type version | The version of the content type: 1. |
+| 7 | 1 | Reserved | 0. |
+| 8 | 2 | Width | W, at least 1. |
+| 10 | 2 | Height | H, at least 1. |
+| 12 | 4 | Loop | The length of one loop in milliseconds, 1 to 4,294,967,295. |
+| 16 | 4 | Payload | P, the number of bytes after the header. |
+
+The container's version, the content type and the type's version are three numbers of
+their own: a new version of one type changes neither the others nor the container. The
+loop is in the header so that a reader that reads the headers only knows how long every
+file plays; a reader that reads the payload refuses a loop that is not the payload's.
+
+### The frames payload
+
+The payload of the type 1 is an ODRG file, as "ODRG" above describes it, for the canvas
+of the container. Its loop is the sum of the durations of its frames. It plays exactly as
+the ODRG file plays by itself.
+
+### The text payload
+
+The payload of the type 2 is a text: its settings, the text as it was written, and its
+layout, the glyphs and their places, which the converter made. The player draws the glyphs
+where the settings move them; it lays out nothing itself.
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Font | 1 `small`, 2 `medium`, 3 `large` |
+| 1 | 1 | Font version | the version of the font the layout was made with: 1 |
+| 2 | 1 | Effect | 0 `static`, 1 `marquee`, 2 `slide`, 3 `pan` |
+| 3 | 1 | Motion | 0 `left`, 1 `right`, 2 `up`, 3 `down` |
+| 4 | 1 | Align | 0 `left`, 1 `center`, 2 `right` |
+| 5 | 1 | Vertical align | 0 `top`, 1 `middle`, 2 `bottom` |
+| 6 | 1 | Direction | 0 `auto`, 1 `ltr`, 2 `rtl` |
+| 7 | 1 | Wrap | 0 or 1 |
+| 8 | 3 | Colour | red, green, blue |
+| 11 | 3 | Background | red, green, blue |
+| 14 | 2 | Speed | pixels a second, 1 to 240 |
+| 16 | 2 | Pause | milliseconds, 0 to 65,535, and at least 20 for `static` |
+| 18 | 2 | Text bytes | T, 1 to 512 |
+| 20 | 2 | Glyphs | G, 0 to 512 |
+| 22 | 2 | Block width | BW, at least 1 |
+| 24 | 2 | Block height | BH, at least 1 |
+| 26 | 2 | Reserved | 0 |
+| 28 | T | Text | the text, UTF-8 |
+| 28 + T | 6 G | Glyphs | each three 16-bit numbers: the glyph's place in its font's table, and x and y of the top left corner of its cell in the block, y growing downwards |
+
+P is 28 + T + 6 G, at most 3,612. The canvas's picture, 3 * W * H bytes, is at most 65,534.
+The direction and wrapping are kept so that the text can be edited; the layout already
+follows them.
+
+**The fonts.** `small` has 7 rows above the baseline and 2 below, `medium` 10 and 3, and
+`large` is `small` at twice the size: every pixel a square of 2 x 2. Each has a glyph for
+the 95 printable ASCII characters and the 27 Hebrew letters from U+05D0 to U+05EA. A glyph's
+cell is its rows by its width; it advances by its width and one column, times the scale,
+and the space is a dark glyph. Lines are a cell and one row apart. The glyphs are those of
+`fonts/` in the repository.
+
+**The layout** is made by the converter: the text split at line feeds into paragraphs; each
+paragraph put in order by the Unicode Bidirectional Algorithm, UAX #9, its direction that
+of its first strong letter unless forced; with wrapping, broken at spaces into lines no
+wider than the canvas, and a word wider than the canvas between its characters; each line
+reordered, brackets in right-to-left runs mirrored, and its glyphs placed from x 0; the
+block as wide as its widest line, each line aligned in it, and as high as its lines.
+
+**The pass.** Where the block rests: x is 0, (W - BW) / 2 or W - BW by the alignment, and y
+0, (H - BH) / 2 or H - BH by the vertical one, rounded down. `steps(d)` is the
+milliseconds of d pixels at the speed, `ceil(d * 1000 / speed)`, and `moved(t)` the pixels
+after t milliseconds, `floor(t * speed / 1000)`. A motion left or right moves x, one up
+or down moves y, and the block rests across it.
+
+| Effect | Must fit | Pass | Where the block is at t |
+|---|---|---|---|
+| `static` | the canvas | the pause | at rest |
+| `marquee` | the canvas across the motion | `steps(size + length)` | it enters at one side and leaves at the other: left from W, right from -BW, up from H, down from -BH, `moved(t)` on |
+| `slide` | the canvas | in + pause + out | it moves in from the side the motion comes from to its rest, holds the pause, and moves out at the other side |
+| `pan` | the canvas across the motion | 2 pauses + 2 `steps(T)`, at least 20 | it holds at one end, moves to the other, holds and moves back; T is the length beyond the canvas, 0 when it fits, and then it rests |
+
+Here size and length are W and BW across a horizontal motion and H and BH across a
+vertical one. A pan left starts with the block's left end at the canvas's left side, one
+right with its right end at the right side, and so for up and down.
+
+**Drawing** at a time t of the pass: the canvas takes the background, and every lit pixel of
+every glyph whose cell meets the canvas at the block's place becomes the colour, a square
+of the scale. Rows are counted from the top here: a canvas row r is the format's row
+H - r.
+
+### The JSON source of a text
+
+A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `version`
+(1), `type` (`"text"`), `width`, `height`, `text` (1 to 512 bytes of UTF-8), `font`
+(`"small"`, `"medium"` or `"large"`), `color` and `background` (colours as in JSON
+frames), `align` (`"left"`, `"center"` or `"right"`), `valign` (`"top"`, `"middle"` or
+`"bottom"`), `direction` (`"auto"`, `"ltr"` or `"rtl"`), `wrap` (`true` or `false`),
+`effect`, `motion`, `speed` (1 to 240) and `pause_ms` (0 to 65,535, at least 20 for
+`static`). It is the tracked source of a text, as JSON frames are of frames; the converter
+writes it with two spaces of indent.
+
+```json
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "שלום world",
+  "font": "small",
+  "color": 16766016,
+  "background": 0,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "marquee",
+  "motion": "left",
+  "speed": 20,
+  "pause_ms": 1000
+}
+```
+
+### The widget payload
+
+The payload of the type 3 is a widget: a clock that the player draws, of 20 bytes.
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Widget | 1 `analog`, 2 `digital`, 3 `melting` |
+| 1 | 1 | Reserved | 0 |
+| 2 | 2 | Seconds | the loop, 1 to 3,600 |
+| 4 | 3 | Face | red, green, blue |
+| 7 | 3 | Hands | red, green, blue |
+| 10 | 3 | Rim | red, green, blue |
+| 13 | 3 | Background | red, green, blue |
+| 16 | 2 | Least speed | times real time, 1 to 3,600 |
+| 18 | 2 | Greatest speed | the least to 3,600 |
+
+The loop in the header is 1,000 times the seconds. The canvas's picture, 3 * W * H bytes,
+is at most 65,534.
+
+**The time a clock shows** is imaginary: no clock of the board or of a network is read.
+Each turn of a clock has a seed, a 32-bit number other than 0, which the player chooses
+when the turn begins: [core.md](core.md), "Clocks". From the seed, xorshift32 (x ^= x <<
+13, x ^= x >> 17, x ^= x << 5, on 32 bits) gives one number after the other, r, and the
+clock takes, in this order:
+
+| Name | From r | What it is |
+|---|---|---|
+| start | r % 43,200,000 | the virtual time at the start of the turn, in milliseconds |
+| b | least + r % (greatest - least + 1) | the base speed |
+| A | floor(min(b - least, greatest - b) * (r % 101) / 102) | the swing of the speed about b |
+| P | 6,000 + r % 14,001 | the period of the swing, in milliseconds |
+| phi | r % 1,024 | the phase of the swing, in 1,024ths of a turn |
+| tilt | 25 + r % 16 | the melting watch's tilt, in degrees |
+| fold | r % 21 | where it folds, in percent of its radius below its centre |
+| stretch | 130 + r % 41 | how far the hanging face stretches, in percent |
+| narrow | 20 + r % 31 | how fast it narrows as it hangs, in percent |
+| shear | 10 + r % 21 | how far it drifts sideways as it hangs, in percent |
+| wave | 2 + r % 3 | how high the fold waves, in half pixels |
+
+`t` milliseconds into the turn, the virtual time is
+
+```
+v(t) = start + b * t + floor(A * P * (c(phi * 65,536) - c(phi * 65,536 + floor(2^26 * (t % P) / P))) / 102,944)
+```
+
+Angles here are in 2^26ths of a turn, and `s` and `c` are the sine and the cosine of the
+sine table of 1,024 entries, in units of 1/16,384, that `fonts/generate.mjs` writes: an
+angle a is read at entry `floor(a / 65,536) % 1,024` and moved towards the next one by
+`floor((next - entry) * (a % 65,536) / 65,536)`; `c(a)` is `s(a + 2^24)`. 102,944 is 2 pi
+times 16,384, rounded. The speed of the virtual time is b plus the swing's sine, never
+below the least speed and never above the greatest. The clock shows `v(t)` modulo 12
+hours. Every division here rounds down.
+
+**Drawing a clock** at a time t of its turn, with its seed. Positions are in half pixels
+from the canvas's centre, with y growing downwards: a pixel x, y, counted from the top,
+is at `2x + 1 - W`, `2y + 1 - H`. A dial of radius R half pixels has a rim of 4 half
+pixels; inside it the pivot, the points whose squared distance from the centre is at most
+16; the hour hand, to `floor(R * 55 / 100)` and 2 half pixels to either side of its line,
+pointing at `v` modulo 12 hours; the minute hand, to `floor(R * 85 / 100)` and 1 half
+pixel to either side, at `v` modulo an hour; twelve marks, from `R - 6 - floor(R / 7)` to
+`R - 6`, 1 half pixel to either side; and the face. The rim and the face take their
+colours, and the pivot, the hands and the marks take the hands' colour.
+
+- **analog**: the background, and a dial of radius `2 * (floor(min(W, H) / 2) - 1)`.
+- **digital**: the background, and `h:mm` of `v` in the font `large`, the hour 1 to 12,
+  as wide as its advances less the spacing after the last, its left at `floor((W -
+  width) / 2)` and its top at `floor((H - 18) / 2)`; the digits in the face's colour and
+  the colon in the rim's, shown while `t % 1,000` is below 500.
+- **melting**: a pocket watch, after the seed's picture in
+  `project-seeds/37-p1-odrgx-text-and-clock-animations/`. Its dial has 66 percent of the
+  analog clock's radius, its centre lies 6 percent of that radius left of the canvas's
+  centre and 12 percent above it, and it is tilted counter-clockwise by `tilt`. Above the
+  fold the dial lies flat; below it, the face hangs straight down, stretched by `stretch`,
+  narrowing by `narrow` and drifting right by `shear` as it hangs, and darker the deeper
+  it hangs. The fold waves by `wave` along the dial, once across it, with a period of 7
+  seconds of real time. A crown and a ring of the rim's colour sit at 12 o'clock. The
+  formulas are those of `core/src/clock.cpp` and `converter/lib/draw.js`, which give the
+  same pixels.
+
+### The JSON source of a clock
+
+A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `version`
+(1), `type` (`"widget"`), `width`, `height`, `widget` (`"analog"`, `"digital"` or
+`"melting"`), `seconds` (1 to 3,600), `face`, `hands`, `rim` and `background` (colours as
+in JSON frames), `speed_min` (1 to 3,600) and `speed_max` (`speed_min` to 3,600).
+
+```json
+{
+  "version": 1,
+  "type": "widget",
+  "width": 60,
+  "height": 60,
+  "widget": "melting",
+  "seconds": 30,
+  "face": 16051408,
+  "hands": 2105376,
+  "rim": 13934615,
+  "background": 0,
+  "speed_min": 60,
+  "speed_max": 600
+}
+```
+
+### What a reader rejects
+
+A file that ends inside the header, a wrong magic, a container version that is not 1, a
+reserved byte that is not 0, a type or a type version the reader does not know, a width or
+height of zero, a payload longer than its type allows, a payload that the rules of its type
+reject, a frames payload of another canvas, a payload whose length is not P, and a loop
+that is not the payload's. The names are listed in [reasons.md](reasons.md), "ODRGX
+files".
 
 ## Guidance for the converter
 

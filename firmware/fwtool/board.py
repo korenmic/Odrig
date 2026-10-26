@@ -78,17 +78,45 @@ def is_busy(reply):
     return isinstance(value, dict) and value.get("error") == "busy"
 
 
+def readiness(reply):
+    """The `readiness` of a reply to `status`, or None for a firmware that reports none."""
+    try:
+        value = json.loads(reply)
+    except ValueError:
+        return None
+    return value.get("readiness") if isinstance(value, dict) else None
+
+
+def outcome(reply):
+    """The line that says what a board's status after a wait comes to: healthy, degraded
+    with the number of animations unavailable, or in recovery with the reason."""
+    value = json.loads(reply)
+    if value.get("error") is not None:
+        return f"outcome: recovery: {value['error']}"
+    if value.get("readiness") == "degraded":
+        return f"outcome: degraded: {value.get('unavailable')} unavailable"
+    return "outcome: healthy"
+
+
 def settled(port, wait=WAIT_SECONDS):
     """The firmware's reply to `status` once it has read every installed animation to its
     end.
 
-    After a restart the firmware plays at once and reads the animations while it plays;
-    until it has, it answers `list` with `busy`, and a fault it finds in one of them
-    shows in `status` only then. So the board is first waited for, then asked for its
-    list every half second until that is no longer refused with `busy`, and then asked
-    for its status. `wait` is the time for all of it, counted from the first try."""
+    After a restart the firmware plays at once and reads the animations while it plays. A
+    firmware that reports its readiness is asked for its status every half second until
+    that says the check has ended. One that does not answers `list` with `busy` until it
+    has read them, and a fault it finds in one of them shows in `status` only then; it is
+    asked for its list every half second until that is no longer refused with `busy`, and
+    then for its status. `wait` is the time for all of it, counted from the first try."""
     deadline = time.monotonic() + wait
-    status(port, wait)
+    reply = status(port, wait)
+    if readiness(reply) is not None:
+        while readiness(reply) == "checking":
+            if time.monotonic() >= deadline:
+                raise Failure("check-not-done", f"the board was still reading its animations after {wait:g} seconds, so its state is not known yet; give it longer with --wait")
+            time.sleep(LIST_EVERY_SECONDS)
+            reply = status(port, max(deadline - time.monotonic(), EXCHANGE_SECONDS))
+        return reply
     while True:
         left = max(deadline - time.monotonic(), 0.0)
         reply = ask(port, b"list\n", client.is_reply, left, "reply to list")

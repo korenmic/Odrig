@@ -39,7 +39,7 @@ class CoreDocument(unittest.TestCase):
         members = {}
         for struct, body in structs.items():
             members[struct] = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
-        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space"])
+        self.assertEqual(members["odrig_host"], ["ctx", "alloc", "open", "read", "close", "log", "write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable"])
         self.assertEqual(members["odrig_leg"], ["leg", "pin", "led_count", "rgb"])
         for struct, names in members.items():
             self.assertTrue(struct in self.named, struct)
@@ -89,13 +89,13 @@ class CoreDocument(unittest.TestCase):
     def test_its_memory_table_adds_up_to_what_the_suite_measures(self):
         table = self.text.split("\n## Memory\n")[1].split("\n## ")[0]
         rows = re.findall(r"(?m)^\| ([^|*]+) \| [^|]+ \| ([0-9,]+) \|$", table)
-        self.assertEqual(len(rows), 16)
+        self.assertEqual(len(rows), 17)
         total = int(re.search(r"\*\*Total\*\* \| \| \*\*([0-9,]+)\*\*", table).group(1).replace(",", ""))
         self.assertEqual(sum(int(number.replace(",", "")) for _, number in rows), total)
         from .test_memory import hundred_items
 
         asked, blocks = support.start(hundred_items()).memory
-        self.assertEqual((asked, blocks), (total, 16))
+        self.assertEqual((asked, blocks), (total, 17))
         example, _ = support.start(support.example_show()).memory
         self.assertIn(f"{example:,} bytes", table)
 
@@ -119,7 +119,7 @@ class CoreDocument(unittest.TestCase):
 class CommandsDocument(unittest.TestCase):
     """docs/commands.md against the core's command front-end."""
 
-    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "in-use", "mapping-conflict", "no-space", "bad-offset",
+    ORDER = ["line-too-long", "unknown-command", "bad-argument", "show-invalid", "no-upload", "incomplete", "bad-checksum", "busy", "unknown-id", "unavailable", "in-use", "read-only", "mapping-conflict", "stale", "order-conflict", "no-space", "bad-offset",
              "bad-file", "storage-error"]
 
     @classmethod
@@ -141,10 +141,10 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "upload begin <id> <file> <bytes>",
-                                      "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
+                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
-        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many"})
+        self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "test", "many", "move", "expect", "rebuild"})
 
     def test_its_limits_are_the_cores(self):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
@@ -189,9 +189,6 @@ class ReasonsDocument(unittest.TestCase):
                 "duplicate-id <id>",
                 "undefined-id <id>",
                 "nested-cycle <id>",
-                "file-missing <name>",
-                "file-malformed <name> <reason>",
-                "size-mismatch <name>",
                 "read-error <name>",
                 "out-of-memory",
             ],
@@ -208,7 +205,7 @@ class ReasonsDocument(unittest.TestCase):
     def test_every_text_begins_with_a_name_the_core_can_report(self):
         names = set(support.host_lines("reasons"))
         texts = re.findall(r"(?m)^\| `([a-z-]+)(?: <[a-z]+>)*` \|", self.section)
-        self.assertGreaterEqual(len(texts), 14)
+        self.assertGreaterEqual(len(texts), 11)
         for text in texts:
             self.assertIn(text, names)
 

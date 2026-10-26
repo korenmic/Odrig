@@ -1,5 +1,6 @@
 #include "odrig_log.h"
 
+#include "odrig_kept.h"
 #include "wled.h"
 
 namespace {
@@ -15,6 +16,9 @@ portMUX_TYPE guard = portMUX_INITIALIZER_UNLOCKED;
 
 // The host's own `log`, which the wrapper calls first.
 void (*playerLog)(void *ctx, const char *text) = nullptr;
+
+// The latest line the player logged, which a software or watchdog reset leaves as it was.
+RTC_NOINIT_ATTR OdrigKept kept;
 
 // A whole line into `into`, LINE_ROOM bytes: the mark, the time, the kind and the text,
 // every byte of the text that is not printable ASCII as `?`, cut so that the line feed
@@ -36,6 +40,7 @@ uint64_t nowMs() { return (uint64_t)esp_timer_get_time() / 1000; }
 void logLine(void *ctx, const char *text) {
   if (playerLog != nullptr) playerLog(ctx, text);
   OdrigLog::add("player", text);
+  OdrigKeep::put(kept, text);
 }
 
 }  // namespace
@@ -78,6 +83,14 @@ size_t OdrigLog::take(char *line, size_t room, size_t most) {
   char text[32];
   snprintf(text, sizeof(text), "%u lines dropped", (unsigned)lost);
   return made(line, nowMs(), "log", text);
+}
+
+void OdrigLog::retained() {
+  char text[sizeof(kept.text)];
+  if (!OdrigKeep::take(kept, text)) return;
+  char line[LINE_ROOM];
+  snprintf(line, sizeof(line), "%s%s", "before this start: ", text);
+  add("odrig", line);
 }
 
 odrig_host OdrigLog::withLog(const odrig_host &given) {

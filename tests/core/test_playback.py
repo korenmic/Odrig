@@ -395,9 +395,7 @@ class NothingToShow(Playback):
         self.assert_dark(files, [1, 2])
 
     def test_an_invalid_show_gives_dark_refreshes(self):
-        missing_file = support.example_show()
-        del missing_file["dvd.odrg"]
-        self.assert_dark(playing(missing_file, 1), [1, 2])
+        self.assert_dark(support.with_show_fault(playing(support.example_show(), 1)), [1, 2])
         no_show = support.example_show()
         del no_show["show.json"]
         self.assert_dark(no_show, [1, 2])

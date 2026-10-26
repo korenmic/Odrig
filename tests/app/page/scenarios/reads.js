@@ -4,7 +4,7 @@
 import {rows, state} from "../reading.js";
 
 export default async function (app) {
-  await app.until(() => app.shown() === "show" && app.text("power") !== "-", "the show screen with a status");
+  await app.until(() => app.shown() === "animations" && app.text("power") !== "-", "the show screen with a status");
   const before = {...state(app), rows: rows(app), message: app.text("message-text")};
   const began = Date.now();
   await app.until(() => rows(app).length === app.settings.rows, `${app.settings.rows} rows`, 20000);

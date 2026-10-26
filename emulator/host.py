@@ -2,6 +2,7 @@
 
 import collections
 import os
+import platform
 import shutil
 import sys
 import time
@@ -22,6 +23,16 @@ NAME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_.")
 DRIVE_MOST = 256
 DRIVE_LOOK_SECONDS = 1.0
 DRIVE_PREFIX = "drive/"
+# What a name of a file of a drive may not hold, and its longest length.
+DRIVE_FORBIDDEN = frozenset('/\\:*?"<>|')
+DRIVE_LONGEST_NAME = 100
+
+
+def drive_name_sound(name):
+    """Whether a name is one a file of a drive's folder may have: 1 to 100 bytes of printable
+    ASCII other than / \\ : * ? " < > |, not beginning with a dot."""
+    return (0 < len(name) <= DRIVE_LONGEST_NAME and name.isascii() and not name.startswith(".")
+            and all(" " <= character <= "~" and character not in DRIVE_FORBIDDEN for character in name))
 
 # Windows refuses to remove a file that a program holds open, and its folder, unless the
 # program let others do so when it opened the file. The host lets them, as macOS does: a
@@ -48,30 +59,33 @@ def reading(path):
 
 def drive_list(folder):
     """The names of the animation files of a drive's folder `odrig`: those that end in
-    `.odrg`, in any case, and do not begin with a dot, in the order of their bytes, the
-    first 256. Empty when the folder cannot be listed."""
+    `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order of their
+    bytes, the first 256. Empty when the folder cannot be listed."""
     try:
         with os.scandir(folder) as entries:
             names = [entry.name for entry in entries if entry.is_file()]
     except OSError:
         return []
-    kept = [name for name in names if name.lower().endswith(".odrg") and not name.startswith(".")]
+    kept = [name for name in names if name.lower().endswith((".odrg", ".odrgx")) and not name.startswith(".")]
     return sorted(kept, key=os.fsencode)[:DRIVE_MOST]
 
 
 class Drive:
-    """A folder of the computer that stands for the top of a USB drive. Its folder `odrig`
-    appearing is a drive plugged in, with a number one higher than the last, and its going
-    is the drive pulled out. The folder is looked for at most once in DRIVE_LOOK_SECONDS
-    of the clock. Its list is made when it appears, and not again while it stays, as the
-    files of a drive do not change while it is plugged in."""
+    """A folder of the computer that stands for the top of a drive, a card or a USB stick.
+    Its folder `odrig` appearing is a drive plugged in, with a number one higher than the
+    last, and its going is the drive pulled out. The folder is looked for at most once in
+    DRIVE_LOOK_SECONDS of the clock. It is listed when the core asks, and not otherwise; the
+    core may give the names of places instead. The core may change its files unless it is
+    read only."""
 
-    def __init__(self, top, clock=time.monotonic):
+    def __init__(self, top, clock=time.monotonic, writable=True):
         self.top = os.fspath(top)
         self.folder = os.path.join(self.top, "odrig")
         self.clock = clock
+        self.writable = writable
         self.number = 0
         self.names = []
+        self.listings = 0
         self._plugged = 0
         self._looked = None
 
@@ -83,7 +97,7 @@ class Drive:
         self._looked = now
         there = os.path.isdir(self.folder)
         if there and self.number == 0:
-            self.names = drive_list(self.folder)
+            self.names = []
             self._plugged += 1
             self.number = self._plugged
         elif not there and self.number != 0:
@@ -91,19 +105,48 @@ class Drive:
             self.names = []
         return self.number
 
+    def list(self, drive):
+        """Lists the folder of that drive now. The number of files, or `None` when it is not
+        plugged in any more."""
+        if drive == 0 or drive != self.number:
+            return None
+        self.names = drive_list(self.folder)
+        self.listings += 1
+        return len(self.names)
+
+    def bind(self, drive, place, name):
+        """Gives the place to the file of this name. False when that drive is not plugged in
+        any more or the name is not one of a drive's file."""
+        if drive == 0 or drive != self.number or not drive_name_sound(name) or place >= DRIVE_MOST:
+            return False
+        self.names += [None] * (place + 1 - len(self.names))
+        self.names[place] = name
+        return True
+
+    def can_write(self, drive):
+        return self.writable and drive != 0 and drive == self.number
+
     def name(self, drive, place):
         """The name of the file at a place of that drive's list, or `None`."""
         if drive == 0 or drive != self.number or place >= len(self.names):
             return None
         return self.names[place]
 
-    def path(self, name):
-        """The file a name `drive/<place>` stands for, or `None` when the drive that is
-        plugged in has none at that place."""
-        place = name[len(DRIVE_PREFIX):]
-        if not place.isascii() or not place.isdigit() or self.number == 0 or int(place) >= len(self.names):
+    def path(self, name, changing=False):
+        """The file a name `drive/<place>` or `drive/<name>` stands for, or `None` when the
+        drive that is plugged in has none at that place, the name is not one of a drive's
+        file, or a change is asked of a drive that cannot be written. A place is never
+        changed."""
+        rest = name[len(DRIVE_PREFIX):]
+        if self.number == 0:
             return None
-        return os.path.join(self.folder, self.names[int(place)])
+        if rest.isascii() and rest.isdigit():
+            if changing or int(rest) >= len(self.names) or self.names[int(rest)] is None:
+                return None
+            return os.path.join(self.folder, self.names[int(rest)])
+        if not drive_name_sound(rest) or (changing and not self.writable):
+            return None
+        return os.path.join(self.folder, rest)
 
 
 class FolderHost:
@@ -198,6 +241,20 @@ class FolderHost:
         """The name of the file at a place of that drive's list, or `None`."""
         return self.drive.name(drive, place)
 
+    def about(self):
+        """The name the emulator gives itself in `status`."""
+        return f"odrig emulator on {platform.system()} {platform.machine()}"
+
+    def drive_list(self, drive):
+        """Lists the drive's folder now: the number of its files, or `None`."""
+        return self.drive.list(drive)
+
+    def drive_bind(self, drive, place, name):
+        return self.drive.bind(drive, place, name)
+
+    def drive_writable(self, drive):
+        return self.drive.can_write(drive)
+
     def log(self, text):
         self.logged.append(text)
         if self.verbose:
@@ -206,7 +263,10 @@ class FolderHost:
     def _path(self, name):
         """The place of a file in the folder, or `None` for a name that is not one the core
         may use: 1 to 32 characters of a-z, 0-9, `-`, `_` and `.`, and not made of dots
-        alone. Such a name has no path separator, so the place is in the folder."""
+        alone. Such a name has no path separator, so the place is in the folder. A name
+        `drive/<name>` is the file of that name of the drive, when it can be written."""
+        if self._of_the_drive(name):
+            return self.drive.path(name, changing=True)
         if not name or len(name) > LONGEST_NAME or not NAME_CHARACTERS.issuperset(name) or not name.strip("."):
             return None
         return os.path.join(self.folder, name)

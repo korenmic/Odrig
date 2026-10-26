@@ -62,6 +62,8 @@ class BodyFaults(unittest.TestCase):
         self.assertIsNone(run.error, "the start takes the file")
         printed = [line for line in run.lines if not line.startswith("log ")]
         expected = support.ReferencePlayer(files, check_first=False).run(script)
+        self.assertEqual([line for line in run.lines if line.startswith("log ")], [line for line in expected if line.startswith("log ")])
+        expected = [line for line in expected if not line.startswith("log ")]
         self.assertEqual(len(printed), len(expected))
         for number, (line, wanted) in enumerate(zip(printed, expected)):
             if line != wanted:
@@ -75,24 +77,29 @@ class BodyFaults(unittest.TestCase):
                 logs.append((int(run.lines[number + 1].split()[1]) - T0, line[4:]))
         return printed, logs
 
-    def assert_dark_from(self, printed, time):
-        """Every refresh from this time after power-on is dark, and none before it."""
-        at = None
+    def assert_lit(self, printed):
+        """Every refresh shows a picture: no fault darkens the LEDs."""
         for line in printed:
             word, _, rest = line.partition(" ")
-            if word == "refresh":
-                at = int(rest) - T0
-            elif word == "data":
-                lit = any(bytes.fromhex(rest.split()[1]))
-                self.assertEqual(lit, at < time, f"the refresh at {at} ms")
+            if word == "data":
+                self.assertTrue(any(bytes.fromhex(rest.split()[1])), line[:40])
 
-    def assert_invalid(self, printed, text):
-        """The last two replies: `status` with this reason and nothing playing, and
-        `list` refused for an invalid show."""
+    def assert_still_checked(self, printed):
+        """The last reply, to `list`, lists the faulty animation as usable, with its size
+        not known yet: the check has not come to it."""
+        faulty = [item for item in json.loads(printed[-1][len("reply "):])["items"] if item["id"] == 2]
+        self.assertEqual((faulty[0]["bytes"], faulty[0].get("fault")), (None, None))
+
+    def assert_quarantined(self, printed, reason, playing="all"):
+        """The last two replies: `status` with no error, the sound animation on the LEDs
+        and this playing, and `list` with the faulty animation and its fault, or `busy`
+        while the check goes on."""
         state, listed = [line[len("reply "):] for line in printed if line.startswith("reply ")][-2:]
         state = json.loads(state)
-        self.assertEqual((state["error"], state["playing"], state["animation"]), (text, None, None))
-        self.assertEqual(listed, refused("show-invalid"))
+        self.assertEqual((state["error"], state["playing"], state["animation"]), (None, playing, 1))
+        if listed != refused("busy"):
+            faulty = [item for item in json.loads(listed)["items"] if item["id"] == 2]
+            self.assertEqual(faulty[0]["fault"], reason)
 
 
 class FoundByTheCheck(BodyFaults):
@@ -110,13 +117,13 @@ class FoundByTheCheck(BodyFaults):
                 time = 20 * (refresh - 1)
                 script = [f"poll {T0 + 20 * step}" for step in range(refresh + 3)]
                 script += [support.line(T0 + 20 * refresh + 40, "status"), support.line(T0 + 20 * refresh + 40, "list")]
-                text = f"file-malformed faulty.odrg {name.split('.')[0]}"
+                text = f"file faulty.odrg unavailable: {name.split('.')[0]}"
                 printed, logs = self.session(show_with(data, sound=self.SOUND), script)
                 self.assertEqual(logs, [(time, text)])
-                self.assert_dark_from(printed, time)
-                self.assert_invalid(printed, text)
+                self.assert_lit(printed)
+                self.assert_quarantined(printed, name.split(".")[0])
 
-    def test_of_two_faulty_files_the_one_the_show_names_first_is_reported(self):
+    def test_two_faulty_files_are_quarantined_in_the_order_the_show_names_them(self):
         files = show_with(cut_clip(10, 3), sound=2)
         files["other.odrg"] = cut_clip(10, 1)
         show = json.loads(files["show.json"])
@@ -124,8 +131,8 @@ class FoundByTheCheck(BodyFaults):
         files["show.json"] = json.dumps(show)
         script = [f"poll {T0 + 20 * step}" for step in range(12)] + [support.line(T0 + 240, "status"), support.line(T0 + 240, "list")]
         printed, logs = self.session(files, script)
-        self.assertEqual([text for _, text in logs], ["file-malformed faulty.odrg truncated"])
-        self.assert_invalid(printed, "file-malformed faulty.odrg truncated")
+        self.assertEqual([text for _, text in logs], ["file faulty.odrg unavailable: truncated", "file other.odrg unavailable: truncated"])
+        self.assert_quarantined(printed, "truncated")
 
     def test_a_file_that_cannot_be_read_to_its_end_is_a_read_error(self):
         files = show_with(support.clip(3, 3, 2, (20,) * 6), sound=self.SOUND)
@@ -134,9 +141,9 @@ class FoundByTheCheck(BodyFaults):
             with self.subTest(offset=offset):
                 run = support.start(files, script, ["--read-fails", "faulty.odrg", str(offset)], check_first=False)
                 self.assertIsNone(run.error, "the start reads the header")
-                self.assertEqual([line for line in run.lines if line.startswith("log ")], ["log read-error faulty.odrg"])
+                self.assertEqual([line for line in run.lines if line.startswith("log ")], ["log file faulty.odrg unavailable: read-error"])
                 state = json.loads(run.lines[-1][len("reply "):])
-                self.assertEqual((state["error"], state["playing"]), ("read-error faulty.odrg", None))
+                self.assertEqual((state["error"], state["playing"], state["animation"]), (None, "all", 1))
 
 
 class FoundByThePlayer(BodyFaults):
@@ -163,20 +170,21 @@ class FoundByThePlayer(BodyFaults):
                     # Every frame decodes, and the fault lies after the last one: the
                     # player never comes to it.
                     self.assertEqual(logs, [])
-                    self.assertEqual(printed[-1], f"reply {refused('busy')}")
+                    self.assert_still_checked(printed)
                 else:
-                    text = f"file-malformed faulty.odrg {name.split('.')[0]}"
+                    # The cycle lists the faulty one alone: the playlist plays from then on.
+                    text = f"file faulty.odrg unavailable: {name.split('.')[0]}"
                     time = -(-sound_ms // 40) * 40
                     self.assertEqual(logs, [(time, text)])
-                    self.assert_dark_from(printed, time)
-                    self.assert_invalid(printed, text)
+                    self.assert_quarantined(printed, name.split(".")[0])
 
     def test_the_frames_before_the_fault_are_shown(self):
         files = show_with(cut_clip(100, 75), sound=self.LONG, cycle=3, alone=True)
         printed, logs = self.session(files, self.every_40_ms(2000))
         # 75 frames of 20 ms: the first refresh at or after 1,500 ms is the one at 1,520.
-        self.assertEqual(logs, [(1520, "file-malformed faulty.odrg truncated")])
-        self.assert_dark_from(printed, 1520)
+        self.assertEqual(logs, [(1520, "file faulty.odrg unavailable: truncated")])
+        # The refresh that meets the fault keeps the picture before it.
+        self.assertEqual(printed[printed.index(f"refresh {T0 + 1520}") + 1], printed[printed.index(f"refresh {T0 + 1480}") + 1])
         whole = support.clip(7, 3, 2, (20,) * 100, compressed=False)
         sound = support.start(show_with(whole, sound=self.LONG, cycle=3, alone=True), self.every_40_ms(2000), check_first=False).lines
         cut = printed.index(f"refresh {T0 + 1520}")
@@ -186,9 +194,9 @@ class FoundByThePlayer(BodyFaults):
         # The sound animation has its turn first: four loops of 8 seconds.
         files = show_with(cut_clip(100, 75), sound=self.LONG)
         printed, logs = self.session(files, self.every_40_ms(35000))
-        self.assertEqual(logs, [(33520, "file-malformed faulty.odrg truncated")])
-        self.assert_dark_from(printed, 33520)
-        self.assert_invalid(printed, "file-malformed faulty.odrg truncated")
+        self.assertEqual(logs, [(33520, "file faulty.odrg unavailable: truncated")])
+        self.assert_lit(printed)
+        self.assert_quarantined(printed, "truncated")
 
     def test_max_seconds_before_the_fault_ends_the_turn_and_the_show_plays_on(self):
         files = show_with(cut_clip(100, 75), sound=self.LONG, max_seconds=1)
@@ -199,7 +207,7 @@ class FoundByThePlayer(BodyFaults):
         printed, logs = self.session(files, self.every_40_ms(20000))
         self.assertEqual(logs, [])
         self.assertIsNone(json.loads(printed[-2][len("reply "):])["error"])
-        self.assertEqual(printed[-1], f"reply {refused('busy')}")
+        self.assert_still_checked(printed)
 
     def test_in_a_cycle_it_is_found_when_a_turn_is_long_enough_to_come_to_it(self):
         data = cut_clip(100, 75)
@@ -208,11 +216,12 @@ class FoundByThePlayer(BodyFaults):
                 printed, logs = self.session(show_with(data, sound=self.LONG, cycle=seconds), self.every_40_ms(9000))
                 if found is None:
                     self.assertEqual(logs, [])
-                    self.assertEqual(printed[-1], f"reply {refused('busy')}")
+                    self.assert_still_checked(printed)
                 else:
-                    self.assertEqual(logs, [(found, "file-malformed faulty.odrg truncated")])
-                    self.assert_dark_from(printed, found)
-                    self.assert_invalid(printed, "file-malformed faulty.odrg truncated")
+                    # The cycle shows its usable animation in the faulty one's turns.
+                    self.assertEqual(logs, [(found, "file faulty.odrg unavailable: truncated")])
+                    self.assert_lit(printed)
+                    self.assert_quarantined(printed, "truncated", playing=3)
 
 
 class FoundByTheCheckOfALateHost(BodyFaults):
@@ -223,6 +232,6 @@ class FoundByTheCheckOfALateHost(BodyFaults):
         files = show_with(whole + b"\0", sound=4)
         script = [f"poll {T0 + 40 * step}" for step in range(190)] + [support.line(T0 + 7600, "status"), support.line(T0 + 7600, "list")]
         printed, logs = self.session(files, script)
-        self.assertEqual(logs, [(40 * 179, "file-malformed faulty.odrg trailing-bytes")])
-        self.assert_dark_from(printed, 40 * 179)
-        self.assert_invalid(printed, "file-malformed faulty.odrg trailing-bytes")
+        self.assertEqual(logs, [(40 * 179, "file faulty.odrg unavailable: trailing-bytes")])
+        self.assert_lit(printed)
+        self.assert_quarantined(printed, "trailing-bytes")

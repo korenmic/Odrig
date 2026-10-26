@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "container.h"
 #include "file_source.h"
 #include "inflate.h"
 #include "odrg_decoder.h"
@@ -11,8 +12,8 @@
 
 namespace odrig {
 
-// The longest reason text: `file-malformed`, a file name of 32 characters and the longest
-// reason of an ODRG file, with the spaces between them, is 65 characters.
+// Room for the reason text of an invalid show: the longest, `duplicate-id` and an id of 11
+// characters, is 24 characters.
 const uint32_t kErrorTextSize = 96;
 
 // One leg of the mapping: its LEDs are `count` entries of the LED tables, from `first` on.
@@ -38,18 +39,56 @@ struct ItemInfo {
     uint32_t count;
 };
 
-// One `.odrg` file the show names. `bytes` is its size, known once a check has read its
-// body to its end. `total_ms` is its length, the sum of the durations of its frames, and 0
-// while it is not known: a check finds it, and so does playing the file through once.
+// One `.odrg` or `.odrgx` file the show names. `type` is what it holds, as its header says.
+// `bytes` is its size, known once a check has read its body to its end. `total_ms` is its
+// length, the sum of the durations of its frames, and 0 while it is not known: a check
+// finds it, and so does playing the file through once. `fault` is the Reason of a fault of
+// the file in this boot, kNone while it is usable: a file with a fault is quarantined, and
+// its animations are unavailable until an upload replaces it. `checked` says that its
+// `bytes` are known: kCheckedRead when a check has read it whole in this boot,
+// kCheckedFromCatalog when they came from the storage's catalog.
+const uint8_t kCheckedRead = 1;
+const uint8_t kCheckedFromCatalog = 2;
 struct FileInfo {
     char name[33];
+    uint8_t fault;
+    uint8_t checked;
+    uint8_t type;
     uint32_t bytes;
     uint64_t total_ms;
+};
+
+// The work in which a file came to a reason: the check at the start or after it, playback,
+// the check of an upload, the check of a drive's file.
+const uint8_t kWorkStart = 1;
+const uint8_t kWorkPlay = 2;
+const uint8_t kWorkUpload = 3;
+const uint8_t kWorkDrive = 4;
+
+// Room for the name of a file in the fault's context: 32 characters and the closing zero.
+const uint32_t kFaultNameSize = 33;
+
+// The latest fault of a file: in which work, the file's name (cut to 32 characters), the
+// frame record it was at counted from 0 (the number of records after the last one), the
+// bytes of its body read so far, inflated ones of a compressed body, and the reason.
+// Each fault replaces the one before; `present` is 0 until the first.
+struct FaultContext {
+    uint8_t present;
+    uint8_t work;
+    uint8_t reason;
+    char name[kFaultNameSize];
+    uint32_t record;
+    uint64_t body_bytes;
 };
 
 // Stands for no item, and for the playlist: every animation item of the show in turn.
 const uint32_t kNothing = 0xFFFFFFFFu;
 const uint32_t kPlaylist = 0xFFFFFFFEu;
+
+// The most entries of `order.txt` the core takes, and what an item or a place that no entry
+// names holds.
+const uint32_t kOrderMost = 512;
+const uint16_t kOrderUnnamed = 0xFFFF;
 
 // What checks an uploaded file beside playback: a second source, which reads the file
 // back from storage, and second decoders.
@@ -80,6 +119,7 @@ struct Upload {
     uint8_t header_read;    // the first step of the check has been taken
     uint16_t id;            // the id the item gets, or has
     char name[33];          // the name the file gets
+    uint8_t installed;      // the file is installed: the id, the name, the size and the CRC-32 are its
     uint32_t size;          // the size `upload begin` named
     uint32_t received;
     uint32_t crc;           // the running CRC-32 of the bytes received
@@ -88,19 +128,43 @@ struct Upload {
     uint64_t progress;      // the time something last moved
 };
 
-// What the core knows of the file at one place of a drive's list: its size and its
-// length once the check has read it whole, the id it got, and its state.
+// What the core knows of the file at one place of a drive's list: its size, its length and
+// its type once the check has read it whole, the id it got when the drive was taken up, its
+// state, and the Reason it was left out for. The state and the type share a byte. A length
+// of 4,294,967,295 ms or more is kept as 4,294,967,295.
 struct DriveEntry {
-    uint64_t total_ms;
+    uint32_t total_ms;
     uint32_t bytes;
     uint16_t id;
-    uint8_t state;
+    uint8_t state : 4;
+    uint8_t type : 4;
+    uint8_t fault;
 };
 
-// The states of a drive's file: to be checked; an animation of the playlist; left out.
+// A file of a drive that was left out for a fault in this boot: the name the drive gave it,
+// cut to 32 characters, the reason, and the number and the CRC-32 of its first bytes, at
+// most 512. A file of a drive taken up later with the same four is left out again after
+// reading those bytes.
+struct Remembered {
+    char name[kFaultNameSize];
+    uint8_t reason;
+    uint16_t first_read;
+    uint32_t crc;
+};
+
+// The most files of drives the core remembers; the oldest gives way to a new one. A file of
+// a drive whose catalog is read is remembered by its entry's CRC-32, with this as its first
+// read.
+const uint32_t kRememberedMost = 16;
+const uint16_t kRememberedWhole = 0xFFFF;
+
+// The states of a drive's file: to be checked; an animation of the playlist; left out; read
+// from the drive's catalog and not published yet; removed by a change of the drive.
 const uint8_t kDriveToCheck = 0;
 const uint8_t kDriveInPlaylist = 1;
 const uint8_t kDriveLeftOut = 2;
+const uint8_t kDriveStaged = 3;
+const uint8_t kDriveGone = 4;
 
 // The most files of a drive, the position in the playlist of the file at place 0, and the
 // first id a drive's animation can get.
@@ -112,6 +176,51 @@ const uint32_t kDriveNameSize = 16;
 // Room for the name of a drive's file as `list` writes it: a longer one is cut to 127 bytes.
 // Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
 const uint32_t kDriveListedName = 128;
+
+// The reading of `order.txt` line by line: the entries taken so far, whether its first line
+// was read and was the header, and the line so far without its line feed. A line longer
+// than kOrderLineMost is no entry. The line's room is a catalog's longest line: the reading
+// of a drive's catalog uses it too, before `order.txt` is read.
+const uint32_t kOrderLineMost = 129;
+const uint32_t kOrderLineRoom = 162;
+struct OrderReader {
+    uint32_t entries;
+    uint16_t length;
+    uint8_t header;     // 0 while no line was read, 1 after the header, 2 after anything else
+    uint8_t over;
+    char line[kOrderLineRoom];
+};
+
+// A length as the drive's table keeps it.
+inline uint32_t drive_length(uint64_t total_ms) {
+    return total_ms < 0xFFFFFFFFu ? static_cast<uint32_t>(total_ms) : 0xFFFFFFFFu;
+}
+
+// The states of a storage's catalog: it has none; it is read and usable; it is being read;
+// it cannot be read; its version is another; there is no such storage now.
+const uint8_t kCatalogNone = 0;
+const uint8_t kCatalogOk = 1;
+const uint8_t kCatalogLoading = 2;
+const uint8_t kCatalogDamaged = 3;
+const uint8_t kCatalogIncompatible = 4;
+const uint8_t kCatalogAbsent = 5;
+// Where a damaged catalog is damaged.
+const uint8_t kDamagedMarker = 1;
+const uint8_t kDamagedPage = 2;
+const uint8_t kDamagedLine = 3;
+const uint8_t kDamagedInterrupted = 4;
+// The catalogs of the core: of the internal storage, and of the drive.
+const uint32_t kInternal = 0;
+const uint32_t kExternal = 1;
+
+// What the core knows of a storage's catalog: its state, where it is damaged, and of one
+// that is read its generation and its number of entries.
+struct CatalogState {
+    uint32_t generation;
+    uint16_t entries;
+    uint8_t state;
+    uint8_t detail;
+};
 
 // Whether a position of the playlist is a drive's file.
 inline bool is_drive(uint32_t position) {
@@ -180,6 +289,9 @@ struct Core {
     // many refreshes in a row came without a grid time left out, counted to
     // kCheckMostSteps; and at how many refreshes in a row the check took no step.
     uint32_t check_at;
+    // What the file the second decoders read holds, by its header: the file of this check,
+    // of a drive's check or of an upload's check, which never read at the same time.
+    ContentHeader check_content;
     uint32_t check_records_left;
     uint64_t check_total_ms;
     uint8_t check_done;
@@ -195,6 +307,24 @@ struct Core {
     uint32_t drive_count;
     uint32_t drive_check_at;
     char drive_check_name[kDriveNameSize];
+    // The files of drives left out in this boot, the place the next one is written to, and
+    // of the drive's file the check is at, the bytes and the CRC-32 of its first read.
+    Remembered *remembered;
+    uint32_t remembered_next;
+    uint32_t drive_first_crc;
+    uint16_t drive_first_read;
+
+    // The saved playlist order, for a host whose storage can be changed: for each item of
+    // the item table, and for each place of a drive, the number of the entry of `order.txt`
+    // that names it, or kOrderUnnamed; for each place the low byte of its name's hash. While
+    // `order_due` is set the drive's check reads the file before the drive's files, and
+    // `order_reading` while it is in the middle of it.
+    uint16_t *order_items;
+    uint16_t *order_drive;
+    uint8_t *order_hash;
+    uint8_t order_due;
+    uint8_t order_reading;
+    OrderReader order_reader;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -224,8 +354,10 @@ struct Core {
     uint16_t line_length;
     uint8_t line_over;
 
-    // The diagnostic holds a decoded picture and a selection to resume.
+    // The diagnostic holds a decoded picture and a selection to resume. `mapping_snake` is the
+    // snake whose test shows, 1 to 20, or 0 for the diagonal.
     uint8_t mapping_test;
+    uint8_t mapping_snake;
     uint32_t mapping_saved_playing;
     uint32_t mapping_saved_shown;
     uint32_t cycle_start_entry;
@@ -236,22 +368,81 @@ struct Core {
     uint32_t playing;       // the position of the cycle being played, kPlaylist, or kNothing
     uint32_t shown;         // the position of the animation item the latest refresh chose
     uint8_t zero_pending;   // the item's time zero is the grid time of the next refresh
+    uint32_t noise;         // what the timestamps of the polls were mixed into
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
     uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
-    // The file that is open for playback: an animation item in one turn and one loop.
+    // The file that is open for playback: an animation item in one turn and one loop. A
+    // drawn one is held in the window, its payload read whole, and its file is closed.
     uint8_t stream_open;
+    uint8_t stream_drawn;
     uint32_t stream_item;
     uint64_t stream_turn;
     uint64_t stream_loop;
     uint64_t frame_end;     // where the frame in the pixel buffer ends, counted in the loop
     uint32_t stream_records;    // the frame records of the open file that were decoded
+    // At the refresh being made: the body bytes the player may still decode, and whether
+    // it has decoded a record.
+    uint32_t catch_up_left;
+    uint8_t catch_up_begun;
+    // The seed of the turn of the clock that is open for playback.
+    uint32_t seed;
 
     FileSource file;
     Inflate inflate;
     OdrgDecoder decoder;
+
+    // The latest fault of a file, kept for reporting.
+    FaultContext fault;
+
+    // The catalogs of the internal storage and of the drive.
+    CatalogState catalogs[2];
+
+    // The reading of a drive's catalog in steps: its phase, the page it is at, the place the
+    // page's entries begin at, the page's lines so far and the count the marker gives it,
+    // whether a line of it was not sound, the running CRC-32 of the page and the one the
+    // marker gives, the CRC-32 of the whole marker, and when it was last looked at.
+    uint8_t catalog_phase;
+    uint8_t catalog_page;
+    uint8_t catalog_bad_line;
+    uint8_t catalog_open;
+    uint16_t catalog_first_place;
+    uint16_t catalog_lines;
+    uint16_t catalog_expected_lines;
+    uint32_t catalog_page_crc;
+    uint32_t catalog_expected_crc;
+    uint32_t catalog_marker_crc;
+    uint64_t catalog_looked;
+
+    // A rebuild of a catalog: 0 for none, 1 + the storage's catalog it makes; the page it
+    // writes, whether that page's new file is open, the file or the place it is at, the files
+    // read and those to read, and the page's lines and running CRC-32. Each page's count and
+    // CRC-32 wait at the end of the chunk buffer, from kRebuildPages on.
+    uint8_t rebuild;
+    uint8_t rebuild_page;
+    uint8_t rebuild_open;
+    uint16_t rebuild_at;
+    uint16_t rebuild_read;
+    uint16_t rebuild_total;
+    uint16_t rebuild_lines;
+    uint32_t rebuild_crc;
 };
+
+// Keeps the context of a file's fault, in place of the one before.
+void note_fault(Core &core, uint8_t work, const char *name, uint32_t record, uint64_t body_bytes, Reason reason);
+
+// Whether a reason belongs to one `.odrg` file of the show, and not to the show itself.
+bool is_file_fault(Reason reason);
+
+// Quarantines the file at this place of the file table for the rest of the boot: its
+// animations are unavailable, the log says why, the fault's context is kept, and the
+// player goes on without them. A file that is quarantined already stays as it is.
+void quarantine_file(Core &core, uint32_t file, Reason reason, uint8_t work, uint32_t record, uint64_t body_bytes);
+
+// Whether the item at a position can be played: an animation whose file is not
+// quarantined, or a cycle that lists one.
+bool item_usable(const Core &core, uint32_t item);
 
 // Makes the show invalid with a reason text: `<reason>`, `<reason> <about>` or
 // `<reason> <about> <detail>`, and passes the text to the host's log. The first failure
@@ -269,6 +460,16 @@ const uint32_t kCheckLeastRate = 30;
 // Whether the check after the start has read every file of the show to its end.
 bool check_complete(const Core &core);
 
+// What one step of the check of a file came to.
+enum StepOutcome { kStepGoingOn, kStepWhole, kStepFault };
+
+// One step of the check of a file through the second decoders: its header and canvas, one
+// frame record, its end, after which nothing may follow, or one slice of the settling of a
+// defect, after which the same step is taken again. When the file is whole, its size is the
+// bytes the second source took and its length the sum of the durations; when it has a
+// fault, `reason` says which, and `record` the frame record it was at.
+StepOutcome check_file_step(Core &core, const char *name, Reason *reason, uint32_t *record);
+
 // Whether a file of the drive waits for the check, which may take it while no upload holds
 // the second decoders.
 bool drive_waits(const Core &core);
@@ -277,15 +478,32 @@ bool drive_waits(const Core &core);
 // kDriveNameSize characters.
 void drive_file_name(uint32_t place, char *name);
 
+// The name of the file at a place of the drive as the host gives it, cut to what fits into
+// `room` characters with the closing zero; the core's own name for it when the host gives
+// none.
+void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t room);
+
 // Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
 void drive_touch(Core &core);
+
+// A drive without a catalog: listed, each file given its id and its key, to be checked.
+void drive_take_listed(Core &core);
+
+// The lowest id from kDriveFirstId up that no item of the show and no file of the drive
+// has, or 0 when there is none.
+uint16_t free_drive_id(const Core &core);
 
 // A file of the drive is left out: its state says so, and the host's log says why.
 void drive_left_out(Core &core, uint32_t place, Reason reason);
 
-// An upload takes the second decoders: the check of a drive's file begins that file
-// again once the upload is over.
+// An upload, or a change that reads with the second source, takes the second decoders:
+// the check after the start, or the check of a drive's file, begins the file it was in
+// again once they are free.
 void drive_check_yields(Core &core);
+
+// A file left the file table at this place: the check after the start stays at the file
+// it was at, and begins it again when it was the one that left.
+void check_file_left(Core &core, uint32_t file);
 
 // Whether an animation of the drive has this id.
 bool drive_has_id(const Core &core, uint32_t id);
@@ -293,13 +511,16 @@ bool drive_has_id(const Core &core, uint32_t id);
 // The place of the drive's animation that has this id, or kDriveMost when none has.
 uint32_t drive_place_of(const Core &core, uint32_t id);
 
+// The place of the drive's file that has this id, whatever its state, or kDriveMost.
+uint32_t drive_place_holding(const Core &core, uint32_t id);
+
 // The check after the start at one refresh, after the LED data was made. `in_step` says
 // whether the refresh followed the one before it without a grid time left out, and
 // `on_time` whether it came no later than kCheckOnTimeMs after its grid time while the
 // last whole second had kCheckLeastRate refreshes or more, or in the first second. At a
 // refresh that is both, the check takes as many steps as refreshes of that kind have
 // followed one another, at most kCheckMostSteps: a step opens a file, decodes one frame
-// record, or reads the end of a file. At any other refresh the count begins again and
+// record, reads the end of a file, or takes one slice of the settling of a defect. At any other refresh the count begins again and
 // the check takes no step, unless it took none at the kCheckLongestWait refreshes before
 // either: then it takes one, so that a host that is always late still comes to the end of
 // the check. A fault makes the show invalid with the reason the start gives for it.

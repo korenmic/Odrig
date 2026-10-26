@@ -19,5 +19,6 @@ export default async function(app) {
   await commands.mappingSet(123, [1,2,3]);
   await commands.mappingTest(true);
   await commands.mappingTest(false);
+  await commands.mappingTestSnake(9);
   return {found, sent};
 }

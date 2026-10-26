@@ -159,7 +159,7 @@ class TheKinds(unittest.TestCase):
                 self.assertIn(f"{image}: 175104 bytes", result.out)
 
     def test_the_other_kinds_are_built_in_wleds_folder_as_before(self):
-        result, ran, _, (patched, overridden, _, written) = self.build("--probe")
+        result, ran, _, (patched, overridden, _, written) = self.build("--stick", "--probe")
         self.assertEqual(ran[0][0][1:], ["-m", "platformio", "run", "-d", str(paths.WLED), "-e", "odrig_probe"])
         patched.assert_called_once()
         overridden.assert_called_once()

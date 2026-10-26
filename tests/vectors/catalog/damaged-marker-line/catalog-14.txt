@@ -1,0 +1,2 @@
+ffffffff 734002 60 60 61000 frames Fire Swirl 2.ODRG
+00000000 0 1 1 0 frames a.odrg

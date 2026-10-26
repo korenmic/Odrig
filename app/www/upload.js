@@ -24,18 +24,25 @@ export function freeId(taken) {
 
 // The file name an animation made from a media file gets: the media's name without its
 // ending, in lower case, every character outside a-z, 0-9, `-` and `_` turned into `-`,
-// cut so that with `.odrg` it has at most 32 characters, and made unique among the names
-// taken with `-2`, `-3` and so on.
-export function fileName(mediaName, taken) {
+// cut so that with its ending, `.odrg` unless another is given, it has at most 32
+// characters, and made unique among the names taken with `-2`, `-3` and so on.
+export function fileName(mediaName, taken, ending = ENDING) {
   const base = mediaName.replace(/\.[^.]*$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "animation";
-  const room = LONGEST_NAME - ENDING.length;
+  const room = LONGEST_NAME - ending.length;
   for (let number = 1; ; number += 1) {
     const added = number === 1 ? "" : `-${number}`;
-    const name = base.slice(0, room - added.length) + added + ENDING;
+    const name = base.slice(0, room - added.length) + added + ending;
     if (!taken.has(name)) {
       return name;
     }
   }
+}
+
+// The name a text's file is made from: its first English letters and digits, in lower
+// case, the words joined by `-`, at most 20 characters; `text` for a text that has none.
+export function textName(text) {
+  const words = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((word) => word !== "");
+  return words.join("-").slice(0, 20).replace(/-+$/, "") || "text";
 }
 
 // Whether a file of some bytes fits into the free storage, as the target judges it.
@@ -52,12 +59,15 @@ function base64(bytes) {
   return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// The upload of a file as a job of the client. `next()` gives the function that sends the
-// next line and takes its reply, or null while there is none to send now. `report` is told
-// the part of the file the target has received and the speed in bytes a second, `end` how
-// the upload ended: `{done: true}`, `{cancelled: true}`, or `{error}` with the Refusal or
-// the Failure that ended it. `wake` asks the client to look for the next line again.
-export function uploading({id, file, bytes}, {report, end, wake}) {
+// The upload of a file as a job of the client, which replaces the file of an item only
+// while it has the CRC-32 `expect` when one is given. With `external` the file goes to the
+// external storage, which gives it its id: `id` is not sent then. `next()` gives the
+// function that sends the next line and takes its reply, or null while there is none to
+// send now. `report` is told the part of the file the target has received and the speed in
+// bytes a second, `end` how the upload ended: `{done: true, id}`, with the id the target
+// gave or null, `{cancelled: true}`, or `{error}` with the Refusal or the Failure that
+// ended it. `wake` asks the client to look for the next line again.
+export function uploading({id, file, bytes, expect = null, external = false}, {report, end, wake}) {
   const crc = crc32(bytes);
   let stage = "begin";
   let chunk = 0;
@@ -122,10 +132,16 @@ export function uploading({id, file, bytes}, {report, end, wake}) {
       }
       if (stage === "begin") {
         return async () => {
-          chunk = await commands.uploadBegin(id, file, bytes.length);
-          stage = "data";
+          chunk = external ? await commands.uploadBeginExternal(file, bytes.length) : await commands.uploadBegin(id, file, bytes.length);
+          stage = expect === null ? "data" : "expect";
           samples.push({at: performance.now(), received: 0});
           report(0, 0);
+        };
+      }
+      if (stage === "expect") {
+        return async () => {
+          await commands.uploadExpect(expect);
+          stage = "data";
         };
       }
       if (stage === "data") {
@@ -139,8 +155,9 @@ export function uploading({id, file, bytes}, {report, end, wake}) {
         };
       }
       return async () => {
+        let given;
         try {
-          await commands.uploadEnd(crc);
+          given = await commands.uploadEnd(crc);
         } catch (error) {
           if (error instanceof commands.Refusal && error.code === "busy") {
             // The target still checks the file: the end is sent again a moment later.
@@ -150,7 +167,7 @@ export function uploading({id, file, bytes}, {report, end, wake}) {
           }
           throw error;
         }
-        finish({done: true});
+        finish({done: true, id: given});
       };
     },
   };

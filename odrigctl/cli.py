@@ -21,13 +21,21 @@ COMMANDS = {
     "off": (),
     "brightness": ("N",),
     "status": (),
+    "fault": (),
     "space": (),
     "list": (),
+    "read": ("ID", "OFFSET"),
+    "catalog": ("[OPERATION]",),
     "remove": ("ID",),
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
+    "order": ("OPERATION",),
     "upload": ("ID", "FILE"),
 }
+# What an upload came to, beside its reply: a reply that does not report success leaves the
+# show as it was.
+UPLOAD_UNCHANGED = "upload: unchanged: the target holds this file already; nothing was sent"
+UPLOAD_UNKNOWN = "upload: not known: the target did not answer; the same upload again sends nothing when the file was installed"
 TIMEOUT_SECONDS = 2.0
 REPORT_SECONDS = 0.5
 COUNTS = ("no argument", "one argument", "two arguments")
@@ -57,7 +65,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, space, list, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, upload ID FILE. ID and N are sent as they are typed.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -65,8 +73,9 @@ def parser():
     target.add_argument("--http", metavar="ADDRESS", help="the address of the target: host or host:port")
     made.add_argument("--timeout", metavar="SECONDS", type=_seconds, default=TIMEOUT_SECONDS, help="how long to wait for a reply (default: 2)")
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
+    made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the FILE of upload")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -75,6 +84,8 @@ def checked(made, arguments):
     with another number of arguments than it takes, or with a line end in one, ends the
     program as a usage error, and so do `--log` with a command or with `--http` and no
     command without `--log`."""
+    if arguments.external and arguments.command != "upload":
+        made.error("--external goes with upload")
     if arguments.log:
         if arguments.http is not None:
             made.error("--log goes with --port or --tcp")
@@ -83,15 +94,34 @@ def checked(made, arguments):
         return []
     if arguments.command is None:
         made.error("a command is needed, or --log")
+    if arguments.command == "upload" and arguments.external:
+        if len(arguments.arguments) != 1:
+            made.error("upload --external takes one argument: FILE")
+        if "\n" in arguments.arguments[0]:
+            made.error("a command is one line")
+        return ["upload", "external", arguments.arguments[0]]
+    if arguments.command == "catalog":
+        words = arguments.arguments
+        if words not in ([], ["cancel"], ["rebuild", "internal"], ["rebuild", "external"]):
+            made.error("catalog takes no argument, rebuild internal, rebuild external, or cancel")
+        return [arguments.command, *words]
     if arguments.command == "remove" and len(arguments.arguments) == 2 and arguments.arguments[0] == "many":
         if any("\n" in word or "\r" in word for word in arguments.arguments):
             made.error("a command is one line")
         return [arguments.command, *arguments.arguments]
     if arguments.command == "mapping":
         words = arguments.arguments
-        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set")
+        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
+            len(words) == 3 and words[:2] == ["test", "snake"])
         if not valid:
-            made.error("mapping takes get, set REV PINS, or test on|off")
+            made.error("mapping takes get, set REV PINS, test on|off, or test snake N")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
+    if arguments.command == "order":
+        words = arguments.arguments
+        if not (words == ["get"] or (len(words) == 2 and words[0] == "get") or (len(words) == 4 and words[0] == "move")):
+            made.error("order takes get [FROM], or move REV ID BEFORE")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
@@ -120,6 +150,7 @@ class Progress:
         self.in_place = stream.isatty()
         self.reported = clock()
         self.width = 0
+        self.all_sent = False
 
     def sent(self, sent, total, seconds):
         now = self.clock()
@@ -130,6 +161,7 @@ class Progress:
         self._write(f"upload: {sent * 100 // total}% {sent}/{total} bytes {speed} B/s")
 
     def checking(self):
+        self.all_sent = True
         self._write("upload: checking")
 
     def _write(self, text):
@@ -177,6 +209,7 @@ def main(argv=None):
         except KeyboardInterrupt:
             return 0
     data = None
+    progress = None
     if arguments.command == "upload":
         try:
             with open(words[2], "rb") as file:
@@ -188,6 +221,8 @@ def main(argv=None):
         with client.Session(port=arguments.port, tcp=arguments.tcp, http=arguments.http, timeout=arguments.timeout) as session:
             if arguments.command == "list":
                 return 0 if content.list_all(session, _print) else 1
+            if words == ["order", "get"]:
+                return 0 if content.list_all(session, _print, b"order get") else 1
             if arguments.command == "upload":
                 progress = Progress(sys.stderr)
                 try:
@@ -197,7 +232,12 @@ def main(argv=None):
             else:
                 reply = session.exchange(" ".join(words).encode("utf-8") + b"\n")
     except client.Unreachable as unreachable:
+        if progress is not None and progress.all_sent:
+            # `upload end` went out and its reply did not come: the file may be in place.
+            print(UPLOAD_UNKNOWN, file=sys.stderr)
         print(f"error: unreachable: {unreachable}", file=sys.stderr)
         return 3
+    if arguments.command == "upload" and content.is_ok(reply):
+        print(UPLOAD_UNCHANGED if content.is_unchanged(reply) else f"upload: committed: {len(data)} bytes sent and checked by the target", file=sys.stderr)
     _print(reply)
     return 0 if content.is_ok(reply) else 1

@@ -7,46 +7,91 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header id="top">
+<p id="app-name">odrig</p>
+<p id="top-link" class="pill" role="status">Checking</p>
+</header>
 <main>
-<section id="show" hidden>
-<div id="state">
-<p id="power" class="state">-</p>
-<p id="brightness">-</p>
-<p id="playing">-</p>
+<section id="animations" hidden>
+<div id="now-panel" class="panel">
+<div class="now-row">
+<div class="now-words">
+<p class="label">Now playing</p>
 <p id="now" hidden></p>
+<p id="playing">-</p>
+</div>
+</div>
+<div id="power-switch" class="power" role="group" aria-label="LEDs">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+<button id="on" type="button" aria-pressed="false">On</button>
+<button id="off" type="button" aria-pressed="false">Off</button>
+</div>
+<div id="state" class="facts">
+<p id="power">-</p>
+<p id="brightness">-</p>
 <p id="fps">-</p>
+</div>
+<p id="readiness" class="small" role="status" aria-live="polite" hidden></p>
+<label for="level" class="slider-label">Set the brightness to <span id="level-number">-</span></label>
+<input id="level" type="range" min="0" max="255" step="1" value="0">
+<div id="test-now" hidden>
+<p id="test-now-text" role="status"></p>
+<button id="stop-test" type="button">Stop test</button>
 </div>
 <p id="silent" hidden></p>
 <p id="silent-why" hidden></p>
-<div class="pair">
-<button id="on" type="button">On</button>
-<button id="off" type="button">Off</button>
 </div>
-<label for="level">Set the brightness to <span id="level-number">-</span></label>
-<input id="level" type="range" min="0" max="255" step="1" value="0">
-<button id="play-all" type="button">Playlist from the start</button>
+<div id="space-panel" class="panel compact">
 <p id="show-space">-</p>
 <p id="show-external-space">-</p>
-<h1>Animations</h1>
-<div id="animations"></div>
-<p id="none" hidden>No animation is installed.</p>
-</section>
-<section id="storage" hidden>
-<h1>Storage</h1>
-<p>Internal storage</p>
-<p id="space">-</p>
-<p id="external-space">-</p>
-<h1>Installed</h1>
+</div>
+<div class="pair">
+<button id="play-all" type="button">Playlist from the start</button>
+<button id="add-animation" type="button" class="primary">Add animation</button>
+</div>
+<div id="tests" class="panel" hidden>
+<div class="group-head">
+<button id="tests-toggle" type="button" aria-expanded="true" aria-controls="tests-body">Tests &middot; 21</button>
+<svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6-3 1-4 4 .5 4-1.5 1.5-4-4-4.5 4.5-1-1L8.5 15l-4-4L6 9.5l4 .5 4-4z" fill="currentColor"/></svg>
+</div>
+<div id="tests-body">
+<p id="tests-note" class="small"></p>
+<div id="tests-grid"></div>
+</div>
+</div>
+<div id="list-head">
+<h1 id="list-title">Animations</h1>
+<button id="select-mode" type="button">Select</button>
+</div>
+<div id="selection-bar" hidden>
 <div class="pair">
 <button id="select-all" type="button">Select all</button>
 <button id="clear-selection" type="button">Clear selection</button>
 </div>
+<div class="pair">
 <button id="delete-selected" type="button" disabled>Delete selected</button>
+<button id="selection-done" type="button">Done</button>
+</div>
 <p id="bulk-progress" role="status" aria-live="polite"></p>
-<div id="installed"></div>
-<p id="installed-none" hidden>No animation is installed.</p>
-<h1>Add an animation</h1>
-<label id="choose" class="button" for="media">Choose a video or a GIF</label>
+</div>
+<div id="filters" hidden>
+<div class="filter"><p class="small">Storage</p><div id="filter-storage" role="group" aria-label="Storage"></div></div>
+<div class="filter"><p class="small">Type</p><div id="filter-type" role="group" aria-label="Type"></div></div>
+</div>
+<p id="order-note" class="small" role="status" aria-live="polite"></p>
+<div id="animations-list" role="list" aria-labelledby="list-title"></div>
+<p id="none" hidden>No animation is installed.</p>
+<div id="filter-empty" hidden>
+<p>No animation matches the filters.</p>
+<button id="filter-reset" type="button">Show all</button>
+</div>
+</section>
+<section id="upload" hidden>
+<h1>Upload</h1>
+<p id="upload-space" class="small">-</p>
+<p id="upload-card-space" class="small" hidden></p>
+<div class="panel">
+<label id="choose" class="button primary" for="media">Choose a video or a GIF</label>
 <input id="media" type="file" accept="video/*,image/gif" hidden>
 <div id="chosen" hidden>
 <p id="media-name"></p>
@@ -61,60 +106,162 @@
 <input id="start" type="text" inputmode="decimal" autocomplete="off" value="0">
 <label for="length">Length in seconds, empty for the rest of the file</label>
 <input id="length" type="text" inputmode="decimal" autocomplete="off" value="">
-<button id="make" type="button">Make the animation</button>
+<button id="make" type="button" class="primary">Make the animation</button>
 <p id="making" hidden></p>
 <button id="stop-making" type="button" hidden>Stop</button>
 <div id="made" hidden>
 <canvas id="preview"></canvas>
 <p id="made-facts"></p>
-<button id="upload" type="button">Upload</button>
+<div id="store-on" hidden>
+<p>Store on</p>
+<div class="pair" role="group" aria-label="Store on">
+<button id="store-card" type="button" aria-pressed="true">The card</button>
+<button id="store-board" type="button" aria-pressed="false">This board</button>
+</div>
+<p class="small">The board's own storage keeps one or two animations to fall back on; the others belong on the card.</p>
+</div>
+<button id="upload-made" type="button" class="primary">Upload to the installation</button>
 <p id="uploading" hidden></p>
 <button id="cancel-upload" type="button" hidden>Cancel</button>
 </div>
 </div>
+</div>
+<div class="pair">
+<button id="make-text" type="button">Make a text</button>
+<button id="make-clock" type="button">Make a clock</button>
+</div>
+<div id="author" class="panel" hidden>
+<h2 id="author-title">A text</h2>
+<div id="text-form">
+<label for="text-words">Text</label>
+<textarea id="text-words" rows="3" autocomplete="off" spellcheck="false"></textarea>
+<label for="text-font">Font</label>
+<select id="text-font"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select>
+<div class="pair">
+<div><label for="text-color">Colour</label><input id="text-color" type="color" value="#ffd040"></div>
+<div><label for="text-background">Background</label><input id="text-background" type="color" value="#000000"></div>
+</div>
+<label for="text-effect">Effect</label>
+<select id="text-effect"><option value="static">Still</option><option value="marquee" selected>Marquee</option><option value="slide">Slide in and out</option><option value="pan">Pan</option></select>
+<label for="text-motion">Motion</label>
+<select id="text-motion"><option value="left">To the left</option><option value="right">To the right</option><option value="up">Up</option><option value="down">Down</option></select>
+<div class="pair">
+<div><label for="text-align">Alignment</label><select id="text-align"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select></div>
+<div><label for="text-valign">Height</label><select id="text-valign"><option value="top">Top</option><option value="middle" selected>Middle</option><option value="bottom">Bottom</option></select></div>
+</div>
+<label for="text-direction">Direction</label>
+<select id="text-direction"><option value="auto">As the text begins</option><option value="ltr">Left to right</option><option value="rtl">Right to left</option></select>
+<label class="check" for="text-wrap"><input id="text-wrap" type="checkbox"><span class="title">Wrap long lines</span></label>
+<div class="pair">
+<div><label for="text-speed">Speed, pixels a second</label><input id="text-speed" type="text" inputmode="numeric" autocomplete="off" value="20"></div>
+<div><label for="text-pause">Pause, milliseconds</label><input id="text-pause" type="text" inputmode="numeric" autocomplete="off" value="1000"></div>
+</div>
+</div>
+<div id="clock-form" hidden>
+<label for="clock-widget">Clock</label>
+<select id="clock-widget"><option value="analog">With hands</option><option value="digital">With digits</option><option value="melting">Melting watch</option></select>
+<label for="clock-seconds">Seconds of a loop</label>
+<input id="clock-seconds" type="text" inputmode="numeric" autocomplete="off" value="30">
+<div class="pair">
+<div><label for="clock-face">Face</label><input id="clock-face" type="color" value="#f4ecd0"></div>
+<div><label for="clock-hands">Hands</label><input id="clock-hands" type="color" value="#202020"></div>
+</div>
+<div class="pair">
+<div><label for="clock-rim">Rim</label><input id="clock-rim" type="color" value="#d4a017"></div>
+<div><label for="clock-background">Background</label><input id="clock-background" type="color" value="#000000"></div>
+</div>
+<div class="pair">
+<div><label for="clock-speed-min">Least speed</label><input id="clock-speed-min" type="text" inputmode="numeric" autocomplete="off" value="60"></div>
+<div><label for="clock-speed-max">Greatest speed</label><input id="clock-speed-max" type="text" inputmode="numeric" autocomplete="off" value="600"></div>
+</div>
+<p class="small">The speeds are how many times faster than real time the clock's imaginary time runs. Each time the clock plays, its hours, its speed and its shape are chosen anew.</p>
+<button id="clock-seed" type="button">New random time</button>
+</div>
+<canvas id="author-preview"></canvas>
+<p id="author-says" role="status" aria-live="polite"></p>
+<button id="author-upload" type="button" class="primary">Upload to the installation</button>
+<p id="author-uploading" hidden></p>
+<button id="author-cancel" type="button" hidden>Cancel</button>
+<button id="author-close" type="button">Close</button>
+</div>
 </section>
-<section id="mapping" hidden>
-<h1>Mapping</h1>
-<p>Assign each three-column snake to an existing ESP32-S3 data pin. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
+<section id="settings" hidden>
+<h1>Settings</h1>
+<div class="panel">
+<label class="check" for="show-tests"><input id="show-tests" type="checkbox"><span><span class="title">Show test animations</span><span class="small">20 snake tests + diagonal</span></span></label>
+</div>
+<div id="catalogs" class="panel">
+<h2>Catalogs</h2>
+<p class="small">A catalog says what a storage holds, so that the installation need not read every animation at its start or when the card goes in. A rebuild reads every animation of the storage whole and writes its catalog anew.</p>
+<p id="catalog-summary" role="status" aria-live="polite">Reading the catalogs&hellip;</p>
+<p id="catalog-internal" hidden></p>
+<button id="rebuild-internal" type="button" hidden>Rebuild the board's catalog</button>
+<p id="catalog-external" hidden></p>
+<p id="catalog-external-note" class="small" hidden>The installation cannot write this card; a computer can make its catalog.</p>
+<button id="rebuild-external" type="button" hidden>Rebuild the card's catalog</button>
+<div id="rebuild-question" hidden>
+<p id="rebuild-question-text"></p>
+<div class="pair">
+<button id="rebuild-yes" type="button" class="primary">Rebuild</button>
+<button id="rebuild-no" type="button">Not now</button>
+</div>
+</div>
+<p id="rebuild-progress" role="status" aria-live="polite" hidden></p>
+<button id="rebuild-cancel" type="button" hidden>Cancel the rebuild</button>
+</div>
+<div id="mapping" class="panel">
+<h2>Mapping</h2>
+<p class="small">Each three-column snake has the board's data pin that drives it beside it. Viewed from the front, snake 1 is columns 1&ndash;3 at the left; each snake starts at the bottom and runs up, down, up.</p>
 <p id="mapping-summary" role="status" aria-live="polite">Reading mapping&hellip;</p>
 <p id="mapping-error" role="alert" hidden></p>
 <div id="mapping-rows"></div>
-<div class="pair">
-<button id="mapping-save" type="button" disabled>Save</button>
-<button id="mapping-cancel" type="button" disabled>Cancel</button>
-</div>
 <button id="mapping-defaults" type="button" disabled>Restore defaults</button>
 <button id="mapping-reload" type="button">Reload</button>
-<h1>Check the installation</h1>
-<p>Show one white diagonal from bottom left to top right, on black. Inspect the real LEDs for one continuous line. The screen cannot verify wiring. Save the mapping before checking it.</p>
-<p id="mapping-mode" role="status" aria-live="polite">State unavailable</p>
-<p id="mapping-power"></p>
-<button id="mapping-test-on" type="button" disabled>Show diagonal</button>
-<button id="mapping-test-off" type="button" disabled>Stop diagonal</button>
-<p class="small">Stop restores the previous playback selection. Leaving this screen keeps the diagonal on the target; normal Play also stops it.</p>
-<div class="pair">
-<button id="mapping-on" type="button">On</button>
-<button id="mapping-off" type="button">Off</button>
+<div id="photo-take" hidden>
+<h3>From a photo</h3>
+<p class="small">One photo of the wall with the diagonal showing tells which snake each position drives: the app reads it and offers the mapping that puts every position right. A snake that does not light is put where a place remains.</p>
+<p id="photo-advice" class="small"></p>
+<button id="show-diagonal" type="button" hidden>Show the diagonal</button>
+<button id="from-photo" type="button" class="primary">From a photo</button>
+<input id="photo" type="file" accept="image/*" hidden>
+<p id="photo-error" role="alert" hidden></p>
 </div>
-<label for="mapping-level">Set the brightness to <span id="mapping-level-number">-</span></label>
-<input id="mapping-level" type="range" min="0" max="255" step="1" value="0">
+<div id="photo-result" hidden>
+<canvas id="photo-preview"></canvas>
+<ul id="photo-words"></ul>
+<p id="photo-said" role="status" hidden></p>
+<p id="photo-choices-note" class="small" hidden>The photo fits more than one reading. Only the wall tells them apart: which edge the wires come in at, which end strip is dark, and after Apply whether the diagonal begins at the bottom left.</p>
+<div id="photo-choices" class="choices" hidden></div>
+<div class="pair">
+<button id="photo-apply" type="button" class="primary">Apply</button>
+<button id="photo-discard" type="button">Discard</button>
+</div>
+<button id="photo-other" type="button" hidden>Other reading</button>
+</div>
+<p class="small">To check the wiring, turn on Show test animations and use the Tests group of Animations: the diagonal and one test for each snake, through the saved mapping. Only a person looking at the LEDs can judge them.</p>
+</div>
 </section>
 <section id="target">
 <h1>Target</h1>
+<div class="panel">
 <label for="address">Address of the installation</label>
 <input id="address" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false">
 <div class="pair">
-<button id="use" type="button">Use</button>
+<button id="use" type="button" class="primary">Use</button>
 <button id="board" type="button">Board</button>
 </div>
 <p id="link" class="state">Checking</p>
 <p id="link-failure" hidden></p>
 <p id="invalid" hidden></p>
+<p id="host" hidden></p>
+<p id="last-fault" hidden></p>
 <p id="route"></p>
 <p>Join the Wi-Fi network odrig in the phone's Wi-Fi settings.</p>
 <p id="about" class="small"></p>
+</div>
 </section>
 </main>
+<div id="row-menu" role="menu" hidden></div>
 <div id="message" hidden>
 <p id="message-text"></p>
 <button id="message-close" type="button">OK</button>
@@ -127,10 +274,10 @@
 </div>
 </div>
 <nav>
-<button id="to-show" type="button">Show</button>
-<button id="to-storage" type="button">Storage</button>
-<button id="to-mapping" type="button">Mapping</button>
-<button id="to-target" type="button">Target</button>
+<button id="to-animations" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/></svg><span>Animations</span></button>
+<button id="to-upload" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5M7.5 9.5 12 5l4.5 4.5M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Upload</span></button>
+<button id="to-settings" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Settings</span></button>
+<button id="to-target" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>Target</span></button>
 </nav>
 <script type="module" src="main.js"></script>
 </body>

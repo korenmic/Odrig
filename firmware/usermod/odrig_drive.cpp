@@ -1,6 +1,8 @@
 #include "odrig_drive.h"
 
 #include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #ifdef ODRIG_DRIVE_SD_SPI
 #include <SD.h>
@@ -14,6 +16,7 @@
 #endif
 #include "wled.h"
 
+#include "odrig_files.h"
 #include "odrig_log.h"
 
 namespace {
@@ -36,8 +39,12 @@ const size_t NAME_ROOM = 256;
 const size_t PATH_ROOM = sizeof(FOLDER) + 1 + NAME_ROOM;
 // The buffer of each file that is read: one request to the drive brings this many bytes.
 const size_t READ_BUFFER = 4096;
-// The room for a name `drive/<place>`.
-const size_t SHORT_NAME = 16;
+// The longest name of a file of the drive that the core gives, and the room for a name
+// `drive/<place>` or `drive/<name>` with its 0.
+const size_t LONGEST_DRIVE_NAME = 100;
+const size_t CORE_NAME_ROOM = sizeof(PREFIX) + LONGEST_DRIVE_NAME;
+// The room for a name of the installed files with its 0.
+const size_t FILES_NAME_ROOM = 33;
 
 // The tasks run on the processor of WLED's loop. The drive's task mounts and lists media.
 #ifndef ODRIG_DRIVE_SD_SPI
@@ -81,8 +88,8 @@ char summaryText[24] = "no USB host";
 #endif
 
 // Held for the number, the list and every file of the drive: by the core's calls, and by
-// the task while it publishes a list or drops a drive. A list is made while the number is
-// 0, when the core reads none of it.
+// the task while it publishes a drive or drops one. The list is made when the core asks
+// for it, and a place gets a name when the core gives one.
 SemaphoreHandle_t guard = nullptr;
 
 struct Guarded {
@@ -95,22 +102,35 @@ uint32_t plugged = 0;
 uint32_t listed = 0;
 char (*names)[NAME_ROOM] = nullptr;
 
-// The file `open` holds and the one `read_at` holds, with the name the core gave the
-// second and the place its next read begins at.
+// The file `open` holds, with its path, and the one `read_at` holds, with the name the core
+// gave it and the place its next read begins at.
 FILE *played = nullptr;
+char playedPath[PATH_ROOM] = "";
 FILE *second = nullptr;
-char secondName[SHORT_NAME] = "";
+char secondName[CORE_NAME_ROOM] = "";
 uint32_t secondAt = 0;
 char *playedBuffer = nullptr;
 char *secondBuffer = nullptr;
+
+// Whether the file being written is the drive's, and the name of the installed file that is
+// being written, when one is.
+bool writingDrive = false;
+char filesWritten[FILES_NAME_ROOM] = "";
 
 #ifdef ODRIG_DRIVE_SD_SPI
 SPIClass cardBus(FSPI);
 bool cardMounted = false;
 // Set only with the guard held. The worker closes the files before it unmounts the card.
 bool cardFailed = false;
+// Whether the card has its folder odrig, which the board never makes.
+bool cardFolder = false;
 const uint32_t CARD_POLL_MS = 1000;
 alignas(4) uint8_t cardProbe[512];
+
+// The file of the card being written, its path, and the bytes given to it so far.
+FILE *written = nullptr;
+char writtenPath[PATH_ROOM] = "";
+size_t writtenBytes = 0;
 #else
 QueueHandle_t events = nullptr;
 msc_host_device_handle_t device = nullptr;
@@ -154,7 +174,7 @@ void readFailed() {
 }
 
 // The place a name `drive/<place>` stands for, MOST_FILES for a place beyond the list's
-// room, or -1 for a name that is not the drive's.
+// room or a name of the drive that is no place, or -1 for a name that is not the drive's.
 long placeOf(const char *name) {
   if (name == nullptr || strncmp(name, PREFIX, PREFIX_LENGTH) != 0) return -1;
   const char *digit = name + PREFIX_LENGTH;
@@ -167,11 +187,45 @@ long placeOf(const char *name) {
   return place < (long)MOST_FILES ? place : MOST_FILES;
 }
 
+// Whether a name of the drive stands for a place of its list, `drive/<digits>`, and not for
+// a file of its folder by its name.
+bool namesAPlace(const char *name) {
+  const char *digit = name + PREFIX_LENGTH;
+  if (*digit == 0) return false;
+  for (; *digit != 0; digit++) {
+    if (*digit < '0' || *digit > '9') return false;
+  }
+  return true;
+}
+
+// Whether a name is one the core may give a file of the drive: 1 to 100 bytes of printable
+// ASCII other than / \ : * ? " < > |, not beginning with a dot.
+bool isDriveName(const char *name) {
+  const size_t length = strlen(name);
+  if (length == 0 || length > LONGEST_DRIVE_NAME || name[0] == '.') return false;
+  for (const char *at = name; *at != 0; at++) {
+    const unsigned char c = (unsigned char)*at;
+    if (c < 0x20 || c > 0x7e || strchr("/\\:*?\"<>|", c) != nullptr) return false;
+  }
+  return true;
+}
+
 // The path of the file at a place of the list of the drive that is plugged in. With the
 // guard held.
 bool pathAt(long place, char *path) {
-  if (number == 0 || place < 0 || (uint32_t)place >= listed) return false;
+  if (number == 0 || place < 0 || (uint32_t)place >= listed || names[place][0] == 0) return false;
   snprintf(path, PATH_ROOM, "%s/%s", FOLDER, names[place]);
+  return true;
+}
+
+// The path of the file a name of the drive stands for: `drive/<place>` at that place of the
+// list, `drive/<name>` by its name in the folder odrig, while a drive is plugged in. With the
+// guard held.
+bool drivePath(const char *name, char *path) {
+  if (namesAPlace(name)) return pathAt(placeOf(name), path);
+  const char *given = name + PREFIX_LENGTH;
+  if (number == 0 || !isDriveName(given)) return false;
+  snprintf(path, PATH_ROOM, "%s/%s", FOLDER, given);
   return true;
 }
 
@@ -184,6 +238,7 @@ FILE *opened(const char *path, char *buffer) {
 void closePlayed() {
   if (played != nullptr) fclose(played);
   played = nullptr;
+  playedPath[0] = 0;
 }
 
 void closeSecond() {
@@ -217,7 +272,7 @@ int driveSpace(void *, uint32_t drive, uint64_t *freeBytes, uint64_t *totalBytes
 
 int driveName(void *, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
   Guarded held;
-  if (drive == 0 || drive != number || place >= listed || capacity == 0) return 0;
+  if (drive == 0 || drive != number || place >= listed || capacity == 0 || names[place][0] == 0) return 0;
   strncpy(buffer, names[place], capacity - 1);
   buffer[capacity - 1] = 0;
   return 1;
@@ -231,9 +286,12 @@ int openFile(void *ctx, const char *name) {
     if (place >= 0) {
       files.close(ctx);
       char path[PATH_ROOM];
-      if (!pathAt(place, path)) return 0;
+      if (!drivePath(name, path)) return 0;
       played = opened(path, playedBuffer);
-      if (played != nullptr) return 1;
+      if (played != nullptr) {
+        strcpy(playedPath, path);
+        return 1;
+      }
       if (errno != ENOENT) readFailed();
       return errno == ENOENT ? 0 : -1;
     }
@@ -269,7 +327,7 @@ int32_t readPart(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, 
   if (second == nullptr || strcmp(secondName, name) != 0) {
     closeSecond();
     char path[PATH_ROOM];
-    if (strlen(name) >= SHORT_NAME || !pathAt(place, path)) return -1;
+    if (strlen(name) >= CORE_NAME_ROOM || !drivePath(name, path)) return -1;
     second = opened(path, secondBuffer);
     if (second == nullptr) {
       if (errno != ENOENT) readFailed();
@@ -293,11 +351,12 @@ int32_t readPart(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, 
   return (int32_t)count;
 }
 
-// Whether a name is one of an animation file: it ends in .odrg, in any case, and does not
-// begin with a dot.
+// Whether a name is one of an animation file: it ends in .odrg or .odrgx, in any case, and
+// does not begin with a dot.
 bool isAnimation(const char *name) {
   const size_t length = strlen(name);
-  return length >= 5 && length < NAME_ROOM && name[0] != '.' && strcasecmp(name + length - 5, ".odrg") == 0;
+  if (length >= NAME_ROOM || name[0] == '.') return false;
+  return (length >= 5 && strcasecmp(name + length - 5, ".odrg") == 0) || (length >= 6 && strcasecmp(name + length - 6, ".odrgx") == 0);
 }
 
 // Puts a name into the list, which holds the first MOST_FILES names in the order of their
@@ -312,7 +371,7 @@ void keepName(const char *name, uint32_t *kept) {
   if (*kept < MOST_FILES) (*kept)++;
 }
 
-// The list of the drive's folder odrig, made while the number is 0. Its length, NO_FOLDER
+// The list of the drive's folder odrig, made with the guard held. Its length, NO_FOLDER
 // when the drive has no folder odrig, or NOT_LISTED when the folder could not be read.
 int32_t listFolder() {
   uint32_t kept = 0;
@@ -323,6 +382,12 @@ int32_t listFolder() {
   }
   closedir(folder);
   return (int32_t)kept;
+}
+
+// Whether the drive has its folder odrig, told without reading the folder.
+bool folderThere() {
+  struct stat found;
+  return stat(FOLDER, &found) == 0 && S_ISDIR(found.st_mode);
 }
 
 void setSummary() {
@@ -349,9 +414,217 @@ void setSummary() {
   }
 }
 
+// The line of the log for a list of the drive's folder: the number of its animation files,
+// or why there is none. A drive without the folder was said when it was mounted.
+void sayListed(int32_t found) {
+#ifdef ODRIG_DRIVE_SD_SPI
+  if (found == NOT_LISTED) {
+    say("card folder odrig could not be read");
+  } else if (found >= 0) {
+    say("card opened: %u animation files in odrig", (unsigned)found);
+  }
+#else
+  if (found == NOT_LISTED) {
+    say("stick not opened: a fault in reading the folder odrig");
+  } else if (found >= 0) {
+    say("stick opened: %u animation files in odrig", (unsigned)found);
+  }
+#endif
+}
+
+// Lists the folder of the drive that is plugged in, as the core asks: its names take the
+// places of the list. A name the core gave read_at may stand for another file now.
+int32_t driveList(void *, uint32_t drive) {
+  Guarded held;
+  if (drive == 0 || drive != number) return -1;
+  closeSecond();
+  const int32_t found = listFolder();
+  listed = found < 0 ? 0 : (uint32_t)found;
+  sayListed(found);
+  setSummary();
+  return (int32_t)listed;
+}
+
+// Gives a place of the list the file of the folder odrig with this name, as the core reads
+// the drive's catalog. The places before it that have no name stay without one; read_at's
+// file of that place is taken again at its next read.
+int driveBind(void *, uint32_t drive, uint32_t place, const char *name) {
+  Guarded held;
+  if (drive == 0 || drive != number || place >= MOST_FILES || name == nullptr || !isDriveName(name)) return 0;
+  for (uint32_t empty = listed; empty < place; empty++) names[empty][0] = 0;
+  strcpy(names[place], name);
+  if (place >= listed) listed = place + 1;
+  if (placeOf(secondName) == (long)place) closeSecond();
+  setSummary();
+  return 1;
+}
+
+#ifdef ODRIG_DRIVE_SD_SPI
+// The card is written while it is mounted with its folder odrig and no read of it failed.
+int driveWritable(void *, uint32_t drive) {
+  Guarded held;
+  return drive != 0 && drive == number && cardMounted && !cardFailed && cardFolder ? 1 : 0;
+}
+
+// The path of the file of the card that a change of the core names, `drive/<name>`, while
+// the card can be written. No place of the list is changed. With the guard held.
+bool changedPath(const char *name, char *path) {
+  return cardMounted && !cardFailed && cardFolder && !namesAPlace(name) && drivePath(name, path);
+}
+
+// Before a change of a file of the card: the file `open` holds is closed when it is that
+// file, so that its reads fail and not those of the card; the one read_at holds is closed
+// always, as its name may stand for another file afterwards. FAT tells no case apart.
+void changing(const char *path) {
+  if (played != nullptr && strcasecmp(playedPath, path) == 0) closePlayed();
+  closeSecond();
+}
+
+// Gives up the card's file being written: closed as far as it got, and removed when asked.
+// With the guard held.
+void giveUpWritten(bool removing) {
+  if (written == nullptr) return;
+  fclose(written);
+  written = nullptr;
+  if (removing) unlink(writtenPath);
+  writtenPath[0] = 0;
+}
+
+// The card's file being written is given up and removed.
+void dropDriveFile() {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  giveUpWritten(true);
+}
+
+int beginDriveFile(const char *name) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  giveUpWritten(true);
+  char path[PATH_ROOM];
+  if (!changedPath(name, path)) return -1;
+  changing(path);
+  written = fopen(path, "wb");
+  if (written == nullptr) return -1;
+  strcpy(writtenPath, path);
+  writtenBytes = 0;
+  return 1;
+}
+
+int addDriveBytes(const uint8_t *bytes, size_t length) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  if (written == nullptr) return -1;
+  writtenBytes += length;
+  return fwrite(bytes, 1, length, written) == length ? 1 : -1;
+}
+
+// The file is whole when its data and its directory entry are on the card and it holds as
+// many bytes as were given.
+int endDriveFile() {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  if (written == nullptr) return -1;
+  struct stat found;
+  bool whole = fflush(written) == 0 && fsync(fileno(written)) == 0 && fstat(fileno(written), &found) == 0 && (size_t)found.st_size == writtenBytes;
+  whole = fclose(written) == 0 && whole;
+  written = nullptr;
+  writtenPath[0] = 0;
+  return whole ? 1 : -1;
+}
+
+// FAT gives no file a name that another file has, so the file that has the new name is
+// removed first, once the file to be renamed is known to be there. After a cut between the
+// two, that file is there under its old name, and the catalog's commit renames it again.
+int renameDriveFile(const char *from, const char *to) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  char pathFrom[PATH_ROOM], pathTo[PATH_ROOM];
+  if (!changedPath(from, pathFrom) || !changedPath(to, pathTo)) return -1;
+  if (written != nullptr && (strcasecmp(writtenPath, pathFrom) == 0 || strcasecmp(writtenPath, pathTo) == 0)) giveUpWritten(false);
+  changing(pathFrom);
+  changing(pathTo);
+  struct stat found;
+  if (stat(pathFrom, &found) != 0 || !S_ISREG(found.st_mode)) return -1;
+  if (strcasecmp(pathFrom, pathTo) != 0 && unlink(pathTo) != 0 && errno != ENOENT) return -1;
+  return rename(pathFrom, pathTo) == 0 ? 1 : -1;
+}
+
+int removeDriveFile(const char *name) {
+  OdrigFiles::StorageCall call;
+  Guarded held;
+  char path[PATH_ROOM];
+  if (!changedPath(name, path)) return -1;
+  if (written != nullptr && strcasecmp(writtenPath, path) == 0) giveUpWritten(false);
+  changing(path);
+  if (unlink(path) == 0) return 1;
+  return errno == ENOENT ? 0 : -1;
+}
+#else
+// A stick is never written.
+int driveWritable(void *, uint32_t) { return 0; }
+void dropDriveFile() {}
+int beginDriveFile(const char *) { return -1; }
+int addDriveBytes(const uint8_t *, size_t) { return -1; }
+int endDriveFile() { return -1; }
+int renameDriveFile(const char *, const char *) { return -1; }
+int removeDriveFile(const char *) { return -1; }
+#endif
+
+// The storage functions: a name of the drive goes to the drive, every other name to the
+// functions of `files`. The core writes one file at a time, in either storage: beginning
+// one gives up and removes the one being written in the other.
+int beginFile(void *ctx, const char *name) {
+  if (placeOf(name) < 0) {
+    if (writingDrive) dropDriveFile();
+    writingDrive = false;
+    const int begun = files.write_open(ctx, name);
+    filesWritten[0] = 0;
+    if (begun == 1 && strlen(name) < FILES_NAME_ROOM) strcpy(filesWritten, name);
+    return begun;
+  }
+  if (filesWritten[0] != 0) files.remove(ctx, filesWritten);
+  filesWritten[0] = 0;
+  writingDrive = true;
+  return beginDriveFile(name);
+}
+
+int addBytes(void *ctx, const uint8_t *bytes, size_t length) {
+  return writingDrive ? addDriveBytes(bytes, length) : files.write(ctx, bytes, length);
+}
+
+int endFile(void *ctx) {
+  if (writingDrive) {
+    writingDrive = false;
+    return endDriveFile();
+  }
+  filesWritten[0] = 0;
+  return files.write_close(ctx);
+}
+
+// An installed file that is renamed or removed is being written no more.
+void letGoOf(const char *name) {
+  if (strcmp(filesWritten, name) == 0) filesWritten[0] = 0;
+}
+
+int renameFile(void *ctx, const char *from, const char *to) {
+  const bool fromDrive = placeOf(from) >= 0;
+  if (fromDrive != (placeOf(to) >= 0)) return -1;
+  if (fromDrive) return renameDriveFile(from, to);
+  letGoOf(from);
+  letGoOf(to);
+  return files.rename(ctx, from, to);
+}
+
+int removeFile(void *ctx, const char *name) {
+  if (placeOf(name) >= 0) return removeDriveFile(name);
+  letGoOf(name);
+  return files.remove(ctx, name);
+}
+
 #ifndef ODRIG_DRIVE_SD_SPI
-// A drive came: it is mounted read as it is, never formatted, and its list is published
-// with a new number.
+// A drive came: it is mounted read as it is, never formatted, and published with a new
+// number. Its folder is listed when the core asks.
 void plugIn(uint8_t address) {
   if (device != nullptr) return;
   const esp_err_t installed = msc_host_install_device(address, &device);
@@ -374,16 +647,13 @@ void plugIn(uint8_t address) {
     setSummary();
     return;
   }
-  const int32_t found = listFolder();
-  if (found == NO_FOLDER) {
-    say("the stick has no folder odrig");
-  } else if (found == NOT_LISTED) {
-    say("stick not opened: a fault in reading the folder odrig");
+  if (folderThere()) {
+    say("stick mounted");
   } else {
-    say("stick opened: %u animation files in odrig", (unsigned)found);
+    say("the stick has no folder odrig");
   }
   Guarded held;
-  listed = found < 0 ? 0 : (uint32_t)found;
+  listed = 0;
   number = ++plugged;
   state = MOUNTED;
   setSummary();
@@ -542,7 +812,8 @@ void driveEvents(void *) {
 }
 #else
 
-// Called with no card published. The VFS is read only through the callbacks above.
+// Called with no card published. The VFS is read and written only through the callbacks
+// above. Its folder is listed when the core asks.
 void mountCard() {
   if (!SD.begin(ODRIG_SD_CS, cardBus, ODRIG_SD_FREQUENCY, MOUNT, 3, false)) {
     if (state != NOT_READ) say("card not mounted; no card or unreadable file system");
@@ -551,20 +822,19 @@ void mountCard() {
     return;
   }
   cardMounted = true;
-  const int32_t found = listFolder();
-  if (found == NO_FOLDER) {
-    say("the card has no folder odrig");
-  } else if (found == NOT_LISTED) {
-    say("card folder odrig could not be read");
+  const bool folder = folderThere();
+  if (folder) {
+    say("card mounted");
   } else {
-    say("card opened: %u animation files in odrig", (unsigned)found);
+    say("the card has no folder odrig");
   }
   Guarded held;
-  listed = found < 0 ? 0 : (uint32_t)found;
+  listed = 0;
   // Zero always means absent, also when the generation counter wraps.
   if (++plugged == 0) ++plugged;
   number = plugged;
   cardFailed = false;
+  cardFolder = folder;
   state = MOUNTED;
   setSummary();
 }
@@ -584,9 +854,11 @@ void sdStep() {
       listed = 0;
       closePlayed();
       closeSecond();
+      giveUpWritten(false);
       SD.end();
       cardMounted = false;
       cardFailed = false;
+      cardFolder = false;
       state = NO_DRIVE;
       setSummary();
       removed = true;
@@ -653,6 +925,16 @@ odrig_host OdrigDrive::withDrive(const odrig_host &given) {
   made.drive = driveNumber;
   made.drive_name = driveName;
   made.drive_space = driveSpace;
+  made.drive_list = driveList;
+  made.drive_bind = driveBind;
+  made.drive_writable = driveWritable;
+  if (given.write_open != nullptr) {
+    made.write_open = beginFile;
+    made.write = addBytes;
+    made.write_close = endFile;
+    made.rename = renameFile;
+    made.remove = removeFile;
+  }
   return made;
 }
 

@@ -24,7 +24,8 @@ EMPTY_SHOW = ROOT / "shows" / "preview" / "show.json"
 MAPPING = ROOT / "mapping" / "legs-20.json"
 WORK = ROOT / "build" / "preview"
 PAGE_PORT = app.PORT
-NAME = "preview.odrg"
+# The name the file is uploaded under, by its ending: an ODRG file or an ODRGX container.
+NAMES = {".odrg": "preview.odrg", ".odrgx": "preview.odrgx"}
 TIMEOUT_SECONDS = 10.0
 STOP_SECONDS = 10
 WINDOWS = sys.platform == "win32"
@@ -41,7 +42,7 @@ class Refused(Exception):
 
 def parser():
     made = argparse.ArgumentParser(prog="python -m preview", description="Shows one finished animation in the emulator, until Ctrl-C.")
-    made.add_argument("file", metavar="FILE", help="the .odrg file to show")
+    made.add_argument("file", metavar="FILE", help="the .odrg or .odrgx file to show")
     made.add_argument("--mapping", metavar="FILE", default=str(MAPPING), help="the mapping file of the canvas (default: mapping/legs-20.json)")
     made.add_argument("--no-browser", action="store_true", help="print the address of the page and open no browser")
     made.add_argument("--core", metavar="PATH", default=str(app.LIBRARY), help=f"the core's shared library (default: core/build/{app.binding.LIBRARY_NAME})")
@@ -122,9 +123,12 @@ def stopped(child):
 
 
 def uploaded(address, data, file, canvas, mapping):
-    """Uploads the file as the show's only item. A reply that is no success is refused."""
+    """Uploads the file as the show's only item, `preview.odrgx` for a file whose name ends
+    in `.odrgx`, in any case, and `preview.odrg` for any other. A reply that is no success is
+    refused."""
+    name = NAMES[".odrgx" if pathlib.Path(file).name.lower().endswith(".odrgx") else ".odrg"]
     with client.Session(http=address, timeout=TIMEOUT_SECONDS) as session:
-        reply = content.upload(session, 1, NAME, data)
+        reply = content.upload(session, 1, name, data)
     if content.is_ok(reply):
         return
     answer = json.loads(reply)

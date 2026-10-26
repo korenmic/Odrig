@@ -149,7 +149,7 @@ class OnTheExampleShow(unittest.TestCase):
         self.assertEqual(self.hub.entries(), [])
         self.engine.line(b"brightness 42", "http")
         status = self.hub.latest_status()
-        self.assertEqual(json.loads(status), {"ok": True, "on": True, "brightness": 42, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6})
+        self.assertEqual(support.without_fps(status), {"ok": True, "on": True, "brightness": 42, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertTrue(re.fullmatch(r"\{.*\}", status))
         self.assertEqual(len(self.hub.entries()), 1)
 

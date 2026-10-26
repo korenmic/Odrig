@@ -2,7 +2,8 @@
 
 `odrig` is a Python package at the repository root: a library for the tests and the tools.
 It reads and writes the project's files, JSON frames, the ODRG format of
-[format.md](format.md), mapping files and shows, and it holds the generators. It converts
+[format.md](format.md) and the ODRGX containers of frames, mapping files and shows, and it
+holds the generators. It converts
 nothing and is no program of its own: the converter, which imports media, encodes, decodes,
 checks and packs, is the JavaScript tool of [converter.md](converter.md).
 
@@ -17,6 +18,7 @@ What builds on it:
 | The [generators](#generators), which write the tracked animations and the dense test clip | `odrig/generators/` |
 | The builder of the [test vectors](#test-vectors) for other ODRG readers | `tests/converter/build_vectors.py` |
 | The program that writes the drawings and tables of [mapping.md](mapping.md), `python -m odrig.mapdoc`, which that page describes | `odrig/mapdoc.py` |
+| The catalogs of [catalog.md](catalog.md), and the program that keeps the catalog of a card mounted on a computer, `python -m odrig.catalog`, which [microsd.md](microsd.md) describes | `odrig/catalog.py` |
 | The check the firmware tool makes of a show folder before it installs it ([firmware.md](firmware.md)) | `firmware/fwtool/` |
 | The decoder and the readers that the suites of the core and the emulator compare with, and the writer with which they make the small animation files they play ([core.md](core.md), [emulator.md](emulator.md)) | `tests/core/`, `tests/emulator/` |
 
@@ -158,6 +160,15 @@ bytes; they are checked by decoding them.
 
 The suite of the converter reads every vector as well, with its own decoder.
 
+`tests/vectors/containers/` holds ODRGX containers, in `valid/` beside the JSON frames they
+decode to and in `invalid/` named by their reason as above, one of "ODRGX files" or, for a
+fault of a frames payload, of "ODRG files". They are made from the ODRG vectors by
+`node tests/vectors/containers/build.mjs`, and the converter's suite checks that the files
+are what it makes. `odrig/odrgx.py` reads them for the suites of this library and of the
+core. Of a text and a clock it reads the header only: the payload is read by the
+converter and the core. `tests/vectors/widgets/` holds the clocks, made the same way by
+`node tests/vectors/widgets/build.mjs`.
+
 ## Tests
 
 ```
@@ -183,6 +194,8 @@ package, is [converter.md](converter.md), "Tests".
 | `odrig.mapping.position(canvas, leg, n)` | The canvas position (x, y) of LED n of a leg, by the rule of [mapping.md](mapping.md). |
 | `odrig.show.read(path)` | The items of a show file. |
 | `odrig.errors.status_of(action)` | The exit status of a command line's work, with its error line for a refusal. |
+| `odrig.catalog.read(storage)`, `add(storage, name, data)`, `remove(storage, name)`, `rebuild(storage)`, `check(storage)`, `recover(storage)` | A storage's catalog of [catalog.md](catalog.md), and the changes a computer makes to it; `Storage(folder)` is a folder, `MemoryStorage(files)` files held in a dict. |
+| `odrig.catalog.main(argv)` | The command line of `python -m odrig.catalog`, as [microsd.md](microsd.md) gives it; returns the exit status. |
 
 A picture is `bytes` of 3 * W * H: red, green and blue for each pixel in the pixel order of
 [format.md](format.md), the bottom row first. A refused input raises

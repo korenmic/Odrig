@@ -36,7 +36,7 @@ takes every line marked *No*.
 | 2 | Plays a playlist of every installed animation when the show names nothing else, each for a turn of at least 30 seconds; `play all`. | 16 | `core/` | The core | In its spec |
 | 3 | Plays at once at power-on: the start checks the headers only, and the bodies are checked while the show plays. | 14 | `core/` | The core | In its spec |
 | 4 | Answers the commands of [commands.md](commands.md), with the same replies on every route: `space`, `list`, `remove` and `upload` among them. | 02, 07 | `core/` | The core | In its spec |
-| 5 | A broken file never stops the show, and a power cut never leaves a half-changed show. | 02, 07, 14, 20 | `core/` | The core | In its spec |
+| 5 | A broken file never stops the show: it is unavailable for the boot and the other animations play; and a power cut never leaves a half-changed show. | 02, 07, 14, 20, 32 | `core/` | The core | In its spec |
 | 6 | Starts the core on the files of `/odrig`, gives it a file in pieces of at most 512 bytes, its memory from the internal memory first, and a 64-bit clock of milliseconds. | 04 | `odrig_usermod.cpp` | Written again | In its spec |
 | 7 | Storage: the seven storage functions of [core.md](core.md) on the file system, every name checked, a file written only in `/odrig`, the free space counted rather than asked of the file system. | 04, 07 | `odrig_files.cpp` | Shared file | Built |
 | 8 | Paces storage: after storage calls, no command line for the longer of 20 ms and twice the time they took. | 07 | `odrig_files.cpp`, `odrig_serial.cpp` | Shared file | Built |
@@ -48,8 +48,8 @@ takes every line marked *No*.
 | 14 | Limits the LED current, counted as WLED counts it, to the value of `firmware/limit.json`; 0 is no limit. | 15 | WLED's limiter; `set-limit` | Written again | Built |
 | 15 | Opens the board's own Wi-Fi network at 4.3.2.1, with the name and the password of `firmware/wifi.json`. | 08 | WLED's Wi-Fi; `set-wifi` | Written again | In its spec |
 | 16 | Answers a phone that joins the network as a captive portal does, also while the show plays. | 04 | `odrig_usermod.cpp`, which keeps WLED's portal answering | Written again | No: its design has no captive portal |
-| 17 | Gives the chip's own USB port to a computer when one is plugged in as the board starts, and to a USB stick otherwise; the wait, 5 seconds, is a setting. | 21 | `odrig_drive.cpp` | Written again | No |
-| 18 | Plays the animations of a USB stick after the installed ones: FAT32 or FAT16, the folder `odrig`, at most 256 files, never written, taken up and dropped while the board runs. | 20 | `odrig_drive.cpp`, `firmware/usb_host_msc/` | Written again | No |
+| 17 | In the USB stick's build, `build --stick`: gives the chip's own USB port to a computer when one is plugged in as the board starts, and to a USB stick otherwise; the wait, 5 seconds, is a setting. | 21 | `odrig_drive.cpp` | Written again | No: the fallback follows the firmware, which keeps the port a serial port, line 26 |
+| 18 | In the USB stick's build, `build --stick`: plays the animations of a USB stick after the installed ones: FAT32 or FAT16, the folder `odrig`, at most 256 files, never written, taken up and dropped while the board runs. | 20 | `odrig_drive.cpp`, `firmware/usb_host_msc/` | Written again | No: the fallback follows the firmware, which reads a microSD card in its place, line 26 |
 | 19 | Writes a log on the socket marked COM: a `#log` line for every event of the chip's own USB port and for every line the player logs. | 23 | `odrig_log.cpp`, `odrig_uart.cpp`, `odrig_drive.cpp` | Written again | No |
 | 20 | Runs on the bigger layout of the flash, one firmware slot and 13,500,416 bytes of storage, and refuses an update over Wi-Fi there with the reason. | 24 | `firmware/fwtool/partitions.py`, `odrig_update.cpp` | Written again, built for both layouts | No: its spec knows WLED's layout only |
 | 21 | Tells a person what it is doing without a command: the show's state, the outputs, the start's time, the stick, and whether an update over Wi-Fi is taken. | 04, 20, 23, 24 | WLED's information page, filled by `odrig_usermod.cpp` | Written again | No: it has no page; how it tells these is settled with the owner when seed 12 goes on |
@@ -57,13 +57,12 @@ takes every line marked *No*.
 | 23 | Is built, flashed, rolled back and set up by one tool: `build`, `flash`, `restore-stock`, `big-storage`, `install-show`, `set-wifi`, `set-limit`, `read-limit`, `install-firmware`, `read-show` and the board's suites. | 04, 08, 15, 24 | `firmware/fw.py`, `firmware/fwtool/` | Written again: each command takes the other firmware too | In part: `build`, `flash` and the board's suite are in its spec |
 | 24 | Saves a complete twenty-pin permutation atomically and displays a packaged white diagonal through the shared core; the same commands reach it over HTTP and serial. | 30 | `core/src/mapping_control.cpp`, `odrig_routing.h`, `odrig_usermod.cpp` | Written again: fixed physical outputs resolve the currently assigned logical snake | Output adapter supports pin lookup; full standalone player remains pending seed 12 |
 | 25 | Persists playlist inclusion, removes installed animations atomically in batches, and reports internal plus nullable external capacity through every command route. | 29 | `core/`; read-only FAT capacity in `odrig_drive.cpp` and `firmware/usb_host_msc/` | The core for semantics; a host callback supplies external capacity | No: the full player and external drive adapter remain pending |
-| 26 | Has an experimental SPI microSD build in place of the USB-storage transport, preserving the external-animation interface and native USB serial; its profile uses SCK39, MISO40, MOSI41 and CS42. All 122 card files and representative playback are verified in the two-USB bench setup; autonomous-power operation remains open. | Owner | `odrig_drive.cpp`, `odrig_sd_config.h`, `build --microsd`; see [microSD preparation](microsd.md) | Written again | No |
+| 26 | Plays the animations of a microSD card after the installed ones, in place of a USB stick: a reader on GPIO39 to GPIO42 over SPI at 4 MHz, FAT32 or FAT16, the folder `odrig`, at most 256 files, read from its catalog or listed when the core asks, never formatted, only files of that folder changed and only as the core asks, taken up and dropped while the board runs; its free and total space under `external` of `space`; its `sd` lines in the log; the chip's own USB socket a serial port always. | 20, 35, 38 | `odrig_drive.cpp`, `odrig_sd_config.h`; `build`, the firmware since 2026-10-24; see [microsd.md](microsd.md) | Written again | In its spec: Requirement 13 |
 
 ## Coming
 
-- **Seed 22, a USB stick through a hub.** When it is done, the firmware reads a stick
-  through any USB hub, on newer USB software of Espressif. Its line comes here then, and
-  the fallback is built on the same USB software.
+Nothing at present. Seed 22, a USB stick through a hub, was superseded by the microSD
+card of line 26.
 
 ## Not carried
 
@@ -91,3 +90,11 @@ adapter adds only a read-only FAT capacity query, using 64-bit byte arithmetic; 
 space JSON is produced by the core. The tracked MSC VFS copy exposes this capacity
 helper; its mount/unmount and licence remain unchanged. The standalone trial still
 has no external drive adapter and does not claim complete player functionality.
+
+## The saved playlist order and the snake tests
+
+The shared core keeps the saved playlist order in `order.txt` of the board's own storage
+and shows the twenty snake tests from pictures it holds; the firmware carries their
+commands as it carries every other line and gives the core its storage functions, whose
+names `order.txt` and `order.part` fit its rule of 32 characters. Nothing of the firmware
+changes for them. No firmware with them has been flashed or checked on the LEDs yet.

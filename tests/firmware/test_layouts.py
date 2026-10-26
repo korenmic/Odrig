@@ -86,7 +86,8 @@ class OnEachLayout(unittest.TestCase):
         for name, layout, address in self.LAYOUTS:
             with self.subTest(layout=name):
                 result, esptool = self.run_on(layout, address, "install-show", self.folder / "show")
-                self.assertEqual((result.status, result.out, result.err), (0, f"{self.line(name)}\n{REPLY}\n", ""))
+                lines = result.out.splitlines()
+                self.assertEqual((result.status, lines[0], lines[-2], lines[-1], result.err), (0, self.line(name), REPLY, "outcome: healthy", ""))
                 self.assertTrue(all(address <= at < address + 64 * support.BLOCK_SIZE for at, _ in esptool.wrote))
 
     def test_read_show_and_read_limit_print_the_layout_first(self):

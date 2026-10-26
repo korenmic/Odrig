@@ -161,13 +161,13 @@ class PlaylistManagement(unittest.TestCase):
         self.assertEqual(listed(run)[-1]['items'][-1]['ignored'], False)
         self.assertNotIn('ignored', json.loads(left['show.json'])['items'][-1])
 
-    def test_commands_through_byte_entry_and_startup_busy(self):
+    def test_commands_through_byte_entry_and_during_the_startup_check(self):
         files = self.files()
         run = support.start(files, [support.fed(0, b'ignore 1 1\nremove many 2,3\n'), support.line(0, 'list')])
         self.assertEqual(listed(run)[:2], [{'ok': True}] * 2)
         self.assertEqual([i['id'] for i in listed(run)[-1]['items']], [1])
         run = support.start(files, [support.line(0, 'ignore 1 1'), support.line(0, 'remove many 1,2')], check_first=False)
-        self.assertEqual(listed(run), [{'ok': False, 'error': 'busy'}] * 2)
+        self.assertEqual(listed(run), [{'ok': True}] * 2)
 
     def test_bulk_failure_before_metadata_commit_retains_old_show(self):
         from .test_powercut import storage_calls, as_bytes
@@ -181,7 +181,7 @@ class PlaylistManagement(unittest.TestCase):
                 self.assertEqual(listed(run), [{'ok': False, 'error': 'storage-error'}])
                 self.assertEqual(left, as_bytes(files))
 
-    def test_cleanup_debt_cannot_be_overwritten_by_a_later_mutation(self):
+    def test_cleanup_debt_is_paid_before_a_later_mutation_and_never_overwritten(self):
         from .test_powercut import storage_calls
         files = self.files()
         script = [support.line(0, 'remove many 1,2')]
@@ -189,6 +189,11 @@ class PlaylistManagement(unittest.TestCase):
         at = next(n for n, line in enumerate(calls, 1) if line.startswith('remove a1.odrg'))
         script += [support.line(0, 'ignore 3 1'), support.line(0, 'remove many 3')]
         run, left = support.start_and_keep(files, script, ['--store-fails-at', str(at)])
+        self.assertEqual(listed(run), [{'ok': True}] * 3)
+        self.assertNotIn('pending.txt', left)
+        self.assertNotIn('a1.odrg', left)
+        # While the cleanup cannot be finished, a later change is refused and the debt stays.
+        run, left = support.start_and_keep(files, script, ['--store-fails-at', str(at), '--read-fails', 'pending.txt', '0'])
         self.assertEqual(listed(run), [{'ok': True}] + [{'ok': False, 'error': 'storage-error'}] * 2)
         self.assertIn(b'a1.odrg\n', left['pending.txt'])
 

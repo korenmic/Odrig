@@ -30,7 +30,8 @@ int main(void) {
     MEMBER(odrig_host, read); MEMBER(odrig_host, close); MEMBER(odrig_host, log);
     MEMBER(odrig_host, write_open); MEMBER(odrig_host, write); MEMBER(odrig_host, write_close);
     MEMBER(odrig_host, rename); MEMBER(odrig_host, remove); MEMBER(odrig_host, space); MEMBER(odrig_host, read_at);
-    MEMBER(odrig_host, drive); MEMBER(odrig_host, drive_name); MEMBER(odrig_host, drive_space);
+    MEMBER(odrig_host, drive); MEMBER(odrig_host, drive_name); MEMBER(odrig_host, drive_space); MEMBER(odrig_host, about);
+    MEMBER(odrig_host, drive_list); MEMBER(odrig_host, drive_bind); MEMBER(odrig_host, drive_writable);
     printf("odrig_leg %zu\\n", sizeof(odrig_leg));
     MEMBER(odrig_leg, leg); MEMBER(odrig_leg, pin); MEMBER(odrig_leg, led_count); MEMBER(odrig_leg, rgb);
     return 0;
@@ -59,7 +60,7 @@ class Declarations(unittest.TestCase):
         body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)
         members = re.findall(r"(?:\(\*|[ *])([a-z_]+)\)?(?:\([^;]*\))?;", body)
         self.assertEqual([name for name, _ in binding.HostRecord._fields_], members)
-        self.assertEqual(members[6:], ["write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space"])
+        self.assertEqual(members[6:], ["write_open", "write", "write_close", "rename", "remove", "space", "read_at", "drive", "drive_name", "drive_space", "about", "drive_list", "drive_bind", "drive_writable"])
 
     def test_every_storage_function_has_as_many_arguments_as_the_header_gives_it(self):
         body = re.search(r"typedef struct odrig_host \{(.*?)\} odrig_host;", header_code(), flags=re.S).group(1)
@@ -158,8 +159,8 @@ class ExampleShow(unittest.TestCase):
 
     def test_command_answers_status(self):
         reply = self.core.command(0, b"status")
-        self.assertEqual(reply, self.reference.command(0, b"status"))
-        self.assertEqual(json.loads(reply), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6})
+        self.assertEqual(support.without_fps(reply), support.without_fps(self.reference.command(0, b"status")))
+        self.assertEqual(support.without_fps(reply), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertEqual(self.core.command(5, b"status\r\n"), reply)
 
     def test_command_gives_the_reply_of_a_line_that_is_no_command(self):
@@ -168,10 +169,10 @@ class ExampleShow(unittest.TestCase):
 
     def test_feed_answers_status_once_the_line_is_finished(self):
         self.assertEqual(self.core.feed(0, b"sta"), [])
-        self.assertEqual(self.core.feed(0, b"tus\nbrightness 9\r\nsta"), [
-            (b"status", self.reference.command(0, b"status"), False),
-            (b"brightness 9", b'{"ok":true}\n', False),
-        ])
+        answered = self.core.feed(0, b"tus\nbrightness 9\r\nsta")
+        self.assertEqual([(line, cut) for line, _, cut in answered], [(b"status", False), (b"brightness 9", False)])
+        self.assertEqual(support.without_fps(answered[0][1]), support.without_fps(self.reference.command(0, b"status")))
+        self.assertEqual(answered[1][1], b'{"ok":true}\n')
         answered = self.core.feed(3, b"tus\n")
         self.assertEqual([line for line, _, _ in answered], [b"status"])
         self.assertEqual(json.loads(answered[0][1])["brightness"], 9)

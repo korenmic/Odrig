@@ -85,10 +85,10 @@ class EmulatorDocument(unittest.TestCase):
         self.assertIn("core/build/libodrig_core.dylib", self.text)
 
     def test_it_names_the_start_command_and_every_option_of_the_emulator(self):
-        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]\n", self.text)
+        self.assertIn("python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]]\n", self.text)
         self.assertIn("python -m emulator SHOW_DIR --record OUT --seconds S [--script FILE] [--core PATH] [--storage BYTES]\n", self.text)
         options = {option for action in app.parser()._actions for option in action.option_strings if option.startswith("--")} - {"--help"}
-        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--record", "--seconds", "--script"})
+        self.assertEqual(options, {"--port", "--serial-link", "--tcp-port", "--core", "--verbose", "--storage", "--lan", "--drive", "--drive-read-only", "--record", "--seconds", "--script"})
         self.assertIn("| `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |", self.text)
         for option in sorted(options):
             self.assertRegex(self.text, rf"`{option}[ `]", option)
@@ -185,7 +185,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
-        self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "height", "ok", "on", "playing", "width"])
+        self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "height", "ok", "on", "playing", "seed", "width"])
         self.assertRegex(events["frame"], r"\A[0-9]+ ")
         self.assertIn(str(hub.LOG_ENTRIES), text)
         self.assertIn("`: keep-alive`", text)
@@ -263,7 +263,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertEqual(len(bodies), len(steps))
         for body in bodies:
             self.assertEqual(body.count("*Seen:*"), 1, body[:60])
-        for phrase in ("Safari", "Chrome", "1280 x 800", "756 x 900", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "file-missing dvd.odrg",
+        for phrase in ("Safari", "Chrome", "1280 x 800", "756 x 900", "build/example-show", "build/dense/show", "build/demo-20/show", "`Mapping`", "show-missing",
                        "docs/specs/03-p0-emulator/requirements.md", "docs/specs/05-p0-canvas-60-by-60/requirements.md"):
             self.assertIn(phrase, text)
         requirements = (SPECS / "03-p0-emulator" / "requirements.md").read_text(encoding="utf-8")

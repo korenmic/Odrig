@@ -153,6 +153,20 @@ contributor works in a clone of their own, and the work meets on `master` of the
    commit. Run `git fetch origin` and look at `project-seeds/` as `origin/master` has it
    before you take the next free number, so that two contributors do not take the same.
 
+**One app, in the emulator and on the phone.** The operators' app is one body of web
+code, `app/www/`. The emulator serves it as it is in the checkout the emulator runs from,
+under `/app/`, as its Controller view, and the APK is built from the same folder by
+`app/app.py build`. Nothing may make them two: no copy of the web code anywhere, no file
+that the build adds and the emulator lacks, no behaviour that is one in the APK and
+another in the Controller view, and no branch that the APK comes from while the owner's
+emulator runs another. The reason is the owner's way of working: what the Controller view
+shows is what the phone will show, and a difference between them is a fault, not a
+version. So the APK is built from the commit the owner runs, and a report of a new APK
+names that commit and the branch to run the emulator from; and a coding agent works in a
+worktree of its own, `git worktree add`, never by `git switch` in the owner's checkout:
+on 2026-10-24 a run that switched it left it on a worker branch, and the emulator started
+there showed an app many seeds behind the phone's.
+
 ## The owner's workflow skills
 
 The owner runs this process with a set of workflow skills for coding agents: one turns a

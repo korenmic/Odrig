@@ -416,3 +416,16 @@ The table of what each offers:
 - **The fallback goes stale.** It is used only when something is wrong. `fw.py test`
   builds nothing, so only a board run shows that it still works. The documents say to run
   `test-board --standalone` after any change to the core's host interface.
+
+## The microSD card
+
+The card's code is `firmware/usermod/odrig_drive.cpp` built with `ODRIG_DRIVE_SD_SPI` and
+the pins of `odrig_sd_config.h`: Arduino's `SD` library over the chip's second SPI unit,
+a FreeRTOS task, and the core's drive functions, with nothing of WLED but the log's
+queue. The standalone firmware compiles it through a file of one line, as the files, the
+port and the HTTP transport are, with the four pin flags and the flag of the card in its
+`platformio.ini.in`; the log's queue, `odrig_log.cpp`, comes with it, and `main.cpp`
+calls `OdrigDrive::begin()` and wraps the host with `OdrigDrive::withDrive()` as the
+usermod does. Whether the `SD` library of Arduino-ESP32 2.0.18, on WLED's platform, takes
+the card as the newer software's does is settled in task 6, on the board; if it does not,
+the standalone firmware moves to the newer software with the WLED-based one.

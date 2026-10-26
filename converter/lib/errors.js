@@ -34,6 +34,20 @@ export const TRAILING_BYTES = "trailing-bytes";
 
 export const TOO_MANY_FRAMES = "too-many-frames";
 
+export const BAD_CONTAINER = "bad-container";
+export const UNKNOWN_TYPE = "unknown-type";
+export const UNKNOWN_TYPE_VERSION = "unknown-type-version";
+export const PAYLOAD_SIZE = "payload-size";
+export const CANVAS_MISMATCH = "canvas-mismatch";
+export const LOOP_MISMATCH = "loop-mismatch";
+export const BAD_SETTINGS = "bad-settings";
+export const BAD_TEXT = "bad-text";
+export const UNKNOWN_FONT = "unknown-font";
+export const BAD_GLYPH = "bad-glyph";
+export const DOES_NOT_FIT = "does-not-fit";
+export const UNSUPPORTED_CHARACTER = "unsupported-character";
+export const UNKNOWN_WIDGET = "unknown-widget";
+
 export const MAPPING_MISSING = "mapping-missing";
 export const MAPPING_MALFORMED = "mapping-malformed";
 

@@ -31,8 +31,8 @@ stored with them.
 |---|---|
 | Make or change an animation or a show | [agent/animation-guide.md](agent/animation-guide.md), then [docs/format.md](docs/format.md) and [docs/show.md](docs/show.md) |
 | Change the converter | [docs/converter.md](docs/converter.md), [docs/format.md](docs/format.md), [docs/reasons.md](docs/reasons.md) |
-| Change the Python library, a generator or the test vectors | [docs/python-library.md](docs/python-library.md), [docs/format.md](docs/format.md) |
-| Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md) |
+| Change the Python library, a generator or the test vectors | [docs/python-library.md](docs/python-library.md), [docs/format.md](docs/format.md), [docs/catalog.md](docs/catalog.md) |
+| Change the core | [docs/core.md](docs/core.md), [docs/format.md](docs/format.md), [docs/show.md](docs/show.md), [docs/commands.md](docs/commands.md), [docs/catalog.md](docs/catalog.md) |
 | Change the emulator or the command tool | [docs/emulator.md](docs/emulator.md), [docs/commands.md](docs/commands.md) |
 | Change the operators' app | [docs/android-app.md](docs/android-app.md), [docs/commands.md](docs/commands.md) |
 | Change how the LEDs are laid out | [docs/mapping.md](docs/mapping.md) |
@@ -48,8 +48,9 @@ the getting-started page has the command of each.
 ## Rules you may not break
 
 1. **Your own branch, your own clone.** Never commit on `master` directly, and never work
-   in a checkout that another contributor uses. Before a commit,
-   `git branch --show-current` names your branch.
+   in a checkout that another contributor uses, nor switch its branch: the emulator serves
+   the app of the checkout it runs from, and the APK is built from the same files, one
+   code. Before a commit, `git branch --show-current` names your branch.
 2. **One task, one commit.** The commit also ticks the task's checkbox in its `tasks.md`.
 3. **Stage named paths only.** Never `git add -A`, `git add .`, `git add -u` or
    `git commit -a`. After a commit, read `git show --stat`.
@@ -131,12 +132,10 @@ present, and do not build on them.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
 - **Bounded decoding and responsive fault handling**, seed 31: no bad file may freeze the board.
 - **Boot-local animation quarantine and recovery**, seed 32: boot completes; bad files grayed.
-- **Readiness progress and retained fault diagnostics**, seed 33: a truthful start-up state.
-- **Incremental and interruption-safe content updates**, seed 34: one file changed, not all.
-- **Managed internal and external animation catalogs**, seed 35: no full check at every start.
-- **Aurora Glass UI and playlist revamp**, seed 36: the app redrawn to the owner's look.
-- **ODRGX text and clock animations**, seed 37: text and clocks as animations.
-- **A microSD card as the external storage**, seed 38: the board runs it; the card checks are open.
+- **Managed internal and external animation catalogs**, seed 35: built; the board session and the owner's phone check are open.
+- **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
+- **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
+- **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 

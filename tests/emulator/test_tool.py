@@ -14,7 +14,7 @@ import unittest
 import zlib
 from unittest import mock
 
-from odrig import mapping
+from odrig import mapping, show
 from odrigctl import cli, client, content
 from tests.core import support as core_support
 from tests.core.support import ReferencePlayer
@@ -35,6 +35,7 @@ OK = '{"ok":true}\n'
 SESSION = (
     ("mapping", "test", "off"),
     ("status",),
+    ("fault",),
     ("brightness", "77"),
     ("status",),
     ("off",),
@@ -44,6 +45,8 @@ SESSION = (
     ("status",),
     ("play", "3"),
     ("status",),
+    ("read", "1", "0"),
+    ("catalog",),
     ("play", "99"),
     ("play", "abc"),
     ("brightness", "256"),
@@ -52,14 +55,22 @@ SESSION = (
     ("list",),
     ("remove", "99"),
     ("ignore", "999", "1"),
+    ("order", "move", "1", "999", "end"),
     ("status",),
 )
+
+
+def catalog_reply(files):
+    """The reply to `catalog` of a target whose storage has no catalog and which has no drive."""
+    named = len(set(show.files(show.loads(files["show.json"]))))
+    return b'{"ok":true,"internal":{"state":"none","uncataloged":%d},"external":{"state":"absent"},"rebuild":null}\n' % named
 
 
 def reference_replies(files, session):
     player = ReferencePlayer(files)
     player.poll(0)
-    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words == ("ignore", "999", "1") else player.command(100, " ".join(words).encode("ascii")) for words in session]
+    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words in (("ignore", "999", "1"), ("order", "move", "1", "999", "end")) else
+            catalog_reply(files) if words == ("catalog",) else player.command(100, " ".join(words).encode("ascii")) for words in session]
 
 
 class AgainstTheEmulator(unittest.TestCase):
@@ -76,7 +87,7 @@ class AgainstTheEmulator(unittest.TestCase):
                     self.assertEqual((result.status, result.out, result.err), (0, OK, ""))
             result = support.run_tool(*target, "status")
             self.assertEqual((result.status, result.err), (0, ""))
-            self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6})
+            self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
             self.assertTrue(result.out.endswith("}\n"))
             self.assertEqual(result.out.count("\n"), 1)
 
@@ -169,7 +180,7 @@ class Session(unittest.TestCase):
                 self.assertEqual([json.dumps(support.without_fps(entry["reply"])) for entry in logged], replies[transport])
         self.assertEqual(replies[support.LINES], replies["http"])
         codes = [json.loads(reply).get("error") for reply in replies["http"]]
-        self.assertEqual(codes[-9:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id"])
+        self.assertEqual(codes[-10:-1], ["unknown-id", "bad-argument", "bad-argument", "line-too-long", None, None, "unknown-id", "unknown-id", "unknown-id"])
         self.assertEqual({words[0] for words in SESSION}, set(cli.COMMANDS) - {"upload"})
 
 
@@ -280,20 +291,25 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "space", "list", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "upload begin <id> <file> <bytes>",
-                                      "upload data <offset> <base64>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
+                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ")) and command not in ("play all", "remove many <ids>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping")],
-                         [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>") for command in one_line])
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog")) and command not in ("play all", "remove many <ids>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog")],
+                         [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
-                           (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line")):
+                           (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line"),
+                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
+                           (["upload", "--external"], "upload --external takes one argument: FILE"),
+                           (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
             result = support.run_tool("--port", "a", *argv)
             self.assertEqual(result.status, 2)
             self.assertIn(said, result.err)
@@ -314,6 +330,10 @@ class Usage(unittest.TestCase):
             (["list"], b"list\n"),
             (["remove", "12"], b"remove 12\n"),
             (["remove", "x y"], b"remove x y\n"),
+            (["catalog"], b"catalog\n"),
+            (["catalog", "rebuild", "internal"], b"catalog rebuild internal\n"),
+            (["catalog", "rebuild", "external"], b"catalog rebuild external\n"),
+            (["catalog", "cancel"], b"catalog cancel\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 
@@ -324,7 +344,7 @@ class Usage(unittest.TestCase):
 
     def test_no_option_tells_the_emulator_from_the_board(self):
         options = {option for action in cli.parser()._actions for option in action.option_strings}
-        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log"})
+        self.assertEqual(options, {"-h", "--help", "--port", "--tcp", "--http", "--timeout", "--log", "--external"})
 
 
 class StandIn:
@@ -550,6 +570,7 @@ class SpaceListAndRemove(Content):
 
     def test_list_stops_at_a_reply_that_is_not_ok_and_exits_with_1(self):
         (self.folder / "dvd.odrg").unlink()
+        support.with_show_fault(self.folder)
         emulator = self.started()
         for target in targets(emulator).values():
             result = support.run_tool(*target, "list")
@@ -564,7 +585,7 @@ class SpaceListAndRemove(Content):
             self.assertEqual(len(json.loads(support.run_module(*target, "list", module="odrigctl").out)["items"]), 3)
             done = support.run_module(*target, "upload", "9", self.hello, module="odrigctl")
             self.assertEqual((done.status, done.out), (0, OK))
-            self.assertRegex(done.err, r"\Aupload: 100% 1138/1138 bytes \d+ B/s\nupload: checking\n\Z")
+            self.assertRegex(done.err, r"\Aupload: 100% 1138/1138 bytes \d+ B/s\nupload: checking\nupload: committed: 1138 bytes sent and checked by the target\n\Z")
             self.assertEqual(support.run_module(*target, "remove", "9", module="odrigctl"), support.Result(0, OK, ""))
 
 
@@ -587,8 +608,8 @@ class Upload(Content):
                     target = targets(emulator)[transport]
                     result = support.run_tool(*target, "upload", "9", self.hello)
                     self.assertEqual((result.status, result.out), (0, OK))
-                    self.assertRegex(result.err, rf"\Aupload: 100% {size}/{size} bytes \d+ B/s\nupload: checking\n\Z")
-                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
+                    self.assertRegex(result.err, rf"\Aupload: 100% {size}/{size} bytes \d+ B/s\nupload: checking\nupload: committed: {size} bytes sent and checked by the target\n\Z")
+                    self.assertEqual(self.named(emulator, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False, "external": False, "type": "frames"}, ("all", 9, None)))
                 finally:
                     emulator.stop()
                 self.assertEqual(support.files_of(self.folder)["hello-again.odrg"], self.before["hello.odrg"])
@@ -596,7 +617,7 @@ class Upload(Content):
                 again = support.Emulator(self.folder)
                 try:
                     target = targets(again)[transport]
-                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False}, ("all", 9, None)))
+                    self.assertEqual(self.named(again, target), ({"id": 9, "file": "hello-again.odrg", "bytes": size, "ignored": False, "external": False, "type": "frames"}, ("all", 9, None)))
                     removed = support.run_tool(*target, "remove", "9")
                     self.assertEqual((removed.status, removed.out, removed.err), (0, OK, ""))
                     # It was the last animation of the playlist: the first one is next.
@@ -618,16 +639,16 @@ class Upload(Content):
                 self.assertEqual((result.status, result.out), (0, OK))
                 self.assertEqual(opened.call_count, 1 if transport == "serial" else 0)
                 lines = result.err.splitlines()
-                self.assertEqual(lines[-2:], [mock.ANY, "upload: checking"])
-                self.assertRegex(lines[-2], rf"\Aupload: 100% {len(clip)}/{len(clip)} bytes \d+ B/s\Z")
+                self.assertEqual(lines[-3:], [mock.ANY, "upload: checking", f"upload: committed: {len(clip)} bytes sent and checked by the target"])
+                self.assertRegex(lines[-3], rf"\Aupload: 100% {len(clip)}/{len(clip)} bytes \d+ B/s\Z")
                 self.assertEqual(support.files_of(self.folder)["clip.odrg"], clip)
                 listed = json.loads(support.run_tool(*target, "list").out)["items"]
-                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip), "ignored": False})
+                self.assertEqual(listed[-1], {"id": number, "file": "clip.odrg", "bytes": len(clip), "ignored": False, "external": False, "type": "frames"})
                 self.assertEqual(support.run_tool(*target, "remove", number).status, 0)
         with support.EventStream(emulator.port) as stream:
             logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")
         lines = [entry["line"] for entry in logged if entry["transport"] == "http"]
-        self.assertEqual(lines[0], f"upload begin 21 clip.odrg {len(clip)}")
+        self.assertEqual(lines[0], f"upload begin 21 clip.odrg {len(clip)} {zlib.crc32(clip):08x}")
         data = [line for line in lines if line.startswith("upload data ")]
         self.assertEqual([int(line.split(" ")[2]) for line in data], list(range(0, len(clip), 1500)))
         ends = [entry for entry in logged if entry["transport"] == "http" and entry["line"].startswith("upload end ")]
@@ -636,19 +657,41 @@ class Upload(Content):
         self.assertEqual([json.loads(entry["reply"]).get("error") for entry in ends], ["busy"] * (len(ends) - 1) + [None])
         self.assert_as_before()
 
+    def test_the_same_upload_again_sends_nothing_and_says_so_by_each_transport(self):
+        emulator = self.started()
+        for transport, target in targets(emulator).items():
+            with self.subTest(transport=transport):
+                first = support.run_tool(*target, "upload", "9", self.hello)
+                self.assertEqual((first.status, first.out), (0, OK))
+                self.assertTrue(first.err.endswith("upload: committed: 1138 bytes sent and checked by the target\n"))
+                again = support.run_tool(*target, "upload", "9", self.hello)
+                self.assertEqual((again.status, again.out, again.err), (0, '{"ok":true,"unchanged":true}\n', f"{cli.UPLOAD_UNCHANGED}\n"))
+                self.assertEqual(support.run_tool(*target, "remove", "9").status, 0)
+        with support.EventStream(emulator.port) as stream:
+            logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")
+        begun = [entry["line"] for entry in logged if entry["line"].startswith("upload begin")]
+        self.assertEqual(begun, [f"upload begin 9 hello-again.odrg 1138 {zlib.crc32(self.before['hello.odrg']):08x}"] * 4)
+        self.assertEqual(len([entry for entry in logged if entry["line"].startswith("upload data")]), 2)
+        emulator.stop()
+        self.assert_as_before()
+
     def test_the_name_sent_is_the_last_part_of_the_path_and_the_id_goes_out_as_typed(self):
         emulator = self.started()
         target = targets(emulator)["http"]
         odd = self.work / "sent" / "Not A Name.ODRG"
         odd.write_bytes(self.before["hello.odrg"])
-        typed = ((("upload", "abc", self.hello), "upload begin abc hello-again.odrg 1138"), (("upload", "007", odd), "upload begin 007 Not A Name.ODRG 1138"),
-                 (("upload", "70000", self.hello), "upload begin 70000 hello-again.odrg 1138"), (("remove", "+2"), "remove +2"))
+        crc = f"{zlib.crc32(self.before['hello.odrg']):08x}"
+        # An upload refused with `bad-argument` is asked for once more without the CRC-32,
+        # as a target that does not take it would want.
+        typed = ((("upload", "abc", self.hello), [f"upload begin abc hello-again.odrg 1138 {crc}", "upload begin abc hello-again.odrg 1138"]),
+                 (("upload", "007", odd), [f"upload begin 007 Not A Name.ODRG 1138 {crc}", "upload begin 007 Not A Name.ODRG 1138"]),
+                 (("upload", "70000", self.hello), [f"upload begin 70000 hello-again.odrg 1138 {crc}", "upload begin 70000 hello-again.odrg 1138"]), (("remove", "+2"), ["remove +2"]))
         for words, _ in typed:
             result = support.run_tool(*target, *words)
             self.assertEqual((result.status, result.out, result.err), (1, '{"ok":false,"error":"bad-argument"}\n', ""), words)
         with support.EventStream(emulator.port) as stream:
             logged = support.of_kind(stream.read_until(lambda events: any(event.kind == "status" for event in events)), "log")
-        self.assertEqual([entry["line"] for entry in logged], [line for _, line in typed])
+        self.assertEqual([entry["line"] for entry in logged], [line for _, lines in typed for line in lines])
         self.assertEqual(emulator.command("upload cancel"), b'{"ok":false,"error":"no-upload"}\n')
         self.assert_as_before()
 
@@ -878,7 +921,7 @@ class UploadSteps(unittest.TestCase):
         clock = iter(range(100, 200)).__next__
         reply = content.upload(session, "4", "clip.odrg", self.DATA, lambda *report: reports.append(report), lambda: events.append(len(reports)), clock=clock)
         self.assertEqual(reply, b'{"ok":true}')
-        self.assertEqual(session.sent[0], b"upload begin 4 clip.odrg 1539\n")
+        self.assertEqual(session.sent[0], b"upload begin 4 clip.odrg 1539 %08x\n" % zlib.crc32(self.DATA))
         self.assertEqual([line.split(b" ")[:3] for line in session.sent[1:4]], [[b"upload", b"data", b"0"], [b"upload", b"data", b"700"], [b"upload", b"data", b"1400"]])
         pieces = [line.split(b" ")[3] for line in session.sent[1:4]]
         self.assertTrue(all(piece.endswith(b"\n") and b"=" not in piece and b"+" not in piece and b"/" not in piece for piece in pieces))
@@ -889,7 +932,42 @@ class UploadSteps(unittest.TestCase):
         self.assertEqual(events, [3])
         nine = Told([b'{"ok":true,"chunk":1500}', received(9), b'{"ok":true}'])
         content.upload(nine, 1, "a.odrg", b"123456789")
-        self.assertEqual(nine.sent, [b"upload begin 1 a.odrg 9\n", b"upload data 0 MTIzNDU2Nzg5\n", b"upload end cbf43926\n"])
+        self.assertEqual(nine.sent, [b"upload begin 1 a.odrg 9 cbf43926\n", b"upload data 0 MTIzNDU2Nzg5\n", b"upload end cbf43926\n"])
+
+    def test_a_target_that_holds_the_file_is_sent_nothing_more(self):
+        session = Told([b'{"ok":true,"unchanged":true}'])
+        reply = content.upload(session, 4, "a.odrg", b"abc", lambda *report: self.fail("a piece was sent"), lambda: self.fail("the check was waited for"))
+        self.assertEqual((reply, session.sent), (b'{"ok":true,"unchanged":true}', [b"upload begin 4 a.odrg 3 %08x\n" % zlib.crc32(b"abc")]))
+
+    def test_a_target_that_refuses_the_crc32_of_upload_begin_gets_the_line_without_it(self):
+        session = Told([refused("bad-argument"), b'{"ok":true,"chunk":1500}', received(3), b'{"ok":true}'])
+        self.assertEqual(content.upload(session, 4, "a.odrg", b"abc"), b'{"ok":true}')
+        self.assertEqual(session.sent[:2], [b"upload begin 4 a.odrg 3 %08x\n" % zlib.crc32(b"abc"), b"upload begin 4 a.odrg 3\n"])
+        twice = Told([refused("bad-argument"), refused("bad-argument")])
+        self.assertEqual(content.upload(twice, "x", "a.odrg", b"abc"), refused("bad-argument"))
+        self.assertEqual(len(twice.sent), 2)
+
+    def test_the_tool_says_what_the_upload_came_to(self):
+        cases = (
+            ([b'{"ok":true,"unchanged":true}'], 0, f"{cli.UPLOAD_UNCHANGED}\n"),
+            ([b'{"ok":true,"chunk":1500}', received(3), b'{"ok":true}'], 0, "upload: committed: 3 bytes sent and checked by the target\n"),
+            ([b'{"ok":true,"chunk":1500}', received(3), None], 3, f"{cli.UPLOAD_UNKNOWN}\nerror: unreachable: no reply\n"),
+            ([b'{"ok":true,"chunk":1500}', None, None], 3, "error: unreachable: no reply\n"),
+            ([refused("no-space")], 1, ""),
+        )
+        for replies, status, said in cases:
+            with self.subTest(replies=replies):
+                session = Told(replies)
+                session.close = lambda: None
+                screen, out = io.StringIO(), io.StringIO()
+                with tempfile.TemporaryDirectory() as folder, mock.patch.object(cli.client, "Session", lambda **_: contextlib.nullcontext(session)), \
+                        mock.patch.object(cli.sys, "stderr", screen), contextlib.redirect_stdout(out):
+                    pathlib.Path(folder, "a.odrg").write_bytes(b"abc")
+                    self.assertEqual(cli.main(["--port", "x", "upload", "5", str(pathlib.Path(folder, "a.odrg"))]), status)
+                self.assertTrue(screen.getvalue().endswith(said), screen.getvalue())
+                self.assertEqual(cli.UPLOAD_UNKNOWN in screen.getvalue(), cli.UPLOAD_UNKNOWN in said)
+                if not said:
+                    self.assertNotIn("upload: committed", screen.getvalue())
 
     def test_upload_end_is_sent_again_every_fifth_of_a_second_while_the_reply_is_busy(self):
         session = Told([BEGUN, received(3)] + [refused("busy")] * 7 + [b'{"ok":true}'])
@@ -1034,7 +1112,7 @@ class ProgressLines(unittest.TestCase):
         parts = [part.rstrip() for part in written.split("\r")]
         self.assertEqual((parts[0], parts[2], len(parts)), ("", "upload: checking", 3))
         self.assertRegex(parts[1], r"\Aupload: 100% 3/3 bytes \d+ B/s\Z")
-        self.assertEqual(session.sent[0], b"upload begin 5 a.odrg 3\n")
+        self.assertEqual(session.sent[0], b"upload begin 5 a.odrg 3 %08x\n" % zlib.crc32(b"abc"))
 
 
 class SessionOfExchanges(unittest.TestCase):

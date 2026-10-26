@@ -1,7 +1,10 @@
 #include "content.h"
 
+#include "catalog.h"
+
 #include <string.h>
 
+#include "order.h"
 #include "player.h"
 #include "storage.h"
 
@@ -34,15 +37,27 @@ const char kListBytes[] = "\",\"bytes\":";
 const char kListCycle[] = ",\"cycle\":[";
 const char kListSeconds[] = "],\"seconds\":";
 const char kListNext[] = "],\"next\":";
+const char kListType[] = ",\"type\":\"";
 const char kListHead[] = "{\"ok\":true,\"items\":[";
+const char kListInternal[] = ",\"external\":false";
+const char kListExternal[] = ",\"external\":true";
+
+// The member that ends an animation of `list` whose file is quarantined, before its reason
+// and the closing quotation mark.
+const char kListFault[] = ",\"fault\":\"";
 
 // The bytes an item takes in a reply of `list`. A cycle is counted with its entries, or
-// with none.
+// with none. An animation whose file is quarantined has `null` for its bytes, which are not
+// known, and its fault.
 uint32_t listed_size(const Core &core, const ItemInfo &item, bool with_entries) {
     uint32_t size = text_length(kListId) + digits(item.id);
     if (!item.is_cycle) {
         const FileInfo &file = core.files[item.first];
-        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + digits(file.bytes) + (item.ignored ? 15 : 16) + 1;
+        const Reason fault = static_cast<Reason>(file.fault);
+        const uint32_t bytes = fault != kNone || !file.checked ? 4 : digits(file.bytes);
+        const uint32_t fault_size = fault != kNone ? text_length(kListFault) + text_length(reason_name(fault)) + 1 : 0;
+        return size + text_length(kListFile) + text_length(file.name) + text_length(kListBytes) + bytes + (item.ignored ? 15 : 16) +
+               text_length(kListInternal) + text_length(kListType) + text_length(type_name(file.type)) + 1 + fault_size + 1;
     }
     size += text_length(kListCycle) + text_length(kListSeconds) + digits(item.seconds) + 1;
     for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -57,19 +72,25 @@ uint32_t list_tail_size(uint32_t next, uint32_t total) {
     return text_length(kListNext) + (next < total ? digits(next) : 4) + 2;
 }
 
-// The number of the drive's animations in the playlist: they are listed after the items.
+// Whether a file of the drive is listed: an animation of the playlist, or a file left out
+// for a fault, which has an id.
+bool drive_is_listed(const DriveEntry &entry) {
+    return entry.state == kDriveInPlaylist || (entry.state == kDriveLeftOut && entry.id != 0);
+}
+
+// The number of the drive's listed files: they are listed after the items.
 uint32_t drive_listed(const Core &core) {
     uint32_t count = 0;
     for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
-        count += core.drive[place].state == kDriveInPlaylist ? 1 : 0;
+        count += drive_is_listed(core.drive[place]) ? 1 : 0;
     }
     return count;
 }
 
-// The place of the drive's animation that is listed at this place among them.
+// The place of the drive's file that is listed at this place among them.
 uint32_t drive_listed_place(const Core &core, uint32_t listed) {
     for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (core.drive[place].state == kDriveInPlaylist) {
+        if (drive_is_listed(core.drive[place])) {
             if (listed == 0) {
                 return place;
             }
@@ -153,7 +174,68 @@ uint32_t content_space(const Core &core, Reply &reply) {
     if (known) reply.number(external_free); else reply.text("null");
     reply.text(",\"total\":");
     if (known) reply.number(external_total); else reply.text("null");
-    reply.text(",\"read_only\":true}}\n");
+    reply.text(catalog_drive_writable(core) ? ",\"read_only\":false}}\n" : ",\"read_only\":true}}\n");
+    return reply.length;
+}
+
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
+    char drive_name[kDriveNameSize];
+    const char *name = nullptr;
+    uint32_t size = 0;
+    for (uint32_t position = 0; name == nullptr && position < core.item_count; ++position) {
+        const ItemInfo &item = core.items[position];
+        if (item.id == id && !item.is_cycle) {
+            const FileInfo &file = core.files[item.first];
+            if (file.fault != kNone) {
+                return refuse(reply, "unavailable");
+            }
+            if (!file.checked) {
+                // The size of a file is known once a check has read it whole.
+                return refuse(reply, "busy");
+            }
+            name = file.name;
+            size = file.bytes;
+        }
+    }
+    if (name == nullptr && core.drive != nullptr && drive_has_id(core, id)) {
+        const uint32_t place = drive_place_of(core, id);
+        drive_file_name(place, drive_name);
+        name = drive_name;
+        size = core.drive[place].bytes;
+    } else if (name == nullptr && core.drive != nullptr && drive_place_holding(core, id) != kDriveMost) {
+        // A file of the drive that was left out for a fault, or one still to be read.
+        return refuse(reply, core.drive[drive_place_holding(core, id)].state == kDriveLeftOut ? "unavailable" : "busy");
+    }
+    if (name == nullptr) {
+        return refuse(reply, "unknown-id");
+    }
+    if (offset > size) {
+        return refuse(reply, "bad-argument");
+    }
+    if (!storage_changes(core)) {
+        // Only the second source reads a file beside the one that plays.
+        return refuse(reply, "storage-error");
+    }
+    // The bytes are read into the chunk buffer, which holds nothing between commands.
+    const odrig_host &host = core.host;
+    const uint32_t wanted = size - offset < kReadMost ? size - offset : kReadMost;
+    uint32_t got = 0;
+    while (got < wanted) {
+        const uint32_t piece = wanted - got < kFileBufferSize ? wanted - got : kFileBufferSize;
+        const int32_t count = host.read_at(host.ctx, name, offset + got, core.chunk + got, piece);
+        if (count < 0) {
+            return refuse(reply, "storage-error");
+        }
+        if (count == 0) {
+            break;
+        }
+        got += static_cast<uint32_t>(count);
+    }
+    reply.text("{\"ok\":true,\"bytes\":");
+    reply.number(size);
+    reply.text(",\"data\":\"");
+    reply.base64(core.chunk, got);
+    reply.text("\"}\n");
     return reply.length;
 }
 
@@ -173,8 +255,11 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
                 // The drive went while the list was written: it is no more.
                 continue;
             }
+            const bool left_out = entry.state == kDriveLeftOut;
+            const char *fault = reason_name(static_cast<Reason>(entry.fault));
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
-                                  text_length(kListBytes) + digits(entry.bytes) + 1;
+                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) +
+                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(entry.type)) + 1 + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -187,7 +272,20 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListFile);
             reply.escaped(name);
             reply.text(kListBytes);
-            reply.number(entry.bytes);
+            if (left_out) {
+                reply.text("null");
+            } else {
+                reply.number(entry.bytes);
+            }
+            reply.text(kListExternal);
+            reply.text(kListType);
+            reply.text(type_name(entry.type));
+            reply.text("\"");
+            if (left_out) {
+                reply.text(kListFault);
+                reply.text(fault);
+                reply.text("\"");
+            }
             reply.text("}");
             continue;
         }
@@ -214,8 +312,21 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.text(kListFile);
             reply.text(file.name);
             reply.text(kListBytes);
-            reply.number(file.bytes);
+            if (file.fault != kNone || !file.checked) {
+                reply.text("null");
+            } else {
+                reply.number(file.bytes);
+            }
             reply.text(item.ignored ? ",\"ignored\":true" : ",\"ignored\":false");
+            reply.text(kListInternal);
+            reply.text(kListType);
+            reply.text(type_name(file.type));
+            reply.text("\"");
+            if (file.fault != kNone) {
+                reply.text(kListFault);
+                reply.text(reason_name(static_cast<Reason>(file.fault)));
+                reply.text("\"");
+            }
         } else {
             reply.text(kListCycle);
             for (uint32_t entry = 0; with_entries && entry < item.count; ++entry) {
@@ -248,8 +359,13 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
         ++position;
     }
     if (position == core.item_count) {
-        // An animation of the drive is the drive's: no command removes it.
-        return refuse(reply, core.drive != nullptr && drive_has_id(core, id) ? "in-use" : "unknown-id");
+        // An animation of a drive the core may change is removed with its entry; another
+        // drive's is the drive's.
+        const uint32_t place = drive_place_holding(core, id);
+        if (place != kDriveMost && catalog_drive_writable(core)) {
+            return catalog_remove_external(core, place) ? succeed(reply) : refuse(reply, "storage-error");
+        }
+        return refuse(reply, place != kDriveMost ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
@@ -275,11 +391,11 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     if (core.upload.state != kUploadNone) return refuse(reply, "busy");
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
-    if (position == core.item_count) return refuse(reply, drive_has_id(core, id) ? "in-use" : "unknown-id");
+    if (position == core.item_count) return refuse(reply, drive_place_holding(core, id) != kDriveMost ? "in-use" : "unknown-id");
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");
     if ((item.ignored != 0) == ignored) return succeed(reply);
-    if (!storage_changes(core) || core.pending_cleanup) return refuse(reply, "storage-error");
+    if (!storage_changes(core) || !storage_cleanup(core)) return refuse(reply, "storage-error");
     ShowChange change;
     change.inclusion = position;
     change.ignored = ignored;
@@ -298,7 +414,7 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;
         while (position < core.item_count && core.items[position].id != ids[at]) ++position;
-        if (position == core.item_count) return refuse(reply, drive_has_id(core, ids[at]) ? "in-use" : "unknown-id");
+        if (position == core.item_count) return refuse(reply, drive_place_holding(core, ids[at]) != kDriveMost ? "in-use" : "unknown-id");
     }
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;
@@ -393,19 +509,24 @@ bool content_write_show(Core &core, const ShowChange &change) {
 
 namespace {
 
-void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms) {
+// The file of an upload whose check has passed: a new content, which is usable and was
+// read whole.
+void set_file(FileInfo &file, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     uint32_t length = 0;
     for (; name[length] != '\0'; ++length) {
         file.name[length] = name[length];
     }
     file.name[length] = '\0';
+    file.fault = kNone;
+    file.checked = 1;
     file.bytes = bytes;
     file.total_ms = total_ms;
+    file.type = type;
 }
 
 }  // namespace
 
-void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms) {
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     ItemInfo &item = core.items[core.item_count++];
     item.id = static_cast<uint16_t>(id);
     item.seconds = 0;
@@ -414,10 +535,11 @@ void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes,
     item.has_ignored = 0;
     item.first = core.file_count++;
     item.count = 0;
-    set_file(core.files[item.first], name, bytes, total_ms);
+    set_file(core.files[item.first], name, bytes, total_ms, type);
+    order_item_added(core, core.item_count - 1);
 }
 
-void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms) {
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type) {
     ItemInfo &item = core.items[position];
     for (uint32_t other = 0; other < core.item_count; ++other) {
         if (other != position && !core.items[other].is_cycle && core.items[other].first == item.first) {
@@ -427,7 +549,7 @@ void content_change_file(Core &core, uint32_t position, const char *name, uint32
             break;
         }
     }
-    set_file(core.files[item.first], name, bytes, total_ms);
+    set_file(core.files[item.first], name, bytes, total_ms, type);
 }
 
 void content_take_out(Core &core, uint32_t position) {
@@ -452,6 +574,7 @@ void content_take_out(Core &core, uint32_t position) {
             const uint32_t after = removed.first + 1;
             memmove(core.files + removed.first, core.files + after, (core.file_count - after) * sizeof(FileInfo));
             --core.file_count;
+            check_file_left(core, removed.first);
             for (uint32_t item = 0; item < core.item_count; ++item) {
                 if (!core.items[item].is_cycle && core.items[item].first > removed.first) {
                     --core.items[item].first;
@@ -460,6 +583,7 @@ void content_take_out(Core &core, uint32_t position) {
         }
     }
 
+    order_item_leaves(core, position);
     memmove(core.items + position, core.items + position + 1, (core.item_count - position - 1) * sizeof(ItemInfo));
     --core.item_count;
 

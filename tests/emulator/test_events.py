@@ -96,8 +96,7 @@ class Stream(unittest.TestCase):
                 kinds = [event.kind for event in events if event.kind != "frame"]
                 self.assertEqual(kinds.count("log"), 1, line)
                 after_the_log = events[[event.kind for event in events].index("log"):]
-                status = support.of_kind(after_the_log, "status")[-1]
-                status.pop("fps")
+                status = support.without_fps(json.dumps(support.of_kind(after_the_log, "status")[-1]))
                 self.assertEqual(status, support.without_fps(port.ask("status")), line)
                 stream.read_until(has("log"), 5)
         logged = support.of_kind(self.stream().read_until(has("status"), 5), "log")
@@ -128,7 +127,7 @@ class Stream(unittest.TestCase):
             for event in stream.read_until(has("status"), 2):
                 if event.kind == "status":
                     arrivals.append(time.monotonic())
-                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6\}\Z')
+                    self.assertRegex(event.data, r'\A\{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":[0-9]+,"error":null,"width":60,"height":6,"readiness":"[a-z]+",[^{}]*\}\Z')
         self.assertGreaterEqual(len(arrivals), 3)
         self.assertLess(max(later - earlier for earlier, later in zip(arrivals, arrivals[1:])), 1.2)
 
@@ -229,14 +228,14 @@ class OtherShows(unittest.TestCase):
             self.assertEqual((hello["legs"], hello["error"]), ([], "mapping-malformed"))
             self.assertEqual(emulator.request("GET", "/show/mapping.json").body, b'{"version": 1, "width": 60, "legs": []}\n')
 
-    def test_a_show_with_a_missing_animation_gives_its_legs_its_reason_and_dark_refreshes(self):
+    def test_an_invalid_show_gives_its_legs_its_reason_and_dark_refreshes(self):
         files = core_support.example_show()
         del files["dvd.odrg"]
-        folder = support.installed(self.work, files)
+        folder = support.installed(self.work, core_support.with_show_fault(files))
         with support.Emulator(folder) as emulator, support.EventStream(emulator.port) as stream:
             events = stream.read_until(has("frame", 10), 5)
             hello = json.loads(events[0].data)
-            self.assertEqual((hello["legs"], hello["error"]), ([[1, 1, 180], [2, 2, 180]], "file-missing dvd.odrg"))
+            self.assertEqual((hello["legs"], hello["error"]), ([[1, 1, 180], [2, 2, 180]], "undefined-id 99"))
             self.assertEqual({data for _, data in support.frames(events)}, {bytes(1080)})
 
 

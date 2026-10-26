@@ -11,12 +11,14 @@ A show is installed as one flat folder of files:
 |---|---|
 | `mapping.json` | The layout of the physical LEDs. See [mapping.md](mapping.md). |
 | `show.json` | The list of things that can be played. See below. |
-| `*.odrg` | The animations named by `show.json`. See [format.md](format.md). |
+| `*.odrg`, `*.odrgx` | The animations named by `show.json`: ODRG files, and ODRGX containers. See [format.md](format.md). |
 
 The player also keeps three files of its own in the folder while it changes the show:
 `upload.part`, `show.part` and `pending.txt`. They are gone when a change is complete, and
-the player removes what is left of them when it starts. No show names them: a name in
-`show.json` ends in `.odrg`.
+the player removes what is left of them when it starts. It keeps the saved playlist order
+in `order.txt`, see [the saved playlist order](#the-saved-playlist-order), and writes its
+next version into `order.part`. No show names them: a name in `show.json` ends in
+`.odrg` or `.odrgx`.
 
 The same folder is what the emulator runs and what is uploaded to the board. The player reads
 these files when it starts. Nothing else defines the layout or the show.
@@ -44,7 +46,7 @@ two kinds, with the members of its kind and no other:
 
 | Kind | Members | Meaning |
 |---|---|---|
-| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg`. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
+| Animation | `id`, `file`, and optionally `repeat`, `max_seconds` and `ignored` | `file` is the name of an `.odrg` or `.odrgx` file in the folder: 1 to 32 characters from `a`-`z`, `0`-`9`, `-`, `_` and `.`, ending in `.odrg` or `.odrgx`. The file's first bytes, not its name, say whether it is an ODRG file or an ODRGX container. `repeat` is how many times the animation is played through when its turn comes, and `max_seconds` the longest that turn lasts, each a whole number from 1 to 65,535. |
 | Cycle | `id`, `cycle`, `seconds` | `cycle` is a list of one or more ids of animation items. `seconds` is how long each one is shown, 1 to 65,535. |
 
 Example: two animations, and a cycle that alternates them every 15 seconds and starts at
@@ -65,9 +67,11 @@ power-on.
 
 ## The playlist
 
-The playlist is every included animation item of the show, in the order of `show.json`, and after
-them the animations of a USB drive when one is plugged in, see [animations from a USB
-drive](#animations-from-a-usb-drive). It is what a show plays by itself: each animation has its turn, then the next one, and after the
+The playlist is every included animation item of the show and the animations of a USB
+drive or a microSD card when one is there, see [animations from a USB
+drive](#animations-from-a-usb-drive), in the saved order, see [the saved playlist
+order](#the-saved-playlist-order). Without a saved order it is the show's animations in the
+order of `show.json` and after them the drive's. It is what a show plays by itself: each animation has its turn, then the next one, and after the
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
@@ -89,6 +93,17 @@ which is the sum of the durations of its frames, and from three numbers:
 - With `max_seconds`, the turn ends when that time is reached, in the middle of a loop if
   need be.
 
+The loop of a text is its pass, and a text is never cut in the middle of one: its turn
+ends at the end of the pass in which `max_seconds` falls, and in a cycle its turn is
+`seconds` rounded up in the same way. A pass of 3 seconds with a `max_seconds` of 10 has a
+turn of 12 seconds. The turns of an animation of frames are as above. `play`, `off` and
+`on` act at once, in the middle of a pass too.
+
+The loop of a clock is its `seconds`, and its turn is its loops as an animation's of
+frames, cut by `max_seconds` in the middle of a loop if need be. Each turn of a clock gets
+a seed when it begins, a `play` too, and keeps it to its end through all its loops; the
+clock's time runs on from the turn's start, not from the start of a loop.
+
 A turn begins with the first frame of its animation, and at the moment the turn before
 it ended. The time of the playlist goes on while the LEDs are switched off.
 
@@ -106,20 +121,30 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 
 The player can take animations from a USB flash drive, when the program it runs in gives
 it one; [core.md](core.md#a-drive) says how. The drive's animations are added to the
-show's; they do not take the place of any. Nothing is written to the drive, and no command changes it.
+show's; they do not take the place of any. Nothing is written to a drive without a catalog,
+and no command changes it; a drive with a catalog that its host can write takes uploads and
+removals, see [commands.md](commands.md#catalogs).
+On the board the drive is a USB stick or a microSD card, as
+[firmware.md](firmware.md#the-external-storage) says.
 
-- The drive's animations are the files of its folder `odrig` whose names end in `.odrg`,
+- The drive's animations are the files of its folder `odrig` whose names end in `.odrg` or `.odrgx`,
   in any case, and do not begin with a dot, in the order of their names, at most 256.
   Folders inside `odrig` and other files are passed over.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
-  has been read, after the show's animations and the drive's before it. One that is not
-  is left out and named in the log with its reason; it does not make the show invalid.
-- Each has an id: the lowest from 60001 up that the show does not use and no animation of
-  the drive before it has. The same files with the same show get the same ids every time.
+  has been read, at its place in the saved order: without one, after the show's
+  animations and the drive's before it. One that is not is left out, named in the log
+  with its reason, and listed with it; it does not make the show invalid, and the drive's
+  other files play.
+- Each has an id from the moment the drive is taken up: the lowest from 60001 up that the
+  show does not use and no file of the drive before it has. The same files with the same
+  show get the same ids every time.
+- A file left out is remembered until the next start by its name and its first 512
+  bytes: taken up again, it is left out again without being read further.
 - Its turn is that of an animation without `repeat` and `max_seconds`. `play <id>` plays
-  it, `status` names it, and `list` lists it after the show's items. `remove` and
-  `upload begin` of its id are refused with `in-use`.
+  it, `status` names it, and `list` lists it after the show's items. `upload begin` of its
+  id is refused with `in-use`, and so is `remove` of it, except on a drive with a catalog
+  that the core may write.
 - A show without an animation of its own plays the drive's animations.
 - A drive plugged in while the show plays is taken up without a restart. A drive pulled
   out is dropped: its animations leave the playlist and `list`. When one of them was
@@ -127,6 +152,29 @@ show's; they do not take the place of any. Nothing is written to the drive, and 
   frame, or nothing plays. A file that cannot be read while it plays is dropped in the
   same way, and the show stays valid.
 - The drive's animations are not part of `show.json`, and `space` does not count them.
+
+A drive with a catalog, the files `catalog.txt` and `catalog-NN.txt` of its folder `odrig`
+as [catalog.md](catalog.md) states them, is read otherwise: its folder is not listed, and
+its animations are the files its catalog names, in the order of its pages, with the sizes,
+lengths and types the catalog gives. The player reads the catalog in steps after the installed
+animations, while the show plays, and every animation of it joins the playlist at the same
+refresh, once every page agrees with the marker; none of the drive's files is read before
+it plays. An entry made for another canvas is left out with `size-mismatch`. A file copied
+onto such a drive without its entry is not an animation until `catalog rebuild external`
+has read it. While the drive stays plugged in,
+the marker is read again once in 10 seconds; another marker drops the drive's animations
+and reads the catalog again. A damaged or incompatible catalog leaves the drive without
+animations, named in the log as `catalog external damaged` or `catalog external
+incompatible`, and the show plays on. A file the player left out is left out again when the
+catalog is read again with the same entry, by its name and CRC-32; an entry with another
+CRC-32 is a new file.
+
+A drive with a catalog that its host can write, the card on the board, is changed by the
+board's commands: `upload begin external` puts a file on it with its entry, `remove` of one
+of its animations takes the file and its entry out, and `catalog rebuild external` reads
+every file of it and writes its catalog anew, as `python3 -m odrig.catalog MOUNT import`
+does on a computer, [microsd.md](microsd.md#the-catalog-made-on-a-computer).
+[commands.md](commands.md#catalogs) has the commands.
 
 ## Changing a show while it runs
 
@@ -183,23 +231,33 @@ layout the first time the show is changed.
 ## When a show is invalid
 
 A show is invalid when `mapping.json` or `show.json` is missing or breaks its format, when an
-id is used twice, when a cycle or `start` names an id that does not exist, when a cycle names
-a cycle, or when a listed `.odrg` file is missing, breaks its format, or has a canvas size
-different from the mapping's.
+id is used twice, when a cycle or `start` names an id that does not exist, or when a cycle
+names a cycle.
 
 With an invalid show the LEDs stay dark, and the status command reports what is wrong.
 
-When it starts, the player reads the mapping, `show.json` and the header of every listed
-file, and then plays at once. What a file holds after its header it reads while the show
-plays. A fault it finds there makes the show invalid at that moment: the LEDs go dark,
-and the status command reports it from then on. A player whose storage cannot be changed
-reads every file to its end when it starts.
-
 Each of these has a fixed name, listed under "Shows" in [reasons.md](reasons.md). When a show
 is invalid in more than one way, the first in this order is reported: the mapping file, the
-format of `show.json`, an id used twice, an id that does not exist, a cycle that names a
-cycle, and then the listed files in the order `show.json` names them. The ids are checked
-over the items in file order.
+format of `show.json`, an id used twice, an id that does not exist, and a cycle that names a
+cycle. The ids are checked over the items in file order.
+
+## An animation that cannot be played
+
+When it starts, the player reads the mapping, `show.json` and the header of every listed
+file, and then plays at once. What a file holds after its header it reads while the show
+plays. A listed `.odrg` file that is missing, cannot be read, breaks its format or has a
+canvas size different from the mapping's is unavailable from the moment the player finds
+it until the next start: the show stays valid and plays its other animations.
+
+- The playlist, `start` and every cycle pass over it; a cycle that lists only
+  unavailable animations gives way to the playlist. When every animation is unavailable,
+  nothing plays and the LEDs are dark, and every command is answered.
+- `play` of it is refused with `unavailable`, and `list` shows it with the reason.
+- The file is not read again until the next start, and it is not changed or removed. An
+  upload to its id that passes its check makes it available at once; `remove` takes it
+  out of the show as any animation.
+- A player whose storage cannot be changed reads every file to its end when it starts,
+  and the same holds for what it finds there.
 
 ## Playlist inclusion
 
@@ -210,3 +268,34 @@ using this member require the updated player and converter; older readers may re
 Manual play still plays one normal turn and cycles retain every explicitly named member.
 All ignored with no external animations leaves a valid, idle black show. An ignored
 startup item is skipped forward to the next included animation, wrapping if necessary.
+
+## The saved playlist order
+
+The order of the playlist is kept in `order.txt` beside `show.json`. The player writes it
+when a command moves an animation, see [commands.md](commands.md#the-saved-playlist-order),
+and nothing else changes it; it may be missing.
+
+```
+odrig-order 1
+i 12
+x sunrise.odrg
+i 3
+```
+
+The first line is `odrig-order 1`; a file with another first line names nothing. Every
+further line ends in a line feed and is an entry: `i` and the id of an animation item of
+the show, in decimal from 1 to 65,535 without a leading zero, or `x` and the file name of an
+animation of the external storage as the drive gives it, 1 to 127 bytes. A line in another
+form is no entry and takes no place. The player takes the first 512 entries, and of two
+entries for one animation the first.
+
+- The playlist plays the animations the file names in the order of their entries, and
+  after them the ones it does not name: the show's in the order of `show.json`, then the
+  drive's in the order of their names. A new item is therefore last until it is moved.
+- An entry whose external file is not there keeps its place and is passed over; a medium
+  with that file name gives the file that place again. An entry of an id that no item has
+  is passed over too, and an upload that gives an item that id gives it that place.
+- `start` still names where the playlist begins at power-on, and `play all` begins it with
+  the first animation of the order. Cycles do not follow the order.
+- A turn in progress, the brightness and whether the LEDs are on do not change when the
+  order does; the next turn follows the new order.

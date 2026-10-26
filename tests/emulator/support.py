@@ -157,9 +157,43 @@ def installed(folder, files):
     return folder
 
 
+def with_show_fault(folder):
+    """Adds to the show file of a folder a cycle that names an id no item has: a fault of the
+    show, which makes it invalid with `undefined-id 99`. A fault of one animation file does
+    not: the file is quarantined."""
+    path = pathlib.Path(folder) / "show.json"
+    path.write_text(core_support.with_show_fault({"show.json": path.read_text(encoding="utf-8")})["show.json"], encoding="utf-8")
+    return folder
+
+
+def checked(listed):
+    """Whether a reply of `list` comes after the check of every file it lists: refused
+    with `busy` it does not, and an animation not read whole yet has `"bytes":null` and no
+    `fault`. A reply that is no list, such as one refused for an invalid show, does."""
+    if listed.get("error") == "busy":
+        return False
+    return all(item.get("bytes", 0) is not None or "fault" in item for item in listed.get("items", []))
+
+
+def without_host(printed):
+    """Lines `reply <time> <json>` of the record mode with the host's name left out of each
+    reply of `status`: the emulator names itself, the reference player names no host."""
+    kept = []
+    for line in printed:
+        word, time, reply = (line.split(" ", 2) + ["", ""])[:3]
+        if word == "reply" and reply.startswith('{"ok":true,"on"'):
+            value = json.loads(reply)
+            value.pop("host", None)
+            line = f"reply {time} {json.dumps(value, separators=(',', ':'))}"
+        kept.append(line)
+    return kept
+
+
 def without_fps(reply):
-    """A reply as a value, without the one member that depends on the speed of this Mac."""
-    value = json.loads(reply)
+    """A reply as a value, without the members that depend on the speed of this Mac: the
+    refreshes of the last second, and what the status says of the check, which reads the
+    files while the emulator runs in real time."""
+    value = core_support.without_readiness(json.loads(reply))
     value.pop("fps", None)
     return value
 
@@ -268,11 +302,12 @@ class Emulator:
         return answer.body
 
     def wait_for_the_check(self):
-        """Asks for the list until it is no longer refused with `busy`. Returns how many
-        times it asked."""
+        """Asks for the list until it gives the size of every animation file the core can
+        read, which it knows once it has read the file whole: a file not read yet has
+        `"bytes":null` and no `fault`. Returns how many times it asked."""
         deadline = time.monotonic() + self.START_SECONDS
         asked = 1
-        while json.loads(self.command("list")).get("error") == "busy":
+        while not checked(json.loads(self.command("list"))):
             if time.monotonic() > deadline:
                 raise AssertionError("the core did not come to the end of its files")
             time.sleep(0.02)

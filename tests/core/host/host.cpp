@@ -30,6 +30,9 @@
 #include "file_source.h"
 #include "guard.h"
 #include "inflate.h"
+#include "container.h"
+#include "clock.h"
+#include "text.h"
 #include "odrg_decoder.h"
 #include "odrig_core.h"
 #include "reasons.h"
@@ -59,18 +62,20 @@ int usage() {
     std::fputs(
         "usage: odrig_host reasons\n"
         "       odrig_host inflate [--batch]\n"
-        "       odrig_host decode FILE | --batch\n"
+        "       odrig_host decode [--slice BYTES] FILE | --batch\n"
+        "       odrig_host render [--seed N] FILE MS...\n"
         "       odrig_host session DIR | --batch [options]\n"
         "       odrig_host guard alloc | new | read | write | write-none | close-none | two-files\n"
         "                        | name | rename-open | remove-open | read-at | read-at-offset\n"
         "options of a session:\n"
-        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --check-first\n"
+        "       --alloc-fails-at N  --dirty-memory  --trace-files  --trace-reads  --trace-calls  --check-first\n"
         "       --read-fails FILE OFFSET  --read-fails-after FILE OFFSET N\n"
         "       --remove-after FILE N  --swap-after FILE N OTHER\n"
         "       --storage BYTES  --no-storage  --only-space  --space-unknown\n"
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
-        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET\n",
+        "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
+        "       --command-read-fails FILE OFFSET\n",
         stderr);
     return kUsage;
 }
@@ -156,6 +161,13 @@ struct Options {
     bool drive_pulled = false;      // the drive is not plugged in at the start
     std::string drive_read_fails_file;  // the file of the drive whose reading with `read`
     long drive_read_fails_offset = 0;   // fails at this offset; `read_at` reads it whole
+    std::string command_read_fails_file;    // the file whose reading with `read_at` inside a
+    long command_read_fails_offset = 0;     // command fails at this offset
+    bool drive_read_only = false;   // the drive cannot be written
+    bool trace_drive = false;       // print `drive list <count>` and `drive bind <place> <name>`
+    bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
+    bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
+    std::string about;              // the text `about` gives; without one the host has no `about`
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -214,15 +226,29 @@ public:
         functions.drive = drive ? drive_number : nullptr;
         functions.drive_name = drive ? drive_name : nullptr;
         functions.drive_space = nullptr;
+        functions.about = options_.about.empty() ? nullptr : about;
+        functions.drive_list = drive ? drive_list : nullptr;
+        functions.drive_bind = drive ? drive_bind : nullptr;
+        functions.drive_writable = drive ? drive_writable : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
         return functions;
     }
 
-    // The drive: plugged in, with a new number and the list of its folder `odrig` as it is
-    // now, or pulled out.
-    void plug() {
+    // The drive: plugged in, with a new number and no list until the core asks for one or
+    // gives the names, or pulled out. A drive plugged in with a folder stands for that
+    // folder from then on.
+    void plug(const std::string &top = std::string()) {
+        if (!top.empty()) {
+            options_.drive = top;
+        }
+        drive_names_.clear();
+        drive_number_ = ++drives_plugged_;
+    }
+
+    // Lists the folder `odrig` of the drive as it is now.
+    void list_drive() {
         drive_names_.clear();
         const std::string folder = options_.drive + "/odrig";
 #ifdef _WIN32
@@ -243,15 +269,17 @@ public:
             closedir(opened);
         }
 #endif
-        // Files whose names end in `.odrg`, in any case, and do not begin with a dot, in the
-        // order of their names, the first 256.
+        // Files whose names end in `.odrg` or `.odrgx`, in any case, and do not begin with a
+        // dot, in the order of their names, the first 256.
         std::vector<std::string> kept;
         for (const std::string &name : drive_names_) {
-            std::string ending = name.size() >= 5 ? name.substr(name.size() - 5) : "";
-            for (char &letter : ending) {
+            std::string lower = name;
+            for (char &letter : lower) {
                 letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
             }
-            if (name[0] != '.' && ending == ".odrg") {
+            const bool odrg = lower.size() >= 5 && lower.compare(lower.size() - 5, 5, ".odrg") == 0;
+            const bool odrgx = lower.size() >= 6 && lower.compare(lower.size() - 6, 6, ".odrgx") == 0;
+            if (name[0] != '.' && (odrg || odrgx)) {
                 kept.push_back(name);
             }
         }
@@ -260,12 +288,27 @@ public:
             kept.resize(256);
         }
         drive_names_ = kept;
-        drive_number_ = ++drives_plugged_;
     }
 
     void pull() {
         drive_number_ = 0;
         drive_names_.clear();
+    }
+
+    // The files of the drive's folder `odrig` become those of `<top>/odrig`, while the drive
+    // stays plugged in with its number: a writer that changed the drive.
+    bool replace_drive(const std::string &top) {
+        const std::string folder = options_.drive + "/odrig";
+        const std::string source = top + "/odrig";
+#ifdef _WIN32
+        std::error_code failed;
+        std::filesystem::remove_all(folder, failed);
+        std::filesystem::copy(source, folder, failed);
+        return !failed;
+#else
+        const std::string command = "rm -rf '" + folder + "' && cp -R '" + source + "' '" + folder + "'";
+        return std::system(command.c_str()) == 0;
+#endif
     }
 
     size_t bytes_given() const { return bytes_given_; }
@@ -302,13 +345,80 @@ private:
         return static_cast<Host *>(ctx)->drive_number_;
     }
 
+    static int32_t drive_list(void *ctx, uint32_t drive) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (drive == 0 || drive != host.drive_number_) {
+            return -1;
+        }
+        host.list_drive();
+        if (host.options_.trace_drive) {
+            std::printf("drive list %zu\n", host.drive_names_.size());
+        }
+        return static_cast<int32_t>(host.drive_names_.size());
+    }
+
+    static int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name) {
+        guard::InHost lowered;
+        Host &host = *static_cast<Host *>(ctx);
+        if (name == nullptr || place >= 256) {
+            stop("file misuse", kFileMisuse);
+        }
+        if (drive == 0 || drive != host.drive_number_ || !drive_name_sound(name)) {
+            return 0;
+        }
+        if (host.drive_names_.size() <= place) {
+            host.drive_names_.resize(place + 1);
+        }
+        host.drive_names_[place] = name;
+        if (host.options_.trace_drive) {
+            std::printf("drive bind %u %s\n", place, name);
+        }
+        return 1;
+    }
+
+    static int drive_writable(void *ctx, uint32_t drive) {
+        guard::InHost lowered;
+        const Host &host = *static_cast<Host *>(ctx);
+        return drive != 0 && drive == host.drive_number_ && !host.options_.drive_read_only ? 1 : 0;
+    }
+
+    // Whether a name is one a file of the drive may have: 1 to 100 bytes of printable
+    // ASCII other than / \ : * ? " < > |, not beginning with a dot.
+    static bool drive_name_sound(const char *name) {
+        const size_t length = std::strlen(name);
+        if (length == 0 || length > 100 || name[0] == '.') {
+            return false;
+        }
+        for (const char *at = name; *at != '\0'; ++at) {
+            if (*at < 0x20 || *at > 0x7E || std::strchr("/\\:*?\"<>|", *at) != nullptr) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a name of the drive names a place, `drive/<digits>`, and not a file by its name.
+    static bool names_a_place(const char *name) {
+        const char *rest = name + 6;
+        if (*rest == '\0') {
+            return false;
+        }
+        for (; *rest != '\0'; ++rest) {
+            if (*rest < '0' || *rest > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
         if (buffer == nullptr || capacity == 0) {
             stop("file misuse", kFileMisuse);
         }
-        if (drive == 0 || drive != host.drive_number_ || place >= host.drive_names_.size()) {
+        if (drive == 0 || drive != host.drive_number_ || place >= host.drive_names_.size() || host.drive_names_[place].empty()) {
             return 0;
         }
         const std::string &name = host.drive_names_[place];
@@ -318,9 +428,12 @@ private:
         return 1;
     }
 
-    // The file of the drive a name `drive/<place>` stands for, or an empty text when the
-    // drive has no file at that place.
+    // The file of the drive a name `drive/<place>` or `drive/<name>` stands for, or an empty
+    // text when the drive has no file at that place or is not plugged in.
     std::string drive_file(const char *name) const {
+        if (!names_a_place(name)) {
+            return drive_number_ != 0 ? std::string(name + 6) : "";
+        }
         const char *place = name + 6;
         size_t at = 0;
         for (const char *digit = place; *digit != '\0'; ++digit) {
@@ -427,6 +540,7 @@ private:
         }
         std::memcpy(buffer, host.content_.data() + host.offset_, count);
         host.offset_ += count;
+        host.call_bytes_ += count;
         return static_cast<int32_t>(count);
     }
 
@@ -552,12 +666,24 @@ private:
         return 1;
     }
 
+    static int about(void *ctx, char *buffer, size_t capacity) {
+        guard::InHost lowered;
+        const std::string &text = static_cast<Host *>(ctx)->options_.about;
+        const size_t length = std::min(text.size(), capacity - 1);
+        std::memcpy(buffer, text.data(), length);
+        buffer[length] = '\0';
+        return 1;
+    }
+
     static int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
         host.check_name(name);
-        const bool goes_on = host.read_at_name_ == name && offset == host.read_at_end_;
-        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on)) {
+        // A file is read from its start, each call where the last for that file ended; only
+        // `read`, a command, begins where it is asked to.
+        const auto ended = host.read_at_ends_.find(name);
+        const bool goes_on = ended != host.read_at_ends_.end() && offset == ended->second;
+        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_)) {
             stop("file misuse", kFileMisuse);
         }
         std::string content;
@@ -577,6 +703,13 @@ private:
             }
             count = std::min(count, fails_at - offset);
         }
+        if (host.in_command_ && name == options.command_read_fails_file) {
+            const size_t fails_at = static_cast<size_t>(options.command_read_fails_offset);
+            if (offset >= fails_at) {
+                return -1;
+            }
+            count = std::min(count, fails_at - offset);
+        }
         const long fails = uploaded ? options.read_back_fails : -1;
         if (fails >= 0 && offset + count > static_cast<size_t>(fails)) {
             if (offset >= static_cast<size_t>(fails)) {
@@ -589,28 +722,37 @@ private:
             content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
         }
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
-        host.read_at_name_ = name;
-        host.read_at_end_ = offset + static_cast<uint32_t>(count);
+        host.read_at_ends_[name] = offset + static_cast<uint32_t>(count);
+        host.call_bytes_ += count;
+        if (options.trace_read_at) {
+            std::printf("read_at %s %u %zu\n", name, offset, count);
+        }
         return static_cast<int32_t>(count);
     }
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
-    // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` file or
-    // one of the five fixed names.
+    // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
+    // file or one of the fixed names: the files of the show, of changes and of the catalog.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
         }
         const std::string given = name;
         if (!options_.drive.empty() && of_the_drive(name) && given.size() > 6 &&
-            given.find_first_not_of("0123456789", 6) == std::string::npos) {
+            (given.find_first_not_of("0123456789", 6) == std::string::npos || drive_name_sound(name + 6))) {
             return;
         }
         bool sound = !given.empty() && given.size() <= 32 &&
                      given.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-_.") == std::string::npos;
-        const bool animation = given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0;
+        const bool animation = (given.size() >= 5 && given.compare(given.size() - 5, 5, ".odrg") == 0) ||
+                               (given.size() >= 6 && given.compare(given.size() - 6, 6, ".odrgx") == 0);
+        const bool page = given.size() == 14 && given.compare(0, 8, "catalog-") == 0 && given[8] >= '0' && given[8] <= '1' &&
+                          given[9] >= '0' && given[9] <= '9' && (given[8] == '0' || given[9] <= '5') &&
+                          (given.compare(10, 4, ".txt") == 0 || given.compare(10, 4, ".new") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
-                           given == "show.part" || given == "pending.txt" || given == "mapping.part";
+                           given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
+                           given == "order.txt" || given == "order.part" || given == "catalog.txt" ||
+                           given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
         }
@@ -637,12 +779,27 @@ private:
         return (is_open_ && open_name_ == name) || (writing_ && writing_name_ == name);
     }
 
-    std::string path_of(const std::string &name) const { return folder_ + "/" + name; }
+    std::string path_of(const std::string &name) const {
+        if (of_the_drive(name.c_str())) {
+            return options_.drive + "/odrig/" + name.substr(6);
+        }
+        return folder_ + "/" + name;
+    }
+
+    // Whether a storage call may change a file of this name: one of the drive only while
+    // the drive can be written.
+    bool may_change(const char *name) const {
+        return !of_the_drive(name) || (drive_number_ != 0 && !options_.drive_read_only && !names_a_place(name));
+    }
 
     // The files as they are stored: in the folder, or in the set held in memory.
 
     bool begin_file(const char *name) {
-        if (from_ == kFromFiles) {
+        writing_drive_ = of_the_drive(name);
+        if (!may_change(name)) {
+            return false;
+        }
+        if (from_ == kFromFiles && !writing_drive_) {
             files_[name].clear();
             return true;
         }
@@ -652,7 +809,7 @@ private:
 
     // Adds bytes to the file being written, so that they are there when the program ends.
     bool add_bytes(const uint8_t *bytes, size_t length) {
-        if (from_ == kFromFiles) {
+        if (from_ == kFromFiles && !writing_drive_) {
             files_[writing_name_].append(reinterpret_cast<const char *>(bytes), length);
             return true;
         }
@@ -660,7 +817,7 @@ private:
     }
 
     bool end_file() {
-        if (from_ == kFromFiles) {
+        if (from_ == kFromFiles && !writing_drive_) {
             return true;
         }
         std::FILE *file = written_;
@@ -669,7 +826,10 @@ private:
     }
 
     bool rename_file(const char *from, const char *to) {
-        if (from_ == kFromFiles) {
+        if (!may_change(from) || !may_change(to) || of_the_drive(from) != of_the_drive(to)) {
+            return false;
+        }
+        if (from_ == kFromFiles && !of_the_drive(from)) {
             auto file = files_.find(from);
             if (file == files_.end()) {
                 return false;
@@ -688,7 +848,10 @@ private:
 
     // 1 when a file was removed, 0 when there was none, -1 otherwise.
     int remove_file(const char *name) {
-        if (from_ == kFromFiles) {
+        if (!may_change(name)) {
+            return -1;
+        }
+        if (from_ == kFromFiles && !of_the_drive(name)) {
             return files_.erase(name) != 0 ? 1 : 0;
         }
 #ifdef _WIN32
@@ -787,6 +950,7 @@ private:
 public:
     bool checks_first() const { return options_.check_first; }
     bool has_drive() const { return !options_.drive.empty(); }
+    bool traces_calls() const { return options_.trace_calls; }
     From from_ = kFromFolder;
     std::string folder_;
     std::map<std::string, std::string> files_;
@@ -800,6 +964,7 @@ public:
     uint32_t drive_number_ = 0;
     uint32_t drives_plugged_ = 0;
     std::vector<std::string> drive_names_;
+    bool writing_drive_ = false;    // the file being written is one of the drive
     bool is_open_ = false;
     size_t offset_ = 0;
     size_t reads_ = 0;
@@ -808,13 +973,14 @@ public:
     std::string writing_name_;
     std::FILE *written_ = nullptr;
     long store_calls_ = 0;
-    std::string read_at_name_;
-    uint32_t read_at_end_ = 0;
+    std::map<std::string, uint32_t> read_at_ends_;   // where the last `read_at` of each file ended
     size_t reads_at_ = 0;
+    bool in_command_ = false;       // a command line is being carried out
 
     long alloc_calls_ = 0;
     size_t bytes_given_ = 0;
     std::vector<void *> blocks_;
+    uint64_t call_bytes_ = 0;       // what `read` and `read_at` gave since the last call's end
 };
 
 // Prints every name reason_name can return, one per line.
@@ -875,11 +1041,14 @@ int inflate(bool in_batch) {
     return 0;
 }
 
-// Reads one ODRG file with the core's decoder, as the core does when it checks a file.
-// Prints `header <W> <H> <C> <F> <compressed>`, one `frame <ms> <hex>` for each record with
-// the picture as three bytes for each pixel, then `end`; or, at the point where the file is
-// refused, `rejected <reason>`.
-void decode_one(Host &host, const char *name) {
+// Reads one ODRG file or ODRGX container of frames with the core's reader, as the core
+// does when it checks a file. Prints, for a container, `container <type> <loop> <payload>`;
+// then `header <W> <H> <C> <F> <compressed>` of the frames, one `frame <ms> <hex>` for each
+// record with the picture as three bytes for each pixel, then `end`; or, at the point where
+// the file is refused, `rejected <reason>`. The decoder is called again while it settles a
+// defect. With a slice, settling takes at most that many bytes in one call, and
+// `pending <calls>`, the calls that gave kPendingWork, comes before the last line.
+void decode_one(Host &host, const char *name, uint32_t slice) {
     odrig_host functions = host.interface();
     odrig::FileSource file;
     std::memset(&file, 0, sizeof file);
@@ -889,21 +1058,38 @@ void decode_one(Host &host, const char *name) {
     std::memset(&inflate, 0, sizeof inflate);
     std::vector<uint8_t> window(odrig::kWindowSize);
 
+    odrig::ContentHeader content;
+    std::memset(&content, 0, sizeof content);
     odrig::Reason reason = file.open(functions, name);
     if (reason == odrig::kNone) {
-        reason = decoder.open(&file, &inflate, window.data());
+        reason = odrig::content_open(&file, &inflate, window.data(), &decoder, &content);
+        if (slice != 0) {
+            decoder.settle_slice = slice;
+        }
     }
-    if (reason == odrig::kNone) {
+    if (content.container) {
+        std::printf("container %u %u %u\n", content.type, content.loop_ms, content.payload);
+    }
+    unsigned long pending = 0;
+    uint64_t total_ms = 0;
+    if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
+        // A text or a widget is read and checked whole, as the core reads it.
+        std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+        reason = odrig::drawn_read(&file, content, payload.data());
+    } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
         std::vector<uint8_t> pixels(decoder.n, 0);
         std::string picture;
         for (uint32_t record = 0; record < decoder.frames && reason == odrig::kNone; ++record) {
             uint16_t duration = 0;
-            reason = decoder.next(pixels.data(), &duration);
+            while ((reason = decoder.next(pixels.data(), &duration)) == odrig::kPendingWork) {
+                ++pending;
+            }
             if (reason != odrig::kNone) {
                 break;
             }
+            total_ms += duration;
             picture.clear();
             if (decoder.colours != 0) {
                 for (uint8_t index : pixels) {
@@ -915,10 +1101,15 @@ void decode_one(Host &host, const char *name) {
             std::printf("frame %u %s\n", duration, hex(picture).c_str());
         }
         if (reason == odrig::kNone) {
-            reason = decoder.finish();
+            while ((reason = odrig::content_finish(&file, &decoder, content, total_ms)) == odrig::kPendingWork) {
+                ++pending;
+            }
         }
     }
     file.close();
+    if (slice != 0) {
+        std::printf("pending %lu\n", pending);
+    }
     if (reason == odrig::kNone) {
         std::printf("end\n");
     } else {
@@ -936,11 +1127,63 @@ size_t last_separator(const std::string &path) {
 #endif
 }
 
-int decode(const std::string &argument) {
+// Draws a text or a clock, as the player draws it, at each of a number of milliseconds into
+// its turn, a clock with a seed, 1 when none is given. Prints `picture <W> <H> <hex>` for
+// each, with three bytes for each pixel in the pixel order of docs/format.md, or
+// `rejected <reason>` once.
+int render(const std::string &path, const std::vector<std::string> &times, uint32_t seed) {
+    for (const std::string &time : times) {
+        if (time.empty() || time.size() > 12 || time.find_first_not_of("0123456789") != std::string::npos) {
+            return usage();
+        }
+    }
+    size_t slash = last_separator(path);
+    Host host = Host::of_folder(slash == std::string::npos ? "." : path.substr(0, slash));
+    odrig_host functions = host.interface();
+    odrig::FileSource file;
+    std::memset(&file, 0, sizeof file);
+    odrig::OdrgDecoder decoder;
+    std::memset(&decoder, 0, sizeof decoder);
+    odrig::Inflate inflate;
+    std::memset(&inflate, 0, sizeof inflate);
+    std::vector<uint8_t> window(odrig::kWindowSize);
+    odrig::ContentHeader content;
+    std::memset(&content, 0, sizeof content);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    odrig::Reason reason = file.open(functions, name.c_str());
+    if (reason == odrig::kNone) {
+        reason = odrig::content_open(&file, &inflate, window.data(), &decoder, &content);
+    }
+    if (reason == odrig::kNone && !odrig::is_drawn(content.type)) {
+        reason = odrig::kUnknownType;
+    }
+    std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    if (reason == odrig::kNone) {
+        reason = odrig::drawn_read(&file, content, payload.data());
+    }
+    file.close();
+    if (reason != odrig::kNone) {
+        std::printf("rejected %s\n", odrig::reason_name(reason));
+        return 0;
+    }
+    std::vector<uint8_t> pixels(3u * content.width * content.height);
+    for (const std::string &time : times) {
+        const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
+        if (content.type == odrig::kTypeText) {
+            odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
+        } else {
+            odrig::clock_draw(payload.data(), seed, content.width, content.height, ms, pixels.data());
+        }
+        std::printf("picture %u %u %s\n", content.width, content.height, hex(std::string(pixels.begin(), pixels.end())).c_str());
+    }
+    return 0;
+}
+
+int decode(const std::string &argument, uint32_t slice) {
     if (argument == "--batch") {
         for (const std::string &content : batch(standard_input())) {
             Host host = Host::of_memory(content);
-            decode_one(host, "file.odrg");
+            decode_one(host, "file.odrg", slice);
         }
         return 0;
     }
@@ -948,7 +1191,7 @@ int decode(const std::string &argument) {
     std::string folder = slash == std::string::npos ? "." : argument.substr(0, slash);
     std::string name = slash == std::string::npos ? argument : argument.substr(slash + 1);
     Host host = Host::of_folder(folder);
-    decode_one(host, name.c_str());
+    decode_one(host, name.c_str(), slice);
     return 0;
 }
 
@@ -999,6 +1242,8 @@ public:
         }
         refuse_a_small_reply();
         std::printf("ready\n");
+        // What the start read is no call's.
+        host_.call_bytes_ = 0;
 
         std::string line;
         while (std::getline(script, line)) {
@@ -1016,14 +1261,21 @@ private:
             print_error();
             return true;
         }
-        if (line == "drive plug" || line == "drive pull") {
+        if (line == "fault") {
+            print_fault();
+            return true;
+        }
+        if (line.rfind("drive replace ", 0) == 0) {
+            return host_.has_drive() && host_.replace_drive(line.substr(14));
+        }
+        if (line == "drive plug" || line == "drive pull" || line.rfind("drive plug ", 0) == 0) {
             if (!host_.has_drive()) {
                 return false;
             }
-            if (line == "drive plug") {
-                host_.plug();
-            } else {
+            if (line == "drive pull") {
                 host_.pull();
+            } else {
+                host_.plug(line.size() > 11 ? line.substr(11) : std::string());
             }
             return true;
         }
@@ -1071,6 +1323,20 @@ private:
         }
     }
 
+    // `fault <work> <record> <bytes> <reason> <name>`: the context the core keeps of the
+    // latest fault of a file; or `fault none`.
+    void print_fault() {
+        const odrig::FaultContext &fault = core_->state.fault;
+        if (!fault.present) {
+            std::printf("fault none\n");
+            return;
+        }
+        static const char *const works[] = {"none", "start", "play", "upload", "drive"};
+        std::printf("fault %s %u %llu %s %s\n", fault.work < 5 ? works[fault.work] : "?", fault.record,
+                    static_cast<unsigned long long>(fault.body_bytes),
+                    odrig::reason_name(static_cast<odrig::Reason>(fault.reason)), fault.name);
+    }
+
     // Turns hexadecimal digits into the bytes they stand for.
     static bool unhex(std::string *text) {
         if (text->size() % 2 != 0 || text->find_first_not_of("0123456789abcdef") != std::string::npos) {
@@ -1105,9 +1371,12 @@ private:
         size_t length;
         {
             guard::InCore inside;
+            host_.in_command_ = true;
             length = odrig_core_command(core_, now, line.data(), line.size(), reply.data(), reply.size());
+            host_.in_command_ = false;
         }
         print_reply(reply.data(), length);
+        trace_call();
     }
 
     // Bytes of a transport. Prints `fed <hex of the line>` and `reply <json>` for every
@@ -1115,7 +1384,9 @@ private:
     void feed(uint64_t now, const std::string &bytes) {
         std::vector<uint8_t> given(bytes.begin(), bytes.end());
         guard::InCore inside;
+        host_.in_command_ = true;
         odrig_core_feed(core_, now, given.data(), given.size(), on_reply, nullptr);
+        host_.in_command_ = false;
     }
 
     static void on_reply(void *, const char *line, size_t line_length, const char *reply, size_t reply_length) {
@@ -1136,6 +1407,14 @@ private:
         return true;
     }
 
+    // With `--trace-calls`, prints what the call that has just ended read of files.
+    void trace_call() {
+        if (host_.traces_calls()) {
+            std::printf("call %llu\n", static_cast<unsigned long long>(host_.call_bytes_));
+        }
+        host_.call_bytes_ = 0;
+    }
+
     // `refresh <ms>` and the LED data of every leg, or `idle <ms>` when no refresh was due.
     void poll(uint64_t now) {
         int produced;
@@ -1143,6 +1422,7 @@ private:
             guard::InCore inside;
             produced = odrig_core_poll(core_, now);
         }
+        trace_call();
         if (!produced) {
             std::printf("idle %llu\n", static_cast<unsigned long long>(now));
             return;
@@ -1327,7 +1607,23 @@ int main(int argc, char **argv) {
         return inflate(true);
     }
     if (invocation == "decode" && arguments.size() == 2) {
-        return decode(arguments[1]);
+        return decode(arguments[1], 0);
+    }
+    long slice = 0;
+    if (invocation == "decode" && arguments.size() == 4 && arguments[1] == "--slice" &&
+        whole_number(arguments[2], &slice) && slice > 0 && slice <= 0x7FFFFFFF) {
+        return decode(arguments[3], static_cast<uint32_t>(slice));
+    }
+    if (invocation == "render" && arguments.size() >= 5 && arguments[1] == "--seed") {
+        uint64_t seed = 0;
+        if (arguments[2].empty() || arguments[2].size() > 10 || arguments[2].find_first_not_of("0123456789") != std::string::npos ||
+            (seed = std::strtoull(arguments[2].c_str(), nullptr, 10)) > 0xFFFFFFFFull) {
+            return usage();
+        }
+        return render(arguments[3], std::vector<std::string>(arguments.begin() + 4, arguments.end()), static_cast<uint32_t>(seed));
+    }
+    if (invocation == "render" && arguments.size() >= 3) {
+        return render(arguments[1], std::vector<std::string>(arguments.begin() + 2, arguments.end()), 1);
     }
     if (invocation == "guard" && arguments.size() == 2 &&
         (arguments[1] == "alloc" || arguments[1] == "new" || arguments[1] == "read")) {
@@ -1353,11 +1649,24 @@ int main(int argc, char **argv) {
                        whole_number(arguments[at + 3], &options.read_fails_after)) {
                 options.read_fails_file = arguments[at + 1];
                 at += 4;
+            } else if (arguments[at] == "--command-read-fails" && at + 2 < arguments.size() &&
+                       whole_number(arguments[at + 2], &options.command_read_fails_offset)) {
+                options.command_read_fails_file = arguments[at + 1];
+                at += 3;
             } else if (arguments[at] == "--drive" && at + 1 < arguments.size()) {
                 options.drive = arguments[at + 1];
                 at += 2;
             } else if (arguments[at] == "--drive-pulled") {
                 options.drive_pulled = true;
+                ++at;
+            } else if (arguments[at] == "--drive-read-only") {
+                options.drive_read_only = true;
+                ++at;
+            } else if (arguments[at] == "--trace-drive") {
+                options.trace_drive = true;
+                ++at;
+            } else if (arguments[at] == "--trace-read-at") {
+                options.trace_read_at = true;
                 at += 1;
             } else if (arguments[at] == "--drive-read-fails" && at + 2 < arguments.size() &&
                        whole_number(arguments[at + 2], &options.drive_read_fails_offset)) {
@@ -1381,6 +1690,12 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--trace-reads") {
                 options.trace_reads = true;
                 at += 1;
+            } else if (arguments[at] == "--trace-calls") {
+                options.trace_calls = true;
+                at += 1;
+            } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
+                options.about = arguments[at + 1];
+                at += 2;
             } else if (arguments[at] == "--check-first") {
                 options.check_first = true;
                 at += 1;

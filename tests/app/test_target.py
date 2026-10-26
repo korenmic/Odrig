@@ -136,12 +136,12 @@ class WhetherTheTargetAnswers(Target):
 
     def test_a_target_whose_show_is_invalid_answers_and_the_screen_says_the_reason(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
-        self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+        self.assertEqual(emulator.status()["error"], "undefined-id 99")
         found = support.run("answers", address=address)
         self.assertEqual((found.seen["link"], found.seen["failure"]), ("Answers", None))
-        self.assertEqual(found.seen["invalid"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen["invalid"], "The installed show is invalid: undefined-id 99.")
 
 
 class Requests(Target):
@@ -151,7 +151,9 @@ class Requests(Target):
     def test_status_is_asked_once_a_second(self):
         target = entered(self, support.StandIn(support.SOUND))
         support.run("waits", address=target.address, settings={"ms": 5300})
-        self.assertEqual(set(target.lines), {self.STATUS, self.LIST, ("/odrig", b"space")})
+        # A target that does not know `order` is asked for it once, after its first list.
+        self.assertEqual(set(target.lines), {self.STATUS, self.LIST, ("/odrig", b"space"), ("/odrig", b"order get")})
+        self.assertEqual(target.lines.count(("/odrig", b"order get")), 1)
         self.assertIn(target.lines.count(self.STATUS), (6, 7), target.lines)
         self.assertEqual(target.together, 1)
 
@@ -168,7 +170,8 @@ class Requests(Target):
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
             logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
-        self.assertEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http")})
+        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http")})
+        self.assertIn(("status", "http"), {(entry["line"], entry["transport"]) for entry in logged})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 
 

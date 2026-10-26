@@ -1,6 +1,6 @@
 """Builds an image with PlatformIO, in WLED's folder or in the folder of the standalone
-firmware, on the software known good or on the newer USB software, and keeps it in the
-work folder with its SHA-256 beside it."""
+firmware, on the newer software or on the software known good, and keeps it in the work
+folder with its SHA-256 beside it."""
 
 import collections
 import hashlib
@@ -13,24 +13,25 @@ from . import Failure, env, paths, standalone, toolchain, wled
 Kind = collections.namedtuple("Kind", "environment image")
 
 KINDS = {
-    "firmware": Kind("odrig", "odrig-firmware.bin"),
-    "probe": Kind("odrig_probe", "odrig-probe.bin"),
+    "firmware": Kind("odrig_microsd", "odrig-firmware.bin"),
+    "probe": Kind("odrig_microsd_probe", "odrig-probe.bin"),
     "stock": Kind("esp32s3dev_16MB_opi", "stock-built.bin"),
     "standalone": Kind("odrig_standalone", "odrig-standalone.bin"),
     "standalone-probe": Kind("odrig_standalone_probe", "odrig-standalone-probe.bin"),
-    "trial": Kind("odrig_trial", "odrig-trial.bin"),
-    "trial-probe": Kind("odrig_trial_probe", "odrig-trial-probe.bin"),
+    "stick": Kind("odrig", "odrig-stick.bin"),
+    "stick-probe": Kind("odrig_probe", "odrig-stick-probe.bin"),
     "microsd": Kind("odrig_microsd", "odrig-microsd.bin"),
 }
 
 # The kinds that are built without WLED, as a project of their own.
 WITHOUT_WLED = ("standalone", "standalone-probe")
 
-# The kinds that are built on the newer USB software, with its own PlatformIO.
-ON_NEWER = ("trial", "trial-probe", "microsd")
+# The kinds that are built on the newer software, with its own PlatformIO: the firmware
+# with the microSD card, its probe build, and the same firmware under the card's own name.
+ON_NEWER = ("firmware", "probe", "microsd")
 
-# The trial's kind that takes the place of the firmware and of the probe build.
-TRIAL_OF = {"firmware": "trial", "probe": "trial-probe"}
+# The USB stick's kind that takes the place of the firmware and of the probe build.
+STICK_OF = {"firmware": "stick", "probe": "stick-probe"}
 
 # The size of the first application partition of WLED's 16 MB layout.
 APPLICATION_SIZE = 0x300000

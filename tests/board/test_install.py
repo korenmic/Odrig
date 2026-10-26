@@ -58,12 +58,14 @@ class Install(unittest.TestCase):
         with support.dim_show() as folder, tempfile.TemporaryDirectory() as out:
             done = support.install(folder)
             self.assertEqual(done.status, 0, done.err)
-            reply = json.loads(done.out)
+            # The board's reply to `status` is the last line, after the lines of the layout,
+            # of the change of the show and of the write.
+            reply = json.loads(done.out.splitlines()[-1])
             self.assertEqual((reply["ok"], reply["error"], reply["playing"], reply["brightness"]), (True, None, 3, support.DIM))
-            self.assertEqual(done.out.count("\n"), 1)
+            self.assertRegex(done.out, r"\nstorage: committed: \d+ bytes written and compared; the board restarts\n")
             read = support.on_port("read-show", pathlib.Path(out, "copy"))
             self.assertEqual(read.status, 0, read.err)
-            self.assertEqual(support.files_of(pathlib.Path(out, "copy")), support.files_of(folder))
+            self.assertEqual(support.files_of(pathlib.Path(out, "copy")), storage.folder_files(folder))
             self.assertEqual(sorted(support.files_of(folder)), ["dvd.odrg", "hello.odrg", "mapping.json", "show.json"])
         after = support.storage_image()
         kept = [path.read_bytes() for path in storage.kept_images(len(before))]
@@ -85,8 +87,8 @@ class Install(unittest.TestCase):
             with support.dim_show(show=one_animation(work, "hello.odrg")) as second:
                 done = support.install(second)
                 self.assertEqual(done.status, 0, done.err)
-                self.assertEqual((json.loads(done.out)["playing"], json.loads(done.out)["animation"]), ("all", 1))
-                self.assertEqual(support.installed(), support.files_of(second))
+                self.assertEqual((json.loads(done.out.splitlines()[-1])["playing"], json.loads(done.out.splitlines()[-1])["animation"]), ("all", 1))
+                self.assertEqual(support.installed(), storage.folder_files(second))
                 self.assertEqual(sorted(support.installed()), ["hello.odrg", "mapping.json", "show.json"])
 
     def test_an_invalid_show_has_the_reason_the_emulator_gives_and_plays_nothing(self):
@@ -100,7 +102,7 @@ class Install(unittest.TestCase):
                 done = support.install(folder, "--no-check")
                 self.assertEqual(done.status, 1, done.err)
                 self.assertEqual(done.err, "")
-                self.assertEqual(json.loads(done.out)["error"], reason)
+                self.assertEqual(json.loads(done.out.splitlines()[-1])["error"], reason)
                 self.assertEqual(support.command(PORT, "status")[1]["error"], reason)
                 self.assertEqual(support.command(PORT, "play", "1"), (1, {"ok": False, "error": "show-invalid"}))
                 self.assertEqual(support.command(PORT, "status")[1]["playing"], None)

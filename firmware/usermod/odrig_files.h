@@ -28,6 +28,18 @@ const char *lastLog();
 // the line.
 bool holding();
 
+// A storage call made apart from these functions, a change of the drive's files: it is
+// timed as theirs are, from its making to the end of its block, so that `holding` holds the
+// command lines back after it too.
+class StorageCall {
+ public:
+  StorageCall();
+  ~StorageCall();
+
+ private:
+  int64_t startUs;
+};
+
 #ifdef ODRIG_PROBE
 // The storage calls since the last call of this function: their number, the longest and
 // the sum of their times in microseconds.

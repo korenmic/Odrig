@@ -1,8 +1,8 @@
 import {shown} from "../reading.js";
 export default async function(app) {
   await shown(app, 39);
-  app.press("Storage");
-  await app.until(() => !app.byId("select-all").disabled, "selection available");
+  await app.until(() => !app.byId("select-mode").disabled, "selection available");
+  app.press("Select");
   app.press("Select all");
   app.press("Delete selected");
   app.press("Remove it");
@@ -11,7 +11,7 @@ export default async function(app) {
   const target = await app.frame.contentWindow.eval('import("/target.js")');
   target.setAddress(app.settings.other);
   client.begin();
-  await app.until(() => !app.byId("select-all").disabled && app.doc.querySelectorAll("#installed > .row").length === 2, "new target list");
+  await app.until(() => !app.byId("select-all").disabled && app.doc.querySelectorAll("#animations-list > .row").length === 2, "new target list");
   await app.sleep(1000);
-  return {selected: app.doc.querySelectorAll('#installed input:checked').length, message: app.text("message-text"), disabled: app.byId("delete-selected").disabled};
+  return {selected: app.doc.querySelectorAll('#animations-list input:checked').length, message: app.text("message-text"), disabled: app.byId("delete-selected").disabled};
 }

@@ -16,6 +16,7 @@
 #include "odrig_leds.h"
 #include "odrig_routing.h"
 #include "odrig_log.h"
+#include "odrig_sd_config.h"
 #include "odrig_serial.h"
 #include "odrig_uart.h"
 #include "odrig_update.h"
@@ -38,6 +39,29 @@ struct Locked {
 };
 
 void syncLegs();
+
+// The name the firmware gives itself in `status`: WLED's release name, the date and time of
+// its build, its storage and the reason of the chip's last reset.
+int aboutHost(void *, char *buffer, size_t capacity) {
+  const char *reset;
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: reset = "power-on"; break;
+    case ESP_RST_SW: reset = "software"; break;
+    case ESP_RST_PANIC: reset = "panic"; break;
+    case ESP_RST_TASK_WDT: reset = "task-watchdog"; break;
+    case ESP_RST_INT_WDT: reset = "interrupt-watchdog"; break;
+    case ESP_RST_BROWNOUT: reset = "brownout"; break;
+    case ESP_RST_DEEPSLEEP: reset = "deep-sleep"; break;
+    default: reset = "other"; break;
+  }
+#if ODRIG_SD_CS >= 0
+  const char *storage = "internal+microsd";
+#else
+  const char *storage = "internal+usb";
+#endif
+  snprintf(buffer, capacity, "%s %s %s %s reset %s", WLED_RELEASE_NAME, __DATE__, __TIME__, storage, reset);
+  return 1;
+}
 
 struct Reply {
   char *text;
@@ -197,7 +221,10 @@ class OdrigUsermod : public Usermod {
     // talks to it on.
     OdrigDrive::begin();
 #endif
-    const odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
+    // What the player logged last before a reset goes to the log before it starts again.
+    OdrigLog::retained();
+    odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
+    host.about = aboutHost;
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE

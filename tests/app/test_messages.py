@@ -38,7 +38,7 @@ class TheTable(unittest.TestCase):
         return self.found["refusals"][f"{code} | {line} | {'null' if reason is None else reason}"]
 
     def test_every_error_code_of_the_command_list_has_a_text_or_is_one_the_app_cannot_get(self):
-        self.assertEqual(len(self.codes), 15)
+        self.assertEqual(len(self.codes), 19)
         cannot_get = self.found["notForTheApp"]
         self.assertLessEqual(set(cannot_get), set(self.codes))
         self.assertEqual(len(cannot_get), len(set(cannot_get)))
@@ -86,13 +86,13 @@ class OnTheScreen(unittest.TestCase):
 
     def test_an_animation_that_is_gone_is_said_so_and_the_list_is_asked_for_again(self):
         emulator, address = self.emulator(entered(self, emulator_support.demo_show()))
-        presses = [{"press": "2 dvd.odrg", "step": True, "wait": 1200}, {"dismiss": True}]
+        presses = [{"row": 2, "step": True, "wait": 1200}, {"dismiss": True}]
         found = support.run("refusals", address=address, steps=[lambda: emulator.command("remove 2")], settings={"rows": 2, "presses": presses})
         refused, dismissed = found.seen
         self.assertEqual(refused["message"], "Animation 2 is not installed any more. (unknown-id)")
         # The list was asked for again at once, not ten seconds later.
         self.assertEqual([row["text"] for row in refused["rows"]], ["1 hello.odrg"])
-        self.assertEqual((refused["playing"], refused["shown"]), ("Playlist", "show"))
+        self.assertEqual((refused["playing"], refused["shown"]), ("Playlist", "animations"))
         self.assertIsNone(dismissed["message"])
 
     def test_the_playlist_of_a_show_without_an_animation(self):
@@ -105,12 +105,12 @@ class OnTheScreen(unittest.TestCase):
 
     def test_an_invalid_show_is_said_with_its_reason(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
         found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Playlist from the start", "wait": 1500}]})
-        self.assertEqual(found.seen[0]["message"], "The installed show is invalid: file-missing dvd.odrg. Nothing can be played until a show is installed over USB. (show-invalid)")
+        self.assertEqual(found.seen[0]["message"], "The installed show is invalid: undefined-id 99. Nothing can be played until a show is installed over USB. (show-invalid)")
         # The message stays while statuses come and go.
-        self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: undefined-id 99.")
 
     def test_a_target_that_does_not_know_a_command_and_one_that_refuses_with_another_code(self):
         old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("weird"), "on": OK}))

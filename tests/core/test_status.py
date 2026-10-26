@@ -29,20 +29,19 @@ def hello_only(brightness=255):
 class StatusReply(Playback):
     def test_its_exact_bytes(self):
         printed = self.assert_as_the_reference(support.example_show(), [status_at(0)])
-        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6}'])
+        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}'])
 
     def test_its_exact_bytes_when_nothing_plays_and_the_show_is_invalid(self):
-        files = support.example_show()
-        del files["hello.odrg"]
+        files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, [at(0, "off"), status_at(0)])
         self.assertEqual(
             printed[1],
-            'reply {"ok":true,"on":false,"brightness":128,"playing":null,"animation":null,"fps":0,"error":"file-missing hello.odrg","width":60,"height":6}',
+            'reply {"ok":true,"on":false,"brightness":0,"playing":null,"animation":null,"fps":0,"error":"undefined-id 99","width":60,"height":6,"readiness":"recovery","checked":0,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}',
         )
 
     def test_it_is_the_reply_of_the_document(self):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
-        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}'
+        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}'
         self.assertIn(example, text)
         script = every_20_ms(50) + [status_at(1000)]
         printed = self.assert_as_the_reference(support.example_show(), script)
@@ -70,11 +69,10 @@ class TheCanvas(Playback):
         self.assertEqual(self.canvas(files), (None, None))
 
     def test_it_is_reported_while_the_show_is_invalid_for_another_reason(self):
-        files = support.example_show()
-        del files["hello.odrg"]
+        files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, [status_at(0)])
         reply = state(printed[0])
-        self.assertEqual((reply["error"], reply["width"], reply["height"]), ("file-missing hello.odrg", 60, 6))
+        self.assertEqual((reply["error"], reply["width"], reply["height"]), ("undefined-id 99", 60, 6))
 
 
 class RefreshRate(Playback):
@@ -170,13 +168,14 @@ class Animation(Playback):
 
 class StateAfterStartup(Playback):
     def started(self, files, options=()):
+        """The status at power-on, without what it says of the check."""
         run = support.start(files, [status_at(0)], options)
-        return state(run.lines[0])
+        return support.without_readiness(state(run.lines[0]))
 
     def test_a_valid_show_is_on_at_its_brightness_with_its_start_item_playing(self):
         self.assertEqual(
             self.started(support.example_show()),
-            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
         self.assertEqual(self.started(hello_only(7))["brightness"], 7)
 
@@ -185,7 +184,7 @@ class StateAfterStartup(Playback):
         files["show.json"] = support.show_text(json.loads(files["show.json"])["items"], 31)
         self.assertEqual(
             self.started(files),
-            {"ok": True, "on": True, "brightness": 31, "playing": "all", "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 31, "playing": "all", "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
     def test_a_valid_show_without_an_animation_plays_nothing(self):
@@ -193,7 +192,7 @@ class StateAfterStartup(Playback):
         files["show.json"] = support.show_text([], 31)
         self.assertEqual(
             self.started(files),
-            {"ok": True, "on": True, "brightness": 31, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6},
+            {"ok": True, "on": True, "brightness": 31, "playing": None, "animation": None, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
     def test_an_invalid_show_is_on_and_plays_nothing(self):
@@ -219,10 +218,6 @@ class StateAfterStartup(Playback):
             (with_show(support.show_text(items + [items[0]], 99, 3)), (), "duplicate-id 1", 0, 60),
             (with_show(support.show_text(items, 99, 8)), (), "undefined-id 8", 0, 60),
             (with_show(support.show_text(items + [{"id": 4, "cycle": [3], "seconds": 1}], 99, 3)), (), "nested-cycle 4", 0, 60),
-            (with_show(support.show_text(items, 99, 3)) | {"hello.odrg": b""}, (), "file-malformed hello.odrg truncated", 99, 60),
-            (without("dvd.odrg") | {"show.json": support.show_text(items, 99, 3)}, (), "file-missing dvd.odrg", 99, 60),
-            (with_show(support.show_text(items, 99, 3)) | {"dvd.odrg": support.clip(1, 2, 2)}, (), "size-mismatch dvd.odrg", 99, 60),
-            (with_show(support.show_text(items, 99, 3)), ("--read-fails", "dvd.odrg", "20"), "read-error dvd.odrg", 99, 60),
             (with_show(support.show_text(items, 99, 3)), ("--read-fails", "show.json", "20"), "read-error show.json", 0, 60),
             (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "8"), "out-of-memory", 0, 60),
             (with_show(support.show_text(items, 99, 3)), ("--alloc-fails-at", "12"), "out-of-memory", 0, 60),
@@ -232,7 +227,33 @@ class StateAfterStartup(Playback):
                 height = None if width is None else 6
                 self.assertEqual(
                     self.started(files, options),
-                    {"ok": True, "on": True, "brightness": brightness, "playing": None, "animation": None, "fps": 0, "error": error, "width": width, "height": height},
+                    {"ok": True, "on": True, "brightness": brightness, "playing": None, "animation": None, "fps": 0, "error": error, "width": width, "height": height, "seed": None},
+                )
+
+    def test_a_bad_file_leaves_the_show_valid_and_playing(self):
+        items = json.loads(support.example_show()["show.json"])["items"]
+
+        def with_show(**changed):
+            files = support.example_show()
+            files["show.json"] = support.show_text(items, 99, 3)
+            for name, content in changed.items():
+                files[name.replace("_", ".")] = content
+            return files
+
+        missing = with_show()
+        del missing["dvd.odrg"]
+        # The cycle that starts plays its first usable animation.
+        cases = (
+            (with_show(hello_odrg=b""), (), 2),
+            (missing, (), 1),
+            (with_show(dvd_odrg=support.clip(1, 2, 2)), (), 1),
+            (with_show(), ("--read-fails", "dvd.odrg", "20"), 1),
+        )
+        for files, options, animation in cases:
+            with self.subTest(animation=animation, options=options):
+                self.assertEqual(
+                    self.started(files, options),
+                    {"ok": True, "on": True, "brightness": 99, "playing": 3, "animation": animation, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
                 )
 
     def test_nothing_is_kept_from_one_startup_to_the_next(self):
@@ -242,8 +263,8 @@ class StateAfterStartup(Playback):
             second = support.session(folder, [status_at(0)])
         self.assertEqual((state(first.lines[-1])["playing"], state(first.lines[-1])["animation"]), ("all", 2))
         self.assertEqual(
-            state(second.lines[0]),
-            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6},
+            support.without_readiness(state(second.lines[0])),
+            {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "fps": 0, "error": None, "width": 60, "height": 6, "seed": None},
         )
 
 

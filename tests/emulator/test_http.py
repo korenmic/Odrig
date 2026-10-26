@@ -44,7 +44,7 @@ class Commands(unittest.TestCase):
                     self.assertEqual(answer.headers["content-length"], str(len(answer.body)))
                     expected = player.command(100, line.encode("ascii"))
                     if line == "status":
-                        self.assertRegex(answer.body, rb'\A\{"ok":true,"on":(true|false),"brightness":[0-9]+,"playing":([0-9]+|"all"),"animation":[0-9]+,"fps":[0-9]+,"error":null,"width":[0-9]+,"height":[0-9]+\}\n\Z')
+                        self.assertRegex(answer.body, rb'\A\{"ok":true,"on":(true|false),"brightness":[0-9]+,"playing":([0-9]+|"all"),"animation":[0-9]+,"fps":[0-9]+,"error":null,"width":[0-9]+,"height":[0-9]+,"readiness":"[a-z]+",[^{}]*\}\n\Z')
                         self.assertEqual(support.without_fps(answer.body), support.without_fps(expected))
                     else:
                         self.assertEqual(answer.body, expected)
@@ -257,6 +257,7 @@ class InvalidShow(unittest.TestCase):
     def test_every_command_still_reaches_the_core_and_gets_its_reply(self):
         with support.example_show() as folder:
             (folder / "dvd.odrg").unlink()
+            support.with_show_fault(folder)
             files = support.files_of(folder)
             with support.Emulator(folder) as emulator:
                 player = ReferencePlayer(files)
@@ -266,7 +267,7 @@ class InvalidShow(unittest.TestCase):
                     self.assertEqual(answer.status, 200)
                     self.assertEqual(support.without_fps(answer.body), support.without_fps(player.command(50, line.encode("ascii"))), line)
                 self.assertEqual(emulator.command("play 1"), b'{"ok":false,"error":"show-invalid"}\n')
-                self.assertEqual(emulator.status()["error"], "file-missing dvd.odrg")
+                self.assertEqual(emulator.status()["error"], "undefined-id 99")
                 with support.lines(emulator) as port:
                     for line in ("status", "play 2", "brightness 200", "off", "on", "status", "dance"):
                         self.assertEqual(support.without_fps(port.ask(line)), support.without_fps(player.command(60, line.encode("ascii"))), line)

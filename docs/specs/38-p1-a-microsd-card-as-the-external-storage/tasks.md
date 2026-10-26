@@ -38,7 +38,8 @@ Rules for every task:
 - The board is touched only in a session with the owner: one program at a time,
   brightness 40 or less, no eFuse, the flash never erased whole, the firmware built only
   as the tool builds it, flashed with `flash --image build/firmware/out/odrig-microsd.bin`
-  and never with `flash` alone, which writes the stick's build. Nothing is soldered.
+  or, once task 10 is done, with `flash`, which then writes the card's firmware too, and
+  never with an image of `build --stick`. Nothing is soldered.
 - Answers to questions that come up are recorded in `docs/drifts.md`, not asked. The
   seed's questions 7 and 8 are the owner's and are not decided here.
 
@@ -117,7 +118,7 @@ Rules for every task:
     card's build does not compile, `mounted` and `msc_host_vfs_space` undeclared.
   - Requirements: 2.6, 8.1
 
-- [ ] 7. The documents in the house style
+- [x] 7. The documents in the house style
   - `docs/microsd.md`: the card's page as the design's "The documents" has it, with the
     two session records of `docs/microsd-preflight/` folded in; then
     `docs/microsd-preflight/` goes, and every link to it.
@@ -154,9 +155,14 @@ Rules for every task:
   - `docs/microsd.md`, `docs/firmware.md`: what was seen. A cause in the card's code or
     its clock is mended here; a cause in the hardware is the owner's and is proposed as a
     new seed, in words.
+  - The question 7 is answered: the two cables of 2026-10-23, both sockets on the Mac,
+    for the fifteen minutes. When tasks 8 and 9 are both done, the commit of the later
+    one also does what task 11 left: `state.json` to `completed` with `completedAt`, the
+    seed out of "What is coming" in `AGENTS.md`, and the final states of lines 9 and 16
+    of `docs/firmware-prerequisites.md`.
   - Requirements: 9.4, 9.5, 9.6
 
-- [ ] 10. The firmware that `build` makes
+- [x] 10. The firmware that `build` makes
   - Only after the owner answers the seed's question 8.
   - When the answer is yes: `firmware/fwtool/` and `firmware/platformio_override.ini.in`:
     `build` and `build --probe` make the card's firmware and its probe build on the newer
@@ -170,7 +176,7 @@ Rules for every task:
     Answers" and this task is ticked with it.
   - Requirements: 10.1, 10.2
 
-- [ ] 11. The state and the change log
+- [x] 11. The state and the change log
   - `docs/decisions.md`: a line in the change log, what the board runs and what the
     sessions showed. `docs/firmware-prerequisites.md`: the final states of lines 9 and
     16. `AGENTS.md`: the seed leaves "What is coming". Set the seed's `state.json` to

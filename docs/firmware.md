@@ -40,8 +40,8 @@ its web interface; `.nvmrc` of WLED 16.0.1 asks for 20.18.
 The tool refuses to work with a WLED folder that is not at the pinned commit
 (`wled-mismatch`), and with a Python below 3.10 (`setup-failed`).
 
-WLED's own build then fetches what WLED's files at the tag name. The tool chooses none of
-it:
+For `build --stick` and `build --stock`, WLED's own build then fetches what WLED's files
+at the tag name. The tool chooses none of it:
 
 | What | From |
 |---|---|
@@ -53,14 +53,15 @@ it:
 | The 67 packages of WLED's `package-lock.json`, which pack the web interface | The npm registry |
 | The Python packages `zopfli`, `wheel` and `tasmota-metrics`, which the platform installs into the tool's Python environment | PyPI |
 
-### The newer USB software
+### The newer software
 
-`build --trial` builds the firmware on newer software of Espressif, whose USB host knows
-hubs: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform 55.03.312-1 and
-PlatformIO 6.2.0. It is the trial of the move to that software, and nothing of it is used
-by the other commands. It lives in `build/firmware/newer/`, so the build known good and its
-tools stay as they are. The first `build --trial` fetches it; nothing of it is on a computer
-before. The sizes are those the sources state, about 700 MB in all; a line *named by its
+`build` and `build --probe` build the firmware on newer software of Espressif than WLED
+16.0.1 names: Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5, with pioarduino's platform
+55.03.312-1 and PlatformIO 6.2.0. The firmware reads its external animations from a
+microSD card on that software; the USB stick's build, `build --stick`, stays on the
+software known good, which WLED's files name. The newer software lives in
+`build/firmware/newer/`, so the build known good and its tools stay as they are. The first
+`build` fetches it; nothing of it is on a computer before. The sizes are those the sources state, about 700 MB in all; a line *named by its
 manifest* is a small manifest that names the real download, which is given as its release
 offers it for a Mac with Apple's processor.
 
@@ -79,16 +80,15 @@ offers it for a Mac with Apple's processor.
 | The platform's own Python environment, `newer/pio/penv`: `uv` first, by pip | 0.13.1 | `https://files.pythonhosted.org/packages/3b/31/fad7fd2ac81954d02d33765bf8535eb320fcc2d71f2603a5c1ba0b13b8ef/uv-0.13.1-py3-none-macosx_11_0_arm64.whl` | 14,391,237 |
 | Then, by `uv`, the newest that PyPI has of `pioarduino` 6.2.0 or later, `littlefs-python`, `fatfs-ng`, `pyyaml`, `rich-click`, `zopfli`, `intelhex`, `rich`, `cryptography`, `certifi`, `ecdsa`, `bitstring`, `reedsolo`, `esp-idf-size`, `esp-coredump`, `pyelftools` and `freertos-gdb`, and what they need | at the time of fetching | PyPI | about 12,000,000 |
 
-The hub support is in Arduino-ESP32's compiled libraries: their `sdkconfig.h` has
-`CONFIG_USB_HOST_HUBS_SUPPORTED 1` and `CONFIG_USB_HOST_HUB_MULTI_LEVEL 1` for every
-memory variant of the ESP32-S3, and nothing of ESP-IDF's own source is fetched.
+Arduino's `SD` library, which reads the card, is part of Arduino-ESP32, and nothing of
+ESP-IDF's own source is fetched.
 
-WLED's libraries are copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_trial` in
-WLED's folder before the first trial build; what is missing there PlatformIO fetches at the
-versions WLED names, which on 2026-10-16 were those of the build known good. The platform takes the
-other compiler, `toolchain-riscv32-esp`, only for a project with a folder `ulp`, and CMake,
-Ninja and ESP-IDF itself only to compile ESP-IDF's libraries again, which the trial does
-not do.
+WLED's libraries can be copied from `.pio/libdeps/odrig` to `.pio/libdeps/odrig_microsd`
+and `.pio/libdeps/odrig_microsd_probe` in WLED's folder before the first build; what is
+missing there PlatformIO fetches at the versions WLED names, which on 2026-10-16 were those
+of the build known good. The platform takes the other compiler, `toolchain-riscv32-esp`,
+only for a project with a folder `ulp`, and CMake, Ninja and ESP-IDF itself only to compile
+ESP-IDF's libraries again, which the firmware's build does not do.
 
 ## The work folder
 
@@ -105,7 +105,7 @@ build/firmware/
   WLED/            WLED's source at the pinned commit
   out/             the built images
   storage/         storage images read from the board and written to it, the newest eight
-  newer/           the newer USB software of `build --trial`
+  newer/           the newer software of `build`, `build --probe` and `build --microsd`
     venv/          its Python environment: PlatformIO 6.2.0, Node.js and npm
     pio/           its PlatformIO folder: the platform, Arduino-ESP32, the compilers and
                    the platform's own Python environment
@@ -113,7 +113,7 @@ build/firmware/
 ```
 
 Every program the tool starts gets these variables, so that nothing lands in the home
-folder. `HOME` is left as it is. For `build --trial` the two folders of PlatformIO are
+folder. `HOME` is left as it is. For `build`, `build --probe` and `build --microsd` the two folders of PlatformIO are
 `build/firmware/newer/pio` and `build/firmware/newer/pio-cache`, and `PATH` begins with
 `build/firmware/newer/venv/bin`; pip's and npm's caches are the same.
 
@@ -135,16 +135,17 @@ Run from the repository root.
 
 ```
 python3 firmware/fw.py setup
-python3 firmware/fw.py build [--stock | --probe] [--standalone | --trial | --microsd] [--verbose]
+python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --microsd] [--verbose]
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
 python3 firmware/fw.py install-firmware [--port P] [--settings FILE] [--limit FILE] [--wait SECONDS]
 python3 firmware/fw.py read-show OUT [--port P]
+python3 firmware/fw.py recover-storage [--port P] [--whole] [--wait SECONDS]
 python3 firmware/fw.py test
 python3 firmware/fw.py test-board [--port P]
 python3 firmware/fw.py test-air --http ADDRESS [--port P]
@@ -178,7 +179,7 @@ with that environment's Python.
 | `verify-failed` | What is in the flash differs from what was written, or the new storage image does not hold what it should. |
 | `no-space` | The files of a show do not fit into storage. Nothing was written to the board. |
 | `not-a-show-folder` | The folder to install is no folder, holds something that is no file, or holds a file the show does not name. |
-| `output-not-empty` | The folder `read-show` is to write exists and is not an empty folder. |
+| `output-not-empty` | The folder `read-show` is to write, or the folder of `install-show --keep-copies`, exists and is not an empty folder. |
 | `wifi-settings-missing` | The settings file to read is not there or is not a file. |
 | `wifi-settings-malformed` | The settings file is not a JSON object with exactly the strings `name` and `password`. |
 | `wifi-name-invalid` | The name does not have 1 to 32 characters of printable ASCII. |
@@ -189,6 +190,9 @@ with that environment's Python.
 | `limit-invalid` | The limit is not from 0 to 65,535. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
+| `cancelled` | An interrupt from the keyboard, Ctrl-C, ended the command before a change of storage was committed. The board holds its storage from before. |
+| `recovery-needed` | A change of the board's storage was cut while the blocks its file system uses were written or compared, or the journal of such a change is in the work folder: run `recover-storage`. Until then every command that reads or writes the board refuses with this reason before it looks for the board. |
+| `storage-changed` | `recover-storage` found the board's storage changed outside the blocks of the change it is to finish. Nothing was written. |
 
 **The layout.** A command that reads the board's partition table, `flash`,
 `install-firmware`, `install-show`, `set-wifi`, `set-limit`, `read-limit` and `read-show`,
@@ -229,6 +233,8 @@ esptool: esptool v5.4.0
 ```
 python3 firmware/fw.py build
 python3 firmware/fw.py build --probe
+python3 firmware/fw.py build --stick
+python3 firmware/fw.py build --stick --probe
 python3 firmware/fw.py build --stock
 ```
 
@@ -238,19 +244,35 @@ larger than the application partition, 3,145,728 bytes, is not kept: `image-too-
 
 | Command | Environment | Image | What it is |
 |---|---|---|---|
-| `build` | `odrig` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`. |
-| `build --probe` | `odrig_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
+| `build` | `odrig_microsd` | `odrig-firmware.bin` | The firmware: WLED's environment `esp32s3dev_16MB_opi` with the usermod of `firmware/usermod/` in place of WLED's audio usermod, the core of `core/`, WLED's serial handling switched off, and the release name `odrig_ESP32-S3_16MB_opi`, on [the newer software](#the-newer-software), with the code of the microSD card on GPIO39 to GPIO42 as its external storage. |
+| `build --probe` | `odrig_microsd_probe` | `odrig-probe.bin` | The probe build: the firmware with the flag `ODRIG_PROBE`, which adds the report of [the probe build](#the-probe-build). It is for the board tests and is not what the installation runs. |
+| `build --stick` | `odrig` | `odrig-stick.bin` | The USB stick's firmware: the same on the software known good, with the USB host for a stick on the chip's own socket in place of the card. |
+| `build --stick --probe` | `odrig_probe` | `odrig-stick-probe.bin` | Its probe build. |
 | `build --stock` | `esp32s3dev_16MB_opi` | `stock-built.bin` | WLED's own environment from WLED's files as they are at the pinned commit, with no patch applied. |
 
-`build --microsd` builds the SPI microSD variant as `odrig-microsd.bin`, on the newer
-Arduino 3 / ESP-IDF 5.5.5 platform. It reads external animations from the card's `odrig`
-folder instead of starting a USB host, and leaves the native USB socket serial. It does
-not go with `--stock`, `--probe`, `--standalone` or `--trial`. Its SPI profile uses
-GPIO39 for SCK, GPIO40 for MISO, GPIO41 for MOSI and GPIO42 for CS, preserving all twenty
-LED outputs. The generic driver's pin defaults remain unconfigured when a build omits
-those flags. [microSD preparation](microsd.md) describes the wiring and remaining
-hardware checks. All 122 card animations and representative playback have been verified
-in the current two-USB bench setup; one-cable and autonomous-power operation remain open.
+The firmware and its probe build are built on [the newer software](#the-newer-software):
+the tool makes the newer software's Python environment first, when
+`build/firmware/newer/venv` is not there or `firmware/requirements-newer.txt` changed, and
+runs that environment's PlatformIO in WLED's folder, with WLED's files and the patches. The
+environment `odrig_microsd` is `odrig` on the newer platform, with the card's flag
+`ODRIG_DRIVE_SD_SPI` and the reader's four pins, GPIO39 for SCK, GPIO40 for MISO, GPIO41
+for MOSI and GPIO42 for CS; `odrig_microsd_probe` adds `ODRIG_PROBE`. The card's code
+takes the place of the USB host, and the chip's own socket stays a serial port.
+[microsd.md](microsd.md) has the card, the reader's wiring, what the board sessions gave
+and what is open. `build --stick` and `build --stick --probe` build the USB stick's
+firmware and its probe build on the software known good, as the firmware was built until
+2026-10-24; `--stick` goes with neither `--stock` nor `--standalone`, and
+`flash --image build/firmware/out/odrig-stick.bin` writes it to the board.
+
+```
+python3 firmware/fw.py build --microsd
+```
+
+`build --microsd` builds the same firmware as `build` and keeps it as `odrig-microsd.bin`,
+the name the board sessions of 2026-10-22 and 2026-10-23 used; it does not go with
+`--stock`, `--probe`, `--stick` or `--standalone`. The image of 2026-10-22, which the board
+runs, has 1,765,808 bytes and the SHA-256
+`fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`.
 
 Before building, the tool brings WLED's tracked files back to the pinned commit, applies
 every patch of `firmware/patches/`, and writes `platformio_override.ini` into WLED's folder
@@ -272,42 +294,37 @@ table is WLED's own file. WLED's files are not patched for it and none is compil
 `--standalone` does not go with `--stock`. The standalone firmware is being built; for
 now it is a trial program, see [Verified on the board](#verified-on-the-board).
 
-```
-python3 firmware/fw.py build --trial
-python3 firmware/fw.py build --trial --probe
-```
+WLED 16.0.1 is not made for Arduino-ESP32 3. The firmware builds on it after these
+changes, none of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of
+which the stick's build sees:
 
-`build --trial` builds the firmware on [the newer USB software](#the-newer-usb-software),
-for the trial of the move to it: the environment `odrig_trial`, which is `odrig` on the
-newer platform, and the image `odrig-trial.bin`; with `--probe`, the environment
-`odrig_trial_probe` and the image `odrig-trial-probe.bin`. The tool makes the newer
-software's Python environment first, when `build/firmware/newer/venv` is not there or
-`firmware/requirements-newer.txt` changed, and runs that environment's PlatformIO in
-WLED's folder, with WLED's files and the patches as for `build`. The trial's images never
-replace `odrig-firmware.bin` and `odrig-probe.bin`, and nothing of the build known good
-changes. `--trial` goes with neither `--stock` nor `--standalone`. `flash --image
-build/firmware/out/odrig-trial.bin` writes the trial build to the board.
-
-WLED 16.0.1 is not made for Arduino-ESP32 3. The trial builds after these changes, none
-of which touches a driver of the LEDs, the Wi-Fi or the storage, and none of which the
-build known good sees:
-
-- Left out of the trial, as this installation uses none of it: WLED's DMX input with its
+- Left out of the firmware, as this installation uses none of it: WLED's DMX input with its
   library `esp_dmx`, the infrared remote with `IRremoteESP8266`, and WLED's own RMT driver
   `NeoESP32RmtHI`; the four RMT outputs take NeoPixelBus's RMT driver, by
   `WLED_USE_SHARED_RMT`.
 - `ESP32_ARDUINO_NO_RGB_BUILTIN` keeps Arduino-ESP32's newer RMT driver out, which ESP-IDF
   does not let start beside the older one that NeoPixelBus uses.
-- `firmware/newer/odrig_newer.h`, read first by every source of the trial, and
+- `firmware/newer/odrig_newer.h`, read first by every source of the firmware, and
   `firmware/patches/020-newer-software.patch`, whose every change is held by
   `ESP_IDF_VERSION_MAJOR >= 5`: the names the newer software changed, and what its checks
   stop at the start: the legacy ADC driver beside the new one, lwIP's raw API without its
   lock, and an address compared with `0U`.
 
-On 2026-10-16 both trial builds built: `odrig-trial.bin` of 1,822,304 bytes, 56.2% of the
-firmware slot, with 21.5% of the static memory, and `odrig-trial-probe.bin` of 1,748,992
-bytes. The firmware holds ESP-IDF's USB host with its hub driver and its driver of a hub's
-ports.
+On 2026-10-16 the firmware with the USB host built on the newer software, for a trial of
+a stick through a hub: 1,822,304 bytes, 56.2% of the firmware slot, with 21.5% of the
+static memory, and its probe build 1,748,992 bytes. On 2026-10-22 the firmware with the
+card built as `odrig-microsd.bin`, 1,765,808 bytes. On 2026-10-24, with the card's free and
+total space, `build` made `odrig-firmware.bin` of 1,771,808 bytes, SHA-256
+`1752f8216be641f0c60907f96a64bf2cd3669ed4e25923d34e0e795c596e19bf`, and `build --microsd`
+the same bytes; `build --probe` made `odrig-probe.bin` of 1,758,624 bytes and
+`build --stick` `odrig-stick.bin` of 1,289,264 bytes. None of them was flashed.
+
+With the texts and clocks of [core.md](core.md), "Texts" and "Clocks", on the seeds of
+2026-10-24 joined, `build` made `odrig-firmware.bin` of 1,799,040 bytes on 2026-10-25,
+SHA-256 `d3b4c516b8d6f7df55cfd7240fd876335bc751554569544c71fdda8909faa022`: 19,760 bytes
+more than the 1,779,280 of the same seeds without them, 55.4% of the firmware slot. Of them 5,464 bytes are the tables of the fonts
+and of the sine, 1,464 for `small`, 1,952 for `medium` and 2,048 for the sine, which stay
+in the flash; the static memory is the same, 70,012 bytes, 21.4%. It was not flashed.
 
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
@@ -417,14 +434,22 @@ python3 firmware/fw.py install-show build/example-show
 Puts a show folder, the installed file set of [show.md](show.md), into the folder `/odrig`
 of the board's storage, checks what was written, restarts the board, waits until the
 board has read every installed animation to its end, and prints the board's reply to
-`status` then. The status is 0 when the reply reports a valid show and 1 when it reports
-a reason.
+`status` then and a line with the outcome:
 
-The board plays right after its restart and reads the animations while it plays. Until
-it has read them all it answers `list` with `busy`, and a fault it finds in one of them
-shows in `status` only then. So the tool waits for the first reply to `status`, asks for
-the list every half second until it is no longer refused with `busy`, and then asks for
-the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
+- `outcome: healthy`: the show is valid and every animation can be played;
+- `outcome: degraded: <n> unavailable`: the show is valid and plays, and `<n>` animations
+  had a fault and are unavailable until the next start or an upload that replaces them;
+  `list` names them with their reasons;
+- `outcome: recovery: <reason>`: the show is invalid.
+
+The status is 0 for healthy and degraded, as the board plays, and 1 for recovery.
+
+The board plays right after its restart and reads the animations while it plays. A
+firmware that reports its `readiness` is asked for its status every half second until the
+readiness is no longer `checking`. One from before seed 33 answers `list` with `busy`
+until it has read them all, and a fault it finds in one of them shows in `status` only
+then: the tool waits for the first reply to `status`, asks for the list every half second
+until it is no longer refused with `busy`, and then asks for the status it prints. All of that has 300 seconds, or as long as `--wait SECONDS` says:
 the board reads a storage full of dense animations for some minutes while one of them
 plays, and a small show within a few seconds; see
 [Measurements on the board](#measurements-on-the-board). A board that is still reading
@@ -433,23 +458,74 @@ whether it is sound is not known yet.
 
 1. The folder is checked before the board is touched: it must be a valid installed file
    set as the readers of the converter judge it, and hold no other file. The reason of a
-   refusal is the converter's, for example `file-missing`. `--no-check` installs any flat
-   folder of files, for trying what the board does with an invalid show.
+   refusal is the converter's, for example `file-missing`. The check is a rebuild of the
+   internal catalog of [catalog.md](catalog.md), on the computer: each animation is read
+   once, in the show's order, for the mapping's canvas, and the catalog's marker and pages
+   go into the board with the show, so that the board need not read the animations at its
+   start. A catalog the folder holds, as `read-show` copies it, is made anew. The marker
+   names the generation after the board's catalog, or 1, and is the board's own when the
+   board's catalog has the same pages: the same folder installed again changes nothing.
+   `--no-check` installs any flat folder of files, without a catalog, for trying what the
+   board does with an invalid show.
 2. The tool reads the partition table and takes the place and size of `spiffs` from it.
 3. It gets the storage as it is now into `build/firmware/storage/`: it takes the newest
    image it kept there when esptool has the chip confirm that storage has that image's
    checksum, which takes 17 seconds, and reads the whole partition otherwise, which takes
    64 seconds.
-4. In that image it removes `/odrig` with everything in it, creates it again and writes the
-   files of the folder. The file system keeps the disk version it had. Files that do not
-   fit are `no-space`, and nothing has been written to the board then. An image that
-   already holds exactly these files is left as it is.
-5. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
-   and every file outside `/odrig` is as it was.
-6. It writes the blocks that changed, neighbouring ones joined, in one esptool call, has
-   the chip compare the whole partition with the new image, and restarts the board.
-   esptool is told that these blocks are data: it would otherwise take a block that begins
-   with the first byte of a program image for a program and refuse it.
+4. It prints how the show changes: the number of files of `/odrig` it keeps, and each
+   file it adds, replaces or removes with its bytes, as `show: kept 56 files`,
+   `show: added new.odrg, 120000 bytes`, `show: replaced mapping.json, 184 bytes, was 16`,
+   `show: removed bad.odrg, 65262 bytes`; for a folder that the board holds already,
+   `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
+   `order.txt` of [show.md](show.md#the-saved-playlist-order), may be a file of the folder;
+   a folder without one keeps the board's, as installing animations does not change the
+   order the operator chose.
+5. In that image it changes only what differs. A file of the folder that `/odrig` holds
+   with the same bytes stays where it is, neither read nor written. A new file is written
+   under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
+   takes the place of the old file by a rename; the files the folder does not hold are
+   removed last. So the bytes of the new files go into blocks that the file system before
+   did not use. When there is no room for the new files beside the old ones, the files
+   that go and the old files of the changed ones are removed first. The file system keeps
+   the disk version it had. Files that do not fit even so are `no-space`, and nothing has
+   been written to the board then. An image that already holds exactly these files is
+   left as it is.
+6. It checks the new image: `/odrig` holds exactly the files of the folder, byte for byte,
+   every file outside `/odrig` is as it was, and every file outside `/odrig` and every file
+   it kept lies in the blocks it lay in.
+7. It writes the blocks that changed, neighbouring ones joined, in two esptool calls, and
+   prints how many first: `storage: 33 blocks to write, 135168 bytes: 31 free first, then
+   2 in use`. The first call writes the blocks the board's file system does not use; a
+   failure of esptool there, or Ctrl-C, ends the command with the board's file system as
+   it was, and the board is restarted. The second call writes the blocks the file system
+   uses: the commit. Then the chip compares every written block with the new image. During
+   the commit and the comparison Ctrl-C waits for their end. A failure there ends with
+   `recovery-needed`, and the chip stays in its bootloader: WLED formats a file system it
+   cannot read when it starts. No call of the write resets the chip, as esptool would
+   after a failure too; once the comparison has passed, the board is restarted and the
+   tool prints `storage: committed: 135168 bytes written and compared; the board
+   restarts`. A folder that the board holds already writes and compares nothing:
+   `storage: unchanged: nothing written; the board restarts`. esptool is told that these
+   blocks are data: it would otherwise take a block that begins with the first byte of a
+   program image for a program and refuse it. The rest of the partition is not compared:
+   it is the image the chip confirmed, or that was read whole, in step 3.
+
+Removing, adding or replacing one animation of a storage 80 % full changes the blocks of
+the files written and two blocks of the file system's records, where the folder rebuilt
+whole changed 8.4 MB of WLED's layout and 10.9 MB of the bigger one;
+`tests/firmware/test_incremental.py` measures it at both layouts.
+
+`--dry-run` does steps 1 to 6, prints the blocks it would write,
+`storage: 33 blocks to write, 135168 bytes: 31 free first, then 2 in use`, and
+`storage: dry run: nothing written; the board restarts`, writes nothing and restarts the
+board. `--keep-copies DIR` copies every file the install removes or replaces, as the board
+holds it, into `DIR`, a folder that is new or empty, before anything is written, and
+prints `kept copies: 2 files in DIR`: a file kept for a look at why it failed.
+
+From its first write to the comparison the change is named by the journal
+`build/firmware/storage/change.json`: the storage region, the new image and the blocks of
+each call, and the step reached. `set-wifi`, `set-limit` and `install-firmware` write their
+change of storage in the same way.
 
 A copy of storage from before the write and the new image stay in
 `build/firmware/storage/`, named by time; the newest eight images are kept. The new image
@@ -582,6 +658,38 @@ the emulator ran:
 diff -r build/example-show build/show-from-board
 ```
 
+### recover-storage
+
+```
+python3 firmware/fw.py recover-storage
+```
+
+Finishes or gives up the change of the board's storage that the journal
+`build/firmware/storage/change.json` names, after a command ended with `recovery-needed`.
+Without a journal it prints `storage: nothing to recover: no change of the board's storage
+is unfinished` and touches nothing.
+
+- A change that was cut before its commit, as when the computer lost power while the free
+  blocks were written, is given up: the board holds its storage from before. The journal
+  and the new image are removed, the board is restarted, and the tool prints
+  `storage: given up: ...` and the board's reply to `status`.
+- Otherwise the chip first compares the board's storage outside the blocks of the change
+  with the new image. When it is the same, the tool writes the change again, the free
+  blocks and then the blocks in use, has the chip compare them, keeps the new image as the
+  board's, removes the journal, restarts the board, and prints
+  `storage: committed: the change was finished: ... bytes written and compared; the board
+  restarts` and the reply to `status`. Ctrl-C waits for the end of the writing.
+- When the storage outside the change differs, something else wrote it since, for
+  example the board started on the half-written storage and formatted it. The command
+  ends with `storage-changed`, writes nothing, and leaves the chip in its bootloader.
+  `recover-storage --whole` writes the new image whole, every block of storage: the last
+  resort, which brings back the settings and the show the new image holds and loses what
+  the board wrote since.
+- A recovery that is cut keeps the journal; the same command finishes it later.
+
+`--wait SECONDS` is how long it waits for the board's reply after the restart (default:
+20).
+
 ### test
 
 ```
@@ -602,19 +710,11 @@ USB and writes to it: it flashes the firmware, the probe build and stock WLED, a
 shows, each with a brightness of 40 or less; a brighter show is refused before the tool is
 started. It also changes the installed show with the commands of
 [commands.md](commands.md): it uploads animations and removes them again. It builds an
-image the work folder does not hold. Its last step leaves the board with the firmware and
-the example show at brightness 32, playing, with no file of a test in `/odrig`. A run
-takes about 55 minutes. Without a board it stops with `no-board` and runs nothing.
-
-```
-ODRIG_BOARD_IMAGES=trial python3 firmware/fw.py test-board
-```
-
-With the variable `ODRIG_BOARD_IMAGES=trial` the suite runs on the trial build of the newer
-USB software: it flashes `odrig-trial.bin` and `odrig-trial-probe.bin` where it takes the
-firmware and the probe build, and builds them with `build --trial` when the work folder does
-not hold them. Its test of `install-firmware`, which writes `odrig-firmware.bin`, flashes the
-trial build after it, and the suite leaves the trial build on the board.
+image the work folder does not hold: the firmware and the probe build are those of the
+microSD card, `odrig-firmware.bin` and `odrig-probe.bin`. Its last step leaves the board
+with the firmware and the example show at brightness 32, playing, with no file of a test in
+`/odrig`. A run takes about 55 minutes. Without a board it stops with `no-board` and runs
+nothing.
 
 ### test-air
 
@@ -670,7 +770,7 @@ The firmware is WLED with one usermod, `firmware/usermod/`, that hosts the core 
 carries.
 
 **At start** the usermod starts the core on the files of the folder `/odrig` of storage:
-`mapping.json`, `show.json` and the `.odrg` files, as `install-show` put them there. It
+`mapping.json`, `show.json` and the `.odrg` and `.odrgx` files, as `install-show` put them there. It
 gives the core a file in the pieces the core asks for, of at most 512 bytes, and never
 holds a whole file. The core's memory comes from the chip's internal memory, and from the
 external memory only when the internal memory has none. The time the core is given is the
@@ -715,9 +815,10 @@ last one.
 reports the reason text of [reasons.md](reasons.md), "The core", and every command is still
 answered.
 
-**The port.** As the board starts, the chip's own USB socket stays this serial port when
-a computer is plugged into it, and otherwise becomes the socket of a
-[USB drive](#a-usb-drive); the probe build keeps it a serial port always. Every byte the
+**The port.** In the firmware the chip's own USB socket is this serial port for as long
+as the board runs. In the USB stick's build, as the board starts, the socket stays this
+serial port when a computer is plugged into it, and otherwise becomes the socket of a
+[USB drive](#the-external-storage); its probe build keeps it a serial port always. Every byte the
 board receives on its USB serial port goes to the core,
 unchanged and in order, and every reply of the core is written back; the firmware writes
 nothing else. The port's queue for what arrives has 4,096 bytes, so that a line of 2,048
@@ -728,7 +829,7 @@ as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
-{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
@@ -749,15 +850,21 @@ tool skips.
 
 esptool reaches the chip through either socket; the tool tells it 921,600 bits a second,
 which the bridge uses and the chip's own USB unit ignores. When the chip's own socket has
-become a drive's, it reaches the chip only in its loader's download mode, which the
+become a drive's, in the USB stick's build, it reaches the chip only in its loader's download mode, which the
 button BOOT held while the board is plugged in brings up; the socket marked COM flashes
 it as before. The suite of the board passes only with the board on the chip's own
 socket: stock WLED, which the suite flashes and restores, and the probe build answer there
 and not on the UART.
 
-**A USB drive.** The firmware plays the animations of a USB flash drive on the chip's own
-socket, after the installed ones, as [show.md](show.md#animations-from-a-usb-drive)
-describes.
+### The external storage
+
+The firmware plays the animations of an external storage after the installed ones, as
+[show.md](show.md#animations-from-a-usb-drive) describes for a drive. In the firmware that
+`build` makes it is a microSD card in a reader on GPIO39 to GPIO42, and nothing of the USB
+host is compiled: [microsd.md](microsd.md) says how a card is prepared, taken up and
+dropped, and what WLED's information says of it. In the USB stick's build,
+`build --stick`, it is a USB flash drive on the chip's own socket, as the rest of this
+section says.
 
 - **A computer or a drive.** As the board starts, the firmware looks at the chip's own
   socket for 5 seconds. A computer plugged into it sends a start-of-frame packet each
@@ -789,8 +896,9 @@ describes.
   USB-C adapter or hub with a power input of its own, which is powered. The computer
   reaches the board on the socket marked COM, for commands and for flashing.
 - **Plugging in and pulling out** work while the board runs. A drive is taken up when it
-  comes: mounted, its folder listed once, and its files read and added to the playlist
-  one by one while the show plays. When it goes, its animations leave the playlist.
+  comes: mounted, and read from its catalog when it has one; otherwise its folder is
+  listed once, when the core asks, and its files are read and added to the playlist one
+  by one while the show plays. When it goes, its animations leave the playlist.
 - WLED's information has `odrig drive`: `looking for a computer` during the wait,
   `computer`, `none`, the number of animation files of the drive, `not readable` for a
   drive that did not mount, or `no USB host` when the host did not start.
@@ -801,7 +909,8 @@ describes.
 ### The log
 
 The firmware writes a log on the socket marked COM, between the replies to commands: a
-line for every event of the chip's own socket, and every line the player logs. A line is
+line for every event of the card, or in the USB stick's build of the chip's own socket,
+and every line the player logs. A line is
 one line of printable ASCII: `#log`, the seconds since the start with three decimals, the
 kind of the line, and its text.
 
@@ -809,12 +918,29 @@ kind of the line, and its text.
 #log 5.012 usb: no computer on the port within 5 s
 #log 5.020 usb: host started
 #log 31.407 usb: a device came: maker 0781, product 5581, a stick
+#log 31.884 usb: stick mounted
 #log 31.902 usb: stick opened: 12 animation files in odrig
 #log 32.115 player: drive file clip.odrg left out: size-mismatch
 #log 58.230 usb: a device went: maker 0781, product 5581, a stick
 ```
 
-The lines of the kind `usb`:
+**The line kept across a reset.** The firmware keeps the latest line the player logged,
+which names a reason (an invalid show, `file <name> unavailable: <reason>`,
+`drive file <name> left out: <reason>`), in memory that a software or watchdog reset
+leaves as it was and a power cut clears, with a CRC-32 of its length and its text, cut to
+95 bytes. Nothing of it is written to flash or to the card. At its next start, before the
+player starts, the firmware writes `#log <seconds> odrig: before this start: <text>` when
+that memory holds a sound line, and clears it either way: a damaged record is passed over
+and holds nothing up.
+
+**The name in `status`.** The firmware gives the core a text that names it, which
+`status` reports as `host`: WLED's release name, the date and the time of the build, its
+storage, `internal+microsd` for the microSD build and `internal+usb` otherwise, and
+`reset` with the reason of the chip's last reset as ESP-IDF tells it: `power-on`,
+`software`, `panic`, `task-watchdog`, `interrupt-watchdog`, `brownout`, `deep-sleep` or
+`other`.
+
+The lines of the kind `usb`, which only the USB stick's build writes:
 
 - After the look for a computer: `a computer is on the port, which stays a serial port`,
   or `no computer on the port within 5 s`, with the wait of the settings.
@@ -829,14 +955,27 @@ The lines of the kind `usb`:
   the device's descriptor; they are only written, and the firmware treats no maker and no
   product apart. The log keeps up to eight devices at once, a hub and what is plugged into
   it among them, to say when each goes; a ninth has its line of coming only.
-- A stick: `stick opened: <n> animation files in odrig`, `the stick has no folder odrig`,
-  `stick not opened: no file system it reads (<error>)`,
-  `stick not opened: a fault in reading (<error>)`, or
+- A stick mounted: `stick mounted`, `the stick has no folder odrig`,
+  `stick not opened: no file system it reads (<error>)`, or
+  `stick not opened: a fault in reading (<error>)`. Its folder listed, when the core asks
+  for a stick without a catalog: `stick opened: <n> animation files in odrig`, or
   `stick not opened: a fault in reading the folder odrig`.
 
+The lines of the kind `sd` are those of the firmware, which reads the card and has no
+line of the kind `usb`:
+
+- A card mounted: `card mounted`, or `the card has no folder odrig`. Its folder listed,
+  when the core asks for a card without a catalog: `card opened: <n> animation files in
+  odrig`, or `card folder odrig could not be read`.
+- No card: `card not mounted; no card or unreadable file system`, once for each spell
+  without a card; and `card unavailable; files closed, waiting for a card` when a card
+  went.
+- The reader not started: `SPI did not start on the configured pins; reader disabled`,
+  or `SD pins or SPI frequency not configured safely; reader disabled`.
+
 The lines of the kind `player` are what the player logs: a file of a drive that is left
-out, `drive file <name> left out: <reason>`, and the reason the show became invalid, as
-WLED's information shows it.
+out, `drive file <name> left out: <reason>`, also for a file of the card, and the reason
+the show became invalid, as WLED's information shows it.
 
 - **Never in the way.** A line is added from any task without waiting, into a queue of 32
   lines of up to 160 bytes; a longer text is cut, and every byte outside printable ASCII
@@ -853,8 +992,8 @@ WLED's information shows it.
   lines, so a command may be sent while the log is read, from another terminal.
 - **Where it is not.** The log goes to the socket marked COM only: not to the chip's own
   socket, not over Wi-Fi, and not into the board's storage. It names nothing of the Wi-Fi
-  settings. The probe build, which never starts the USB host, has the player's lines
-  only.
+  settings. The probe builds, which start neither the card's reader nor the USB host,
+  have the player's lines only.
 
 **Commands over HTTP.** WLED's web server answers `POST /odrig` as
 [commands.md](commands.md) defines it and as the emulator does; the body goes to the same
@@ -907,7 +1046,7 @@ entries of the usermod:
 | `odrig show` | `ok`, or the reason the show is invalid, as `status` reports it. |
 | `odrig outputs` | `<working>/<legs>`, and ` leg <n> pin <p>` for each output that does not work. |
 | `odrig start` | The milliseconds the core took to start. |
-| `odrig drive` | What there is of a USB drive, as [A USB drive](#a-usb-drive) says. |
+| `odrig drive` | What there is of the external storage: of the microSD card, as [microsd.md](microsd.md#the-log-and-wleds-information) says, or in the USB stick's build of a USB drive, as [The external storage](#the-external-storage) says. |
 | `odrig update` | `refused: no second slot` on a board of the bigger layout, where an update over Wi-Fi is refused; `WLED's` on WLED's layout, where WLED's own update works. |
 
 **An update over Wi-Fi.** On a board of the bigger layout of
@@ -999,6 +1138,16 @@ most: the port hands the core a whole line under one hold of the lock, and a com
 HTTP is one call. The legs are read from the core once, at the start, so the loop needs no
 lock to know them.
 
+No call of the core does unbounded work on a file: it settles a defect in slices of 32 KiB
+and decodes at most 128 KiB of a body at a refresh, as [core.md](core.md#bounded-work)
+says. On the board a call is to take 50 ms at most, so a command never waits longer, and a
+read of the microSD card or of a USB drive 250 ms at most. ESP-IDF's task watchdog, whose
+five seconds restarted the board in the investigation of 2026-10-24, stays on: the
+firmware changes none of its settings, and no task feeds it while it waits for the lock,
+so a call that held the lock for seconds would still restart the chip. WLED's own watchdog
+of its loop is off (`WLED_WATCHDOG_TIMEOUT=0`), as it has been since seed 04. The board
+session of seed 31 measures these budgets.
+
 ## What the firmware changes in WLED
 
 | Changed | Left as it is |
@@ -1028,8 +1177,8 @@ The usermod cannot do this from outside: the limits are constants compiled into 
 the type of the parallel outputs is chosen inside WLED. WLED's LED settings page shows the
 new limits, which it gets from the firmware.
 
-A second patch, `firmware/patches/020-newer-software.patch`, is for the trial build on
-[the newer USB software](#the-newer-usb-software). Every change in it is held by
+A second patch, `firmware/patches/020-newer-software.patch`, is for the firmware on
+[the newer software](#the-newer-software). Every change in it is held by
 `ESP_IDF_VERSION_MAJOR >= 5`, so on the software known good WLED compiles as before:
 
 | File of WLED | Change |
@@ -1231,6 +1380,83 @@ With 1,800 LEDs the core's work for one dense frame was 6.6 ms compressed and 4.
 uncompressed and a send to ten outputs 7.7 ms, and both fitted into the 20 ms of a frame
 in one loop.
 
+## Changing what the board holds
+
+Five kinds of work change or judge what the board holds, and each does its own part only.
+
+| Work | Tool | What it writes | When it is the one |
+|---|---|---|---|
+| Flashing | `flash`, `install-firmware` | The program in the first firmware slot; `install-firmware` also the network's name and password and the limit on LED current into storage. | A new firmware. It never removes, adds or repairs an animation: storage keeps what it had. |
+| A change by command | `odrigctl upload`, `remove`, `remove many`, `ignore`, `order move`; the operators' app | One animation file and the show file, or the saved order, through the core's own file system calls. | Adding, replacing, removing, leaving out or moving one animation, also while others are unavailable. The first choice. |
+| A change by image | `install-show` | The blocks of storage in which the board's file system changes. | A whole show at once, or when the board does not answer commands. |
+| Quarantine | the core, at every start | Nothing. | A file that cannot be played is unavailable for the boot and listed with its reason; it is repaired by a change by command. |
+| The board's check | the core, after every start | Nothing. | Every installed animation is read to its end while the show plays; `list` gives its size once it is read. |
+| The recovery of storage | `recover-storage` | The blocks of a change by image that was cut. | Only after a change by image that ended with `recovery-needed`. |
+
+**A change by command.** The core writes the new file as `upload.part`, checks it and
+renames it onto its name; for a new name or a removal it also writes the show file as
+`show.part` and renames it onto `show.json`, with the names concerned in `pending.txt`
+until the old file is gone; [core.md](core.md), "The files the core writes", has every
+step. A power cut at any step leaves the old show or the new one, whole; the change is
+committed by one rename. Moving an animation in the saved order writes `order.part` and
+renames it onto `order.txt` the same way. What one change writes:
+
+| Change | What is written | Bytes |
+|---|---|---|
+| Removing one animation | `pending.txt` and the show file | the file's name and a line feed, and the show file |
+| Adding one animation | the file, `pending.txt` and the show file | the file, its name and a line feed, and the show file |
+| Replacing one under its name | the file | the file |
+| The same file again (`odrigctl upload`) | nothing | 0 |
+
+`odrigctl upload` sends the CRC-32 of the file with `upload begin`, and a target whose last
+upload installed that file answers `unchanged`: nothing is sent or written. So an upload
+whose last reply did not arrive is run again safely. A cleanup that a change could not finish is finished by the next change, or by
+the next start.
+
+**A change by image.** `install-show` changes only the files that differ, writes the
+blocks of the change in two parts and compares what it wrote:
+
+1. The blocks the board's file system does not use: the bytes of the new and changed
+   files. A cut here, by a failure of esptool, a cable pulled or Ctrl-C, leaves the board's
+   file system as it was before; the tool says `the change was not made` and restarts the
+   board.
+2. The blocks the board's file system uses: its records, one to four blocks for the
+   change of one file. This is the commit. Ctrl-C waits for its end. A cut here, or a
+   comparison that fails, ends with `recovery-needed`: the board stays in its bootloader,
+   because WLED formats a file system it cannot read when it starts, and
+   `recover-storage` finishes the change.
+3. The chip compares every written block with the new image, and the board restarts.
+
+Measured on a storage 80 % full of animations of 50 to 250 KB (the tests of
+`tests/firmware/test_incremental.py`):
+
+| Change of one animation | WLED's layout, 57 files | The bigger layout, 75 files |
+|---|---|---|
+| Removal | 3 blocks, 12,288 bytes, 2 in use | 3 blocks, 12,288 bytes, 2 in use |
+| Addition of 120,000 bytes | 33 blocks, 135,168 bytes, 2 in use | 33 blocks, 135,168 bytes, 2 in use |
+| Replacement by 140,000 bytes | 37 blocks, 151,552 bytes, 2 in use | 37 blocks, 151,552 bytes, 2 in use |
+| The same folder again | nothing | nothing |
+| A removal as `/odrig` was rebuilt before | 2,046 blocks, 8,380,416 bytes | 2,653 blocks, 10,866,688 bytes |
+
+**What the kept images bring back.** `build/firmware/storage/` keeps the newest eight
+images of the board's storage: the one before each change by image and the one after.
+`recover-storage` uses the new image of a change that was cut. The others are a record:
+no command writes one back, and none holds what the board changed itself since, by
+command or by WLED's settings. A file the change removes or replaces is copied before the
+write when `install-show --keep-copies DIR` asks for it; `read-show` copies every file of
+`/odrig`. The last resort for the whole flash stays the factory backup, written by hand.
+
+**What cannot be cancelled.** A change by command is committed by one rename on the
+board; `upload cancel` and an upload left for 60 seconds leave the show as it was. A
+change by image can be cancelled until its commit; from then on it is finished, by the
+same command or by `recover-storage`. Neither `install-show` nor `recover-storage`
+promises to go back to the storage from before: the kept image from before is a record,
+and `recover-storage --whole` writes the new image, not the old one.
+
+`tests/core/test_incremental.py` and `tests/core/test_powercut.py` cut the power at every
+storage call of the changes by command; `tests/firmware/test_recovery.py` cuts a change by
+image at each of its steps, at both layouts.
+
 ## The regions of the flash
 
 The board has WLED's 16 MB layout. The tool reads the partition table before it writes and
@@ -1286,6 +1512,27 @@ of the bigger one, with its settings and without its show; `big-storage` moves i
 The last resort is the factory backup of the board: one image of the whole 16 MB flash with
 its own checksum file, kept beside this repository. No tool reads or writes it. It is
 written back by hand with esptool, at address `0x0`, after its checksum has been compared.
+
+## Capturing evidence
+
+When the board refuses an animation, restarts, or does something nobody can explain, the
+evidence is gathered before anything is changed, so that the cause can be told apart from
+what was done afterwards.
+
+1. **Say what is there.** Write down the app's version, the show (`list`, every page of it)
+   and which medium is in: `space` says whether a card or a stick is present.
+2. **Read without restarting.** Ask `status` and `fault` with `odrigctl` over the serial
+   port or HTTP, and read the log with `python -m odrigctl --port <port> --log`: a restart
+   would clear what the core keeps, and the kept line of a reset is written once. `status`
+   says `host`, which names the build and the reason of the last reset.
+3. **Keep the bytes.** Copy the animation that is unavailable, as it is on the card or as
+   `read-show` gets it from the board's storage, before anything removes or replaces it.
+   Its reason names what the decoder found in the bytes it was given; whether the storage
+   is damaged or a read went wrong on the way is found by reading the copy again
+   (`node converter/odrig.js check`).
+4. **Change one thing at a time,** and write down what each trial was meant to show and
+   what it showed. Do not alternate broad writes, removals and reinstalls without a
+   question each of them answers.
 
 ## The owner's checks
 
@@ -1888,6 +2135,122 @@ animations, all through the socket marked COM:
 - Not tried yet: a hub with its own power and a stick on the chip's own socket, without
   the Mac there.
 
+**The microSD card.** What the board gave with the card's build, `odrig-microsd.bin` of
+1,765,808 bytes, SHA-256 `fd089753d86c92d9cbfbb2e4823d49428e4b037213b656736636b9dd9a1950a5`,
+on the bigger layout, with the owner's card of 122 animations, 16,475,328 bytes, in the
+reader. [microsd.md](microsd.md#the-board-sessions) has both sessions in full.
+
+- 2026-10-22, the Mac on the chip's own socket only: `flash --image` there, the show and
+  the settings kept; the card mounted, 60001 and 60002 listed, and `play 60001` at 41
+  refreshes a second. Then listed entries disappeared and were found again, in one open
+  session, at 4 MHz, 1 MHz and 400 kHz alike. The 4 MHz image was built again with the
+  same SHA-256 and flashed back.
+- 2026-10-23, both sockets on the Mac and the commands through the socket marked COM,
+  nothing flashed: all 122 animations listed as 60001 to 60122 after the installed one,
+  and no entry lost in 161 samples over fifteen minutes. Four of them played past a
+  loop boundary at 26 to 50 refreshes a second, the largest at 26 to 48, and the
+  playlist went on to the card's animations by itself.
+- Why the first day dropped out and the second did not is not known. The board was left
+  on that image, playing, at brightness 32.
+
+**The run of 2026-10-25.** What the board gave with the firmware of the run, built by
+`python3 firmware/fw.py build` from the branch `seeds-28-to-39-unified`: first from
+8aa68b9, which held seeds 28 to 34, 36, 37 and the rest of 38, `odrig-firmware.bin` of
+1,801,536 bytes, SHA-256 `d57fea4f3b7f24ce158eb09c4778456d5e141461a81c82014157813a88effd22`,
+then from ea73e23, which holds seed 35 too, 1,821,168 bytes, SHA-256
+`868bce6ff06910d780c45ad3088d7255059af1e26ba49bbed975a5b346f7d262`, each written with
+`flash --image` through the socket marked COM, the show and the settings kept, at
+brightness 32. The board held 84 installed animations and no card: `space` gave
+`"external":{"present":false,...}` and the log `sd: card not mounted; no card or unreadable
+file system` at every start, so nothing of the card was tried.
+
+- **Readiness (seed 33).** With the firmware of 8aa68b9, restarted by `read-limit` through
+  COM: the first reply came within a second of the tool's end, already
+  `"readiness":"checking"` with `"to_check":84`; `list` was answered during the check, all
+  84 animations, 35 of them still with `"bytes":null`; the first refreshes were counted
+  within two seconds; the check ended `ready` about 250 seconds after the restart (02:06:30
+  to 02:10:40). `host` gave `odrig_ESP32-S3_16MB_opi Oct 25 2026 02:01:23 internal+microsd
+  reset power-on`. A file that is no ODRG file, `broken-test.odrg`, installed with
+  `--no-check`, was quarantined: `install-show` printed `outcome: degraded: 1 unavailable`,
+  `list` gave it `"bytes":null` and `"fault":"bad-palette-size"`, `play 120` was refused
+  with `unavailable`, and `fault` gave
+  `{"work":"start","file":"broken-test.odrg","record":0,"bytes":0,"reason":"bad-palette-size"}`.
+  A restart through the chip's own socket (`host` then said `reset other`) left on COM
+  `#log 0.368 odrig: before this start: file broken-test.odrg unavailable:
+  bad-palette-size` before the player's own line of that start. The install that took the
+  file away printed `outcome: healthy`. With the firmware of ea73e23 `status`, `host` and
+  `fault` were the same, and the reproducer of seed 31 ended `degraded`.
+- **Content changes (seed 34).** With the firmware of 8aa68b9: `odrigctl remove 84` was
+  answered in 0.95 s; `odrigctl upload 101 hebrew.marquee.odrgx`, 113 bytes, `committed`
+  in 2.7 s; the same upload again `unchanged: the target holds this file already; nothing
+  was sent`, `{"ok":true,"unchanged":true}`, in 0.69 s. `install-show --no-check
+  --keep-copies` of a folder without the other 20 line tests and with a bad file wrote 18
+  blocks, 73,728 bytes, 2 free first and then 16 in use, committed and compared, 280 s in
+  all with the board's check after it, and kept 22 copies; the install that took the bad
+  file away wrote 5 blocks, 20,480 bytes. `read-show` gave the manifests before (84
+  animations), between (93 items, with the texts, the clocks and `order.txt`) and after
+  (73 items). With the firmware of ea73e23, which keeps the catalog: `remove 107` in 2.2 s,
+  the catalog's generation from 1 to 2 and its entries from 73 to 72; the upload of the
+  same file in 2.4 s, generation 3, 73 entries; the same upload again `unchanged`; a
+  checked `install-show --keep-copies` that took the reproducer of seed 31 away wrote 9
+  blocks, 36,864 bytes, the catalog with them, in 68 s, `outcome: healthy`. The app was not
+  flashed.
+- **Bounded decoding (seed 31).** With no card, the reproducer, `python3 -m
+  tests.core.huge_tail` (65,263 bytes that inflate to 64 MiB of zeros after a bad record),
+  went into the board's own storage as item 130 with `install-show --no-check`, firmware
+  of ea73e23. The check reached it after the 73 others and read it for about three and a
+  half minutes (06:12:53 to 06:16:23). Meanwhile 29 samples of `status` over the chip's
+  own socket took 0.43 to 0.61 s each through the command tool, 0.43 to 0.46 s before it,
+  the refreshes stayed at 31 to 50 a second, and `host` kept `reset power-on`: no watchdog
+  reset. The check ended `degraded`, the file quarantined with `bad-palette-index` after
+  67,112,475 bytes of its body. Open: the reproducer on the card, and the time of each of
+  the core's calls on the board, which the command tool's round trip does not show.
+- **Quarantine (seed 32).** A bad file in the board's storage, and the reproducer: the
+  board started, answered at once, played the rest at 49 refreshes a second, and `list`
+  marked each with its `fault`. Open: a bad file on the card, and the owner's look at the
+  app and the LEDs.
+- **The saved order and the tests (seed 36).** The 21 line tests went: `lines-test.odrg`
+  and `rainbow-lines-01` to `-20`, id 84 by `remove` and the others by `install-show`.
+  `order move <revision> 101 1` put 101 first and `play all` began with it; 110 before
+  101 likewise. `mapping test snake 1` to `20` were each `{"ok":true}`, with `mapping get`
+  giving `"snake":<n>`, and `snake 21` was `bad-argument`; `mapping test on` and `off`
+  likewise. Open: a card entry absent and back, and Snake 1 to 20 and the diagonal seen on
+  the LEDs, which is the owner's look.
+- **Texts and clocks (seed 37).** Ten files of `tests/vectors` uploaded as ids 101 to 110:
+  the texts `hebrew.marquee`, `mixed.pan`, `finals.slide`, `english.static`, `rtl.down`,
+  `tall.up` and `multiline.wrap`, and the clocks `analog`, `digital` and `melting`. Played
+  one by one, `status` three seconds later gave 41, 50, 42, 50, 50, 50 and 32 refreshes a
+  second for the texts and 28, 48 and 23 for the clocks, each clock with its `seed`, and
+  `list` gave `"type":"text"` and `"type":"widget"`; with the firmware of ea73e23, 40, 38
+  and 23 for 101, 108 and 110. Open: the owner's look at the LEDs and at the app.
+- **The catalogs (seed 35).** With the firmware of ea73e23 `catalog` first gave
+  `"internal":{"state":"none","uncataloged":73},"external":{"state":"absent"}`. `catalog
+  rebuild internal` read the 73 files, its progress in `catalog`, and ended
+  `"state":"ok","generation":1,"entries":73`. A restart then answered `ready`, 73
+  checked, at its first reply, about two seconds after the tool's end, gave `list` with
+  every size at once, and played within four seconds, where without the catalog the
+  check had ended about 250 seconds after a restart. A checked `install-show` writes the
+  catalog too, and an unchecked one that names no catalog removes it. Open: everything of
+  the card, its catalog, uploads to it and removals from it, and the board keeping only one
+  or two small animations inside, which waits for the card.
+- **The card (seed 38).** Not mounted at any start of the run: tasks 8 and 9 are open.
+- **Not explained.** The first `catalog rebuild internal`, sent through COM while the check
+  after a start was under way, was followed by a restart whose reason `host` gave as
+  `panic`; five rebuilds after it, two of them cancelled and two begun as that one was,
+  through either socket while the check of a start without a catalog was under way, ran
+  without one, and the panic's text was not captured. While a rebuild runs, `status` counts the files it has still to
+  read in `to_check` (60 became 72). After a `read-limit` failed because another program
+  had the COM socket open, every restart through the chip's own socket started the chip in
+  its download mode (`rst:0x15 (USB_UART_CHIP_RESET),boot:0x0`), so that it answered on
+  neither socket; a reset through COM with the boot line released started it normally
+  (`boot:0x8`), and `flash` through COM put the firmware back.
+- **The board was left** on the firmware of ea73e23 with 73 animations, the ten texts and
+  clocks among them, the internal catalog `ok` at generation 1 after a last rebuild, the
+  order beginning with 101, playing at brightness 32. Long reads of the storage through
+  COM broke off at 5 to 8 percent several times late in the session, where they had not
+  before; through the chip's own socket they did not, and its restart was followed by a
+  reset through COM.
+
 ## Live pin assignments
 
 The shared core durably commits a whole pin permutation through the mapping command
@@ -1898,4 +2261,4 @@ cannot split a frame between two assignments. The standalone output adapter foll
 the same pin lookup contract. Its current main program remains a seed-12 trial,
 not a complete standalone player or evidence that app control works on that trial.
 
-The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never writes or formats removable media. Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.
+The shared core handles `ignore ID 0|1` and atomic `remove many IDS` over serial and HTTP. The WLED drive adapter supplies optional external free/total bytes from FAT free clusters under its mutex. It never formats removable media, never writes a USB stick, and changes only files of a card's folder `odrig`, as the core asks ([microsd.md](microsd.md#plugging-in-and-pulling-out)). Unsupported hosts report unavailable capacity; the standalone image remains its existing trial, not a complete player.

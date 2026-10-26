@@ -3,17 +3,21 @@
 
 import * as client from "./client.js";
 import * as messages from "./messages.js";
-import * as showScreen from "./screens/show.js";
-import * as storageScreen from "./screens/storage.js";
-import * as mappingScreen from "./screens/mapping.js";
+import * as authoring from "./screens/author.js";
+import * as catalogs from "./screens/catalogs.js";
+import * as animationsScreen from "./screens/show.js";
+import * as uploadScreen from "./screens/storage.js";
+import * as settingsScreen from "./screens/mapping.js";
+import * as photomap from "./screens/photomap.js";
 import * as targetScreen from "./screens/target.js";
 
-const SCREENS = ["show", "storage", "mapping", "target"];
+const SCREENS = ["animations", "upload", "settings", "target"];
+const LINKS = {checking: "Checking", answers: "Connected", "no-answer": "No answer"};
 let screen = "target";
 // The screen of the app's first entry of the page's history: the target screen until
-// the target has answered, the show screen from then on.
+// the target has answered, Animations from then on.
 let first = "target";
-// Whether the show screen was shown by itself after the target's first answer.
+// Whether Animations was shown by itself after the target's first answer.
 let led = false;
 
 function byId(id) {
@@ -27,7 +31,11 @@ function show(name) {
     byId(`to-${other}`).setAttribute("aria-current", String(other === name));
   }
   client.showing(name);
-  mappingScreen.showing(name === "mapping");
+  settingsScreen.showing(name === "settings");
+  photomap.showing(name === "settings");
+  catalogs.showing(name === "settings");
+  animationsScreen.showing(name === "animations");
+  targetScreen.showing(name === "target");
 }
 
 // Shows a text in the place for messages until it is dismissed or another takes its
@@ -47,7 +55,8 @@ function isField(element) {
 }
 
 // A long press or a right click opens a menu only in a field one types into, as the
-// style sheet lets text be marked only there. Nothing of the app is done by a long press.
+// style sheet lets text be marked only there. A long press on a row of the list lifts it
+// to be moved, which the list itself handles.
 document.addEventListener("contextmenu", (event) => {
   if (!isField(event.target)) {
     event.preventDefault();
@@ -106,21 +115,27 @@ window.addEventListener("popstate", (event) => {
     show(event.state.screen);
   }
 });
-byId("to-show").addEventListener("click", () => go("show"));
-byId("to-storage").addEventListener("click", () => go("storage"));
-byId("to-mapping").addEventListener("click", () => go("mapping"));
-byId("to-target").addEventListener("click", () => go("target"));
+for (const name of SCREENS) {
+  byId(`to-${name}`).addEventListener("click", () => go(name));
+}
+byId("add-animation").addEventListener("click", () => go("upload"));
 
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
-showScreen.start({message});
-storageScreen.start({message});
-mappingScreen.start();
+animationsScreen.start({message});
+uploadScreen.start({message});
+authoring.start({message, go});
+settingsScreen.start();
+photomap.start();
+catalogs.start({message});
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
-  // The app begins on the target screen and goes to the show screen as soon as the
-  // target has answered once. The show screen is the app's first screen from then on.
+  const pill = byId("top-link");
+  pill.textContent = LINKS[state.link];
+  pill.dataset.link = state.link;
+  // The app begins on the target screen and goes to Animations as soon as the target has
+  // answered once. Animations is the app's first screen from then on.
   if (!state.answered) {
     led = false;
   } else if (!led) {
@@ -128,9 +143,9 @@ client.watch((state) => {
     if (screen === "target" && onTop()) {
       window.history.back();
     } else if (screen === "target") {
-      window.history.replaceState({screen: "show", depth: 0}, "");
-      first = "show";
-      show("show");
+      window.history.replaceState({screen: "animations", depth: 0}, "");
+      first = "animations";
+      show("animations");
     }
   }
 });

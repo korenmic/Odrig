@@ -17,6 +17,64 @@ export function ofInvalidShow(reason) {
   return `The installed show is invalid: ${reason}.`;
 }
 
+// A reason the installation gives for a file, in words.
+function faultWords(reason) {
+  return {
+    "file-missing": "the file is missing",
+    "read-error": "the file cannot be read",
+    "size-mismatch": "the file is made for another canvas",
+    "duplicate-id": "no id is left for it",
+  }[reason] ?? "the file is damaged";
+}
+
+// Why an animation is unavailable, in words, from the reason the installation gives for
+// its file, which follows in brackets.
+export function ofFault(reason) {
+  return `Unavailable: ${faultWords(reason)} (${reason}).`;
+}
+
+// What the show screen says of the installation's reading of its animations after a
+// start: how far it is while it reads them, and how many are unavailable when it has read
+// them all and some are; null when there is nothing to say.
+export function ofProgress(progress) {
+  if (progress === null) {
+    return null;
+  }
+  if (progress.readiness === "checking") {
+    const unavailable = progress.unavailable > 0 ? `, ${progress.unavailable} unavailable` : "";
+    return `Reading the animations: ${progress.checked} read, ${progress.toCheck} to read${unavailable}.`;
+  }
+  if (progress.readiness === "degraded") {
+    return `${progress.unavailable} ${progress.unavailable === 1 ? "animation" : "animations"} unavailable; the others play.`;
+  }
+  return null;
+}
+
+// The line of the target screen that names the installation, as its software names
+// itself.
+export function ofHost(host) {
+  return `Installation: ${host}`;
+}
+
+// What the installation was doing with a file when it met a fault in it.
+const WORKS = {
+  start: "checked after the start",
+  play: "played",
+  upload: "checked after its upload",
+  drive: "read from the external storage",
+};
+
+// The last fault the installation met in a file, in words, with the reason it gives in
+// brackets and where in the file it was.
+export function ofLastFault(fault) {
+  return `Last fault: ${fault.file}, while it was ${WORKS[fault.work]}, at frame record ${fault.record} after ${fault.bytes} bytes of its frames: ` +
+    `${faultWords(fault.reason)} (${fault.reason}).`;
+}
+
+// The line under an unavailable file of external storage, which the installation does not
+// change.
+export const MENDED_ELSEWHERE = "Fix it on a computer: the card is read-only here.";
+
 // The line of the show screen while the target does not answer.
 export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
@@ -43,17 +101,26 @@ const REFUSALS = {
   "bad-argument": NOT_UNDERSTOOD,
   "show-invalid": (line, reason) =>
     `${reason === null ? "The installed show is invalid." : ofInvalidShow(reason)} Nothing can be played until a show is installed over USB.`,
-  "unknown-id": (line) => line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  "unknown-id": (line) => line.startsWith("order ") ? "That animation is not on the installation any more. The list is read again." : line.startsWith("remove many ") ? "Some selected animations are not installed any more. Refresh the selection." : (line === "play all" ? "No animation is installed." : `Animation ${line.split(" ")[1]} is not installed any more.`),
+  unavailable: (line) => line.startsWith("read ") ? `Animation ${line.split(" ")[1]} cannot be read until it is replaced: its file has a fault. The list says which.`
+    : `Animation ${line.split(" ")[1]} cannot be played until it is replaced: its file has a fault. The list says which.`,
   busy: () => "The installation is busy. Try again in a moment.",
   "in-use": (line) =>
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
     line.startsWith("ignore ") ? "Only installed animations support playlist inclusion." :
+    line.startsWith("order ") ? "A cycle has no place in the order of the playlist." :
     line.startsWith("upload ")
       ? "That name or id is in use on the installation. The list is asked for again; upload again."
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
+  "read-only": (line) =>
+    line.startsWith("catalog ") ? "That storage cannot be written now, so its catalog cannot be rebuilt." :
+    line.startsWith("upload ") ? "The card cannot be written now. Choose This board to store the animation on the board." :
+    `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
+  "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
+  stale: () => "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
-  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null).replace(/ \(no-space\)$/, ""),
+  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,
   "bad-checksum": NOT_WHOLE,
   incomplete: NOT_WHOLE,
@@ -61,21 +128,33 @@ const REFUSALS = {
   "no-upload": () => "The installation dropped the upload, after the app was away for a minute or more. Upload again.",
 };
 
-// What the app says of an animation that does not fit into the free storage. The free
-// bytes are null when the app does not know them.
-export function ofNoSpace(bytes, free) {
-  const room = free === null ? "more than the installation has free" : `and the installation has ${kilobytes(free)} KB free`;
+// What the app says of an animation that does not fit into the free storage, of the
+// installation or, as `where` says, of the card. The free bytes are null when the app
+// does not know them.
+export function ofNoSpace(bytes, free, where = "the installation") {
+  const room = free === null ? `more than ${where} has free` : `and ${where} has ${kilobytes(free)} KB free`;
   return `The animation needs ${kilobytes(bytes)} KB, ${room}. (no-space)`;
 }
 
-// What the app says when an upload succeeded. It is no failure and has no code.
-export function ofUploaded(id, file) {
-  return `Uploaded as animation ${id} ${file}. It plays in the playlist.`;
+// What the app says when an edited animation was saved. It is no failure and has no code.
+export function ofSaved(id, file) {
+  return `Saved animation ${id} ${file}.`;
+}
+
+// What the app says when an upload succeeded, to the board's own storage or to the card,
+// whose reply gives the id, null when it gives none. It is no failure and has no code.
+export function ofUploaded(id, file, external = false) {
+  if (!external) {
+    return `Uploaded as animation ${id} ${file}. It plays in the playlist.`;
+  }
+  return id === null ? `Uploaded ${file} to the card. It plays in the playlist.` : `Uploaded to the card as animation ${id} ${file}. It plays in the playlist.`;
 }
 
 // What the app says when an animation cannot be made from a file, by the reason: its own,
 // or one of the library that makes it, whose text is given as the detail.
 const CONVERSIONS = {
+  "unsupported-character": (detail) => `The fonts have no letter for ${detail.replace(/^[^:]*: /, "")}. Write English letters, digits, signs and Hebrew letters.`,
+  "does-not-fit": (detail) => `The text cannot be seen whole on the canvas with this effect: ${detail.replace(/^[^;]*; /, "")}.`,
   "no-canvas": () => "The installation has no usable mapping, so the app does not know the canvas to convert for.",
   "no-gif-decoder": () => "This phone's web view cannot read GIF files. Update Android System WebView.",
   "unreadable-media": () => "The phone cannot read this file as a video or a GIF.",
@@ -84,13 +163,16 @@ const CONVERSIONS = {
 };
 
 export function ofConversion(failure) {
-  const text = Object.prototype.hasOwnProperty.call(CONVERSIONS, failure.reason) ? CONVERSIONS[failure.reason]() : `The animation cannot be made: ${failure.detail}.`;
+  const text = Object.prototype.hasOwnProperty.call(CONVERSIONS, failure.reason) ? CONVERSIONS[failure.reason](failure.detail) : `The animation cannot be made: ${failure.detail}.`;
   return `${text} (${failure.reason})`;
 }
 
-// The question before an animation is removed.
+// The question before an animation is removed: from the board, or from the card, whose
+// file is deleted.
 export function ofRemoval(animation) {
-  return `Remove animation ${animation.id} ${animation.file} from the installation?`;
+  return animation.external === true
+    ? `Remove animation ${animation.id} ${animation.file}? Its file is deleted from the card.`
+    : `Remove animation ${animation.id} ${animation.file} from the installation?`;
 }
 
 // What the app says when an animation was removed. It is no failure and has no code.

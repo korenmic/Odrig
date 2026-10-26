@@ -53,12 +53,9 @@ function u16(bytes, at) {
   return bytes[at] | (bytes[at + 1] << 8);
 }
 
-// Reads an ODRG file given as bytes.
-//
-// The result is `{width, height, paletteSize, compressed, records, modes}`. `records` has
-// one `{ms, picture}` for every frame record, in order: its duration and the picture the
-// pixel buffer holds after it. `modes` has the mode byte of every record.
-export function decode(data) {
+// The checked header of an ODRG file given as bytes, the file's first 16 bytes:
+// `{width, height, paletteSize, frameCount, compressed, n}`.
+export function header(data) {
   if (data.length < HEADER_SIZE) {
     throw new Rejection(TRUNCATED, `the file ends inside the ${HEADER_SIZE}-byte header`);
   }
@@ -92,8 +89,17 @@ export function decode(data) {
   if (frameCount === 0) {
     throw new Rejection(NO_FRAMES, "the frame count is 0");
   }
+  return {width, height, paletteSize, frameCount, compressed: (flags & COMPRESSED) !== 0, n};
+}
 
-  const compressed = (flags & COMPRESSED) !== 0;
+// Reads an ODRG file given as bytes.
+//
+// The result is `{width, height, paletteSize, compressed, records, modes}`. `records` has
+// one `{ms, picture}` for every frame record, in order: its duration and the picture the
+// pixel buffer holds after it. `modes` has the mode byte of every record.
+export function decode(data) {
+  const {width, height, paletteSize, frameCount, compressed, n} = header(data);
+  const bpp = paletteSize > 0 ? 1 : 3;
   const body = compressed ? inflated(data.subarray(HEADER_SIZE)) : data.subarray(HEADER_SIZE);
   let position = 0;
   const take = (count, what) => {

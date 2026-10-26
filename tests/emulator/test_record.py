@@ -91,8 +91,7 @@ class Recording(unittest.TestCase):
         self.assertEqual([path.name for path in self.work.iterdir() if path.name.endswith(".part")], [])
 
     def test_a_script_that_uploads_acts_on_the_folder_and_gives_the_same_recording_from_the_same_folder(self):
-        # The first second is the core's: it reads the two files of the show to their ends
-        # and takes no upload before it has.
+        # An upload opened at the start holds the check of the show's files until it ends.
         clip = core_support.clip(9, 60, 6, (20,) * 10)
         lines = core_support.upload_lines(9, "clip.odrg", clip, 100)
         commands = [(0, f"upload begin 9 clip.odrg {len(clip)}")]
@@ -108,14 +107,14 @@ class Recording(unittest.TestCase):
             recordings.append(((self.work / f"{number}.odrr").read_bytes(), printed, files))
         self.assertEqual(recordings[0], recordings[1])
         printed = recordings[0][1]
-        self.assertEqual(printed[0], 'reply 0 {"ok":false,"error":"busy"}')
+        self.assertEqual(printed[0], 'reply 0 {"ok":true,"chunk":1500}')
         self.assertIn('reply 1200 {"ok":false,"error":"busy"}', printed)
         self.assertIn('reply 1420 {"ok":true}', printed)
         self.assertIn('reply 1900 {"ok":false,"error":"in-use"}', printed)
         state = json.loads(printed[-1].split(" ", 2)[2])
         self.assertEqual((state["playing"], state["animation"]), ("all", 9))
         refreshes, replies = support.reference(support.files_of(self.example()), tick_times(3), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
         self.assert_equals_reference(recfile.read(self.work / "1.odrr"), refreshes)
 
     def test_the_storage_option_goes_with_record_mode(self):
@@ -156,13 +155,13 @@ class Recording(unittest.TestCase):
         animations = [json.loads(line.split(" ", 2)[2])["animation"] for line in printed]
         self.assertEqual(animations, [1, 2, 2, 1, 1, 2])
         _, replies = support.reference(support.files_of(folder), tick_times(46), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
 
     def test_a_script_with_every_command_gives_the_replies_and_the_led_data_of_the_reference(self):
         folder = self.example()
         recording, printed = self.record(folder, 4, SCRIPT)
         refreshes, replies = support.reference(support.files_of(folder), tick_times(4), SCRIPT)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(SCRIPT, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(SCRIPT, replies)]))
         self.assert_equals_reference(recording, refreshes)
         codes = [json.loads(reply).get("error") for reply in replies]
         self.assertEqual(sorted(set(filter(None, codes))), ["bad-argument", "line-too-long", "unknown-command", "unknown-id"])
@@ -179,11 +178,12 @@ class Recording(unittest.TestCase):
     def test_play_on_an_invalid_show_is_show_invalid_and_the_leds_stay_dark(self):
         files = core_support.example_show()
         del files["dvd.odrg"]
+        files = core_support.with_show_fault(files)
         folder = self.installed(files)
         commands = [(100, "play 1"), (200, "status")]
         recording, printed = self.record(folder, 1, commands)
         self.assertEqual(printed[0], 'reply 100 {"ok":false,"error":"show-invalid"}')
-        self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["error"], "file-missing dvd.odrg")
+        self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["error"], "undefined-id 99")
         refreshes, _ = support.reference(files, tick_times(1), commands)
         self.assert_equals_reference(recording, refreshes)
         self.assertTrue(all(tick.produced and tick.data == bytes(1080) for tick in recording.ticks))
@@ -319,7 +319,7 @@ class Recording(unittest.TestCase):
         commands = [(990, "brightness 3"), (999, "status")]
         _, printed = self.record(folder, 1, commands)
         _, replies = support.reference(support.files_of(folder), tick_times(1), commands)
-        self.assertEqual(printed, [f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)])
+        self.assertEqual(support.without_host(printed), support.without_host([f"reply {time} {reply.decode('ascii')[:-1]}" for (time, _), reply in zip(commands, replies)]))
         self.assertEqual(json.loads(printed[1].split(" ", 2)[2])["brightness"], 3)
 
     def test_a_script_may_hold_comments_empty_lines_and_carriage_returns(self):
@@ -428,7 +428,8 @@ class Recording(unittest.TestCase):
         script.write_text("0 status\n", encoding="utf-8")
         result = support.run_module(folder, "--record", self.out, "--seconds", "0.5", "--script", script)
         self.assertEqual((result.status, result.err), (0, ""))
-        self.assertEqual(result.out, 'reply 0 {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6}\n')
+        self.assertTrue(result.out.startswith("reply 0 ") and result.out.endswith("}\n") and result.out.count("\n") == 1, result.out)
+        self.assertEqual(support.without_fps(result.out[len("reply 0 "):]), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
         self.assertEqual(len(recfile.read(self.out).ticks), 25)
         failed = support.run_module(self.work / "none", "--record", self.out, "--seconds", "0.5")
         self.assertEqual(failed.status, 1)

@@ -22,6 +22,14 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply);
 uint32_t content_remove(Core &core, uint32_t id, Reply &reply);
 uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Reply &reply);
 uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply);
+
+// The most bytes `read` gives in one reply.
+const uint32_t kReadMost = 600;
+
+// `read`, on a valid show whose files the check after the start has read: up to kReadMost
+// bytes of the file of an animation of the show or of the drive, from an offset, with the
+// size of the file.
+uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply);
 struct ShowChange;
 bool content_removed(const Core &core, uint32_t position, const ShowChange &change);
 
@@ -45,12 +53,12 @@ struct ShowChange {
 bool content_write_show(Core &core, const ShowChange &change);
 
 // Adds an animation item with a file of its own at the end of the tables. There is room.
-void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms);
+void content_add_item(Core &core, uint32_t id, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type = kTypeFrames);
 
 // Gives the animation item at a position another file: its name, its size and its total
 // duration. When another item names the item's old file too, the item gets an entry of
 // its own at the end of the file table.
-void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms);
+void content_change_file(Core &core, uint32_t position, const char *name, uint32_t bytes, uint64_t total_ms, uint8_t type = kTypeFrames);
 
 // Takes the item at a position out of the tables: the items after it move up, its
 // entries leave the entry table when it is a cycle, and its file leaves the file table

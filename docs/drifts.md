@@ -8930,3 +8930,1478 @@ the authority for every mutation and capacity fact.
 
 **Resolution.** `app/www/commands.js`, the Show and Storage screens, and
 `docs/android-app.md` describe and implement this compatibility behavior.
+
+## Seed 28: where the two numbers stand
+
+**Question.** The seed asks for a line of its own for the external number, hidden when no
+medium is plugged in, but seed 29 has since put a line of the external storage's capacity
+on the same dashboard, which says `absent` when there is none. Two lines about one medium?
+
+**Answer.** One line each, the lines seed 29 made: the number goes before the capacity,
+`Internal storage: 84 animations, free …` and `External storage: 12 animations, free …`.
+While the medium is absent, the external line says `absent` with no number and no label
+of a number, which is what the owner asked for on 2026-10-16: the label or the value is
+missing. A present medium without animations says `0 animations`, as the owner answered.
+The storage screen's lines are made by the same code and say the same words.
+
+**Resolution.** `docs/specs/28-p2-the-apps-count-of-installed-and-stick-animations/`,
+Requirements 1 and 2; `app/www/capacity.js`.
+
+## Seed 28: numbers that cannot be known
+
+**Question.** While the board reads its animations after a start, `list` answers `busy`;
+while the show is invalid, `space` reports 0 animations and `list` is refused. What do the
+lines say then?
+
+**Answer.** The internal number comes from `space`, which answers from the start; while
+the newest status reports an invalid show it says `animations not known`, as 0 would be
+wrong. The external number needs a complete list: while the newest list request was
+answered `busy`, before the first list, and when the difference of the list and `space`
+falls below 0 for a moment between their two replies, it says `animations not known yet`.
+When a later seed marks each item's storage in `list`, the app counts by that mark in
+place of the difference; the ids are never used.
+
+**Resolution.** Requirements 3 and 4 of the spec; `app/www/client.js`, `state.listBusy`.
+
+## Seed 31: no new limit on a body's size
+
+**Question.** The seed asks for explicit expansion limits, and a limit would end the
+reproducer quickly; but the format says a compressed body is inflated whole before its
+records count, and a limit would change which reason an overlong bad file gets, in the
+converter and the Python library too. Limit, or slices?
+
+**Answer.** Slices, and no new limit. Settling inflates on in slices of 32 KiB, one per
+call, and ends with the very reason a whole-file reader gives, so the format and its
+other readers do not change. A huge tail only takes longer to settle, in the background,
+while every command is answered; seed 32 makes the file's animation unplayable as soon as
+its first defect is found, before settling ends.
+
+**Resolution.** `docs/specs/31-p0-bounded-decoding-and-responsive-fault-handling/`,
+Requirement 1.
+
+## Seed 31: the budgets, and the reproducer on the board
+
+**Question.** Must the budgets wait for a board session, and how does the reproducer reach
+the board, which the seed forbids to install as an ordinary animation?
+
+**Answer.** The budgets are set from what is on record (seed 05's 9 to 17 ms for a dense
+frame, seed 14's timings, Codex's captures): 32 KiB a settling slice, 128 KiB of catch-up a
+refresh, 50 ms a call, 250 ms a host's read. The board session measures them. The
+reproducer goes on the microSD card for that session, never into the board's own storage,
+and is taken off again. The check at the start of a host that cannot change its storage,
+the emulator's record mode, still reads whole files in one call: nothing waits on it.
+
+**Resolution.** The spec's design, "Budgets and their reasons"; task 5.
+
+## The serial run of 2026-10-24: which suites before a commit
+
+**Question.** Every task's rules say to run every suite before its commit, about seventeen
+minutes; the owner's run of 2026-10-24 has about forty tasks in eight hours. Every suite
+before every commit, or not?
+
+**Answer.** Every suite at the end of each seed, before its branch is pushed, and before
+each task's commit the suites of the parts the task changed, always the core's, the
+onboarding's and the documents' tests among them. A task that changes the core runs the
+core's and the emulator's suites; one that changes the app runs the app's; one that
+changes the firmware runs the firmware's. A failure found at a seed's end is mended in a
+commit of its own before the push.
+
+**Resolution.** The commits of the run say which suites ran.
+
+## Seed 31: the name of the internal result `pending`
+
+**Question.** The design names the internal result `kPending`, but `core/src/storage.h`
+already has a constant `kPending`, the name of the file `pending.txt`. Rename that one, or
+name the result otherwise?
+
+**Answer.** The result is `kPendingWork`, a value of `Reason` after `kReasonCount`, with
+no name; the file's constant keeps its name, as the rules of the run ask to add and not
+rename. The documents call the result `pending`, as the spec does.
+
+**Resolution.** `core/src/reasons.h`.
+
+## Seed 31: slices of 7 bytes without a second build of the host
+
+**Question.** The design has the core's tests build a second test host with
+`-DODRIG_SETTLE_SLICE=7`. That is a second compilation of every source with the
+sanitizers, in the makefile and in `core/build.py` for Windows. Is there a lighter way that
+tests the same code?
+
+**Answer.** The size of a slice is a field of the decoder, `settle_slice`, which `open`
+sets to `kSettleSliceBytes`. The test host's `decode --slice BYTES` sets it after `open`
+and decodes as the core's whole-file check does, calling again while the decoder gives
+`pending`, and prints how many calls gave it. Every vector, 1,500 damaged copies and the
+reproducer give the same records and reasons in slices of 7 bytes, and of 1, as in one
+call. The core and its build are the same everywhere.
+
+**Resolution.** `core/src/odrg_decoder.h`, `tests/core/host/host.cpp`,
+`tests/core/test_bounded.py`.
+
+## Seed 31: empty DEFLATE blocks inside one byte of output
+
+**Question.** Settling is bounded now. Is any other call of the decoder unbounded?
+
+**Answer.** One is, and it is a gap of the spec, not of this seed's tasks: the DEFLATE
+decoder's `get` goes on through blocks that give no byte until one does, and a block with
+the fixed codes builds its tables anew. A crafted stream of many empty blocks, a few
+hundred kilobytes of them, could hold one call of `get` for seconds. Valid files from the
+converter have no empty blocks. Mending it means a limit on blocks without output, which
+changes what the format accepts (an owner's decision, docs/format.md), or a decoder that
+can stop between blocks inside a frame record, which is larger than this seed. It is
+proposed to the owner as new work and left as it is.
+
+**Resolution.** None yet; said to the owner in the run's report.
+
+## Seed 31: what a refresh shows while the player catches up
+
+**Question.** The design says a refresh that brought no picture keeps the picture before.
+What does `status` report as the animation then, and is there content that never catches
+up?
+
+**Answer.** The LEDs keep the LED data of the refresh before, and `status` keeps naming
+the animation that picture came from until a picture of the new one is shown. A refresh
+decodes at most 131,072 bytes of a body, a record's boundary after it, and always one
+record; a settling slice counts against it, so a settling takes one slice a refresh. A
+clip whose frames last less than its records take to decode at that rate, such as frames
+of 1 ms on a dense 60 x 60 canvas, would fall further behind at every refresh and keep its
+picture: no file of the converter has such frames, and the board could not show them in
+time before either. A file that settles longer than a cycle's turn lasts begins its
+settling again at each of its turns, as it opens anew; the check after the start, which
+reads files beside playback and is not bound to turns, comes to its reason.
+
+**Resolution.** `core/src/player.cpp`, `next_record` and `advance`.
+
+## Seed 31: what the fault's context names, and how the emulator measures a call
+
+**Question.** The design keeps the file's name in the fault's context, but a drive's file
+is known to the core as `drive/<place>`; and the emulator cannot time a call of the core
+from outside. What is kept, and what is measured?
+
+**Answer.** A drive's file is kept by the name the host gives it, cut to 32 characters,
+as an installed file is; a file that did not open was at record 0 with no body read. An
+upload whose bytes read back differ from those received has no reason and leaves the
+context as it was. The emulator's suite measures what a command waits: the time from a
+`status` line on the line port to its reply, which holds the wait for the core's lock and
+the call. With a show that plays the reproducer in a cycle and checks it after a sound
+file of 3,000 frames, every wait stays within 50 ms on the Mac; the core before seed 31
+made one wait 122.8 ms.
+
+**Resolution.** `core/src/core_state.h`, `FaultContext`; `tests/emulator/test_bounded.py`.
+
+## Seed 32: which faults still make the show invalid
+
+**Question.** The seed keeps mapping and show-file faults apart from animation faults and
+asks for a safe recovery state for the first. Which reasons quarantine one file, and what
+is the recovery state?
+
+**Answer.** `file-missing`, `size-mismatch`, `read-error` while a file is read, and every
+reason of "ODRG files" belong to one file and quarantine it. The reasons of the mapping
+file and of the show file, `duplicate-id`, `undefined-id`, `nested-cycle` and
+`out-of-memory` still make the show invalid, as they did: without a show there are no
+safe ids to act on. The invalid show is the recovery state: `status` reports the fault,
+the LEDs are dark, and the commands that need a show are refused with `show-invalid`;
+the board is put right by installing a show, as before.
+
+**Resolution.** The spec's requirements 1.1 to 1.3; `docs/show.md`.
+
+## Seed 32: the names of the additions
+
+**Question.** How does a reply mark an unavailable animation, and how is `play` of one
+refused?
+
+**Answer.** A `list` item gets the member `fault`, the name of the reason, only when the
+animation is unavailable: a reply stays as it was for a usable one, and the member adds
+the reason the app shows. `bytes` is `null` for a file not read whole. `play` of an
+unavailable animation, or of a cycle without a usable member, is refused with the new
+error code `unavailable`. A quarantine writes `file <name> unavailable: <reason>` to the
+log, beside the drive's `drive file <name> left out: <reason>`.
+
+**Resolution.** `docs/commands.md`; the spec's design, "Commands and replies".
+
+## Seed 32: what "the same content" of a drive's file is
+
+**Question.** A quarantined file must not be tried again when its medium is taken up
+again in the same boot, but a card swapped in may hold another file of the same name. The
+host gives the core no size and no identity of a card. What is the content's identity?
+
+**Answer.** The file's name on the drive, the bytes of its first read, at most 512, and
+their CRC-32: the one read the check's header step makes anyway. A remembered file is
+left out again after that read, without its body being decoded. The core remembers the
+last 16 files left out in the boot, 704 bytes; one pushed out is checked again, under the
+bounds of seed 31. Two files that agree in name and in their first 512 bytes and differ
+after them are taken for the same.
+
+**Resolution.** The spec's design, "A drive".
+
+## Seed 32: entries of a medium that is gone
+
+**Question.** The seed asks to keep known entries as unavailable when their medium
+disappears. The core knows a drive's file names only through the host, while the drive is
+in, and has no room for 256 names of 127 bytes. Keep them, or drop them?
+
+**Answer.** A pulled drive's files leave the playlist and `list` as today; the files of
+the next drive are checked and listed anew, and a remembered one is left out again. Keeping
+the entries of an absent medium needs its metadata in the core, which the managed catalog
+of seed 35 brings; it is left to that seed.
+
+**Resolution.** The spec's requirement 6.2; seed 35.
+
+## Seed 32: when the player meets a defect that settles long
+
+**Question.** Seed 31's drift log said that seed 32 makes an animation unplayable as soon
+as its first defect is found, before settling ends. Must the player stop at once?
+
+**Answer.** No. The reason a file is reported with is the one settling ends with, and the
+player keeps the picture before while it settles, a slice a refresh. The check after the
+start settles the same file sixteen slices a refresh beside it, and whichever ends first
+quarantines the file; then the player goes on with the next animation. For the
+reproducer of seed 31 that is under three seconds. A report before settling ends could
+name a reason the file does not have.
+
+**Resolution.** The spec's requirement 2.2.
+
+## Seed 32: the commands of repair during the check
+
+**Question.** `list`, `remove` and `upload begin` wait for the check after the start
+today, because it reads the files they change and owns the decoders an upload's check
+needs. How do they stay open during the check?
+
+**Answer.** `list` answers at once, with `bytes` of `null` for a file not read whole. A
+removal keeps the check at its file. An upload takes the second decoders; the check takes
+no step while an upload is open and afterwards begins its file again. A file an upload
+installed was read whole by the upload's check and is not checked again.
+
+**Resolution.** The spec's requirement 5; `docs/commands.md`.
+
+## Seed 32: the tests and checks that made a show invalid with a missing file
+
+**Question.** Many tests, and step 22 of the emulator's check list by eye, made an invalid
+show by leaving out an animation file. With the quarantine such a show is valid. What do
+they use now, and what does the status of a quarantine say?
+
+**Answer.** A test that needs an invalid show adds to the show file a cycle that names an
+id no item has (`with_show_fault` of the core's and the emulator's test support), and
+expects `undefined-id 99`; a test of a missing, cut or unreadable file expects the
+quarantine. Step 22 removes `show.json` and expects `show-missing`. `status` keeps
+`"error":null` for a quarantine; a cycle that is played names its first usable animation
+as the one on the LEDs from its start; an upload that replaces an animation while nothing
+plays, because none was usable, starts the playlist. The room for an invalid show's text
+stays 96 bytes, though its longest text is 24 characters now.
+
+**Resolution.** `tests/core/support.py`, `tests/emulator/support.py`, `docs/emulator.md`,
+`core/src/player.cpp`.
+
+## Seed 32: how a client knows the check has ended
+
+**Question.** Tests and tools waited for the end of the check after the start by asking
+`list` until it was no longer `busy`. `list` is answered at once now. What tells the end?
+
+**Answer.** `list` gives `"bytes":null` for a file not read whole yet; once every listed
+animation has its size or a `fault`, the check has passed every file. The emulator's test
+support waits for that, and the app's storage screen shows `size not read yet` in place
+of a size. `remove`, `remove many`, `ignore` and `upload` are answered during the check;
+an upload holds the check until it ends. Seed 33 reports the check's progress itself.
+
+**Resolution.** `tests/emulator/support.py`, `app/www/screens/storage.js`,
+`docs/commands.md`.
+
+## Seed 32: another drive, and the first read of a drive's file
+
+**Question.** Requirement 3.2 asks to check every file of another drive anew, but the
+host gives the core a new number at every plug, for the same card as for another one; and
+the hosts give a file's bytes in pieces of any size, so the bytes of the first call of
+`read_at` are no identity. What does the core compare?
+
+**Answer.** The first step of a drive's file reads its first 512 bytes, whatever pieces
+they come in, and the core compares their number and CRC-32 with the name. Another card
+with a file of the same name and the same first 512 bytes is taken for the same content,
+as the design says; a file that differs in those bytes, on any card, is checked anew. The
+first step reads those bytes once more than before, at most 512 of them.
+
+**Resolution.** `core/src/core.cpp`, `drive_step`; `docs/core.md`, "A drive".
+
+## Seed 32: what the test host needs for another drive
+
+**Question.** A test of another card with a file of the same name needs a second drive
+in one session, and the test host knows one drive's folder.
+
+**Answer.** The input line `drive plug <folder>` plugs in a drive that stands for that
+folder from then on; `drive plug` alone plugs the same folder again, as before.
+
+**Resolution.** `tests/core/host/host.cpp`; `docs/core.md`, "The test host".
+## Seed 38: The owner's question 7, the cables at the event
+
+**Question.** The seed's question 7 was the owner's: which socket powers the board at the
+event, the chip's own or the one marked COM, and is a computer on it? The first board
+session, with the Mac on the chip's own socket only, lost the card; the second, with both
+sockets on the Mac, did not. Task 9 waits for the answer.
+
+**Answer.** Decided under the owner's mandate for the run of 2026-10-24, which has every
+open question answered and recorded rather than asked: the firmware must work with one
+cable or with two, powered through either socket, with or without a computer on the
+other; and the board session checks the two-cable arrangement of today, both sockets on
+the Mac, for fifteen minutes, as step 4 of the design's "The board session" has it. A
+dropout seen with one cable is a fault of the card's code or its clock when the session
+shows a cause there, and the owner's otherwise, as "The dropouts of 2026-10-22 are found
+out, not solved" above says. Task 9 needs no further answer.
+
+**Resolution.** `project-seeds/38-p1-a-microsd-card-as-the-external-storage/seed.md`,
+"The Owner's Answers"; `docs/microsd.md`, "What is open".
+
+## Seed 38: The card's page and the two session records
+
+**Question.** The design folds the two records of `docs/microsd-preflight/` into
+`docs/microsd.md` "in full". The records hold the Mac's mount of the card's source folder,
+the local file names of the session logs under `build/`, and the steps of Codex's own
+checklists. What of them goes into the page?
+
+**Answer.** What the board showed and how it was asked: the cables and the sockets, the
+firmware's hash, every count, time and rate, the four files played with their ids, and
+what stayed unknown. The path of the Mac's mount, the names of the local logs, which are
+in an ignored folder of another worktree, and the checklists' steps stay out: the first
+two name nothing another computer has, and the third is this spec's `tasks.md`. The page
+says the board's serial devices by the names the Mac gave them, as `docs/firmware.md`
+does.
+
+**Resolution.** `docs/microsd.md`, "The board sessions".
+
+## Seed 38: The owner's question 8, the firmware that `build` makes
+
+**Question.** The seed's question 8 was the owner's: once the board checks pass, does the
+microSD build become the firmware that `build` makes, with the stick's build kept behind
+an option? Task 10 waits for the answer, and when it is yes leaves open what the option
+is called, what the images are named, and what becomes of `build --microsd`.
+
+**Answer.** Yes, decided under the owner's mandate for the run of 2026-10-24, before the
+board checks of tasks 8 and 9, which the run leaves to the session with the board:
+
+- `build` makes the card's firmware on the newer software, environment `odrig_microsd`,
+  as `odrig-firmware.bin`, and `build --probe` its probe build, the new environment
+  `odrig_microsd_probe`, as `odrig-probe.bin`. So `flash` without `--image`,
+  `install-firmware` and the board's suite take the card's firmware without a word more.
+- The stick's build is `build --stick`, environment `odrig` on the software known good,
+  as `odrig-stick.bin`, and `build --stick --probe`, environment `odrig_probe`, as
+  `odrig-stick-probe.bin`. The environments keep their names, so WLED's folder keeps the
+  libraries it fetched for them; `--stick` goes with neither `--stock` nor
+  `--standalone`, as `--trial` did not.
+- `build --microsd` stays and builds the same firmware into `odrig-microsd.bin`, the name
+  the board sessions of 2026-10-22 and 2026-10-23 used and the spec's board session
+  names; the other lines of the run may name it too. Two names for one firmware is the
+  price of not breaking a command that is written down.
+- `build --trial`, the environments `odrig_trial` and `odrig_trial_probe`, and
+  `ODRIG_BOARD_IMAGES=trial` go. `tests/firmware/test_trial.py` becomes
+  `test_newer_software.py`, since what it tests, the newer software's folder, packages and
+  environment, stays.
+- The board's suite on the card's firmware is run in the board session of task 8, which
+  flashes that firmware anyway; task 10 has no board of its own in this run.
+- Seed 12's spec takes the card's line, line 26 of `firmware-additions.md`, as its
+  Requirement 13, and the stick's lines 17 and 18 hold for the stick's build only: the
+  seed's question 8 says the fallback follows the firmware the installation runs.
+
+**Resolution.** `firmware/fwtool/build.py`, `firmware/fwtool/cli.py`,
+`firmware/platformio_override.ini.in`, `tests/board/support.py`; `docs/firmware.md`,
+"The newer software" and "build"; `docs/decisions.md`, "Firmware";
+`docs/specs/12-p2-standalone-firmware-as-a-fallback/requirements.md`, Requirement 13.
+
+## Seed 38: The last task before the board session
+
+**Question.** Task 11 sets the seed's state to `completed` and takes the seed out of
+"What is coming" in `AGENTS.md`. The run of 2026-10-24 does task 11 before tasks 8 and 9,
+which need the board and the owner and are left to the session with the board at the end
+of the run. Is the seed completed by task 11 then?
+
+**Answer.** No. With Requirement 9 and the definition of done's points 3, 4 and 6 open,
+`completed` would say what is not so; seeds 20, 24, 27, 29 and 30 stay `in_progress` with
+their owner's checks open. Task 11 does what is true now: the change log says what the
+board runs and what the two sessions showed, and that the session is open; line 9 of
+`firmware-prerequisites.md` says the same; `AGENTS.md` keeps the seed in "What is coming"
+with what is left. Setting `state.json` to `completed` with `completedAt`, and taking the
+seed out of "What is coming", move to the commit of the last of tasks 8 and 9 that is
+done, which task 9 now names.
+
+**Resolution.** `docs/specs/38-p1-a-microsd-card-as-the-external-storage/tasks.md`,
+tasks 9 and 11; `docs/decisions.md`, the change log; `AGENTS.md`, "What is coming".
+## Seed 36: the order file and what it names
+
+**Question.** The owner answered that the playlist order is a file of the internal storage
+that names internal items by id and card items by file name, one mixed order, an absent
+card entry keeping its place. What is its form, where do animations it does not name go,
+and what of an entry whose internal item was removed?
+
+**Answer.** `order.txt` beside `show.json`, a header line `odrig-order 1` and one entry a
+line, `i <id>` or `x <name>`, at most 512 entries. Animations it does not name come after
+the named ones, the internal ones in the order of `show.json`, then the card's in the
+order of their names, so that a new upload is last until it is moved and a show without
+the file plays as before. An entry of a removed internal id stays until the file is next
+written, and an upload that reuses the id takes its place; the core reads the file again
+after such an upload, so that a restart gives the same order. The core keeps a key of two
+bytes per item and per drive place, and a byte of each card name's hash, not the names.
+
+**Resolution.** `docs/specs/36-p1-aurora-glass-ui-and-playlist-revamp/design.md`, "The
+order file"; `docs/show.md` and `docs/core.md` with task 1.
+
+## Seed 36: the order's commands
+
+**Question.** The seed leaves the protocol of the saved order to the spec. Should `list`
+report each item's place and the order's revision, or should the order have commands of
+its own?
+
+**Answer.** Commands of its own: `order get [<from>]` gives the listed animations' ids in
+the saved order with a revision, in parts as `list` does, and
+`order move <revision> <id> <before>` moves one animation before another or to the `end`,
+refused with the new error `order-conflict` when the revision is stale. `list` gains only
+`external`, which the three lines of the run agreed on, so that the other lines' tests of
+`list` keep their replies. The revision is the CRC-32 of each listed animation's id and
+key, so it is the same after a restart for the same files and changes with any change of
+the order or of the listed animations. A move is refused `busy` during the startup check
+and an open upload, whose check shares the second file source, and allowed while a test
+animation shows, since it changes no playback.
+
+**Resolution.** The spec's design, "`order get`" and "`order move`"; docs/commands.md with
+tasks 1 and 2.
+
+## Seed 36: what a snake test shows
+
+**Question.** The seed asks that Snake N identify one three-strip snake through the saved
+mapping, and to reuse the diagonal's one-white-pixel-wide line from bottom left to top
+right. Three pixels of the canvas's diagonal fall into one snake; is that the picture?
+
+**Answer.** No: each snake shows its own diagonal across its three columns, from the
+bottom of its first column to the top of its third, 20 white pixels in each column and
+every other LED dark. That lights 60 LEDs, places the snake at once, and shows whether each
+of its strips runs the right way, which three pixels would not. The diagonal of the whole
+canvas stays the 21st test. The pictures are one 20-frame JSON source that the converter
+encodes, embedded in the core as the diagonal is.
+
+**Resolution.** The spec's requirement 3.1 and design, "The test animations".
+
+## Seed 36: the look's measures
+
+**Question.** The app's look tests demanded a black background, three colours of text and
+controls of 56 pixels; the owner chose Aurora Glass, a midnight background with teal and
+violet accents and translucent panels, with a small `...` button on each row. Which
+measures stay?
+
+**Answer.** Every text keeps a contrast of 7:1 or more against what lies behind it, the
+translucent panels composited onto the midnight background; the page's background stays
+dark; the tabs stay along the bottom at equal width. The main controls keep 48 pixels or
+more, and the row's `...` button, the badge-sized controls and the test buttons 44, the
+size of a fingertip that Android's own guidelines name. Power is one toggle, as the mockup
+draws it, which sends `on` or `off` by the state the target last reported.
+
+**Resolution.** The spec's design, "The look"; `tests/app/test_look.py` with task 5.
+
+## Seed 36: the diagonal's buttons and the test state
+
+**Question.** Settings keeps the mapping editor and loses the duplicated playback
+controls; where do the diagonal's Show and Stop go, and how does an app learn that a test
+shows when it did not start it?
+
+**Answer.** The diagonal is one of the 21 entries of the Tests group, and Settings says to
+turn on Show test animations to check the wiring. Every test, from any controller, makes
+`status` say that nothing plays on a valid show; only then, and after a test command, does
+the app ask `mapping get` every two seconds while Animations shows, and it names the
+active test with Stop test in the now-playing area, whether the Tests group is shown or
+not. No member is added to `status`.
+
+**Resolution.** The spec's design, "Tests and Settings".
+
+## Seed 36: the power control, again
+
+**Question.** The entry "Seed 36: the look's measures" made power one toggle that sends
+`on` or `off` by the state the target last reported. Building it showed that a toggle
+sends the wrong line when another controller changed the power within the last second,
+and sends nothing before the first status. Is a toggle what the operator should have?
+
+**Answer.** No: power is two buttons, On and Off, together in one rounded pill with the
+power sign, as the mockup draws one pill. Each sends what it says whatever the last
+status was, the one that is in effect is marked, and a status keeps them true. The other
+measures of that entry stand.
+
+**Resolution.** `app/www/index.html`, `#power-switch`; `app/www/screens/show.js`.
+
+## Seed 39: Move up and Move down while a filter hides rows
+
+**Question.** The seed turns dragging off while a filter is not All, because the places of
+hidden rows would be unclear, and keeps the row menu, inclusion, play and deletion as they
+are. Move up and Move down are in the row menu and move a row as a drag does. Do they stay?
+
+**Answer.** No: they are reordering, and with rows hidden "up" would pass over rows the
+operator cannot see. Both are off in the menu while a filter is not All, and the list says
+`Set both filters to All to move animations: hidden rows would make the places unclear.`
+The menu's other actions work as before.
+
+**Resolution.** `docs/specs/39-p2-playlist-filters-by-storage-and-type/requirements.md`,
+1.6; `app/www/screens/reorder.js`, `blocked()`.
+
+## Seed 39: what counts as which type, and when the filters show
+
+**Question.** `type` comes from seed 37, which another line builds at the same time. What
+of a `type` the app does not know, of a target change, and of an installation without
+animations?
+
+**Answer.** A missing `type`, and any value other than `text` and `widget`, counts as
+Normal, so a newer type never vanishes from All and Normal. The choices are the phone's
+and stay across a target change, as they stay across a reload. The two rows of choices
+show while the list has animations, and the list says that no animation is installed, as
+before, when it has none.
+
+**Resolution.** `app/www/screens/filters.js`; the spec's design, "The filters".
+
+## Seeds 32 and 36: an unavailable animation in the rows of Animations
+
+**Question.** Seed 32 grays an animation whose file had a fault on the show screen, says
+its reason under it and turns its Play off; seed 36 replaces that screen with rows that
+play on a tap and have a menu, and the storage screen, which said `size not read yet`,
+with Upload, which has no list. Where do these go, and does an unavailable row keep its
+menu and its place in the order?
+
+**Answer.** In the row: its Play, the name and the line of id and size, is dimmed and
+cannot be pressed; the reason in words, and on the external storage `Fix it on a computer:
+the card is read-only here.`, stand under it across the row; the line of id and size says
+`size not read yet` while `bytes` is null. The menu stays as for any row, so an internal
+unavailable animation can be ignored, selected and deleted, and any can be moved with
+Move up and Move down, since replacing or removing it is the way out and its place in the
+playlist is the operator's. The filters count it by its storage and type as any other.
+
+**Resolution.** `app/www/screens/show.js`, `row()` and `metaOf()`; `app/www/style.css`,
+`.row.unavailable` and `.row .fault`; `tests/app/test_quarantine.py`.
+
+## Seeds 32 and 36: the saved order of unavailable animations, and during the check
+
+**Question.** Seed 36's `order get` holds "the animations `list` lists" and is "refused
+as `list` is". Seed 32 lists a file of the card left out for a fault, with an id, and
+answers `list` while the player reads the installed animations after a start, where it
+was refused with `busy` before. Does the order hold such a file, and does `order get`
+answer during the check?
+
+**Answer.** Yes to both, as the two sentences say. A file of the card left out for a
+fault stands in the order where its name does and can be moved; without it the app,
+which keeps an order only when it holds exactly the listed animations, asked for the list
+and the order again and again while a card had such a file. `order get` answers during
+the check, as `list` does, so the rows stand in the saved order from the start; `order
+move` stays refused with `busy` until the check ends, since the move reads the order file
+with the reader that the check uses.
+
+**Resolution.** `core/src/order.cpp`, `listed()` and `listed_with()`;
+`core/src/commands.cpp`, the route of `order get`; docs/commands.md, `order get`;
+tests/core/test_order.py, `UnavailableAnimations` and `test_it_is_refused_as_list_is`.
+
+## Seed 33: where readiness and the last fault are reported
+
+**Question.** The seed asks to extend existing reporting where it can and approves no
+command, while the owner approved in advance every command the specs of the run need.
+Does the fault's context go into `status`, or a command of its own?
+
+**Answer.** Readiness and the counts go into `status`, which every client asks already.
+The fault's context, a file name, a record, a byte count and a reason, is asked for
+seldom and would make every `status` longer; it gets the command `fault`, approved in
+advance. Its reply names a decoder's reason and the work it came in, and claims no damage
+on the storage.
+
+**Resolution.** The spec's requirements 1 and 2; `docs/commands.md`.
+
+## Seed 33: what names the host, and what survives a reset
+
+**Question.** The seed asks for the firmware's identity, its storage, its media and the
+reason of its last reset in the reports, and for the last fault to survive a reset. The
+core knows none of the first, and the board has no storage meant for logs.
+
+**Answer.** An optional host function, `about`, gives a text of at most 95 bytes that
+`status` reports as `host`. The firmware gives WLED's release name, the build's date and
+time, its storage and the reset reason ESP-IDF names; the emulator gives its own name.
+The firmware keeps the latest reason text its player logged in memory that survives a
+software or watchdog reset, never in flash or on the card, with a CRC-32, and writes it
+to its log at its next start. A power cut loses it, as the seed allows when it is said.
+
+**Resolution.** The spec's requirements 3 and 4; `docs/firmware.md`.
+
+## Seed 33: the tool's wait after seed 32
+
+**Question.** `install-show` waited for a `list` that is not `busy`. Since seed 32 `list`
+is answered at once during the check, so the tool stops waiting at once. How does it know
+the check has ended, and what does it say?
+
+**Answer.** It asks `status` until `readiness` leaves `checking`, and falls back to the
+`busy` list of a firmware without `readiness`. It prints `outcome: healthy`,
+`outcome: degraded: <n> unavailable` or `outcome: recovery: <reason>`; healthy and
+degraded end with 0, as the board plays, and recovery with 1. A wait that runs out stays
+the failure `check-not-done`.
+
+**Resolution.** The spec's requirement 5; `firmware/fwtool/board.py`.
+
+## Seed 33: the emulator's name
+
+**Question.** The design has the emulator name itself `odrig emulator, core <date of the
+library's build>`. The core's library tells no date of its build: no function of its
+interface gives one. Does the core get one for the emulator?
+
+**Answer.** No. The interface stays as the other hosts use it. The emulator names itself
+and the computer it runs on, `odrig emulator on <system> <processor>`, as Python tells
+them, which is what tells one emulator from another in a report.
+
+**Resolution.** `emulator/host.py`; `docs/emulator.md`.
+
+## Seed 33: the app's lines on the screens of seed 36
+
+**Question.** The spec was written for the app before seed 36. Its task 5 is built on seed
+36's four tabs. Where do the line of the reading, the installation's name and the last
+fault go, and when is `fault` asked for?
+
+**Answer.** The line of the reading stands in the panel of Animations, under the
+refreshes a second: `Reading the animations: <n> read, <m> to read.`, with
+`, <k> unavailable` when there are, and `<k> animations unavailable; the others play.`
+when the reading has ended with some unavailable, `1 animation` for one; no line for a
+ready installation or one that does not say. The name and the last fault stand on the
+target screen, the name as `Installation: <host>`. `fault` is asked for each time the
+operator opens the target screen after the installation has answered, once for each
+opening, and never at the start: the app leaves the target screen at the first answer. A
+software that does not know `fault` shows no line of it, and no message.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/screens/target.js`,
+`app/www/messages.js`; `docs/android-app.md`.
+## Seed 34: where the broad write is
+
+**Question.** The seed asks that one-file maintenance not rebuild the animation folder.
+Which operation rebuilds it?
+
+**Answer.** The firmware tool's `install-show`: it reads the board's storage into an image,
+removes `/odrig` with everything in it, writes every file again and writes the blocks that
+differ, which for one removal from a storage 80 % full are 8.4 MB of WLED's layout and
+10.9 MB of the bigger one. The commands `upload`, `remove`, `remove many` and `ignore`
+already change one file and the show file through a temporary file and a rename, and
+survive a power cut at every storage call (seed 07). The seed's work is therefore on the
+image route, plus three things of the live route: an upload of unchanged bytes, the
+cleanup a change leaves unfinished, and fault tests for `remove many`, `ignore` and the
+start's cleanup.
+
+**Resolution.** The spec's requirement 1; `firmware/fwtool/storage.py`.
+
+## Seed 34: the order of the image's write, and the step that cannot be cancelled
+
+**Question.** Writing changed raw blocks is not atomic: esptool erases a sector and then
+programs it, and sorts the stretches of a call by address. Where can a write of the image
+be cancelled safely?
+
+**Answer.** A new or changed file is written into the image while every old file is still
+there, so the file system puts its bytes into blocks the old file system does not use;
+only the records of the file system, one or two blocks for one file, change blocks in use.
+The tool writes the free blocks in one esptool call and the blocks in use in a second.
+Up to the second call a cut leaves the board's file system exactly as it was: a test
+writes the free part alone and reads the old show. The second call and the comparison are
+the commit: they are not cancelled, an interrupt from the keyboard waits for their end,
+and a cut there needs the recovery. On a full storage the commit is 2 blocks, 8 KiB.
+LittleFS has no means in the tool's library to make the commit one atomic write of one
+block, and a simulation of a cut inside it found the old show, the new one, a mixture and
+an unreadable storage; so the tool does not promise more than a deterministic recovery.
+
+**Resolution.** The spec's requirement 2; the design, "The write".
+
+## Seed 34: no restart after a cut commit
+
+**Question.** Today the tool restarts the board after every failure. Should it after a cut
+commit?
+
+**Answer.** No. WLED mounts its file system with `WLED_FS.begin(true)`, which formats a
+file system it cannot mount: a board started on a half-written storage can lose its
+settings and its show. After a failure in the commit or the comparison the chip stays in
+its bootloader, and the message names `recover-storage`. esptool 5.4 resets the chip as
+`--after` says also after a failed command, so every call of the write is made with
+`--after no-reset`, and the board is restarted by a call of its own once the comparison
+passed. A power cut of the board itself cannot be prevented; then
+`recover-storage` finds the storage changed outside the change, and `--whole` writes the
+new image whole.
+
+**Resolution.** The spec's requirement 3.3; `firmware/fwtool/cli.py`.
+
+## Seed 34: what recover-storage brings back
+
+**Question.** The tool keeps the image from before and the new one. Does that make a cut
+change reversible?
+
+**Answer.** It makes it finishable. The journal names the new image and the runs of the
+change; the board's storage outside them is the image from before, which the chip
+confirms before anything is written. `recover-storage` writes the change again and
+compares it: the board then holds the new image. A change cut before its commit is given
+up, as the board holds the image from before. Going back to the image from before is not
+offered: the change was asked for, and writing the old runs back is the same kind of
+write with the same commit. When the storage outside the change differs, something else
+wrote it since (the board started and formatted it, or saved settings), and the tool
+refuses with `storage-changed`; `recover-storage --whole` writes the whole new image, the
+last resort, which brings back the settings it holds and loses what the board wrote since.
+
+**Resolution.** The spec's requirement 3.5; the design, "recover-storage".
+
+## Seed 34: comparing the written blocks only
+
+**Question.** The tool compares the whole partition after each write, 17 seconds on the
+board. Must it?
+
+**Answer.** No. Before the write the chip confirmed that the board holds the kept image,
+or the tool read the partition whole; the write changes only the runs. The chip compares
+every written run with the new image in one call, and the board is restarted when all are
+equal. An unchanged folder writes and compares nothing.
+
+**Resolution.** The spec's requirement 2.4.
+
+## Seed 34: an unchanged upload, and its CRC-32
+
+**Question.** An upload of the bytes an item already has writes the file again. How does
+the core know that it is unchanged before the bytes are sent?
+
+**Answer.** `upload begin` takes an optional fourth argument, the CRC-32 of the file, as
+`upload end` does. When the last upload of this boot installed that file as the item's,
+with that size and that CRC-32, no upload has begun since, and the item holds it still,
+the reply is `{"ok":true,"unchanged":true}` and no upload opens. The upload's record keeps
+the id, the name, the size and the CRC-32 after `upload end`, and one byte of its padding
+says that it was installed. A file the check after the start read, or an older upload
+installed, is uploaded again as today. Two files of the same size and CRC-32 are taken for
+the same, as `upload end` takes them. Old firmware answers `bad-argument` to the fourth
+argument, and `odrigctl` then sends the form without it.
+
+**Resolution.** `docs/commands.md`; the spec's requirement 5.1.
+
+## Seed 34: the cleanup at the next change
+
+**Question.** When a change committed but could not remove the file it replaced, or
+`pending.txt`, every later change is refused with `storage-error` until a restart. Is a
+restart needed?
+
+**Answer.** No. The next change first does the cleanup again: it reads `pending.txt` with
+`read_at`, removes each file it names that no item names, and then `pending.txt`. When
+that still fails, the change is refused as today and the next start tries again. The
+cleanup reads at most 1,500 bytes, within the budget of a call.
+
+**Resolution.** The spec's requirement 5.4; `core/src/storage.cpp`.
+
+## Seed 34: no CRC-32 for every file
+
+**Question.** A CRC-32 of each file would let the core answer `unchanged` for every file
+it read whole: 8 bytes an entry of the file table (4 and the alignment of the next entry),
+1,056 bytes for the target file. With seeds 31, 32 and 36 joined, the target file with a
+drive takes about 130,701 of the 131,072 bytes the core may use. Is there room?
+
+**Answer.** No. The core remembers the file the last upload installed only, in the record
+the upload has anyway: the case the seed names, a request repeated after a reply that did
+not arrive, writes nothing, and the core grows by no byte. The padding of a file's entry
+and of an item is taken by seeds 29 and 32, and making `total_ms` 32 bits would change
+what an animation of four billion frames does.
+
+**Resolution.** `core/src/core_state.h`, `Upload.installed`; `docs/core.md`, "Uploads and
+the check".
+
+## Seed 34: `remove many` without a file that goes
+
+**Question.** The fault tests found that `remove many` of an animation whose file another
+item names gives the host a `write` of 0 bytes for `pending.txt`, which the host interface
+forbids. Is mending it in the seed's scope?
+
+**Answer.** Yes: it is a durable step of a live change, and the seed asks for every one to
+be tested. Without a file that goes, `remove many` writes no `pending.txt`, as `remove`
+does not.
+
+**Resolution.** `core/src/storage.cpp`; `tests/core/test_incremental.py`.
+
+## Seed 34: the app's uploads
+
+**Question.** Must the operators' app send the CRC-32 with `upload begin`?
+
+**Answer.** No. The app uploads a new animation under a free id and a name no item has;
+an upload repeated after a lost reply is refused with `in-use` without a write. Seed 36
+redraws the app; it can take the fourth argument up when it replaces animations.
+
+**Resolution.** The app is unchanged.
+
+## Seed 34: what install-show prints, and the copies
+
+**Question.** How precise is the tool's account, and how is an affected file kept before
+it is removed?
+
+**Answer.** Before writing, `install-show` prints the number of files kept and each file
+added, replaced or removed with its bytes, then the blocks and bytes to write, the free
+ones first; afterwards one line `storage: committed: ... written and compared; the board
+restarts`, or `unchanged`, or the error. `--dry-run` prints the plan and writes nothing.
+`--keep-copies DIR` copies each file it removes or replaces, as the board holds it, into a
+new or empty folder before anything is written. `read-show` copies everything, as before.
+
+**Resolution.** The spec's requirement 4.
+
+## Seed 34: the saved order on the image route
+
+**Question.** Seed 36 keeps the playlist order the operator chose in `order.txt` of
+`/odrig`. A show folder from the converter has none, and the check of a show folder
+refuses one. What does `install-show` do with it?
+
+**Answer.** It keeps it. The seed asks to preserve the stored playlist choices unless the
+operation changes them, and installing animations does not change the order: an entry of
+an id or a file that is gone is passed over, and a new animation comes last until it is
+moved. A folder may hold its own `order.txt`, as `read-show` copies it, and that one takes
+its place. `order.part` is the core's own and goes like any file the folder does not hold.
+
+**Resolution.** `firmware/fwtool/storage.py`, `folder_files`; `firmware/fwtool/cli.py`,
+`install-show`; the spec's requirement 1.6.
+## Seed 37: The header, the three versions and the names
+
+**Question.** The seed asks for a header-selected container with magic, lengths, canvas,
+type and version, keeps the owner's names odrg1, odrg2 and odrg3 for frames, text and
+widgets, and leaves the layout of the header to the specification.
+
+**Answer.** A header of 20 bytes, `ODRX`, the container's version, the type (1 frames,
+2 text, 3 widget, the owner's odrg1 to odrg3), the type's own version, a reserved byte,
+the canvas, the loop in milliseconds and the payload's length. The loop is in the header so
+that the start, which reads headers only, knows every file's length and type at once, and
+the check after the start holds it to the payload. A frames payload is an ODRG file as it
+is, so no second codec exists. The extension is `.odrgx`, and readers dispatch by the
+magic: a container named `.odrg` is read as a container, and an ODRG file named `.odrgx`
+as an ODRG file.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The
+container".
+
+## Seed 37: Where the layout of a text is made
+
+**Question.** The seed wants the C++ core to own rendering and the app's preview to show
+the same pixels, allows "compact precomputed layout ... with font/version references",
+and asks for the Unicode Bidirectional Algorithm for mixed Hebrew and English. Is the
+bidirectional ordering and the wrapping done by the core at every start, or once?
+
+**Answer.** Once, by the converter's library, when the file is made, in the app or on a
+computer; the file stores the text as written, its settings, and the glyphs with their
+places. The core checks that every glyph is in its font and in its block, computes the
+pass from the settings and the block, and draws. So the algorithm exists once, in
+JavaScript, beside the preview that uses it, and the core stays small; a text whose stored
+glyphs do not spell its text can only show its glyphs. Both the core and the converter
+draw, with the same integer rules, and reference pictures that both must reproduce hold
+them together; compiling the core to WebAssembly for the app would need a toolchain the
+project does not have.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The layout,
+in the converter" and "Decisions".
+
+## Seed 37: The fonts
+
+**Question.** The owner wants the fonts in the firmware, preferably pixel fonts drawn by
+hand for Hebrew and Latin in two or three sizes, made in the repository. Which sizes and
+which characters?
+
+**Answer.** Two drawn fonts and a third made from the first: `small`, 7 pixels from the
+baseline to a capital's top with 2 below, ten pixels a line, five lines and more on 60
+rows; `medium`, 10 and 3, fourteen a line, four lines; and `large`, `small` at twice the
+size, for big messages and the digital clock's digits. Each has the 95 printable ASCII
+characters and the 27 Hebrew letters, the five final forms among them, which descend below
+the baseline as `ק` does. Niqqud, other scripts and emoji are refused by name. The glyphs
+are text files that show the pixels, and one generator writes the core's tables and the
+converter's.
+
+**Resolution.** `fonts/`; `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`,
+"The fonts".
+
+## Seed 37: Where a clock's randomness comes from
+
+**Question.** A clock needs a fresh random seed at each turn. The core has no source of
+randomness, and promises the same output for the same timestamps. Does the host give one?
+
+**Answer.** No member is added to the host. The core mixes the timestamp of every refresh
+into a 32-bit noise, and a clock's seed is that noise mixed with the item and the start
+time of the turn. On the board and in the emulator the refreshes come at times that jitter,
+so every turn and every start differs; in the tests the timestamps are given, so the seeds
+are repeatable. `status` reports the seed, and the converter's drawing replays it.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The seed".
+
+## Seed 37: The commands for editing
+
+**Question.** The app must read an installed text or clock back to edit it, and must not
+overwrite another controller's change. Which commands, given that a command line has at
+most five words and the owner approved new commands in advance?
+
+**Answer.** `read <id> <offset>`, which gives up to 600 bytes of an animation's file in
+base64, and `upload expect <crc32>`, sent between `upload begin` and `upload end`, which
+makes the upload replace the item's file only when that file has the CRC-32 the app read;
+otherwise the new error `stale`, and the upload is discarded. While an upload is open no
+other controller can change the show's files, so the comparison holds until the end. The
+core keeps no CRC-32 of a file: it reads the item's file when asked, which is why `upload
+expect` takes files of at most 16,384 bytes. `list` gains `type` and `status` gains
+`seed`.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/requirements.md`,
+Requirement 10; `design.md`, "Commands".
+
+## Seed 37: What waits for seeds 32, 35, 36 and 39
+
+**Question.** The seed registers every type through seed 35's catalogs, keeps seed 32's
+quarantine, puts authoring into seed 36's upload screen, and seed 39 filters by type.
+Those seeds are built at the same time on other branches.
+
+**Answer.** This branch builds on today's upload path and today's storage screen, and its
+last task is done by the session that combines the branches: the catalogs take the type
+and the loop of the header, the quarantine takes a refused file, the forms move into seed
+36's screens, and the filter reads `type`. Until then a refused file installed by hand
+makes the show invalid, as any refused file does today, while an upload of one is refused
+with `bad-file` and changes nothing.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14.
+
+## Seed 37: The stored answers of the Python tool and the show's file names
+
+**Question.** A show may now name `.odrgx` files, and the converter and the Python library
+both say "ending in .odrg or .odrgx" of a name that breaks the rule. The converter's suite
+compares that detail with what the Python tool answered when it still converted, stored in
+`converter/tests/expected/`, where 24 answers say "ending in .odrg". The Python tool can no
+longer be run to answer again. What becomes of those answers?
+
+**Answer.** They are changed in that phrase only, in `read_shows.json` and in
+`run.json.gz`, since the Python library, which is the reference they record, now gives the
+new phrase in the same place: every other byte of each answer, and every key, stays. The
+reason, `show-malformed`, does not change.
+
+**Resolution.** `odrig/show.py`, `converter/lib/show.js`, `converter/tests/expected/`.
+
+## Seed 37: The swing of a clock's speed
+
+**Question.** The design gives a clock's speed a swing of up to all the room between its
+base speed and the nearer of its two limits, so that the speed is never below the least.
+The cosine is read from the sine table between its entries, and those straight pieces are
+steeper than the true curve by up to 0.47 percent. With the whole room, the speed dips
+below the least by that much, and below nothing for a least speed of 1: the hands would go
+back for a moment. Is the room or the guarantee kept?
+
+**Answer.** The guarantee. The swing is at most 100/102 of the room, `(r % 101) / 102`
+where the design had `/ 100`, so the steepest piece of the table stays inside the limits.
+The converter's suite checks the speed over irregular steps for hundreds of seeds and
+limits.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/design.md`, "The virtual
+time"; `docs/format.md`, "The widget payload".
+
+## Seed 37: When `status` has a seed
+
+**Question.** Requirement 8 asks for the seed of the clock whose turn it is, and `null`
+while no clock is on the LEDs. A `play` closes what plays until the next refresh, and
+`off` darkens the LEDs while the turn goes on. What does `status` give then?
+
+**Answer.** The seed belongs to the turn. `status` gives it from the turn's first refresh
+to its end, also while the LEDs are off, since the turn and its clock go on and `on`
+shows them again at once. From a `play` until the next refresh, while the new turn has
+no seed yet, and while frames or a text or nothing plays, it gives `null`.
+
+**Resolution.** `docs/commands.md`, "Status reply"; `docs/core.md`, "Clocks".
+
+## Seed 37: A status reply longer than 192 bytes
+
+**Question.** `seed` makes the longest `status` reply 210 bytes. Seed 02 held every reply
+to 192 bytes, and the core's suite still holds `status` to that. Is a member dropped?
+
+**Answer.** No. Seed 07 raised every reply to 1,024 bytes, and nothing reads `status` into
+a smaller buffer: the emulator's and the firmware's replies take 1,024. The test now holds
+the longest `status` under 256 bytes.
+
+**Resolution.** `tests/core/test_commands.py`; the change log of `docs/decisions.md`.
+
+## Seed 37: The look of the melting watch
+
+**Question.** The melting clock is to resemble the seed's picture, a tilted pocket watch
+whose lower half sags, with hands that stay joined at their pivot. Which shape, made of
+integer steps the core can take at every refresh?
+
+**Answer.** The dial of the analog clock, two thirds as large, up and to the left of the
+centre, tilted counter-clockwise by 25 to 40 degrees. Above a fold line it lies flat;
+below it the face hangs straight down, stretched by 130 to 170 percent, drifting right and
+narrowing as it hangs, and darker the deeper it hangs, with a dark crease at the fold. The
+fold waves slowly with the real time. A crown and a ring of the rim's colour sit at 12
+o'clock. Each pixel is taken back to the dial, so the hands bend with the face and stay on
+it. The owner's look on the LEDs is task 13.
+
+**Resolution.** `docs/format.md`, "The widget payload"; `core/src/clock.cpp`;
+`converter/lib/draw.js`.
+
+## Seed 37: Carried onto the joined seeds, and what task 14 has left
+
+**Question.** Seeds 31, 32, 36 and 39 were joined while this seed was being built, on
+`seeds-28-to-39-unified`, and the run's main session asked for seed 37 to be built on
+top of them before its app tasks. Task 14 was to fit seed 37 to them after combining.
+What of task 14 is left?
+
+**Answer.** Seed 37 was carried onto the joined branch as
+`seed-37-odrgx-text-and-clock-animations-unified`, each task with its own commit again,
+and fitted there: a text or a clock with a fault is quarantined as seed 32 quarantines
+any file, and `read` answers `unavailable` for one; `list` gives `type` after seed 36's
+`external` and before seed 32's `fault`; a cycle's turns take the animation seed 32
+chooses for each; `stale` stands after `mapping-conflict` and before `order-conflict`;
+the forms of tasks 9 to 11 were built in seed 36's Upload tab and rows' menus, from the
+start; seed 39's filter reads `type` as it is. The core asks for 16 bytes more than the
+joined seeds: the noise and the seed lie in holes of its object, a drive entry keeps its
+type in a half byte beside its state, and the upload's check reads its header into the
+check's. What is left of task 14 is seed 35's catalogs, which register the type and the
+loop of every file; it waits for seed 35 to be joined. The seed's state then follows task
+13 too.
+
+**Resolution.** `docs/specs/37-p1-odrgx-text-and-clock-animations/tasks.md`, task 14;
+the branch `seed-37-odrgx-text-and-clock-animations-unified`.
+
+
+## Seed 35: what a storage without a catalog does
+
+**Question.** The seed wants no routine reading of the library and no discovery of
+copied files, and also no automatic rebuild when a catalog is missing. The board and the
+owner's card have no catalog today. What does a start or a plug-in do with them?
+
+**Answer.** They are legacy and are read as before this spec: the start opens each file
+and the check after the start reads it, a drive is listed and its files checked before
+they play, and a file copied onto a legacy drive joins as before. Nothing writes a
+catalog by itself; `catalog rebuild` on the board, or the PC tool's `import`, makes one
+once, and from then on the storage is read from its catalog. A damaged or incompatible
+catalog is reported and its files read as legacy (internal) or not taken (a drive), so
+that nothing that plays now stops playing and no start loops.
+
+**Resolution.** The spec's requirements 2.3, 4.3 and 4.5; design, "The start" and "The
+drive".
+
+## Seed 35: the format, its pages and its commit
+
+**Question.** The seed asks for metadata work per change that does not grow with the
+library and for a fixed-size marker, and the owner for byte-identical files from the board
+and from a computer. One catalog file rewritten at each change grows with the library;
+fixed slots need a byte of memory for every installed file, which the target file does not
+have.
+
+**Answer.** Text, 16 pages, an entry's page the low four bits of its name's FNV-1a hash
+(the hash of the saved order), lines in the order they came in; a marker of 409 bytes with
+the generation and each page's count and CRC-32. A change writes its pages and marker as
+`.new` files and then the commit record `catalog.do`; finishing renames them into place
+and is repeated after a cut. A change rewrites the page of its entry, N/16 entries on
+average and at most N, which the documents say as such; no change lists the storage or
+reads another animation. On FAT, where a file cannot be renamed onto another, the host
+removes the target first, and the commit record covers the moment between.
+
+**Resolution.** The design, "The catalog format"; `docs/catalog.md`.
+
+## Seed 35: the show file and the catalog
+
+**Question.** An upload of a new item and a removal change both `show.json` and the
+catalog. Each file is replaced in one rename. Which goes first, and what does a cut between
+leave?
+
+**Answer.** An upload commits the catalog first, with the file's rename in its commit
+record, and then writes the show as before; a removal writes the show and removes the file
+as seed 34 does, and then commits the catalog. A cut between leaves an entry for a file
+the show does not name, or a file the show names without its entry: the first is not an
+animation, the second is read as legacy, and the next rebuild leaves both out. A
+replacement under its name is one commit.
+
+**Resolution.** The design, "Changes of the internal storage".
+
+## Seed 35: room in the core
+
+**Question.** With a drive the target file takes 130,701 of 131,072 bytes. The catalogs
+need about 220 bytes of state. Where is the room?
+
+**Answer.** The drive's table keeps a file's length in 32 bits: 49 days and more count as
+4,294,967,295 ms. Its 256 entries take 12 bytes each instead of 16, which frees 1,024
+bytes; the catalogs take part of them, and the measurement says what is left.
+
+**Resolution.** The design, "Memory"; `docs/core.md`'s table.
+
+## Seed 35: the board writes the card
+
+**Question.** The owner's answer 7 lets the board write the card. Which commands, which
+ids, and what of a USB drive?
+
+**Answer.** The host says whether its drive can be written: the SD card when it is
+mounted, a USB drive never. `upload begin external <file> <bytes> [<crc32>]` uploads to the
+card, and `upload end` answers the new animation's id; a file of the same name is replaced
+and keeps its id. `remove <id>` removes a card's animation; `remove many` and `ignore` stay
+for the board's own storage. A legacy card is not written until it has a catalog, and the
+new error `read-only` says so, as it does for a card that cannot be written.
+
+**Resolution.** The design, "The board writes the drive".
+
+## Seed 35: rebuild, its writes and its budget
+
+**Question.** A rebuild writes a page while it reads its files over many refreshes, and the
+host has one file being written. What of other changes meanwhile, and what are the budgets?
+
+**Answer.** While a rebuild has a page open, the commands that write storage answer `busy`;
+playing, power, brightness, `list` and the rest work. A rebuild takes the steps of the
+check after the start: up to 16 a refresh, each one read of at most 512 bytes or one frame
+record, and one at least in 10 refreshes. A drive's catalog is read in the same steps; an
+unchanged drive's marker is read once in 10 seconds; the internal catalog is read whole at
+the start (at most 132 entries, metadata only). An external rebuild drops the card's
+animations, lists the folder once and lets each file join again as it passes.
+
+**Resolution.** The design, "Rebuild" and "The drive".
+
+## Seed 35: unmanaged changes and the check
+
+**Question.** How is a file that was changed behind the catalog's back found?
+
+**Answer.** By the PC tool's `check`, which compares each file's size and CRC-32 with its
+entry, and by a rebuild, which reads every file; playback keeps seed 31's decoding and seed
+32's quarantine, which catch a file that no longer decodes. No start or refresh hashes the
+library.
+
+**Resolution.** The spec's requirement 2.5; the design, "The PC tool".
+
+## Seed 35: the PC tool's reader and seed 37's types
+
+**Question.** The PC tool must admit what the core admits. Which reader does it use, and
+what type does an entry have before seed 37?
+
+**Answer.** The project's Python reader, `odrig.odrg.decode`, whose reasons the shared
+vectors keep equal to the core's; the tests run the core and the tool on the same files.
+Every entry of an ODRG file has the type `frames`; seed 37 adds `text` and `widget` with its
+container.
+
+**Resolution.** The design, "The PC tool"; `tests/vectors/catalog/`.
+
+## Seed 35: where the app puts a new animation
+
+**Question.** The owner wants one or two small animations on the board and the rest on the
+card. What does Upload offer?
+
+**Answer.** When the card can be written, Upload offers `The card` first and `This board`
+second; otherwise it stores on the board as before. Settings shows both catalogs and their
+rebuilds; a card's row has `Delete` when the card can be written.
+
+**Resolution.** The design, "The app".
+
+## Seed 35: the PC tool's lines and exit statuses
+
+**Question.** The design gives `python3 -m odrig.catalog <mount> status|import|add|remove|
+check|recover`, exit 0, 1 and 2 and a line of outcome per change. What are the lines, and
+what does it do on a card without a catalog or a folder that is not there?
+
+**Answer.** One line per file or outcome, `added: NAME, BYTES bytes`, `replaced: ...`,
+`removed: NAME`, `refused: NAME: REASON` with the check's reason, `imported: N animations,
+generation G`, `differs: NAME: missing|size|crc` and `checked: N entries, M differ`;
+`status` gives the catalog's state with its generation and entries, the animation files of
+the folder and those without an entry. A refused file does not stop the others. `add`,
+`remove` and `check` need a catalog that is `ok` and say so on standard error with what to
+run (`import`, or `recover` for an interrupted change); `status`, `import` and `recover` work
+on any. A file to add that cannot be read is refused as `file-missing`. A MOUNT without a
+folder `odrig`, or with `--folder` a path that is no folder, is a usage error, status 2,
+as `odrigctl` treats what it cannot start with. The canvas is the installation's, 60 x 60.
+`main` is added to `odrig/catalog.py` and nothing of the module changes.
+
+**Resolution.** `odrig/catalog.py`, `main`; `tests/converter/test_catalog_cli.py`;
+`docs/microsd.md`, "The catalog, made on a computer".
+
+## Seed 35: the catalog that install-show writes
+
+**Question.** The firmware tool's `install-show` is to write the internal catalog of the
+folder it installs, as a rebuild would, with the generation after the board's. Its check
+of the folder already decodes every animation, and a rebuild decodes them again; the
+board's generation is known only once the board's storage is read; and installing the
+same folder again changed nothing before. How do these go together?
+
+**Answer.** `storage.folder_files` checks the folder by the rebuild itself, on an
+in-memory storage, in the show's order and for the mapping's canvas: each animation is
+decoded once. The first file the rebuild refuses, in the show's order, is judged again by
+the check before it, so that its reason and its words stay those of the converter's
+readers; a name the show allows and the catalog does not is checked alone and left out of
+the catalog. A catalog the folder holds is made anew. Once the board's storage is read,
+the marker gets the generation after the board's, or 1; when the board's catalog has the
+same pages the board's own marker is kept, so that the same folder installed again still
+writes nothing. `--no-check` writes no catalog. The rebuild of the PC library stands for
+the core's in the tests until the core rebuilds.
+
+**Resolution.** `firmware/fwtool/storage.py`, `folder_files`, `catalog_files`,
+`with_board_generation`; `tests/firmware/test_catalog.py`; `docs/firmware.md`,
+"install-show".
+
+## Seed 35: the board writes the card, and a storage call that fails
+
+**Question.** A card that its host can write takes `upload begin external` and `remove`,
+and the design asks for a cut and a failure at every storage call of every change on both
+storages. What does a call that fails leave behind, and what does the next change do with
+it? Which names may an upload to the card have while the entries of the catalog have no
+type yet? The app sends neither new command before its own task: what does it make of the
+new code `read-only`?
+
+**Answer.** Before the commit record is whole, a failed call ends the change with
+`storage-error`, and a file that was being written is removed, which also ends its writing,
+as seed 34's changes do. After it the change is made and the reply is as for success. The
+finishing stops at the call that failed and leaves the record; every later change of that
+storage finishes it before it writes anything, and is refused with `storage-error` while
+it cannot; the start and the plug-in keep `upload.part` while a record is left, since the
+record may move it. A start that cannot finish the record reads the board's storage as
+without its catalog, `damaged` with `interrupted`, and the first change that finishes it
+takes the catalog up again from its marker; a card whose record cannot be finished at its
+plug-in is `damaged`, `interrupted`, and nothing of it plays until it is plugged in again.
+The core's own commit on the card sets the CRC-32 of the marker that the look every 10
+seconds compares, so that the card is not read again after each change. An upload to the
+card takes a name of the show's files that ends in `.odrg` until the entries record their
+type (seed 37's task 14), and the upload's check gives the new place its type. A file
+replaced while it plays is released before the commit and played anew from its start
+after it, as an item's file replaced under its name is. The app's
+tests count `read-only` among the codes the app cannot get (`NOT_FOR_THE_APP`) until its
+task gives it a text. Task 4's tests had the cut at every call and not the failure; the
+failure at every call of the internal changes comes with this task's.
+
+**Resolution.** `core/src/catalog.cpp` (`finish`, `catalog_settle`, `catalog_left`,
+`write_whole`, `write_page`, `catalog_install_external`, `catalog_remove_external`),
+`core/src/upload.cpp`, `core/src/content.cpp`, `core/src/commands.cpp`,
+`core/src/storage.cpp`; `tests/core/test_catalog_writes.py`,
+`tests/core/test_catalog_changes.py`; `docs/commands.md`, "Catalogs"; `docs/catalog.md`,
+"A change".
+
+## Seed 35: a rebuild on the board
+
+**Question.** `catalog rebuild internal|external` reads every animation with the check's
+steps and commits the catalog at the end, and `catalog cancel` ends it. Where do the
+pages' counts and CRC-32s wait while the rebuild goes page by page, what is left on the
+storage by a cancel, a failed call or a drive pulled out, which files does a rebuild of
+the board's storage take while the catalog cannot hold every name the show may have, and
+what does the check after the start do after it?
+
+**Answer.** The count and the CRC-32 of each page wait at the end of the chunk buffer, six
+bytes a page from byte 1,400, which nothing else uses while a rebuild runs, as every
+command that writes storage is `busy` meanwhile; the core object grows by 16 bytes for the
+rebuild's own fields, measured: the target file 125,341 bytes, 129,821 with a drive. A
+cancel, a storage call that fails and a drive pulled out end the rebuild without its
+commit: the page being written and the pages written before it are removed, and on a drive
+that is gone they stay, never read without a record. A rebuild first finishes a change
+that a failed call left, as every change does, and is `storage-error` when it cannot. A
+rebuild of the board's storage takes the show's files whose names a catalog may hold; the
+check after the start gives way while it runs and takes up after it, or after a cancel,
+every file that is neither read nor quarantined. A rebuild of the drive drops its places,
+lists the folder once and gives each file its id and its place in the saved order as a
+plug-in without a catalog does; a file joins as it is read. Readiness is `checking` with
+the rebuild's files read and to read while it runs, and the file it reads.
+
+**Resolution.** `core/src/catalog.cpp` (`catalog_rebuild`, `catalog_cancel`,
+`catalog_rebuild_step`, `catalog_drive_went`), `core/src/core.cpp` (`check_file_step`
+shared with the rebuild), `core/src/commands.cpp` (the routes, `busy`, readiness);
+`tests/core/test_catalog_rebuild.py`; `docs/commands.md`, "Catalogs"; `docs/core.md`,
+"Readiness" and "Memory".
+## Seed 35: the firmware writes the card
+
+**Question.** Task 11 has the firmware list the drive's folder only when the core asks,
+give places the names the core binds, say whether the card can be written, and make the
+core's changes by `drive/<name>`, with `odrig_files.cpp` routing the `drive/` names. Where
+does the routing go, which drives get the three functions, what does a card without its
+folder do, how is the one file being written kept across two storages, and what of the
+file the player reads when a change replaces it?
+
+**Answer.** The routing of `drive/` names was in `odrig_drive.cpp` already, whose
+`withDrive` wraps the installed files' functions for the reads; it wraps the five that
+change files too, when the installed files have them, and `odrig_files.cpp` only lends its
+timing: `OdrigFiles::StorageCall` times a change of the card as its own calls are timed,
+so that the command lines are paced after it. Both backends have `drive_list`,
+`drive_bind` and `drive_writable`, so that a stick with a catalog is read from it too; the
+stick's `drive_writable` says 0 and its changes fail. The card is written while it is
+mounted, has its folder `odrig` and no read of it has failed: the board makes no folder,
+so a card without one stays as it is. Beginning a file in one storage gives up and removes
+the one being written in the other, as the core's header has it for one storage. A rename
+onto a file that is there removes that file first, as FAT renames onto none, once the file
+to be renamed is there; when the target is the same file in another case, nothing is
+removed. A change of the file the player holds closes it first, as FAT frees the clusters
+of a removed file under a reader: its reads fail, as the installed files' do with no file
+open, and the card stays mounted; the file `read_at` holds is closed at every change and at
+every list. A write is whole only when the card holds every byte given, so a failed write
+makes the end fail as well. Mounting a drive logs `card mounted` or `stick mounted`, or
+that it has no folder `odrig`; the lines with the number of files come when the folder is
+listed.
+
+**Resolution.** `firmware/usermod/odrig_drive.cpp`, `odrig_drive.h`, `odrig_files.h`,
+`odrig_files.cpp`; `tests/firmware/test_usermod_sd.py`, `test_usermod_drive.py`,
+`test_usermod_files.py`, `test_usermod_log.py`; `docs/microsd.md`, `docs/firmware.md`,
+`docs/firmware-additions.md`, line 26.
+
+## Seed 35: the command tool's catalog and the card's upload
+
+**Question.** The design names `odrigctl catalog [rebuild internal|rebuild external|cancel]`
+and `odrigctl upload --external FILE`. How does the tool's table of commands hold a command
+whose operation may be left out, how is `--external` told from an id, and does the tool
+wait for a rebuild to end?
+
+**Answer.** `catalog` takes `[OPERATION]` in the table and the synopsis: none, `rebuild
+internal`, `rebuild external` or `cancel`, each sent as it is, anything else a usage error
+of status 2 that says what it takes. `--external` is an option of the tool that goes with
+`upload` only and takes the file alone; the upload is the one of `upload ID FILE` with the
+word `external` in the place of the id, so that `upload begin external <name> <bytes>
+<crc32>` goes out, and the reply of `upload end` with the card's id is printed as it comes.
+The tool does not wait for a rebuild: its reply comes at once, and `catalog` shows the
+progress. The tests run the commands through the emulator by each transport, and a card
+the emulator wrote is read by the PC tool and the other way round.
+
+**Resolution.** `odrigctl/cli.py`; `tests/emulator/test_catalog.py`,
+`tests/emulator/test_tool.py`; `docs/emulator.md`, "The command tool".
+## Seed 35: the app's task built beside the core's
+
+**Question.** Task 13, the app, is built at the same time as tasks 7 and 8, which give the
+core the upload to the card, the removal from it, `space`'s `read_only` and the rebuild.
+What does the app follow, and what does it run against?
+
+**Answer.** The forms the design and the core's line fixed for those tasks: `catalog` with
+`internal`, `external` and `rebuild`, `catalog rebuild internal|external` and `catalog
+cancel`, `upload begin external <file> <bytes>` with its `upload end` giving `id`,
+`remove <id>` of a card's animation, `"read_only":false`, and the code `read-only`. The
+app's tests run them against stand-in targets that answer so, and `catalog`'s states
+against the emulator as well. The app gives `read-only` its sentences already; the table
+of codes in `docs/commands.md`, and with it the count of `tests/app/test_messages.py`,
+gain the code with task 7.
+
+**Resolution.** `app/www/commands.js`, `app/www/screens/catalogs.js`,
+`tests/app/test_catalog.py`; `docs/android-app.md`.
+
+## Seed 35: where the app's choices stand, and their words
+
+**Question.** The design names `Store on: The card / This board` on Upload, `Rebuild` and
+`Cancel` in Settings, and the progress `Reading the animations: 12 of 84`. Upload makes
+texts and clocks as well as animations of videos, Settings has the mapping's `Cancel`
+already, and Animations says `Reading the animations: ...` during a rebuild. Where do the
+choices stand, and what do they say?
+
+**Answer.** `Store on` stands with the animation that was made, above `Upload to the
+installation`, as it is the choice of that upload; texts and clocks are stored on the
+board, as the card's catalog holds `.odrg` files only. Settings' buttons name what they
+do, `Rebuild the board's catalog`, `Rebuild the card's catalog` and `Cancel the
+rebuild`, and the question's `Rebuild` and `Not now`; the progress is `Rebuilding the
+catalog of the board: 12 of 84 animations read.`, so that it is not Animations' line. The
+app does not judge a card's free storage before an upload: the card's file system rounds
+as the board knows, and the board refuses with `no-space` before a byte is sent. A card's
+storage line and its badge say `read-only` only while the installation cannot write it,
+and a file with a fault on a card it can write is deleted from its menu, not mended on a
+computer.
+
+**Resolution.** `app/www/index.html`, `app/www/screens/storage.js`, `screens/show.js`,
+`screens/catalogs.js`, `capacity.js`; `docs/android-app.md`.
+## Seed 35: a checked install of a show with ODRGX containers
+
+**Question.** On the board, `install-show` of a show that names a text and a clock refused
+the folder: `file-malformed: .../hebrew.marquee.odrgx: bad-magic: the file starts with 4f 44
+52 58, not 4f 44 52 47`. Its check read every file as ODRG; seed 37 lets a show name ODRGX
+containers. How does the check read them?
+
+**Answer.** As the library reads them, told apart by their first four bytes as format.md
+says: an ODRG file whole, as before and in the same words; a container of frames by
+`odrgx.decode_frames`, its canvas, its frames and their loop; a container of text or of a
+widget by `odrgx.read_header` and the length its header gives the payload; each with the
+mapping's canvas, else `size-mismatch`. A refused file is reported with the library's
+reason. The library has no reader of the payloads of text and widgets, which the board
+reads by its own: a payload whose settings or glyphs are wrong passes the tool's check and
+is made unavailable by the board's (seed 32), and a payload with bytes after it or cut short
+is refused here as `payload-size` where the board's reader names `trailing-bytes` or
+`truncated`. Until the catalog reads containers, they are left out of it and the board
+checks them at its start.
+
+**Resolution.** `firmware/fwtool/storage.py`, `_check_animation`;
+`tests/firmware/test_containers.py`.
+
+## Seed 37: the type and the loop in a catalog, the PC part
+
+**Question.** Seed 35's catalogs were made before seed 37 and read every file as ODRG. Seed
+37's task 14 asks the catalogs to register the type and the loop of every file. Does the
+format have room, and what does the PC library record?
+
+**Answer.** The format has room: each line of a page holds a length in milliseconds and a
+type, `frames`, `text` or `widget`, so no line changes its form. `odrig.catalog.entry_of` reads
+a container as the core's check does, told apart by its first four bytes: one of frames by
+`odrgx.decode_frames`, one of text or a widget by `odrgx.read_header` and the length its
+header gives the payload; the entry has the header's canvas, its loop as the length and its
+type; an ODRG file stays of `frames` with the sum of its durations. Names may end in
+`.odrgx`, and a storage lists them as the drive does. `canvas=None` leaves the canvas
+uncompared, which the firmware tool's check uses before it compares the mapping's in its own
+words. This is the PC library's half; the core's reader of a catalog still takes names
+ending in `.odrg` only and writes `frames` for every entry, and is the other half of the
+task.
+
+**Resolution.** `odrig/catalog.py`, `entry_of`, `name_allowed`, `names`;
+`firmware/fwtool/storage.py`, `_check_animation`; `tests/converter/test_catalog_types.py`;
+`docs/catalog.md`.
+
+## Seeds 35 and 37: the core records the type and the loop
+
+**Question.** With the PC library's half in (it reads a container as the core's check does
+and writes each entry's type and loop), the core still took only `.odrg` names on a page
+and wrote `frames` for every entry, so that a catalog that `install-show` writes for a show
+with texts or clocks would be read by the board as damaged. What does the core write, read
+and give for each kind of file, and may the card hold texts and clocks?
+
+**Answer.** The core writes the type its check found and, for a text or a clock, the loop
+its header gives as the length; it reads the type back with the entry and gives it to the
+show's file and to the drive's place, so that `list` has it at once, without a scan. A
+name on a page may end in `.odrg` or `.odrgx`, in any case, as the PC library's rule says,
+and `upload begin external` takes either: the card may hold texts and clocks, and the app
+keeps sending them to the board, as its task chose. A rebuild takes `.odrgx` files from
+here on. The rest of seed 37's task 14 stands on what the branch holds: a refused text or
+clock is quarantined at the start (seed 37's tests of texts and clocks), the forms of making
+and editing are in seed 36's Upload and Animations (seed 37's tasks 9 to 11), and seed
+39's filter goes by `type` of `list` (seed 39's task 1).
+
+**Resolution.** `core/src/catalog.cpp` and `.h` (`catalog_name_allowed`, `EntryLine.type`,
+`CatalogChange.added_type`, `put_entry`), `core/src/storage.cpp`, `core/src/commands.cpp`;
+`tests/core/test_catalog_odrgx.py`; `docs/commands.md`, "Catalogs".
+
+## Seed 35: the measured costs, and two that the design put otherwise
+
+**Question.** Task 14 asks for `docs/catalog.md` with the measured costs. The design's
+table said that a start reads the marker and the pages once, and that a drive's catalog is
+read in steps of at most 512 bytes. What do the measurements say, and how are they taken
+without a board?
+
+**Answer.** They are taken through the core's test host, with refreshes 20 ms apart, on the
+target file of 80 animations and on drives of 16, 64 and 256 animations, and given in
+`docs/catalog.md` beside the table. A start reads the marker once and the pages twice: the
+core checks every page against the marker before it takes an entry, so that a damaged page
+leaves every file as without a catalog; 7,289 bytes for a catalog of 3,849. A step of a
+drive's catalog is one read of at most 512 bytes, and the marker is read again before each
+page, so that a marker changed while the pages are read starts the reading again; a refresh
+takes as many steps as the check's pace gives it, at most 2,266 bytes for 256 animations,
+in 10 refreshes. The table now says both. The board's own times are its session's, task 15.
+The app's page gave as the reason that texts and clocks stay on the board that the card's
+catalog held `.odrg` files only; with seed 37's types in the catalogs that is no longer so,
+and the page gives the app's choice alone.
+
+**Resolution.** `docs/catalog.md`, "What each operation costs"; `docs/core.md`, "Startup" and
+"The catalogs"; `docs/android-app.md`, "Using it".
+
+## Seed 36: the snake test seen on the installation
+
+**Question.** With the twenty snakes wired, the owner found the test of a snake, one white
+line of 20 pixels in each of its three columns, too sparse to judge the snake by: most of
+its LEDs stayed dark. What should it show?
+
+**Answer.** The owner's choice: a white block of 3 x 3 pixels that runs the length of the
+snake, from the bottom of its three columns to their top and back, one row every 40 ms,
+so that every LED of the snake lights in turn and the direction of each strip is seen as
+the block passes. Within one snake a block three wide can move along the snake's length
+only, so "back and forth" is up and down the columns. It is drawn at each refresh from
+the time since the player started, as a clock is, and keeps no state and no embedded
+picture; the file of twenty frames and its generator are gone.
+
+**Resolution.** `core/src/mapping_control.cpp`, `snake_test_draw`; docs/commands.md,
+docs/core.md, docs/android-app.md; the change log of docs/decisions.md.
+
+## Seed 40: the owner's photo in a lit room, and the edge the wires are at
+
+**Question.** The owner's first photo of the diagonal, taken in a lit room with the wall on
+its table and seen from the side, was refused: 401 bright spots, the lens of every unlit
+LED catching the room's light, which a threshold of the picture's median plus a margin
+could not part from the lit LEDs; darkening the photo by hand did not help, as the median
+darkened with it. And the stubs fell to the right, where the design expects them to rise:
+seen from the side, the positions run down the picture and the heights across it. How are
+the lit LEDs told from the lenses, and how is the picture's orientation read?
+
+**Answer.** The owner's rule: the picture is scanned from the brightest level down, as if
+brightened little by little, and the count of peaks at or above each level is watched; the
+lit LEDs, all about as bright, come in together and then nothing new comes until the lenses
+and the reflections flood in, so the level is the middle of the longest stretch of levels
+over which the count holds steady, at one to a hundred peaks. A picture with no stretch of
+twelve levels has no steady set of lit LEDs and is refused, `no steady set of lit LEDs
+among them`. Pictures with reflections are the normal case, not a fault. The slope of the
+stubs tells upright from turned: they rise to the right when the wall is seen upright and
+fall when it is seen from the side, a quarter turn either way. Which edge the wires are at,
+the picture cannot tell, so the advice asks for the wires' edge at the bottom of the
+picture or at its left, and both edges are offered as choices, the advised one first, in
+the words of the wires rather than of a dark strip at the left or the right, which a
+turned picture would confuse. The picture is analysed at 900 pixels on its long side, not
+600, so that the LEDs of a wall that fills the frame are some 15 pixels apart. The owner's
+screenshots of the app with the photo, one as taken and one darkened, are test vectors
+beside the seed, read to the mapping the stubs show by eye.
+
+**Resolution.** `app/www/photo.js`, `app/www/screens/photomap.js`; the seed's
+`photos/05-the-diagonal-from-the-side-screenshot.jpg` and `06-…-darkened-screenshot.jpg`;
+docs/android-app.md; the spec's requirements and design; the change log of
+docs/decisions.md.

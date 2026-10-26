@@ -8,8 +8,8 @@ from .test_storage import SPACE
 # or switched off, and so is a text area.
 TYPED = {"text", "number", "search", "url", "email", "tel", "password", "date", "time", "datetime-local", "month", "week"}
 # The fields of the page: the address, and the start and the length of a part of a video.
-FIELDS = ["#start", "#length", "#address"]
-LOOKS = ("show", "storage", "question", "target", "message")
+FIELDS = ["#start", "#length", "#text-words", "#text-speed", "#text-pause", "#clock-seconds", "#clock-speed-min", "#clock-speed-max", "#address"]
+LOOKS = ("animations", "upload", "question", "target", "message")
 
 
 def is_field(element):
@@ -45,14 +45,14 @@ class ALongPressOrARightClick(unittest.TestCase):
             for element in elements:
                 if not is_field(element):
                     self.assertEqual((element["marks"], element["stopped"]), ("none", True), f"{look}: {element['what']}")
-        tags = {element["tag"] for element in self.seen["storage"]["elements"]}
+        tags = {element["tag"] for element in self.seen["upload"]["elements"]}
         self.assertLessEqual({"html", "body", "main", "section", "h1", "p", "label", "button", "span", "div", "nav", "canvas", "input"}, tags)
-        kinds = {element["kind"] for element in self.seen["show"]["elements"] if element["tag"] == "input"}
+        kinds = {element["kind"] for element in self.seen["animations"]["elements"] if element["tag"] == "input"}
         self.assertLessEqual({"range", "file"}, kinds)
-        rows = [element["what"] for element in self.seen["storage"]["elements"] if element["what"].startswith("#installed > div.row")]
+        rows = [element["what"] for element in self.seen["animations"]["elements"] if element["what"].startswith("#animations-list > div.row")]
         self.assertGreaterEqual(len(rows), 2 * 6)
 
-    def test_in_the_three_fields_text_can_be_marked_and_the_menu_opens(self):
+    def test_in_every_field_text_can_be_marked_and_the_menu_opens(self):
         for look in LOOKS:
             fields = [element for element in self.seen[look]["elements"] if is_field(element)]
             self.assertEqual([field["what"] for field in fields], FIELDS, look)
@@ -64,10 +64,9 @@ class ALongPressOrARightClick(unittest.TestCase):
             self.assertEqual(self.seen[look]["marked"], "", look)
 
     def test_a_button_whose_menu_was_stopped_still_works_by_a_press(self):
-        # The scenario pressed `Storage` after the stopped right click, and the storage
-        # screen came.
+        # The scenario pressed `Upload` after the stopped right click, and Upload came.
         self.assertTrue(self.seen["stoppedBeforePress"])
-        self.assertIn("storage", self.seen)
+        self.assertIn("upload", self.seen)
 
     def test_what_is_made_later_is_a_field_by_its_kind(self):
         made = self.seen["made"]

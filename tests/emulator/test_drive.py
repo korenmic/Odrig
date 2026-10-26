@@ -33,13 +33,14 @@ class TheOption(unittest.TestCase):
         self.assertEqual(list(self.work.iterdir()), [])
 
     def test_the_list_of_a_folder_passes_over_hidden_and_other_files_and_keeps_the_order_of_names(self):
-        folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b"", ".a.odrg": b"", "c.odrg.txt": b"", "notes.txt": b""})
+        folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b"", ".a.odrg": b"", "c.odrg.txt": b"", "notes.txt": b"",
+                                                         "d.odrgx": b"", "C.ODRGX": b"", ".e.odrgx": b"", "f.odrgx.txt": b""})
         (folder / "inner.odrg").mkdir()
-        self.assertEqual(host.drive_list(folder), ["A.ODRG", "b.odrg"])
+        self.assertEqual(host.drive_list(folder), ["A.ODRG", "C.ODRGX", "b.odrg", "d.odrgx"])
         support.installed(folder, {f"{index:03d}.odrg": b"" for index in range(300)})
         self.assertEqual(len(host.drive_list(folder)), 256)
 
-    def test_the_folder_is_looked_for_once_a_second_and_its_list_is_made_when_it_appears(self):
+    def test_the_folder_is_looked_for_once_a_second_and_listed_when_the_core_asks(self):
         now = [0.0]
         drive = host.Drive(self.work, clock=lambda: now[0])
         self.assertEqual(drive.look(), 0)
@@ -47,7 +48,9 @@ class TheOption(unittest.TestCase):
         now[0] = 0.5
         self.assertEqual(drive.look(), 0)
         now[0] = 1.0
-        self.assertEqual((drive.look(), drive.name(1, 0), drive.name(1, 1)), (1, "a.odrg", None))
+        self.assertEqual((drive.look(), drive.name(1, 0)), (1, None))
+        self.assertEqual(drive.list(1), 1)
+        self.assertEqual((drive.name(1, 0), drive.name(1, 1)), ("a.odrg", None))
         support.installed(self.work / "odrig", {"b.odrg": b""})
         now[0] = 2.0
         self.assertEqual((drive.look(), drive.names), (1, ["a.odrg"]))
@@ -56,7 +59,7 @@ class TheOption(unittest.TestCase):
         self.assertEqual((drive.look(), drive.name(1, 0), drive.path("drive/0")), (0, None, None))
         support.installed(self.work / "odrig", {"b.odrg": b""})
         now[0] = 4.0
-        self.assertEqual((drive.look(), drive.names, drive.path("drive/0")), (2, ["b.odrg"], str(self.work / "odrig" / "b.odrg")))
+        self.assertEqual((drive.look(), drive.list(2), drive.names, drive.path("drive/0")), (2, 1, ["b.odrg"], str(self.work / "odrig" / "b.odrg")))
 
 
 class AnEmulatorWithADrive(unittest.TestCase):
@@ -91,10 +94,13 @@ class AnEmulatorWithADrive(unittest.TestCase):
 
     def test_a_damaged_file_and_one_of_another_canvas_are_left_out_and_logged(self):
         wide = core_support.clip(4, 3, 3, (100,))
-        # The sound file is read last: once it is listed, the two before it have been read.
+        # The sound file is read last: once it is listed, the two before it have been read,
+        # and they are listed too, with their faults.
         support.installed(self.top / "odrig", {"broken.odrg": self.animation[:-5], "wide.odrg": wide, "z.odrg": self.animation})
         emulator = self.start("--verbose")
-        self.assertEqual(self.drives(self.listed_when(emulator, lambda items: len(self.drives(items)) == 1)), [(60001, "z.odrg")])
+        self.assertEqual(self.drives(self.listed_when(emulator, lambda items: len(self.drives(items)) == 3)), [(60001, "broken.odrg"), (60002, "wide.odrg"), (60003, "z.odrg")])
+        faults = [item.get("fault") for item in json.loads(emulator.command("list"))["items"] if item["id"] > 60000]
+        self.assertEqual(faults, ["truncated", "size-mismatch", None])
         err = emulator.stop().err
         self.assertIn("core: drive file broken.odrg left out: truncated\n", err)
         self.assertIn("core: drive file wide.odrg left out: size-mismatch\n", err)

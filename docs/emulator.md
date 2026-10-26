@@ -4,7 +4,9 @@ The emulator is a program for macOS and Windows that runs the core of [core.md](
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
 repository root and uses only the Python standard library. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
-decision about files, time and commands to it.
+decision about files, time and commands to it. So it plays texts and clocks as the board
+does, drawn by the core at every refresh, a clock with the seed `status` reports; its
+suite finds every reference picture of `tests/vectors/procedural/` on its LEDs.
 
 This page covers the [commands](#commands) that build and test it, the
 [two shows](#two-shows-to-run) to run, [starting](#starting) it, its
@@ -97,7 +99,7 @@ of the Python library of [python-library.md](python-library.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -125,6 +127,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--storage BYTES` | The size of the storage the core is told of, as the total space of `space`: a whole number from 0 to 4,294,967,295. | 13,500,416, the size of the board's storage on its bigger layout |
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
+| `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
@@ -173,18 +176,19 @@ python -m emulator build/demo-20/show --drive build/stick
 ```
 
 - The emulator looks for the folder `DIR/odrig` once a second. When it appears, a drive
-  is plugged in: its list is made then, of the files whose names end in `.odrg`, in any
-  case, and do not begin with a dot, in the order of their names, at most 256. When the
-  folder goes, the drive is pulled out. A folder `DIR` that is not there yet is no
-  error: the drive is plugged in once `DIR/odrig` is.
-- The list is made when the folder appears and not again while it stays, as the files of
-  a drive do not change while it is plugged in. To take up files added to it, move the
-  folder `odrig` away for two seconds and back.
+  is plugged in; when it goes, the drive is pulled out. A folder `DIR` that is not there
+  yet is no error: the drive is plugged in once `DIR/odrig` is.
+- The folder is listed when the core asks, for a drive without a catalog: the files whose
+  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order
+  of their names, at most 256. It is not listed again while it stays. To take up files
+  added to it, move the folder `odrig` away for two seconds and back.
+- The core may change the drive's files, by their names, unless `--drive-read-only` is
+  given: the files a change of the drive writes go into `DIR/odrig`.
 - The core reads the drive's files after the installed ones, while the show plays. Each
   sound one joins the playlist and `list` with an id from 60001 up once it has been read;
   one that is not is left out, and with `--verbose` the reason is printed, as
   `core: drive file broken.odrg left out: truncated`.
-- Nothing is written to `DIR`. `space` counts the folder of the show only.
+- `space` counts the folder of the show only.
 - The page's header names the folder `DIR` after `drive`.
 
 `--drive` does not go with `--record`: record mode has no drive.
@@ -328,7 +332,7 @@ From top to bottom the page has:
   reports: its refreshes in the last full second. `page` is the page's own count: the
   refreshes it drew in the last full second.
 - **The reason band.** When the core reports that the show is invalid, a red band shows the
-  reason text exactly as the core gives it, for example `file-missing dvd.odrg`. With a
+  reason text exactly as the core gives it, for example `show-missing`. With a
   valid mapping the LEDs are still drawn, all dark. With an invalid mapping there are no
   LEDs to draw, and the page says so.
 - **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
@@ -653,6 +657,12 @@ line with `#controller` at its end.
 The emulator serves `app/www/` from the repository it runs in. Where that folder is not
 there, the frame is empty.
 
+The Controller view is the app itself: the files of `app/www/` as they are in the checkout
+the emulator runs from, the same files the APK is built from. A difference between what
+the Controller view shows and what the phone shows is a fault, by the working rules, "One
+app, in the emulator and on the phone"; the first thing to check is that the emulator and
+the APK come from one commit.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
@@ -670,7 +680,7 @@ event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
-data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 
 event: frame
 data: 123460 <base64 of the refresh>
@@ -705,12 +715,17 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] off
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] brightness N
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] status
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] fault
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] space
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] list
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] read ID OFFSET
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] catalog [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] remove ID
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
 
 Through the serial port, here the emulator's; for the board the name is its USB serial
@@ -722,12 +737,19 @@ python -m odrigctl --port build/emulator/serial on
 python -m odrigctl --port build/emulator/serial off
 python -m odrigctl --port build/emulator/serial brightness 40
 python -m odrigctl --port build/emulator/serial status
+python -m odrigctl --port build/emulator/serial fault
 python -m odrigctl --port build/emulator/serial space
 python -m odrigctl --port build/emulator/serial list
+python -m odrigctl --port build/emulator/serial read 1 0
+python -m odrigctl --port build/emulator/serial catalog
+python -m odrigctl --port build/emulator/serial catalog rebuild internal
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+python -m odrigctl --port build/emulator/serial upload --external build/hello-card.odrg
 python -m odrigctl --port build/emulator/serial remove 9
 python -m odrigctl --port build/emulator/serial remove many 9,10
 python -m odrigctl --port build/emulator/serial ignore 9 1
+python -m odrigctl --port build/emulator/serial order get
+python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -739,12 +761,19 @@ python -m odrigctl --tcp 127.0.0.1:8601 on
 python -m odrigctl --tcp 127.0.0.1:8601 off
 python -m odrigctl --tcp 127.0.0.1:8601 brightness 40
 python -m odrigctl --tcp 127.0.0.1:8601 status
+python -m odrigctl --tcp 127.0.0.1:8601 fault
 python -m odrigctl --tcp 127.0.0.1:8601 space
 python -m odrigctl --tcp 127.0.0.1:8601 list
+python -m odrigctl --tcp 127.0.0.1:8601 read 1 0
+python -m odrigctl --tcp 127.0.0.1:8601 catalog
+python -m odrigctl --tcp 127.0.0.1:8601 catalog cancel
 python -m odrigctl --tcp 127.0.0.1:8601 upload 9 build/hello-bench.odrg
+python -m odrigctl --tcp 127.0.0.1:8601 upload --external build/hello-card.odrg
 python -m odrigctl --tcp 127.0.0.1:8601 remove 9
 python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
 python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
+python -m odrigctl --tcp 127.0.0.1:8601 order get
+python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -756,28 +785,38 @@ python -m odrigctl --http 127.0.0.1:8600 on
 python -m odrigctl --http 127.0.0.1:8600 off
 python -m odrigctl --http 127.0.0.1:8600 brightness 40
 python -m odrigctl --http 127.0.0.1:8600 status
+python -m odrigctl --http 127.0.0.1:8600 fault
 python -m odrigctl --http 127.0.0.1:8600 space
 python -m odrigctl --http 127.0.0.1:8600 list
+python -m odrigctl --http 127.0.0.1:8600 read 1 0
+python -m odrigctl --http 127.0.0.1:8600 catalog
+python -m odrigctl --http 127.0.0.1:8600 catalog rebuild external
 python -m odrigctl --http 127.0.0.1:8600 upload 9 build/hello-bench.odrg
+python -m odrigctl --http 127.0.0.1:8600 upload --external build/hello-card.odrg
 python -m odrigctl --http 127.0.0.1:8600 remove 9
 python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
 python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
+python -m odrigctl --http 127.0.0.1:8600 order get
+python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 ```
+
+`status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
+system and the processor of the computer.
 
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 | Status | Meaning |
 |---:|---|
-| 0 | The reply has `"ok":true`: for `list` every reply, and for `upload` the reply to `upload end`. |
+| 0 | The reply has `"ok":true`: for `list` every reply, and for `upload` the reply to `upload end`, or the reply `unchanged` to `upload begin`. |
 | 1 | A reply has `"ok":false`. It is printed all the same. An upload the tool had opened is cancelled first. |
 | 2 | The command line was not understood, or the file to upload cannot be read: then one line `error: not-found: <detail>` is written to standard error and nothing is sent. |
 | 3 | The target could not be reached, or no reply arrived within the time limit. One line `error: unreachable: <detail>` is written to standard error. |
 
-- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `space`, `list` or
+- The line sent is `play <ID>`, `on`, `off`, `brightness <N>`, `status`, `fault`, `space`, `list` or
   `remove <ID>`, followed by a newline. ID and N are sent as they were typed and are not
   checked: `play abc` is sent and the reply says `bad-argument`. Every judgement is the
   command front-end's.
@@ -833,16 +872,24 @@ node converter/odrig.js encode animations/hello.json build/hello-bench.odrg
 python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
 upload: 100% 1138/1138 bytes 1206147 B/s
 upload: checking
+upload: committed: 1138 bytes sent and checked by the target
 {"ok":true}
+python -m odrigctl --port build/emulator/serial upload 9 build/hello-bench.odrg
+upload: unchanged: the target holds this file already; nothing was sent
+{"ok":true,"unchanged":true}
 ```
 
 The emulator takes a small file in a thousandth of a second, which is the speed shown
 here; the board's is in [firmware.md](firmware.md).
 
 - The tool reads the whole file before it sends anything. It sends `upload begin <ID>
-  <name> <bytes>`, where the name is the last part of the path as it is, then the file in
-  pieces of the size the reply names, each as one `upload data` line, and then
-  `upload end` with the CRC-32 of the file. ID and the name are not checked by the tool.
+  <name> <bytes> <crc32>`, where the name is the last part of the path as it is and the
+  CRC-32 is the file's, then the file in pieces of the size the reply names, each as one
+  `upload data` line, and then `upload end` with the CRC-32 of the file. ID and the name
+  are not checked by the tool.
+- A reply `{"ok":true,"unchanged":true}` to `upload begin` ends the upload: the item holds
+  this file already, and nothing more is sent. A reply `bad-argument` to it is followed by
+  `upload begin <ID> <name> <bytes>` once, for a target older than the CRC-32 there.
 - Progress goes to standard error: the percentage, the bytes acknowledged and the total,
   and the speed, which is the bytes acknowledged over the time since `upload begin` was
   answered. A report is written when half a second has passed since the one before, and
@@ -853,15 +900,23 @@ here; the board's is in [firmware.md](firmware.md).
   `upload end` is `busy`, the target is checking the file, and the tool sends
   `upload end` again every 0.2 seconds. After 600 seconds of `busy` it sends
   `upload cancel`, prints the last reply and exits with status 1.
+- After an upload that ended well, one more line on standard error says what it came to:
+  `upload: committed: <bytes> bytes sent and checked by the target`, or `upload:
+  unchanged: the target holds this file already; nothing was sent`. A reply that was not
+  ok leaves the show as it was. When `upload end` went out and no reply came, the line
+  `upload: not known: the target did not answer; the same upload again sends nothing when
+  the file was installed` comes before the error line: the same command run again finds
+  the file unchanged when the target installed it.
 - Standard output gets the reply that ended the command: the `{"ok":true}` of
-  `upload end`, or the first reply that was not ok. After such a reply to a piece or to
+  `upload end`, the reply `unchanged` of `upload begin`, or the first reply that was not
+  ok. After such a reply to a piece or to
   `upload end` the tool sends `upload cancel`, unless the reply says that the upload is
   gone. A refused `upload begin` is not followed by a cancel: the upload that is open
   then is someone else's.
 - When no reply to an `upload data` line arrives in time, the tool sends the same line
   once more. `bad-offset` for that second line means that the first one was taken, and the
   tool goes on. Without a reply to the second line either, it exits with status 3. No
-  other line is sent twice.
+  other line is sent twice, but for `upload begin` after `bad-argument` as above.
 - Through a serial port the tool keeps the port open for the whole upload.
 
 Another program can use the exchanges directly. `odrigctl.client.serial_exchange(port,
@@ -881,6 +936,23 @@ exchange is one request. `odrigctl.content.list_all(session, show)` and
 take more than one exchange through a session; `progress(sent, total, seconds)` is called
 after every piece that was acknowledged.
 
+**`catalog`** prints the reply of `catalog`: the state of the catalog of the target's own
+storage and of its drive, and a rebuild's progress. **`catalog rebuild internal`** and
+**`catalog rebuild external`** start a rebuild of one of them, and **`catalog cancel`** ends
+one; each prints the reply, which comes at once: the rebuild goes on in the target, and
+`catalog` asked again shows how far it is. Another operation is status 2, and nothing is
+sent.
+
+**`upload --external FILE`** sends an animation to the target's drive, a card the core may
+write, as `upload ID FILE` sends one with an id: the same pieces, progress and replies, with
+`upload begin external <name> <bytes> <crc32>` in the place of `upload begin`, and the reply
+of `upload end` gives the id the card's animation got, `{"ok":true,"id":60003}`. A target
+whose drive cannot be written answers `read-only`, which is status 1. With the emulator,
+`--drive DIR` without `--drive-read-only` is such a drive once `DIR/odrig` has a catalog:
+the PC tool's `python3 -m odrig.catalog DIR import` writes one, and so does `catalog rebuild
+external`. What the emulator wrote there the PC tool reads, and a change the PC tool makes
+there the emulator takes up within ten seconds, when it reads the marker again.
+
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.
 
@@ -896,7 +968,8 @@ python -m odrigctl --http 127.0.0.1:8600 mapping get
 python -m preview FILE [--mapping FILE] [--no-browser] [--core PATH]
 ```
 
-Shows one finished `.odrg` file in the emulator, alone, until Ctrl-C. The path may be
+Shows one finished `.odrg` or `.odrgx` file in the emulator, alone, until Ctrl-C: frames,
+a text or a clock. The path may be
 absolute or relative, and the file may have any name: it is not changed. `preview` is a
 small program of its own, beside the emulator and the command tool, and holds no
 converter logic.
@@ -909,7 +982,8 @@ converter logic.
 3. The emulator starts on that folder, on port 8600, or on a free port when that is
    taken: the command then says `preview: port 8600 is taken; the page is on <port>`.
    It has a serial port and a line port of its own, so it runs beside another emulator.
-4. The file is uploaded as item 1, `preview.odrg`, as the operators' app will upload one
+4. The file is uploaded as item 1, `preview.odrgx` when its name ends in `.odrgx` and
+   `preview.odrg` otherwise, as the operators' app will upload one
    to the board: the core checks it whole. A file of another canvas ends the command with
    `preview: <file> is 60 x 60, and the mapping <mapping> is 60 x 6`.
 5. `page: <address>` is printed and the page opens in the default browser, unless
@@ -977,7 +1051,7 @@ after it. For each command the emulator prints one line to standard output, `rep
 time and the reply:
 
 ```
-reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 ```
 
 The whole script is checked before the core starts. A script that breaks a rule is refused
@@ -1186,9 +1260,9 @@ in a narrower window the mapping view of every other step has the arrangement of
     the emulator, start `python -m emulator build/dense/show`, and watch for ten seconds
     in the mapping view. *Seen:* `page` shows 49 or more in every second, each time.
 22. **An invalid show says why (10.1).** Stop the emulator. Copy `build/example-show` to
-    `build/example-broken`, remove `dvd.odrg` from the copy and start
+    `build/example-broken`, remove `show.json` from the copy and start
     `python -m emulator build/example-broken`. *Seen:* a band under the header shows
-    `file-missing dvd.odrg`, in the LEDs view and in the mapping view, and every LED is
+    `show-missing`, in the LEDs view and in the mapping view, and every LED is
     dark.
 
 ### What has been checked
@@ -1304,6 +1378,12 @@ routing in their hello event. The mapping file endpoint returns the committed fi
 
 For a serial client, `python3 -m odrigctl --port build/emulator/serial mapping get`
 reads the assignment. Use `mapping set REV PINS` to save the complete comma-separated
-pin list, and `mapping test on` or `mapping test off` for the packaged diagonal.
+pin list, `mapping test on` or `mapping test off` for the packaged diagonal, and
+`mapping test snake N` for the test of snake N.
 
-The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files remain read-only.
+`order get` prints the saved playlist order, a reply for each part, and
+`order move REV ID BEFORE` moves one animation, with `BEFORE` an id or `end`; the tool
+sends the words as they are typed. The emulator keeps the order in `order.txt` of its show
+folder, as the board does in its storage, and plays its playlist in that order.
+
+The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).

@@ -1,7 +1,10 @@
 #include "storage.h"
 
+#include "catalog.h"
 #include "content.h"
+#include "crc32.h"
 #include "json_reader.h"
+#include "order.h"
 #include "player.h"
 #include "show.h"
 
@@ -43,6 +46,75 @@ bool write_pending(Core &core, const char *first, const char *second) {
     return host.write(host.ctx, core.chunk, length) == 1 && host.write_close(host.ctx) == 1;
 }
 
+// Whether a name is the one given as the context.
+bool is_the_name(const Core &, const char *name, uint32_t length, const void *context) {
+    const char *given = static_cast<const char *>(context);
+    uint32_t at = 0;
+    for (; at < length && given[at] == name[at]; ++at) {
+    }
+    return at == length && given[at] == '\0';
+}
+
+// Whether a name is the file of an animation that a `remove many`, given as the context,
+// takes out of the show and that no item it keeps names.
+bool is_removed_file(const Core &core, const char *name, uint32_t length, const void *context) {
+    const ShowChange &change = *static_cast<const ShowChange *>(context);
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        if (!is_the_name(core, name, length, core.files[file].name)) {
+            continue;
+        }
+        bool removed = false;
+        bool retained = false;
+        for (uint32_t at = 0; at < core.item_count; ++at) {
+            if (!core.items[at].is_cycle && core.items[at].first == file) {
+                if (content_removed(core, at, change)) removed = true;
+                else retained = true;
+            }
+        }
+        return removed && !retained;
+    }
+    return false;
+}
+
+uint32_t page_of_name(const char *name) {
+    uint32_t length = 0;
+    while (name[length] != '\0') {
+        ++length;
+    }
+    return 1u << catalog_page_of(name, length);
+}
+
+// The upload's file put in place under its name, as the commit of the internal catalog
+// does it with its entry when the storage has one, and by a rename otherwise. The entry of
+// `dropped`, when given, is taken out in the same commit.
+bool place_upload(Core &core, const char *dropped) {
+    const Upload &upload = core.upload;
+    if (core.catalogs[kInternal].state != kCatalogOk) {
+        return core.host.rename(core.host.ctx, kUploadPart, upload.name) == 1;
+    }
+    CatalogChange change;
+    change.added = upload.name;
+    change.added_bytes = upload.size;
+    change.added_crc = crc_value(upload.crc);
+    change.added_total_ms = upload.total_ms;
+    change.added_type = core.check_content.type;
+    change.moves_part = true;
+    if (dropped != nullptr) {
+        change.drops = is_the_name;
+        change.context = dropped;
+        change.drop_pages = page_of_name(dropped);
+    }
+    return catalog_commit(core, kInternal, change);
+}
+
+// The file of the item at a position: its size came from the catalog's new entry when the
+// storage has a catalog.
+void entered(Core &core, uint32_t position) {
+    if (core.catalogs[kInternal].state == kCatalogOk) {
+        core.files[core.items[position].first].checked = kCheckedFromCatalog;
+    }
+}
+
 }  // namespace
 
 void storage_clear_parts(Core &core) {
@@ -53,7 +125,13 @@ void storage_clear_parts(Core &core) {
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "mapping.part", 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, "mapping.part");
     }
-    core.host.remove(core.host.ctx, kUploadPart);
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kOrderPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kOrderPart);
+    }
+    if (!catalog_left(core, kInternal)) {
+        // A change of the catalog that is not finished may move the upload's part yet.
+        core.host.remove(core.host.ctx, kUploadPart);
+    }
     core.host.remove(core.host.ctx, kShowPart);
 }
 
@@ -104,8 +182,54 @@ void storage_settle_pending(Core &core) {
     }
 }
 
+bool storage_cleanup(Core &core) {
+    if (!core.pending_cleanup) {
+        return true;
+    }
+    const odrig_host &host = core.host;
+    if (host.read_at == nullptr || core.chunk == nullptr) {
+        return false;
+    }
+    // `pending.txt` is read with `read_at`, beside the files of playback and of the checks.
+    uint32_t length = 0;
+    while (length < kPendingSize) {
+        const uint32_t room = kPendingSize - length;
+        const int32_t got = host.read_at(host.ctx, kPending, length, core.chunk + length, room < kFileBufferSize ? room : kFileBufferSize);
+        if (got < 0) {
+            return false;
+        }
+        if (got == 0) {
+            break;
+        }
+        length += static_cast<uint32_t>(got);
+    }
+    bool all_gone = true;
+    uint32_t begin = 0;
+    for (uint32_t at = 0; at < length; ++at) {
+        if (core.chunk[at] != '\n') {
+            continue;
+        }
+        const uint32_t size = at - begin;
+        char name[33];
+        if (size >= 1 && size <= 32) {
+            for (uint32_t index = 0; index < size; ++index) {
+                name[index] = static_cast<char>(core.chunk[begin + index]);
+            }
+            name[size] = '\0';
+            if (is_file_name(name) && !is_named(core, name) && host.remove(host.ctx, name) == -1) {
+                all_gone = false;
+            }
+        }
+        begin = at + 1;
+    }
+    if (all_gone) {
+        core.pending_cleanup = host.remove(host.ctx, kPending) == -1 ? 1 : 0;
+    }
+    return core.pending_cleanup == 0;
+}
+
 bool storage_install_upload(Core &core) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     const Upload &upload = core.upload;
     uint32_t position = 0;
@@ -117,10 +241,11 @@ bool storage_install_upload(Core &core) {
         // The item's file is replaced under its own name: the show file stays as it is,
         // and the one rename is where the show changes.
         player_releases_file(core, position);
-        if (host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+        if (!place_upload(core, nullptr)) {
             return false;
         }
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms);
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, position);
         player_file_replaced(core, position);
         return true;
     }
@@ -148,7 +273,7 @@ bool storage_install_upload(Core &core) {
     const bool with_old_file = old_file[0] != '\0';
 
     if (!write_pending(core, upload.name, with_old_file ? old_file : nullptr) ||
-        host.rename(host.ctx, kUploadPart, upload.name) != 1) {
+        !place_upload(core, with_old_file ? old_file : nullptr)) {
         host.remove(host.ctx, kPending);
         return false;
     }
@@ -169,10 +294,15 @@ bool storage_install_upload(Core &core) {
 
     // The show in storage is the new one from here on.
     if (is_new) {
-        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms);
+        content_add_item(core, upload.id, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, core.item_count - 1);
+        // An old entry of the order may name the new item's id: it stands there at once,
+        // as it would after a restart.
+        order_reload(core);
         player_item_added(core);
     } else {
-        content_change_file(core, position, upload.name, upload.size, upload.total_ms);
+        content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
+        entered(core, position);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;
@@ -183,7 +313,7 @@ bool storage_install_upload(Core &core) {
 }
 
 bool storage_remove_item(Core &core, uint32_t position) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     const ItemInfo &item = core.items[position];
 
@@ -206,6 +336,17 @@ bool storage_remove_item(Core &core, uint32_t position) {
     }
     const bool with_file = file[0] != '\0';
 
+    // The catalog first: a cut after it leaves a file of the show without an entry, which
+    // the next start reads as without a catalog.
+    if (with_file) {
+        CatalogChange taken;
+        taken.drops = is_the_name;
+        taken.context = file;
+        taken.drop_pages = page_of_name(file);
+        if (!catalog_commit(core, kInternal, taken)) {
+            return false;
+        }
+    }
     if (with_file && !write_pending(core, file, nullptr)) {
         host.remove(host.ctx, kPending);
         return false;
@@ -232,11 +373,28 @@ bool storage_remove_item(Core &core, uint32_t position) {
 }
 
 bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
-    if (core.pending_cleanup) return false;
+    if (!storage_cleanup(core)) return false;
     const odrig_host &host = core.host;
     ShowChange change;
     change.removed = ids;
     change.removed_count = count;
+    // The catalog first, as for one removal.
+    CatalogChange taken;
+    taken.drops = is_removed_file;
+    taken.context = &change;
+    for (uint32_t file = 0; file < core.file_count; ++file) {
+        const char *name = core.files[file].name;
+        uint32_t size = 0;
+        while (name[size] != '\0') {
+            ++size;
+        }
+        if (is_removed_file(core, name, size, &change)) {
+            taken.drop_pages |= page_of_name(name);
+        }
+    }
+    if (taken.drop_pages != 0 && !catalog_commit(core, kInternal, taken)) {
+        return false;
+    }
     uint32_t length = 0;
     for (uint32_t file = 0; file < core.file_count; ++file) {
         bool removed = false;
@@ -249,13 +407,16 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
         }
         if (removed && !retained) length = add_line(core, length, core.files[file].name);
     }
-    if (host.write_open(host.ctx, kPending) != 1 || host.write(host.ctx, core.chunk, length) != 1 || host.write_close(host.ctx) != 1) {
+    // Without a file that goes, as when each removed animation's file is another item's,
+    // there is no `pending.txt`.
+    const bool with_files = length != 0;
+    if (with_files && (host.write_open(host.ctx, kPending) != 1 || host.write(host.ctx, core.chunk, length) != 1 || host.write_close(host.ctx) != 1)) {
         host.remove(host.ctx, kPending);
         return false;
     }
     if (!content_write_show(core, change) || host.rename(host.ctx, kShowPart, kShowFile) != 1) {
         host.remove(host.ctx, kShowPart);
-        host.remove(host.ctx, kPending);
+        if (with_files) host.remove(host.ctx, kPending);
         return false;
     }
     // Excluded candidates cannot become the next automatic turn while tables compact.
@@ -269,6 +430,7 @@ bool storage_remove_many(Core &core, const uint16_t *ids, uint32_t count) {
             content_take_out(core, at);
         }
     }
+    if (!with_files) return true;
     core.pending_cleanup = 1;
     drive_check_yields(core);
     FileSource &source = core.checker->file;

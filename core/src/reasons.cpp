@@ -34,9 +34,22 @@ const char *reason_name(Reason reason) {
         case kTooMuchPadding: return "too-much-padding";
         case kBadPaletteIndex: return "bad-palette-index";
         case kTrailingBytes: return "trailing-bytes";
+        case kBadContainer: return "bad-container";
+        case kUnknownType: return "unknown-type";
+        case kUnknownTypeVersion: return "unknown-type-version";
+        case kPayloadSize: return "payload-size";
+        case kCanvasMismatch: return "canvas-mismatch";
+        case kLoopMismatch: return "loop-mismatch";
+        case kUnknownFont: return "unknown-font";
+        case kBadSettings: return "bad-settings";
+        case kBadText: return "bad-text";
+        case kDoesNotFit: return "does-not-fit";
+        case kBadGlyph: return "bad-glyph";
+        case kUnknownWidget: return "unknown-widget";
         case kNone:
         case kEnd:
         case kReasonCount:
+        case kPendingWork:
             break;
     }
     return "";

@@ -37,6 +37,12 @@ struct FileSource {
 
     int refill();
 
+    // Of a file that was just opened and of which nothing was taken: holds its first bytes
+    // in the buffer, up to `want`, fewer only at its end, so that they can be looked at and
+    // are then given by `get` as ever. Returns how many are held, or -1 when the host
+    // reports a failure.
+    int32_t look(uint32_t want);
+
     const odrig_host *host;
     const char *at_name;    // the file read with `read_at`, or null
     uint32_t taken;         // the bytes the host has handed out since the file was opened

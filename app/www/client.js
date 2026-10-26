@@ -16,7 +16,11 @@ const SPACE_EVERY_MS = 10000;
 // `animations` is the animation items of the newest complete list, in the order of the
 // show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
 // its cycles. `space` holds internal and external capacity from the newest reply, or null.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0};
+// `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
+// saved playlist order that goes with the newest list, `{ids, revision}`, or null while
+// there is none; `orderKnown` is false when the target has no saved order, an older one.
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0, listBusy: false,
+  order: null, orderVersion: 0, orderKnown: true};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -34,10 +38,16 @@ let listTimer = null;
 let listing = null;
 // The animation a status named that the list did not have, for which the list was asked.
 let askedFor = null;
+// Whether the saved order is due after a complete list, and the order that is being asked
+// for in parts: the ids so far, the position to ask for next and the revision of the
+// first part.
+let orderDue = false;
+let ordering = null;
 // Whether a list has waited while a status was sent. It goes before the next status
 // then, so that a target that answers slowly does not keep the list away.
 let listWaited = false;
-// Whether the show screen, or the storage screen, is the one on the screen of the phone.
+// Whether Animations, or Upload, is the screen on the screen of the phone: both use the
+// list and the capacity.
 let showScreen = false;
 let storageScreen = false;
 let spaceDue = false;
@@ -121,7 +131,7 @@ function listAgainLater(after = LIST_EVERY_MS) {
   }, after);
 }
 
-// Capacity is asked for periodically while Show or Storage is visible.
+// Capacity is asked for periodically while Animations or Upload is visible.
 function spaceAgainLater() {
   clearTimeout(spaceTimer);
   spaceTimer = setTimeout(() => {
@@ -175,8 +185,12 @@ async function askListPart() {
       listing = {items, from: reply.next};
     } else {
       state.listVersion += 1;
+      state.listBusy = false;
       state.animations = items.filter((item) => item.cycle !== true);
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
+      orderDue = state.orderKnown;
+      ordering = null;
+      if (!state.orderKnown) state.order = null;
       listAgainLater();
     }
   } catch (error) {
@@ -187,16 +201,67 @@ async function askListPart() {
       // The target has just started and still reads what it has installed. What is
       // known of its list stays, and the list is asked for again soon.
       heard();
+      state.listBusy = true;
       listAgainLater(LIST_WHEN_BUSY_MS);
     } else if (error instanceof commands.Refusal) {
       // The target answers and has no list to give: its show is invalid.
       heard();
+      state.listBusy = false;
       state.animations = null;
       state.cycles = [];
       listAgainLater();
     } else {
       failed(error);
       listAgainLater();
+    }
+  }
+  changed();
+}
+
+// Asks for one part of the saved order. The order takes the place of the one before when
+// its last part has come and it holds exactly the animations of the list; otherwise the
+// list is asked for again.
+async function askOrderPart() {
+  const asked = target;
+  const part = ordering === null ? {ids: [], from: 0, revision: null} : ordering;
+  ordering = null;
+  try {
+    const reply = await commands.orderGet(part.from);
+    if (asked !== target) {
+      return;
+    }
+    heard();
+    const ids = part.ids.concat(reply.ids);
+    if (part.revision !== null && part.revision !== reply.revision) {
+      // The order changed between two parts: it is asked for whole again.
+      orderDue = true;
+    } else if (reply.next !== null) {
+      ordering = {ids, from: reply.next, revision: reply.revision};
+    } else {
+      const listed = new Set((state.animations || []).map((item) => item.id));
+      if (ids.length === listed.size && ids.every((id) => listed.has(id))) {
+        state.order = {ids, revision: reply.revision};
+        state.orderVersion += 1;
+      } else {
+        state.order = null;
+        listing = null;
+        listDue = true;
+      }
+    }
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+      state.order = null;
+      if (["unknown-command", "bad-argument"].includes(error.code)) {
+        // A target whose software has no saved order: the list stays in its own order.
+        state.orderKnown = false;
+        state.orderVersion += 1;
+      }
+    } else {
+      failed(error);
     }
   }
   changed();
@@ -234,7 +299,7 @@ async function give(request) {
     }
     request.reject?.(error);
   }
-  if (request.kind === "remove" || request.kind === "ignore") {
+  if (request.kind === "remove" || request.kind === "ignore" || request.kind === "order") {
     listing = null;
     listDue = true;
     spaceDue = true;
@@ -309,6 +374,10 @@ function due() {
     listWaited = false;
     return askListPart;
   }
+  if (orderDue || ordering !== null) {
+    orderDue = false;
+    return askOrderPart;
+  }
   if (spaceDue) {
     spaceDue = false;
     return askSpace;
@@ -352,6 +421,11 @@ export function begin() {
   state.animations = null;
   state.cycles = [];
   state.space = null;
+  state.listBusy = false;
+  state.order = null;
+  state.orderKnown = true;
+  orderDue = false;
+  ordering = null;
   cancelWaiting();
   statusDue = true;
   listDue = false;
@@ -368,12 +442,12 @@ export function begin() {
 }
 
 // Says which screen is on the screen of the phone. The list is kept fresh while it is
-// the show screen or the storage screen, together with capacity.
+// Animations or Upload, together with capacity.
 export function showing(name) {
   const was = showScreen || storageScreen;
   const wasStorage = storageScreen;
-  showScreen = name === "show";
-  storageScreen = name === "storage";
+  showScreen = name === "animations";
+  storageScreen = name === "upload";
   if ((showScreen || storageScreen) && !was && state.answered && listTimer === null) {
     listDue = true;
   }
@@ -480,6 +554,25 @@ export function mappingTest(enabled) {
   return requestOperation("mapping", () => commands.mappingTest(enabled));
 }
 
+export function mappingTestSnake(snake) {
+  return requestOperation("mapping", () => commands.mappingTestSnake(snake));
+}
+
+// The latest fault of a file the target met since its start, or null when it met none or
+// its software does not know `fault`.
+export function lastFault() {
+  return requestOperation("fault", async () => {
+    try {
+      return await commands.fault();
+    } catch (error) {
+      if (error instanceof commands.Refusal && ["unknown-command", "bad-argument"].includes(error.code)) {
+        return null;
+      }
+      throw error;
+    }
+  });
+}
+
 export function contentBusy() {
   return contentLocked || job !== null;
 }
@@ -503,6 +596,53 @@ export function ignore(id, ignored) {
   });
 }
 
+// The whole file of an animation, read from the target in pieces, as bytes.
+export function readFile(id) {
+  return requestOperation("read", async () => {
+    const parts = [];
+    let offset = 0;
+    for (;;) {
+      const {bytes, data} = await commands.read(id, offset);
+      parts.push(data);
+      offset += data.length;
+      if (data.length === 0 || offset >= bytes) {
+        break;
+      }
+    }
+    const whole = new Uint8Array(offset);
+    let at = 0;
+    for (const part of parts) {
+      whole.set(part, at);
+      at += part.length;
+    }
+    return whole;
+  });
+}
+
 export function removeMany(ids) {
   return requestOperation("remove", () => commands.removeMany(ids));
+}
+
+// The catalogs of the target, the rebuild of one of them and its cancel.
+export function catalog() {
+  return requestOperation("catalog", () => commands.catalog());
+}
+
+export function catalogRebuild(storage) {
+  return requestOperation("catalog", () => commands.catalogRebuild(storage));
+}
+
+export function catalogCancel() {
+  return requestOperation("catalog", () => commands.catalogCancel());
+}
+
+// Moves an animation before another, or to the end with "end", in the saved order the
+// list is shown in. The list and the order are asked for again afterwards, whatever the
+// reply.
+export function orderMove(id, before) {
+  const revision = state.order === null ? null : state.order.revision;
+  if (revision === null) {
+    return Promise.reject(new Error("no saved order"));
+  }
+  return requestOperation("order", () => commands.orderMove(revision, id, before));
 }

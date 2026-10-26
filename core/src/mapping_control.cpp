@@ -12,6 +12,10 @@ namespace {
 #include "diagonal_data.h"
 
 const uint32_t kSnakes = 20;
+// The test of a snake: a white block of 3 x 3 pixels that runs from the bottom of the snake's
+// three columns to their top and back, one row every kSnakeStepMs milliseconds.
+const uint32_t kSnakeBlock = 3;
+const uint64_t kSnakeStepMs = 40;
 const char kMappingPart[] = "mapping.part";
 const char kMappingFile[] = "mapping.json";
 
@@ -100,7 +104,10 @@ bool persist(Core &core, const uint8_t *pins) {
     return true;
 }
 
+// An ODRG file the core holds, read as a host reads a file.
 struct Asset {
+    const uint8_t *bytes;
+    uint32_t size;
     uint32_t offset;
 };
 int asset_open(void *ctx, const char *) {
@@ -109,22 +116,23 @@ int asset_open(void *ctx, const char *) {
 }
 int32_t asset_read(void *ctx, uint8_t *out, size_t capacity) {
     Asset &asset = *static_cast<Asset *>(ctx);
-    size_t count = sizeof kDiagonal - asset.offset;
+    size_t count = asset.size - asset.offset;
     if (count > capacity) count = capacity;
-    memcpy(out, kDiagonal + asset.offset, count);
+    memcpy(out, asset.bytes + asset.offset, count);
     asset.offset += static_cast<uint32_t>(count);
     return static_cast<int32_t>(count);
 }
 void asset_close(void *) {}
 
+// Decodes the diagonal's one frame into the pixel buffer.
 bool decode_diagonal(Core &core) {
-    Asset asset = {0};
+    Asset asset = {kDiagonal, static_cast<uint32_t>(sizeof kDiagonal), 0};
     odrig_host host = {};
     host.ctx = &asset;
     host.open = asset_open;
     host.read = asset_read;
     host.close = asset_close;
-    Reason reason = core.file.open(host, "diagonal");
+    Reason reason = core.file.open(host, "test");
     if (reason == kNone) reason = core.decoder.open(&core.file, &core.inflate, core.window);
     if (reason == kNone) {
         memset(core.pixels, 0, core.decoder.n);
@@ -141,7 +149,7 @@ bool available(const Core &core, uint32_t item) {
         const uint32_t place = item - kDriveBase;
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
-    return item < core.item_count && !core.items[item].is_cycle;
+    return item < core.item_count && !core.items[item].is_cycle && item_usable(core, item);
 }
 
 }  // namespace
@@ -172,6 +180,8 @@ uint32_t mapping_get(const Core &core, Reply &reply) {
     }
     reply.text("],\"revision\":"); reply.number(editable ? revision_of(core) : 0);
     reply.text(",\"test\":"); reply.text(core.mapping_test ? "true" : "false");
+    reply.text(",\"snake\":");
+    if (core.mapping_test && core.mapping_snake != 0) reply.number(core.mapping_snake); else reply.text("null");
     reply.text("}\n");
     return reply.length;
 }
@@ -202,6 +212,7 @@ uint32_t mapping_set(Core &core, uint32_t revision, const char *text, uint32_t l
 void mapping_test_stop(Core &core) {
     if (!core.mapping_test) return;
     core.mapping_test = 0;
+    core.mapping_snake = 0;
     if (core.invalid) return;
     if (core.mapping_saved_playing < core.item_count && core.items[core.mapping_saved_playing].is_cycle) {
         const uint32_t saved = core.mapping_saved_playing;
@@ -221,24 +232,42 @@ void mapping_test_stop(Core &core) {
     }
 }
 
-uint32_t mapping_test(Core &core, bool enabled, Reply &reply) {
+uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     if (!enabled) {
         mapping_test_stop(core);
         return succeed(reply);
     }
-    if (core.mapping_test) return succeed(reply);
+    if (core.mapping_test && core.mapping_snake == snake) return succeed(reply);
     if (core.invalid) return refuse(reply, "show-invalid");
     if (!mapping_editable(core)) return refuse(reply, "bad-argument");
     if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
-    core.mapping_saved_playing = core.playing;
-    core.mapping_saved_shown = core.shown;
-    player_halt(core);
+    // A test that follows another one resumes what played before the first.
+    if (!core.mapping_test) {
+        core.mapping_saved_playing = core.playing;
+        core.mapping_saved_shown = core.shown;
+        player_halt(core);
+    }
     core.mapping_test = 1;
-    if (!decode_diagonal(core)) {
+    core.mapping_snake = static_cast<uint8_t>(snake);
+    if (snake == 0 && !decode_diagonal(core)) {
         mapping_test_stop(core);
         return refuse(reply, "storage-error");
     }
     return succeed(reply);
+}
+
+void snake_test_draw(Core &core, uint64_t now) {
+    const uint32_t travel = core.height - kSnakeBlock;
+    const uint64_t step = (now - core.t0) / kSnakeStepMs;
+    const uint32_t phase = static_cast<uint32_t>(step % (2u * travel));
+    const uint32_t at = phase <= travel ? phase : 2u * travel - phase;
+    const uint32_t left = (core.mapping_snake - 1u) * kSnakeBlock;
+    // The picture has three bytes a pixel and no palette, as a drawn animation has.
+    core.decoder.colours = 0;
+    memset(core.pixels, 0, 3u * core.width * core.height);
+    for (uint32_t row = at; row < at + kSnakeBlock; ++row) {
+        memset(core.pixels + 3u * (row * core.width + left), 255, 3u * kSnakeBlock);
+    }
 }
 
 }  // namespace odrig

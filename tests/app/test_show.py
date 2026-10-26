@@ -41,7 +41,7 @@ class Show(unittest.TestCase):
 class TheState(Show):
     def test_the_demo_show_plays_its_playlist_and_the_screen_says_what_status_says(self):
         emulator, address = self.emulator(entered(self, emulator_support.demo_show()))
-        found = support.run("state", address=address, settings={"rows": 2, "until": "Now 1 hello\\.odrg (49|50|51) refreshes a second"})
+        found = support.run("state", address=address, settings={"rows": 2, "until": "Now 1 hello\\.odrg .*(49|50|51) refreshes a second"})
         status = emulator.status()
         self.assertEqual((status["on"], status["brightness"], status["playing"], status["animation"], status["error"]), (True, 128, "all", 1, None))
         self.assertEqual({name: found.seen[name] for name in ("power", "brightness", "playing", "now")},
@@ -67,10 +67,10 @@ class TheState(Show):
 
     def test_an_invalid_show_has_its_reason_in_the_place_of_what_plays(self):
         folder = entered(self, emulator_support.example_show())
-        pathlib.Path(folder, "dvd.odrg").unlink()
+        emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
         found = support.run("state", address=address, settings={"rows": 0, "until": "The installed show is invalid"})
-        self.assertEqual(found.seen["playing"], "The installed show is invalid: file-missing dvd.odrg.")
+        self.assertEqual(found.seen["playing"], "The installed show is invalid: undefined-id 99.")
         self.assertEqual((found.seen["now"], found.seen["rows"], found.seen["none"]), (None, [], None))
         self.assertEqual(found.seen["power"], "ON")
 
@@ -122,7 +122,7 @@ class TheList(Show):
 
     def test_an_animation_that_somebody_else_uploads_is_in_the_list_within_twelve_seconds(self):
         emulator, address = self.emulator(entered(self, emulator_support.example_show()))
-        found = support.run("changed", address=address, steps=[lambda: self.upload(emulator, 9, "new.odrg")], settings={"rows": 2, "until": "9 new\\.odrg", "within": 13000})
+        found = support.run("changed", address=address, steps=[lambda: self.upload(emulator, 9, "new.odrg")], settings={"rows": 2, "until": "new\\.odrg 9 \u00b7", "within": 13000})
         self.assertEqual([row["text"] for row in found.seen["after"]["rows"]], ["1 hello.odrg", "2 dvd.odrg", "9 new.odrg"])
         self.assertLess(found.seen["ms"], 12000)
 
@@ -150,7 +150,7 @@ class WhileItDoesNotAnswer(Show):
         self.assertEqual((found.seen["before"]["silent"], found.seen["before"]["dimmed"], found.seen["before"]["listDimmed"]), (None, False, False))
         # The screen keeps what the last replies said, dimmed, and stays the show screen.
         first_seen = found.seen["first"]
-        self.assertEqual((first_seen["dimmed"], first_seen["listDimmed"], first_seen["shown"]), (True, True, "show"))
+        self.assertEqual((first_seen["dimmed"], first_seen["listDimmed"], first_seen["shown"]), (True, True, "animations"))
         self.assertEqual((first_seen["power"], first_seen["playing"], len(first_seen["rows"])), ("ON", "Playlist", 2))
         said = r"\AThe installation has not answered for ([0-9]+) seconds?\.\Z"
         self.assertRegex(first_seen["silent"], said)
@@ -196,7 +196,7 @@ class ATargetThatStillReads(unittest.TestCase):
         self.assertGreaterEqual(len(asked), 3)
         self.assertEqual(set(asked), {b"list 0"})
 
-    def test_an_emulator_that_has_just_started_shows_its_state_at_once_and_its_rows_when_it_has_read_them(self):
+    def test_an_emulator_that_has_just_started_shows_its_state_and_its_rows_while_it_reads_them(self):
         # Four dense animations of twenty seconds and more: the core reads them for five
         # seconds at the least.
         work = entered(self, tempfile.TemporaryDirectory())
@@ -208,9 +208,10 @@ class ATargetThatStillReads(unittest.TestCase):
         files["show.json"] = json.dumps({"version": 1, "brightness": 128, "items": items})
         folder = emulator_support.installed(pathlib.Path(work, "show"), files)
         emulator = entered(self, emulator_support.Emulator(folder, checked=False))
-        self.assertEqual(json.loads(emulator.command("list")).get("error"), "busy")
+        # The list is given at once, with no sizes while the files are read.
+        self.assertIn(None, [item["bytes"] for item in json.loads(emulator.command("list"))["items"]])
         found = support.run("reads", address=f"127.0.0.1:{emulator.port}", settings={"rows": 4})
         before, after = found.seen["before"], found.seen["after"]
-        self.assertEqual((before["power"], before["playing"], before["rows"], before["message"]), ("ON", "Playlist", [], None))
+        self.assertEqual((before["power"], before["playing"], before["message"]), ("ON", "Playlist", None))
         self.assertEqual([row["text"] for row in after["rows"]], [f"{number} dense{number}.odrg" for number in (1, 2, 3, 4)])
         self.assertIsNone(after["message"])

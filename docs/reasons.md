@@ -86,6 +86,95 @@ read whole before its value is judged, so a code cut off by the end of the data 
 
 The canvas is judged before the number of frame records.
 
+## ODRGX files
+
+Rules: [format.md](format.md), "ODRGX".
+
+| Reason | Condition |
+|---|---|
+| `truncated` | The file ends before the 20-byte header is complete. |
+| `bad-magic` | Bytes 0 to 3 are neither `4F 44 52 58` nor, for an ODRG file, `4F 44 52 47`. |
+| `bad-container` | The container's version is not 1, or its reserved byte is not 0. |
+| `unknown-type` | The content type is not one the reader knows: 1, frames, 2, a text, or 3, a widget. |
+| `unknown-type-version` | The version of the content type is not the one the reader knows: 1. |
+| `zero-size` | Width or height is 0. |
+| `payload-size` | The payload's length is above the most its type may have, 3,612 bytes for a text and 20 for a widget, or, once the payload was read, not the number of bytes after the header. |
+| `canvas-mismatch` | The canvas of a frames payload differs from the container's. |
+| `loop-mismatch` | The loop the header gives differs from the payload's: for frames, the sum of the durations; for a text, its pass; for a widget, its seconds. |
+
+The checks run in this order: the header's length, its fields in the order of their
+offsets, then the payload, whose faults are those of its type, a frames payload's those of
+"ODRG files", a text's those of "Texts in ODRGX" and a widget's those of "Widgets in
+ODRGX", then the canvas of a frames payload,
+the payload's length, and last the loop.
+
+## Texts in ODRGX
+
+Rules: [format.md](format.md), "The text payload".
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large` | The text is for a canvas whose picture, 3 * W * H bytes, is above 65,534. |
+| `truncated` | The payload ends before its settings, its text or a glyph is complete. |
+| `unknown-font` | The text names a font, or a version of it, that the reader does not have. |
+| `bad-settings` | A setting is outside its values: the effect, the motion, the alignments, the direction, wrapping, a speed that is not 1 to 240, a `static` text shown for less than 20 ms, more than 512 glyphs, a block of no width or height, or reserved bytes that are not 0. |
+| `bad-text` | The text has not 1 to 512 bytes, or they are not UTF-8. |
+| `payload-size` | The payload's length in the header is not 28 bytes, the text and 6 bytes for each glyph. |
+| `does-not-fit` | The block cannot be seen whole: a `static` or `slide` block larger than the canvas, or a moving one larger than the canvas across its motion. |
+| `bad-glyph` | A glyph is not in its font, or its cell is not in the block. |
+| `trailing-bytes` | Bytes follow the last glyph. |
+| `loop-mismatch` | The loop the header gives is not the pass of the text. |
+
+The payload is checked as it is read: the canvas, the settings in the order of their
+offsets, the payload's length against them, whether the block fits, the text, each glyph,
+the end, and last the loop.
+
+## Widgets in ODRGX
+
+Rules: [format.md](format.md), "The widget payload".
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large` | The clock is for a canvas whose picture, 3 * W * H bytes, is above 65,534. |
+| `payload-size` | The payload's length in the header is not 20 bytes. |
+| `truncated` | The file ends before the 20 bytes of the payload. |
+| `unknown-widget` | The widget is not one the reader has: 1 `analog`, 2 `digital` or 3 `melting`. |
+| `bad-settings` | The reserved byte is not 0, the seconds are not 1 to 3,600, the least speed is not 1 to 3,600, or the greatest is below the least or above 3,600. |
+| `trailing-bytes` | Bytes follow the payload. |
+| `loop-mismatch` | The loop the header gives is not 1,000 times the seconds. |
+
+The payload is checked as it is read: the canvas, the payload's length, the widget, the
+other settings in the order of their offsets, the end, and last the loop.
+
+## Sources that `encode` cannot write as ODRGX
+
+| Reason | Condition |
+|---|---|
+| `canvas-too-large`, `too-many-frames` | The frames cannot be written as ODRG, as above; or a text or a clock is for a canvas above 65,534 bytes. |
+| `loop-mismatch` | The loop would be longer than 4,294,967,295 milliseconds. |
+| `unsupported-character` | A text holds a character that no font has: anything but the printable ASCII characters, the 27 Hebrew letters and the line feed. The detail names each, with its code point. |
+| `does-not-fit` | A text's block cannot be seen whole with its effect and motion; the detail names the effects that show it. |
+
+## JSON sources of texts
+
+Rules: [format.md](format.md), "The JSON source of a text". A source is told from JSON
+frames by its member `type`.
+
+| Reason | Condition |
+|---|---|
+| `bad-json`, `missing-member`, `bad-type`, `bad-version`, `unknown-member` | As for JSON frames files. |
+| `unknown-type` | `type` is not `"text"` or `"widget"`. |
+| `out-of-range` | A number or a name is outside its values: the canvas, `text` of not 1 to 512 bytes of UTF-8, a colour, the font, an alignment, the direction, the effect, the motion, `speed` not 1 to 240, `pause_ms` not 0 to 65,535, or below 20 for a `static` text. |
+
+## JSON sources of clocks
+
+Rules: [format.md](format.md), "The JSON source of a clock".
+
+| Reason | Condition |
+|---|---|
+| `bad-json`, `missing-member`, `bad-type`, `bad-version`, `unknown-member` | As for JSON frames files. |
+| `out-of-range` | A number or a name is outside its values: the canvas, the widget, `seconds` not 1 to 3,600, a colour, `speed_min` not 1 to 3,600, or `speed_max` below `speed_min` or above 3,600. |
+
 ## Mapping files
 
 Rules: [mapping.md](mapping.md), "Rules". The two reasons hold for both kinds of mapping
@@ -111,7 +200,7 @@ reason that applies.
 | `undefined-id` | A cycle, or `start`, names an id that no item has. |
 | `nested-cycle` | A cycle names an item that is a cycle. |
 | `output-not-empty` | The output folder of `pack` exists and is not empty. |
-| `file-missing` | The source `X.json` of a named `X.odrg` is not in the sources folder. |
+| `file-missing` | The source `X.json` of a named `X.odrg` or `X.odrgx` is not in the sources folder. |
 | `file-malformed` | A source is rejected as a JSON frames file. The detail gives that reason too. |
 | `size-mismatch` | A source's canvas size differs from the mapping's. |
 | `canvas-too-large`, `too-many-frames` | A source cannot be written as ODRG, as under `encode`. |
@@ -148,9 +237,13 @@ The core is the library that plays an installed show, on the board and in the em
 [core.md](core.md). It writes no error line. When it refuses a show it holds the reason as a
 text that begins with a reason name, and the `status` command reports that text.
 
-It names an invalid show as "Shows" does, from `mapping-missing` to `size-mismatch`, and a
-rejected `.odrg` file as "ODRG files" does. It adds two reasons that only a running player
-can meet:
+It names an invalid show as "Shows" does, from `mapping-missing` to `nested-cycle`, and a
+rejected `.odrg` file as "ODRG files" does, and a rejected container as "ODRGX files"
+does. A fault of one `.odrg` or `.odrgx` file, `file-missing`, `size-mismatch`, `read-error`
+or a reason of "ODRG files" or "ODRGX files", does not make the show invalid:
+the file is quarantined, the log says `file <name> unavailable: <reason>`, and `list` gives
+the reason's name as the animation's `fault`. It adds two reasons that only a running
+player can meet:
 
 | Reason | Condition |
 |---|---|
@@ -168,16 +261,22 @@ The text is the reason name, followed for most reasons by what it is about:
 | `duplicate-id <id>` | Two items have that id. |
 | `undefined-id <id>` | A cycle, or `start`, names that id and no item has it. |
 | `nested-cycle <id>` | The cycle item with that id names an item that is a cycle. |
-| `file-missing <name>` | The named `.odrg` file does not exist. |
-| `file-malformed <name> <reason>` | The named file is rejected with that reason of "ODRG files". |
-| `size-mismatch <name>` | The named file's canvas size differs from the mapping's. |
-| `read-error <name>` | The host reports a failure while the named file is read. |
+| `read-error <name>` | The host reports a failure while `mapping.json` or `show.json` is read. |
 | `out-of-memory` | The host cannot supply the memory the core asks for. |
 
-The checks of the first ten rows are made in the order of the table and the first one that
-fails decides; the files are taken in the order in which `show.json` first names them, and
-each by its header, then its size, then its body. The last two rows are reported at the
-point where they happen.
+The checks of the first seven rows are made in the order of the table and the first one
+that fails decides. The last two rows are reported at the point where they happen.
+
+The files of the show are taken in the order in which `show.json` first names them, and
+each by its header, then its size, then its body. A file that does not exist is
+`file-missing`, one whose canvas differs from the mapping's `size-mismatch`, one the host
+cannot read `read-error`, and one rejected as an ODRG file has that reason of "ODRG
+files". Each quarantines the file and is not a text of an invalid show.
+
+Inside the core, work that is not finished yet gives the internal result `pending`: the
+decoder settling a defect in slices, or the player catching up over several refreshes;
+see [core.md](core.md#bounded-work). `pending` is no reason. It is never reported, in a
+reply, a log line or a reason text, and a file's reason is the same whatever the slices.
 
 `<id>` is a decimal number. For `undefined-id` it is the number as the file writes it, which
 need not be an id at all, such as `0`, `-5` or `70000`; a number beyond 32 bits is given as
@@ -186,6 +285,5 @@ need not be an id at all, such as `0`, `-5` or `70000`; a number beyond 32 bits 
 decoder of the converter gives for the same file. The whole text is made of lower-case
 letters, digits, `.`, `-`, `_` and spaces, so it stands in a JSON string as it is.
 
-A show can also become invalid while it plays, when a file is gone, cannot be read, or no
-longer follows the format. The text is then `file-missing <name>`, `read-error <name>`,
-`size-mismatch <name>` or `file-malformed <name> <reason>`.
+A file that is gone, cannot be read, or no longer follows the format while the show plays
+does not make the show invalid: the file is quarantined, as above.

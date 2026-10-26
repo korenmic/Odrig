@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "type": "text",
+  "width": 60,
+  "height": 60,
+  "text": "ךםןףץ ק",
+  "font": "small",
+  "color": 16764992,
+  "background": 16,
+  "align": "center",
+  "valign": "middle",
+  "direction": "auto",
+  "wrap": false,
+  "effect": "slide",
+  "motion": "right",
+  "speed": 40,
+  "pause_ms": 700
+}

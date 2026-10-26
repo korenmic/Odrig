@@ -200,6 +200,11 @@ Reason OdrgDecoder::open(FileSource *from, Inflate *with, uint8_t *window) {
     records_left = 0;
     palette_pending = 0;
     compressed = 0;
+    settling = 0;
+    settle_found = kNone;
+    settle_missing = 0;
+    settle_slice = kSettleSliceBytes;
+    body_read = 0;
 
     uint8_t header[kHeaderSize];
     for (uint32_t i = 0; i < kHeaderSize; ++i) {
@@ -271,36 +276,67 @@ Reason OdrgDecoder::body_stopped(int got) {
 // a record before it looks at a bit. This reads on to find what such a reader meets first:
 // a defect of the stream, bytes after the stream, or a record whose data is cut short.
 Reason OdrgDecoder::settled(Reason found, uint32_t record_bytes_left) {
-    uint32_t missing = record_bytes_left;
+    settling = 1;
+    settle_found = found;
+    settle_missing = record_bytes_left;
+    return settle_more();
+}
+
+// Goes on settling for at most `settle_slice` bytes of the body: kPendingWork when the slice
+// ends first, and otherwise the reason, which every later call gives again.
+Reason OdrgDecoder::settle_more() {
+    if (settling == 2) {
+        return settle_found;
+    }
+    Reason ending = settle_found;
+    uint32_t budget = settle_slice;
     if (!compressed) {
-        for (; missing != 0; --missing) {
+        for (; settle_missing != 0; --settle_missing) {
+            if (budget == 0) {
+                return kPendingWork;
+            }
+            --budget;
             int byte = file->get();
             if (byte < 0) {
-                return body_stopped(byte);
+                ending = body_stopped(byte);
+                break;
             }
+            ++body_read;
         }
-        return found;
+        settling = 2;
+        settle_found = ending;
+        return ending;
     }
     for (;;) {
+        if (budget == 0) {
+            return kPendingWork;
+        }
+        --budget;
         int byte = inflate->get();
         if (byte == -kEnd) {
             break;
         }
         if (byte < 0) {
-            return static_cast<Reason>(-byte);
+            settling = 2;
+            settle_found = static_cast<Reason>(-byte);
+            return settle_found;
         }
-        if (missing != 0) {
-            --missing;
+        ++body_read;
+        if (settle_missing != 0) {
+            --settle_missing;
         }
     }
     int after = file->get();
     if (after >= 0) {
-        return kTrailingBytes;
+        ending = kTrailingBytes;
+    } else if (after != -kEnd) {
+        ending = kReadError;
+    } else if (settle_missing != 0) {
+        ending = kTruncated;
     }
-    if (after != -kEnd) {
-        return kReadError;
-    }
-    return missing != 0 ? kTruncated : found;
+    settling = 2;
+    settle_found = ending;
+    return ending;
 }
 
 Reason OdrgDecoder::read_palette() {
@@ -386,6 +422,9 @@ Reason OdrgDecoder::coded(uint8_t *pixels, uint32_t mode, uint32_t data_bytes) {
 }
 
 Reason OdrgDecoder::next(uint8_t *pixels, uint16_t *duration) {
+    if (settling) {
+        return settle_more();
+    }
     if (records_left == 0) {
         return kTruncated;
     }
@@ -451,6 +490,9 @@ Reason OdrgDecoder::next(uint8_t *pixels, uint16_t *duration) {
 }
 
 Reason OdrgDecoder::finish() {
+    if (settling) {
+        return settle_more();
+    }
     int byte = body_get();
     if (byte >= 0) {
         return settled(kTrailingBytes, 0);

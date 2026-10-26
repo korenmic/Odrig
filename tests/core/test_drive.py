@@ -82,7 +82,9 @@ class TheDrivesList(unittest.TestCase):
     def test_a_file_of_another_canvas_and_a_damaged_one_are_left_out_and_logged(self):
         drive = {"a.odrg": loop_of(2, 5), "broken.odrg": loop_of(2, 6)[:-3], "wide.odrg": support.clip(7, CANVAS[0] + 1, CANVAS[1], (1000,)), "z.odrg": loop_of(3, 8)}
         run = with_drive(SHOW, drive, asked(0, "list", "status"))
-        self.assertEqual(listed(replies(run)[0]), [(1, "four.odrg"), (60001, "a.odrg"), (60002, "z.odrg")])
+        # Each file has its id from the start; the files left out are listed with their fault.
+        self.assertEqual(listed(replies(run)[0]), [(1, "four.odrg"), (60001, "a.odrg"), (60002, "broken.odrg"), (60003, "wide.odrg"), (60004, "z.odrg")])
+        self.assertEqual([item.get("fault") for item in replies(run)[0]["items"]], [None, None, "truncated", "size-mismatch", None])
         self.assertEqual(logged(run), ["drive file broken.odrg left out: truncated", "drive file wide.odrg left out: size-mismatch"])
         self.assertIsNone(replies(run)[1]["error"])
 
@@ -132,7 +134,7 @@ class TheDrivesList(unittest.TestCase):
         without = support.start(SHOW, script)
         with a_drive(DRIVE) as top:
             fixed = support.start(SHOW, script, ["--drive", top, "--only-space"])
-        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False}], "next": None})
+        self.assertEqual(replies(without)[0], {"ok": True, "items": [{"id": 1, "file": "four.odrg", "bytes": len(SHOW["four.odrg"]), "ignored": False, "external": False, "type": "frames"}], "next": None})
         self.assertEqual(replies(without)[2], refusal("unknown-id"))
         self.assertEqual(replies(fixed), replies(without))
 
@@ -153,7 +155,7 @@ class TheCheckOfTheDrive(unittest.TestCase):
             item = "busy" if reply == refusal("busy") else [id for id, _ in listed(reply)]
             if not seen or seen[-1] != item:
                 seen.append(item)
-        self.assertEqual(seen, ["busy", [1], [1, 60001], [1, 60001, 60002]])
+        self.assertEqual(seen, [[1], [1, 60001], [1, 60001, 60002]])
 
     def test_an_upload_while_the_drive_is_checked_is_installed_and_the_check_goes_on(self):
         drive = {"a.odrg": loop_of(12, 5), "b.odrg": loop_of(12, 6)}
@@ -175,7 +177,9 @@ class TheCheckOfTheDrive(unittest.TestCase):
         without, blocks = support.start(files).memory
         with a_drive({}) as top:
             drive, drive_blocks = support.start(files, options=["--drive", top]).memory
-        self.assertEqual((drive - without, drive_blocks - blocks), (4096, 1))
+        # The drive's table of 256 places, the boot's memory of 16 files left out, and in
+        # the block of the saved order a key and a hash for each place.
+        self.assertEqual((drive - without, drive_blocks - blocks), (3072 + 640 + 256 * 3, 2))
         self.assertLess(drive, 131072)
         self.assertIn(f"the target file takes {drive:,} bytes", (support.ROOT / "docs" / "core.md").read_text(encoding="utf-8"))
 
@@ -237,5 +241,6 @@ class FaultsWhilePlaying(unittest.TestCase):
         run = with_drive(SHOW, DRIVE, script, ["--drive-read-fails", "b.odrg", "20"])
         _, status, reply = replies(run)
         self.assertEqual((status["playing"], status["animation"], status["error"]), ("all", 1, None))
-        self.assertEqual(listed(reply), [(1, "four.odrg"), (60001, "A.ODRG")])
+        self.assertEqual(listed(reply), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg")])
+        self.assertEqual((reply["items"][2]["bytes"], reply["items"][2]["fault"]), (None, "read-error"))
         self.assertEqual(logged(run), ["drive file b.odrg left out: read-error"])

@@ -317,8 +317,8 @@ class LegList(unittest.TestCase):
     def test_the_canvas_of_the_target_file_is_60_by_60(self):
         for width, height in ((60, 30), (30, 60), (60, 61), (180, 20), (20, 180)):
             run = self.target_with(support.clip("another size", width, height, (20,)))
-            self.assertEqual(run.error, "size-mismatch clip.odrg", (width, height))
-            self.assertEqual(run.lines[0], "error size-mismatch clip.odrg")
+            self.assertIsNone(run.error, (width, height))
+            self.assertEqual(run.logs, ("file clip.odrg unavailable: size-mismatch",), (width, height))
         run = self.target_with(support.clip("the size", 60, 60, (20,)))
         self.assertIsNone(run.error)
         self.assertEqual(run.lines[:2], ["error none", "refresh 0"])
@@ -440,7 +440,7 @@ class ChangedBetweenTheReadings(unittest.TestCase):
     def read_twice(self, first, second):
         files = {"mapping.json": json.dumps(first), "second.json": json.dumps(second)}
         run = support.start(files, ["error", "poll 0"], ["--swap-after", "mapping.json", "1", "second.json", "--trace-files"])
-        self.assertEqual(run.opened[:2], (("mapping.json", 1), ("mapping.json", 1)))
+        self.assertEqual([opened for opened in run.opened if not opened[0].startswith("catalog")][:2], [("mapping.json", 1), ("mapping.json", 1)])
         self.assertEqual(run.core, "ok")
         return run
 

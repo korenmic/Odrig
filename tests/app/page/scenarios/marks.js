@@ -3,7 +3,7 @@
 // before a removal and with a message; for elements made after the app started; and on
 // the page for a web view that is too old.
 
-import {shown, storage} from "../reading.js";
+import {choose, menuOf, shown} from "../reading.js";
 
 // What is added to the target screen after the app started, each by its name.
 const MADE = {
@@ -70,12 +70,15 @@ function look(app) {
 
 export default async function (app) {
   await shown(app, app.settings.rows);
-  const seen = {show: look(app)};
-  seen.stoppedBeforePress = stopped(app.byId("to-storage"));
-  app.press("Storage");
-  await app.until(() => app.shown() === "storage" && app.text("space") !== "-" && storage(app).rows.length === app.settings.rows, "the storage screen with its rows");
-  seen.storage = look(app);
-  app.pressIn("#installed > .row", "Remove");
+  const seen = {animations: look(app)};
+  seen.stoppedBeforePress = stopped(app.byId("to-upload"));
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload" && app.text("upload-space") !== "-", "Upload with the space");
+  seen.upload = look(app);
+  app.press("Animations");
+  await app.until(() => app.shown() === "animations", "Animations");
+  menuOf(app, 1);
+  choose(app, "Delete");
   await app.until(() => app.text("confirm-text") !== null, "the question");
   seen.question = look(app);
   app.press("Keep it");

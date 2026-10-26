@@ -100,6 +100,15 @@ it stands now.
   with WLED's limiter dimming every LED, and side by side, on the chip's two processor
   cores, both take a quarter to a third longer. See [firmware.md](firmware.md), "Verified
   on the board".
+- The external storage of animations is a microSD card in a reader on GPIO39 to GPIO42,
+  in place of a USB stick. The board reads it, and writes only files of its folder `odrig`,
+  as its core keeps the card's catalog (the owner, 2026-10-24, seed 35); a USB stick is
+  never written. The firmware that
+  `python3 firmware/fw.py build` makes reads the card and is built on the newer software
+  of Espressif, Arduino-ESP32 3.3.12 on ESP-IDF 5.5.5; the USB stick's build stays
+  available as `build --stick`, on the software WLED 16.0.1 names. The fallback of seed 12
+  follows the firmware. The owner, 2026-10-21, 2026-10-22 and 2026-10-24; see
+  [microsd.md](microsd.md).
 - The firmware is updated over the USB cable with `firmware/fw.py`, and not over Wi-Fi: the
   owner gave up updates over Wi-Fi on 2026-10-15, so that the board's second firmware slot
   can hold animations. On the bigger layout of [firmware.md](firmware.md), "The regions of
@@ -140,6 +149,16 @@ and a hosting service refuses a single file above 100 MB, so a long piece is cut
 animations.
 
 Both formats are specified in [format.md](format.md). The custom binary format is called ODRG.
+
+The runtime format was extended on purpose with seed 37: ODRGX, a container of 20 bytes
+that names what its payload is, holds frames as an ODRG file, a text, or a widget, a clock.
+The tracked source of a text or a clock is typed JSON, not JSON frames: the settings of
+the text with its words, or of the clock. The player draws them at every refresh from
+those settings, with fonts and clocks that are built into the core and the converter
+alike, generated from one source; a file names a font or a clock and brings no glyph, no
+code and no network to the player. The converter makes a text's layout and stores it,
+and the core checks its bounds and draws it. A clock's randomness comes from the timing
+of the refreshes, mixed with the turn. See [format.md](format.md), "ODRGX".
 
 ### Measurements behind the choice
 
@@ -521,3 +540,177 @@ are in [format.md](format.md), "Measured sizes".
   run, on one branch per seed stacked in order and merged by one pull request, the branches
   kept. Afterwards the board keeps one or two small animations in its own storage, as a
   fallback when the card is missing, and plays the rest from the microSD card.
+- 2026-10-24: Seed 28: the operators' app's storage lines begin with the number of
+  animations of each storage, the board's own from `space` and the external storage's
+  from the list less those; an absent medium shows no number, a present empty one 0. The
+  web code alone does it; the check on a phone with the card is the owner's and is open.
+- 2026-10-24: Seed 31: no call of the core does unbounded work on a file. The decoder settles
+  a defect in slices of 32 KiB, giving the internal result `pending`, which is no reason;
+  the player decodes at most 128 KiB of a body at a refresh and keeps the picture before
+  while it catches up; the core keeps the context of the latest fault of a file. The
+  reasons of every file are as before; the budgets are 50 ms a call and 250 ms a read on
+  the board. The board's measurement is open.
+- 2026-10-24: Seed 32 (the owner's approval of 2026-10-24): a fault of one animation file,
+  missing, unreadable, malformed or of another canvas, no longer makes the show invalid.
+  The file is quarantined for the boot: the playlist, `start` and cycles pass over it,
+  `play` of it is refused with the new error code `unavailable`, and `list` gives it with
+  `"bytes":null` and the new member `fault`, the reason's name. Faults of the mapping file
+  and of the show file still make the show invalid. Nothing is written for a quarantine;
+  a new start checks every file again.
+- 2026-10-24: Seed 38, the owner's answer to its question 8 under the mandate of the run:
+  `python3 firmware/fw.py build` makes the firmware that reads the microSD card, on the
+  newer software, as `odrig-firmware.bin`, and `build --probe` its probe build; `flash`,
+  `install-firmware` and the board's suite take them. The USB stick's build is
+  `build --stick`, on the software known good, and `build --microsd` keeps the card's
+  firmware under its own name; `build --trial` and `ODRIG_BOARD_IMAGES=trial` are gone.
+  Built on the Mac; nothing was flashed.
+- 2026-10-24: Seed 38, what the board runs and what its sessions showed: the card's
+  firmware of 2026-10-22, SHA-256 `fd089753…`, on the bigger layout, given back its 84
+  installed animations that day. With the Mac on the chip's own socket only, on
+  2026-10-22, the card dropped out at 4 MHz, 1 MHz and 400 kHz alike; with both sockets on
+  the Mac, on 2026-10-23, all 122 animations of the owner's card were listed after the
+  installed one, none was lost in fifteen minutes, and four played at 26 to 50 refreshes a
+  second. The card's code, its documents, and `build` making it are done; the board
+  session, with the firmware of today, plugging in and pulling out, the dropouts with two
+  cables, Wi-Fi and the owner's look, is open, and the seed stays in progress until then.
+- 2026-10-24: Seed 36, under the owner's advance approval of the run: the saved playlist
+  order is `order.txt` in the board's own storage, naming internal animations by id and
+  the card's by file name in one mixed order, an absent card entry keeping its place;
+  the playlist, `play all` and the start follow it. New commands `order get [<from>]`,
+  `order move <revision> <id> <before>` and `mapping test snake <n>`; new reply members
+  `external` of every animation item of `list`, `ids`, `next` and `revision` of
+  `order get`, and `snake` of `mapping get`; new error `order-conflict`. The operators'
+  app is redrawn in the owner's Aurora Glass look with four tabs, Animations, Upload,
+  Settings and Target, rows with `in`/`ex` badges and a menu, moving by a long press or
+  Move up and Move down, and a Tests group of the diagonal and twenty snake tests shown
+  by a Settings checkbox. The 21 hand-uploaded line-test files leave the board in its
+  board session; the owner's phone and LED checks are open.
+- 2026-10-24: Seed 39: the operators' app filters its list of animations by storage, all,
+  internal or external, and by type, all, normal, text or widget, with a count on each
+  choice, choices kept on the phone, and moving off while a filter hides rows. The web
+  code alone does it, from `external` and `type` of `list`; no command or reply member is
+  added. The owner's check on a phone with the card in is open.
+- 2026-10-24: Seed 33: `status` reports the readiness of the player, `checking`, `ready`,
+  `degraded` or `recovery`, with the new members `readiness`, `checked`, `to_check`,
+  `unavailable` and `checking`, and the new command `fault` reports the context of the
+  latest fault of a file. Both were approved in advance by the owner.
+- 2026-10-24: Seed 33: the firmware names itself in `status` (`host`: its release, its build,
+  its storage and the reason of its last reset), keeps the latest line its player logged
+  across a software or watchdog reset in memory that a power cut clears, and writes it to
+  its log at its next start; `install-show` waits for the readiness and prints the
+  outcome, healthy, degraded or recovery. The new reply member `host` was approved in
+  advance by the owner.
+- 2026-10-24: Seed 34: the firmware tool's `install-show` changes only the files of `/odrig`
+  that differ, where it rebuilt the folder whole, and writes a change of the board's
+  storage in two parts: the blocks its file system does not use, then the blocks it uses,
+  the commit, after which the chip compares what was written. A journal in the work folder
+  names the change until it is finished; a change cut in the commit is finished by the new
+  command `recover-storage`, and the board stays in its bootloader meanwhile. New:
+  `recover-storage [--whole]`, `install-show --dry-run` and `--keep-copies DIR`, and the
+  reasons `cancelled`, `recovery-needed` and `storage-changed`, approved in advance by the
+  owner.
+- 2026-10-24: Seed 34: `upload begin <id> <file> <bytes> <crc32>`, approved in advance by the
+  owner, answers `{"ok":true,"unchanged":true}` and opens no upload when the last upload of
+  the boot installed that file and the item holds it still; the core keeps no more memory
+  for it. A cleanup a change could not finish is done before the next change instead of
+  blocking every change until a restart, and `remove many` writes no empty `pending.txt`.
+- 2026-10-24: Seed 37 adds the reply member `type` to every animation item of `list`, of
+  the show and of a drive, after `external` and before `fault`: `"frames"` for an ODRG
+  file and an ODRGX container of frames, by the file's header. Approved by the owner in
+  advance; a reply without it counts as frames. A show may name `.odrgx` files, and the
+  player reads a container of frames as it reads the ODRG file it holds; a container
+  with a fault is quarantined as an ODRG file is.
+- 2026-10-24: Seed 37 adds the reply member `seed` to `status`, as its last member: the
+  seed of the clock on the LEDs, or `null`. Approved by the owner in advance. The core
+  draws texts and clocks, with fonts and widgets built into it; `list` gives them `type`
+  `"text"` and `"widget"`, and the reason `unknown-widget` names a widget the player does
+  not have. A `status` reply is now up to 210 bytes; every reply stays within 1,024.
+- 2026-10-24: Seed 37 adds the commands `read <id> <offset>`, which gives up to 600 bytes
+  of an animation's file in base64, and `upload expect <crc32>`, which lets an open upload
+  replace its item's file only while that file has the CRC-32 the client read, and the
+  error `stale`, after `mapping-conflict`, when it has not. Approved by the owner in
+  advance. `read` reads with the host's `read_at` from any offset; the other readers still
+  begin at 0.
+- 2026-10-25: Seed 37: the runtime format is ODRG and ODRGX, and a text or a clock has a
+  typed JSON source that the core draws at runtime; recorded under "Animation formats".
+  The operators' app makes, previews, uploads and edits texts and clocks on Upload, and
+  edits only the board's own. The firmware grew by 19,760 bytes, the core asks for 16
+  bytes more. The board session and the owner's look are open, and seed 35's catalogs
+  take the type when the branches are combined.
+- 2026-10-25: Seed 35: each storage of animations has a catalog, in one text format that the
+  core and the PC library `odrig.catalog` both read and write (`docs/catalog.md`): a marker
+  of 409 bytes and 16 pages of entries by the name's hash, changed through a commit record
+  that a start finishes after a cut. At its start the core takes the size and the length of
+  every installed file its catalog names, without opening the file; a storage without a
+  catalog, or with one that cannot be read, is read as before. To make room, the drive's
+  table keeps a file's length in 32 bits. New command `catalog`, approved in advance by the
+  owner.
+- 2026-10-25: Seed 35 (the owner's answer 7 of 2026-10-24): the board writes the card. A
+  host may say that its drive can be written (`drive_writable`), lists it only when the core
+  asks (`drive_list`) and is given the names of a cataloged drive's files (`drive_bind`). A
+  drive with a catalog is read from it in bounded steps, without a listing and without
+  reading an animation, and its animations join at once; its marker is read again once in
+  10 seconds. New: `upload begin external <file> <bytes> [<crc32>]`, the reply member `id`
+  of its `upload end`, `remove <id>` of a writable card's animation, `"read_only":false` in
+  `space`, and the error code `read-only`, approved in advance by the owner.
+- 2026-10-25: Seed 35: a rebuild of a catalog on the board. New: `catalog rebuild internal`,
+  `catalog rebuild external`, `catalog cancel`, and the reply member `rebuild` of `catalog`
+  with `storage`, `read` and `to_read`, approved in advance by the owner on 2026-10-24. A
+  rebuild reads the files with the check's steps and commits at the end; the changes of
+  storage are `busy` while it runs, and readiness counts its files.
+- 2026-10-25: Seed 35: the firmware writes the card. It lists the card's folder only when
+  the core asks, gives places the names the core reads from the card's catalog, says that a
+  mounted card with its folder `odrig` and no failed read can be written, and makes the
+  core's changes of the files of that folder by their names, a rename onto a file removing
+  that file first, as FAT needs. A USB stick is read from its catalog too, and never
+  written. No command is added.
+- 2026-10-25: Seed 35: the command tool takes `catalog [rebuild internal|rebuild
+  external|cancel]` and `upload --external FILE`, the design's forms, approved in advance by
+  the owner on 2026-10-24; the emulator's `--drive DIR` is written by the board's commands
+  once its folder has a catalog, unless `--drive-read-only`.
+- 2026-10-25: Seed 35 is built, its tasks 1 to 14: each storage keeps a catalog that the
+  board and the PC tool write alike; a start reads no cataloged animation, a cataloged card
+  is read without a listing, the board writes the card and rebuilds either catalog, and the
+  types of seed 37 are in the entries. `docs/catalog.md` has the costs as measured through
+  the test host. The board session, which moves the board's animations onto the card and
+  keeps one or two small ones inside, and the owner's check on a phone are open.
+- 2026-10-25: The board session of the run, on the firmware of the unified branch: seeds 33
+  and 34 are completed on the board; seeds 31, 32, 35, 36 and 37 behaved as specified in
+  everything that needs neither the card nor the owner's eyes, and seed 38's card sessions
+  are open, as the card was not mounted. One restart for a panic after the first catalog
+  rebuild is not explained. docs/firmware.md, "Verified on the board", has the record.
+- 2026-10-25: The owner's report from a phone: Settings flickered every two seconds and an
+  open selector of the mapping editor closed. The editor's read every two seconds disabled
+  all twenty selectors while it waited; it now changes nothing unless the target's mapping
+  changed.
+- 2026-10-25: The owner's choice: the mapping editor is a column of the twenty pins with the
+  snakes beside them, moved by dragging up or down between two others, and each move is
+  saved at once; the selectors, Save and Cancel are gone. Restore defaults saves at once.
+- 2026-10-25: The owner's correction of the mapping editor: the snakes stand still at the
+  left and the pins at the right are dragged; each new place a dragged pin passes into is
+  saved at once, while the finger is still down, not when it is lifted.
+- 2026-10-25: The owner's change after seeing the snake tests on the installation: the test of
+  a snake is a white block of 3 x 3 pixels that runs the snake's three columns from the
+  bottom to the top and back, one row every 40 ms, so that every LED of the snake lights in
+  turn; the line of 20 pixels a column of seed 36 is gone, and with it the embedded file of
+  twenty frames. The diagonal stays as it was.
+- 2026-10-25: Seed 40 is built, its tasks 1 to 3: the app reads a photo of the wall with the
+  diagonal showing, finds the lit LEDs as bright peaks, places them on the grids of sixty
+  columns and rows, reads which snake each position drives, shows it on the photo and
+  applies it on one tap; a dead line's snake goes where a place remains, and a gap at an
+  end offers its readings. No command, no library; `app/www/photo.js` and
+  `screens/photomap.js`, about 25 KB. The owner's photo with the diagonal showing, and the
+  check on a phone, are open.
+- 2026-10-25: Seed 40, after the owner's first photo of the diagonal: the level of
+  brightness that tells the lit LEDs from the lenses is where the count of bright spots
+  holds steady while the picture is scanned from the brightest level down, the owner's
+  rule, so that a lit room's reflections are the normal case; the slope of the stubs tells
+  a wall seen upright from one seen from the side; the edge the wires are at is advised,
+  bottom or left, and both edges are offered as choices. Pictures are analysed at 900
+  pixels on the long side.
+- 2026-10-26: The owner's policy, written into the working rules after an emulator run
+  from a checkout left on a worker branch showed an older app than the phone's: the app
+  is one body of code, served by the emulator as it is in its checkout and built into the
+  APK from the same files; a difference between the Controller view and the APK is a
+  fault, not a version; the APK is built from the commit the owner runs and its report
+  names that commit; a coding agent never switches the owner's checkout.

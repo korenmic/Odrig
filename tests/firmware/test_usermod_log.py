@@ -58,7 +58,7 @@ class TheLog(unittest.TestCase):
     def test_the_usb_ports_events_are_lines_of_the_log(self):
         for text in ("a computer is on the port, which stays a serial port", "no computer on the port within", "host started", "host did not start: ",
                      "a device came: %s", "maker %04x, product %04x, %s", "a hub", "a stick", "another device (class %u)", "a device went: %s",
-                     "stick opened: %u animation files in odrig", "stick not opened: ", "the stick has no folder odrig"):
+                     "stick mounted", "stick opened: %u animation files in odrig", "stick not opened: ", "the stick has no folder odrig"):
             self.assertIn(text, self.drive, text)
         self.assertIn("usb_host_client_register(", self.drive)
         self.assertIn("USB_HOST_CLIENT_EVENT_NEW_DEV", self.drive)
@@ -67,7 +67,7 @@ class TheLog(unittest.TestCase):
     def test_every_line_the_player_logs_goes_to_the_log(self):
         self.assertIn('OdrigLog::add("player", text);', self.log)
         setup = self.usermod[self.usermod.index("void setup() override {"):self.usermod.index("void loop() override {")]
-        self.assertIn("const odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));", setup)
+        self.assertIn("odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));", setup)
 
     def test_nothing_of_the_wifi_settings_is_named_in_the_log(self):
         for text in (self.header, self.log):

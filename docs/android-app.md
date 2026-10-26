@@ -6,49 +6,80 @@ built, installed and used, what it says when something fails, and what has been 
 
 ## What it is
 
-The app has four screens, and a button for each at the bottom: `Show`, `Storage`,
-`Mapping` and `Target`.
+The app has four screens, and a tab for each at the bottom: `Animations`, `Upload`,
+`Settings` and `Target`. Its look is the owner's Aurora Glass: a midnight background with
+teal and violet aurora, translucent rounded panels with a restrained glow, light text, and
+a top bar with the app's name and whether the installation answers.
 
-- **The show screen** says what the installation does: `ON` or `OFF`, the brightness, what
-  plays, the animation on the LEDs with its id and its file name, and the refreshes a
-  second. Below that are two buttons, `On` and `Off`, a slider for the brightness, the
-  button `Playlist from the start`, and one button for each installed animation, in the
-  order of the playlist. Each installed animation has an `Include in playlist`
-  checkbox and an Included or Ignored label. Explicit Play still plays an ignored item.
-  Both Show and Storage report internal and external capacity; absent media and
-  unavailable capacity are distinct, and external storage is read-only.
-- **The storage screen** says how much of the installation's storage is free, as
-  `Free 3.2 MB of 10.4 MB`, and lists the installed animations in the order of the
-  playlist, each with its id, its file name and its size in kilobytes, and a button
-  `Remove`. Cycles are not listed. Below the list it makes an animation from a video or
-  a GIF of the phone, and uploads it. Select checkboxes, `Select all` and `Clear selection`
-  mark installed animations for `Delete selected`. External entries have no mutation
-  controls. The confirmation names the count and files before anything is sent.
-- **The mapping screen** edits the twenty saved snake-to-pin assignments and controls
-  the built-in diagonal for a person to check on the real LEDs.
-- **The target screen** has the address of the installation, says whether it answers, and
-  says how the phone's requests travel.
+- **Animations** says what the installation does and holds its animations. A panel says
+  what plays, the animation on the LEDs with its id and its file name, `ON` or `OFF`, the
+  brightness and the refreshes a second, with `On` and `Off` together in one pill and a
+  slider for the brightness. Under the refreshes, while the installation reads its
+  animations after a start, a line says how far it is, as `Reading the animations: 12
+  read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
+  the number of animations of that storage, as
+  `Internal storage: 84 animations, free 6.7 MB of 13.5 MB` and
+  `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`, without
+  `(read-only)` while the installation can write its card: the board's
+  own from `space`, the external storage's by `external` of `list`. A medium that is
+  present without animations says `0 animations`; an absent one says `absent` with no
+  number. While the board still reads its animations after a start, the external number
+  is `animations not known yet`, and while the show is invalid the internal one is
+  `animations not known`. Below them are `Playlist from the start` and `Add animation`,
+  which opens Upload; then, when Settings says so, the pinned Tests group; then two
+  filters and the one list of animations, in the saved order of the playlist. Each row
+  names its file, its id and its size, or `size not read yet` while the installation has
+  not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
+  read-only unless the installation can write its card), and a small `...` button that
+  opens its menu. Cycles are not listed. An
+  animation that the installation found unavailable, because its file had a fault, is
+  drawn grayed with its reason in words under it, such as `Unavailable: the file is
+  damaged (truncated).`, and a tap on it plays nothing; one of a card that the
+  installation cannot write adds `Fix it on a computer: the card is read-only here.` Its
+  menu works as any other's. The
+  other animations and every other control work as ever, also when every animation is
+  unavailable.
+- **Upload** makes an animation from a video or a GIF of the phone, or makes a text or a
+  clock, and uploads it, with the free internal storage above it. While the installation
+  can write its card, an animation of a video or a GIF goes to the card unless
+  `This board` is chosen, and the card's free storage is there too.
+- **Settings** has the checkbox `Show test animations`, the catalogs of the board's own
+  storage and of the card with a rebuild of each, and the mapping editor: the twenty
+  saved snake-to-pin assignments. It has no copy of the power or brightness controls.
+- **Target** has the address of the installation, says whether it answers, names the
+  installation and the last fault it met in a file, and says how the phone's requests
+  travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-twenty command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-two command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
 | Nothing: once a second while the app is on the screen | `status` |
 | Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
-| Presses an animation | `play <id>` |
+| Taps a row of the list | `play <id>` |
 | Presses `Playlist from the start` | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
 | Moves the slider | `brightness <n>` |
-| Nothing: at boot, reconnect, return to the app, entering Show or Storage, every ten seconds while either is visible, and after upload or deletion | `space` |
-| Presses `Remove` and then `Remove it` | `remove <id>` |
-| Changes Include in playlist | `ignore <id> <0-or-1>` |
+| Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
+| Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
+| Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
 | Confirms Delete selected | `remove many <ids>` |
-| Presses `Upload` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
+| Presses `Upload to the installation` | `upload begin <id> <file> <bytes>`, then `upload data <offset> <base64>` for each piece, then `upload end <crc32>`, sent again while the installation still checks the file |
+| Presses `Upload to the installation` with `The card` chosen | `upload begin external <file> <bytes>`, then the pieces and the end as for an upload |
 | Presses `Cancel` while it uploads | `upload cancel` |
-| Opens Mapping, reloads, or waits two seconds while Mapping is visible | `mapping get` |
-| Saves the twenty assignments | `mapping set <revision> <pins>` |
-| Shows or stops the diagonal | `mapping test on`, `mapping test off` |
+| Chooses Edit in the menu of a text's or a clock's row | `read <id> <offset>`, from offset 0 until the whole file is read |
+| Presses `Save` for a text or a clock it edits | `upload begin <id> <file> <bytes>`, then `upload expect <crc32>` with the CRC-32 of the file it read, then the pieces and the end as for an upload |
+| Opens Settings, reloads, or waits two seconds while Settings is visible; on Animations every two seconds while nothing plays, which is so during a test, and after a test is started or stopped | `mapping get` |
+| Drags a pin of the mapping into another place, presses an arrow key on its handle, or presses Restore defaults | `mapping set <revision> <pins>` |
+| Presses `Diagonal` in the Tests group, or `Stop test` | `mapping test on`, `mapping test off` |
+| Presses a snake's test in the Tests group | `mapping test snake <n>` |
+| Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
+| Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
+| Opens the target screen while the installation answers | `fault` |
+| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel | `catalog` |
+| Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
+| Presses `Cancel the rebuild` | `catalog cancel` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -206,8 +237,8 @@ Store. It asks for no permission that the phone shows a question for.
    settings; [wifi.md](wifi.md) has the network. The app joins no network itself.
 2. Start the app. It begins on the target screen with the installation's address,
    `4.3.2.1`, and says `Checking`, then `Answers` or `No answer`. As soon as the
-   installation has answered once, the app shows the show screen.
-3. On the show screen, press an animation to play it: the playlist goes on with the
+   installation has answered once, the app shows Animations.
+3. On Animations, tap an animation to play it: the playlist goes on with the
    animation after it. `Playlist from the start` goes back to the first animation. `Off`
    makes every LED dark and `On` lights them again; the playlist's time goes on while
    they are off. The slider sets the brightness from 0 to 255.
@@ -218,27 +249,95 @@ installation does not answer, the values are dimmed and a line says for how long
 the app goes on asking and recovers by itself. While the app is not on the screen of the
 phone it sends nothing, and the phone's screen stays on while the app is in front.
 
-Right after the installation was switched on, the show screen has the state at once:
-the installation plays from its first moment, and `On`, `Off`, the slider and `Playlist
-from the start` work. The buttons of the animations come a moment later. The
-installation reads what it has installed while it plays, and until it has, it answers
-the app's request for the list with `busy`. The app takes that for what it is: it shows
-no message, keeps what it knows, and asks again every second. With a few small
-animations that is over within two seconds; with the storage full of heavy ones it takes
-longer, see [firmware.md](firmware.md#measurements-on-the-board).
+Right after the installation was switched on, Animations has the state and the rows
+at once, in the saved order: the installation plays from its first moment, and `On`,
+`Off`, the slider and `Playlist from the start` work. The installation reads what it has
+installed while it plays; until it has read a file whole, its row says `size not read
+yet`, and a file in which it finds a fault turns unavailable. Moving an animation waits
+until it has read them all: the installation refuses a move with `busy` until then, and
+the app says so. With a few small animations that is over within two seconds; with the
+storage full of heavy ones it takes longer, see
+[firmware.md](firmware.md#measurements-on-the-board).
+
+Meanwhile a line under the refreshes says how far the installation has read, from
+`readiness`, `checked`, `to_check` and `unavailable` of `status`:
+`Reading the animations: <n> read, <m> to read.`, with `, <k> unavailable` before the
+full stop when it has found some unavailable. When it has read them all and some are
+unavailable, the line says `<k> animations unavailable; the others play.`, or
+`1 animation unavailable; the others play.`; when it has read them all and every one plays,
+and on an installation whose software does not say, there is no line. No time is given for
+the rest, as the installation gives none. Every control works meanwhile, and the
+refreshes are counted as refreshes a second as at any other time.
+
+The target screen names the installation as its software names itself, from `host` of
+`status`, as `Installation: odrig emulator on Darwin arm64`: the board gives its release,
+the date and the time of its build, its storage and the reason of its last start. Each
+time the screen is opened while the installation answers, the app asks for `fault` and
+says the last fault the installation met in a file since its start, as
+`Last fault: b.odrg, while it was played, at frame record 3 after 1234 bytes of its
+frames: the file is damaged (truncated).` The work is `checked after the start`,
+`played`, `checked after its upload` or `read from the external storage`, and the words
+of the reason are those of an unavailable row. The reason is what the installation found
+in the bytes it read; it does not say whether the storage is damaged. An installation that
+names nothing, or met no fault, or whose software does not know `fault`, shows no such
+line.
 
 A cycle of the show is not in the list and cannot be started from the app. While one
-plays, the show screen says `Cycle` with its id, and `Playlist from the start` leaves it.
+plays, Animations says `Cycle` with its id, and `Playlist from the start` leaves it.
 
-To remove an animation, open the storage screen and press `Remove` beside it. The app
-asks `Remove animation <id> <file> from the installation?`; `Remove it` removes it, and
-`Keep it` sends nothing. Afterwards the app says `Removed animation <id> <file>.`, and the
-list and the free storage are asked for again. An animation that a cycle plays, or that a
-USB stick holds, cannot be removed: the installation refuses it, and the app says why.
-The back gesture goes from the storage screen or the target screen to the show screen.
+A tap on a row plays its animation. Its `...` button opens the row's menu and plays
+nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
+playlist` when it is ignored, `Move up`, `Move down`, `Select` and `Delete`; the menu of an
+animation of the external storage has `Move up` and `Move down`, and `Delete` while the
+installation can write its card; otherwise it says that external storage is read-only. An ignored row says `Ignored` with a sign and its name is muted; it
+keeps its place in the order and the playlist passes over it. A change of inclusion shows
+`Saving...` on the row until the installation has confirmed it.
 
-To make an animation, press `Choose a video or a GIF` on the storage screen and pick a
-file; the phone shows its own picker. The app shows the file's name, and for a video its
+`Delete` asks `Remove animation <id> <file> from the installation?`, or for an animation
+of the card `Remove animation <id> <file>? Its file is deleted from the card.`; `Remove it`
+removes it, and `Keep it` sends nothing. Afterwards the app says `Removed animation <id>
+<file>.`, and the list and the free storage are asked for again. An animation that a cycle
+plays, or that a USB stick or a card the installation cannot write holds, cannot be
+removed: the installation refuses it, and the app says why. A file of a card the
+installation can write that has a fault is deleted from its menu, or uploaded again under
+its name, which keeps its id. `Select`, in the menu or above the list, starts the selection mode: a checkbox on
+each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The
+question names the count and the files before anything is sent; the deletion goes in
+batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
+gesture goes from Upload, Settings or the target screen to Animations.
+
+Two filters stand above the list, each a row of choices with the number of animations it
+would show beside each: `Storage` with `All`, `Internal` and `External`, and `Type` with
+`All`, `Normal`, `Text` and `Widget`. A row is shown when it matches both; each choice
+counts with the other filter as it is, as `External 12`, and a choice with 0 can still be
+chosen. Storage goes by where the installation says an animation is; Type by its type, an
+animation that names none being Normal, as every animation is until the installation's
+software has text and widget animations. When no row matches, the list says
+`No animation matches the filters.` with `Show all`, which sets both back to `All`. The
+choices stay on the phone across a restart of the app, and another phone has its own. A
+filter changes only what the list shows: not the playlist, its order, an animation's
+inclusion or what plays. While a filter hides rows, an animation cannot be moved, by a
+long press or by Move up and Move down, and the list says so; `Select all` takes the
+shown rows only, and a row a filter hides leaves the selection. The Tests group is not
+filtered. While the card is out, `External` counts 0.
+
+To move an animation in the order of the playlist, hold its row for half a second: it
+lifts, and a dashed place shows where it lands as the finger moves; near the top or the
+tabs the list scrolls. Letting go saves the order on the installation; the row says
+`Saving...` until the installation's order comes back. Letting go where it began, or a
+cancelled touch, moves nothing. `Move up` and `Move down` in the row's menu do the same
+without holding. A mouse drags as a finger does, in a browser and in the emulator's
+Controller view. Internal and external animations stand in one order, which the
+installation keeps; an external animation keeps its place by its file name while its
+medium is out. The order cannot be changed, and the list says why, while the installation
+does not answer, keeps no order (older software, whose list stays in its show's order), a
+move, an upload or a deletion is under way, or the selection mode is on. When another
+controller moved something meanwhile, the installation refuses the move with
+`order-conflict`, the app says so and reads the order again; it never moves again by
+itself.
+
+To make an animation, open Upload, or press `Add animation`, press `Choose a video or a
+GIF` and pick a file; the phone shows its own picker. The app shows the file's name, and for a video its
 length. Then:
 
 1. Choose how the picture fits the canvas: `Fill`, at first, covers the whole canvas and
@@ -260,7 +359,7 @@ and makes the file. A GIF gives the very file the converter's command line makes
 video gives the same frames, and colours that may differ by a little, as two decoders'
 colours do. A video is drawn at most 1,280 pixels wide or high before it is fitted.
 
-`Upload` sends the animation to the installation as a new item:
+`Upload to the installation` sends the animation to the installation as a new item:
 
 - Its id is the lowest from 1 up that no item has. Its file name is the name of the
   file it was made from, without its ending, in lower case, every character other than
@@ -275,15 +374,64 @@ colours do. A video is drawn at most 1,280 pixels wide or high before it is fitt
   dropped it meanwhile, after a minute, the app says so.
 - The installation checks the whole file before it takes it, which takes about a
   fiftieth of a second for each frame. Then the app says
-  `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is in the
-  list of both screens, has its turn in the playlist, and plays when it is pressed.
+  `Uploaded as animation <id> <file>. It plays in the playlist.` The animation is last in
+  the list of Animations and in the playlist until it is moved, and plays when it is
+  tapped.
 
-The animations of a USB drive plugged into the installation are buttons too, after the
-installed ones, each with its id from 60001 up and its file's name on the drive, and a
-press plays one as it plays an installed animation; see
+While the installation can write its card, `space` says so with `"read_only":false`, and
+Upload has `Store on` above `Upload to the installation`, with `The card`, chosen at
+first, and `This board`, and the card's free storage under the board's: the card holds the
+animations, and the board's own storage keeps one or two to fall back on. An animation for
+the card goes as `upload begin external <file> <bytes>` with the same file name, then its
+pieces and its end as above; the card gives it its id, from 60001 up, and its place in the
+playlist by its name, and the app says `Uploaded to the card as animation <id> <file>. It
+plays in the playlist.` The app does not compare its size with the card's free storage
+first: the installation refuses one that does not fit before anything is sent, and the app
+says so. While the card cannot be written, or is out, Upload has no choice and stores on
+the board, as before. Texts and clocks are stored on the board, though the card may hold
+them too.
+
+To make a text, press `Make a text` on Upload. A form opens under it: the text, written
+with English letters, digits, signs and Hebrew letters, and line feeds; its font,
+`Small`, `Medium` or `Large`; its colour and its background; its effect, `Still`,
+`Marquee`, `Slide in and out` or `Pan`, and its motion, to the left, to the right, up or
+down; its alignment and its height on the canvas; its direction, as the text begins,
+left to right or right to left; whether long lines wrap; its speed in pixels a second and
+its pause in milliseconds. Below the form the text moves in a preview of the
+installation's canvas, drawn by the converter's library as the player draws it, and a
+line says `One pass takes 4.50 seconds.`, or why the text cannot be made: a character no
+font has, named with its code point, or a block that cannot be seen whole with the
+effect, with the effects that show it. `Upload to the installation` sends it as a new
+item, as a video's animation is sent, as an `.odrgx` file named after its first English
+words, `hello-world.odrgx`, or `text.odrgx` when it has none; `Close` closes the form.
+[format.md](format.md) has what a text holds.
+
+To make a clock, press `Make a clock`. Its form has the kind, `With hands`, `With digits`
+or `Melting watch`; the seconds of a loop, 30 at first; the colours of its face, its
+hands, its rim and its background; and its least and its greatest speed, how many times
+faster than real time its imaginary time runs. The preview shows it as the installation
+will, with a time, a speed and, for the melting watch, a shape chosen at random as each
+turn of it on the installation chooses them; `New random time` shows another. A line says
+`One loop takes 30.00 seconds.`, or names a number that is out of its range. It is
+uploaded as a text is, as `clock-<kind>.odrgx`, `clock-analog.odrgx` for one with hands.
+
+A text or a clock of the board's own storage has `Edit` in its row's menu. The app reads its
+file back from the installation, opens its form on Upload, titled with its id and its
+file, as `Animation 5 hello.odrgx`, and fills it with what the file holds. `Save` sends
+the changed file to the same id under the same name, so the animation keeps its place in
+the list and the playlist and whether it is ignored, and says `Saved animation <id>
+<file>.`. The installation takes it only while the file it holds is the one the app read:
+when another controller changed or removed the animation meanwhile, it refuses with
+`stale`, the app says so, nothing is overwritten, and the form keeps the edits. An
+animation of the card or of a USB drive has no `Edit`: that storage is read-only here.
+
+The animations of a microSD card or a USB drive plugged into the installation are rows
+too, with the badge `ex`, each with its id from 60001 up and its file's name on the
+medium, and a tap plays one as it plays an installed animation; see
 [show.md](show.md#animations-from-a-usb-drive). They come a moment after the drive is
 plugged in, once the installation has read them, and go about ten seconds after it is
-pulled out, when the app asks for the list again. The app has no code of its own for
+pulled out, when the app asks for the list again. Besides Upload's choice and a row's
+`Delete` while the installation can write the card, the app has no code of its own for
 them.
 
 To point the app at an emulator, write the emulator's address on the target screen and
@@ -293,8 +441,9 @@ it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
 field one types into: the address on the target screen, and `Start at` and `Length` on
-the storage screen. Anywhere else, on a word, a button, a list or an empty part of the
-screen, a long press marks nothing and opens nothing, and a tap works as before. In a
+Upload. Anywhere else, on a word, a button, a list or an empty part of the screen, a long
+press marks nothing and opens nothing, and a tap works as before; on a row of the list a
+long press lifts the row to be moved, and nothing else. In a
 browser a right click does the same: the browser's menu opens only in a field. A field
 that the app gets later is the same as these three.
 
@@ -302,34 +451,114 @@ The app keeps clear of the phone's bars: its heading begins below the bar at the
 with the clock and the icons, and its tabs end above the bar at the bottom, with
 Android's three buttons or the line of gesture navigation. Held sideways, it keeps clear
 of a bar or of the camera at a side too. The room comes from what the phone reports for
-its bars and its camera, so it fits each phone; it shows the app's black, and the bars'
-icons are light on it. What scrolls up goes under a band of black at the top, and the
+its bars and its camera, so it fits each phone; it shows the app's midnight, and the
+bars' icons are light on it. What scrolls up goes under a band of midnight at the top, and the
 last line of a list can be scrolled above the tabs. While the phone's keyboard is open
 for a field, the tabs are hidden, so that they do not stand over the field, and the field
 stays in view; they come back when the keyboard closes. In a browser there are no bars,
 and the page keeps no room.
 
-**Mapping.** Twenty selectors name snakes 1-20 and their three columns, left to right
-when viewed from the front. Each snake starts at the bottom and runs up, down, up.
-Only the installed 60x60 geometry is editable. Select an existing GPIO to swap the two
-assignments in a local draft. Save writes the entire permutation with its base revision;
-Cancel adopts the latest saved assignment, Reload reads it again, and Restore defaults
-creates a draft only when the installed pin set matches those defaults. No new pin can
-be entered. Save is disabled while a request is pending or another controller has changed
-the mapping. A background read preserves the draft and asks for Reload or Cancel.
+**Catalogs.** A catalog says what a storage holds, so that the installation reads no
+animation at its start, or when the card goes in, for the files it has a catalog of; see
+[catalog.md](catalog.md). Settings' panel `Catalogs` has a line for each storage, from
+`catalog`, which the app asks when Settings is opened and every two seconds while it is
+shown:
 
-Show diagonal uses the saved mapping and displays one white line on black, bottom left
-to top right. It keeps the target's power and brightness; On, Off and brightness remain
-available on Mapping, and an off/zero-brightness message explains a dark installation.
-Stop diagonal restores the previous playback selection. Leaving Mapping or restarting
-the app leaves this transient mode on the target; normal Play also stops it. The target's
-mapping reply supplies the mode. Only the person looking at the LEDs can judge the line.
+| The catalog | The line |
+|---|---|
+| `ok` | `Board: 84 animations, cataloged.`, with `; 2 more not cataloged yet` before the full stop for files of the show it has no entry for; `Card: 122 animations, cataloged.` |
+| `none` | `Board: not cataloged yet; its 84 animations are read whole at every start.`; `Card: not cataloged yet; its animations are read whole each time it goes in.` |
+| `loading` | `Card: reading its catalog.` |
+| `damaged` | `Board: catalog damaged (a page); its animations are read whole at every start until a rebuild.`, the part named `its marker`, `a page`, `a line` or `a change was cut off`; `Card: catalog damaged (...); its animations play only after a rebuild.` |
+| `incompatible` | `Board: catalog of another version; ...`, and the card's, as for a damaged one |
+| `absent` | `Card: none in the installation.` |
+
+`Rebuild the board's catalog` and `Rebuild the card's catalog` ask first, as `Rebuild the
+catalog of the board? The installation reads every animation of the board whole, which
+takes a while; it plays on meanwhile.`; `Rebuild` sends `catalog rebuild internal` or
+`catalog rebuild external`, and `Not now` sends nothing. A rebuild of a storage without a
+catalog is its first catalog. While a rebuild runs, from this phone or another controller,
+the panel says `Rebuilding the catalog of the board: 12 of 84 animations read.` with
+`Cancel the rebuild`, which ends it and leaves the catalog as it was; both buttons are off
+meanwhile. Animations says how far the installation has read, as after a start, and every
+control works; when the rebuild has ended, the list is asked for again. The card's rebuild
+needs a card the installation can write; for one it cannot, the panel says `The
+installation cannot write this card; a computer can make its catalog.`, as
+[microsd.md](microsd.md#the-catalog-made-on-a-computer) has it. A refused rebuild is said
+in the place for messages. An installation whose software keeps no catalogs says `This
+installation's software keeps no catalogs.` and is not asked again.
+
+**Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
+right when viewed from the front, each starting at the bottom and running up, down, up;
+beside each snake stands the data pin that drives it, `GPIO p`. Only the installed 60x60
+geometry is editable. A pin is moved by dragging its handle `≡` up or down, or by holding
+it as a row of the playlist is held: the snakes keep their places, and the pins between
+move one place. Every time the dragged pin passes into another place, the whole
+permutation is saved at once with the revision it was read with, while the finger is
+still down, so that the LEDs follow the drag; the summary says `Saved: GPIO p drives snake
+n.`. Several quick places are saved one after another, the latest last; after the pin is
+let go the assignment is read once and shown. The arrow keys on a handle move its pin one
+place and save it the same way. When another controller changed the mapping meanwhile the
+save is refused, said, the drag ends and the target's assignment is shown; when no reply
+confirms a save, the drag ends, the assignment is read once again and nothing is sent
+twice. Restore defaults saves the default assignment at once, offered only when the
+installed pin set matches those defaults; Reload reads the assignment again. No new pin
+can be entered. The read every two seconds changes the column only when the target's
+mapping changed, and never while a pin is held or moves are saved.
+
+**The mapping from a photo.** Under the mapping's column, `From a photo` takes an image
+file of the phone, a JPEG or a PNG, through the phone's own chooser: no camera is part of
+the app. The photo is taken with the whole wall in it and the diagonal showing, in a room
+as dark as can be had, the edge where the wires come in at the bottom of the picture or,
+when the wall is seen from the side, at its left; `Show the diagonal` starts the diagonal
+while it is not showing. The diagonal lights, in each snake, three LEDs whose height tells
+the snake's number, so one photo tells which snake each position drives. The app finds the
+bright peaks of the picture and scans the brightness from the brightest level down, as if
+brightening the picture little by little, until the count of peaks holds steady over a
+long stretch of levels: the lit LEDs, all about as bright, come in together, and then
+nothing new comes until the lenses of the unlit LEDs and the room's reflections flood in,
+a few at every level. A lit room is the normal case; a picture whose count never settles
+is refused. The app takes the slant out, places the LEDs on the grids of sixty columns and
+sixty rows by the pitch between neighbours, tells from the slope of the stubs whether the
+wall is seen upright or from the side, and reads for each position the snake its LEDs
+vote for. It shows the photo scaled down with a circle and the snake's number at each
+position, and the words `Position 3 shows snake 7.` for each position whose snake is not
+its own, or `Every position shows its own snake.`; `Apply` saves the mapping that puts
+every position right, with the revision last read, as a drag saves one, and the column
+shows it; `Discard` drops the photo, as leaving Settings does. The reading is a best
+effort: a snake that does not light leaves no LEDs, and its number goes to the position
+that remains, `Position 5 shows no snake; snake 12 goes there.`, drawn dashed. Which edge
+the wires are at, the picture cannot tell, nor a dark end of the wall from the other end:
+the readings are offered as choices, `Wires at the bottom` or `Wires at the top` for a
+wall seen upright, `Wires at the left` or `Wires at the right` for one seen from the
+side, with `Position 1 dark`, `Position 20 dark`, `Lowest snake missing` or `Highest
+snake missing` when an end is dark, the advised edge first; only the wall tells them
+apart, and after Apply whether the diagonal begins at the bottom left; `Other reading`
+applies the next one. Bright spots off the grid are ignored and counted; a photo with no
+steady set of bright spots, with fewer than two lit LEDs, or with LEDs that fit no grid,
+is refused with the count found and the advice, and `Try another photo`. Nothing of the
+photo leaves the phone.
+
+**The test animations.** `Show test animations` in Settings, off at first and
+remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
+· 21`, which can be folded, with `Diagonal` and `Snake 1` to `Snake 20`. The diagonal
+shows one white line on black from bottom left to top right; the test of snake n a white
+block of 3 x 3 pixels that runs up and down the snake's three columns, one row every 40
+milliseconds, lighting each of its LEDs in turn, with every other LED dark. Each goes
+through the saved mapping and keeps the target's
+power and brightness. A test is never a row of the list: it cannot be ignored, selected,
+deleted or moved, and no playlist, start, cycle or order includes it. While a test shows,
+from this phone or another controller, the now-playing panel says `Test: Snake 3 is
+showing. Normal playback is paused.` with `Stop test`, which restores the previous
+playback selection; a tap on an animation ends the test too. The group says why its tests
+are off for a mapping that is not the twenty-snake installation's, and for software
+without them. Only the person looking at the LEDs can judge a test.
 
 Mapping requests use the same single request stream as playback and uploads. Changing
 the target clears the draft and discards older replies. A failed save is not retried: the
 app reads the target once to reconcile, preserves the draft and asks for Reload before a
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
-have readable messages on Mapping.
+have readable messages in Settings.
 
 ## Messages
 
@@ -347,15 +576,22 @@ it is dismissed with `OK` or another takes its place.
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
 | `unknown-id` | The animation that was pressed was removed meanwhile. The list is asked for again. | Animation `<id>` is not installed any more. |
 | `unknown-id` | `Playlist from the start` on a show without an animation. | No animation is installed. |
-| `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open. | The installation is busy. Try again in a moment. |
+| `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
+| `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
+| `read-only` | A removal of an animation of the card while the installation cannot write it. | Animation `<id>` cannot be removed: the card cannot be written now. |
+| `read-only` | An upload to the card while the installation cannot write it. | The card cannot be written now. Choose This board to store the animation on the board. |
+| `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
+| `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
+| `order-conflict` | A move used an order that another controller, an upload or the card changed. | The order changed on the installation since the app read it. The list is read again; move the animation again. |
+| `stale` | A text or a clock that was edited was changed or removed by another controller since it was read. | Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -367,6 +603,8 @@ When an animation cannot be made, the app says why:
 
 | Code | When | The sentence |
 |---|---|---|
+| `unsupported-character` | A text holds a character no font has. | The fonts have no letter for `<characters>`. Write English letters, digits, signs and Hebrew letters. |
+| `does-not-fit` | A text cannot be seen whole on the canvas with its effect and motion. | The text cannot be seen whole on the canvas with this effect: `<the effects that show it>`. |
 | `no-canvas` | The installation reports no canvas: it has no mapping it can use, or its software is older than the app. | The installation has no usable mapping, so the app does not know the canvas to convert for. |
 | `no-gif-decoder` | The phone's web view has no `ImageDecoder`. | This phone's web view cannot read GIF files. Update Android System WebView. |
 | `unreadable-media` | The web view cannot read the file as a video or a GIF. | The phone cannot read this file as a video or a GIF. |
@@ -377,8 +615,9 @@ Any other reason of the converter is said as `The animation cannot be made:` wit
 converter's own words and its reason in brackets.
 
 A removal and an upload that succeeded are said in the same place, without a code:
-`Removed animation <id> <file>.` and `Uploaded as animation <id> <file>. It plays in the
-playlist.`
+`Removed animation <id> <file>.`, `Uploaded as animation <id> <file>. It plays in the
+playlist.`, `Uploaded to the card as animation <id> <file>. It plays in the playlist.` and
+`Saved animation <id> <file>.`
 
 ## The phone and the installation's network
 
@@ -439,34 +678,75 @@ installed; the phone with mobile data on.
    action. While one strip is fed from the board itself, as on the desk today, keep the
    brightness at 40 or less.
 9. **Mobile data off.** Switch mobile data off and repeat step 3. *Seen:* the same.
-10. **Removing.** With the emulator of step 2, open `Storage`, press `Remove` beside an
-    animation that no cycle plays, and `Remove it`. *Seen:* the app says it removed the
-    animation, the row is gone, and the free storage grew.
-11. **Converting.** On `Storage`, choose a short video filmed with the phone, held
+10. **Removing.** With the emulator of step 2, on Animations, open the `...` menu of an
+    animation that no cycle plays, choose `Delete`, and `Remove it`. *Seen:* the app says it
+    removed the animation, the row is gone, and the free storage grew.
+11. **Converting.** On `Upload`, choose a short video filmed with the phone, held
     sideways, and then a GIF; try each fit and a part of a few seconds, and press
     `Make the animation`. *Seen:* the progress, the animation drawn in a loop as the
     file looks, and its frames, length and size. Note how long a video of ten seconds
     took.
-12. **Uploading.** Press `Upload`, to the emulator on the local network and then to the
-    board on its own network. *Seen:* the progress with its speed, then
-    `Uploaded as animation ...`; the animation is in both lists and plays on the
-    emulator's page and on the LEDs when it is pressed.
-13. **A long press.** Hold a finger for a second on a line of the show screen, on the
-    button `On`, on an animation, on a row of `Storage`, on an empty part of the screen,
-    and then on the address of the target screen. *Seen:* outside the address no text
-    is marked and no menu opens; in the address a word is marked and the menu of
-    copying and pasting opens. The buttons still work by a tap. Note whether a long
-    press on a button pressed it too.
+12. **Uploading.** Press `Upload to the installation`, to the emulator on the local
+    network and then to the board on its own network. *Seen:* the progress with its speed,
+    then `Uploaded as animation ...`; the animation is last in the list of Animations and
+    plays on the emulator's page and on the LEDs when its row is tapped.
+13. **A long press.** Hold a finger for a second on a line of Animations, on the button
+    `On`, on the `...` of a row, on an empty part of the screen, and then on the address of
+    the target screen. *Seen:* outside the address no text is marked and no menu opens; in
+    the address a word is marked and the menu of copying and pasting opens. The buttons
+    still work by a tap. Note whether a long press on a button pressed it too.
 14. **The phone's bars.** Hold the phone upright, and then sideways, on each screen.
-    *Seen:* the heading is below the clock and the icons at the top, and the tabs `Show`,
-    `Storage` and `Target` are wholly above Android's buttons or the line of gesture
-    navigation; sideways, nothing of the app lies under a bar or the camera at a side.
-    On the show screen and on `Storage`, scroll to the end: nothing shows under the
+    *Seen:* the heading is below the clock and the icons at the top, and the tabs
+    `Animations`, `Upload`, `Settings` and `Target` are wholly above Android's buttons or the
+    line of gesture navigation; sideways, nothing of the app lies under a bar or the camera
+    at a side. On Animations and on Settings, scroll to the end: nothing shows under the
     clock, and the last line stands above the tabs. On the target screen, tap the
     address: the keyboard opens, the tabs go away and the address stays in view; they
     come back when the keyboard closes. Note whether the phone has three buttons or
     gesture navigation.
-15. **Note** the phone's model, its Android version, the web view's version from the
+15. **The numbers of animations.** On the board's network, with the microSD card in,
+    once the list has come. *Seen:* `Internal storage:` begins with the number of the
+    board's own animations and `External storage:` with the number of the card's, and
+    both match what `python3 -m odrigctl --port … space` and `list` say. Take the card
+    out: within twenty seconds the external line says `absent (read-only).` with no
+    number; put it back: the number comes back.
+16. **The look and the menus.** On each tab, upright and sideways. *Seen:* the midnight
+    background with teal and violet, the panels, every text readable; each row has its
+    `in` or `ex` badge and its `...`; a row's menu opens beside it without playing it, and
+    an external row's menu says it is read-only. Choose `Ignore in playlist` and then
+    `Restore to playlist`: the row says `Ignored`, and then not.
+17. **Moving by a finger.** Hold a row for half a second and drag it up and down a long
+    list, then let go. *Seen:* the row lifts, a dashed place follows the finger, the list
+    scrolls near the tabs, the row stays where it was let go and says `Saving...` a
+    moment; after a restart of the app the order is the same; the next animation of the
+    playlist is the next of the new order. Use `Move up` in a row's menu too.
+18. **The Tests group.** Turn on `Show test animations` in Settings and go back to
+    Animations. *Seen:* the pinned group `Tests · 21` above the list; `Snake 1` lights
+    the first snake's one-pixel line from its bottom left to its top right and no other
+    snake, and so on to `Snake 20`; `Diagonal` the diagonal; the now-playing panel names the
+    test, and `Stop test` brings the playlist back. While one strip is fed from the board
+    itself, keep the brightness at 40 or less.
+19. **The filters.** On the board's network with the card in, choose each choice of
+    `Storage` and `Type`. *Seen:* the rows of that storage and type only, each count the
+    number of rows it shows, `Show all` when none matches; after a restart of the app the
+    choices are kept; while a filter hides rows, holding a row lifts nothing.
+20. **A text and a clock.** On Upload, `Make a text`: write `שלום world`, choose
+    `Marquee` and then each other effect and motion. *Seen:* the preview moves as the
+    words say and `One pass takes` names a length; `Upload to the installation` adds a row,
+    and the LEDs show the text as the preview did. Then `Make a clock` with each kind and
+    upload one; choose `Edit` in its row's menu, change its seconds and `Save`. *Seen:* the
+    clock's hands or digits move on the LEDs, the melting watch's hands bend with its
+    face, and after the save the row is where it was.
+21. **The card and the catalogs.** With firmware that writes the card, and the card in.
+    On Upload, make an animation: `Store on` has `The card` chosen; upload it. *Seen:*
+    `Uploaded to the card as animation ...`, its row with `ex`, and it plays on the LEDs
+    when tapped. Choose `Delete` in its menu and `Remove it`. *Seen:* the row goes, and the
+    card's free storage grows. In Settings, `Rebuild the card's catalog` and `Rebuild`.
+    *Seen:* the count of the progress grows, Animations says how far the reading is, and the
+    LEDs play on; `Cancel the rebuild` ends it, and a second rebuild that runs to its end
+    leaves `Card: <n> animations, cataloged.` Keep the brightness at 40 or less while one
+    strip is fed from the board itself.
+22. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -493,15 +773,39 @@ Neither needs a phone.
 
 By programs, on a Mac:
 
-- The four screens and every action of the web code, in Chrome against the emulator:
+- The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
   `play all`, `on`, `off`, the brightness with at most five commands a second, the free
-  storage, a removal confirmed and one kept, each message, the look at widths of 360 and
-  320 pixels, and the back gesture across the four screens.
+  storage, a removal from a row's menu confirmed and one kept, each message, the back
+  gesture across the four tabs and `Add animation`.
+- The Aurora Glass look, in Chrome at 360 and 320 pixels upright and 740 sideways:
+  every text at a contrast of 7:1 or more against what lies behind it, the translucent
+  panels composited onto the midnight background, every control at least 44 pixels and
+  the main ones 48, 8 pixels apart, the four tabs at equal width along the bottom, a
+  row's menu, a message and a question above the tabs, nothing scrolling sideways.
+- The rows and their menus, in Chrome against the emulator: `in` and `ex` badges by
+  `external` of `list`, Ignore in playlist and Restore to playlist shown as saving until
+  confirmed, a refused change read again, the selection mode with more than 32
+  animations, a refused batch and a lost reply, a target change during a deletion.
+- The saved order, in Chrome against the emulator: rows in the saved order with card
+  animations among them; a drag by a finger and by a mouse saved where it was let go; a
+  long list scrolled while a row is held near the tabs; a drag let go where it began and
+  one cancelled moving nothing; Move up and Move down; a conflict, a refusal and a lost
+  reply each said and read again without a second move; an older target without an order;
+  moving off during the selection mode; a move of another controller shown.
+- The filters, in Chrome against the emulator and against stand-in targets that report
+  types: every combination of Storage and Type with its counts, the empty list and
+  `Show all`, the choices kept across a reload, moving off while a filter hides rows,
+  `Select all` and a filter change, the Tests group not filtered, a card pulled out and
+  plugged in, a row without a type, and no request more than without the filters.
+- The test animations, in Chrome against the emulator: the checkbox off at first and
+  remembered across a reload, 21 entries pinned above the list, a snake test, stopping,
+  the diagonal, a play that ends a test, a test of another controller named with the
+  group hidden, a mapping of another installation explained, the tests in no list or
+  order.
 - Mapping in Chrome against the real emulator: twenty labelled swaps, saved/default
   drafts, Cancel/Reload, concurrent edits, uncertain save replies, target changes,
-  diagnostic state across navigation and app restart, native bridge reply validation,
-  and portrait/landscape layouts. See [the verification record](specs/30-p1-app-mapping-and-diagonal-check/verification.md).
+  native bridge reply validation with the snake test, and portrait/landscape layouts. See [the verification record](specs/30-p1-app-mapping-and-diagonal-check/verification.md).
 - Converting in Chrome: a GIF with each fit and with a part gives the very file the
   converter's command line makes of it, and an mp4 in H.264, whole and as a part, gives
   its frames and lengths; stopping; a file that cannot be read; a target without a
@@ -521,7 +825,33 @@ By programs, on a Mac:
   line of each list can be scrolled above the tabs, and with the keyboard open the field
   is in view and the tabs are hidden. Without the room the page is as before. The
   settings of the bars in the Android project, and in the APK.
-- That the web code sends the twenty lines above and no other, and names no address
+- That the storage lines of Animations begin with the number
+  of animations of each storage, in Chrome against the emulator with no drive, a drive of
+  animations, an empty drive, and a drive plugged in and pulled out, and against stand-in
+  targets that answer `list` with `busy` or report an invalid show.
+- How far the installation has read its animations, in Chrome against a stand-in target
+  that reads three and against the emulator: each count in turn, the unavailable ones,
+  the end with unavailable animations, no line for an installation that has read every
+  one or does not say, and the controls usable meanwhile; the target screen's name of
+  the emulator and its last fault, asked once when the screen is opened, and neither line
+  for a target that does not say.
+- Texts and clocks, in Chrome against the emulator and against stand-in targets: the
+  preview of a text and of each kind of clock is, at the time and with the seed it shows,
+  the core's own drawing of the same file; a character no font has, a block that does
+  not fit and numbers out of range said in words; a text and a clock uploaded, listed with
+  their type and holding the converter's bytes; a cancelled upload; an edit of a text and
+  of a clock saved in its place with its inclusion; another controller's change between
+  reading and saving said and not overwritten; `Edit` only for the board's own texts and
+  clocks.
+- The catalogs and the card, in Chrome against stand-in targets and against the
+  emulator: each state of each catalog in words; a rebuild asked about, answered `Not now`,
+  refused, cancelled and run to its end, with its progress and Animations working
+  meanwhile; a target without catalogs asked once; the emulator's board without a catalog
+  and with one the PC tool wrote; an upload to a card the installation can write, with
+  `This board` chosen instead, each refusal in words, and no choice for a card it cannot
+  write; `Delete` of a card's animation, one with a fault among them, and none on a card
+  that cannot be written; the storage lines and the badges of both kinds of card.
+- That the web code sends the thirty-two lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -535,16 +865,32 @@ By programs, on a Mac:
 - **Mapping and the diagonal on the real installation.** No firmware was flashed for
   this run. Seed 30 task 5 requires the owner to inspect all twenty snakes, correct an
   assignment from the APK, see a continuous diagonal, restart and resume ordinary playback.
+- **Seed 36 on the board and on a phone.** No program has dragged a row with a finger,
+  seen the Aurora Glass look on a phone, or seen the snake tests and the saved order on
+  the LEDs: steps 16 to 18 above, and seed 36's board session, which also removes the 21
+  hand-uploaded line-test files from the board.
 
+- **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
+  name of the board and its last fault on a phone; that belongs to the seed's board
+  session.
 - **The check on a phone**, all of it. No program has run the app on a phone, and no test
   runs the sender. In particular nobody has seen yet that a request reaches the board
   while the phone has mobile data on, what the phone says about a network without
   internet, that the screen stays on, that the back gesture goes from the target screen
-  to the show screen and from there out of the app, that a long press marks text and
+  to Animations and from there out of the app, that a long press marks text and
   opens its menu only in a field, and that the app keeps clear of Android's bars, upright
-  and sideways, also with the keyboard open. On 2026-10-15 the owner ran the APK against
+  and sideways, also with the keyboard open, and that the numbers of animations match the
+  board's and the card's. On 2026-10-15 the owner ran the APK against
   the board on its own network and saw its state and its list; on 2026-10-16 the owner
   saw the app lie under the bars, before it kept clear of them.
+- **Seed 35 against the board and on a phone.** The app's upload to the card, its
+  `Delete` of a card's animation and its rebuilds were tried against stand-in targets that
+  answer as [commands.md](commands.md) says, and its catalog lines against the emulator
+  too; nobody has uploaded to the card, deleted from it or rebuilt a catalog from a phone:
+  step 21 above, and the seed's board session.
+- **Texts and clocks on a phone and on the LEDs.** No phone has made, previewed, uploaded
+  or edited a text or a clock, and nobody has looked at one on the LEDs: step 20 above, and
+  seed 37's board session.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

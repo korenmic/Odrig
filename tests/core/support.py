@@ -17,7 +17,7 @@ import tempfile
 import unittest
 import zlib
 
-from odrig import errors, jsonframes, mapping, odrg, show
+from odrig import errors, jsonframes, mapping, odrg, odrgx, show
 from odrig.generators import dense, dvd_bounce, hello_world
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -121,30 +121,37 @@ def inflate_each(streams):
     return results
 
 
-Decoded = collections.namedtuple("Decoded", "header records reason")
-Decoded.__doc__ = """What the core's ODRG decoder makes of a file.
+Decoded = collections.namedtuple("Decoded", "header records reason container", defaults=(None,))
+Decoded.__doc__ = """What the core's reader makes of an ODRG file or an ODRGX container of frames.
 
-`header` is `(W, H, C, F, compressed)`, or `None` when the header is refused. `records` holds
-`(duration, picture)` for each frame record decoded, the picture as three bytes for each
-pixel. `reason` is `None` for a file read to its end, or the reason it is refused for.
+`header` is `(W, H, C, F, compressed)` of the frames, or `None` when a header is refused.
+`records` holds `(duration, picture)` for each frame record decoded, the picture as three
+bytes for each pixel. `reason` is `None` for a file read to its end, or the reason it is
+refused for. `container` is `(type, loop, payload)` of a container whose header was read,
+and `None` for an ODRG file.
 """
 
 
-def _decoded(lines):
+def _decoded(lines, pending=None):
     header = None
+    container = None
     records = []
     for line in lines:
         word, _, rest = line.partition(" ")
-        if word == "header":
+        if word == "pending" and pending is not None:
+            pending.append(int(rest))
+        elif word == "container":
+            container = tuple(int(number) for number in rest.split())
+        elif word == "header":
             width, height, colours, frames, compressed = (int(number) for number in rest.split())
             header = (width, height, colours, frames, bool(compressed))
         elif word == "frame":
             duration, _, picture = rest.partition(" ")
             records.append((int(duration), bytes.fromhex(picture)))
         elif word == "end":
-            return Decoded(header, tuple(records), None)
+            return Decoded(header, tuple(records), None, container)
         elif word == "rejected":
-            return Decoded(header, tuple(records), rest)
+            return Decoded(header, tuple(records), rest, container)
         else:
             break
     raise AssertionError("odrig_host decode printed no ending")
@@ -159,6 +166,23 @@ def decode_each(files):
     """What the core's ODRG decoder makes of each of these files, given as bytes."""
     lines = iter(host_lines("decode", "--batch", stdin=batch(files)))
     results = [_decoded(lines) for _ in files]
+    if next(lines, None) is not None:
+        raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
+    return results
+
+
+def decode_in_slices(files, slice_bytes):
+    """What the core's ODRG decoder makes of each of these files when it settles a defect in
+    slices of `slice_bytes` bytes: `(Decoded, pending)` for each file, where `pending` counts
+    the calls that gave no answer yet."""
+    lines = iter(host_lines("decode", "--slice", slice_bytes, "--batch", stdin=batch(files)))
+    results = []
+    for _ in files:
+        pending = []
+        decoded = _decoded(lines, pending)
+        if len(pending) != 1:
+            raise AssertionError("odrig_host decode --slice printed no count of pending calls")
+        results.append((decoded, pending[0]))
     if next(lines, None) is not None:
         raise AssertionError(f"odrig_host decode printed more than {len(files)} results")
     return results
@@ -417,6 +441,35 @@ def demo_show():
     return dict(_demo_show())
 
 
+# The members of a reply of `status` that say how far the check is.
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host")
+
+
+def without_readiness(state):
+    """A reply of `status`, as a value, without the members that say how far the check is,
+    for tests of the others."""
+    return {name: value for name, value in state.items() if name not in READINESS}
+
+
+def status_lines_without_readiness(lines):
+    """The lines of a session with every reply of `status` written without those members."""
+    kept = []
+    for line in lines:
+        if line.startswith('reply {"ok":true,"on"'):
+            line = "reply " + json.dumps(without_readiness(json.loads(line[len("reply "):])), separators=(",", ":"))
+        kept.append(line)
+    return kept
+
+
+def with_show_fault(files, missing=99):
+    """The files with a cycle added to the show file that names an id no item has: a fault
+    of the show, which makes it invalid with `undefined-id <missing>`. A fault of one file
+    does not: the file is quarantined."""
+    listed = json.loads(files["show.json"])
+    listed["items"].append({"id": 65535, "cycle": [missing], "seconds": 1})
+    return {**files, "show.json": json.dumps(listed)}
+
+
 def show_text(items, brightness=128, start=None):
     """A show file with these items, each written as docs/show.md has it."""
     show = {"version": 1, "brightness": brightness, "items": list(items)}
@@ -513,6 +566,99 @@ class _Invalid(Exception):
     """The installed file set is refused, with this reason text."""
 
 
+def frames_payload(data):
+    """The ODRG file a runtime file plays: an ODRG file itself, or a container's payload."""
+    return odrgx.payload_of(data) if odrgx.is_container(data) else data
+
+
+def header_fault(data, canvas):
+    """The reason a reader refuses a runtime file for by its headers, as the core reads them
+    before any frame record, or None: a container's header, the header of the ODRG file of
+    its frames and their canvas, and last the canvas against `canvas`, as `size-mismatch`.
+    A text has its canvas in the container's header alone."""
+    container = None
+    if odrgx.is_container(data):
+        try:
+            container = odrgx.read_header(data)
+        except errors.Rejection as rejection:
+            return rejection.reason
+        if container.type != 1:
+            return "size-mismatch" if (container.width, container.height) != tuple(canvas) else None
+    inner = frames_payload(data)
+    # The header alone, when it is sound, is refused as a file cut after it.
+    try:
+        odrg.decode(inner[:16])
+    except errors.Rejection as rejection:
+        if len(inner) < 16 or rejection.reason != "truncated":
+            return rejection.reason
+    width, height = struct.unpack_from("<HH", inner, 6)
+    if container is not None and (width, height) != (container.width, container.height):
+        return "canvas-mismatch"
+    if (width, height) != tuple(canvas):
+        return "size-mismatch"
+    return None
+
+
+def type_of(data):
+    """What `list` says a runtime file holds."""
+    if odrgx.is_container(data) and data[5] in odrgx.TYPE_NAMES:
+        return odrgx.TYPE_NAMES[data[5]]
+    return "frames"
+
+
+def rendered(data, times, seed=None):
+    """The pictures the core's drawing makes of a text or a clock at these times into its
+    turn, a clock with a seed, by `odrig_host render`, or the reason it is refused for."""
+    with tempfile.TemporaryDirectory() as folder:
+        path = pathlib.Path(folder) / "drawn.odrgx"
+        path.write_bytes(data)
+        seeded = () if seed is None else ("--seed", str(seed))
+        lines = host_lines("render", *seeded, str(path), *(str(time) for time in times))
+    if lines[0].startswith("rejected "):
+        return lines[0][len("rejected "):]
+    return [bytes.fromhex(line.split(" ")[3]) for line in lines]
+
+
+def mix(value):
+    """MurmurHash3's finalizer, as the core mixes the timestamps of the refreshes and the
+    seed of a clock's turn."""
+    value ^= value >> 16
+    value = (value * 0x85EBCA6B) & 0xFFFFFFFF
+    value ^= value >> 13
+    value = (value * 0xC2B2AE35) & 0xFFFFFFFF
+    return value ^ (value >> 16)
+
+
+def seed_of(noise, number, start):
+    """The seed of the turn of a clock: the noise, the item's id and the turn's start."""
+    return mix(noise ^ mix((number ^ start) & 0xFFFFFFFF)) or 1
+
+
+class _Drawn:
+    """A text or a clock. The reference knows the length of its loop, a text's pass or a
+    clock's seconds, and takes the pictures from the core's drawing, which tests of their
+    own hold to the converter's pictures."""
+
+    AHEAD = 250
+
+    def __init__(self, data, loop):
+        self.data = data
+        self.total = loop
+        self.broken = None
+        self.widget = type_of(data) == "widget"
+        self.pictures = {}
+
+    def picture_at(self, elapsed, seed=None):
+        # A text is drawn at its time in its pass, a clock at its time in the turn.
+        time = elapsed if self.widget else elapsed % self.total
+        if (seed, time) not in self.pictures:
+            # The times of the refreshes to come are drawn with it, 20 ms apart.
+            ahead = (time + 20 * step for step in range(self.AHEAD))
+            times = sorted(set(ahead) if self.widget else {later % self.total for later in ahead})
+            self.pictures.update(((seed, later), picture) for later, picture in zip(times, rendered(self.data, times, seed)))
+        return self.pictures[(seed, time)]
+
+
 class _Clip:
     """The frames of one `.odrg` file, as the reference decoder gives them.
 
@@ -582,6 +728,10 @@ class ReferencePlayer:
         self.clips = {}         # the frames of each file by name
         self.on = True
         self.brightness = 0
+        self.noise = 0          # what the timestamps of the polls were mixed into
+        self.seed = 0           # the seed of the latest clock's turn
+        self.seed_turn = None   # that turn: the clock's id and the turn's start
+        self.seed_shown = False # whether the latest refresh drew that clock, and nothing came between
         self.playing = None     # the id of the cycle being played, ALL for the playlist, or None
         self.turn = None        # while the playlist plays, the id of the animation whose turn it is
         self.zero = None        # the time zero of that item, once a refresh has set it
@@ -591,6 +741,10 @@ class ReferencePlayer:
         self.next_due = None
         self.refreshes_in = collections.Counter()   # the refreshes of each second after power-on
         self.unfinished = b""   # the bytes of a transport since the last newline
+        self.faults = {}        # the reason of each quarantined file, by its name
+        self.logged = []        # the texts of the log since the last refresh was printed
+        self.start_logs = []    # the texts of the log of the start
+        self.last_sent = None   # the LED data of the latest refresh
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
         if changeable:
@@ -600,18 +754,28 @@ class ReferencePlayer:
             start = self._check(content)
         except _Invalid as invalid:
             self.error = str(invalid)
+            self.start_logs.append(self.error)
         else:
-            # A cycle named as the start plays. Otherwise the playlist plays, from the
-            # animation the start names or from its first, when the show has one.
-            if start is not None and self.items[start].cycle is not None:
+            # A cycle named as the start plays while it lists a usable animation.
+            # Otherwise the playlist plays, from the animation the start names or the next
+            # usable one after it, or from its first, when the show has one.
+            if start is not None and self.items[start].cycle is not None and self._usable(start):
                 self._play(start)
-            elif start is not None or self._animations():
-                self._play_all(start)
+            else:
+                first = start if start is not None and self.items[start].cycle is None else None
+                if first is not None and not self._usable(first):
+                    first = self._after(first)
+                elif first is None:
+                    first = self._animations()[0] if self._animations() else None
+                if first is not None:
+                    self._play_all(first)
             if check_first:
-                refused = [f"file-malformed {name} {reason}" for name, _, reason in self.checks if reason is not None]
+                for name, _, reason, _ in list(self.checks):
+                    if reason is not None:
+                        self._quarantine(name, reason)
                 self.checks = []
-                if refused:
-                    self._fail(refused[0])
+            self.start_logs += self.logged
+            self.logged = []
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
@@ -641,42 +805,93 @@ class ReferencePlayer:
             named = show.files(listed)
             for line in files.pop(self.PENDING)[:1500].split(b"\n")[:-1]:
                 name = line.decode("latin-1")
-                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDING) and name not in named:
+                if show.FILE_NAME.fullmatch(name) and name.endswith(show.ENDINGS) and name not in named:
                     files.pop(name, None)
 
         for name in show.files(listed):
+            # A file that cannot be used is quarantined; the others are read as ever.
             if name not in files:
-                raise _Invalid(f"file-missing {name}")
+                self._quarantine(name, "file-missing")
+                continue
             data = files[name]
-            # The header is judged first, then the size against the mapping, then the body.
-            # The header alone, when it is sound, is refused as a file cut after it.
-            try:
-                odrg.decode(data[:16])
-            except errors.Rejection as rejection:
-                if len(data) < 16 or rejection.reason != "truncated":
-                    raise _Invalid(f"file-malformed {name} {rejection.reason}") from None
-            if struct.unpack_from("<HH", data, 6) != (canvas.width, canvas.height):
-                raise _Invalid(f"size-mismatch {name}")
+            # The headers are judged first, then the size against the mapping, then the body.
+            fault = header_fault(data, (canvas.width, canvas.height))
+            if fault is not None:
+                self._quarantine(name, fault)
+                continue
             # The body is read after the start, while the show plays, by a check that
             # takes one step for the file, one for each frame record and one for its end.
             # A host whose storage cannot be changed has no second reader: there the
             # body is read at the start.
             steps, reason, clip = self._judge(data)
             if reason is not None and not self.changeable:
-                raise _Invalid(f"file-malformed {name} {reason}")
-            if reason is not None:
+                self._quarantine(name, reason)
+                continue
+            if reason is not None and type_of(data) != "frames":
+                # Nothing of a text is played before its fault.
+                clip = _Clip([], reason)
+            elif reason is not None:
                 # The frames before the fault can be played. A fault after the last
                 # frame record is met by the check alone.
                 sound = found_in(data).records
-                clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", data, 12)[0] else reason)
+                clip = _Clip(sound, None if len(sound) == struct.unpack_from("<I", frames_payload(data), 12)[0] else reason)
             self.clips[name] = clip
             if self.changeable:
-                self.checks.append([name, steps, reason])
+                self.checks.append([name, steps, reason, steps])
         return listed.start
+
+    def _usable(self, number):
+        """Whether an item can be played: an animation whose file is not quarantined, or a
+        cycle that lists one."""
+        item = self.items[number]
+        if item.cycle is None:
+            return item.file not in self.faults
+        return any(self.items[member].file not in self.faults for member in item.cycle)
+
+    def _after(self, number):
+        """The usable animation after this one in the order of the show, the first one
+        after the last, or None when there is none."""
+        order = [item.id for item in self.items.values() if item.cycle is None]
+        at = order.index(number)
+        for step in range(1, len(order) + 1):
+            candidate = order[(at + step) % len(order)]
+            if self._usable(candidate):
+                return candidate
+        return None
+
+    def _quarantine(self, name, reason):
+        """Makes a file unavailable for the rest of the boot. The playlist goes on with the
+        next usable animation when the one whose turn it is has the file, from the next
+        refresh; a cycle that lists no usable animation gives way to the playlist."""
+        if name in self.faults:
+            return
+        self.faults[name] = reason
+        self.logged.append(f"file {name} unavailable: {reason}")
+        current = self.checks[0][0] if self.checks else None
+        if current != name:
+            self.checks = [check for check in self.checks if check[0] != name]
+        else:
+            # The check is at the file: its next step passes over it.
+            self.checks[0][1:] = [1, None, 1]
+        if self.playing == self.ALL and self.turn is not None and not self._usable(self.turn):
+            following = self._after(self.turn)
+            if following is None:
+                self.playing = self.shown = self.zero = self.turn = None
+            else:
+                self._play_all(following)
+        elif self.playing not in (None, self.ALL) and not self._usable(self.playing):
+            order = self._animations()
+            if order:
+                self._play_all(order[0])
+            else:
+                self.playing = self.shown = self.zero = self.turn = None
+
+    KEEP = object()
 
     def _fail(self, reason):
         """Makes the show invalid while it runs: nothing plays from here on."""
         self.error = reason
+        self.seed_shown = False
         self.playing = self.shown = self.zero = self.turn = None
         if self.upload is not None:
             self._discard()
@@ -685,28 +900,40 @@ class ReferencePlayer:
 
     def _play(self, number):
         """Starts a cycle. An animation is not played by itself: it has its turn."""
+        self.seed_shown = False
         self.playing = number
         self.zero = None
-        self.shown = self.items[number].cycle[0]
+        self.shown = next(member for member in self.items[number].cycle if self._usable(member))
 
     def _animations(self):
-        """The ids of the animation items, in the order of the show: the playlist."""
-        return [item.id for item in self.items.values() if item.cycle is None]
+        """The ids of the usable animation items, in the order of the show: the playlist."""
+        return [item.id for item in self.items.values() if item.cycle is None and item.file not in self.faults]
 
     def _play_all(self, number=None):
         """Starts the playlist with the turn of an animation, or of its first one."""
+        self.seed_shown = False
         self.playing = self.ALL
         self.zero = None
         self.turn = self.shown = self._animations()[0] if number is None else number
 
+    def _whole_passes(self, number, turn):
+        """A longest time given to the turn of a text, rounded up to its whole passes."""
+        clip = self.clips[self.items[number].file]
+        if not isinstance(clip, _Drawn) or clip.widget:
+            return turn
+        return -(-turn // clip.total) * clip.total
+
     def _turn_ms(self, number):
         """How long the turn of an animation lasts: its loops, which are the show's
-        `repeat` or the fewest that last `min_seconds`, cut at its `max_seconds`."""
+        `repeat` or the fewest that last `min_seconds`, cut at its `max_seconds`, or, for a
+        text, at the whole pass in which that ends."""
         item = self.items[number]
         loop = self.clips[item.file].total
         loops = item.repeat if item.repeat is not None else -(-1000 * self.min_seconds // loop)
         turn = loops * loop
-        return turn if item.max_seconds is None else min(turn, 1000 * item.max_seconds)
+        if item.max_seconds is None or turn <= 1000 * item.max_seconds:
+            return turn
+        return self._whole_passes(number, 1000 * item.max_seconds)
 
     def _touch(self, now):
         """Takes the timestamp of a call and gives the time the call happens at."""
@@ -738,8 +965,8 @@ class ReferencePlayer:
                     # turn that lies before it ends the turn first.
                     longest = None if item.max_seconds is None else 1000 * item.max_seconds
                     if clip.total <= (elapsed if longest is None else min(elapsed, longest)):
-                        self._fail(f"file-malformed {item.file} {clip.broken}")
-                        return None
+                        self._quarantine(item.file, clip.broken)
+                        return self.KEEP
                     if longest is None or elapsed < longest:
                         break
                     turn = longest
@@ -752,16 +979,37 @@ class ReferencePlayer:
                 self.turn = order[(order.index(self.turn) + 1) % len(order)]
         else:
             # Turn t of a cycle shows the animation at place t mod n, with its time
-            # counted from the start of the turn.
+            # counted from the start of the turn: the animation of the turn, or the first
+            # usable one after it in the cycle. A turn is `seconds` long, a text's rounded up
+            # to its whole passes.
             cycle = self.items[self.playing]
-            turn, elapsed = divmod(elapsed, 1000 * cycle.seconds)
-            item = self.items[cycle.cycle[turn % len(cycle.cycle)]]
+
+            def shown_in(turn):
+                members = [cycle.cycle[(turn + step) % len(cycle.cycle)] for step in range(len(cycle.cycle))]
+                return next(member for member in members if self._usable(member))
+
+            lengths = [self._whole_passes(shown_in(place), 1000 * cycle.seconds) for place in range(len(cycle.cycle))]
+            elapsed %= sum(lengths)
+            place = 0
+            while elapsed >= lengths[place]:
+                elapsed -= lengths[place]
+                place += 1
+            item = self.items[shown_in(place)]
             clip = self.clips[item.file]
             if clip.broken and clip.total <= elapsed:
-                self._fail(f"file-malformed {item.file} {clip.broken}")
-                return None
+                self._quarantine(item.file, clip.broken)
+                return self.KEEP
         self.shown = item.id
-        picture = clip.picture_at(elapsed)
+        self.seed_shown = isinstance(clip, _Drawn) and clip.widget
+        if self.seed_shown:
+            # A clock's turn gets its seed at its first refresh and keeps it to its end.
+            start = now - elapsed
+            if self.seed_turn != (item.id, start):
+                self.seed = seed_of(self.noise, item.id, start)
+                self.seed_turn = (item.id, start)
+            picture = clip.picture_at(elapsed, self.seed)
+        else:
+            picture = clip.picture_at(elapsed)
         return picture if self.on else None
 
     def poll(self, now):
@@ -769,6 +1017,7 @@ class ReferencePlayer:
 
         Returns `(leg number, LED data)` for each leg, or None when no refresh is due.
         """
+        self.noise = mix(self.noise ^ (now & 0xFFFFFFFF))
         now = self._touch(now)
         if not self.legs or now < self.next_due:
             return None
@@ -790,7 +1039,7 @@ class ReferencePlayer:
         # last whole second had 30 refreshes or more, at most 16. At any other refresh it
         # takes none, or one when it took none at the nine refreshes before either. A
         # fault it finds makes the show invalid from this refresh on.
-        if self.error is None and self.checks:
+        if self.error is None and self.checks and self.upload is None:
             second = (now - self.t0) // 1000
             steady = second == 0 or self.refreshes_in[second - 1] >= self.CHECK_LEAST_RATE
             on_time = in_step and now - grid <= self.CHECK_ON_TIME_MS and steady
@@ -803,21 +1052,28 @@ class ReferencePlayer:
                 if check[1] == 0:
                     self.checks.pop(0)
                     if check[2] is not None:
-                        self._fail(f"file-malformed {check[0]} {check[2]}")
-                        picture = None
+                        self._quarantine(check[0], check[2])
                     if self.error is not None or not self.checks:
                         break
+        if picture is self.KEEP:
+            dark = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            self.last_sent = self.last_sent if self.on and self.last_sent is not None else dark
+            return self.last_sent
         if picture is None:
-            return [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            self.last_sent = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+            return self.last_sent
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
-        return [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+        self.last_sent = [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+        return self.last_sent
 
     CHECK_MOST_STEPS = 16
     CHECK_LONGEST_WAIT = 9
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048)}
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
+    READ_MOST = 600
+    EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
     REPLY_MAX = 1024
 
@@ -835,6 +1091,10 @@ class ReferencePlayer:
             return b'{"ok":false,"error":"' + code.encode("ascii") + b'"}\n'
         if line == b"status":
             return self._status(now)
+        if line == b"fault":
+            if self.faults:
+                raise NotImplementedError("the reference player does not state where in a file a fault lies")
+            return b'{"ok":true,"fault":null}\n'
         if line == b"space":
             return self._space()
         if line.split(b" ")[0] == b"list":
@@ -853,6 +1113,8 @@ class ReferencePlayer:
             return "bad-argument"
         if name == b"upload":
             return self._upload(arguments)
+        if name == b"read":
+            return self._read(arguments)
         if name == b"play" and arguments == [b"all"]:
             if self.error is not None:
                 return "show-invalid"
@@ -873,6 +1135,8 @@ class ReferencePlayer:
                 return "show-invalid"
             if value not in self.items:
                 return "unknown-id"
+            if not self._usable(value):
+                return "unavailable"
             if self.items[value].cycle is None:
                 self._play_all(value)
             else:
@@ -885,12 +1149,10 @@ class ReferencePlayer:
         elif name == b"list":
             if self.error is not None:
                 return "show-invalid"
-            if self.checks:
-                return "busy"
         elif name == b"remove":
             if self.error is not None:
                 return "show-invalid"
-            if self.checks or self.upload is not None:
+            if self.upload is not None:
                 return "busy"
             if value not in self.items:
                 return "unknown-id"
@@ -899,7 +1161,7 @@ class ReferencePlayer:
             if not self.changeable:
                 return "storage-error"
             self._remove(value)
-        elif name != b"status":
+        elif name not in (b"status", b"fault"):
             self.on = name == b"on"
         return None
 
@@ -929,36 +1191,66 @@ class ReferencePlayer:
     def _judge(self, data):
         """What the check of an uploaded file finds: the steps it takes, and the reason
         the file is refused for, or None with the frames of the file."""
-        if len(data) < 16:
-            return 1, "truncated", None
+        fault = header_fault(data, self.canvas)
+        if fault is not None:
+            return 1, fault, None
+        if type_of(data) != "frames":
+            # The payload is read whole in one step, and the end in another.
+            reason = found_in(data).reason
+            return (2, reason, None) if reason is not None else (3, None, _Drawn(data, odrgx.read_header(data).loop_ms))
         try:
-            odrg.decode(data[:16])
-        except errors.Rejection as rejection:
-            if rejection.reason != "truncated":
-                return 1, rejection.reason, None
-        if struct.unpack_from("<HH", data, 6) != self.canvas:
-            return 1, "size-mismatch", None
-        try:
-            records = odrg.decode(data).records
+            records = odrg.decode(frames_payload(data)).records
         except errors.Rejection as rejection:
             sound = self.sound_records.get(zlib.crc32(data))
             if sound is None:
                 sound = len(found_in(data).records)
             return sound + 2, rejection.reason, None
+        if odrgx.is_container(data):
+            # After the last record: the payload's length, then the loop.
+            container = odrgx.read_header(data)
+            if len(data) - odrgx.HEADER.size != container.payload_size:
+                return len(records) + 2, "payload-size", None
+            if sum(duration for duration, _ in records) != container.loop_ms:
+                return len(records) + 2, "loop-mismatch", None
         return len(records) + 2, None, _Clip(records)
 
+    def _read(self, arguments):
+        """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
+        with its size. Returns an error code or the reply."""
+        number = self._number(arguments[0], 1, 65535) if len(arguments) == 2 else None
+        offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
+        if number is None or offset is None:
+            return "bad-argument"
+        if self.error is not None:
+            return "show-invalid"
+        item = self.items.get(number)
+        if item is None or item.cycle is not None:
+            return "unknown-id"
+        if item.file in self.faults:
+            return "unavailable"
+        if any(check[0] == item.file for check in self.checks):
+            # The size of a file is known once a check has read it whole.
+            return "busy"
+        data = self.files[item.file]
+        if offset > len(data):
+            return "bad-argument"
+        if not self.changeable:
+            return "storage-error"
+        piece = base64.urlsafe_b64encode(data[offset:offset + self.READ_MOST]).rstrip(b"=")
+        return b'{"ok":true,"bytes":%d,"data":"%s"}\n' % (len(data), piece)
+
     def _upload(self, arguments):
-        """The four `upload` commands. Returns an error code, a reply, or None."""
+        """The `upload` commands. Returns an error code, a reply, or None."""
         verb = arguments[0] if arguments else b""
         if verb == b"begin":
             number = self._number(arguments[1], 1, 65535) if len(arguments) == 4 else None
             size = self._number(arguments[3], 1, 4294967295) if len(arguments) == 4 else None
             name = arguments[2].decode("latin-1") if len(arguments) == 4 else ""
-            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDING):
+            if number is None or size is None or not show.FILE_NAME.fullmatch(name) or not name.endswith(show.ENDINGS):
                 return "bad-argument"
             if self.error is not None:
                 return "show-invalid"
-            if self.checks or self.upload is not None:
+            if self.upload is not None:
                 return "busy"
             item = self.items.get(number)
             if item is not None and item.cycle is not None:
@@ -973,6 +1265,10 @@ class ReferencePlayer:
                 return "storage-error"
             self.upload = {"id": number, "name": name, "size": size, "data": b"", "state": "receiving", "progress": self.latest}
             self.files["upload.part"] = b""
+            # The upload takes the second decoders: the check after the start begins the
+            # file it was in again afterwards.
+            if self.checks:
+                self.checks[0][1] = self.checks[0][3]
             return b'{"ok":true,"chunk":1500}\n'
         if verb == b"data":
             offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 3 else None
@@ -1013,6 +1309,24 @@ class ReferencePlayer:
                 return b'{"ok":false,"error":"bad-file","reason":"%s"}\n' % upload["reason"].encode("ascii")
             self._install(upload)
             return None
+        if verb == b"expect":
+            if len(arguments) != 2 or not re.fullmatch(rb"[0-9a-f]{8}", arguments[1]):
+                return "bad-argument"
+            if self.error is not None:
+                return "show-invalid"
+            if self.upload is None:
+                return "no-upload"
+            item = self.items.get(self.upload["id"])
+            if item is None or item.cycle is not None:
+                self._discard()
+                return "stale"
+            data = self.files[item.file]
+            if len(data) > self.EXPECT_LARGEST:
+                return "bad-argument"
+            if zlib.crc32(data) != int(arguments[1], 16):
+                self._discard()
+                return "stale"
+            return None
         if verb == b"cancel" and len(arguments) == 1:
             if self.error is not None:
                 return "show-invalid"
@@ -1030,6 +1344,14 @@ class ReferencePlayer:
         old = self.items.get(number)
         self.files[name] = upload["data"]
         self.clips[name] = upload["clip"]
+        self.faults.pop(name, None)
+        # The upload's check read the new file whole: the check after the start does not
+        # read the one it replaces.
+        if old is not None and not any(other.file == old.file for other in self.items.values() if other.id != number):
+            if self.checks and self.checks[0][0] == old.file:
+                self.checks[0][1:] = [1, None, 1]
+            else:
+                self.checks = [check for check in self.checks if check[0] != old.file]
         # An item that gets another animation keeps what the show says of its turn.
         self.items[number] = show.Item(number, name, None, None, old.repeat if old else None, old.max_seconds if old else None)
         if old is not None:
@@ -1039,9 +1361,13 @@ class ReferencePlayer:
             if self.playing == self.ALL and self.turn == number:
                 # The animation whose turn it is has another file: its turn begins again.
                 self.zero = None
+                self.seed_shown = False
             played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and number in played.cycle:
                 self._play(self.playing)
+            if self.playing is None:
+                # Nothing played, as every animation was unavailable: the playlist starts.
+                self._play_all(self._animations()[0])
         elif self.playing is None:
             # The show had no animation, and nothing played: the playlist starts.
             self._play_all()
@@ -1050,8 +1376,16 @@ class ReferencePlayer:
 
     def _listed(self, item, with_entries=True):
         """One item as `list` writes it."""
+        if item.cycle is None and item.file in self.faults:
+            kind = type_of(self.files.get(item.file, b""))
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "external": False, "type": kind, "fault": self.faults[item.file]}, separators=(",", ":"))
+        if item.cycle is None and any(check[0] == item.file for check in self.checks):
+            # The file has not been read whole yet: its size is not known.
+            kind = type_of(self.files[item.file])
+            return json.dumps({"id": item.id, "file": item.file, "bytes": None, "ignored": bool(item.ignored), "external": False, "type": kind}, separators=(",", ":"))
         if item.cycle is None:
-            return json.dumps({"id": item.id, "file": item.file, "bytes": len(self.files[item.file]), "ignored": bool(item.ignored)}, separators=(",", ":"))
+            data = self.files[item.file]
+            return json.dumps({"id": item.id, "file": item.file, "bytes": len(data), "ignored": bool(item.ignored), "external": False, "type": type_of(data)}, separators=(",", ":"))
         return json.dumps({"id": item.id, "cycle": list(item.cycle) if with_entries else [], "seconds": item.seconds}, separators=(",", ":"))
 
     def _list(self, first):
@@ -1102,7 +1436,7 @@ class ReferencePlayer:
             goes_on = order[(order.index(number) + 1) % len(order)]
         elif self.playing == number:
             # The cycle that plays leaves: the playlist plays, from its first animation.
-            goes_on = order[0]
+            goes_on = order[0] if order else number
         item = self.items.pop(number)
         if self.start == number:
             self.start = None
@@ -1114,6 +1448,8 @@ class ReferencePlayer:
         if item.file is not None and all(other.file != item.file for other in self.items.values()):
             self.files.pop(item.file, None)
             self.clips.pop(item.file, None)
+            self.faults.pop(item.file, None)
+            self.checks = [check for check in self.checks if check[0] != item.file]
         self.files["show.json"] = self.show_text()
 
     def _space(self):
@@ -1134,6 +1470,17 @@ class ReferencePlayer:
             "width": self.canvas[0] if self.legs else None,
             "height": self.canvas[1] if self.legs else None,
         }
+        # How far the check is, and what is unavailable: files whose check has ended and
+        # those still to read, and the animations unavailable; all 0 for an invalid show.
+        names = {item.file for item in self.items.values() if item.cycle is None}
+        to_check = 0 if self.error is not None else len([check for check in self.checks if check[0] in names])
+        checked = 0 if self.error is not None else len(names) - to_check
+        unavailable = 0 if self.error is not None else len([item for item in self.items.values() if item.cycle is None and item.file in self.faults])
+        readiness = "recovery" if self.error is not None else "checking" if to_check else "degraded" if unavailable else "ready"
+        state.update(readiness=readiness, checked=checked, to_check=to_check, unavailable=unavailable,
+                     checking=self.checks[0][0] if self.error is None and self.checks else None, host=None)
+        # The seed of the clock on the LEDs, the last member.
+        state["seed"] = self.seed if self.seed_shown and self.error is None and self.playing is not None else None
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 
     def feed(self, now, data):
@@ -1157,9 +1504,10 @@ class ReferencePlayer:
         word, _, rest = line.partition(" ")
         if word == "poll":
             refresh = self.poll(int(rest))
+            logs, self.logged = [f"log {text}" for text in self.logged], []
             if refresh is None:
-                return [f"idle {rest}"]
-            return [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
+                return logs + [f"idle {rest}"]
+            return logs + [f"refresh {rest}"] + [f"data {leg} {rgb.hex()}" for leg, rgb in refresh]
         if line == "error":
             return [f"error {self.error or 'none'}"]
         if word in ("line", "linehex", "bytes"):

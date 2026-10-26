@@ -215,7 +215,7 @@ class TheStart(ThePlaylist):
     def test_a_show_without_start_plays_the_playlist_from_its_first_animation(self):
         self.assertEqual(self.playing_at(three(), [0, 1000]), [("all", 1), ("all", 1)])
         printed = self.assert_as_the_reference(three(), [support.line(T0, "status")])
-        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":255,"playing":"all","animation":1,"fps":0,"error":null,"width":3,"height":2}'])
+        self.assertEqual(support.status_lines_without_readiness(printed), ['reply {"ok":true,"on":true,"brightness":255,"playing":"all","animation":1,"fps":0,"error":null,"width":3,"height":2,"seed":null}'])
 
     def test_a_start_that_names_an_animation_begins_the_playlist_there(self):
         files = three(first={"repeat": 1}, second={"repeat": 1}, third={"repeat": 1}, start=2)
@@ -233,11 +233,17 @@ class TheStart(ThePlaylist):
         self.assertEqual(self.pictures_at(files, [0, 20]), [bytes(18), bytes(18)])
 
     def test_an_invalid_show_plays_nothing(self):
+        files = support.with_show_fault(three())
+        printed = self.assert_as_the_reference(files, asked_at([0]))
+        self.assertIn('"playing":null,"animation":null', printed[-1])
+        self.assertIn('"error":"undefined-id 99"', printed[-1])
+
+    def test_a_missing_file_leaves_the_others_in_the_playlist(self):
         files = three()
         del files["ten.odrg"]
         printed = self.assert_as_the_reference(files, asked_at([0]))
-        self.assertIn('"playing":null,"animation":null', printed[-1])
-        self.assertIn('"error":"file-missing ten.odrg"', printed[-1])
+        self.assertIn('"playing":"all","animation":1', printed[-1])
+        self.assertIn('"error":null', printed[-1])
 
 
 class TheJump(ThePlaylist):
@@ -334,8 +340,7 @@ class PlayAll(ThePlaylist):
         self.assertEqual(self.replies_to(show_of([], {}), ["play all"]), [refused("unknown-id")])
 
     def test_an_invalid_show_refuses_it_with_show_invalid(self):
-        files = three()
-        del files["ten.odrg"]
+        files = support.with_show_fault(three())
         self.assertEqual(self.replies_to(files, ["play all"]), [refused("show-invalid")])
 
     WRONG = ["play all 1", "play all all", "play all ", "play  all", "play ALL", "play All", "play al", "play alll", "play all\t", "play 1 all", "play -all", "play all,"]
@@ -344,8 +349,7 @@ class PlayAll(ThePlaylist):
         self.assertEqual(self.replies_to(three(), self.WRONG), [refused("bad-argument")] * len(self.WRONG))
 
     def test_a_bad_argument_is_named_before_an_invalid_show(self):
-        files = three()
-        del files["ten.odrg"]
+        files = support.with_show_fault(three())
         self.assertEqual(self.replies_to(files, self.WRONG), [refused("bad-argument")] * len(self.WRONG))
 
     def test_a_refused_one_leaves_what_plays(self):

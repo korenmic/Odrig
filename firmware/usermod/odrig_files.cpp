@@ -316,6 +316,10 @@ odrig_host OdrigFiles::host() {
   made.drive = nullptr;
   made.drive_name = nullptr;
   made.drive_space = nullptr;
+  made.about = nullptr;
+  made.drive_list = nullptr;
+  made.drive_bind = nullptr;
+  made.drive_writable = nullptr;
   return made;
 }
 
@@ -337,6 +341,14 @@ bool OdrigFiles::holding() {
   }
   portEXIT_CRITICAL(&paceGuard);
   return held;
+}
+
+OdrigFiles::StorageCall::StorageCall() : startUs(esp_timer_get_time()) {}
+
+// Timed by a Timed that began when the call did.
+OdrigFiles::StorageCall::~StorageCall() {
+  Timed timed;
+  timed.startUs = startUs;
 }
 
 #ifdef ODRIG_PROBE

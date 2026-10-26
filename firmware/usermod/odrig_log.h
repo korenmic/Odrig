@@ -23,6 +23,11 @@ void add(const char *kind, const char *text);
 // After lines gave way, the first line is one that says how many.
 size_t take(char *line, size_t room, size_t most);
 
+// At the start: the line the player logged last before a software or watchdog reset, when
+// the memory that survives such a reset holds a sound one, as a line of the kind `odrig`,
+// `before this start: <text>`. The memory is cleared either way.
+void retained();
+
 // The host functions of the core with its `log` wrapped: each line goes to the given
 // `log`, and to the log as a line of the kind `player`.
 odrig_host withLog(const odrig_host &given);

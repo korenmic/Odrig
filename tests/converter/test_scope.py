@@ -10,12 +10,12 @@ PACKAGE = support.ROOT / "odrig"
 # What stays of the package: a library that reads and writes the project's files for the
 # tests and the tools, and the generators. Converting and packing are the converter's.
 LIBRARY = {
-    "__init__.py", "errors.py", "files.py", "strictjson.py", "jsonframes.py", "odrg.py", "mapping.py", "show.py", "mapdoc.py",
+    "__init__.py", "errors.py", "files.py", "strictjson.py", "jsonframes.py", "odrg.py", "odrgx.py", "mapping.py", "show.py", "mapdoc.py", "catalog.py",
     "generators/__init__.py", "generators/dense.py", "generators/dvd_bounce.py", "generators/hello_world.py", "generators/line_groups.py", "generators/lines_test.py", "generators/rainbow.py",
 }
 # The tools, which run no converter logic, and what of the library they may read with.
 TOOLS = ("emulator", "odrigctl", "preview", "firmware/fwtool")
-READING = {"odrig", "odrig.errors", "odrig.files", "odrig.strictjson", "odrig.mapping", "odrig.show", "odrig.odrg"}
+READING = {"odrig", "odrig.errors", "odrig.files", "odrig.strictjson", "odrig.mapping", "odrig.show", "odrig.odrg", "odrig.odrgx", "odrig.catalog"}
 
 # Modules that open a network connection or a serial port.
 FORBIDDEN_MODULES = (

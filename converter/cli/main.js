@@ -5,7 +5,7 @@
 
 import fs from "node:fs";
 
-import {errors, jsonframes, mapping, odrg, timeline, whole} from "../lib/index.js";
+import {errors, jsonframes, mapping, odrg, odrgx, timeline, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
@@ -81,21 +81,47 @@ async function importMedia(values) {
   files.write(values.output, jsonframes.dumps(animation));
 }
 
+// Writes an ODRG file of JSON frames, or an ODRGX container when the output's name ends in
+// `.odrgx`, which a text is always written as.
 function encode(values) {
   const source = files.read(values.input);
-  const data = errors.naming(values.input, () => odrg.encode(jsonframes.loads(source), {compressed: !values.uncompressed}));
+  const container = ending(values.output) === odrgx.ENDING;
+  const read = errors.naming(values.input, () => odrgx.loadsSource(source));
+  if (read.type !== "frames" && !container) {
+    throw new UsageError(`${values.output}: a text or a widget is written as .odrgx`, "encode");
+  }
+  const options = {compressed: !values.uncompressed};
+  const data = errors.naming(values.input, () => (container ? odrgx.encodeSource(read, options) : odrg.encode(read.animation, options)));
   files.write(values.output, data);
 }
 
+// What a runtime file holds, read by its first bytes: an ODRG file, or an ODRGX container
+// with `type`, the name of its content type.
+export function readRuntime(data) {
+  if (odrgx.isContainer(data)) {
+    return {format: "odrgx", ...odrgx.decode(data)};
+  }
+  return {format: "odrg", type: "frames", header: null, ...odrg.decode(data)};
+}
+
+// Writes the JSON frames of frames, and the JSON source of a text or a clock.
 function decode(values) {
   const data = files.read(values.input);
-  const decoded = errors.naming(values.input, () => odrg.decode(data));
+  const decoded = errors.naming(values.input, () => readRuntime(data));
+  if (decoded.type === "text") {
+    files.write(values.output, odrgx.dumpsText(odrgx.textOf(decoded)));
+    return;
+  }
+  if (decoded.type === "widget") {
+    files.write(values.output, odrgx.dumpsWidget(odrgx.widgetOf(decoded)));
+    return;
+  }
   const animation = {width: decoded.width, height: decoded.height, frames: decoded.records};
   files.write(values.output, jsonframes.dumps(animation));
 }
 
-// What `check` prints for a JSON frames file ("json") or an ODRG file ("odrg") given as
-// bytes: its lines, each with a line feed.
+// What `check` prints for a JSON frames file ("json") or a runtime file ("odrg"), an ODRG
+// file or an ODRGX container, given as bytes: its lines, each with a line feed.
 export function summary(kind, data) {
   let width;
   let height;
@@ -106,9 +132,18 @@ export function summary(kind, data) {
     ({width, height, frames} = jsonframes.loads(data));
     lines.push("format: json-frames");
   } else {
-    const decoded = odrg.decode(data);
+    const decoded = readRuntime(data);
+    if (decoded.type === "text") {
+      return textSummary(decoded, data);
+    }
+    if (decoded.type === "widget") {
+      return widgetSummary(decoded, data);
+    }
     ({width, height, records: frames} = decoded);
-    lines.push("format: odrg");
+    lines.push(`format: ${decoded.format}`);
+    if (decoded.header !== null) {
+      lines.push(`type: ${odrgx.TYPE_NAMES[decoded.header.type]}`);
+    }
     more.push(`palette: ${decoded.paletteSize}`, `compressed: ${decoded.compressed ? "yes" : "no"}`);
   }
   lines.push(
@@ -121,13 +156,44 @@ export function summary(kind, data) {
   return `${[...lines, ...more].join("\n")}\n`;
 }
 
+// What `check` prints for a container of a text.
+function textSummary(decoded, data) {
+  const lines = [
+    "format: odrgx",
+    "type: text",
+    `canvas: ${decoded.header.width}x${decoded.header.height}`,
+    `loop_ms: ${decoded.header.loopMs}`,
+    `font: ${decoded.settings.font}`,
+    `effect: ${decoded.settings.effect} ${decoded.settings.motion}`,
+    `block: ${decoded.block.width}x${decoded.block.height}`,
+    `glyphs: ${decoded.glyphs.length}`,
+    `text_bytes: ${new TextEncoder().encode(decoded.text).length}`,
+    `file_bytes: ${data.length}`,
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+// What `check` prints for a container of a clock.
+function widgetSummary(decoded, data) {
+  const lines = [
+    "format: odrgx",
+    "type: widget",
+    `canvas: ${decoded.header.width}x${decoded.header.height}`,
+    `loop_ms: ${decoded.header.loopMs}`,
+    `widget: ${decoded.settings.widget}`,
+    `speed: ${decoded.settings.speedMin} to ${decoded.settings.speedMax}`,
+    `file_bytes: ${data.length}`,
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
 function check(values, streams) {
   let kind = values.format;
   if (kind === null) {
     const name = values.file.toLowerCase();
     if (name.endsWith(".json")) {
       kind = "json";
-    } else if (name.endsWith(".odrg")) {
+    } else if (name.endsWith(".odrg") || name.endsWith(odrgx.ENDING)) {
       kind = "odrg";
     } else {
       throw new UsageError(`the name of ${values.file} does not tell its format; give --format`, "check");

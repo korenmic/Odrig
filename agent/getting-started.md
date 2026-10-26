@@ -181,14 +181,14 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null}
 ```
 
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,
-and `"animation":1` that Hello world is on the LEDs. With a show that is not valid, `error`
-holds the reason, such as `file-missing dvd.odrg`; [reasons.md](../docs/reasons.md) lists them.
-The record file holds the colour of every LED at every refresh;
-[emulator.md](../docs/emulator.md#record-mode) describes it.
+`"animation":1` that Hello world is on the LEDs, `"readiness":"ready"` that both files were
+read without a fault, and `host` names the emulator and its computer, here a Mac. With a
+show that is not valid, `error` holds the reason, such as `show-missing`; [reasons.md](../docs/reasons.md)
+lists them. The record file holds the colour of every LED at every refresh; [emulator.md](../docs/emulator.md#record-mode) describes it.
 
 ## What to read next
 

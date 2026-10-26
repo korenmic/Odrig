@@ -20,7 +20,10 @@ def b64(data):
 
 
 def frames_of(data):
-    return len(odrg.decode(data).records)
+    """The frame records of a file: a text is read whole, as one."""
+    if support.type_of(data) != "frames":
+        return 1
+    return len(odrg.decode(support.frames_payload(data)).records)
 
 
 def received(count):
@@ -114,7 +117,7 @@ class NewAndReplaced(Uploads):
         script = Script().polls(20).upload(9, "new.odrg", clip).line("list", "play 9", "status").polls(30).line("status", "space")
         given = self.play(files, script)
         self.assertEqual(given[:3], [CHUNK, received(len(clip)), OK])
-        self.assertEqual(json.loads(given[3])["items"][-1], {"id": 9, "file": "new.odrg", "bytes": len(clip), "ignored": False})
+        self.assertEqual(json.loads(given[3])["items"][-1], {"id": 9, "file": "new.odrg", "bytes": len(clip), "ignored": False, "external": False, "type": "frames"})
         self.assertEqual([item["id"] for item in json.loads(given[3])["items"]], [1, 2, 3, 4, 5, 6, 9])
         self.assertEqual(given[4], OK)
         self.assertEqual((json.loads(given[5])["playing"], json.loads(given[5])["animation"], json.loads(given[6])["animation"]), ("all", 9, 9))
@@ -130,7 +133,7 @@ class NewAndReplaced(Uploads):
         self.assertEqual(self.play(files, Script().polls(5).upload(700, "kept.odrg", clip))[-1], OK)
         again = Script().line("list", "play 700").polls(10).line("status")
         given = self.play(self.left, again)
-        self.assertEqual(json.loads(given[0])["items"][-1], {"id": 700, "file": "kept.odrg", "bytes": len(clip), "ignored": False})
+        self.assertEqual(json.loads(given[0])["items"][-1], {"id": 700, "file": "kept.odrg", "bytes": len(clip), "ignored": False, "external": False, "type": "frames"})
         self.assertEqual((json.loads(given[2])["playing"], json.loads(given[2])["animation"]), ("all", 700))
 
     def test_a_replacement_under_the_same_name_leaves_the_show_file_and_restarts_what_plays(self):
@@ -143,7 +146,7 @@ class NewAndReplaced(Uploads):
         self.assertEqual(self.answers("upload end"), [OK])
         self.assertEqual(self.left["one.odrg"], clip)
         self.assertEqual(self.left["show.json"], before)
-        self.assertEqual(json.loads(self.answers("list")[0])["items"][0], {"id": 1, "file": "one.odrg", "bytes": len(clip), "ignored": False})
+        self.assertEqual(json.loads(self.answers("list")[0])["items"][0], {"id": 1, "file": "one.odrg", "bytes": len(clip), "ignored": False, "external": False, "type": "frames"})
         # The one storage call that puts it in place is the rename onto its name.
         self.assertEqual(self.stored[-1], "rename upload.part one.odrg 1")
         self.assertNotIn("write_open show.part 1", self.stored)
@@ -357,7 +360,7 @@ class Arguments(Uploads):
 
 class EveryCode(Uploads):
     def test_with_an_invalid_show_every_upload_command_is_refused(self):
-        invalid = {"mapping.json": support.mapping_texts()["legs-2"], "show.json": support.show_text([animation(1, "gone.odrg")])}
+        invalid = support.with_show_fault({"mapping.json": support.mapping_texts()["legs-2"], "show.json": support.show_text([animation(1, "gone.odrg")])})
         lines = ["upload begin 9 new.odrg 10", "upload data 0 QUJD", "upload end 12345678", "upload cancel", "upload begin 9 new.odrg 0", "upload sideways"]
         printed = self.run_both(invalid, [support.line(T0, line) for line in lines])
         self.assertEqual(replies(printed), [refused("show-invalid")] * 4 + [refused("bad-argument")] * 2)
@@ -603,7 +606,7 @@ class TheCheck(Uploads):
             self.assertEqual(self.answers("upload end") + self.answers("upload cancel"), [refused("busy"), bad_file("size-mismatch"), refused("no-upload")])
         # The header is judged before the size, and the size before the body.
         wrong_size = support.clip(55, 60, 5)
-        cases = ((b"ODRX" + wrong_size[4:], "bad-magic"), (wrong_size[:-3], "size-mismatch"), (wrong_size[:16], "size-mismatch"), (wrong_size[:15], "truncated"), (b"O", "truncated"))
+        cases = ((b"ODRZ" + wrong_size[4:], "bad-magic"), (wrong_size[:-3], "size-mismatch"), (wrong_size[:16], "size-mismatch"), (wrong_size[:15], "truncated"), (b"O", "truncated"))
         for data, reason in cases:
             self.play(files, Script().polls(2).send(9, "new.odrg", data).polls(1).end(data))
             self.assertEqual(self.answers("upload end"), [bad_file(reason)], reason)
@@ -698,14 +701,14 @@ class Quiet(Uploads):
         self.assertEqual(self.answers("upload end"), [OK])
         self.assertGreater(script.time - T0, 400000)
 
-    def test_a_show_that_becomes_invalid_discards_the_upload(self):
+    def test_an_animation_that_turns_unavailable_leaves_the_upload_open(self):
         files = small_show([animation(1, "one.odrg")], start=1)
         clip = support.clip(64, 60, 6)
         script = Script().polls(2).line(f"upload begin 9 new.odrg {len(clip)}", f"upload data 0 {b64(clip[:5])}").polls(60).line("status", "upload cancel", f"upload data 5 {b64(clip[5:])}")
         run, left = support.start_and_keep(files, script.lines, ["--remove-after", "one.odrg", "2", "--trace-store"])
         given = replies(run.lines)
-        self.assertEqual(json.loads(given[2])["error"], "file-missing one.odrg")
-        self.assertEqual(given[3:], [refused("show-invalid")] * 2)
+        self.assertEqual((json.loads(given[2])["error"], json.loads(given[2])["playing"]), (None, None))
+        self.assertEqual(given[3:], [OK, refused("no-upload")])
         self.assertNotIn("upload.part", left)
         self.assertIn("store remove upload.part 1", run.lines)
 

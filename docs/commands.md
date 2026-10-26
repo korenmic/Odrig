@@ -17,14 +17,19 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. An unavailable animation is refused. |
 | `play all` | Plays the playlist, from its first animation. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
 | `status` | Reports the current state. |
+| `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
 | `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
+| `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
+| `catalog` | Reports the catalog of the board's own storage and of the drive. |
+| `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
+| `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
 | `remove many <ids>` | Atomically removes 1–32 distinct installed animations. |
 | `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
@@ -32,8 +37,13 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
-| `upload begin <id> <file> <bytes>` | Opens an upload of an animation. |
+| `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
+| `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
+| `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
+| `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
+| `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
+| `upload expect <crc32>` | Lets the open upload replace its item's file only while that file is the one the client read. |
 | `upload end <crc32>` | Closes the upload and installs the animation. |
 | `upload cancel` | Discards the open upload. |
 
@@ -49,7 +59,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}
 ```
 
 | Member | Meaning |
@@ -61,6 +71,34 @@ A number in a command is written in decimal digits.
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
 | `width`, `height` | The canvas of the installed mapping, in pixels: what an animation for this target is made for. Both `null` while there is no mapping the player can use; reported also while the show is invalid for another reason. |
+| `readiness` | `checking` while the player still reads files after a start, while a rebuild reads them and while a drive's catalog is read, `degraded` when it has read them all and one or more animations are unavailable, `ready` when it has read them all and none is, and `recovery` while the show is invalid. What plays is said by `playing` and `animation`, whatever the readiness. |
+| `checked` | The files the player has read to their end, or found a fault in, since its start: those of the show, each once however many items name it, and those of a drive. While a rebuild runs, the files it has read. |
+| `to_check` | The files it has still to read, or that a rebuild has still to read. No time is given for them. |
+| `unavailable` | The animations unavailable now: the show's whose file had a fault, and the drive's files left out. |
+| `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
+| `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
+| `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
+
+`checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
+is invalid.
+
+## The last fault
+
+```
+fault
+{"ok":true,"fault":{"work":"play","file":"dvd.odrg","record":3,"bytes":1234,"reason":"truncated"}}
+```
+
+`fault` reports the latest fault the player met in a file since its start: `work` is
+`start` for the check at and after the start, `play` for playback, `upload` for the check
+of an upload and `drive` for the check of a drive's file; `file` is the file's name, cut to
+32 characters; `record` the frame record it was at, counted from 0, the number of records
+after the last one; `bytes` the bytes of its body read so far, inflated ones of a
+compressed body; `reason` the reason, as [reasons.md](reasons.md) names it. A later fault
+replaces an earlier one. Before any fault the reply is `{"ok":true,"fault":null}`. The
+reason is what the decoder found in the bytes it was given; it does not tell whether the
+storage is damaged or a read went wrong on the way. `fault` is answered while the show
+is invalid too.
 
 ## Storage and the installed items
 
@@ -70,27 +108,39 @@ space
 ```
 
 `free` and `total` are bytes of the storage the show is in. `animations` is the number of
-animation items of the show, and 0 while the show is invalid.
+animation items of the show, unavailable ones among them, and 0 while the show is invalid.
 
 ```
 list
-{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
+{"ok":true,"items":[{"id":1,"file":"hello.odrg","bytes":1138,"ignored":false,"external":false,"type":"frames"},{"id":2,"file":"dvd.odrg","bytes":1612,"ignored":false,"external":false,"type":"frames"},{"id":3,"cycle":[1,2],"seconds":15}],"next":null}
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
 from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
-`id`, its `file` and the size of that file in `bytes`. A cycle has its `id`, the ids of its
+`id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
+animation of the board's own storage, `true` for one of the external storage; then its
+`type`, what the file holds as its header says ([format.md](format.md)): `"frames"` for an
+ODRG file and for an ODRGX container of frames, `"text"` for a text and `"widget"` for a
+clock. A reply without `type` comes from a player before it, and its animations are
+frames. A cycle has its `id`, the ids of its
 animations in `cycle`, and its `seconds`. The reply holds as many items as fit into it.
 `next` is the position of the first item that was left out, to be asked for with
-`list <next>`, or `null` when the last item is in the reply. A position at or after the end
+`list <next>`, or `null` when the last item is in the reply. An unavailable animation, one
+whose file had a fault in this boot, is listed in its place with `bytes` `null` and one
+more member, `fault`, the name of the reason:
+`{"id":2,"file":"dvd.odrg","bytes":null,"ignored":false,"fault":"bad-palette-index"}`.
+A usable animation has no `fault`. A position at or after the end
 gives no items and `null`, and so does a show without items:
 `{"ok":true,"items":[],"next":null}`. While the show is invalid, `list` is refused with
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
-The animations of a USB drive come after the items of the show, in the order of their
-file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"ignored":false}`.
-Their ids are from 60001 up, the lowest that the show does not use, and `file` is the
+The files of a USB drive or of the card come after the items of the show, in the order of
+their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+A file left out for a fault is listed in its place as
+`{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
+refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
+use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
 `<from>` and `next` count both kinds. An animation of the drive is listed once the player
@@ -99,9 +149,33 @@ read, and is not refused with `busy` for them. [show.md](show.md#animations-from
 says what the board does with a drive.
 
 After a start the show plays at once, and the player reads every installed animation to
-its end while it plays. Until it has, it does not know the sizes of the files, and
-`list` is refused with `busy`: ask again a moment later. `status` and `space` are
-answered from the start.
+its end while it plays. Until it has read a file whole it does not know its size: `list`
+gives its `bytes` as `null` until then. `list`, `remove`, `remove many`, `ignore` and
+`upload` are answered from the start, as `status` and `space` are.
+
+## Reading a file back
+
+```
+read 2 0
+{"ok":true,"bytes":40,"data":"T0RSWAEDAQA8ADwAMHUAABQAAAADAB4A9OzQICAg1KAXAAAAPABYAg"}
+read 2 40
+{"ok":true,"bytes":40,"data":""}
+```
+
+`read <id> <offset>` gives up to 600 bytes of the file of an animation, of the show or of
+a USB drive, from `<offset>`, so that a text or a clock can be read back and edited.
+`bytes` is the size of the file, and `data` its bytes from the offset in base64 as
+`upload data` takes it; at the end of the file it is empty. `<id>` is 1 to 65,535 and
+`<offset>` 0 to 4,294,967,295, both in decimal digits.
+
+- An offset above the size of the file is refused with `bad-argument`.
+- An id that is no animation of the show or of the drive, a cycle's too, is refused with
+  `unknown-id`.
+- A file the player has not read whole since the start is refused with `busy`: ask again
+  a moment later. An animation that is unavailable, as its file had a fault, is refused
+  with `unavailable`; while the show is invalid, `read` is refused with `show-invalid`; and
+  when the file cannot be read, or the player has no storage that can be changed, with
+  `storage-error`.
 
 ## Removing an item
 
@@ -121,8 +195,7 @@ The item leaves the show, and the items after it move up.
 - If the item is the cycle that is playing, the playlist plays, from its first animation.
 - Anything else that plays goes on undisturbed.
 - The animation's file is deleted when no remaining item names it.
-- While an upload is open, `remove` is refused with `busy`. So it is after a start,
-  until the player has read every installed animation to its end.
+- While an upload is open, `remove` is refused with `busy`.
 
 ## Uploading an animation
 
@@ -151,10 +224,26 @@ whichever route its commands arrive by.
 - `<file>` is the name the file gets, under the naming rule of [show.md](show.md).
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
-- It is refused with `busy` when an upload is open, and after a start until the player
-  has read every installed animation to its end; with `in-use` when the id belongs to a
+- It is refused with `busy` when an upload is open; with `in-use` when the id belongs to a
   cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
+
+**`upload begin <id> <file> <bytes> <crc32>`** is the same with the CRC-32 of the file, as
+`upload end` takes it: eight hexadecimal digits, `0`-`9` and `a`-`f`. When the last upload
+of this boot installed `<file>` as the file of the animation item `<id>`, with `<bytes>`
+bytes and this CRC-32, no upload has begun since, and the item names that file still,
+usable, the reply is
+
+```
+upload begin 4 clip.odrg 3200 1c291ca3
+{"ok":true,"unchanged":true}
+```
+
+and no upload opens: nothing is sent and nothing is written. Otherwise the line is taken
+as `upload begin <id> <file> <bytes>`: a file that was installed in another way, or before
+another upload, is uploaded again. A client that sends the same file again after a reply
+that did not arrive is told so instead of writing the file a second time. A target older
+than this form answers `bad-argument`.
 
 **`upload data <offset> <base64>`** adds bytes. `<offset>` is the number of bytes sent
 before these, and must equal the number received so far; otherwise the reply is
@@ -183,6 +272,19 @@ nine bytes `123456789` is `cbf43926`.
   its turn begins again; if a cycle that is playing lists it, the cycle starts again from
   its first frame.
 
+**`upload expect <crc32>`**, after `upload begin` and before `upload end`, makes the
+upload replace the item's file only when that file has this CRC-32 now: the one the client
+read with `read`. `<crc32>` is written as for `upload end`. The reply is `{"ok":true}` when
+it has.
+
+- `stale`: the id of the upload has no animation item, or its file has another CRC-32:
+  another controller changed or removed it. The upload is discarded.
+- `bad-argument`: the item's file is longer than 16,384 bytes. The upload stays open.
+- `storage-error`: the file could not be read. The upload is discarded.
+
+While an upload is open no other controller can change the show's files, so what
+`upload expect` found holds until `upload end`.
+
 **`upload cancel`** discards the open upload. An upload on which nothing has moved for 60
 seconds is discarded too: no data arrived, and no check is running.
 
@@ -196,18 +298,22 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `remove` or an `upload` command was sent while the show is invalid. |
-| `no-upload` | `upload data`, `upload end` or `upload cancel` was sent while no upload is open. |
+| `show-invalid` | `play`, `list`, `read`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `list`, `remove` or `upload begin` while the installed animations are still being checked after a start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `play all` was sent while the playlist has no animation. |
-| `in-use` | `remove` names an animation that a cycle lists, or one of a USB drive; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
+| `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
+| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
-| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item. |
+| `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
+| `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
+| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive, or the drive has 256 animations. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
-| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. |
+| `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
 
 When more than one code applies, the reply has the first in the order of this table.
 
@@ -234,7 +340,7 @@ front-end, including replies with `"ok":false`. Any other method on `/odrig` get
 
 ## Mapping controls
 
-`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false}`.
+`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false,snake:null}`.
 Pins are in snake order, 1 through 20. Unsupported or invalid mappings report
 `editable:false`, an empty `pins` array and revision 0. The test flag is target-wide.
 Only the target's existing twenty-pin permutation is editable.
@@ -256,6 +362,17 @@ test status reports no ordinary playing item or animation; `mapping get` identif
 the active test. Upload and remove return `busy`, but mapping saves, list, space,
 status, power and brightness remain available. The test changes no show entry.
 
+`mapping test snake <n>` shows the test of snake n, n from 1 to 20, until
+`mapping test off` or a valid ordinary play command: one white block of 3 x 3 pixels that
+runs the length of the snake's three columns, from their bottom to their top and back, one
+row every 40 milliseconds, through the saved mapping, with every other LED dark; one way
+up lights every LED of the snake once. While it shows,
+`mapping get` reports `"test":true` and `"snake":<n>`; for the diagonal and while no test
+shows, `"snake":null`. Entry, busy refusals, power, brightness and restart are as for the
+diagonal. A test that starts while another one shows takes its place, and stopping it
+resumes what played before the first. No test enters the playlist, `start`, a cycle or
+the saved order, and none changes a file.
+
 The protocol is identical over HTTP, board serial and emulator serial or TCP.
 
 ## Playlist inclusion and batch deletion
@@ -269,7 +386,7 @@ cycle membership still work. Unknown ids return unknown-id; cycles/drive ids in-
 per command. Every id is validated first; unknown ids return unknown-id; cycles,
 external entries and animations referenced by cycles return in-use. Duplicates and
 malformed lists return bad-argument. Single `remove <id>` retains cycle deletion.
-Both mutation forms return busy during startup checking, upload or mapping test;
+Both mutation forms return busy during an upload or the mapping test;
 show-invalid and storage-error retain their meanings. Every transport forwards these
 commands into the same core parser; no route has separate deletion/playback rules.
 
@@ -280,3 +397,141 @@ ignored items. Its `external` object contains boolean `present`, `read_only:true
 nullable `free` and `total` byte counts. Absent media reports false/null/null. Mounted
 media with unknown capacity reports true/null/null. Known counters support volumes
 over 4 GiB, up to 9,007,199,254,740,991 bytes. Capacity never grants write access to a drive.
+
+## Catalogs
+
+```
+catalog
+{"ok":true,"internal":{"state":"ok","generation":42,"entries":84,"uncataloged":0},"external":{"state":"absent"},"rebuild":null}
+```
+
+**`catalog`** reports the catalog of each storage, as [catalog.md](catalog.md) states it:
+`internal` of the board's own storage, `external` of the drive.
+
+- `state`: `none` (the storage has no catalog and is read as before catalogs), `ok`,
+  `loading` (a drive's catalog being read), `damaged`, `incompatible` (another version of
+  the format or the check), or `absent` (no drive is plugged in). A damaged one has
+  `detail`: `marker`, `page`, `line` or `interrupted`.
+- `generation` and `entries`: those of a catalog that is `ok` or `loading`.
+- `uncataloged`: the files of the show whose size and length did not come from the
+  catalog; the start opens them and the check after the start reads them, as without a
+  catalog.
+- `writable`: whether the core may write the drive, when one is plugged in.
+- `rebuild`: `null` while no rebuild runs; during one, `{"storage":"internal","read":12,"to_read":72}`:
+  the storage, the files it has read and those it has still to read.
+
+At the start the core reads the internal catalog. Every file of the show that it has an
+entry for has its size and its type in `list` at once and is neither opened nor read by the
+check after the start; an entry for another canvas than the mapping's makes its file unavailable with
+`size-mismatch`. A damaged or incompatible catalog is logged (`catalog internal damaged`,
+`catalog internal incompatible`) and its storage is read as without one. A change of the
+catalog that a cut interrupted after its commit is finished first.
+
+**`catalog rebuild internal`** reads every file of the show whose name a catalog may hold,
+page by page, with the steps of the check after the start, and writes the board's catalog
+anew at the end in one commit, generation one more than the old one's, or 1: the same
+files the PC tool's rebuild writes of the same files. A file that passes gets its size and
+length at once; one that fails is quarantined, as by the check. The check after the start
+gives way while it runs and takes up after it the files it did not read. **`catalog
+rebuild external`** does the same for the drive: its places go, the folder is listed once,
+and each file joins the playlist as it is read, or is left out; at the end the drive's
+catalog is `ok`. Both answer `{"ok":true}` when the rebuild begins, and `catalog` shows its
+progress. Refused with `bad-argument` for another word, `show-invalid`, `busy` while an
+upload is open, a test shows, a rebuild runs or the drive's catalog is read, `read-only` on
+a host that cannot change its storage, and for `external` without a drive the core may
+write, and `storage-error` when a change that a failed call left cannot be finished first.
+While a rebuild runs, every command that writes storage is `busy`. A storage call that
+fails ends it, logged as `catalog rebuild failed: storage-error`, with the catalog as it
+was; a drive pulled out ends it too. **`catalog cancel`** ends a rebuild: the pages it
+wrote are removed, the catalog is as it was, and what the files read taught the core stays.
+It is `{"ok":true}` also without a rebuild.
+
+A drive with a catalog is `loading` from its plug-in until every page is read; its
+animations then join `list` together. One without a catalog is `none` and is listed and
+read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
+
+**`upload begin external <file> <bytes>`** and **`upload begin external <file> <bytes>
+<crc32>`** open an upload to the drive when the core may write it: its host says the drive
+can be written and the drive's catalog is `ok`. `<file>` follows the naming rule of the
+show's files. The rest of the upload is as for the board's own storage: `upload data`, the
+check, `upload end`. On success one commit of the drive's catalog moves the file onto its
+name with its entry, and the reply gives the animation's id: `{"ok":true,"id":60003}`. A file
+of that name on the drive is replaced and keeps its id, and where it plays it plays anew
+from its start, as an item's file replaced under its name does; a new one gets the lowest free id
+from 60,001, and its place in the saved order by its name. `busy` while an upload is open or
+the drive's catalog is read, `read-only` when the core may not write the drive, `no-space`
+when `drive_space` says the file does not fit or 256 animations are on the drive.
+
+`remove <id>` of an animation of a drive the core may write removes its file and its entry
+in one commit; its id is free again. Of any other drive it is `in-use`, as before. `space`
+reports `"read_only":false` for a drive the core may write.
+
+An upload, `remove` and `remove many` keep a catalog that is `ok`: an upload commits the
+entry of its file, with the size, the CRC-32, the length and the type its check found (of a
+text or a clock the loop its header gives), in the same
+commit that puts the file in place; a removal takes the entries of the files that go out
+before the show file is written. Each writes the pages of its entries, the marker and the
+commit record, and no other file of the catalog. A storage without a catalog, or with one
+that is not `ok`, gets none from a change.
+
+A storage call that fails stops a change where it is. Before its commit record is whole the
+change is refused with `storage-error` and the catalog is as it was; a file it was writing
+is removed. After it the reply is as for success, and what is left is finished before the
+next change of that storage writes anything: while that fails, the change is refused with
+`storage-error`, and the upload's part that the record may move is kept. A start that cannot
+finish it reads its storage as without a catalog, `damaged` with `interrupted`, and takes the
+catalog up again once a later change has finished it; a drive that cannot be finished at its
+plug-in is `damaged`, `interrupted`, until it is plugged in again.
+
+## The saved playlist order
+
+The playlist plays its included animations in the saved order, which the board keeps in
+its own storage, internal and external animations in one order. An animation the saved
+order does not name comes after every one it names: the internal ones in the order of
+`show.json`, then the external ones in the order of their file names. An external
+animation is named by its file name, so it keeps its place while its medium is absent
+and takes it again when the medium is back. [show.md](show.md#the-saved-playlist-order)
+has the file.
+
+```
+order get
+{"ok":true,"ids":[3,60002,1],"next":null,"revision":2805384113}
+```
+
+`ids` are the ids of the animations `list` lists, the ignored ones, the unavailable ones
+and the external storage's among them, in the saved order, beginning at the position `<from>`, counted
+from 0, which is 0 when it is left out; `<from>` is 0 to 65,535. The reply holds as many
+as fit into it, and `next` is the position of the first one left out, or `null`, as for
+`list`. `revision` is a number that changes whenever the order or the listed animations
+change, and is the same after a restart for the same files. `order get` is refused as
+`list` is, with `show-invalid` while the show is invalid; while the player reads every
+installed animation after a start it answers, as `list` does, and `order move` is refused
+with `busy`.
+
+```
+order move 2805384113 1 3
+{"ok":true}
+```
+
+`order move <revision> <id> <before>` moves the listed animation with the id `<id>`, of the
+board's own storage or of the external storage, to stand right before the listed animation
+with the id `<before>`, or last when `<before>` is the word `end`. `<revision>` is the
+`revision` of `order get` the client read, 0 to 4,294,967,295; `<id>` and `<before>` are 1
+to 65,535. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
+the order before the move or the one after it. A move that changes nothing, of an
+animation that already stands right before `<before>`, or last for `end`, or before
+itself, writes nothing.
+
+- `bad-argument`: the words are not in their form.
+- `show-invalid`: the show is invalid.
+- `busy`: until the player has read every installed animation after a start, and while
+  an upload is open.
+- `unknown-id`: `<id>` or `<before>` is the id of no listed animation and of no cycle.
+- `in-use`: `<id>` or `<before>` is the id of a cycle, which has no place in the order.
+- `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
+  `order get` again.
+- `storage-error`: the order could not be saved. It is as it was.
+
+A move does not change the animation whose turn it is, its time, the brightness or
+whether the LEDs are on; the next turn follows the new order. It works while a test of
+the mapping shows. Every route carries it to the one command parser of the core.

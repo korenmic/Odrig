@@ -45,31 +45,33 @@ class BuildingMicroSD(unittest.TestCase):
         kept.assert_not_called()
 
     def test_micro_sd_rejects_other_build_variants_before_building(self):
-        for other in ("--stock", "--probe", "--trial", "--standalone"):
+        for other in ("--stock", "--probe", "--stick", "--standalone"):
             with self.subTest(other=other), mock.patch.object(build, "build") as built:
                 result = support.run_main("build", "--microsd", other)
             self.assertEqual(result.status, 2, result.err)
             self.assertIn("--microsd does not go with", result.err)
             built.assert_not_called()
 
-    def test_micro_sd_image_does_not_replace_the_default_image(self):
+    def test_micro_sd_is_the_firmware_kept_under_a_name_of_its_own(self):
         self.assertEqual(build.KINDS.get("microsd"), ("odrig_microsd", "odrig-microsd.bin"))
+        self.assertEqual(build.KINDS["firmware"], ("odrig_microsd", "odrig-firmware.bin"))
         self.assertEqual(build.image_path("firmware"), paths.OUT / "odrig-firmware.bin")
         self.assertEqual(build.checksum_path(build.image_path("microsd")), paths.OUT / "odrig-microsd.bin.sha256")
         self.assertIn("microsd", build.ON_NEWER)
 
-    def test_micro_sd_inherits_the_trial_and_selects_spi_storage_only_in_its_variant(self):
+    def test_micro_sd_extends_the_sticks_environment_and_alone_with_its_probe_build_selects_spi_storage(self):
         environments = configparser.ConfigParser(interpolation=None)
         environments.read_string(wled.override_text())
         self.assertIn("env:odrig_microsd", environments)
         microsd = environments["env:odrig_microsd"]
-        self.assertEqual(microsd["extends"], "env:odrig_trial")
-        self.assertEqual(microsd["build_flags"].split("\n"), [
-            "${env:odrig_trial.build_flags}", "-D ODRIG_DRIVE_SD_SPI",
+        self.assertEqual(microsd["extends"], "env:odrig")
+        self.assertEqual(microsd["build_flags"].split("\n")[5:], [
+            "-D ODRIG_DRIVE_SD_SPI",
             "-D ODRIG_SD_SCK=39", "-D ODRIG_SD_MISO=40",
             "-D ODRIG_SD_MOSI=41", "-D ODRIG_SD_CS=42",
         ])
-        for section in ("env:odrig", "env:odrig_probe", "env:odrig_trial", "env:odrig_trial_probe"):
+        self.assertEqual(environments["env:odrig_microsd_probe"]["extends"], "env:odrig_microsd")
+        for section in ("env:odrig", "env:odrig_probe"):
             self.assertNotIn("ODRIG_DRIVE_SD_SPI", environments[section].get("build_flags", ""))
 
     def test_deployment_pins_match_the_agreed_wiring_and_leave_every_snake_output_free(self):

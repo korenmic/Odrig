@@ -2,7 +2,12 @@
 
 #include <string.h>
 
+#include "catalog.h"
 #include "odrig_core.h"
+#include "clock.h"
+#include "mapping_control.h"
+#include "order.h"
+#include "text.h"
 #include "upload.h"
 
 namespace odrig {
@@ -12,6 +17,7 @@ namespace {
 void close_stream(Core &core) {
     core.file.close();
     core.stream_open = 0;
+    core.stream_drawn = 0;
 }
 
 // The length of the animation at a position of the playlist, 0 while it is not known. A
@@ -33,27 +39,51 @@ uint32_t seconds_of(const Core &core, uint32_t animation) {
     return is_drive(animation) ? 0 : core.items[animation].seconds;
 }
 
+// The id `list` and `status` give the animation at a position of the playlist.
+uint32_t id_of(const Core &core, uint32_t animation) {
+    return is_drive(animation) ? core.drive[animation - kDriveBase].id : core.items[animation].id;
+}
+
+// What the animation at a position of the playlist holds, as its header says.
+uint8_t type_of(const Core &core, uint32_t animation) {
+    if (is_drive(animation)) {
+        return core.drive[animation - kDriveBase].type;
+    }
+    return core.files[core.items[animation].first].type;
+}
+
+// The longest a turn may last, rounded up to whole passes for a text: its pass is never
+// cut off by the time a turn is given.
+uint64_t whole_passes(const Core &core, uint32_t animation, uint64_t turn) {
+    const uint64_t loop = length_of(core, animation);
+    if (type_of(core, animation) != kTypeText || loop == 0) {
+        return turn;
+    }
+    return (turn + loop - 1) / loop * loop;
+}
+
 // Whether a position of the playlist holds an animation that plays: an animation item of
-// the show, or a file of the drive that is in the playlist.
+// the show that is neither ignored nor unavailable, or a file of the drive that is in the
+// playlist.
 bool plays(const Core &core, uint32_t position) {
     if (is_drive(position)) {
         const uint32_t place = position - kDriveBase;
         return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
     }
-    return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored;
+    return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored &&
+           item_usable(core, position);
 }
 
-// The position after this one in the order of the playlist: the show's items, then the
-// drive's places, then the first item again.
-uint32_t following(const Core &core, uint32_t position) {
-    if (is_drive(position)) {
-        const uint32_t place = position - kDriveBase + 1;
-        return place < core.drive_count ? kDriveBase + place : 0;
+// The animation a cycle shows in one of its turns: the entry of the turn, or the first
+// usable entry after it in the cycle's order; kNothing when the cycle lists none.
+uint32_t cycle_animation(const Core &core, const ItemInfo &cycle, uint64_t turn) {
+    for (uint32_t step = 0; step < cycle.count; ++step) {
+        const uint32_t animation = core.entries[cycle.first + (turn + core.cycle_start_entry + step) % cycle.count];
+        if (item_usable(core, animation)) {
+            return animation;
+        }
     }
-    if (position + 1 < core.item_count) {
-        return position + 1;
-    }
-    return core.drive_count != 0 ? kDriveBase : 0;
+    return kNothing;
 }
 
 // Opens the file of an animation for one turn and one loop, with the pixel buffer all
@@ -71,12 +101,27 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     if (reason != kNone) {
         return reason;
     }
-    reason = core.decoder.open(&core.file, &core.inflate, core.window);
+    ContentHeader header;
+    reason = content_open(&core.file, &core.inflate, core.window, &core.decoder, &header);
     if (reason != kNone) {
         return reason;
     }
-    if (core.decoder.width != core.width || core.decoder.height != core.height) {
+    if (header.width != core.width || header.height != core.height) {
         return kSizeMismatch;
+    }
+    if (is_drawn(header.type)) {
+        // The payload is held whole in the window, which no frames file uses meanwhile.
+        reason = drawn_read(&core.file, header, core.window);
+        core.file.close();
+        if (reason != kNone) {
+            return reason;
+        }
+        core.stream_open = 1;
+        core.stream_drawn = 1;
+        core.stream_item = animation;
+        core.stream_turn = turn;
+        core.stream_loop = loop;
+        return kNone;
     }
     memset(core.pixels, 0, core.decoder.n);
     core.stream_open = 1;
@@ -86,6 +131,21 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
     core.frame_end = 0;
     core.stream_records = 0;
     return kNone;
+}
+
+// Decodes the next frame record of the file open for playback into the pixel buffer, as
+// long as the refresh has bytes left to decode: kPendingWork when it has none, and the
+// record is decoded at the next refresh. The first record of a refresh is always decoded.
+Reason next_record(Core &core, uint16_t *duration) {
+    if (core.catch_up_begun && core.catch_up_left == 0) {
+        return kPendingWork;
+    }
+    const uint64_t before = core.decoder.body_read;
+    const Reason reason = core.decoder.next(core.pixels, duration);
+    const uint64_t used = core.decoder.body_read - before;
+    core.catch_up_left = used >= core.catch_up_left ? 0 : core.catch_up_left - static_cast<uint32_t>(used);
+    core.catch_up_begun = 1;
+    return reason;
 }
 
 // Decodes the first loop of an animation whose length is not known, up to a time since
@@ -98,7 +158,10 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
     }
     while (reason == kNone && core.frame_end <= time && core.stream_records < core.decoder.frames) {
         uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
+        reason = next_record(core, &duration);
+        if (reason != kNone) {
+            break;
+        }
         core.frame_end += duration;
         ++core.stream_records;
     }
@@ -110,9 +173,35 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
 }
 
 // Brings the pixel buffer to the picture an animation shows at a time since the start of
-// its turn. While the length of the animation is not known, the time lies in its first
-// loop. Once it is known, the loop and the place in it are found by division.
-Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) {
+// its turn, which began at `start`. While the length of the animation is not known, the
+// time lies in its first loop. Once it is known, the loop and the place in it are found by
+// division. A text is drawn at its time in its pass; a clock at its time in the turn, with
+// the seed the turn got when it began.
+Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, uint64_t start) {
+    const uint8_t type = type_of(core, animation);
+    if (is_drawn(type)) {
+        const uint64_t loop = length_of(core, animation);
+        if (loop == 0) {
+            return kLoopMismatch;
+        }
+        if (!core.stream_open || !core.stream_drawn || core.stream_item != animation || core.stream_turn != turn) {
+            const Reason reason = open_stream(core, animation, turn, 0);
+            if (reason != kNone) {
+                return reason;
+            }
+            // A clock's turn gets its seed when it begins: its file is opened once in a turn.
+            if (type == kTypeWidget) {
+                core.seed = clock_seed(core.noise, id_of(core, animation), start);
+            }
+        }
+        core.decoder.colours = 0;
+        if (type == kTypeText) {
+            text_draw(core.window, core.width, core.height, in_turn % loop, core.pixels);
+            return kNone;
+        }
+        clock_draw(core.window, core.seed, core.width, core.height, in_turn, core.pixels);
+        return kNone;
+    }
     uint64_t length = length_of(core, animation);
     if (length == 0) {
         const Reason reason = first_loop_to(core, animation, turn, in_turn);
@@ -129,8 +218,12 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn) 
     }
     while (reason == kNone && core.frame_end <= within) {
         uint16_t duration = 0;
-        reason = core.decoder.next(core.pixels, &duration);
+        reason = next_record(core, &duration);
+        if (reason != kNone) {
+            break;
+        }
         core.frame_end += duration;
+        ++core.stream_records;
     }
     return reason;
 }
@@ -145,20 +238,34 @@ uint64_t turn_ms(const Core &core, uint32_t position) {
     }
     const uint64_t turn = loops * loop;
     const uint64_t longest = 1000ull * seconds_of(core, position);
-    return longest != 0 && turn > longest ? longest : turn;
+    return longest != 0 && turn > longest ? whole_passes(core, position, longest) : turn;
 }
 
-// The position of the animation after this one in the playlist, the first one after the
-// last; this one again when no other plays.
-uint32_t next_animation(const Core &core, uint32_t position) {
-    uint32_t at = position;
-    for (uint32_t step = 0; step <= core.item_count + core.drive_count; ++step) {
-        at = following(core, at);
-        if (plays(core, at)) {
-            return at;
+// The animation that plays with the smallest key, among the show's items alone or among
+// them and the drive's, whose key is above `above` unless `any` is set; kNothing when none.
+uint32_t lowest_playing(const Core &core, bool with_drive, uint32_t above, bool any) {
+    uint32_t best = kNothing;
+    uint32_t best_key = 0;
+    const uint32_t places = with_drive ? core.drive_count : 0;
+    for (uint32_t at = 0; at < core.item_count + places; ++at) {
+        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
+        if (!plays(core, position)) {
+            continue;
+        }
+        const uint32_t key = order_key(core, position);
+        if ((any || key > above) && (best == kNothing || key < best_key)) {
+            best = position;
+            best_key = key;
         }
     }
-    return kNothing;
+    return best;
+}
+
+// The position of the animation after this one in the playlist, in the saved order, the
+// first one after the last; this one again when no other plays.
+uint32_t next_animation(const Core &core, uint32_t position) {
+    const uint32_t after = lowest_playing(core, true, order_key(core, position), false);
+    return after != kNothing ? after : lowest_playing(core, true, 0, true);
 }
 
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
@@ -235,9 +342,13 @@ Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     }
 }
 
-// Brings the pixel buffer to the picture of what is being played at a moment. False when
-// there is no picture to show.
-bool advance(Core &core, uint64_t now) {
+// What a refresh shows: no picture, the picture in the pixel buffer, or the picture of the
+// refresh before, while the player has not come to the picture of the moment yet.
+enum Shown { kShowsNothing, kShowsPicture, kShowsBefore };
+
+// Brings the pixel buffer to the picture of what is being played at a moment, decoding at
+// most kCatchUpBytes of a body.
+Shown advance(Core &core, uint64_t now) {
     // The playlist is a row of turns, each as long as its animation makes it. A cycle is
     // a row of turns of equal length, each with the next animation of its list. The time
     // of an animation is counted from the start of its turn.
@@ -245,20 +356,60 @@ bool advance(Core &core, uint64_t now) {
     uint64_t turn;
     uint64_t in_turn = 0;
     Reason reason = kNone;
+    core.catch_up_left = kCatchUpBytes;
+    core.catch_up_begun = 0;
     if (core.playing == kPlaylist) {
         reason = playlist_turn(core, now, &in_turn);
-        if (core.playing == kNothing) return false;
+        if (core.playing == kNothing) return kShowsNothing;
         animation = core.turn_item;
         turn = core.turn_number;
     } else {
+        // A cycle's turns are `seconds` long each, a text's rounded up to whole passes:
+        // whole rounds are taken off by division, then the turns of the round walked.
         const ItemInfo &cycle = core.items[core.playing];
-        const uint64_t turn_length = 1000ull * cycle.seconds;
-        turn = (now - core.zero) / turn_length;
-        in_turn = (now - core.zero) % turn_length;
-        animation = core.entries[cycle.first + (turn + core.cycle_start_entry) % cycle.count];
+        const uint64_t elapsed = now - core.zero;
+        if (cycle_animation(core, cycle, 0) == kNothing) {
+            // Every animation of the cycle is unavailable: the playlist plays.
+            const uint32_t first = player_first_in_playlist(core);
+            if (first == kNothing) {
+                player_halt(core);
+                return kShowsNothing;
+            }
+            player_play_all(core, first);
+            return kShowsBefore;
+        }
+        uint64_t round = 0;
+        for (uint32_t at = 0; at < cycle.count; ++at) {
+            round += whole_passes(core, cycle_animation(core, cycle, at), 1000ull * cycle.seconds);
+        }
+        uint64_t within = elapsed % round;
+        uint32_t at = 0;
+        for (;;) {
+            animation = cycle_animation(core, cycle, at);
+            const uint64_t length = whole_passes(core, animation, 1000ull * cycle.seconds);
+            if (within < length) {
+                break;
+            }
+            within -= length;
+            ++at;
+        }
+        turn = elapsed / round * cycle.count + at;
+        in_turn = within;
     }
     if (reason == kNone) {
-        reason = show_at(core, animation, turn, in_turn);
+        reason = show_at(core, animation, turn, in_turn, now - in_turn);
+    }
+    if (reason == kPendingWork) {
+        // The rest is decoded at the next refresh, or the file settles a defect and its
+        // reason comes at a later one.
+        return kShowsBefore;
+    }
+    if (reason != kNone && is_drive(animation)) {
+        // Where the file was: a file that did not open was at its start.
+        const bool opened = core.stream_open && core.stream_item == animation;
+        char name[kFaultNameSize];
+        drive_given_name(core, animation - kDriveBase, name, sizeof name);
+        note_fault(core, kWorkPlay, name, opened ? core.stream_records : 0, opened ? core.decoder.body_read : 0, reason);
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.
@@ -266,21 +417,22 @@ bool advance(Core &core, uint64_t now) {
         close_stream(core);
         core.drive[place].state = kDriveLeftOut;
         drive_left_out(core, place, reason);
+        catalog_drive_left_out(core, place, reason);
         player_drive_changed(core);
-        return false;
+        return kShowsBefore;
     }
     if (reason != kNone) {
-        // The file cannot be played: the show is invalid from this refresh on.
-        const FileInfo &file = core.files[core.items[animation].first];
-        if (reason == kFileMissing || reason == kReadError || reason == kSizeMismatch) {
-            core_fail(core, reason, file.name, kNone);
-        } else {
-            core_fail(core, kFileMalformed, file.name, reason);
-        }
-        return false;
+        // The file cannot be played: it is quarantined, this refresh keeps the picture
+        // before, and the next one goes on without it.
+        const bool opened = core.stream_open && core.stream_item == animation;
+        const uint32_t record = opened ? core.stream_records : 0;
+        const uint64_t body_bytes = opened ? core.decoder.body_read : 0;
+        close_stream(core);
+        quarantine_file(core, core.items[animation].first, reason, kWorkPlay, record, body_bytes);
+        return kShowsBefore;
     }
     core.shown = animation;
-    return true;
+    return kShowsPicture;
 }
 
 // Writes the colour of every LED: its pixel, through the palette in a palette file, at the
@@ -331,24 +483,12 @@ void player_set_brightness(Core &core, uint8_t value) {
 }
 
 uint32_t player_first_animation(const Core &core) {
-    uint32_t position = 0;
-    while (position < core.item_count && (core.items[position].is_cycle || core.items[position].ignored)) {
-        ++position;
-    }
-    return position;
+    const uint32_t first = lowest_playing(core, false, 0, true);
+    return first != kNothing ? first : core.item_count;
 }
 
 uint32_t player_first_in_playlist(const Core &core) {
-    const uint32_t first = player_first_animation(core);
-    if (first != core.item_count) {
-        return first;
-    }
-    for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (core.drive[place].state == kDriveInPlaylist) {
-            return kDriveBase + place;
-        }
-    }
-    return kNothing;
+    return lowest_playing(core, true, 0, true);
 }
 
 void player_drive_joined(Core &core, uint32_t place) {
@@ -381,14 +521,35 @@ void player_start(Core &core) {
     if (core.invalid) {
         return;
     }
-    if (core.has_start && core.items[core.start_item].is_cycle) {
+    if (core.has_start && core.items[core.start_item].is_cycle && item_usable(core, core.start_item)) {
         player_play_cycle(core, core.start_item);
         return;
     }
-    uint32_t from = core.has_start ? core.start_item : player_first_animation(core);
-    if (from < core.item_count && core.items[from].ignored) from = next_animation(core, from);
+    uint32_t from = core.has_start && !core.items[core.start_item].is_cycle ? core.start_item : player_first_animation(core);
+    if (from < core.item_count && !plays(core, from)) from = next_animation(core, from);
     if (from != core.item_count && from != kNothing) {
         player_play_all(core, from);
+    }
+}
+
+void player_file_failed(Core &core, uint32_t file) {
+    if (core.stream_open && !is_drive(core.stream_item) && core.items[core.stream_item].first == file) {
+        close_stream(core);
+    }
+    if (core.playing == kPlaylist && !is_drive(core.turn_item) && !plays(core, core.turn_item)) {
+        const uint32_t next = next_animation(core, core.turn_item);
+        if (next == kNothing) {
+            player_halt(core);
+        } else {
+            player_play_all(core, next);
+        }
+    } else if (core.playing != kNothing && core.playing != kPlaylist && !item_usable(core, core.playing)) {
+        const uint32_t first = player_first_in_playlist(core);
+        if (first == kNothing) {
+            player_halt(core);
+        } else {
+            player_play_all(core, first);
+        }
     }
 }
 
@@ -403,7 +564,7 @@ void player_play_cycle(Core &core, uint32_t item) {
     close_stream(core);
     core.playing = item;
     core.zero_pending = 1;
-    core.shown = core.entries[core.items[item].first];
+    core.shown = cycle_animation(core, core.items[item], 0);
 }
 
 void player_play_all(Core &core, uint32_t from) {
@@ -422,6 +583,8 @@ void player_releases_file(Core &core, uint32_t item) {
 
 void player_file_replaced(Core &core, uint32_t item) {
     if (core.playing == kNothing) {
+        // Nothing played, as no animation was usable: the playlist starts.
+        player_item_added(core);
         return;
     }
     if (core.playing == kPlaylist) {
@@ -492,6 +655,7 @@ void player_item_leaves(Core &core, uint32_t item) {
 }
 
 int player_poll(Core &core, uint64_t now_ms) {
+    core.noise = clock_stir(core.noise, now_ms);
     const uint64_t now = clock_touch(core, now_ms);
     upload_touch(core, now);
     if (core.leg_count == 0 || now < core.next_due) {
@@ -516,17 +680,20 @@ int player_poll(Core &core, uint64_t now_ms) {
     }
     ++core.count_running;
 
-    bool lit = core.mapping_test && !core.invalid;
+    Shown shows = core.mapping_test && !core.invalid ? kShowsPicture : kShowsNothing;
+    if (shows == kShowsPicture && core.mapping_snake != 0) {
+        snake_test_draw(core, now);
+    }
     if (!core.mapping_test && !core.invalid && core.playing != kNothing) {
         if (core.zero_pending) {
             core.zero = grid;
             core.zero_pending = 0;
         }
-        lit = advance(core, now);
+        shows = advance(core, now);
     }
-    if (lit && core.on) {
+    if (shows == kShowsPicture && core.on) {
         fill_leds(core);
-    } else {
+    } else if (shows != kShowsBefore || !core.on) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     // The LED data is complete. The check of an uploaded file takes one step now, and
@@ -538,10 +705,20 @@ int player_poll(Core &core, uint64_t now_ms) {
     const bool was_valid = !core.invalid;
     const bool steady = second == 0 || player_fps(core, now) >= kCheckLeastRate;
     check_after_start(core, in_step, now - grid <= kCheckOnTimeMs && steady);
+    catalog_drive_look(core);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     return 1;
+}
+
+bool player_seed(const Core &core, uint32_t *seed) {
+    if (core.invalid || core.playing == kNothing || core.shown == kNothing || !core.stream_open || !core.stream_drawn ||
+        core.stream_item != core.shown || type_of(core, core.shown) != kTypeWidget) {
+        return false;
+    }
+    *seed = core.seed;
+    return true;
 }
 
 uint32_t player_fps(const Core &core, uint64_t now) {
