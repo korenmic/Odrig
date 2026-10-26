@@ -47,6 +47,10 @@ uint32_t player_first_animation(const Core &core);
 // drive's animation, or kNothing.
 uint32_t player_first_in_playlist(const Core &core);
 
+// The position of the first animation that plays at or below a folder of the drive's tree,
+// in the saved order, or kNothing; the root's is the playlist's.
+uint32_t player_first_in_folder(const Core &core, uint32_t folder);
+
 // A file of the drive has joined the playlist. When nothing plays, the playlist starts
 // with it.
 void player_drive_joined(Core &core, uint32_t place);

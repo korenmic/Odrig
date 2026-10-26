@@ -66,6 +66,13 @@ void tree_clear(Core &core);
 // table, the others keep their ids and their order.
 void tree_place_gone(Core &core, uint32_t place);
 
+// The folder of the table with this id, or kFolderMost: none while the tree is not known.
+uint32_t tree_folder_with_id(const Core &core, uint32_t id);
+
+// Makes a folder of the table the current playlist, kept as its index and its path; the
+// root for 0.
+void tree_choose(Core &core, uint32_t folder);
+
 // The path of a folder of the table, from the drive's folder, into `into` with a 0 after
 // it: the name of its place cut to its depth. Returns its length, 0 for the root and when
 // the host gives no name.

@@ -208,7 +208,8 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
         return refuse(reply, core.drive[drive_place_holding(core, id)].state == kDriveLeftOut ? "unavailable" : "busy");
     }
     if (name == nullptr) {
-        return refuse(reply, "unknown-id");
+        // A folder of the drive's tree is a playlist, with no file to read.
+        return refuse(reply, tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
     }
     if (offset > size) {
         return refuse(reply, "bad-argument");
@@ -393,7 +394,7 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
         if (place != kDriveMost && catalog_drive_writable(core)) {
             return catalog_remove_external(core, place) ? succeed(reply) : refuse(reply, "storage-error");
         }
-        return refuse(reply, place != kDriveMost ? "in-use" : "unknown-id");
+        return refuse(reply, place != kDriveMost || tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
@@ -419,7 +420,9 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     if (core.upload.state != kUploadNone) return refuse(reply, "busy");
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
-    if (position == core.item_count) return refuse(reply, drive_place_holding(core, id) != kDriveMost ? "in-use" : "unknown-id");
+    if (position == core.item_count) {
+        return refuse(reply, drive_place_holding(core, id) != kDriveMost || tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
+    }
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");
     if ((item.ignored != 0) == ignored) return succeed(reply);
@@ -442,7 +445,9 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;
         while (position < core.item_count && core.items[position].id != ids[at]) ++position;
-        if (position == core.item_count) return refuse(reply, drive_place_holding(core, ids[at]) != kDriveMost ? "in-use" : "unknown-id");
+        if (position == core.item_count) {
+            return refuse(reply, drive_place_holding(core, ids[at]) != kDriveMost || tree_folder_with_id(core, ids[at]) != kFolderMost ? "in-use" : "unknown-id");
+        }
     }
     for (uint32_t at = 0; at < count; ++at) {
         uint32_t position = 0;

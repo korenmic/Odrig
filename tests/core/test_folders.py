@@ -10,7 +10,7 @@ from odrig import catalog
 from . import support
 from .test_catalog_drive import card, polls
 from .test_catalog_writes import a_card, folder_of
-from .test_drive import SHOW, a_drive, asked, logged, refusal, replies, with_drive
+from .test_drive import DONE, SHOW, a_drive, asked, logged, refusal, replies, statuses, with_drive
 from .test_order import HEADER
 from .test_playback import T0
 from .test_playlist import CANVAS, loop_of
@@ -146,6 +146,59 @@ class ThePathsInTheSavedOrderAndTheCatalog(unittest.TestCase):
     def test_upload_begin_external_takes_a_bare_file_name(self):
         run = on_cataloged_card(card(NESTED), asked(8100, "upload begin external night/new.odrg 100", "upload begin external new.odrg 100", "upload cancel"))
         self.assertEqual((replies(run)[0], replies(run)[1]["ok"]), (refusal("bad-argument"), True))
+
+
+def every(ms, until, *commands):
+    """A refresh and these commands every `ms` until a time after power-on."""
+    return [line for time in range(0, until, ms) for line in asked(time, *commands)]
+
+
+def played(run):
+    """The animations `status` named, each run of the same one once."""
+    seen = []
+    for _, animation in statuses(run):
+        if not seen or seen[-1] != animation:
+            seen.append(animation)
+    return seen
+
+
+class PlayOfAFolder(unittest.TestCase):
+    def test_play_of_a_folder_plays_its_first_animation_and_goes_on_in_the_saved_order(self):
+        run = with_drive(SHOW, NESTED, asked(0, "play 60008") + every(100, 40000, "status"))
+        self.assertEqual(replies(run)[0], DONE)
+        self.assertEqual(played(run)[:5], [60004, 60005, 60006, 1, 60001])
+
+    def test_play_all_plays_the_root_and_a_folder_plays_again_from_its_first(self):
+        script = asked(0, "play 60007") + asked(20, "status") + asked(40, "play all") + asked(60, "status") + asked(80, "play 60008") + asked(100, "status")
+        script += asked(120, "play 60008") + asked(140, "status")
+        run = with_drive(SHOW, NESTED, script)
+        self.assertEqual([reply for reply in replies(run) if "on" not in reply], [DONE] * 4)
+        self.assertEqual(played(run), [60003, 1, 60004])
+        self.assertEqual(len(statuses(run)), 4)
+
+    def test_a_folder_with_nothing_to_play_plays_the_root_in_its_place(self):
+        drive = {**NESTED, "solo/bad.odrg": b"not an animation"}
+        run = with_drive(SHOW, drive, asked(0, "list", "play 60012") + asked(20, "status"))
+        reply, done = replies(run)[:2]
+        self.assertEqual(folders(reply)[-1], (60012, "solo"))
+        self.assertEqual([item.get("fault") for item in reply["items"] if item.get("file") == "solo/bad.odrg"], ["bad-magic"])
+        self.assertEqual((done, statuses(run)), (DONE, [("all", 1)]))
+
+    def test_a_folders_id_is_unknown_while_the_card_is_out(self):
+        run = with_drive(SHOW, NESTED, asked(0, "list") + ["drive pull"] + asked(40, "play 60008", "list"))
+        self.assertEqual(replies(run)[1], refusal("unknown-id"))
+        self.assertEqual(folders(replies(run)[2]), [])
+
+    def test_a_folders_id_is_in_use_for_the_commands_of_an_animation(self):
+        with a_drive(NESTED) as top:
+            revision = replies(support.start(SHOW, asked(0, "order get"), ["--drive", top]))[0]["revision"]
+            commands = ("remove many 60008", "ignore 60008 1", "read 60008 0", "upload begin 60008 x.odrg 10", f"order move {revision} 60008 60001",
+                        f"order move {revision} 60001 60008", "remove 60008")
+            run = support.start(SHOW, asked(0, *commands), ["--drive", top])
+        self.assertEqual(replies(run), [refusal("in-use")] * len(commands))
+        on_card = on_cataloged_card(card(NESTED), asked(8100, "remove 60008", "list"))
+        self.assertEqual(replies(on_card)[0], refusal("in-use"))
+        self.assertEqual(folders(replies(on_card)[1]), list(zip(range(60007, 60011), TREE)))
 
 
 if __name__ == "__main__":

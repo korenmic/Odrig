@@ -115,7 +115,11 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 - `play <id>` of a cycle shows each listed animation in order for `seconds`, then starts
   over, and repeats forever. Each turn starts its animation from the first frame. While
   a cycle plays, the playlist does not.
-- `play all` plays the playlist from its first animation, whatever `start` names.
+- `play all` plays the playlist from its first animation, whatever `start` names, and
+  makes the root playlist current.
+- `play <id>` of a folder of the card makes that folder's playlist current and plays its
+  first animation; when nothing at or below the folder can play, the root plays in its
+  place.
 
 ## Animations from a USB drive
 

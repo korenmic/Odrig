@@ -475,12 +475,32 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             // A file of the drive that was left out for a fault.
             return refuse(reply, "unavailable");
         }
-        if (item == kNothing) {
+        // A folder of the drive's tree: its playlist becomes current, and it plays from
+        // its first animation, or the root does in its place.
+        uint32_t folder = all ? 0 : kFolderMost;
+        if (!all && item == kNothing) {
+            folder = tree_folder_with_id(core, id);
+            if (folder != kFolderMost) {
+                item = player_first_in_folder(core, folder);
+                if (item == kNothing) {
+                    item = player_first_in_playlist(core);
+                }
+            }
+        }
+        if (item == kNothing && (all || folder == kFolderMost)) {
+            // `play all` while the playlist has no animation, or an id that nothing has.
             return refuse(reply, "unknown-id");
         }
-        if (!is_drive(item) && !item_usable(core, item)) {
+        if (item != kNothing && !is_drive(item) && !item_usable(core, item)) {
             // A quarantined animation, or a cycle that lists only such: nothing is read.
             return refuse(reply, "unavailable");
+        }
+        if (folder != kFolderMost) {
+            tree_choose(core, folder);
+        }
+        if (item == kNothing) {
+            // A folder chosen while nothing plays anywhere: the choice stands.
+            return succeed(reply);
         }
         core.mapping_test = 0;
         // An animation is played as its turn of the playlist, which goes on after it.

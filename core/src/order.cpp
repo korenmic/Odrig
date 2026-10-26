@@ -456,6 +456,22 @@ void tree_place_gone(Core &core, uint32_t place) {
     set_ends(core);
 }
 
+uint32_t tree_folder_with_id(const Core &core, uint32_t id) {
+    for (uint32_t folder = 1; core.folders != nullptr && core.tree_known && folder <= core.folder_count; ++folder) {
+        if (core.folders[folder].id == id) {
+            return folder;
+        }
+    }
+    return kFolderMost;
+}
+
+void tree_choose(Core &core, uint32_t folder) {
+    core.current = static_cast<uint8_t>(folder);
+    if (core.playlist_path != nullptr) {
+        tree_folder_path(core, folder, core.playlist_path, kPlaylistPathRoom);
+    }
+}
+
 uint32_t tree_folder_path(const Core &core, uint32_t folder, char *into, uint32_t room) {
     into[0] = '\0';
     if (core.folders == nullptr || folder == 0 || folder > core.folder_count) {
@@ -847,7 +863,9 @@ uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before,
     }
     const uint32_t moved = listed_with(core, id);
     const uint32_t target = before == 0 ? kNothing : listed_with(core, before);
-    if ((moved == kNothing && !is_cycle_id(core, id)) || (before != 0 && target == kNothing && !is_cycle_id(core, before))) {
+    // A cycle and a folder of the drive's tree have ids and no place in the order.
+    if ((moved == kNothing && !is_cycle_id(core, id) && tree_folder_with_id(core, id) == kFolderMost) ||
+        (before != 0 && target == kNothing && !is_cycle_id(core, before) && tree_folder_with_id(core, before) == kFolderMost)) {
         return refuse(reply, "unknown-id");
     }
     if (moved == kNothing || (before != 0 && target == kNothing)) {

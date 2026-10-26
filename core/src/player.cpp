@@ -491,6 +491,30 @@ uint32_t player_first_in_playlist(const Core &core) {
     return lowest_playing(core, true, 0, true);
 }
 
+uint32_t player_first_in_folder(const Core &core, uint32_t folder) {
+    if (folder == 0) {
+        return player_first_in_playlist(core);
+    }
+    if (core.folders == nullptr || !core.tree_known || folder > core.folder_count) {
+        return kNothing;
+    }
+    const uint32_t end = core.folders[folder].end;
+    uint32_t best = kNothing;
+    uint32_t best_key = 0;
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        const uint8_t byte = core.drive_folder[place];
+        if (byte == kNoFolder || byte < folder || byte >= end || !plays(core, kDriveBase + place)) {
+            continue;
+        }
+        const uint32_t key = order_key(core, kDriveBase + place);
+        if (best == kNothing || key < best_key) {
+            best = kDriveBase + place;
+            best_key = key;
+        }
+    }
+    return best;
+}
+
 void player_drive_joined(Core &core, uint32_t place) {
     if (core.playing == kNothing && !core.invalid && !core.mapping_test) {
         player_play_all(core, kDriveBase + place);

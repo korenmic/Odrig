@@ -17,8 +17,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. An unavailable animation is refused. |
-| `play all` | Plays the playlist, from its first animation. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the card's folder with that id current and plays its first animation. An unavailable animation is refused. |
+| `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
@@ -196,6 +196,7 @@ The item leaves the show, and the items after it move up.
 
 - An animation that a cycle lists is refused with `in-use`: remove the cycle first.
 - An animation of a USB drive is refused with `in-use`: the drive holds it.
+- A folder of the card is refused with `in-use`: it is a playlist, not a file.
 - If the item is the `start` item, the show has no `start` afterwards.
 - If the item is the animation whose turn it is in the playlist, the playlist goes on
   with the animation after it, from its first frame. If it was the only animation of the
@@ -233,7 +234,7 @@ whichever route its commands arrive by.
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
 - It is refused with `busy` when an upload is open; with `in-use` when the id belongs to a
-  cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
+  cycle, to an animation of a USB drive or to a folder of the card, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
 **`upload begin <id> <file> <bytes> <crc32>`** is the same with the CRC-32 of the file, as
@@ -311,9 +312,9 @@ succeeds.
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
@@ -534,8 +535,10 @@ itself, writes nothing.
 - `show-invalid`: the show is invalid.
 - `busy`: until the player has read every installed animation after a start, and while
   an upload is open.
-- `unknown-id`: `<id>` or `<before>` is the id of no listed animation and of no cycle.
-- `in-use`: `<id>` or `<before>` is the id of a cycle, which has no place in the order.
+- `unknown-id`: `<id>` or `<before>` is the id of no listed animation, of no cycle and of
+  no folder of the card.
+- `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the card, which
+  have no place in the order.
 - `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
   `order get` again.
 - `storage-error`: the order could not be saved. It is as it was.

@@ -113,7 +113,7 @@ Rules for every task:
   - Suites: core, emulator, onboarding.
   - Requirements: 1.1, 1.6, 5.2, 5.3, 5.5, 6.2, 8.1, 9.1, 9.3, 10.1, 10.2
 
-- [ ] 4. `play` of a folder and the refusals of a folder's id
+- [x] 4. `play` of a folder and the refusals of a folder's id
   - `core/src/commands.cpp`: `play <id>` of a folder makes it current, kept as its path
     and index, and plays its first animation (the exhausting order of task 5 and the
     window of task 6 not yet: it plays from the folder's first animation and goes on in
