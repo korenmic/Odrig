@@ -172,34 +172,41 @@ the root and its folders in the depth-first order of the listing; "a turn" is as
 
 ## Requirement 7: the app
 
-1. The Animations tab SHALL show the list as groups in the order they play: the root's
-   group first, under the heading `Root` with the count of its rows, then one group per
-   folder in the tree's order, each heading carrying the folder's whole path and the
-   count of the files directly in it. The groups SHALL not be indented and SHALL not
-   fold. A folder with no file directly in it SHALL keep its heading, its count `0` and
-   its button. A group that has rows and none of which the filters show SHALL not be
-   shown, heading included.
-2. Every group, the root's included, SHALL have the button `Play this folder`: a folder's
-   sends `play <id>` of the folder, the root's sends `play all`. The button `Playlist
-   from the start` of seed 36 SHALL go.
-3. The pinned Tests group of seed 36 SHALL stay above the list, outside the folder
-   groups: no playlist, no button, no mark and no count of this seed, and the filters
-   leave it alone.
+1. The Animations tab SHALL show the card's folders one level at a time, as a file
+   explorer does. At the root the list SHALL hold the root's own rows, the board's
+   animations and the card's loose files in the saved order, then one folder row per
+   sub-folder of `odrig` in the tree's order; inside a folder the list SHALL hold that
+   folder's own files in the saved order, then one folder row per sub-folder of it. A
+   folder row SHALL show the folder's name, the count of the files directly in it and a
+   way in, and SHALL enter the folder when tapped. A folder with no file of its own SHALL
+   keep its row, its count `0` and its way in. The list SHALL never show the files of
+   every folder at once.
+2. Every level SHALL have a heading: `Root` at the root, the folder's whole path inside a
+   folder, with a `Back` control that goes up one level and is not shown at the root; the
+   root SHALL be reached by `Back` from any depth. The level's button `Play this folder`
+   SHALL stand above the list: inside a folder it sends `play <id>` of the folder, at the
+   root `play all`. The button `Playlist from the start` of seed 36 SHALL go. A new
+   target, the card out, or a folder gone from the list SHALL bring the list to the root.
+3. The pinned Tests group of seed 36 SHALL stay above the list, outside the levels: no
+   playlist, no button, no mark and no count of this seed, and the filters leave it alone.
 4. The now-playing line SHALL read `Playlist night · 23 h 12 min left` for a current
    folder, by its path, or by its id while the list has no item of it; `Playlist · 23 h
-   12 min left` for the root while the list holds a folder group; `Playlist` without a
-   time while `playing` is `"all"` and the list holds no folder group; and `Playlist
-   night, the root plays for now · 23 h 12 min left` while the root plays in the current
-   folder's place, which the app knows from `status`: `playing` a folder's id and
-   `animation` no file of that folder nor of a folder below it, read from the paths. A
-   jump by `play <id>` to an animation outside the current playlist shows the same words
-   for its turn. The hours and minutes come from `left`.
-5. The current playlist's group SHALL be marked, the root's group when the root is
-   current; while the root plays in a folder's place the folder's group keeps the mark.
-6. The filters of seed 39 SHALL work within the groups; dragging and the menu's moves
-   SHALL work within one group and not across groups; selection for deletion and the
-   counts of animations SHALL take rows only, a folder item being no animation; uploads
-   SHALL go to the root.
+   12 min left` for the root while the list holds a folder; `Playlist` without a time
+   while `playing` is `"all"` and the list holds no folder; and `Playlist night, the root
+   plays for now · 23 h 12 min left` while the root plays in the current folder's place,
+   which the app knows from `status`: `playing` a folder's id and `animation` no file of
+   that folder nor of a folder below it, read from the paths. A jump by `play <id>` to an
+   animation outside the current playlist shows the same words for its turn. The hours
+   and minutes come from `left`.
+5. The heading of the level shown SHALL be marked while its playlist is current, the
+   root's at the root; at every level above the current folder, the folder row that leads
+   to it SHALL be marked; the row of the animation on the LEDs SHALL be marked as today.
+   While the root plays in a folder's place the marks stay.
+6. The filters of seed 39 SHALL work within the level shown, their counts those of the
+   level's rows, and a folder row SHALL be shown whatever the filters; dragging and the
+   menu's moves SHALL work within the level shown and never across folders; selection for
+   deletion and `Select all` SHALL take the level's rows only; the counts of animations
+   SHALL take rows only, a folder item being no animation; uploads SHALL go to the root.
 7. The app's validators SHALL accept a `list` item with `playlist` and `status` with
    `left` and with a folder's id in `playing`. The APK, the browser and the emulator's
    Controller view run the same files.

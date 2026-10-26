@@ -245,7 +245,43 @@ Rules for every task:
     session open. The seed stays `in_progress` for task 11.
   - Requirements: 8.1, 8.2, 10.5
 
-- [ ] 11. The owner's check on the board and a phone
+- [ ] 11. The app's explorer: the levels, the folder rows, the heading with `Back`, the level's button and the marks
+  - `app/www/screens/show.js` (the level kept in the screen, the level head with `Back`,
+    the title and `#play-all` sending `play all` or `play <id>`, the level's rows and
+    folder rows, the marks of the head and of the folder rows, `#none` and
+    `#filter-empty` by the level), `app/www/index.html`, `app/www/style.css`; the flat
+    groups of task 8 go.
+  - Tests: `tests/app/test_folders.py` and `tests/app/page/scenarios/folders.js` against a
+    stand-in with a fixed `left` and against the emulator with a nested `--drive`: the
+    root's rows and folder rows with their names and counts, a 0-file folder's row,
+    entering a folder and the heading, `Back` to the parent and to the root, the level's
+    `Play this folder` inside a folder and at the root, the marks on the head and on the
+    folder rows that lead to the current playlist, the line's forms, the Tests group, the
+    card out and in bringing the list to the root. `tests/app/test_controls.py`,
+    `test_drive.py`, `test_messages.py` keep the root's button; `tests/app/test_look.py`
+    passes with the head and a folder row.
+  - `docs/android-app.md`: the explorer in place of the groups, the rows, `Back`, the
+    button, the marks, `What is verified`.
+  - Prove it fails first: at the root the Animations tab shows `night/comet.odrg` as a
+    row, and no folder row `night`.
+  - Suites: app, onboarding.
+  - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.7, 8.1, 10.4
+
+- [ ] 12. The app's filters, moves and selection within the level shown
+  - `app/www/screens/filters.js` (the counts of the level's rows), `selection.js` (the
+    level's rows for `Select all` and what can be selected), `reorder.js` (checked: moves
+    within the level, a folder row ending the level), `show.js` passing the level's rows.
+  - Tests: `tests/app/test_folders.py`: the filter counts at a level, a folder row shown
+    under every filter, `Move up` and `Move down` and a drag within the level only and
+    nothing sent for a drop in place, `Select all` taking the level's rows only, the
+    storage lines counting files only. `docs/android-app.md`: the filters, moves and
+    selection within the level, uploads to the root. `docs/decisions.md`: the change-log
+    line of the owner's correction of 2026-10-26.
+  - Prove it fails first: `Select all` inside `night` selects the root's rows.
+  - Suites: app, onboarding.
+  - Requirements: 7.6, 8.1, 10.4
+
+- [ ] 13. The owner's check on the board and a phone
   - In a session with the owner, with the firmware of task 10 flashed and the APK on the
     phone, a card prepared with sub-folders: the groups on the phone, a folder chosen and
     playing, the board restarted and playing the same folder, the root chosen and playing,

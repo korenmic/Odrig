@@ -299,23 +299,29 @@ items alone, so the order, the counts, the filters and the selection are untouch
 folders; when `status.playing` is a number that is neither a cycle nor a folder of the
 known list, the list is asked at once, as it is for an unknown `animation`.
 
-`screens/show.js`: a file's folder is the path before its last `/`, the root when there is
-none; a file lies under folder `p` when its path begins with `p` and `/`. The list is
-drawn as groups: a static head before `#animations-list`, `div#root-head.folder-head`
-with `h2#root-title` `Root · <n>` and `button#play-all` `Play this folder`, which keeps the
-id the scenarios read and sends `play all`; inside `#animations-list`, before each
-folder's rows, a `div.folder-head` with `data-group` (the path) and `data-id`, an `h2`
-`<path> · <n>` and a `button` `Play this folder` with `aria-label` `Play folder <path>`,
-which sends `play <id>`. The rows stay direct children `.row` of the list, each with
-`data-group`, so every selector of the app and the suites keeps working; the heads are
-not rows, not indented, and do not fold. One pass over `shownOrder(state)` puts each
-animation into its group; a folder of the list with no row of its own keeps its head
-with `0`; a group with rows and none shown by the filters is hidden with its head; the
-root's group hides the same way. The count of a group is the number of its rows, filters
-or not. `drawRows` compares heads and rows by their keys and rebuilds only on a change;
-`rowsState` marks the current group's head with `aria-current="true"` and the row of the
-animation as today, and updates the counts in place. The pinned Tests group stays where
-it is, above, untouched. `.pair` keeps `#add-animation` alone.
+`screens/show.js` shows one level at a time, the explorer the owner asked for on
+2026-10-26. A file's folder is the path before its last `/`, the root when there is
+none; a folder's parent is the path before its last `/`, the root when there is none; a
+file lies under folder `p` when its path begins with `p` and `/`. The level shown is a
+path kept in the screen, `""` for the root, brought to the root by `client.begin` and
+whenever the level's folder is not in `state.folders`. A static level head before
+`#animations-list`, `div#level-head.folder-head`, holds `button#level-back` `Back`,
+hidden at the root, `h2#level-title` with `Root` or the level's path, and `button#play-all`
+`Play this folder`, which keeps the id the scenarios read and sends `play all` at the root
+and `play <id>` of the level's folder inside one. Inside `#animations-list` the level's
+own files stand as rows, direct children `.row` as today, each with `data-group` the
+level, in `shownOrder(state)` and under the filters; after them one `button.folder-row`
+per direct sub-folder of the level, in the order of `state.folders`, with `data-path`,
+`data-id`, the folder's name, its count of files directly in it, a chevron, and the
+`aria-label` `Open folder <path>`; a tap sets the level to its path and redraws. A folder
+row is no `.row`, so every selector of the rows keeps working, and it is shown whatever
+the filters. `drawRows` compares rows and folder rows by their keys and rebuilds only on
+a change; `rowsState` marks the level head with `aria-current="true"` while the level is
+the current playlist, each folder row whose path is the current folder or above it, and
+the row of the animation as today, and updates the counts in place. `#none` shows at the
+root when the list has no animation at all; `#filter-empty` when the level has files and
+the filters show none of them. The pinned Tests group stays where it is, above, untouched.
+`.pair` keeps `#add-animation` alone.
 
 The now-playing line, `playing(status, state)`, with `fmt(left)` as `<h> h <m> min left`:
 the invalid show's text as today; `Nothing plays` for null; `Cycle <id>` for a number in
@@ -323,21 +329,23 @@ the invalid show's text as today; `Nothing plays` for null; `Cycle <id>` for a n
 for now` when `status.animation` names an animation of the list whose path is not under
 the folder, then ` · ` and `fmt(left)`; for any other number, `Playlist <id> · <fmt>`
 while `left` is known, else `Cycle <id>` as today; for `"all"`, `Playlist · <fmt>` when
-`state.folders` is not empty and `left` is known, else `Playlist`. The marked group is the
-folder of `playing`, the root for `"all"`, none for a cycle or null.
+`state.folders` is not empty and `left` is known, else `Playlist`. The marked playlist is
+the folder of `playing`, the root for `"all"`, none for a cycle or null.
 
-`screens/reorder.js`: `neighbour` runs over the ids of the row's own group; `lift` marks
-the rows of the same group only; `place` with no mark below puts the placeholder after
-the group's last row; `drop` takes the next sibling only while it is a row of the same
-group, else `end`; the no-move check compares the group's ids before and after. Global
-`end` is right for the last of a group: it changes no other group's relative order.
-`filters.js`, `selection.js` and `capacity.js` change nothing, since folders are not in
-`state.animations`. `messages.js` keeps its words: a folder's `play` refused with
-`unknown-id` while the card is out reads as an animation's, which the seed accepts by
-keeping the codes.
+`screens/reorder.js`: `neighbour` runs over the ids of the row's own group, the level;
+`lift` marks the rows of the same group only; `place` with no mark below puts the
+placeholder after the group's last row; `drop` takes the next sibling only while it is a
+row of the same group, else `end`, so a folder row after the rows ends the level; the
+no-move check compares the group's ids before and after. `filters.js` draws its counts
+from the level's rows, given by the screen; `selection.js` takes the level's rows, given
+the same way, for `Select all` and for what can be selected; `capacity.js` changes
+nothing, since folders are not in `state.animations`. `messages.js` keeps its words: a
+folder's `play` refused with `unknown-id` while the card is out reads as an animation's,
+which the seed accepts by keeping the codes.
 
-The style gives the heads `overflow-wrap: anywhere`, a 48 px root button and 44 px
-folder buttons 8 px from their neighbours, at the contrast the look test asks.
+The style gives the level head `overflow-wrap: anywhere`, a 48 px `Back` and `Play this
+folder`, and folder rows the look of a row, 60 px high, with the chevron at the right, at
+the contrast the look test asks.
 
 ## The documents
 
