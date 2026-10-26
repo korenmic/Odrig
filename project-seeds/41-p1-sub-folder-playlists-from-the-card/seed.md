@@ -108,14 +108,19 @@ folder on with one tap.
   with a fresh window, as on a card without folders. With no folder on the card the root
   is the only playlist, and its window changes nothing. The length of the window is a
   constant of the core, not a setting.
-- **The clock.** The board has no clock: it counts the time since it started. So the
-  window counts running time, across restarts: the core keeps the current playlist's path
+- **The clock.** The board has no clock: it counts the time since it started. The window
+  counts running time and nothing else; calendar time is never considered, in this seed
+  or after it. The window runs across restarts: the core keeps the current playlist's path
   and the time spent in its window in a file of its own in the board's storage, beside
   `order.txt`, written as `order.txt` is written, when the current playlist changes and at
   most once in 15 minutes while it plays. A restart goes on with the saved playlist and
-  loses at most the last 15 minutes of its window. Calendar days are not the measure,
-  since nothing on site knows the date; a later seed may let the app give the board the
-  phone's time.
+  loses at most the last 15 minutes of its window.
+- **The choice persists.** A playlist chosen by a command, the root included, is the
+  current playlist until another choice or the end of its window, and it is saved the
+  moment it is chosen; so is the playlist the rotation moves to. A restart, a power cut
+  included, plays the playlist that was current, the chosen folder among them, from its
+  first animation and with the window's saved time. Nothing but another choice, the
+  rotation, or a card that is read and has no playlist of the saved path changes it.
 - **The card out, or a playlist with nothing to play.** The choice and its window are kept
   whatever the card does. While the current playlist has nothing it can play, because the
   card is out or not yet read, or every file of the folder and of the folders below it is
@@ -200,34 +205,37 @@ folder on with one tap.
    mapping test in progress ends first. The window counts the board's running time,
    whatever plays, and goes on across restarts from the saved time, at most 15 minutes
    lost at a power cut.
-5. At power-on the saved current playlist plays: the root from the animation `start` names
-   or its first, as today; a folder from its first animation. The root plays when nothing
-   is saved, and while the card is not yet read; a card that is read and has no playlist
-   of the saved path makes the root current. A cycle named as `start` plays as today.
+5. The current playlist is saved the moment it is chosen or the rotation moves to it, and
+   at power-on it plays again, the chosen folder included: the root from the animation
+   `start` names or its first, as today; a folder from its first animation. The root plays
+   when nothing is saved, and in the saved folder's place while the card is not yet read; a
+   card that is read and has no playlist of the saved path makes the root current. A cycle
+   named as `start` plays as today.
 6. While the current playlist has nothing it can play, the root plays in its place, and
    the current playlist takes over as soon as it can.
 7. `list` names each folder as an item with its id and path, after the show's items and
    before the card's files, and names a file in a folder by its path. `order.txt`, the
    catalog and `drive_name` name a file in a folder by its path; a card cataloged before
    this seed, whose files are all loose, reads as before.
-8. The Animations tab shows the list as groups in the order they play: the root's items
-   first, without a heading, then one group per folder, the groups following one another
-   in the depth-first order of the tree, each heading carrying the folder's whole path and
-   the count of the files directly in it; the groups are not indented and do not fold. A
-   folder with no file directly in it keeps its heading, its count `0` and its button,
-   since it is the playlist of its sub-folders; a group that has rows and none of which
-   the filters show is not shown, heading included. Each folder's group has a button `Play
-   this folder`, which sends `play <id>` of the folder and on the current folder restarts
-   it with a fresh window; `Playlist from the start` stays where it is above the list and
-   keeps sending `play all`. The pinned Tests group of seed 36 stays above the list,
-   outside the folder groups: it is no playlist, has no button, no mark and no count of
-   this seed, and the filters leave it alone as today.
+8. The Animations tab shows the list as groups in the order they play: the root's group
+   first, under the heading `Root` with the count of its rows, then one group per folder,
+   the groups following one another in the depth-first order of the tree, each heading
+   carrying the folder's whole path and the count of the files directly in it; the groups
+   are not indented and do not fold. A folder with no file directly in it keeps its
+   heading, its count `0` and its button, since it is the playlist of its sub-folders; a
+   group that has rows and none of which the filters show is not shown, heading included.
+   Every group, the root's included, has the same button, `Play this folder`: a folder's
+   sends `play <id>` of the folder, the root's sends `play all`, and on the current
+   playlist it restarts it with a fresh window. The button `Playlist from the start` of
+   seed 36 goes, the root's button being it. The pinned Tests group of seed 36 stays above
+   the list, outside the folder groups: it is no playlist, has no button, no mark and no
+   count of this seed, and the filters leave it alone as today.
 9. The now-playing line names the current playlist and the time its window has left in
    whole hours and minutes: `Playlist night · 23 h 12 min left` for a folder, by its path,
    or by its id while the list has no item of it; `Playlist · 23 h 12 min left` for the
    root while the list holds a folder group; `Playlist` as today, without a time, while
    `playing` is `"all"` and the list holds no folder group. The current playlist's group
-   is marked, the root's rows above the folder groups when the root is current. While the
+   is marked, the root's group when the root is current. While the
    root plays in place of the current folder the line reads `Playlist night, the root
    plays for now · 23 h 12 min left` and the folder's group keeps its mark; the app knows
    it from `status`, `playing` a folder's id and `animation` no file of that folder nor of
@@ -266,13 +274,15 @@ folder on with one tap.
    core and `odrig.catalog` write the same bytes from such a card, and
    `tests/vectors/catalog/` gains a storage with folders and its outcome in `cases.json`.
    The firmware's suite checks the depth-first listing of folders on the Mac with the
-   stand-in card. The app's suite checks the groups, the headings and counts, the current
-   playlist's mark and time left, `Play this folder`, the line while the root plays in
-   place, the filters, moves within a group only, the Tests group left alone, and the card
-   out and in, in Chrome against the emulator.
+   stand-in card. The app's suite checks the groups, the headings and counts, the root's
+   group and its button, the current playlist's mark and time left, `Play this folder` on
+   a folder and on the root, the line while the root plays in place, the filters, moves
+   within a group only, the Tests group left alone, and the card out and in, in Chrome
+   against the emulator.
 2. The microSD firmware is built with `fw.py build`, and in a session with the owner the
    board plays a card prepared with sub-folders: the groups show on a phone, a folder is
-   chosen there and plays, and the card out and in behaves as this seed says; the log's
+   chosen there and plays, the board is restarted and plays the same folder, the root is
+   chosen and plays, and the card out and in behaves as this seed says; the log's
    time between `card mounted` and `card opened` is noted for a card with 32 sub-folders
    and 256 files. The 24-hour rotation is checked in the core's suite only; on the board
    the owner sees the time left count down in the app.
@@ -288,10 +298,10 @@ name, at most three levels and 32 sub-folders, exhausting as one turn each in th
 order and the sub-folders once each after the own items, a window of 24 hours of running
 time kept across restarts in a file of the core's that names the playlist by its path, the
 next playlist in the depth-first order and the root after the last, a cycle playing on
-past the window's end, the choice kept while the card is out and the root playing in its
-place, `play <id>` of a folder's id in place of a new command, the folder items of `list`
-after the show's items, `left` always reported, and the words of the app's button and of
-its line.
+past the window's end, the choice saved when made and kept while the card is out with the
+root playing in its place, `play <id>` of a folder's id in place of a new command, the
+folder items of `list` after the show's items, `left` always reported, the root as a
+group with the same button as a folder, and the words of the app's button and of its line.
 
 ## The Owner's Answers
 
@@ -301,8 +311,11 @@ plays now; the sub-folders of the card's animation folder dictate the sub-playli
 playlist repeats for 24 hours only and afterwards the next sub-playlist starts; when a
 parent playlist is played, all of its non-sub-folder items are exhausted first and then
 its sub-folders start to get exhausted; the seed covers the firmware changes and the app
-changes, and is to be ready for its spec with zero open questions. The owner's acceptance
-of this seed is the owner's word on the two additions to replies, the folder items of
-`list` and `status`'s `left` with `playing` as a folder's id, since every addition to the
-command list needs the owner, and on the change of the playlist decision in
-`docs/decisions.md` that the constraints name.
+changes, and is to be ready for its spec with zero open questions. Later the same day the
+owner hardened it: a chosen folder is a persistent decision, so that a board that restarts
+plays the same folder; the root folder must be a selectable option like any folder; and
+calendar time is never to be considered. The owner's acceptance of this seed is the
+owner's word on the two additions to replies, the folder items of `list` and `status`'s
+`left` with `playing` as a folder's id, since every addition to the command list needs the
+owner, and on the change of the playlist decision in `docs/decisions.md` that the
+constraints name.
