@@ -40,15 +40,16 @@ along it instead of waiting.
   While the length is not known the bar shows the time played alone and cannot be
   dragged. While nothing plays, or a cycle plays, the bar shows nothing.
 - **No change in the core.** The core exposes neither the position nor the length, and
-  this seed adds nothing to `core/` or to `firmware/`: the emulator infers both. The
-  engine asks the core for `status` ten times a second in place of once, its own
-  requests, not logged, as today; the moment `animation` changes is the start of that
-  animation's turn as the engine knows it, within a tenth of a second, and the engine
-  counts the position from there with its own clock, modulo the length. After a seek the
-  engine knows the start exactly, since it made it. The length comes from the storage's
-  catalog when the storage has one, else from the file's records read with the Python
-  library `odrig` in a thread of the emulator, once per file and kept for the run; a
-  file not yet read shows no length.
+  this seed adds nothing to `core/` or to `firmware/`: the emulator infers both from what
+  passes through its hands. The core opens the file it plays anew at the start of every
+  loop and every turn, through the host, so the emulator's host knows the moment each
+  loop of the animation on the LEDs began, to the 20 ms grid; the position is the time
+  since then on the engine's clock, and `status`, asked as today, names the animation.
+  After a seek the engine knows the start exactly, since it made it. The length comes
+  from the storage's catalog when the storage has one; else, when Node.js is at hand,
+  from the converter's `check` of the file, run in a thread of the emulator once per file
+  and kept for the run; else from the loop itself once it has been seen twice. A file
+  whose length is not yet known shows no length.
 - **Seeking.** Dragging the bar to a point of the loop moves playback there with what
   exists. When the point is ahead of the position, the engine moves its own clock
   forward by the difference, rounded to the 20 ms grid: the core's next refresh then
@@ -67,12 +68,12 @@ along it instead of waiting.
   sends no command; its one control, the seek bar, asks the emulator to move playback.
   `docs/emulator.md` and the page's tests change with it, and nothing else of the page
   sends anything.
-- **A fifth event.** The event stream gains `position`, sent with each of the engine's
-  own `status` requests, ten times a second: the animation's id, the time played within
-  the loop and the loop's length in milliseconds, or null while unknown, and the turn's
-  start on the engine's clock. The page draws the bar from it alone, so a seek made by
-  another page, or a `play` sent by any tool, is seen at once. The four events of today
-  are unchanged.
+- **A fifth event.** The event stream gains `position`, sent to a new connection and
+  whenever it changes: the animation's id, the start of its current loop and of its turn
+  on the engine's clock, and the loop's length in milliseconds, or null while unknown.
+  The page draws the bar from it and from the timestamps of the frames it receives, so
+  a seek made by another page, or a `play` sent by any tool, is seen at once. The four
+  events of today are unchanged.
 - **Record mode.** The bar and the route are not part of a recording; `--record` is
   unchanged.
 - **Where the work goes.** `emulator/engine.py` for the faster status requests, the
@@ -85,8 +86,8 @@ along it instead of waiting.
 ## Required Behavior
 
 1. Under the LEDs' drawing, in every view that shows it, a row holds the animation's
-   name or id, a progress bar, and `m:ss / m:ss`; the bar moves as the animation plays,
-   updated ten times a second.
+   id, a progress bar, and `m:ss / m:ss`; the bar moves as the animation plays, with
+   every frame the page receives.
 2. While the length is unknown the row shows the time played alone and the bar is not
    draggable; while nothing plays or a cycle plays, the row is empty.
 3. Dragging the bar to a point moves playback there: forward by a move of the emulator's
@@ -95,28 +96,29 @@ along it instead of waiting.
    step.
 4. The log shows a restart made for a seek with the transport `seek`; a move of the clock
    advances the turn and the window as running time, and the row says so in a word.
-5. The event stream gains `position` with the animation's id, the time played, the
-   length or null, and the turn's start, ten times a second; the other events are as
-   they are.
+5. The event stream gains `position` with the animation's id, the starts of its loop and
+   of its turn, and the length or null, sent to a new connection and at every change; the
+   other events are as they are.
 6. `POST /seek` takes a target in milliseconds and answers the position moved to; a
    target beyond the length, a target while the length is unknown, and a target while
    nothing or a cycle plays are refused with a reason.
-7. The lengths come from the catalog when the storage has one, else from the files,
-   read once in a thread; reading them never delays a refresh.
+7. The lengths come from the catalog when the storage has one, else from the converter's
+   `check` when Node.js is at hand, run once per file in a thread, else from a loop seen
+   twice; nothing of it delays a refresh.
 8. `docs/emulator.md` describes the bar, the route, the event and the changed rule of
    the page; the command list, the core and the firmware are untouched.
 
 ## Definition Of Done
 
 1. All test suites that need no board and no phone pass. The emulator's suite checks,
-   with an injected clock: the `position` events and their rate, the position's error
-   within a tenth of a second after a turn begins and exact after a seek, the lengths
-   from a catalog and from files, a seek forward and a seek backward against a reference
-   player's frames, the refusals of `/seek`, the log line of a restart, the window's
-   `left` after a seek, and that record mode is unchanged; the page's JavaScript is
-   checked in the shell tests and the page files test allows the one fetch; the docs
-   tests know five events and the reworded rule; and a Chrome test sees the bar move and
-   a drag seek.
+   with an injected clock: the `position` events at a connection, at a turn's start, at a
+   loop's start and at a seek, the starts within a grid step of the reference player's,
+   the lengths from a catalog, from the converter's `check` and from a loop seen twice, a
+   seek forward and a seek backward against a reference player's frames, the refusals of
+   `/seek`, the log line of a restart, the window's `left` after a seek, and that record
+   mode is unchanged; the page's JavaScript is checked in the shell tests and the page
+   files test allows the one fetch; the docs tests know five events and the reworded
+   rule; and a Chrome test sees the bar move and a seek.
 2. The owner looks at the bar in the emulator, drags it on a long animation, and sees
    the LEDs follow.
 
@@ -124,10 +126,11 @@ along it instead of waiting.
 
 None. The owner asked for this seed to be answered without a question pass; the
 decisions it needed are taken in the constraints: a bar that is dragged to seek, not a
-display alone; the emulator infers the position and the length rather than the core
-exposing them; the seek moves the emulator's clock forward and restarts for a move back;
-the page's one request goes to a route of the emulator's and is no command; a fifth event
-carries the position; and the rate is ten a second.
+display alone; the emulator infers the position from the file's opens and the length
+from the catalog, the converter or a loop seen twice, rather than the core exposing them;
+the seek moves the emulator's clock forward and restarts for a move back; the page's one
+request goes to a route of the emulator's and is no command; and a fifth event carries
+the position at every change.
 
 ## The Owner's Answers
 
