@@ -14,7 +14,7 @@ Rules for every task:
   seen into the commit message.
 - Code states what it does now; no comment about seeds, tasks or dates.
 
-- [ ] 1. The position and the length
+- [x] 1. The position and the length
   - Set the seed's `state.json` to `in_progress`.
   - `emulator/host.py`: `on_open`, called with the name and the path after an open of an
     animation file. `emulator/engine.py`: the `Playback` record, the note of an open

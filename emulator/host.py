@@ -165,6 +165,9 @@ class FolderHost:
         self._written_name = None
         self._second = None
         self._second_name = None
+        # Told of every open of an animation file, with the name the core used and the
+        # file's path, when set: the engine learns the start of a loop from it.
+        self.on_open = None
 
     def open(self, name):
         """1 when the file is open, 0 when the folder has no file of that name, -1 otherwise."""
@@ -179,16 +182,28 @@ class FolderHost:
                 return 0
             except OSError:
                 return -1
+            self._opened(name, path)
             return 1
         if not name or "/" in name or "\\" in name or os.sep in name or (os.altsep and os.altsep in name):
             return -1
+        path = os.path.join(self.folder, name)
         try:
-            self._file = reading(os.path.join(self.folder, name))
+            self._file = reading(path)
         except FileNotFoundError:
             return 0
         except OSError:
             return -1
+        self._opened(name, path)
         return 1
+
+    def _opened(self, name, path):
+        """Tells of an open of an animation file: a show file by its ending, a drive file
+        by its place."""
+        if self.on_open is None:
+            return
+        rest = name[len(DRIVE_PREFIX):] if name.startswith(DRIVE_PREFIX) else None
+        if name.lower().endswith((".odrg", ".odrgx")) or (rest is not None and rest.isascii() and rest.isdigit()):
+            self.on_open(name, path)
 
     def read(self, capacity):
         """Up to `capacity` bytes of the open file, none at its end, `None` on a failure."""

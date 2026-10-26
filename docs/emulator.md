@@ -2,7 +2,8 @@
 
 The emulator is a program for macOS and Windows that runs the core of [core.md](core.md) on an installed show,
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
-repository root and uses only the Python standard library. It loads the core as a shared
+repository root and uses only the Python standard library and the repository's own
+`odrig` package, pure Python, which reads the catalogs. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
 decision about files, time and commands to it. So it plays texts and clocks as the board
 does, drawn by the core at every refresh, a clock with the seed `status` reports; its
@@ -663,13 +664,33 @@ the Controller view shows and what the phone shows is a fault, by the working ru
 app, in the emulator and on the phone"; the first thing to check is that the emulator and
 the APK come from one commit.
 
+### Seeking
+
+The emulator knows where the animation on the LEDs stands, which the core does not tell:
+the core opens the file it plays through the emulator's host anew at the start of every
+loop and of every turn, and so the emulator takes the grid time of the refresh in which
+the played file was opened as the start of the loop that shows, and the first such open
+after the animation changed, after a command was answered, or after a restart of the
+emulator's own as the start of the turn. The position is the time since the loop's start
+on the clock of the frames' timestamps.
+
+The loop's length comes from three sources, the first that answers: the catalog of the
+storage the file is in, when it has one; the converter's `check` of the file, run once
+per file in a thread of the emulator, when Node.js is on the path; and the loop itself,
+once the emulator has seen two consecutive opens of the same file with no command
+answered and no seek between them. A text or a clock without a catalog entry has no
+length. Reading a catalog or running the converter never delays a refresh.
+
+What the emulator knows goes to the page as the `position` event of the
+[event stream](#the-event-stream).
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
 and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
 byte (404 when the folder has none). Another program may read both in the same way.
 
-The stream is a response of type `text/event-stream` that stays open. It has four kinds of
+The stream is a response of type `text/event-stream` that stays open. It has five kinds of
 event:
 
 ```
@@ -682,6 +703,9 @@ data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"p
 event: status
 data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
 
+event: position
+data: {"animation":1,"start":40020,"turn":40020,"length":5100}
+
 event: frame
 data: 123460 <base64 of the refresh>
 ```
@@ -692,11 +716,12 @@ data: 123460 <base64 of the refresh>
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
+| `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
 
-A new connection gets `hello`, the log entries kept so far, the latest status, and then
-everything that happens. The emulator keeps the last 500 log entries.
+A new connection gets `hello`, the log entries kept so far, the latest status, the latest
+position, and then everything that happens. The emulator keeps the last 500 log entries.
 
-Log and status events are never dropped. Refreshes do not queue: each connection has one
+Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
 skips refreshes and does not fall behind. What the system has already taken for a
 connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to

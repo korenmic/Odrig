@@ -111,7 +111,7 @@ def serve(arguments, out):
     server = None
     try:
         core = binding.Core(arguments.core, files)
-        running = engine.Engine(core, hub.Hub())
+        running = engine.Engine(core, hub.Hub(), host=files)
         running.tick()
         running.refresh_status()
         if link is not None:
