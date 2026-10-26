@@ -714,3 +714,12 @@ are in [format.md](format.md), "Measured sizes".
   APK from the same files; a difference between the Controller view and the APK is a
   fault, not a version; the APK is built from the commit the owner runs and its report
   names that commit; a coding agent never switches the owner's checkout.
+- 2026-10-26: Seed 42 is built, its tasks 1 to 4: the emulator's page gets a seek bar
+  under the LEDs that shows where the animation on the LEDs stands in its loop and is
+  dragged to move playback there, the emulator alone. The emulator takes the start of a
+  loop from the core's opening of the played file through its host, exact to the grid,
+  the length from the storage's catalog, the converter's check when Node.js is on the
+  path, or a loop seen twice, and moves playback by moving its own clock forward, with a
+  restart of its own for a move back, logged with the transport `seek`. No command: the
+  page's one request is the route `POST /seek` of the emulator, and the board and the
+  emulator accept the same commands as before. The owner's look is open.

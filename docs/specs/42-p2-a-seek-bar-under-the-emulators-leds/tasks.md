@@ -57,7 +57,7 @@ Rules for every task:
   - Prove it fails first: the page has no `#seek`.
   - Requirements: 1.1 to 1.7, 4.5, 6.2, 6.3
 
-- [ ] 4. Every suite, the documents and the decision
+- [x] 4. Every suite, the documents and the decision
   - Every suite that works on this computer passes: converter, Python library, core,
     emulator, app, firmware tool, onboarding.
   - `docs/decisions.md`: the change-log line; `docs/drifts.md`: the decisions taken

@@ -10405,3 +10405,45 @@ beside the seed, read to the mapping the stubs show by eye.
 `photos/05-the-diagonal-from-the-side-screenshot.jpg` and `06-…-darkened-screenshot.jpg`;
 docs/android-app.md; the spec's requirements and design; the change log of
 docs/decisions.md.
+
+## Seed 42: what the emulator takes for the position, the length and a seek
+
+**Question.** The seed asks for a seek bar in the emulator alone: the core exposes
+neither the position of the animation on the LEDs nor its length, and no command may be
+added for the emulator. Where does the emulator take the position and the length from,
+what does a seek do at the grid, and what of the rules that the page sends no command and
+the emulator holds no reader of the show?
+
+**Answer.** The core opens the file it plays through the host anew at every loop and
+every turn, and a refresh begins at a grid time, so the start of a loop is the grid time
+of the refresh in which the played file was opened, and the first open after a change of
+file, a command answered, or a restart of the emulator's own is the start of a turn; the
+emulator asks `status` once more after such a refresh, so that the animation's id is
+known at once. A numeric `playing` is a cycle, as the page reads it today; the bar shows
+nothing then, and a seek is refused with `cycle`. The length comes from the storage's
+catalog, which the emulator's `lengths` module reads itself, line by line, since the
+emulator imports nothing of the `odrig` package; else from the converter's `check` of
+the file, run in a thread when Node.js is on the path, which the emulator's suite needs
+anyway, so that the emulator's `lengths` module is the second tool, after the preview,
+that starts the converter, and only to check; else from two consecutive opens of the same file with no command answered and no
+seek between them, kept per file across a restart. A text or a clock without a catalog
+entry has no length. The numbers are `m:ss`, and `h:mm:ss` from one hour. A seek names a
+point from 0 to the length less two grid steps; the move of the clock is rounded down to
+whole grid steps, so the position lands within a grid step below the point; a move back
+is a restart with the emulator's own `play <id>`, logged with the transport `seek`, then
+one grid step so that the core takes the refresh that begins the turn, whose grid time
+is the start, then the move. The page keeps the rule that it sends no command: its one
+request, `POST /seek`, is a route of the emulator and no command of the core; the page
+files test allows that one fetch and keeps `/odrig` forbidden. The engine reads
+`animation` and `playing` off the status reply with two patterns rather than a JSON
+reader, since only the hub reads JSON in the emulator. No keyboard seeking. The word
+`length unknown` stands while the length is not known, and `clock +N s` for three seconds
+after a seek that moved the clock. The Chrome check runs a harness page served beside the
+emulator's page, since Chrome's dump of a page waits for its load, which an open event
+stream never ends: the harness frames the page, reads its numbers, drags its bar with
+pointer events, and holds its own load back with a late image.
+
+**Resolution.** `emulator/engine.py`, `emulator/lengths.py`, `emulator/host.py`,
+`emulator/hub.py`, `emulator/httpd.py`, `emulator/web/`; docs/emulator.md; the spec's
+requirements and design; tests/emulator/test_playback.py, test_seek.py,
+test_page_files.py, tests/app/test_emulator_seek.py; the change log of docs/decisions.md.

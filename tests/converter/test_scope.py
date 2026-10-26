@@ -82,11 +82,13 @@ class WhoConverts(unittest.TestCase):
                     self.assertIn(name, READING, f"{path.relative_to(support.ROOT)} imports {name}")
             self.assertNotRegex(text, r"\bodrg\.encode\(|\bjsonframes\b", path.relative_to(support.ROOT))
 
-    def test_only_the_preview_starts_the_converter_and_only_to_check_and_pack(self):
+    def test_only_the_preview_and_the_emulators_lengths_start_the_converter_and_only_to_check_and_pack(self):
         starting = {path.relative_to(support.ROOT).as_posix() for path, text in tool_modules() if "odrig.js" in text}
-        self.assertEqual(starting, {"preview/__init__.py"})
+        self.assertEqual(starting, {"preview/__init__.py", "emulator/lengths.py"})
         preview = (support.ROOT / "preview" / "__init__.py").read_text(encoding="utf-8")
         self.assertEqual(sorted(set(re.findall(r'converter\(node, "([a-z]+)"', preview))), ["check", "pack"])
+        lengths = (support.ROOT / "emulator" / "lengths.py").read_text(encoding="utf-8")
+        self.assertEqual(sorted(set(re.findall(r'self\.converter, "([a-z]+)"', lengths))), ["check"])
 
 
 class Scope(unittest.TestCase):
