@@ -29,6 +29,16 @@ ENTRIES = [
     catalog.Entry("a.odrg", 0, 0, 1, 1, 0),
 ]
 MANY = [catalog.Entry(f"clip-{number:03d}.odrg", 1000 + number, number * 7919, 60, 60, 1000 * number) for number in range(40)]
+# Entries of a card with sub-folders: paths of one, two and three folders, a folder with a
+# space in its name, one of digits alone, and a loose file.
+FOLDERS = [
+    catalog.Entry("loose.odrg", 2048, 0x0000BEEF, 60, 60, 3000),
+    catalog.Entry("night/comet.odrg", 4096, 0x00C0FFEE, 60, 60, 8000),
+    catalog.Entry("night/deep/x.odrg", 512, 0x0DEADBEE, 60, 60, 1500),
+    catalog.Entry("night/deep/deeper/y.odrgx", 777, 0x0ABCDEF0, 60, 60, 2000, "text"),
+    catalog.Entry("a b/c.odrg", 1024, 0x00001234, 60, 60, 4000),
+    catalog.Entry("2026/day.odrg", 3333, 0x0000CAFE, 60, 60, 6000),
+]
 
 
 def files_of(entries, generation=1):
@@ -111,6 +121,14 @@ def cases():
     record = catalog.do_text(0x2B, 1 << page, [("move", catalog.PART, "sunrise.odrg")])
     made["interrupted"] = ({**valid, catalog.DO: record}, {"state": "damaged", "detail": "interrupted"})
     made["torn-commit-record"] = ({**valid, catalog.DO: record[:-2]}, {"state": "ok", "generation": 0x2A, "entries": listed(ENTRIES)})
+
+    folders = files_of(FOLDERS, generation=3)
+    made["ok-folders"] = (folders, {"state": "ok", "generation": 3, "entries": listed(FOLDERS)})
+    comet_page = catalog.page_of("night/comet.odrg")
+    comet_lines = folders[catalog.page_name(comet_page)]
+    made["damaged-line-path-empty-part"] = (remarked(folders, comet_page, comet_lines.replace(b"night/comet.odrg", b"night//comet.odrg")), {"state": "damaged", "detail": "line"})
+    made["damaged-line-path-dot"] = (remarked(folders, comet_page, comet_lines.replace(b"night/comet.odrg", b".night/comet.odrg")), {"state": "damaged", "detail": "line"})
+    made["damaged-line-path-deep"] = (remarked(folders, comet_page, comet_lines.replace(b"night/comet.odrg", b"a/b/c/d/comet.odrg")), {"state": "damaged", "detail": "line"})
     return made
 
 

@@ -33,7 +33,7 @@ Rules for every task:
   decisions a task takes beyond the seed go into `docs/drifts.md` under "Seed 41" in the
   task's commit (requirement 8.2).
 
-- [ ] 1. The path rule and the depth-first listing of the hosts and the PC tool
+- [x] 1. The path rule and the depth-first listing of the hosts and the PC tool
   - Set the seed's `state.json` to `in_progress`.
   - `core/include/odrig_core.h`: the comments of `drive_name` and `drive_list` describe
     paths and the depth-first order. `core/src/catalog.cpp`: `catalog_name_allowed`

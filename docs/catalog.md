@@ -51,15 +51,22 @@ its type and its name. An ODRG file is of `frames`, its length the sum of the du
 its frame records; an ODRGX container of [format.md](format.md) is of the type its header
 names, `frames`, `text` or `widget`, its canvas and its length the header's, the loop. What
 a file is, its first four bytes say, not its name. The page of a name is the low four bits
-of the FNV-1a hash of its bytes. A page's lines stand in the order their entries came in: a
-rebuild writes them in the storage's order, an addition puts its line last on its page, a
-replacement keeps its line's place, a removal takes its line out. A line is at most 161
-bytes.
+of the FNV-1a hash of its bytes, the whole path of a file in a sub-folder. A page's lines
+stand in the order their entries came in: a rebuild writes them in the storage's order, an
+addition puts its line last on its page, a replacement keeps its line's place, a removal
+takes its line out. A line is at most 161 bytes.
 
-A name is 1 to 100 bytes of printable ASCII other than `/ \ : * ? " < > |`; it does not
-begin with `.` or a space, does not end with a space or `.`, is not made of digits alone,
-and ends in `.odrg` or `.odrgx` in any case. A name of the board's own storage follows the
-show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`.
+A name is the path of the file from the storage's folder: the names of at most three
+folders and the file's name, joined by `/`, 1 to 100 bytes in all. Each part is printable
+ASCII other than `/ \ : * ? " < > |`, neither beginning nor ending with a space or a dot. A
+folder's name may be digits alone; the file's name is not, and ends in `.odrg` or `.odrgx`
+in any case. A card's folder `odrig` is listed as a drive is: a folder's animation files by
+the bytes of their names, then its sub-folders by the bytes of their names, each the same
+way, at most 256 files and 32 sub-folders, a folder counted with its uncounted ancestors
+when the first file at or below it is kept. A name of the board's own storage follows the
+show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, so it holds no
+folder. A reader from before paths were names finds a catalog that names a file in a
+folder `damaged`, with `line` saying where.
 
 ### What a reader finds
 

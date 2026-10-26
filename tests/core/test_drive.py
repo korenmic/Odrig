@@ -27,7 +27,9 @@ def a_drive(files):
         folder = pathlib.Path(top, "odrig")
         folder.mkdir()
         for name, content in files.items():
-            pathlib.Path(folder, name).write_bytes(content)
+            path = folder.joinpath(*name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
         yield top
 
 

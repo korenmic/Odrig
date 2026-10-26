@@ -141,6 +141,21 @@ class External(unittest.TestCase):
         self.assertEqual(listed["bad.odrg"], "truncated")
         self.assertIn("x" * 96 + ".odrg", listed)
 
+    def test_a_card_with_sub_folders_is_imported_as_the_pc_library_imports_it(self):
+        drive = {"sun.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(3, 6), "night/deep/x.odrg": loop_of(2, 7), "a b/c.odrg": loop_of(3, 8), "a-b/d.odrg": loop_of(2, 9),
+                 "night/bad.odrg": loop_of(2, 10)[:-4]}
+        with a_card(drive) as top:
+            run = support.start(SHOW, asked(0, "catalog rebuild external") + polls(20, 500) + asked(10100, "catalog", "list"), ["--drive", top])
+            left = folder_of(top)
+        self.assertEqual(catalog_replies(run)[-1]["external"], {"state": "ok", "generation": 1, "entries": 5, "writable": True})
+        storage = catalog.MemoryStorage(drive)
+        _, refused = catalog.rebuild(storage, canvas=CANVAS)
+        self.assertEqual([name for name, _ in refused], ["night/bad.odrg"])
+        self.assertEqual(catalog_files(left), catalog_files(storage.files))
+        listed = [(item["file"], item.get("fault")) for item in replies(run)[-1]["items"] if item.get("external")]
+        self.assertEqual(listed, [("sun.odrg", None), ("a b/c.odrg", None), ("a-b/d.odrg", None), ("night/bad.odrg", "truncated"), ("night/comet.odrg", None),
+                                  ("night/deep/x.odrg", None)])
+
     def test_a_file_copied_onto_a_card_with_a_catalog_joins_after_a_rebuild(self):
         drive = {**card({"sun.odrg": loop_of(2, 5), "moon.odrg": loop_of(3, 6)}), "copied.odrg": loop_of(2, 7)}
         script = polls(0, 300) + asked(6100, "list") + asked(6120, "catalog rebuild external") + polls(6140, 400) + asked(14200, "list")

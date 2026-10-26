@@ -910,21 +910,43 @@ void publish(Core &core) {
 }  // namespace
 
 bool catalog_name_allowed(const char *name, uint32_t length) {
-    if (length < 6 || length > kCatalogNameMost || name[0] == '.' || name[0] == ' ') {
+    // A path from the card's folder: the names of at most kCatalogDeepest folders and the
+    // file's name, joined by `/`, 1 to kCatalogNameMost bytes in all. Each part is printable
+    // ASCII other than \ : * ? " < > |, neither beginning nor ending with a space or a dot;
+    // a folder's may be digits alone, the file's is not and ends in `.odrg` or `.odrgx`.
+    if (length < 6 || length > kCatalogNameMost) {
         return false;
     }
-    bool digits_only = true;
-    for (uint32_t at = 0; at < length; ++at) {
-        const char c = name[at];
-        if (c < 0x20 || c > 0x7E || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+    uint32_t folders = 0;
+    uint32_t start = 0;
+    for (uint32_t at = 0; at <= length; ++at) {
+        if (at < length && name[at] != '/') {
+            const char c = name[at];
+            if (c < 0x20 || c > 0x7E || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+                return false;
+            }
+            continue;
+        }
+        // A part ends here: at a `/` or at the end of the name.
+        if (at == start || name[start] == '.' || name[start] == ' ' || name[at - 1] == '.' || name[at - 1] == ' ') {
             return false;
         }
-        digits_only = digits_only && c >= '0' && c <= '9';
+        if (at < length) {
+            if (++folders > kCatalogDeepest) {
+                return false;
+            }
+            start = at + 1;
+        }
     }
-    // The name ends in `.odrg` or `.odrgx`, in any case.
+    // The file's part: not digits alone, and ending in `.odrg` or `.odrgx`, in any case.
+    const uint32_t file_length = length - start;
+    bool digits_only = true;
+    for (uint32_t at = start; at < length; ++at) {
+        digits_only = digits_only && name[at] >= '0' && name[at] <= '9';
+    }
     const uint32_t ending = (name[length - 1] == 'x' || name[length - 1] == 'X') ? 6 : 5;
     const char tail[] = ".odrgx";
-    if (length < ending + 1) {
+    if (file_length < ending + 1) {
         return false;
     }
     const char *end = name + length - ending;

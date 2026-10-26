@@ -274,7 +274,9 @@ def installed(files):
     with tempfile.TemporaryDirectory() as folder:
         for name, content in files.items():
             data = content if isinstance(content, bytes) else content.encode("utf-8")
-            pathlib.Path(folder, name).write_bytes(data)
+            path = pathlib.Path(folder, *name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
         yield folder
 
 
@@ -373,8 +375,10 @@ def start(files, script=(), options=(), status=0, check_first=True):
 
 
 def folder_files(folder):
-    """The files of a folder: the content of each by its name."""
-    return {path.name: path.read_bytes() for path in sorted(pathlib.Path(folder).iterdir()) if path.is_file()}
+    """The files of a folder and of its sub-folders: the content of each by its path from
+    the folder, the parts joined by `/`."""
+    root = pathlib.Path(folder)
+    return {path.relative_to(root).as_posix(): path.read_bytes() for path in sorted(root.rglob("*")) if path.is_file()}
 
 
 def start_and_keep(files, script=(), options=(), status=0, check_first=True):
