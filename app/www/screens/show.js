@@ -406,7 +406,7 @@ function draw(state) {
   }
   const here = levelOf(state, all);
   const animations = here.shown;
-  filters.draw(state);
+  filters.draw(state, here.rows);
   // A row that is held keeps the rows as they are until it is let go.
   if (!reorder.dragging()) {
     drawRows(here);
@@ -597,7 +597,7 @@ export function isVisible() {
 export function start(options) {
   message = options.message;
   filters.start({redraw});
-  selection.start({message, redraw});
+  selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});

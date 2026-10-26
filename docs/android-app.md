@@ -298,9 +298,12 @@ line.
 A cycle of the show is not in the list and cannot be started from the app. While one
 plays, Animations says `Cycle` with its id, and `Play this folder` leaves it.
 
-An upload to the card puts the file in the card's folder `odrig` itself, the group
-`Root`; a folder item is no animation, so it is not counted in the storage lines, not
-offered by the filters and not taken by `Select all`.
+The filters count the rows of the level shown and hide only rows: a folder row stays
+whatever the filters, and `No animation matches the filters.` speaks of the level's rows.
+`Select` and `Select all` take the rows of the level shown. An upload to the card puts
+the file in the card's folder `odrig` itself, the root level; a folder row is no
+animation, so it is not counted in the storage lines, not offered by the filters and not
+taken by `Select all`.
 
 The line that says what plays names the current playlist and the time left in its window
 of 24 hours of running time, from `status`: `Playlist · 23 h 12 min left` for the root
@@ -353,10 +356,10 @@ tabs the list scrolls. Letting go saves the order on the installation; the row s
 `Saving...` until the installation's order comes back. Letting go where it began, or a
 cancelled touch, moves nothing. `Move up` and `Move down` in the row's menu do the same
 without holding. A mouse drags as a finger does, in a browser and in the emulator's
-Controller view. A row moves within its group only: the dashed place stays among the
-rows of its group, `Move up` is off for the first row of a group and `Move down` for the
-last, and a row let go where it began, or at its group's edge where it already stands,
-sends nothing. Internal and external animations stand in one order, which the
+Controller view. A row moves within the level shown only: the dashed place stays among
+the rows of the level, above its folder rows, `Move up` is off for the first row of the
+level and `Move down` for the last, and a row let go where it began, or at the level's
+edge where it already stands, sends nothing. Internal and external animations stand in one order, which the
 installation keeps; an external animation keeps its place by its file name while its
 medium is out. The order cannot be changed, and the list says why, while the installation
 does not answer, keeps no order (older software, whose list stays in its show's order), a

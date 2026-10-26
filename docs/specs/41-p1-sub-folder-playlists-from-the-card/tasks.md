@@ -267,7 +267,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.7, 8.1, 10.4
 
-- [ ] 12. The app's filters, moves and selection within the level shown
+- [x] 12. The app's filters, moves and selection within the level shown
   - `app/www/screens/filters.js` (the counts of the level's rows), `selection.js` (the
     level's rows for `Select all` and what can be selected), `reorder.js` (checked: moves
     within the level, a folder row ending the level), `show.js` passing the level's rows.

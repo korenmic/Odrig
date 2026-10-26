@@ -165,12 +165,23 @@ export default async function (app) {
         type: [...app.doc.querySelectorAll("#filter-type button")].map((button) => button.textContent.trim()),
       }});
       continue;
-    } else if (step.select) {
+    } else if (step.select !== undefined) {
+      // Select all at this level: the rows checked on the screen, and which of these ids
+      // the selection holds, shown or not.
+      const selection = await app.frame.contentWindow.eval('import("/screens/selection.js")');
+      if (app.byId("select-mode").disabled) {
+        // Nothing of this level can be selected: Select is off.
+        found.steps.push({selected: [], held: step.select.filter((id) => selection.has(id)), offered: false, ...seen(app)});
+        continue;
+      }
       app.press("Select");
-      app.press("Select all");
+      const selectAll = app.byId("select-all");
+      if (!selectAll.disabled) app.press("Select all");
       const selected = [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));
+      const held = step.select.filter((id) => selection.has(id));
+      const offered = !selectAll.disabled;
       app.press("Done");
-      found.steps.push({selected, ...seen(app)});
+      found.steps.push({selected, held, offered, ...seen(app)});
       continue;
     } else if (step.step) {
       // The card is pulled out, or plugged in again, by the test.

@@ -731,3 +731,12 @@ are in [format.md](format.md), "Measured sizes".
   items of `list`, `playing` as a folder's id and `left` of `status`; and the app's groups
   with `Play this folder`. The firmware is built and not flashed; the owner's session with
   the board and a phone is open.
+- 2026-10-26: The owner's correction of seed 41 after the emulator review, verbatim: "I
+  do not like how you implemented entering a folder, instead of entering it uncollapse
+  its contents into the root hierarchy, I rather a folder be "entered" like a file
+  explorer and THEN the user can select to start playing items in it. fix it in the PR."
+  The app shows one level of the card's folders at a time: a folder row is entered with a
+  tap, a heading carries the path with `Back`, the level's `Play this folder` stands at
+  the top, the folder rows that lead to the current playlist are marked, and the filters,
+  moves and selection work within the level shown. The replies, the core and the firmware
+  are as they were; the firmware built on 2026-10-26 stands.

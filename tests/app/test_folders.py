@@ -197,5 +197,66 @@ class AgainstTheEmulator(unittest.TestCase):
         self.assertEqual(([folder["path"] for folder in back["folders"]], marked(back)["folders"]), (["night", "only"], ["night"]))
 
 
+class WithinTheLevel(AgainstTheEmulator):
+    def order_of(self, emulator):
+        reply = json.loads(emulator.command("order get"))
+        return reply["ids"], reply["revision"]
+
+    def test_move_up_and_move_down_stay_within_the_level(self):
+        emulator, _, folders_ = self.card(zeta=True)
+        address = f"127.0.0.1:{emulator.port}"
+        # Inside `night`, comet (60002) cannot move up and zeta (60003) cannot move down; at
+        # the root the first row cannot move up. Comet moved down goes last in the saved
+        # order and after zeta in its level.
+        steps = [{"menus": [1]}, {"enter": "night", "level": "night", "rows": 2}, {"menus": [60002, 60003]},
+                 {"menu": [60002, "Move down", [60003, 60002]], "rows": 2}]
+        found = support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": steps}).seen
+        self.assertEqual(found["steps"][0]["menus"]["1"][:3], ["Ignore in playlist", "Move up (disabled)", "Move down"])
+        self.assertEqual(found["steps"][2]["menus"]["60002"][:2], ["Move up (disabled)", "Move down"])
+        self.assertEqual(found["steps"][2]["menus"]["60003"][:2], ["Move up", "Move down (disabled)"])
+        self.assertEqual(ids(found["steps"][3]), [60003, 60002])
+        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60003, 60004, 60005, 60002])
+        found = support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": [{"enter": "night", "level": "night", "rows": 2}, {"menu": [60002, "Move up", [60002, 60003]], "rows": 2}]}).seen
+        self.assertEqual(self.order_of(emulator)[0], [1, 2, 60001, 60002, 60003, 60004, 60005])
+
+    def test_a_drag_lands_within_the_level_and_a_drop_in_place_sends_nothing(self):
+        emulator, _, folders_ = self.card(zeta=True)
+        address = f"127.0.0.1:{emulator.port}"
+        _, revision = self.order_of(emulator)
+        # Zeta dragged to the top of comet lands before it; comet, then last, dragged to the
+        # bottom of the list, below the folder row, stays last and sends nothing; a row
+        # brought back where it began sends nothing either.
+        steps = [{"enter": "night", "level": "night", "rows": 2}, {"drag": {"id": 60003, "to": 60002, "expected": [60003, 60002]}},
+                 {"drag": {"id": 60002, "to": "bottom", "expected": [60003, 60002]}}, {"back_drag": {"id": 60003, "to": 60002}}]
+        found = support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": steps}).seen
+        _, first, second, back = found["steps"]
+        self.assertEqual(first["landing"], {"lifted": True, "before": 60002})
+        self.assertEqual(ids(first), [60003, 60002])
+        ids_, moved = self.order_of(emulator)
+        self.assertEqual(ids_, [1, 2, 60001, 60003, 60002, 60004, 60005])
+        self.assertNotEqual(moved, revision)
+        self.assertEqual(second["landing"], {"lifted": True, "before": "end"})
+        self.assertEqual(ids(back), [60003, 60002])
+        self.assertEqual(self.order_of(emulator), (ids_, moved))
+
+    def test_the_filters_count_the_levels_rows_and_leave_the_folder_rows_and_selection_takes_the_levels_rows(self):
+        emulator, _, folders_ = self.card()
+        address = f"127.0.0.1:{emulator.port}"
+        steps = [{"filter": ["storage", "Internal"]}, {"filter": ["storage", "All"]}, {"select": [1, 2, 60002]},
+                 {"enter": "night", "level": "night", "rows": 1}, {"filter": ["storage", "Internal"]}, {"filter": ["storage", "External"]},
+                 {"filter": ["storage", "All"]}, {"select": [1, 2, 60002]}]
+        found = support.run("folders", address=address, settings={"rows": 3, "folders": 2, "steps": steps}).seen
+        root_internal, _, root_select, _, night_internal, night_external, _, night_select = found["steps"]
+        self.assertEqual(root_internal["filters"]["storage"], ["All 3", "Internal 2", "External 1"])
+        self.assertEqual((ids(root_internal), [folder["path"] for folder in root_internal["folders"]]), ([1, 2], ["night", "only"]))
+        self.assertEqual((root_select["selected"], root_select["held"], root_select["offered"]), ([1, 2], [1, 2], True))
+        self.assertEqual(night_internal["filters"]["storage"], ["All 1", "Internal 0", "External 1"])
+        self.assertEqual((ids(night_internal), [folder["path"] for folder in night_internal["folders"]], night_internal["filterEmpty"]),
+                         ([], ["night/deep"], "No animation matches the filters.\nShow all"))
+        self.assertEqual((ids(night_external), night_external["filterEmpty"]), ([60002], None))
+        self.assertEqual((night_select["selected"], night_select["held"], night_select["offered"]), ([], [], False))
+        self.assertEqual(found["first"]["externalLine"].split(",")[0], "External storage: 4 animations")
+
+
 if __name__ == "__main__":
     unittest.main()
