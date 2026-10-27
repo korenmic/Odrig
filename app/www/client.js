@@ -561,6 +561,10 @@ export function mappingSet(revision, pins) {
   return requestOperation("mapping", () => commands.mappingSet(revision, pins));
 }
 
+export function mappingCross(crossed) {
+  return requestOperation("mapping", () => commands.mappingCross(crossed));
+}
+
 export function mappingTest(enabled) {
   return requestOperation("mapping", () => commands.mappingTest(enabled));
 }

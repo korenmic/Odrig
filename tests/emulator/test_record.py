@@ -239,7 +239,7 @@ class Recording(unittest.TestCase):
 
     def test_every_made_up_column_leg_mapping_is_recorded_with_its_own_legs_as_the_reference_plays_it(self):
         texts = core_support.column_mapping_texts()
-        self.assertEqual(sorted(texts), ["columns-apart", "one-led-column", "top-start", "two-and-four-columns"])
+        self.assertEqual(sorted(texts), ["columns-apart", "crossed-columns", "one-led-column", "top-start", "two-and-four-columns"])
         sizes = set()
         for name, text in texts.items():
             with self.subTest(mapping=name):

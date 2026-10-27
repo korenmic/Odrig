@@ -35,6 +35,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `ignore <id> <value>` | Excludes or includes an installed animation in the automatic playlist. |
 | `mapping get` | Reports saved pin assignments, their revision and diagnostic state. |
 | `mapping set <revision> <pins>` | Atomically saves a complete comma-separated pin permutation. |
+| `mapping cross on` | Saves snake 10 as cross-wired: its chain up column 28, up column 30, down column 29. |
+| `mapping cross off` | Saves snake 10 as wired as the other snakes. |
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
 | `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
@@ -353,10 +355,12 @@ front-end, including replies with `"ok":false`. Any other method on `/odrig` get
 
 ## Mapping controls
 
-`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,test:false,snake:null}`.
+`mapping get` reports `{ok:true,editable:true,pins:[...],revision:N,cross:false,test:false,snake:null}`.
 Pins are in snake order, 1 through 20. Unsupported or invalid mappings report
-`editable:false`, an empty `pins` array and revision 0. The test flag is target-wide.
-Only the target's existing twenty-pin permutation is editable.
+`editable:false`, an empty `pins` array, revision 0 and `cross:false`. The test flag is
+target-wide. Only the target's existing twenty-pin permutation is editable, its twenty
+snakes of three columns each, snake 10 wired as the others or cross-wired. `cross` is
+`true` when snake 10 is cross-wired.
 
 `mapping set <revision> <pins>` accepts exactly twenty comma-separated GPIO numbers.
 The revision is the decimal CRC-32 of the current twenty pin bytes in snake order.
@@ -367,6 +371,17 @@ performs no storage writes. Re-read after any uncertain reply.
 A stale revision gives `mapping-conflict`; malformed or unsupported assignments give
 `bad-argument`. Invalid shows give `show-invalid`; startup checking or an open upload
 makes writes `busy`; failed or unavailable writable storage gives `storage-error`.
+
+`mapping cross on` saves snake 10 as cross-wired, its chain running up column 28, up
+column 30 and down column 29, as the installation's snake 10 is wired around a dead data
+output; `mapping cross off` saves it as wired as the others, up, down, up. The pins stay
+as they are, and the mapping file is rewritten as `mapping set` writes it, atomically,
+with snake 10's leg as `"columns":[28,30,29],"starts":["bottom","bottom","top"]` when it
+is cross-wired ([mapping.md](mapping.md)). From the next refresh the snake's LEDs show the
+canvas by the new wiring; nothing else changes. The same word again is `{ok:true}` and
+writes nothing. The revision is the pins' and is not changed by the wiring, which a
+`mapping set` keeps. A word other than `on` or `off`, or a mapping that is not editable,
+gives `bad-argument`; `show-invalid`, `busy` and `storage-error` are as for `mapping set`.
 
 `mapping test on` displays the built-in diagonal until `mapping test off` or a valid
 ordinary play command. Both test commands are idempotent. Entry requires the valid

@@ -33,6 +33,7 @@ class Leg:
     pin: int
     first_led: str            # "left" or "right" in a row leg, "bottom" or "top" in a column leg
     strips: tuple[int, ...]   # the y of each row, or the x of each column, in chain order
+    starts: tuple[str, ...] | None = None   # the end each strip starts at, in chain order; None: they alternate
 
 
 @dataclasses.dataclass(frozen=True)
@@ -79,9 +80,13 @@ def position(canvas, leg, n):
         raise ValueError(f"leg {leg.leg} has no LED {n}")
     strip, along = divmod(n - 1, length)
     low_end = _NAMES[canvas.kind].ends[0]
-    # The first strip of the chain starts at the `first_led` end, and every strip after it
-    # at the end opposite to the one before.
-    starts_at_the_low_end = (leg.first_led == low_end) == (strip % 2 == 0)
+    # With `starts` each strip starts at the end it names. Without it the first strip of
+    # the chain starts at the `first_led` end, and every strip after it at the end opposite
+    # to the one before.
+    if leg.starts is not None:
+        starts_at_the_low_end = leg.starts[strip] == low_end
+    else:
+        starts_at_the_low_end = (leg.first_led == low_end) == (strip % 2 == 0)
     place = 1 + along if starts_at_the_low_end else length - along
     across = leg.strips[strip]
     return (place, across) if canvas.kind == ROWS else (across, place)
@@ -117,7 +122,7 @@ def _mapping(data):
     pins = set()
     for place, entry in enumerate(listed, 1):
         what = f"entry {place} of legs"
-        strictjson.members(entry, ("leg", "pin", "first_led", names.strips), what=what)
+        strictjson.members(entry, ("leg", "pin", "first_led", names.strips), optional=("starts",), what=what)
         number = strictjson.integer(entry["leg"], 1, 255, what=f"leg of {what}")
         if number in numbers:
             raise _malformed(f"two legs have the number {number}")
@@ -134,7 +139,18 @@ def _mapping(data):
             raise _malformed(f"{names.strips} of leg {number} is empty")
         for strip in strips:
             strictjson.integer(strip, what=f"a {names.strip} of leg {number}")
-        legs.append(Leg(number, pin, first_led, tuple(strips)))
+        starts = None
+        if "starts" in entry:
+            words = strictjson.array(entry["starts"], what=f"starts of leg {number}")
+            for word in words:
+                if type(word) is not str or word not in names.ends:
+                    raise _malformed(f'a start of leg {number} is not "{names.ends[0]}" or "{names.ends[1]}"')
+            if len(words) != len(strips):
+                raise _malformed(f"starts of leg {number} has {len(words)} words for {len(strips)} {names.strips}")
+            if words[0] != first_led:
+                raise _malformed(f"the first start of leg {number} is not its first_led")
+            starts = tuple(words)
+        legs.append(Leg(number, pin, first_led, tuple(strips), starts))
 
     total = sum(len(leg.strips) for leg in legs)
     seen = set()

@@ -752,3 +752,10 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-27: Seed 42 is completed: the owner looked at the seek bar in the emulator, after
   a seek far into a long file was made to show its frame at once by moving the clock in
   strides of 400 ms, and the bar was made to show during a folder's playlist of seed 41.
+- 2026-10-27: Seed 43, the owner's request after re-chaining snake 10 around the dead output
+  of line 29: a leg of the mapping may name the end each strip starts at, `starts`, so
+  that a snake chained up, up, down is placed right; `mapping cross on|off` saves snake 10
+  so wired, and `mapping get` reports it as `cross`, a command and a member the owner
+  approved through the seed; the app's Settings show it as a checkbox, `Snake 10 is
+  cross-wired`, off by default because a photo of the diagonal cannot tell which snake is
+  cross-wired. The pins and their revision are unchanged by it.

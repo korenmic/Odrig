@@ -91,6 +91,17 @@ class TheAnalysis(unittest.TestCase):
         self.assert_read_back("twoDead", dead=[5, 12])
         self.assertEqual(self.seen["twoDead"]["readings"][0]["filled"], [{"position": 5, "snake": 5}, {"position": 12, "snake": 12}])
 
+    def test_a_cross_wired_position_read_with_the_box_off_gets_the_snake_that_remains(self):
+        """The core places position 10's second and third pixels on its other two lines,
+        in the rows of the snake 21 - s: the position that shows that snake keeps it, and
+        position 10 gets the snake no other position shows, its own."""
+        found = self.seen["crossedTen"]
+        self.assertNotIn("refused", found, found)
+        shuffled = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 47, 15, 16, 17, 18, 21, 1, 11]
+        self.assertIsNone(found["positions"][9], found)
+        self.assertEqual(found["readings"][0]["filled"], [{"position": 10, "snake": shows(shuffled, 10)}])
+        self.assertEqual(found["pins"], DEFAULTS)
+
     def test_bright_spots_off_the_grid_are_ignored(self):
         self.assert_read_back("noise")
         self.assertGreaterEqual(self.seen["noise"]["ignored"], 1)

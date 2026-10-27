@@ -43,6 +43,22 @@ class HostRouting(unittest.TestCase):
                 self.assertEqual([leg[1] for leg in changed[0]],PINS[::-1])
                 events.disconnect(connection)
 
+    def test_engine_announces_the_mapping_after_a_cross_on_every_transport_and_not_after_a_refusal(self):
+        for transport in ('http','serial','tcp'):
+            with self.subTest(transport=transport):
+                core=self.opened();events=hub.Hub();running=engine.Engine(core,events,clock=lambda:0)
+                connection=events.connect({})
+                for line in (b'mapping cross on',b'mapping cross maybe',b'mapping cross on'):
+                    if transport=='http':running.line(line,transport)
+                    else:running.feed(line+b'\n',transport)
+                published=connection.take(.01)
+                changed=[json.loads(value) for kind,value in published if kind=='mapping']
+                # The page reads the mapping file again for the save; the refusal publishes
+                # nothing, and the same word again only once more.
+                self.assertEqual(len(changed),2)
+                self.assertEqual([leg[1] for leg in changed[0]],PINS)
+                events.disconnect(connection)
+
     def test_pin_bytes_follow_the_saved_assignment_without_changing_canvas_data(self):
         core=self.opened();core.command(1001,b'mapping test on');core.poll(1020)
         picture=core.frame();before={leg.pin:picture[i*540:(i+1)*540] for i,leg in enumerate(core.legs)}
@@ -77,7 +93,7 @@ int main() {
 class MappingCli(unittest.TestCase):
     def test_mapping_forms_are_sent_without_reinterpreting_pins(self):
         from odrigctl import cli
-        for words in [('mapping','get'),('mapping','test','on'),('mapping','test','off'),('mapping','set','123','1,2,3')]:
+        for words in [('mapping','get'),('mapping','test','on'),('mapping','test','off'),('mapping','set','123','1,2,3'),('mapping','cross','on'),('mapping','cross','off')]:
             parser=cli.parser()
             parsed=parser.parse_args(['--port','unused',*words])
             self.assertEqual(cli.command_line(parser,parsed),(' '.join(words)+'\n').encode())

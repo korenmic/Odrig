@@ -10406,6 +10406,69 @@ beside the seed, read to the mapping the stubs show by eye.
 docs/android-app.md; the spec's requirements and design; the change log of
 docs/decisions.md.
 
+## Seed 43: how a leg says that its strips do not alternate
+
+**Question.** Snake 10 of the installation runs up column 28, up column 30 and down column
+29, where the mapping's rule has the strips of a leg alternate from the `first_led` end.
+How does the mapping file say so, and in which words?
+
+**Answer.** A leg may have `starts`, one word for each strip in chain order, the end the
+strip starts at, in the words of `first_led`: `bottom` or `top` for a column, `left` or
+`right` for a row, not `up` and `down`, which the format does not use. Its first word
+repeats `first_led`, so a reader that knows only `first_led` still places the first strip
+right, and a difference is malformed. Without `starts` the strips alternate as before, so
+every file written before is the same file. The member is general, for any leg of either
+kind; only the app's checkbox is particular to snake 10. The core takes the bits of the
+ends only when the file has a `starts`, so the memory of a file without one is unchanged:
+one block more, of one bit a strip, with it.
+
+**Resolution.** docs/mapping.md, rule 6 and "Where each LED is"; `core/src/mapping.cpp`,
+`odrig/mapping.py`, `emulator/web/layout.js`; the tests of the core, the library and the
+emulator.
+
+## Seed 43: the bit of the cross-wired snake, its command and its revision
+
+**Question.** How does the app set the bit that snake 10 is cross-wired: a member of
+`mapping set`, or a command of its own? Is the bit part of the revision that guards a
+save? And what does the snake test of snake 10 show with the bit on?
+
+**Answer.** A command of its own, `mapping cross on|off`: `mapping set` keeps its form,
+which every client and the command tool send, and the bit is not a pin. The revision
+stays the CRC-32 of the twenty pins: the app computes it from the pins it shows, and the
+bit is idempotent, so a stale app can only set the bit it means to set; `mapping set`
+keeps the bit as it is. The bit is nothing but the form of leg 10 in the mapping file,
+`"columns":[28,30,29]` with `"starts":["bottom","bottom","top"]`, so a restart, the
+emulator and every app agree, and a hand-written file with that leg reads as the bit on.
+The snake test and the diagonal are drawn on the canvas as before: with the bit on, on
+the installation as wired, the block of snake 10 climbs its three lines together and the
+stub of position 10 rises like the others; with it off the block climbs line 28 and
+descends lines 29 and 30. The emulator publishes the mapping again after every successful
+`mapping cross`, so that its page reads the file again, although the legs and their pins
+are the same.
+
+**Resolution.** docs/commands.md, "Mapping controls"; docs/core.md; docs/mapping.md;
+`core/src/mapping_control.cpp`, `core/src/commands.cpp`; `emulator/binding.py`,
+`emulator/engine.py`; `odrigctl/cli.py`; the mapping suite.
+
+## Seed 43: the photo of a cross-wired snake read with the box off
+
+**Question.** The design said that nothing of the photo reading changes: with snake 10
+cross-wired and the box off, position 10's second and third LEDs land in the rows of the
+snake 21 - s, the position that shows that snake keeps it with more votes, and position
+10 gets the snake that remains. The test of such a wall failed instead: every position
+was read one snake off, and positions 10 and 11 had none. Why, and what changes?
+
+**Answer.** The two misplaced LEDs share their rows with the stub of snake 21 - s, so two
+rows hold two LEDs each. The grid of the rows takes its pitch at each step from the four
+nearest gaps between sorted values, and the two gaps of nearly nothing between the LEDs
+of one row halved it there: the next step counted two places, and every row above was
+one place higher. The pitch now leaves out a gap of less than 0.6 of the typical gap, two
+LEDs at one place, and takes the four nearest gaps between places. A wall with no two
+LEDs in a row reads as before; the owner's photos read as before.
+
+**Resolution.** `app/www/photo.js`, `places`; the wall of the tests with a cross-wired
+position, `tests/app/page/scenarios/photo-analysis.js`; `tests/app/test_photo.py`;
+docs/android-app.md, "The mapping from a photo".
 ## Seed 42: what the emulator takes for the position, the length and a seek
 
 **Question.** The seed asks for a seek bar in the emulator alone: the core exposes

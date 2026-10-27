@@ -285,7 +285,17 @@ export async function mappingGet() {
   if (!(snake === null || (reply.test === true && whole(snake, 1, 20)))) {
     throw new Failure("bad-reply", address());
   }
-  return {editable: reply.editable, pins: reply.pins, revision: reply.revision, test: reply.test, snake};
+  // `cross` says that snake 10 is cross-wired; an older target gives none.
+  const cross = reply.cross === undefined ? false : reply.cross;
+  if (typeof cross !== "boolean") {
+    throw new Failure("bad-reply", address());
+  }
+  return {editable: reply.editable, pins: reply.pins, revision: reply.revision, cross, test: reply.test, snake};
+}
+
+// Saves snake 10 as cross-wired, or as wired as the others.
+export async function mappingCross(crossed) {
+  await carriedOut(`mapping cross ${crossed ? "on" : "off"}`);
 }
 
 export async function mappingSet(revision, pins) {

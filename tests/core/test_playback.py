@@ -172,7 +172,7 @@ class EveryLedShowsItsPixel(Playback):
                             i = (n - 1) % width
                             y = leg["rows"][r]
                             starts_on_the_first_side = r % 2 == 0
-                            from_the_right = (leg["first_led"] == "right") == starts_on_the_first_side
+                            from_the_right = leg["starts"][r] == "right" if "starts" in leg else (leg["first_led"] == "right") == starts_on_the_first_side
                             x = width - i if from_the_right else 1 + i
                             self.assertEqual(tuple(data[3 * (n - 1):3 * n]), (x, y, 200), f"LED {n} of leg {leg['leg']}")
                             shown.append((x, y))
@@ -183,7 +183,7 @@ class EveryLedShowsItsPixel(Playback):
                             i = (n - 1) % height
                             x = leg["columns"][s]
                             starts_at_the_first_end = s % 2 == 0
-                            from_the_bottom = (leg["first_led"] == "bottom") == starts_at_the_first_end
+                            from_the_bottom = leg["starts"][s] == "bottom" if "starts" in leg else (leg["first_led"] == "bottom") == starts_at_the_first_end
                             y = 1 + i if from_the_bottom else height - i
                             self.assertEqual(tuple(data[3 * (n - 1):3 * n]), (x, y, 200), f"LED {n} of leg {leg['leg']}")
                             shown.append((x, y))

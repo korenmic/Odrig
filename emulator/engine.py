@@ -136,14 +136,19 @@ class Engine:
             self._take_lengths()
             self._publish()
 
+    def routing(self):
+        """What the page must read the mapping again for: the legs and their pins, and the
+        saves of a leg's wiring."""
+        return getattr(self.core, "legs", ()), getattr(self.core, "wiring_saves", 0)
+
     def line(self, data, transport):
         """One command line, as HTTP delivers it. Returns the reply."""
         with self._lock:
             now = self.now_ms()
-            before = getattr(self.core, "legs", ())
+            before = self.routing()
             reply = self.core.command(now, data)
             self._answered += 1
-            if before != getattr(self.core, "legs", ()):
+            if before != self.routing():
                 self.hub.mapping(self.core.legs)
         kept = data[:-1] if data.endswith(b"\n") else data
         kept = kept[:-1] if kept.endswith(b"\r") else kept
@@ -156,10 +161,10 @@ class Engine:
         lines they finish, joined."""
         with self._lock:
             now = self.now_ms()
-            before = getattr(self.core, "legs", ())
+            before = self.routing()
             answered = self.core.feed(now, data)
             self._answered += len(answered)
-            if before != getattr(self.core, "legs", ()):
+            if before != self.routing():
                 self.hub.mapping(self.core.legs)
         for line, reply, cut in answered:
             self.hub.log(now, transport, line, cut, reply)

@@ -216,6 +216,24 @@ class AcceptedColumns(unittest.TestCase):
         result = mapping.loads(column_source(height=1, legs=[column_leg(columns=range(1, 65535))]))
         self.assertEqual((result.width, result.height), (65534, 1))
 
+    def test_a_leg_may_name_the_end_each_column_starts_at(self):
+        legs = [column_leg(1, 1, columns=(1, 3, 2), starts=["bottom", "bottom", "top"]), column_leg(2, 2, "top", columns=(4, 5))]
+        result = mapping.loads(column_source(height=4, legs=legs))
+        self.assertEqual(result.legs, (mapping.Leg(1, 1, "bottom", (1, 3, 2), ("bottom", "bottom", "top")), mapping.Leg(2, 2, "top", (4, 5))))
+        self.assertIsNone(result.legs[1].starts)
+        self.assertEqual([mapping.position(result, result.legs[0], n) for n in range(1, 13)],
+                         [(1, 1), (1, 2), (1, 3), (1, 4), (3, 1), (3, 2), (3, 3), (3, 4), (2, 4), (2, 3), (2, 2), (2, 1)])
+
+    def test_a_row_leg_may_name_the_side_each_row_starts_at(self):
+        result = mapping.loads(source(width=3, legs=[leg(1, 1, "left", rows=(1, 2, 3), starts=["left", "left", "right"])]))
+        self.assertEqual([mapping.position(result, result.legs[0], n) for n in range(1, 10)],
+                         [(1, 1), (2, 1), (3, 1), (1, 2), (2, 2), (3, 2), (3, 3), (2, 3), (1, 3)])
+
+    def test_starts_that_alternate_give_the_places_of_a_leg_without_them(self):
+        plain = mapping.loads(column_source(height=3, legs=[column_leg(1, 1, "top", columns=(2, 1, 3))]))
+        named = mapping.loads(column_source(height=3, legs=[column_leg(1, 1, "top", columns=(2, 1, 3), starts=["top", "bottom", "top"])]))
+        self.assertEqual([mapping.position(named, named.legs[0], n) for n in range(1, 10)], [mapping.position(plain, plain.legs[0], n) for n in range(1, 10)])
+
     def test_the_members_may_come_in_any_order_with_columns_before_first_led(self):
         text = b'{"legs": [{"columns": [2, 1], "pin": 3, "leg": 9, "first_led": "top"}], "height": 3, "version": 1}'
         result = mapping.loads(text)
@@ -545,6 +563,15 @@ class Order(unittest.TestCase):
         legs = [column_leg(1, 1, columns=(2, 2)), column_leg(2, 2, columns=(0,))]
         self.refused(column_source(legs=legs), "column 2 is listed twice")
 
+    def test_starts_of_another_length_kind_or_first_word_are_refused(self):
+        self.refused(column_source(legs=[column_leg(columns=(1, 2, 3), starts=["bottom", "top"])]), "starts of leg 1 has 2 words for 3 columns")
+        self.refused(column_source(legs=[column_leg(columns=(1,), starts=[])]), "starts of leg 1 has 0 words for 1 columns")
+        self.refused(column_source(legs=[column_leg(columns=(1, 2), starts=["bottom", "right"])]), 'a start of leg 1 is not "bottom" or "top"')
+        self.refused(source(legs=[leg(first_led="left", rows=(1, 2), starts=["left", "top"])]), 'a start of leg 1 is not "left" or "right"')
+        self.refused(column_source(legs=[column_leg(columns=(1, 2), starts=["bottom", 1])]), 'a start of leg 1 is not "bottom" or "top"')
+        self.refused(column_source(legs=[column_leg(columns=(1, 2), starts=["top", "bottom"])]), "the first start of leg 1 is not its first_led")
+        self.refused(column_source(legs=[column_leg(columns=(1,), starts="bottom")]), "bad-type: starts of leg 1 is not an array")
+
     def test_the_columns_are_judged_before_the_size_of_the_canvas(self):
         self.refused(column_source(height=65535, legs=[column_leg(columns=(2,))]), "column 2 of leg 1 is not from 1 to 1, the number of columns")
         self.refused(column_source(height=65535, legs=[column_leg(columns=(1,))]), "the canvas of 1 x 65535 has 65535 pixels, above 65534")
@@ -559,7 +586,10 @@ def place_by_the_rule(file, entry, n):
         i = (n - 1) % w
         y = entry["rows"][r]
         starts_on_the_first_led_side = r % 2 == 0
-        starts_right = (entry["first_led"] == "right") == starts_on_the_first_led_side
+        if "starts" in entry:
+            starts_right = entry["starts"][r] == "right"
+        else:
+            starts_right = (entry["first_led"] == "right") == starts_on_the_first_led_side
         x = w - i if starts_right else 1 + i
     else:
         h = file["height"]
@@ -567,7 +597,10 @@ def place_by_the_rule(file, entry, n):
         i = (n - 1) % h
         x = entry["columns"][s]
         starts_at_the_first_led_end = s % 2 == 0
-        starts_at_the_bottom = (entry["first_led"] == "bottom") == starts_at_the_first_led_end
+        if "starts" in entry:
+            starts_at_the_bottom = entry["starts"][s] == "bottom"
+        else:
+            starts_at_the_bottom = (entry["first_led"] == "bottom") == starts_at_the_first_led_end
         y = 1 + i if starts_at_the_bottom else h - i
     return x, y
 
@@ -578,6 +611,7 @@ ROW_LEG_FILES = {
     "two and four rows": source(width=5, legs=[leg(1, 4, "right", rows=(6, 5)), leg(2, 5, "left", rows=(1, 2, 3, 4))]),
     "rows apart": source(width=4, legs=[leg(1, 1, "right", rows=(2, 4)), leg(2, 2, "left", rows=(1, 5, 3))]),
     "one LED": source(width=1, legs=[leg(1, 1, "left", rows=(1,))]),
+    "rows named by starts": source(width=4, legs=[leg(1, 1, "left", rows=(1, 2, 3), starts=["left", "left", "right"]), leg(2, 2, "right", rows=(4,))]),
 }
 
 COLUMN_LEG_FILES = {
@@ -587,6 +621,7 @@ COLUMN_LEG_FILES = {
     "two and four columns": column_source(height=5, legs=[column_leg(1, 4, "bottom", columns=(1, 2)), column_leg(2, 5, "top", columns=(6, 5, 4, 3))]),
     "columns apart": column_source(height=4, legs=[column_leg(1, 1, "bottom", columns=(2, 4)), column_leg(2, 2, "top", columns=(1, 5, 3))]),
     "one LED": column_source(height=1, legs=[column_leg(1, 1, "top", columns=(1,))]),
+    "a snake chained around a dead output": column_source(height=4, legs=[column_leg(1, 1, columns=(1, 3, 2), starts=["bottom", "bottom", "top"]), column_leg(2, 2, columns=(4, 5, 6))]),
 }
 
 

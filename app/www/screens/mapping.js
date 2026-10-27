@@ -30,6 +30,8 @@ let polling = false;
 // The saving of moves: the assignment the target confirmed last and its revision, the one
 // wanted now, whether a call is out, and the pin that was moved.
 let live = null;
+// The saving of snake 10's wiring is under way.
+let crossing = false;
 let problem = "";
 let note = "";
 let fresh = false;
@@ -45,7 +47,7 @@ const same = (a, b) => a.length === b.length && a.every((value, at) => value ===
 const editable = () => latest?.editable === true && latest.pins.length === SNAKES;
 // The pins of snakes 1 to 20 that the column shows.
 const shownPins = () => live !== null ? live.wanted ?? live.confirmed : editable() ? latest.pins : [];
-const locked = () => pending || !fresh || !editable();
+const locked = () => pending || !fresh || !editable() || crossing;
 const defaultsAvailable = () => editable() && same([...latest.pins].sort((a, b) => a - b), [...DEFAULTS].sort((a, b) => a - b));
 // The revision of an assignment: the CRC-32 of its twenty pin bytes, snake 1 first.
 const revisionOf = pins => parseInt(crc32(Uint8Array.from(pins)), 16);
@@ -70,6 +72,7 @@ function reset() {
   pending = false;
   polling = false;
   live = null;
+  crossing = false;
   problem = "";
   note = "";
   fresh = false;
@@ -143,8 +146,44 @@ function draw() {
   const error = problem || (latest !== null && !editable() ? "This editor only supports the 60 \u00d7 60 installation with twenty three-column snakes." : "");
   setText(byId("mapping-error"), error);
   setHidden(byId("mapping-error"), error === "");
-  setDisabled(byId("mapping-defaults"), locked() || live !== null || !defaultsAvailable() || same(latest.pins, DEFAULTS));
-  setDisabled(byId("mapping-reload"), pending || live !== null);
+  setDisabled(byId("mapping-defaults"), locked() || live !== null || crossing || !defaultsAvailable() || same(latest.pins, DEFAULTS));
+  setDisabled(byId("mapping-reload"), pending || live !== null || crossing);
+  // The box shows the target's wiring, and what was tapped while it is being saved.
+  const box = byId("mapping-cross");
+  if (!crossing) {
+    const crossed = editable() && latest.cross === true;
+    if (box.checked !== crossed) box.checked = crossed;
+  }
+  setDisabled(box, crossing || locked() || live !== null || press !== null);
+}
+
+// Saves snake 10's wiring as the box was set, at once, as a move is saved.
+async function cross() {
+  const box = byId("mapping-cross");
+  if (crossing || locked() || live !== null || press !== null) {
+    draw();
+    return;
+  }
+  const crossed = box.checked;
+  const asked = version;
+  crossing = true;
+  note = "";
+  problem = "";
+  draw();
+  try {
+    await client.mappingCross(crossed);
+    if (asked !== version) return;
+    latest = {...latest, cross: crossed};
+    note = crossed ? "Saved: snake 10 is cross-wired." : "Saved: snake 10 is wired as the others.";
+  } catch (error) {
+    if (asked !== version) return;
+    problem = explanation(error);
+  } finally {
+    if (asked === version) {
+      crossing = false;
+      await read(true);
+    }
+  }
 }
 
 function explanation(error) {
@@ -191,13 +230,14 @@ async function read(quiet = false) {
 // mapping did, never while a pin is held or moves are saved, and a reply that does not come
 // changes nothing.
 async function poll() {
-  if (!ready || pending || polling || press !== null || live !== null || document.hidden) return;
+  if (!ready || pending || polling || press !== null || live !== null || crossing || document.hidden) return;
   const asked = version;
   polling = true;
   try {
     const reply = await client.mappingGet();
-    if (asked !== version || pending || live !== null) return;
-    const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable || !same(latest.pins, reply.pins);
+    if (asked !== version || pending || live !== null || crossing) return;
+    const changed = latest === null || !fresh || latest.revision !== reply.revision || latest.editable !== reply.editable || latest.cross !== reply.cross ||
+      !same(latest.pins, reply.pins);
     latest = reply;
     fresh = true;
     if (changed) {
@@ -512,6 +552,7 @@ export function start() {
     note = "";
     read();
   });
+  byId("mapping-cross").addEventListener("change", cross);
   client.watch(() => {
     if (version !== client.targetVersion()) {
       reset();
