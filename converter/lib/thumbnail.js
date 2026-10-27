@@ -114,13 +114,13 @@ export function maker(data) {
       const record = read.next();
       if (record === null) {
         while (samples.length < PICTURES) {
-          samples.push(last === null ? new Uint8Array(3 * width * height) : last.slice());
+          samples.push(last === null ? new Uint8Array(3 * width * height) : new Uint8Array(last));
         }
         stage = "encode";
         return;
       }
       while (samples.length < PICTURES && times[samples.length] < elapsed + record.ms) {
-        samples.push(record.picture.slice());
+        samples.push(new Uint8Array(record.picture));
       }
       elapsed += record.ms;
       last = record.picture;

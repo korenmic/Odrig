@@ -58,12 +58,12 @@ Rules for every task:
     reader's two parts.
   - Suites: `npm test --prefix converter`, the converter's Python suite, onboarding.
 
-- [ ] 2. The subcommand `thumbnail`
+- [x] 2. The subcommand `thumbnail`
   - `converter/cli/arguments.js`: `thumbnail` in `NAMES` and the tool's usage, its
     `SPECS` with the variadic `FILE`, `--out`, `--catalog`, `--card` and the check of the
     two forms. `converter/cli/thumbnail.js`: the two forms, `parseCatalog`,
     `formatCatalog`, the names with `--card`, the passed-over lines; `main.js` maps it.
-  - Tests in `converter/tests/thumbnail-cli.test.js` (run as a process, as `cli.test.js`
+  - Tests in `converter/tests/thumbnailtool.test.js` (run as a process, as `cli.test.js`
     does): `--out` writes `make`'s bytes and writes nothing on a refused file (status 1,
     one `error:` line); `--catalog` makes the folder, adds GIFs and lines, adds a name to
     a key it holds without writing its GIF again, sorts keys and names by their bytes,

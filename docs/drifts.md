@@ -10611,3 +10611,21 @@ walk checks. `decode` and `decodeFrames` are the readers read to their end.
 **Resolution.** `converter/lib/thumbnail.js`, `converter/lib/odrg.js`,
 `converter/lib/odrgx.js`; docs/converter.md, docs/reasons.md;
 converter/tests/thumbnail.test.js, converter/tests/browser.test.js.
+
+## Seed 44: what `thumbnail --catalog` does beside adding previews
+
+**Question.** The seed gives `thumbnail FILE... --catalog DIR [--card ODRIG]` and passes
+over a file the readers refuse. What does it do with a folder `DIR` that is missing, with a
+key whose line is there and whose GIF is not, with `--card` given with `--out`, and with a
+GIF or the mapping that cannot be written?
+
+**Answer.** It makes the folder and the folders above it. A key whose GIF is missing gets
+its GIF again; one whose GIF is there keeps it and only gains the name. `--card` goes with
+`--catalog` only: with `--out` it is a mistake of the command line, status 2. A file that
+cannot be read is passed over as a refused one is, with `not-found`; a GIF or a mapping
+that cannot be written ends the run with status 1 and `cannot-write`, since the catalog is
+then not what the run would leave. The tests of the subcommand are in
+`converter/tests/thumbnailtool.test.js`, as a test file's name is letters alone.
+
+**Resolution.** `converter/cli/thumbnail.js`, `converter/cli/arguments.js`;
+docs/converter.md; converter/tests/thumbnailtool.test.js.
