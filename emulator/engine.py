@@ -17,6 +17,9 @@ SEEK_STRIDE_MS = 400
 # The two members of the status reply the engine reads, as the core writes them.
 ANIMATION = re.compile(rb'"animation":([0-9]+|null)')
 PLAYING = re.compile(rb'"playing":("all"|[0-9]+|null)')
+# A cycle among the items of a list reply, and the position of the reply's next page.
+CYCLE_ITEM = re.compile(rb'\{"id":([0-9]+),"cycle":')
+NEXT_PAGE = re.compile(rb'"next":([0-9]+|null)')
 AFTER_GRID_NS = 200_000
 LONG_WAIT_NS = 3_000_000
 KEPT_BACK_NS = 2_000_000
@@ -59,13 +62,15 @@ class Playback:
         self.turn = None
         self.length = None
         self.source = None
+        self.cycles = set()
 
     def clear(self):
         self.stream = self.path = self.start = self.turn = self.length = self.source = None
 
     def cycle(self):
-        """A cycle plays: `playing` names an item, as the page reads it."""
-        return isinstance(self.playing, int)
+        """A cycle plays: `playing` names one of the show's cycles. Any other number in it
+        is a folder of the card whose playlist plays."""
+        return self.playing in self.cycles
 
     def event(self):
         """What the page is told: nothing while nothing plays or a cycle plays."""
@@ -98,6 +103,8 @@ class Engine:
         self.lengths = lengths if lengths is not None else Lengths()
         self._answered = 0
         self._answered_at_open = 0
+        self._listed_for = -1
+        self._told_apart = set()
         self._seek_since_open = False
         self._restarting = False
         self._opened = None
@@ -281,10 +288,31 @@ class Engine:
         self._restarting = False
 
     def _status_now(self, now):
-        """Asks the core for its status, takes it in, and hands it to the hub."""
+        """Asks the core for its status, takes it in, and hands it to the hub. A number in
+        `playing` that the engine has not told apart since the last command answered, a
+        cycle or a folder of the card, has the cycles listed."""
         reply = self.core.command(now, b"status")
         self._take_status(reply)
+        playing = self.playback.playing
+        if isinstance(playing, int):
+            if self._listed_for != self._answered:
+                self._told_apart = set()
+                self._listed_for = self._answered
+            if playing not in self._told_apart:
+                self._list_cycles(now)
+                self._told_apart.add(playing)
         self.hub.status(reply)
+
+    def _list_cycles(self, now):
+        """The ids of the show's cycles, from the pages of `list`; the engine's own requests."""
+        cycles = set()
+        page = 0
+        while page is not None:
+            reply = self.core.command(now, b"list %d" % page)
+            cycles.update(int(found) for found in CYCLE_ITEM.findall(reply))
+            found = NEXT_PAGE.search(reply)
+            page = int(found.group(1)) if found and found.group(1) != b"null" else None
+        self.playback.cycles = cycles
 
     def _take_status(self, reply):
         """Reads `animation` and `playing` off the reply, as the core writes them."""

@@ -3,7 +3,10 @@ turn from the core's opens of the played file, its length from a catalog, from t
 converter's check or from a loop seen twice, and the `position` event of the hub."""
 
 import json
+import pathlib
+import re
 import shutil
+import tempfile
 import unittest
 
 from emulator import binding, engine, host, hub, lengths
@@ -157,3 +160,46 @@ class Opens(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FolderPlaylist(unittest.TestCase):
+    """A folder of the card as the current playlist: `playing` names the folder's id, and
+    the bar shows the animation as it does for the playlist."""
+
+    def setUp(self):
+        self.folder = support.entered(self, support.example_show())
+        card = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
+        (card / "odrig" / "night").mkdir(parents=True)
+        (card / "odrig" / "night" / "comet.odrg").write_bytes((self.folder / "hello.odrg").read_bytes())
+        self.files = host.FolderHost(self.folder, drive=host.Drive(card, writable=False))
+        self.addCleanup(self.files.close)
+        self.core = binding.Core(support.LIBRARY, self.files)
+        self.hub = hub.Hub()
+        self.now = 0
+        self.engine = engine.Engine(self.core, self.hub, clock=lambda: self.now * 1_000_000, host=self.files, lengths=lengths.Lengths(node=None))
+
+    def tick_until(self, ms):
+        while self.now < ms:
+            self.now += GRID
+            self.engine.tick()
+
+    def folder_id(self):
+        for _ in range(500):
+            self.tick_until(self.now + 100)
+            found = re.search(rb'\{"id":([0-9]+),"playlist":"night"', self.core.command(self.now, b"list 0"))
+            if found:
+                return int(found.group(1))
+        self.fail("the card's folder never came into the list")
+
+    def test_a_folder_playlist_shows_its_animation_and_a_cycle_still_shows_nothing(self):
+        number = self.folder_id()
+        self.engine.line(b"play %d" % number, "http")
+        self.tick_until(self.now + 3 * GRID)
+        self.assertEqual(self.engine.playback.playing, number)
+        event = json.loads(self.hub.latest_position())
+        self.assertIsNotNone(event["animation"])
+        self.assertIsNotNone(event["start"])
+        self.engine.line(b"play 3", "http")
+        self.tick_until(self.now + 3 * GRID)
+        self.assertEqual(json.loads(self.hub.latest_position()), {"animation": None, "start": None, "turn": None, "length": None})
+        self.assertEqual(self.engine.seek(100), {"ok": False, "error": "cycle"})

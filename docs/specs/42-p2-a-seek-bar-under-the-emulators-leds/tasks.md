@@ -75,6 +75,16 @@ Rules for every task:
     the picture before.
   - Requirements: 3.2
 
+- [x] 7. The bar during a folder's playlist
+  - With seed 41 merged, `playing` names a folder of the card while its playlist is
+    current, and the engine took every number there for a cycle. The engine now lists
+    the cycles when `playing` holds a number it has not told apart since the last command.
+  - Tests: `tests/emulator/test_playback.py`, a card with a folder: its playlist shows the
+    bar, a cycle still shows nothing and refuses a seek.
+  - `docs/emulator.md` and `docs/drifts.md`.
+  - Prove it fails first: during the folder's playlist the hub has no position.
+  - Requirements: 1.4, 4.1
+
 - [ ] 5. The owner's look
   - The owner opens the emulator on a long animation, sees the bar move, drags it and
     sees the LEDs follow; then `state.json` becomes `completed` and the seed's line in

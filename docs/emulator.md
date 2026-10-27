@@ -696,7 +696,10 @@ answered and no seek between them. A text or a clock without a catalog entry has
 length. Reading a catalog or running the converter never delays a refresh.
 
 What the emulator knows goes to the page as the `position` event of the
-[event stream](#the-event-stream).
+[event stream](#the-event-stream). A cycle shows nothing: the emulator tells a cycle's id
+in `playing` from a folder's of the card, whose playlist shows its animation as the
+playlist does, by the cycles that `list` names, asked of the core when `playing` holds a
+number not yet told apart since the last command answered.
 
 A seek names a point of the loop, from 0 to the length less two grid steps, and the
 emulator moves playback there with what it has. When the point is at or after the

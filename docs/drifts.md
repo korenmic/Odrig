@@ -10507,3 +10507,19 @@ since an upload from the page needs a cataloged card the emulator may write.
 **Resolution.** `docs/specs/41-p1-sub-folder-playlists-from-the-card/design.md`; the
 commits of tasks 1 to 10 on the branch `seed-41-sub-folder-playlists`; docs/show.md,
 docs/commands.md, docs/core.md, docs/microsd.md, docs/android-app.md, docs/reasons.md.
+
+## Seed 42: a folder's playlist is not a cycle
+
+**Question.** With seed 41, `status` names a folder of the card in `playing` while its
+playlist is current, a number as a cycle's id is, and the engine took any number there
+for a cycle: the bar showed nothing during a folder's playlist and a seek was refused
+with `cycle`. How does the emulator tell the two apart, without a reader of JSON and
+without asking more than it needs?
+
+**Answer.** By the cycles `list` names: the engine lists the show's items with requests of
+its own, reading each cycle's id off the reply with a pattern, when `playing` holds a
+number it has not told apart since the last command answered; any other number is a
+folder's playlist, shown as the playlist is. A show without cycles and a playlist of the
+root ask nothing more than before.
+
+**Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.
