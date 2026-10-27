@@ -714,3 +714,10 @@ are in [format.md](format.md), "Measured sizes".
   APK from the same files; a difference between the Controller view and the APK is a
   fault, not a version; the APK is built from the commit the owner runs and its report
   names that commit; a coding agent never switches the owner's checkout.
+- 2026-10-27: Seed 43, the owner's request after re-chaining snake 10 around the dead output
+  of line 29: a leg of the mapping may name the end each strip starts at, `starts`, so
+  that a snake chained up, up, down is placed right; `mapping cross on|off` saves snake 10
+  so wired, and `mapping get` reports it as `cross`, a command and a member the owner
+  approved through the seed; the app's Settings show it as a checkbox, `Snake 10 is
+  cross-wired`, off by default because a photo of the diagonal cannot tell which snake is
+  cross-wired. The pins and their revision are unchanged by it.

@@ -33,7 +33,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `tests/app/page/scenarios/photo-analysis.js`, a case with position 10 crossed read
       with the position given the remaining snake, in `tests/app/test_photo.py`; the
       sentence in the photo's paragraph of `docs/android-app.md`. Suites: app, onboarding.
-- [ ] 5. The firmware, the APK and every suite: `docs/decisions.md`'s dated line, the
+- [x] 5. The firmware, the APK and every suite: `docs/decisions.md`'s dated line, the
       seed in AGENTS.md's list, every suite that runs on this computer, `fw.py build` and
       `app/app.py build`, both put with the artifacts on the share and on Drive, the
       connected board flashed through its COM socket and seen running with `cross` false,

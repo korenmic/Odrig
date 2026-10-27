@@ -138,7 +138,7 @@ present, and do not build on them.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Sub-folder playlists from the card**, seed 41: a folder of the card as the playlist, a day each.
 - **A seek bar under the emulator's LEDs**, seed 42: a draggable progress bar, the emulator alone.
-- **A cross-wired snake 10**, seed 43: its strips chained up, up, down; a checkbox in Settings.
+- **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 
 The state of every seed is in the `state.json` of its folder.
 
