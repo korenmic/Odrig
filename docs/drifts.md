@@ -10737,3 +10737,24 @@ again when the phone's catalog gains a preview.
 **Resolution.** `app/www/previews.js`, `app/www/convert.js`, `app/www/screens/storage.js`,
 `app/www/screens/author.js`, `app/www/main.js`; docs/android-app.md;
 tests/app/test_own_previews.py, tests/app/page/scenarios/ownpreviews.js.
+
+## Seed 44: the tracked previews are the media the repository holds
+
+**Question.** An answer of this page, that of the converter's own tests, says that no media
+file is tracked in the repository. Seed 44 tracks a GIF for every animation known on the
+first computer. What does the repository hold now, and how is the default catalog made
+again?
+
+**Answer.** Besides the images it held, the icons and splash screens of the app and the
+pictures of the seeds, the repository tracks the previews of `thumbnails/` and no other GIF,
+MP4 or MOV file; the converter's test says exactly that. The first default catalog was made
+on 2026-10-27 by `thumbnail --catalog thumbnails`, one run for each source the seed lists,
+the two card copies with `--card`: 424 previews of 609 to 65,484 bytes, 12,510,264 bytes in
+all, 409 of them of 24 pictures and 15 of 12. Every source was at hand, the share and the
+mirror of Google Drive among them. Three files were passed over, the broken test files of the
+board's session of 2026-10-25: `huge-tail-test.odrg` twice with `bad-palette-index` and
+`broken-test.odrg` with `bad-palette-size`. A later conversion adds its preview the same way
+in the commit that records it; a file whose key the folder holds only adds its name.
+
+**Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
+docs/decisions.md; converter/tests/thumbnails.test.js.

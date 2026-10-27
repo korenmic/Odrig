@@ -139,7 +139,7 @@ it stands now.
 | JSON frames | The tracked, lossless source of each animation (source code, not runtime). A list of frames; each frame is a duration in milliseconds plus one value per LED, with only the fields that are consumed. |
 | Custom binary, compressed | The runtime format the board plays. First choice. |
 | Custom binary, uncompressed | Fallback if decompression proves too slow on the board. The player may support both. |
-| GIF | Fallback of last resort: the working proof of concept on stock WLED. |
+| GIF | Fallback of last resort: the working proof of concept on stock WLED. And, never played, the preview of each animation that the operators' app shows, kept in `thumbnails/` and made by the converter. |
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
 

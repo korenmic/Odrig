@@ -162,7 +162,7 @@ Rules for every task:
   - `docs/android-app.md`: the phone's catalog of previews.
   - Suites: the app's, onboarding.
 
-- [ ] 9. The default preview catalog from every source
+- [x] 9. The default preview catalog from every source
   - Runs of `thumbnail --catalog thumbnails` over every source the seed lists, the two
     card copies with `--card`; the passed-over files and the sources not at hand noted.
   - `thumbnails/` committed; its test of task 5 passes.

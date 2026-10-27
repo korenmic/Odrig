@@ -85,9 +85,9 @@ the entry links to it.
 
 - **converter**: The command-line tool in `converter/`, written in JavaScript and started
   as `node converter/odrig.js`. It turns a video or a GIF into a source, a source into an
-  ODRG file and back, checks a file, and packs a show into an installed file set. Its
-  library, `converter/lib/`, also runs in a web page. See
-  [converter.md](../docs/converter.md).
+  ODRG file and back, checks a file, packs a show into an installed file set, and makes a
+  short GIF of an animation's pictures. Its library, `converter/lib/`, also runs in a web
+  page. See [converter.md](../docs/converter.md).
 - **Python library**: The Python package `odrig/`. It reads and writes the project's files,
   JSON frames, ODRG files, mapping files and shows, for the tests and the tools, and holds
   the generators. It converts nothing; it was the converter before, and what it answered to
@@ -113,6 +113,12 @@ the entry links to it.
 - **operators' app**: The Android app in `app/` with which operators see and steer, from
   a phone, what the installation plays. It sends the same commands over HTTP. See
   [android-app.md](../docs/android-app.md).
+- **preview**: A short GIF that loops, made by the converter from an animation's own
+  pictures and named by the animation's key, the CRC-32 and the size of its file. The
+  operators' app shows it in a square beside each row. The previews of every animation
+  known are kept in `thumbnails/`, the default preview catalog; a phone keeps those of what
+  it uploaded. Not the moving picture of the form of a text or a clock, which the app draws
+  itself, and not `python -m preview`, which plays one animation in the emulator.
 
 ## How the work is organised
 
