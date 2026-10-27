@@ -137,7 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
-- **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
+- **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
 - **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
 
 The state of every seed is in the `state.json` of its folder.
