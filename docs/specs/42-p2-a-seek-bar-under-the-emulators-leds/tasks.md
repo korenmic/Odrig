@@ -85,7 +85,7 @@ Rules for every task:
   - Prove it fails first: during the folder's playlist the hub has no position.
   - Requirements: 1.4, 4.1
 
-- [ ] 5. The owner's look
+- [x] 5. The owner's look
   - The owner opens the emulator on a long animation, sees the bar move, drags it and
     sees the LEDs follow; then `state.json` becomes `completed` and the seed's line in
     "What is coming" says so, as the lines of built seeds do.

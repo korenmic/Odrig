@@ -749,3 +749,6 @@ are in [format.md](format.md), "Measured sizes".
   restart of its own for a move back, logged with the transport `seek`. No command: the
   page's one request is the route `POST /seek` of the emulator, and the board and the
   emulator accept the same commands as before. The owner's look is open.
+- 2026-10-27: Seed 42 is completed: the owner looked at the seek bar in the emulator, after
+  a seek far into a long file was made to show its frame at once by moving the clock in
+  strides of 400 ms, and the bar was made to show during a folder's playlist of seed 41.

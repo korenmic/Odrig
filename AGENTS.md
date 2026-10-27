@@ -136,7 +136,6 @@ present, and do not build on them.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
-- **A seek bar under the emulator's LEDs**, seed 42: a draggable progress bar, the emulator alone.
 - **A cross-wired snake 10**, seed 43: each strip's direction in the mapping, and a checkbox in Settings.
 
 The state of every seed is in the `state.json` of its folder.
