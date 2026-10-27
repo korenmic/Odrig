@@ -1,0 +1,10 @@
+{
+  "number": 48,
+  "slug": "48-p2-a-bar-for-the-animation-playing-now",
+  "state": "remaining",
+  "title": "A bar for the animation playing now, and a frozen top",
+  "priority": "P2",
+  "addedAt": "2026-10-27T18:58:44+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The Animations panel gets a bar for the animation on the LEDs, with its row menu's actions but the moves and `Repeat this` with a field that sets the loops of the turn in progress ad hoc, through a new command `repeat <id> <n>` and the `status` members `repeat` and `loop`; the panel down to the brightness slider stays at the top while the list scrolls."
+}

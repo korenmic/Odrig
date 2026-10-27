@@ -129,14 +129,14 @@ present, and do not build on them.
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
 - **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
-- **Managed internal and external animation catalogs**, seed 35: built; the board session and the owner's phone check are open.
+- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
-- **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
+- **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
 - **Previews of the animations**, seed 44: built; the board session and the owner's phone check are open.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 
