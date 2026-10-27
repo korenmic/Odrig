@@ -10758,3 +10758,29 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 51: the core builds on Windows again
+
+**Question.** Microsoft's compiler does not know `__attribute__((noinline))` and doubts the
+`Marker` of `catalog_read_internal`; GCC 16 refuses a comparison of `page_step`. Where does
+the mark of a function kept out of line live, and how is a warning that is wrong answered,
+when every warning is an error and no flag may change?
+
+**Answer.** One macro, `ODRIG_NOINLINE`, in `core/src/core_state.h`, the header every source
+of the core reaches: `__declspec(noinline)` where `_MSC_VER` is defined, which `clang-cl`
+defines too, and `__attribute__((noinline))` everywhere else, so that GCC and Clang, and the
+firmware and macOS with them, compile the same text as before. A header of its own for one
+macro was not needed. The wrong warning, C4701, is answered in the code, not by turning it
+off: the `Marker` starts as zeros and is set by `read_marker` before it is read, as before.
+The comparison takes the length as an unsigned number; the sum is the same number. The
+emulator's check that the library it loads is as new as the core's sources is not part of
+this seed; that it ran an old library without a word on 2026-10-27 is told to the owner.
+On Windows, outside this seed, the core's suite has one error, a test that writes a file
+named `z"z.odrg`; the emulator's suite fails the walk of a folder named `bad.`, which
+Windows names `bad`, the position of `test_events`, whose start is not a multiple of 20
+frames there, and most times the internal catalog's rebuild through the emulator, answered
+`busy`, the same without this seed's change of `catalog_read_internal`; the converter's
+suites fail the same folder `bad.`, a file named `a"b.odrg` and a reference picture.
+
+**Resolution.** `core/src/core_state.h`, `core/src/catalog.cpp`, `core/src/player.cpp`;
+docs/core.md; tests/emulator/test_build_script.py.

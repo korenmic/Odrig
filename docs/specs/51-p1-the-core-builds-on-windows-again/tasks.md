@@ -45,7 +45,7 @@ Rules for every task:
   - Suites: core, emulator.
   - Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 4.2
 
-- [ ] 3. The pages, every suite, and the seed done
+- [x] 3. The pages, every suite, and the seed done
   - `docs/core.md`: the sentence of the design on the emulator's suite and Microsoft's
     compiler.
   - One entry at the end of `docs/drifts.md`, `## Seed 51: the core builds on Windows

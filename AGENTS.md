@@ -138,7 +138,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
 - **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
-- **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
 
 The state of every seed is in the `state.json` of its folder.
 

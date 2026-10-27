@@ -54,6 +54,11 @@ library for them, the undefined-behaviour checks as traps, the stack protector a
 assertions of the standard library; with Microsoft's compiler its own run-time checks. A
 fault that only the address sanitizer finds is therefore found on macOS. With Microsoft's
 compiler the tests that need a GNU-style `nm`, `ar`, `cc` or `c++` are skipped.
+The emulator's suite compiles every source of the core with Microsoft's compiler, with the
+flags the build script gives it, wherever the script finds that compiler, also where the
+core is built with GCC. The nine functions the core keeps out of line, so that the frame of
+the refresh stays small, are marked with the macro `ODRIG_NOINLINE` of `core_state.h`, which
+each compiler reads in its own words.
 
 Git ignores `core/build/`.
 
