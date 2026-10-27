@@ -22,7 +22,7 @@ Rules for every task:
 - Code and tests state what they do now: no comment about seeds, tasks, dates or earlier
   versions.
 
-- [ ] 1. The comparison GCC refuses
+- [x] 1. The comparison GCC refuses
   - Set `"state": "in_progress"` in
     `project-seeds/51-p1-the-core-builds-on-windows-again/state.json`.
   - `core/src/catalog.cpp`, `page_step`: `static_cast<uint32_t>(line.length) + 1 <
