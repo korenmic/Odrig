@@ -12,6 +12,7 @@ from . import support
 WEB = support.ROOT / "emulator" / "web"
 APP = support.ROOT / "app" / "www"
 LIBRARY = support.ROOT / "converter" / "lib"
+THUMBNAILS = support.ROOT / "thumbnails"
 CONTENT_TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json"}
 
 
@@ -152,13 +153,32 @@ class TheApp(unittest.TestCase):
             library.mkdir()
             for name in ("index.js", "notes.txt"):
                 pathlib.Path(library, name).write_bytes(b"y")
-            table = httpd.app_files(folder, library)
-            self.assertEqual(sorted(table), ["/app/", "/app/a.js", "/app/converter/index.js", "/app/index.html", "/app/library/index.js", "/app/sub/b.js", "/app/sub/deep/c.css"])
+            previews = pathlib.Path(folder, "previews")
+            (previews / "deep").mkdir(parents=True)
+            for name in ("catalog.js", "0a0b0c0d-12.gif", "notes.txt", "deep/0a0b0c0d-13.gif"):
+                pathlib.Path(previews, name).write_bytes(b"z")
+            table = httpd.app_files(folder, library, previews)
+            self.assertEqual(sorted(table), ["/app/", "/app/a.js", "/app/converter/index.js", "/app/index.html", "/app/library/index.js", "/app/previews/catalog.js", "/app/sub/b.js", "/app/sub/deep/c.css",
+                                             "/app/thumbnails/0a0b0c0d-12.gif", "/app/thumbnails/catalog.js"])
+            self.assertEqual(table["/app/thumbnails/0a0b0c0d-12.gif"], (str(pathlib.Path(previews, "0a0b0c0d-12.gif")), "image/gif"))
+            self.assertEqual(table["/app/thumbnails/catalog.js"][1], "text/javascript")
             self.assertEqual(table["/app/"], table["/app/index.html"])
             self.assertEqual(table["/app/sub/deep/c.css"], (str(pathlib.Path(folder, "sub", "deep", "c.css")), "text/css"))
-            self.assertEqual(httpd.app_files(pathlib.Path(folder, "absent"), pathlib.Path(folder, "absent")), {})
+            self.assertEqual(httpd.app_files(pathlib.Path(folder, "absent"), pathlib.Path(folder, "absent"), pathlib.Path(folder, "absent")), {})
         served = httpd.app_files()
-        self.assertEqual(sorted(served), sorted(["/app/"] + ["/app/" + path.relative_to(APP).as_posix() for path in app_files()] + ["/app/converter/" + path.name for path in LIBRARY.glob("*.js")]))
+        self.assertEqual(sorted(served), sorted(["/app/"] + ["/app/" + path.relative_to(APP).as_posix() for path in app_files()] + ["/app/converter/" + path.name for path in LIBRARY.glob("*.js")] +
+                                                ["/app/thumbnails/" + path.name for path in THUMBNAILS.iterdir() if path.suffix in (".js", ".gif")]))
+
+    def test_the_default_preview_catalog_is_served_beside_the_app_and_nothing_below_it(self):
+        gifs = sorted(THUMBNAILS.glob("*.gif"))
+        self.assertTrue(gifs)
+        for path in (THUMBNAILS / "catalog.js", gifs[0], gifs[-1]):
+            answer = self.emulator.request("GET", "/app/thumbnails/" + path.name)
+            self.assertEqual(answer.status, 200, path.name)
+            self.assertEqual(answer.body, path.read_bytes())
+            self.assertEqual(answer.headers["content-type"], "image/gif" if path.suffix == ".gif" else "text/javascript")
+        for path in ("/app/thumbnails/", "/app/thumbnails/none.gif", "/app/thumbnails/../main.js", "/thumbnails/catalog.js", "/app/thumbnails/%2e%2e/main.js"):
+            self.assertEqual(self.emulator.request("GET", path).status, 404, path)
 
 
 class TheControllerView(unittest.TestCase):

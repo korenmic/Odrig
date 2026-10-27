@@ -38,6 +38,11 @@ APP_PATH = "/app/"
 # The converter's library, which the app imports from `converter/` beside its own files.
 LIBRARY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "converter", "lib")
 LIBRARY_PATH = APP_PATH + "converter/"
+# The default preview catalog, which the app imports from `thumbnails/` beside its own files:
+# its mapping and its GIFs.
+THUMBNAILS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "thumbnails")
+THUMBNAILS_PATH = APP_PATH + "thumbnails/"
+THUMBNAIL_TYPES = {".js": "text/javascript", ".gif": "image/gif"}
 INDEX = "index.html"
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -62,12 +67,19 @@ def page_files(folder=WEB):
     return files
 
 
-def app_files(folder=APP, library=LIBRARY):
+def app_files(folder=APP, library=LIBRARY, thumbnails=THUMBNAILS):
     """The files of the operators' app by the path each is asked for, under `/app/`: its
-    place on disk and its content type, and under `/app/converter/` the scripts of the
-    converter's library. The table is made by walking the folders, so nothing outside
-    them can be asked for. A folder that is not there gives no file."""
+    place on disk and its content type, under `/app/converter/` the scripts of the
+    converter's library, and under `/app/thumbnails/` the mapping and the GIFs of the default
+    preview catalog. The table is made by walking the folders, so nothing outside them can be
+    asked for. A folder that is not there gives no file."""
     files = {}
+    if os.path.isdir(thumbnails):
+        for name in sorted(os.listdir(thumbnails)):
+            place = os.path.join(thumbnails, name)
+            content_type = THUMBNAIL_TYPES.get(os.path.splitext(name)[1])
+            if content_type is not None and os.path.isfile(place):
+                files[THUMBNAILS_PATH + name] = (place, content_type)
     if os.path.isdir(library):
         for name in sorted(os.listdir(library)):
             place = os.path.join(library, name)

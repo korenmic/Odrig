@@ -653,7 +653,9 @@ as a phone, 390 points; in a window narrower than 760 points it lies under the L
 
 - **The same code.** What runs in the frame is the app's web code, the files of
   `app/www/`, which the emulator serves under `/app/` as they are, with the scripts of
-  the converter's library, `converter/lib/`, under `/app/converter/`. The APK holds the
+  the converter's library, `converter/lib/`, under `/app/converter/`, and the default
+  preview catalog, `thumbnails/`, its `catalog.js` and its GIFs as `image/gif`, under
+  `/app/thumbnails/`. The table of what it serves is made when it starts. The APK holds the
   same files, so what a button does here is what it does on a phone. One thing differs: on a
   phone a piece of Android code carries each line to the target, and here the browser
   does.

@@ -182,7 +182,9 @@ python3 app/app.py build
 
 Runs the setup, copies the web code into `build/app/www/` with a note of the commit it
 was built from, and beside it the scripts of the converter's library, `converter/lib/`,
-into `build/app/www/converter/`; lets Capacitor copy that into the Android project
+into `build/app/www/converter/`, and the default preview catalog, `thumbnails/`, its
+`catalog.js` and its GIFs, into `build/app/www/thumbnails/`; lets Capacitor copy that into
+the Android project
 `app/android/`, lets Gradle build it, and prints three lines:
 
 ```
@@ -219,13 +221,15 @@ python3 app/app.py serve
 Serves the web code on `http://127.0.0.1:8610/`, or on the port `--port` names, for a
 browser on this computer, and runs until it is stopped. The converter's library is served
 beside it under `/converter/`, from `converter/lib/` as it is: the web code imports it
-from there, and no copy of it is kept in `app/`. With an emulator running beside
+from there, and no copy of it is kept in `app/`. The default preview catalog is served the
+same way under `/thumbnails/`, from `thumbnails/`, its GIFs as `image/gif`. With an emulator running beside
 it, write the emulator's address, `127.0.0.1:8600`, into the app's target screen.
 
 The emulator shows the app by itself as well: its page has a view `Controller`, at
 `http://127.0.0.1:8600/#controller`, with the app beside the LEDs and aimed at that
-emulator. It serves the same files of `app/www/`, and the converter's library under
-`/app/converter/`, so a change of the web code shows there after a reload. This is the quickest way to try the app: see
+emulator. It serves the same files of `app/www/`, the converter's library under
+`/app/converter/` and the default preview catalog under `/app/thumbnails/`, so a change of
+the web code shows there after a reload. This is the quickest way to try the app: see
 [emulator.md](emulator.md#the-controller-view).
 
 ## Installing on a phone

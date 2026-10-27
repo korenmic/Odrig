@@ -27,7 +27,7 @@ class TheWebCode(unittest.TestCase):
         self.assertEqual({path.suffix for path in files()}, {".html", ".css", ".js"})
         for path in files():
             self.assertTrue(path.read_bytes().isascii(), path.name)
-        for name in ("package.json", "node_modules", "lib", "dist", "converter"):
+        for name in ("package.json", "node_modules", "lib", "dist", "converter", "thumbnails"):
             self.assertFalse((support.WWW / name).exists(), name)
 
     def test_a_script_imports_only_files_of_the_web_code_and_the_converters_library(self):
@@ -40,6 +40,10 @@ class TheWebCode(unittest.TestCase):
                     if beside[:1] == ("converter",):
                         self.assertEqual(len(beside), 2, imported)
                         self.assertTrue((CONVERTER_LIBRARY / beside[1]).is_file(), imported)
+                    elif beside[:1] == ("thumbnails",):
+                        # The mapping of the default preview catalog, and no GIF: an image's source names those.
+                        self.assertEqual(beside, ("thumbnails", "catalog.js"), imported)
+                        self.assertTrue((support.THUMBNAILS / "catalog.js").is_file(), imported)
                     else:
                         self.assertTrue(found.is_file() and support.WWW in found.parents, imported)
 

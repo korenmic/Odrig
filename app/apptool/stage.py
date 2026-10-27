@@ -1,5 +1,5 @@
-"""The folder handed to Capacitor: the web code as it is, the converter's library beside
-it, and a note of what it was built from."""
+"""The folder handed to Capacitor: the web code as it is, the converter's library and the
+default preview catalog beside it, and a note of what it was built from."""
 
 import json
 import shutil
@@ -23,14 +23,19 @@ def note():
     return {"commit": _git("rev-parse", "HEAD").strip(), "changed": _git("status", "--porcelain", "--", "app") != ""}
 
 
-def staged(folder=paths.STAGED, source=paths.WWW, made_from=None, library=paths.CONVERTER_LIB):
+def staged(folder=paths.STAGED, source=paths.WWW, made_from=None, library=paths.CONVERTER_LIB, thumbnails=paths.THUMBNAILS):
     """Makes the folder anew: every file of the web code, every script of the converter's
-    library under `converter/`, and the note."""
+    library under `converter/`, the mapping and the GIFs of the default preview catalog under
+    `thumbnails/`, and the note."""
     shutil.rmtree(folder, ignore_errors=True)
     shutil.copytree(source, folder)
     beside = folder / paths.LIBRARY_FOLDER
     beside.mkdir()
     for script in sorted(library.glob("*.js")):
         shutil.copyfile(script, beside / script.name)
+    previews = folder / paths.THUMBNAILS_FOLDER
+    previews.mkdir()
+    for kept in sorted([*thumbnails.glob("catalog.js"), *thumbnails.glob("*.gif")]):
+        shutil.copyfile(kept, previews / kept.name)
     (folder / NOTE).write_text(json.dumps(note() if made_from is None else made_from) + "\n", encoding="utf-8")
     return folder

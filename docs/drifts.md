@@ -10648,3 +10648,27 @@ compact JSON of its value.
 
 **Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`; docs/commands.md,
 docs/core.md, docs/catalog.md; tests/core/test_catalog_page.py, tests/core/test_docs.py.
+
+## Seed 44: the first content of `thumbnails/`, and how the hosts take it
+
+**Question.** The seed makes `thumbnails/` the default preview catalog, served and packed as
+the converter's library is, and fills it from every source of the first computer. What
+does the folder hold before those sources are read, which of its files do the hosts take,
+and how is it kept out of a board's storage?
+
+**Answer.** Its first commit holds the previews of the tracked animations alone,
+`test-animations/` and the valid vectors, made by `thumbnail --catalog thumbnails`, so that
+a clone can make them again and a test compares them with what the library makes; the
+sources of the first computer come in a commit of their own. The emulator, `app.py serve`
+and the APK's staging take `catalog.js` and the `.gif` files of the folder and nothing below
+it: the emulator under `/app/thumbnails/`, the server under `/thumbnails/`, both with
+`image/gif`, the staging into `thumbnails/` beside the web code. The web code may import
+`thumbnails/catalog.js` and no other file of the folder. A board's storage is made from a
+show folder, which the firmware tool refuses when it holds a folder or a file the show does
+not name, a GIF of the folder among them, and `pack` writes exactly the show's files.
+
+**Resolution.** `thumbnails/`, `emulator/httpd.py`, `app/apptool/webserver.py`,
+`app/apptool/stage.py`, `app/apptool/paths.py`; docs/emulator.md, docs/android-app.md;
+converter/tests/thumbnails.test.js, converter/tests/library.test.js,
+tests/emulator/test_page_files.py, tests/app/test_tool.py, tests/app/test_scope.py,
+tests/apk/test_apk.py, tests/firmware/test_storage.py.

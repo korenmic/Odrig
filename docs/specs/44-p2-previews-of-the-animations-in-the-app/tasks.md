@@ -104,7 +104,7 @@ Rules for every task:
   - `docs/emulator.md`: the command tool's new form.
   - Suites: the emulator's, onboarding.
 
-- [ ] 5. The folder `thumbnails/` and the hosts of the app
+- [x] 5. The folder `thumbnails/` and the hosts of the app
   - `thumbnails/` made with the subcommand from `test-animations/` and the valid vectors
     (`tests/vectors/valid`, `texts/valid`, `widgets/valid`, `containers/valid`).
   - `converter/tests/thumbnails.test.js`: the folder's shape and its names; the GIFs of
