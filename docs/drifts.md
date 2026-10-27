@@ -10586,3 +10586,28 @@ folder's playlist, shown as the playlist is. A show without cycles and a playlis
 root ask nothing more than before.
 
 **Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.
+
+## Seed 44: the preview's times, its GIF and the walk of a file
+
+**Question.** The seed gives a preview 24 pictures over the first loop, each shown for a
+twenty-fourth of it rounded to 10 ms within 20 and 120 ms, and asks that a long file be
+walked without keeping every picture and that the same file give the same bytes
+everywhere. Which time is "k twenty-fourths", how is a delay rounded, what does the GIF
+hold besides its pictures, and how is the loop known before the walk reaches its end?
+
+**Answer.** Picture `k` is the one on screen at `floor(k * loop / 24)` ms, so those at
+twelfths and sixths are the even ones and those of `k` divisible by 4, and one walk serves
+all three sizes. A delay is `floor((loop + 5N) / (10N))` hundredths, half rounded up,
+between 2 and `288 / N`. The GIF holds a global table and no local one, the loop extension
+`NETSCAPE2.0` with the count 0, and for each picture a control extension with the disposal
+"do not dispose" and no transparency, and a whole image of the canvas; its LZW starts with
+a clear code and clears again when the table is full. `odrg.reader` reads the header, the
+body and the palette at once and then one record at a time, as `decode` does, with the same
+refusals; its `loopMs` sums the durations from the records' starts alone and refuses
+nothing, since a file it cannot sum is refused by the walk at the record where `decode`
+refuses it. A container of frames gives the loop its header names, which the end of the
+walk checks. `decode` and `decodeFrames` are the readers read to their end.
+
+**Resolution.** `converter/lib/thumbnail.js`, `converter/lib/odrg.js`,
+`converter/lib/odrgx.js`; docs/converter.md, docs/reasons.md;
+converter/tests/thumbnail.test.js, converter/tests/browser.test.js.

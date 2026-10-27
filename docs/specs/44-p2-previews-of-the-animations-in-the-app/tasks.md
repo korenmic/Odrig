@@ -32,7 +32,7 @@ Rules for every task:
   decisions a task takes beyond the seed go into `docs/drifts.md` under "Seed 44" in the
   task's commit.
 
-- [ ] 1. The walk and the preview in the converter's library
+- [x] 1. The walk and the preview in the converter's library
   - Set the seed's `state.json` to `in_progress`.
   - `converter/lib/odrg.js`: `reader(data)` with `loopMs()` and `next()`; `decode` built
     on it, its results and refusals unchanged. `converter/lib/odrgx.js`:

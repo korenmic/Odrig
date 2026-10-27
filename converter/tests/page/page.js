@@ -65,6 +65,13 @@ export async function work(library, sourceBytes) {
   }
   const timed = pictures.map((picture, i) => ({...picture, time: [1001 * i, 30]}));
   const video = await timeline.importFrames({kind: "video", frames: timed}, {width: 60, height: 60}, {fit: "fill", startMs: 20});
+  const {odrgx, thumbnail} = library;
+  const sourceOf = (source) => odrgx.encodeSource(odrgx.loadsSource(new TextEncoder().encode(JSON.stringify(source))));
+  const text = sourceOf({version: 1, type: "text", width: 60, height: 60, text: "Hello \u05e9\u05dc\u05d5\u05dd", font: "small", color: 16764992,
+    background: 16, align: "center", valign: "middle", direction: "auto", wrap: false, effect: "marquee", motion: "left", speed: 40, pause_ms: 700});
+  const clock = sourceOf({version: 1, type: "widget", width: 60, height: 60, widget: "analog", seconds: 30, face: 16051408, hands: 2105376,
+    rim: 13934615, background: 0, speed_min: 60, speed_max: 600});
+  const previewed = [compressed, uncompressed, odrg.encode(video), text, clock];
   return {
     compressed: base64(compressed),
     uncompressed: base64(uncompressed),
@@ -73,6 +80,7 @@ export async function work(library, sourceBytes) {
     placed,
     video: base64(jsonframes.dumps(video)),
     reasons: Object.keys(library.errors).filter((name) => name === name.toUpperCase()).length,
+    previews: previewed.map((file) => `${thumbnail.keyOf(file)} ${base64(thumbnail.make(file))}`),
   };
 }
 

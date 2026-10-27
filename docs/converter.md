@@ -361,8 +361,8 @@ a web page load the same files.
 | `jsonframes.js` | JSON frames files: `loads` reads one, `dumps` writes the canonical layout. |
 | `inflate.js` | The DEFLATE decoder. |
 | `deflate.js` | The DEFLATE compressor. |
-| `odrg.js` | ODRG files: `header`, `decode` and `encode`. |
-| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; and `pictureAt`, the picture of a text or a clock at a time. |
+| `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `decode` and `encode`. |
+| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; and `pictureAt`, the picture of a text or a clock at a time. |
 | `bidi.js` | The Unicode Bidirectional Algorithm for the characters of a text: `paragraphLevel`, `levels` and `visualOrder`. |
 | `textlayout.js` | The layout of a text: `checkCharacters`, `visualLines` and `layout`, with the fonts by name. |
 | `draw.js` | What the player draws: the pass of a text and the place of its block at a time, `passMs` and `placeAt`, and its picture, `drawText`; a clock's seed, `mix`, `stir` and `seedOf`, what the seed chooses, `clockOf`, its virtual time, `virtualTime`, and its picture, `drawClock`. |
@@ -371,6 +371,7 @@ a web page load the same files.
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |
 | `fit.js` | Fitting a picture to a canvas: `place`. |
 | `timeline.js` | The 50 frames-per-second timeline of decoded frames: `importFrames`. |
+| `thumbnail.js` | Previews: `keyOf`, the key of a file, its CRC-32 of zlib and PNG and its size; `maker`, which makes a file's preview in steps, and `make`, at once: a GIF of 24 pictures taken over its first loop, or of 12 or 6 when it would be above 65,536 bytes; `encode`, `crc32`, `timesOf` and `delayOf`. |
 | `fonttables.js` | The glyphs of the fonts of texts and the sine table of the clocks, `FONT_TABLES` and `SINE`, written by `node fonts/generate.mjs` from the fonts of the folder `fonts/`. |
 
 **Loading it in a page.** A page loads `converter/lib/index.js` as a module, and the
