@@ -134,11 +134,11 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Previews at once, without the dark squares**, seed 49: from the default catalog by name and size, and keys kept on the phone.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
-- **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
-- **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
+- **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
 - **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
+- **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
 
 The state of every seed is in the `state.json` of its folder.
 
