@@ -273,23 +273,114 @@ class OlderTargets(unittest.TestCase):
 
 
 class Dropped(unittest.TestCase):
-    def test_the_keys_go_at_a_silence_and_at_another_target_and_come_back_from_a_new_read(self):
+    def test_the_keys_go_at_a_silence_and_at_another_target_and_come_back_kept_on_the_phone(self):
         target = Paged(INTERNAL, EXTERNAL)
+        marks = []
 
         def quiet():
             target.silent = True
 
         def back():
+            marks.append(len(stand_in.lines))
             target.silent = False
 
         with support.StandIn(target.replies()) as stand_in, support.StandIn(support.SOUND) as other:
             plan = [{"until": "both"}, {"snap": "before"}, {"step": True}, {"until": "no-answer", "ms": 15000}, {"step": True}, {"until": "answers", "ms": 15000},
                     {"snap": "again"}, {"until": "both", "ms": 15000}, {"snap": "read"}, {"address": other.address}, {"snap": "other"}]
             seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[quiet, back]).seen
+            after = sent(stand_in)[marks[0]:]
+        self.assertIn("catalog", after)
+        self.assertEqual(page_lines(after), [], "the kept keys come back with no page read")
         self.assertGreater(seen["again"]["version"], seen["before"]["version"])
         self.assertTrue(seen["again"]["internal"] is None or seen["again"]["version"] >= seen["before"]["version"] + 2)
         self.assertEqual(seen["read"]["internal"]["byName"], target.keys("internal"))
         self.assertEqual((seen["other"]["internal"], seen["other"]["external"]), (None, None))
+
+
+class KeptOnThePhone(unittest.TestCase):
+    def test_after_a_reload_the_keys_come_from_the_phone_and_no_page_is_asked(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def mark():
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"snap": "first"}, {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "again"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[mark]).seen
+            after = sent(stand_in)[marks[0]:]
+        self.assertIn("catalog", after)
+        self.assertEqual(page_lines(after), [])
+        self.assertEqual(seen["again"]["internal"]["byName"], target.keys("internal"))
+        self.assertEqual(seen["again"]["external"]["byName"], target.keys("external"))
+        self.assertEqual(dict(seen["again"]["rowKeys"]), dict(seen["first"]["rowKeys"]))
+
+    def test_a_new_generation_is_read_and_kept_and_the_next_start_reads_no_page(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def changed():
+            with target.lock:
+                target.files["internal"][3] = ("file-03.odrg", 7777, "0badf00d")
+                target.generation["internal"] = 4
+            marks.append(len(stand_in.lines))
+
+        def mark():
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"step": True}, {"reload": True}, {"untilKeys": "internal", "generation": 4, "ms": 20000}, {"sleep": 500},
+                {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "last"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[changed, mark]).seen
+            lines = sent(stand_in)
+        read = page_lines(lines[marks[0]:marks[1]])
+        self.assertTrue(read)
+        self.assertEqual({line.split(" ")[2] for line in read}, {"internal"}, "the card's kept keys still hold")
+        self.assertEqual(page_lines(lines[marks[1]:]), [])
+        self.assertEqual(seen["last"]["internal"]["byName"]["file-03.odrg"], "0badf00d-7777")
+
+    def test_loading_and_absent_keep_the_kept_keys_and_damaged_forgets_them(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def away():
+            with target.lock:
+                target.state["internal"] = "damaged"
+                target.state["external"] = "absent"
+            marks.append(len(stand_in.lines))
+
+        def loading():
+            with target.lock:
+                target.state["internal"] = "ok"
+                target.state["external"] = "loading"
+            marks.append(len(stand_in.lines))
+
+        def back():
+            with target.lock:
+                target.state["external"] = "ok"
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"step": True}, {"reload": True}, {"sleep": 2000}, {"step": True}, {"reload": True},
+                {"untilKeys": "internal", "ms": 20000}, {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "back"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[away, loading, back]).seen
+            lines = sent(stand_in)
+        while_ok_again = page_lines(lines[marks[1]:marks[2]])
+        self.assertTrue(while_ok_again, "the damaged catalog's keys were forgotten and read again")
+        self.assertEqual({line.split(" ")[2] for line in while_ok_again}, {"internal"})
+        self.assertEqual(page_lines(lines[marks[2]:]), [], "absent and loading kept the card's keys")
+        self.assertEqual(seen["back"]["external"]["byName"], target.keys("external"))
+
+    def test_another_address_has_keys_of_its_own(self):
+        first = Paged(INTERNAL, EXTERNAL)
+        second = Paged(files("other-", 20, 7), [(f"night/{name}", size, crc) for name, size, crc in files("dusk-", 10, 8)])
+        with support.StandIn(first.replies()) as one, support.StandIn(second.replies()) as two:
+            plan = [{"until": "both", "ms": 20000}, {"address": two.address}, {"until": "both", "ms": 20000}, {"snap": "other"}]
+            seen = support.run("keys", address=one.address, settings={"plan": plan}).seen
+            asked = page_lines(sent(two))
+        self.assertTrue(asked, "the second address reads its own pages")
+        self.assertEqual(seen["other"]["internal"]["byName"], second.keys("internal"))
+        self.assertEqual(seen["other"]["external"]["byName"], second.keys("external"))
 
 
 class TheOperatorFirst(unittest.TestCase):

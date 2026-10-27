@@ -55,7 +55,7 @@ Rules for every task:
   - Suites: app.
   - Requirements: 2.1 to 2.4, 4.1
 
-- [ ] 3. The keys kept on the phone
+- [x] 3. The keys kept on the phone
   - `app/www/previews.js`: `VERSION = 2`, both stores created when missing, `kept` taken
     at `start()` without replacing a key kept in this run, `blocked` and `versionchange`,
     and `keeper` with `kept`, `keep` and `forget`.

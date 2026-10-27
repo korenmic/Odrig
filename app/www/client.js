@@ -2,7 +2,7 @@
 // way at a time. The state holds only what a reply said.
 
 import * as commands from "./commands.js";
-import {Failure} from "./target.js";
+import {Failure, address} from "./target.js";
 
 const STATUS_EVERY_MS = 1000;
 const LIST_EVERY_MS = 10000;
@@ -73,6 +73,12 @@ let job = null;
 let catalogDue = false;
 const reads = [];
 let pageWait = null;
+// Where the keys of the catalogs are kept between two starts of the app, the address they are
+// kept under, and whether those of earlier starts have been taken: no page of a catalog is
+// asked before.
+let keeper = {kept: () => null, keep: () => {}, forget: () => {}};
+let keptUnder = null;
+let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 let contentLocked = false;
@@ -319,6 +325,9 @@ export function noteCatalog(reply) {
     const part = reply[storage];
     const at = reads.findIndex((read) => read.storage === storage);
     if (part.state !== "ok") {
+      if (["damaged", "incompatible", "none"].includes(part.state)) {
+        keeper.forget(keptUnder, storage);
+      }
       if (at !== -1) {
         reads.splice(at, 1);
       }
@@ -330,6 +339,17 @@ export function noteCatalog(reply) {
     }
     const kept = state.keys[storage];
     const same = (read) => read.generation === part.generation && read.entries === part.entries;
+    // Keys kept on the phone of this generation and number of entries are the storage's at
+    // once, and its pages are not read.
+    const record = state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptUnder, storage);
+    if (record !== null && same(record)) {
+      if (at !== -1) {
+        reads.splice(at, 1);
+      }
+      state.keys[storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      state.keysVersion += 1;
+      continue;
+    }
     if (state.pagesRefused || (at !== -1 && same(reads[at])) || (at === -1 && kept !== null && same(kept))) {
       continue;
     }
@@ -341,6 +361,32 @@ export function noteCatalog(reply) {
       reads.sort((a, b) => STORAGES.indexOf(a.storage) - STORAGES.indexOf(b.storage));
     }
   }
+}
+
+// Takes where the keys of the catalogs are kept between two starts of the app.
+export function keepKeysIn(given) {
+  keeper = given;
+}
+
+// Says that the keys kept at earlier starts have been taken, or found missing: pages may be
+// asked from now on. A read under way of the generation and number of entries of kept keys
+// ends, and those keys are the storage's.
+export function keptKeysReady() {
+  keptTaken = true;
+  let took = false;
+  for (const read of [...reads]) {
+    const record = keeper.kept(keptUnder, read.storage);
+    if (record !== null && record.generation === read.generation && record.entries === read.entries) {
+      reads.splice(reads.indexOf(read), 1);
+      state.keys[read.storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      state.keysVersion += 1;
+      took = true;
+    }
+  }
+  if (took) {
+    changed();
+  }
+  next();
 }
 
 // Says that the target keeps no catalogs: it is asked for none again until it changes.
@@ -422,6 +468,7 @@ async function askPage() {
         reads.shift();
         state.keys[read.storage] = {generation: read.pageGeneration, entries: read.entries, byName: read.byName};
         state.keysVersion += 1;
+        keeper.keep(keptUnder, read.storage, state.keys[read.storage]);
       }
     }
   } catch (error) {
@@ -592,7 +639,7 @@ function due() {
     catalogDue = false;
     return askCatalog;
   }
-  if (reads.length > 0 && pageWait === null) {
+  if (reads.length > 0 && pageWait === null && keptTaken) {
     return askPage;
   }
   return null;
@@ -619,6 +666,7 @@ async function next() {
 // upload to the earlier target ends.
 export function begin() {
   target += 1;
+  keptUnder = address();
   contentLocked = false;
   state.listVersion = 0;
   if (job !== null) {

@@ -14,6 +14,9 @@ import * as targetScreen from "./screens/target.js";
 
 const SCREENS = ["animations", "upload", "settings", "target"];
 const LINKS = {checking: "Checking", answers: "Connected", "no-answer": "No answer"};
+// How long the app waits at most for the keys kept on the phone before it asks a catalog's
+// pages.
+const KEPT_WAIT_MS = 3000;
 let screen = "target";
 // The screen of the app's first entry of the page's history: the target screen until
 // the target has answered, Animations from then on.
@@ -125,8 +128,12 @@ window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 animationsScreen.start({message});
-// The phone's own previews are taken up while the app starts; the rows show them when they come.
-previews.start();
+// The phone's own previews and the keys kept on it are taken up while the app starts; the rows
+// show them when they come, and no page of a catalog is asked before, nor after a few seconds
+// whatever happens.
+client.keepKeysIn(previews.keeper);
+previews.start().then(() => client.keptKeysReady());
+setTimeout(() => client.keptKeysReady(), KEPT_WAIT_MS);
 uploadScreen.start({message});
 authoring.start({message, go});
 settingsScreen.start();
