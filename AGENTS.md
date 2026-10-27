@@ -122,16 +122,13 @@ commands of Windows.
 These are planned as seeds and are not in the repository yet. Do not describe them as
 present, and do not build on them.
 
-- **Animations from a USB drive**, seed 20: built; a stick is not read on the board yet.
-- **One USB port for a computer or a stick**, seed 21: built; not tried on the board yet.
+- **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
 - **A USB log on the serial port**, seed 23: built; the plug-in and pull-out check is open.
 - **A bigger animation space**, seed 24: the board was moved to it on 2026-10-16; checks open.
 - **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
 - **The app's count of installed and external animations**, seed 28: a dashboard line.
-- **Toggle animations in the playlist**, seed 29: merged; the owner's phone check is open.
-- **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
-- **Bounded decoding and responsive fault handling**, seed 31: no bad file may freeze the board.
-- **Boot-local animation quarantine and recovery**, seed 32: boot completes; bad files grayed.
+- **Toggle animations, and app mapping with a diagonal check**, seeds 29 and 30: merged; the owner's checks are open.
+- **Bounded decoding, and boot-local quarantine and recovery**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
 - **Managed internal and external animation catalogs**, seed 35: built; the board session and the owner's phone check are open.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
@@ -139,6 +136,8 @@ present, and do not build on them.
 - **Playlist filters by storage and type**, seed 39: two filters in the app only.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
+- **A seek bar under the emulator's LEDs**, seed 42: a draggable progress bar, the emulator alone.
+- **A cross-wired snake 10**, seed 43: each strip's direction in the mapping, and a checkbox in Settings.
 
 The state of every seed is in the `state.json` of its folder.
 
