@@ -10698,3 +10698,23 @@ app sends take `catalog` and its pages among the lines it sends by itself.
 
 **Resolution.** `app/www/client.js`, `app/www/commands.js`, `app/www/screens/catalogs.js`;
 docs/android-app.md; tests/app/test_keys.py, tests/app/page/scenarios/keys.js.
+
+## Seed 44: the square in a row, and the note under the name
+
+**Question.** The seed puts a square of 44 by 44 pixels at the start of each row's Play
+button and the row's `Saving…` or `⊘ Ignored` note under the name inside Play at 320 px in
+selection mode. Is the note moved only then, how does a row get its preview without being
+drawn again, and how is the row's checkbox measured?
+
+**Answer.** The note stands under the name inside Play at every width and in every mode,
+one layout for all. The square is set each time the rows' state is drawn, its image made,
+changed or taken out only when its source differs, so that a row is never drawn again for
+its preview and a press is never lost to it; the square takes no pointer itself and the
+tap goes to Play. The now-playing panel's square shows when `status` names an animation the
+list holds and something plays, which is never so during a test. The look test measures a
+row in selection mode with its note; the row's checkbox counts among the row's own controls,
+44 pixels high as its Play and its menu are.
+
+**Resolution.** `app/www/previews.js`, `app/www/screens/show.js`, `app/www/index.html`,
+`app/www/style.css`; docs/android-app.md; tests/app/test_previews.py,
+tests/app/page/scenarios/previews.js, tests/app/test_look.py.

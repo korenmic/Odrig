@@ -137,7 +137,7 @@ Rules for every task:
     `tests/app/test_docs.py`: the table.
   - Suites: the app's, onboarding.
 
-- [ ] 7. The app shows the previews
+- [x] 7. The app shows the previews
   - `app/www/previews.js` (the default catalog and `sourceOf`), `app/www/screens/show.js`
     (the square in the rows, the now-playing panel), `app/www/index.html`,
     `app/www/style.css`, `app/www/main.js`.

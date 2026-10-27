@@ -12,7 +12,9 @@ teal and violet aurora, translucent rounded panels with a restrained glow, light
 a top bar with the app's name and whether the installation answers.
 
 - **Animations** says what the installation does and holds its animations. A panel says
-  what plays, the animation on the LEDs with its id and its file name, `ON` or `OFF`, the
+  what plays, the animation on the LEDs with its id and its file name, before them the
+  square of its preview as a row has it, hidden while nothing plays, while a test shows
+  and while the list does not hold the animation yet, `ON` or `OFF`, the
   brightness and the refreshes a second, with `On` and `Off` together in one pill and a
   slider for the brightness. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
@@ -39,8 +41,15 @@ a top bar with the app's name and whether the installation answers.
   level's playlist is current, and so is the folder row that leads to the current
   playlist at every level above it. The list comes back to the root when the target
   changes, when the card goes out and when the folder shown is gone from the list. Each row
+  begins its Play button with a square of 44 by 44 pixels: the preview of its animation, a
+  short GIF that loops, its pixels kept square and whole, a 60-by-6 strip as a band across
+  the middle, or an empty dark square when the animation has no preview or a fault; a tap
+  on the square plays as a tap on the name does. The previews are those of the default
+  preview catalog that comes with the app, `thumbnails/`, found by each animation's key
+  (see "The keys of the animations" below), then the phone's own. Folder rows and the
+  Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
-  not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
+  not read the file whole, and under them its `Saving…` or `⊘ Ignored`, has a badge `in` (internal storage) or `ex` (external storage,
   read-only unless the installation can write its card), and a small `...` button that
   opens its menu. Cycles are not listed. An
   animation that the installation found unavailable, because its file had a fault, is
@@ -790,7 +799,9 @@ installed; the phone with mobile data on.
     number; put it back: the number comes back.
 16. **The look and the menus.** On each tab, upright and sideways. *Seen:* the midnight
     background with teal and violet, the panels, every text readable; each row has its
-    `in` or `ex` badge and its `...`; a row's menu opens beside it without playing it, and
+    square, with the moving preview of its animation when the default catalog or this phone
+    has one, its `in` or `ex` badge and its `...`; the panel of what plays shows the
+    preview of the animation on the LEDs; a row's menu opens beside it without playing it, and
     an external row's menu says it is read-only. Choose `Ignore in playlist` and then
     `Restore to playlist`: the row says `Ignored`, and then not.
 17. **Moving by a finger.** Hold a row for half a second and drag it up and down a long
