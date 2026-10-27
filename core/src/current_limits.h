@@ -3,12 +3,15 @@
 
 #include <stdint.h>
 
+#include "commands.h"
 #include "core_state.h"
 
 namespace odrig {
 
-// The budgets' file, beside `mapping.json`.
+// The budgets' file, beside `mapping.json`, and the next one while it is written, until it
+// is renamed.
 const char kLimitsFile[] = "limits.json";
+const char kLimitsPart[] = "limits.part";
 
 // The largest budget of the wall and of a leg, in mA.
 const uint32_t kLargestWallBudget = 250000;
@@ -36,6 +39,21 @@ void limits_read(Core &core);
 // left; last, a leg that its own pass brought within its budget and the wall's fade took
 // above it, by its own budget again. Sets each leg's `limited` and the wall's.
 void limits_apply(Core &core);
+
+// The reply of `limits <from>`: whether budgets are saved; the wall's LED count, budget,
+// estimate and whether it was limited; and the same for each leg of the mapping, with its
+// number first, in the mapping's order from position `from`, as many as fit, and `next`, the
+// position of the first left out, or null. The estimates are those of the LED data of the
+// latest refresh that wrote the LEDs.
+uint32_t limits_reply(const Core &core, uint32_t from, Reply &reply);
+
+// Saves the budget of the leg numbered `number`, or the wall's with `number` 0, and puts it
+// in force from the next refresh that writes the LEDs. The words have been checked, and no
+// rebuild runs.
+uint32_t limits_set(Core &core, uint32_t number, uint32_t budget, Reply &reply);
+
+// Removes `limits.json`, when there is one, and puts the defaults in force.
+uint32_t limits_default(Core &core, Reply &reply);
 
 }  // namespace odrig
 

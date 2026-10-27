@@ -93,7 +93,7 @@ Every function receives `ctx` as its first argument.
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, at most 256 files and 32 sub-folders, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
-| `limit_default` | `uint32_t limit_default(void *ctx)`: optional; the wall's budget in mA while no budgets are saved, see [current limits](#current-limits). The core calls it once, inside `odrig_core_begin`. `NULL`, or 0, is no limit: the emulator and the test host have none, and the firmware gives WLED's stored maximum less 120 mA. |
+| `limit_default` | `uint32_t limit_default(void *ctx)`: optional; the wall's budget in mA while no budgets are saved, see [current limits](#current-limits). The core calls it once, inside `odrig_core_begin`. `NULL`, or 0, is no limit: the emulator and the firmware have none, and the test host has one only when it is given `--limit-default`. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
@@ -105,9 +105,9 @@ The last seven members are the storage functions: three that write a file, `rena
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
 
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
-  and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
-  the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
-  `order.txt` and `order.part`.
+  and `.`: `mapping.json`, `limits.json`, `show.json`, the name of an `.odrg` file, or one
+  of the names the core keeps for itself, `upload.part`, `show.part`, `pending.txt`,
+  `mapping.part`, `limits.part`, `order.txt` and `order.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the command `read` begins at the offset it is given. Between two
@@ -293,6 +293,20 @@ start, `limits unreadable`. A leg's budget and whether it was limited are kept i
 legs' table, and the wall's in the core object: the budgets take no block of memory of
 their own.
 
+**The commands** `limits`, `limits wall`, `limits snake` and `limits default` of
+[commands.md](commands.md#current-limits) report and change the budgets. `limits` makes
+the estimates again from the LED data of the latest refresh that wrote the LEDs: they are
+not kept. A save writes `limits.part` through the chunk, as the mapping is written, and
+renames it to `limits.json`; the budgets in memory change after the rename. The file holds
+the wall's budget and then the legs whose budget is above 0: the mapping's from memory, in
+the mapping's order, and then, once budgets are saved, those the old file gives legs the
+mapping lacks, in its order. The core reads the old file for them with `read_at`, through
+the second source, as `order move` reads the old order, after the check of a drive's file
+has given that up. A failure of any call, or an old file that cannot be read, removes
+`limits.part` and leaves the budgets as they were, with `storage-error`; a power cut leaves
+the old file or the new one, and the next start removes `limits.part`. `limits default`
+removes `limits.json` when there is one, readable or not, and puts the defaults in force.
+
 ## Command lines
 
 The commands and their replies are those of [commands.md](commands.md). The core is the
@@ -356,8 +370,8 @@ change left:
 1. Before anything is read, it finishes the change of the catalog whose commit record is
    whole; when a call of that fails, the record stays and the catalog is `damaged`,
    `interrupted`, for this boot. Then it removes `upload.part`, which stays while a record
-   is left, and `show.part`, and `mapping.part` and `order.part` when a `read_at` of one
-   byte finds them there.
+   is left, and `show.part`, and `mapping.part`, `limits.part` and `order.part` when a
+   `read_at` of one byte finds them there.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
    it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
@@ -749,7 +763,9 @@ tables. The core keeps three names in the folder for itself:
 
 The saved order and the saved playlist have files of their own, `order.txt` and
 `playlist.txt`, each written as `order.part` or `playlist.part` and renamed: see [the saved
-order](#the-saved-order) and [the saved playlist](#the-saved-playlist). No show names any
+order](#the-saved-order) and [the saved playlist](#the-saved-playlist). So do the budgets of
+the current limits, `limits.json`, written as `limits.part` and renamed: see [current
+limits](#current-limits). No show names any
 of these: a name in `show.json` ends in `.odrg` or `.odrgx`.
 
 There are four kinds of change. Each line is one call to the host; "write X" is

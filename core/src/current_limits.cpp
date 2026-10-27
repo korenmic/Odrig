@@ -1,6 +1,7 @@
 #include "current_limits.h"
 
 #include "json_reader.h"
+#include "storage.h"
 
 namespace odrig {
 
@@ -110,9 +111,20 @@ uint32_t wall_estimate_at(const Core &core, uint32_t level, uint32_t budget) {
     return sum;
 }
 
-// Reads the whole budgets' file once, setting the budgets of the legs it names that the
-// mapping has. False when it breaks a rule.
-bool read_budgets(Core &core, JsonReader &json) {
+// The leg of the mapping with this number, or a null pointer.
+LegInfo *leg_numbered(const Core &core, uint32_t number) {
+    for (uint32_t index = 0; index < core.leg_count; ++index) {
+        if (core.legs[index].leg == number) {
+            return &core.legs[index];
+        }
+    }
+    return nullptr;
+}
+
+// Reads a whole budgets' file, giving the wall's budget to `wall` and each entry of its legs
+// to `take(leg, budget)`, in the file's order. False when it breaks a rule.
+template <typename Take>
+bool read_budgets(JsonReader &json, uint32_t *wall, Take take) {
     char name[kNameSize];
     uint32_t members = 0;
     // One bit for each leg number, to find one named twice.
@@ -142,11 +154,9 @@ bool read_budgets(Core &core, JsonReader &json) {
                 return false;
             }
         } else if (member == 2) {
-            uint32_t wall;
-            if (!json.integer(&wall) || wall > kLargestWallBudget) {
+            if (!json.integer(wall) || *wall > kLargestWallBudget) {
                 return false;
             }
-            core.wall_budget = wall;
         } else {
             if (!json.array_begin()) {
                 return false;
@@ -163,11 +173,7 @@ bool read_budgets(Core &core, JsonReader &json) {
                     return false;
                 }
                 named[leg >> 3] |= bit;
-                for (uint32_t index = 0; index < core.leg_count; ++index) {
-                    if (core.legs[index].leg == leg) {
-                        core.legs[index].budget = static_cast<uint16_t>(budget);
-                    }
-                }
+                take(leg, budget);
             }
             if (json.failed) {
                 return false;
@@ -184,6 +190,119 @@ void use_defaults(Core &core) {
         core.legs[index].budget = 0;
     }
     core.limits_saved = 0;
+}
+
+// The bytes of `limits.part` while it is written, gathered in the chunk and given to the
+// host's `write` whenever it is full. `ok` is cleared at the first failure, after which
+// nothing more is given.
+struct LimitsWriter {
+    Core &core;
+    uint32_t length;
+    uint32_t entries;
+    bool ok;
+
+    void put(char byte) {
+        if (length == kChunkSize) {
+            flush();
+        }
+        core.chunk[length++] = static_cast<uint8_t>(byte);
+    }
+    void flush() {
+        if (ok && length != 0) {
+            ok = core.host.write(core.host.ctx, core.chunk, length) == 1;
+        }
+        length = 0;
+    }
+    void text(const char *value) {
+        while (*value != '\0') {
+            put(*value++);
+        }
+    }
+    void number(uint32_t value) {
+        char figures[10];
+        uint32_t count = 0;
+        do {
+            figures[count++] = static_cast<char>('0' + value % 10);
+            value /= 10;
+        } while (value != 0);
+        while (count != 0) {
+            put(figures[--count]);
+        }
+    }
+    // An entry of the legs, `[leg,mA]`, for a budget above 0.
+    void leg(uint32_t leg_number, uint32_t budget) {
+        if (budget == 0) {
+            return;
+        }
+        if (entries++ != 0) {
+            put(',');
+        }
+        put('[');
+        number(leg_number);
+        put(',');
+        number(budget);
+        put(']');
+    }
+};
+
+// Writes `limits.part` and renames it to `limits.json`: the wall's budget `wall`; the
+// budget above 0 of each leg of the mapping, in its order, leg `number`'s being `budget`;
+// and, when budgets are saved, each budget above 0 that the old file gives a leg the mapping
+// lacks, in the old file's order. False when the host could not take it or the old file
+// could not be read; `limits.part` is then removed.
+bool save(Core &core, uint32_t wall, uint32_t number, uint32_t budget) {
+    const odrig_host &host = core.host;
+    if (!storage_changes(core) || core.chunk == nullptr || core.checker == nullptr || host.write_open(host.ctx, kLimitsPart) != 1) {
+        return false;
+    }
+    LimitsWriter out = {core, 0, 0, true};
+    out.text("{\"version\":1,\"wall\":");
+    out.number(wall);
+    out.text(",\"legs\":[");
+    for (uint32_t index = 0; index < core.leg_count; ++index) {
+        const LegInfo &leg = core.legs[index];
+        out.leg(leg.leg, leg.leg == number ? budget : leg.budget);
+    }
+    if (core.limits_saved) {
+        // The old file is read with the second source, which the check of a drive's file
+        // gives up for this.
+        drive_check_yields(core);
+        FileSource &source = core.checker->file;
+        source.open_at(host, kLimitsFile);
+        JsonReader json;
+        json.start(&source);
+        uint32_t old_wall = 0;
+        const bool sound = read_budgets(json, &old_wall, [&](uint32_t other, uint32_t kept) {
+            if (leg_numbered(core, other) == nullptr) {
+                out.leg(other, kept);
+            }
+        });
+        source.close();
+        out.ok = out.ok && sound;
+    }
+    out.text("]}\n");
+    out.flush();
+    const bool written = out.ok;
+    if (host.write_close(host.ctx) != 1 || !written || host.rename(host.ctx, kLimitsPart, kLimitsFile) != 1) {
+        host.remove(host.ctx, kLimitsPart);
+        return false;
+    }
+    return true;
+}
+
+// The decimal digits of a number.
+uint32_t digits(uint32_t value) {
+    uint32_t count = 1;
+    while (value >= 10) {
+        value /= 10;
+        ++count;
+    }
+    return count;
+}
+
+// The estimate of a leg's LED data as it is.
+uint32_t leg_estimate(const Core &core, const LegInfo &leg) {
+    return limits_estimate(limits_sum(leg_data(core, leg), leg.count), leg.count);
 }
 
 }  // namespace
@@ -212,7 +331,13 @@ void limits_read(Core &core) {
     if (opened == kNone) {
         JsonReader json;
         json.start(&core.file);
-        sound = read_budgets(core, json);
+        // A leg the mapping lacks is passed over.
+        sound = read_budgets(json, &core.wall_budget, [&](uint32_t number, uint32_t budget) {
+            LegInfo *leg = leg_numbered(core, number);
+            if (leg != nullptr) {
+                leg->budget = static_cast<uint16_t>(budget);
+            }
+        });
         core.file.close();
     }
     if (!sound) {
@@ -275,6 +400,100 @@ void limits_apply(Core &core) {
         }
         leg.limited &= kLimitedBit;
     }
+}
+
+uint32_t limits_reply(const Core &core, uint32_t from, Reply &reply) {
+    uint32_t leds = 0;
+    uint32_t estimate = 0;
+    for (uint32_t index = 0; index < core.leg_count; ++index) {
+        leds += core.legs[index].count;
+        estimate += leg_estimate(core, core.legs[index]);
+    }
+    reply.text("{\"ok\":true,\"saved\":");
+    reply.text(core.limits_saved ? "true" : "false");
+    reply.text(",\"wall\":[");
+    reply.number(leds);
+    reply.text(",");
+    reply.number(core.wall_budget);
+    reply.text(",");
+    reply.number(estimate);
+    reply.text(core.wall_limited ? ",1],\"legs\":[" : ",0],\"legs\":[");
+    // The tail: `],"next":<n>}` and a line feed, with room for any position.
+    const uint32_t tail = 9 + 5 + 2;
+    uint32_t position = from;
+    for (; position < core.leg_count; ++position) {
+        const LegInfo &leg = core.legs[position];
+        const uint32_t leg_estimate_now = leg_estimate(core, leg);
+        // `[leg,N,B,E,L]`, after a comma but for the first.
+        const uint32_t size = (position == from ? 0 : 1) + 7 + digits(leg.leg) + digits(leg.count) + digits(leg.budget) + digits(leg_estimate_now);
+        if (!reply.fits(size + tail)) {
+            break;
+        }
+        reply.text(position == from ? "[" : ",[");
+        reply.number(leg.leg);
+        reply.text(",");
+        reply.number(leg.count);
+        reply.text(",");
+        reply.number(leg.budget);
+        reply.text(",");
+        reply.number(leg_estimate_now);
+        reply.text(leg.limited ? ",1]" : ",0]");
+    }
+    reply.text("],\"next\":");
+    if (position < core.leg_count) {
+        reply.number(position);
+    } else {
+        reply.text("null");
+    }
+    reply.text("}\n");
+    return reply.length;
+}
+
+uint32_t limits_set(Core &core, uint32_t number, uint32_t budget, Reply &reply) {
+    if (core.invalid) {
+        return refuse(reply, "show-invalid");
+    }
+    LegInfo *leg = number != 0 ? leg_numbered(core, number) : nullptr;
+    if (number != 0 && leg == nullptr) {
+        return refuse(reply, "bad-argument");
+    }
+    if (!check_complete(core) || core.upload.state != kUploadNone) {
+        return refuse(reply, "busy");
+    }
+    // Once budgets are saved, the value in force writes nothing; until then every set
+    // writes the whole file.
+    const uint32_t before = leg != nullptr ? leg->budget : core.wall_budget;
+    if (core.limits_saved && before == budget) {
+        return succeed(reply);
+    }
+    if (!save(core, leg != nullptr ? core.wall_budget : budget, number, budget)) {
+        return refuse(reply, "storage-error");
+    }
+    if (leg != nullptr) {
+        leg->budget = static_cast<uint16_t>(budget);
+    } else {
+        core.wall_budget = budget;
+    }
+    core.limits_saved = 1;
+    core.limits_present = 1;
+    return succeed(reply);
+}
+
+uint32_t limits_default(Core &core, Reply &reply) {
+    if (core.invalid) {
+        return refuse(reply, "show-invalid");
+    }
+    if (!check_complete(core) || core.upload.state != kUploadNone) {
+        return refuse(reply, "busy");
+    }
+    if (core.limits_present) {
+        if (!storage_changes(core) || core.host.remove(core.host.ctx, kLimitsFile) < 0) {
+            return refuse(reply, "storage-error");
+        }
+        core.limits_present = 0;
+    }
+    use_defaults(core);
+    return succeed(reply);
 }
 
 }  // namespace odrig

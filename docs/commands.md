@@ -42,6 +42,10 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
 | `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
+| `limits`, `limits <from>` | Reports the current limits: the budgets of the wall and of each leg, and the current they are estimated to draw. |
+| `limits wall <mA>` | Saves the wall's budget, 0 to 250,000 mA; 0 is no limit. |
+| `limits snake <n> <mA>` | Saves the budget of leg n, 1 to 255, which on the installation is snake n: 0 to 65,535 mA; 0 is no limit. |
+| `limits default` | Removes the saved budgets, so that the defaults are in force again. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
@@ -313,11 +317,11 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `read`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `show-invalid` | `play`, `list`, `read`, `remove`, an `upload` command or a `limits` command that saves was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
+| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set`, `catalog rebuild` and a `limits` command that saves while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
@@ -565,3 +569,63 @@ itself, writes nothing.
 A move does not change the animation whose turn it is, its time, the brightness or
 whether the LEDs are on; the next turn follows the new order. It works while a test of
 the mapping shows. Every route carries it to the one command parser of the core.
+
+## Current limits
+
+The core limits the current the LEDs draw by budgets in whole mA: one for the wall, all
+legs together, and one for each leg. On the installation leg n is snake n, the three
+columns 3n-2 to 3n: a physical place, whatever pin drives it, which `mapping set` and
+`mapping cross` do not change. A budget is a ceiling on WLED's estimate of what the LEDs
+draw, not a measurement and not a cap on brightness; it dims only a refresh whose bytes
+would be estimated above it, and 0 is no limit. [core.md](core.md#current-limits) has the
+estimate, the fade and the order in which the budgets apply.
+
+```
+limits
+{"ok":true,"saved":true,"wall":[360,0,631,0],"legs":[[1,180,500,451,1],[2,180,0,180,0]],"next":null}
+```
+
+`wall` is the wall's number of LEDs, its budget, its estimate and whether its budget dimmed
+the latest refresh that wrote the LEDs, 1 or 0. Each entry of `legs` is the same for one
+leg of the mapping, with the leg's number first. The estimates are those of the bytes that
+refresh sent, after every limiting. `saved` is false while no budgets are saved and the
+defaults are in force: no leg has a budget, and the wall's is the default of the host the
+core runs in. The legs are those of the mapping, in the order of its file, from the
+position `<from>`, counted from 0, which is 0 when it is left out; `<from>` is 0 to 65,535.
+The reply holds as many as fit into it, and `next` is the position of the first one left
+out, or `null`, as for `list`. Without a mapping that can be used there are no legs, and
+the wall's number of LEDs is 0. `limits` is answered while the show is invalid too, and is
+refused only with `bad-argument`, for a `<from>` that is not such a number.
+
+```
+limits snake 1 500
+{"ok":true}
+```
+
+`limits wall <mA>` saves the wall's budget, 0 to 250,000 mA, and `limits snake <n> <mA>` the
+budget of leg n, 1 to 255, 0 to 65,535 mA. The reply `{"ok":true}` comes once the budgets
+are saved, and they are in force from the next refresh that writes the LEDs. The board
+keeps them in `limits.json` beside `mapping.json`, which is written whole and renamed into
+place, so that a power cut leaves the budgets before the save or those after it. The file
+holds the wall's budget and every leg's budget above 0, the budgets of legs the mapping
+lacks among them, which another mapping uses. While the defaults are in force, the first
+save writes the whole file: the wall's budget then in force, every leg at 0, and the value
+saved; until a file is saved every save writes, even of the value in force. Once one is
+saved, the value in force again writes nothing. There is no revision: the last save wins.
+
+`limits default` removes `limits.json`, so that the defaults are in force again and `saved`
+is false; with no file it writes nothing.
+
+The three are refused in this order:
+
+- `bad-argument`: the words are not in one of the forms, the leg number is not from 1 to
+  255, or the budget is out of its range.
+- `busy`: a rebuild of a catalog runs.
+- `show-invalid`: the show is invalid.
+- `bad-argument`: `limits snake` names a leg the mapping lacks.
+- `busy`: until the player has read every installed animation after a start, and while an
+  upload is open.
+- `storage-error`: the file could not be written or removed. The budgets are as they were.
+
+They are taken while a test of the mapping shows, which they limit as any picture. Every
+route carries them to the one command parser of the core.

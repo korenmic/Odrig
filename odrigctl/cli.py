@@ -30,6 +30,7 @@ COMMANDS = {
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
     "order": ("OPERATION",),
+    "limits": ("[OPERATION]",),
     "upload": ("ID", "FILE"),
 }
 # What an upload came to, beside its reply: a reply that does not report success leaves the
@@ -65,7 +66,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, limits [FROM], limits wall MA, limits snake N MA, limits default, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get and limits without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -75,7 +76,7 @@ def parser():
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
     made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, the ID and the FILE of upload, the FILE of upload --external")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, FROM, wall MA, snake N MA or default of limits, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -122,6 +123,14 @@ def checked(made, arguments):
         words = arguments.arguments
         if not (words == ["get"] or (len(words) == 2 and words[0] == "get") or (len(words) == 4 and words[0] == "move")):
             made.error("order takes get [FROM], or move REV ID BEFORE")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
+    if arguments.command == "limits":
+        words = arguments.arguments
+        valid = len(words) == 0 or (len(words) == 1 and words[0] not in ("wall", "snake")) or (len(words) == 2 and words[0] == "wall") or (len(words) == 3 and words[0] == "snake")
+        if not valid:
+            made.error("limits takes no argument, FROM, wall MA, snake N MA, or default")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
@@ -223,6 +232,8 @@ def main(argv=None):
                 return 0 if content.list_all(session, _print) else 1
             if words == ["order", "get"]:
                 return 0 if content.list_all(session, _print, b"order get") else 1
+            if words == ["limits"]:
+                return 0 if content.list_all(session, _print, b"limits") else 1
             if arguments.command == "upload":
                 progress = Progress(sys.stderr)
                 try:

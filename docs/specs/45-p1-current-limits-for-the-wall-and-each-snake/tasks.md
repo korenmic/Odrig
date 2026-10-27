@@ -28,7 +28,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `tests/core/test_docs.py` and `tests/emulator/test_binding.py`. `docs/core.md`: the
       host's member, the LED data, the start, the memory table, the test host's option.
       Suites: core, emulator, onboarding.
-- [ ] 3. The commands and the save. `limits_reply` with paging, `limits wall`, `limits
+- [x] 3. The commands and the save. `limits_reply` with paging, `limits wall`, `limits
       snake`, `limits default` with their refusals in order, the atomic save copying the
       legs the mapping lacks, `limits.part` cleared at the start, the command tool's forms
       and paging. Tests: the defaults' first save, the same value again, a power loss at

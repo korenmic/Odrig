@@ -3,6 +3,7 @@
 #include "catalog.h"
 
 #include "content.h"
+#include "current_limits.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -420,6 +421,23 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             return mapping_set(core, revision, words.text[3], words.size[3], reply);
         }
         return refuse(reply, "bad-argument");
+    }
+    if (words.is(0, "limits")) {
+        uint32_t from = 0;
+        if (words.count == 1 || (words.count == 2 && number_word(words, 1, 0, 65535, &from))) {
+            return limits_reply(core, from, reply);
+        }
+        // The wall is number 0.
+        uint32_t number = 0;
+        uint32_t budget = 0;
+        const bool wall = words.count == 3 && words.is(1, "wall") && number_word(words, 2, 0, kLargestWallBudget, &budget);
+        const bool snake = words.count == 4 && words.is(1, "snake") && number_word(words, 2, 1, 255, &number) &&
+                           number_word(words, 3, 0, kLargestLegBudget, &budget);
+        const bool defaults = words.count == 2 && words.is(1, "default");
+        if (!wall && !snake && !defaults) return refuse(reply, "bad-argument");
+        if (catalog_rebuilding(core)) return refuse(reply, "busy");
+        if (defaults) return limits_default(core, reply);
+        return limits_set(core, number, budget, reply);
     }
     if (words.is(0, "catalog")) {
         if (words.count == 1) {

@@ -10742,3 +10742,79 @@ holds for a leg's budget alone. Changing the order needs the owner.
 
 **Resolution.** `odrig/limits.py` and `core/src/current_limits.cpp` as they are;
 `tests/core/test_limits.py`.
+
+## Seed 45: the reply of `limits`
+
+**Question.** Requirement 3.1 gives the reply of `limits` and the wall's LED count, budget,
+estimate and `limited`, but not what the wall's count and estimate are when the reply holds
+only some of the legs, what the estimates are before the first refresh, how much room the
+paging keeps for `next`, nor whether `limits` answers while the show is invalid.
+
+**Answer.** The wall's count and estimate are those of every leg of the mapping, whichever
+part is asked for: its count is the sum of the legs' LEDs and its estimate the sum of their
+estimates, made again from the LED data at each reply. Before the first refresh the LED data
+is dark, so each leg is estimated at its LEDs at rest and nothing is limited. The tail of the
+reply, `],"next":` with a position and `}` with a line feed, is set aside first with room for
+a position of five digits, as `order get` does, and a leg is written only while its entry and
+the tail fit. `limits` answers whatever the state of the show, an invalid one too, and of the
+check after the start; only a `<from>` that is not a whole number from 0 to 65,535 is refused.
+The legs of `limits <from>` start at that position of the mapping's order, and a position at
+or past the last leg gives no legs and `next` null.
+
+**Resolution.** `core/src/current_limits.cpp`, `limits_reply`; docs/commands.md, "Current
+limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the save of the budgets and its failures
+
+**Question.** Requirement 2.3 has a save copy the legs of the old file that the mapping lacks,
+and the design has the old file read through the second source after the check of a drive's
+file yields, as `order move` reads the old order. It leaves open when the old file is read,
+what an old file that cannot be read then comes to, what is copied of an entry at 0, and what
+`limits default` does with a file it cannot remove or a host whose storage cannot be changed.
+
+**Answer.** The old file is read only while saved budgets are in force: a missing file has
+nothing to copy, and an unreadable one is replaced whole, as requirement 2.4 says. An old file
+that cannot be read whole and by the rules at the save, which the core read or wrote itself,
+is a failure of the storage: `limits.part` is closed and removed, the reply is
+`storage-error` and nothing changes, as `order move` does not write an order again from a
+part of the old one. An entry of the old file at 0 is not copied, since the file holds the
+budgets above 0; the copied entries keep the old file's order, after the mapping's legs.
+`limits.part` is always closed before it is removed on a failure. A save on a host whose
+storage cannot be changed is `storage-error`. `limits default` removes `limits.json` when
+there is one, readable or not; when the host cannot remove it, or cannot change its storage,
+the reply is `storage-error` and the budgets in force stay; with no file it writes nothing
+and succeeds on any host. `limits default` has the refusals of the two sets but the one of a
+leg the mapping lacks.
+
+**Resolution.** `core/src/current_limits.cpp`, `save`, `limits_set`, `limits_default`;
+docs/commands.md and docs/core.md, "Current limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the command tool's forms of `limits`
+
+**Question.** Requirement 3.3 has the command tool send the five forms of `limits` and follow
+`next` for `limits` without a position. Which words does the tool itself refuse?
+
+**Answer.** As for `order`, the tool checks only the shape: `limits` alone, followed through
+every part as `list` and `order get` are; one word that is neither `wall` nor `snake`, sent as
+typed, which is `limits <from>` or `limits default`; `wall` with one more word; and `snake`
+with two more. Anything else is a usage error, status 2, "limits takes no argument, FROM, wall
+MA, snake N MA, or default", and nothing is sent; the values are judged by the core. The
+command list puts `limits` before `upload`, which stays last, and the session of
+`tests/emulator/test_tool.py` sends `limits default`, which a target without saved budgets
+answers with `{"ok":true}` and no change.
+
+**Resolution.** `odrigctl/cli.py`; docs/emulator.md, "The command tool";
+`tests/emulator/test_tool.py`, `tests/emulator/test_limits.py`.
+
+## Seed 45: the host's default before the firmware gives one
+
+**Question.** docs/core.md's row of the host's member `limit_default` said that the test host
+has none and that the firmware gives WLED's stored maximum less 120 mA. The test host has one
+with `--limit-default`, and the firmware's record sets the member to a null pointer until
+the firmware's task gives it the default. What does the row say now?
+
+**Answer.** What holds now: the emulator and the firmware have none, and the test host has
+one only when it is given `--limit-default`. The firmware's task changes the row when the
+firmware gives its default.
+
+**Resolution.** docs/core.md, "What the host supplies".
