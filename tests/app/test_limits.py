@@ -99,7 +99,8 @@ class AgainstTheEmulator(unittest.TestCase):
             reply = json.loads(target.command("limits"))
         first = found["first"]
         self.assertEqual(first["heading"], "Current limits")
-        for words in ("a ceiling, in mA, on WLED's estimate", "not a measurement", "A low wall budget also dims the diagonal that the mapping from a photo reads"):
+        for words in ("a ceiling, in mA, on WLED's estimate", "not a measurement", "A low wall budget also dims the diagonal that the mapping from a photo reads",
+                      "A budget of 0, or an empty field, means no limit. To remove a limit, clear its field or type 0."):
             self.assertIn(words, first["explanation"])
         self.assertEqual(first["keys"], ["wall", *SNAKES])
         self.assertEqual(first["labels"], ["The wall's budget, mA", *LABELS])

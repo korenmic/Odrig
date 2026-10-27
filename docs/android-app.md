@@ -675,7 +675,9 @@ budget, mA` has the wall's estimate beside it, as `Estimate 3,616 mA`; under it,
 `mapping get` reports the installation's twenty snakes as editable, a row for each snake,
 `Snake n · columns a–b`, with its field and its estimate. For another mapping, or none, the
 panel has the wall's field alone. A field takes digits only, and a budget of 0, no limit,
-shows as an empty field that says `No limit`.
+shows as an empty field that says `No limit`. The panel's explanation, before the fields,
+says so in words: `A budget of 0, or an empty field, means no limit. To remove a limit,
+clear its field or type 0.`
 
 Text that differs from the budget read last is saved when Enter is pressed in its field or
 the field is left, with `limits wall <mA>` or `limits snake <n> <mA>`; an emptied field
