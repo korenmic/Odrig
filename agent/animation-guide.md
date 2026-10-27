@@ -150,6 +150,7 @@ play in turn, and `"animation":1` that item 1 is the one playing now.
 | A source a generator writes for the target | `build/`, written again whenever a show is packed | No. The generator is. |
 | A show file | `shows/NAME/show.json` | Yes. |
 | A mapping file | `mapping/` | Yes. It changes only when the LEDs are wired another way, which is the owner's to say. |
+| The preview of an animation | `thumbnails/<key>.gif` and its line in `thumbnails/catalog.js`, written by `node converter/odrig.js thumbnail FILE --catalog thumbnails` | Yes, in the commit of the animation's source, or of the conversion that made it. |
 | The video or GIF you imported, installed file sets, ODRG files, record files, everything you try | `build/` | No. Git ignores the folder. |
 
 `pack` makes `NAME.odrg` from `NAME.json`, so name a source in lower-case letters, digits,

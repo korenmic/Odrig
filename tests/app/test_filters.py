@@ -103,7 +103,7 @@ class TheFilters(unittest.TestCase):
         with typed_target() as target:
             support.run("filters", address=target.address, settings={"rows": 6, "every": True})
             words = {line.split(b" ")[0] for _, line in target.lines}
-        self.assertLessEqual(words, {b"status", b"list", b"space", b"order"})
+        self.assertLessEqual(words, {b"status", b"list", b"space", b"order", b"catalog"})
 
 
 if __name__ == "__main__":

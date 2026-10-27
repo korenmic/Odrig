@@ -14,6 +14,7 @@ It is written in JavaScript, lives in the folder `converter/`, and has two parts
 | [`decode`](#decode) | Turns an ODRG file back into a JSON frames file. |
 | [`check`](#check) | Says whether a JSON frames or ODRG file is valid and what it holds. |
 | [`pack`](#pack) | Builds the folder that is installed for a show. |
+| [`thumbnail`](#thumbnail) | Makes the preview of an animation, a short GIF that loops, or adds previews to a preview catalog. |
 
 This is the one converter of the project. The Python package `odrig/` converted before it;
 what that package answered to the same inputs is stored with the [tests](#tests) of this
@@ -24,9 +25,9 @@ other ODRG readers. All of that is on its own page,
 
 ## Setup
 
-The tool needs Node.js 20 or later. `encode`, `decode`, `check` and `pack` need Node.js alone:
-there is nothing to install and nothing to build. `import` needs two packages, which one
-command puts into the project folder:
+The tool needs Node.js 20 or later. `encode`, `decode`, `check`, `pack` and `thumbnail`
+need Node.js alone: there is nothing to install and nothing to build. `import` needs two
+packages, which one command puts into the project folder:
 
 ```
 npm ci --prefix converter
@@ -73,7 +74,7 @@ system only.
 
 | Status | Meaning |
 |---:|---|
-| 0 | The subcommand did its work. |
+| 0 | The subcommand did its work. `thumbnail` with `--catalog` ends with 0 also when it passed files over, each named on standard error. |
 | 1 | An input was rejected. One line `error: <reason>: <detail>` is written to standard error and no output is left behind. The reasons are listed in [reasons.md](reasons.md). |
 | 2 | The command line was not understood, or Node.js is older than 20. A usage message, or one line that names the version of Node.js, is written to standard error and nothing else is written. |
 | 70 | The tool itself failed: an error that is no rejection of an input. The error is written to standard error as Node.js prints it. It is a defect of the tool. |
@@ -343,6 +344,64 @@ source must have the canvas size of the mapping. The first thing that is wrong i
 with a reason from "Shows" in [reasons.md](reasons.md), and the output folder and the
 folder around it are left as they were.
 
+## thumbnail
+
+```
+node converter/odrig.js thumbnail FILE... (--catalog DIR [--card ODRIG] | --out OUT.gif)
+```
+
+Makes the preview of an ODRG file or an ODRGX container: a GIF of the animation's own
+canvas, the top row first, that loops forever. It holds 24 pictures taken over the
+animation's first loop, picture `k` the one on screen at `floor(k * loop / 24)` ms, each
+shown for a twenty-fourth of the loop rounded to 10 ms, at least 20 ms and at most 120 ms:
+an animation of up to three seconds plays at its own speed, a longer one as a summary of
+about three seconds. The loop of frames is the sum of their durations, that of a text its
+pass, that of a clock a thousand times its seconds; a clock is drawn with the seed 1. The
+palette is every colour of the pictures when they hold at most 256, otherwise the 256 that
+cover the most pixels, a tie going to the smaller colour read as one number of 24 bits;
+each pixel takes the nearest colour, without dithering. A preview above 65,536 bytes is
+made again with the 12 pictures at twelfths, each at most 240 ms, and then with the 6 at
+sixths, each at most 480 ms; one above even then is refused with `preview-too-large`. The
+file is read record by record: what is kept is the current picture and the sampled ones.
+The same file gives the same bytes here and in a web page.
+
+With `--out`, the preview of one file is written to `OUT.gif`. A file that the readers
+refuse, or whose preview is too large, ends with status 1 and its reason, and nothing is
+written:
+
+```
+node converter/odrig.js thumbnail test-animations/lines-test.odrg --out build/lines-test.gif
+```
+
+With `--catalog`, the preview of each file is added to the preview catalog of the folder
+`DIR`, which is made when it is missing: `DIR/<key>.gif`, named by the key of the file,
+its CRC-32 of zlib and PNG as eight lowercase hexadecimal digits, a dash and its size in
+bytes, and a line of `DIR/catalog.js` for the key with the GIF's name and the names the
+animation was given. A key the catalog holds keeps its GIF and gains the name. The name of
+a file inside the folder `--card` names is its path from that folder, its parts joined by
+`/`, as the card's catalog names it; the name of any other file is its own name, never a
+folder of the computer. A file that the readers refuse, or whose preview is too large, is
+passed over with one line on standard error,
+`passed over: <FILE>: <reason>: <detail>`, and the run ends with status 0 once the
+mapping is written. Nothing is written on standard output, and no separate check is run.
+`catalog.js` is read and written as text, in one shape, plain ASCII:
+
+```
+export default {
+  "1a2b3c4d-52340": {"gif": "1a2b3c4d-52340.gif", "names": ["sunrise.odrg"]},
+};
+```
+
+one line for each key in the order of its bytes, its names in the order of theirs, a name
+outside printable ASCII with `\u` and four hexadecimal digits for each character above
+`~`. A `catalog.js` of another shape is a fault of the folder: the run ends with status 70.
+The default preview catalog of the repository is the folder `thumbnails/`, written by this
+subcommand only:
+
+```
+node converter/odrig.js thumbnail test-animations/*.odrg --catalog thumbnails
+```
+
 ## The library
 
 `converter/lib/` is the converter without files and without a command line: it is given
@@ -361,8 +420,8 @@ a web page load the same files.
 | `jsonframes.js` | JSON frames files: `loads` reads one, `dumps` writes the canonical layout. |
 | `inflate.js` | The DEFLATE decoder. |
 | `deflate.js` | The DEFLATE compressor. |
-| `odrg.js` | ODRG files: `header`, `decode` and `encode`. |
-| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; and `pictureAt`, the picture of a text or a clock at a time. |
+| `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `decode` and `encode`. |
+| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; and `pictureAt`, the picture of a text or a clock at a time. |
 | `bidi.js` | The Unicode Bidirectional Algorithm for the characters of a text: `paragraphLevel`, `levels` and `visualOrder`. |
 | `textlayout.js` | The layout of a text: `checkCharacters`, `visualLines` and `layout`, with the fonts by name. |
 | `draw.js` | What the player draws: the pass of a text and the place of its block at a time, `passMs` and `placeAt`, and its picture, `drawText`; a clock's seed, `mix`, `stir` and `seedOf`, what the seed chooses, `clockOf`, its virtual time, `virtualTime`, and its picture, `drawClock`. |
@@ -371,6 +430,7 @@ a web page load the same files.
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |
 | `fit.js` | Fitting a picture to a canvas: `place`. |
 | `timeline.js` | The 50 frames-per-second timeline of decoded frames: `importFrames`. |
+| `thumbnail.js` | Previews: `keyOf`, the key of a file, its CRC-32 of zlib and PNG and its size; `maker`, which makes a file's preview in steps, and `make`, at once: a GIF of 24 pictures taken over its first loop, or of 12 or 6 when it would be above 65,536 bytes; `encode`, `crc32`, `timesOf` and `delayOf`. |
 | `fonttables.js` | The glyphs of the fonts of texts and the sine table of the clocks, `FONT_TABLES` and `SINE`, written by `node fonts/generate.mjs` from the fonts of the folder `fonts/`. |
 
 **Loading it in a page.** A page loads `converter/lib/index.js` as a module, and the

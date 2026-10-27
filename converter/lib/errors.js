@@ -48,6 +48,8 @@ export const DOES_NOT_FIT = "does-not-fit";
 export const UNSUPPORTED_CHARACTER = "unsupported-character";
 export const UNKNOWN_WIDGET = "unknown-widget";
 
+export const PREVIEW_TOO_LARGE = "preview-too-large";
+
 export const MAPPING_MISSING = "mapping-missing";
 export const MAPPING_MALFORMED = "mapping-malformed";
 

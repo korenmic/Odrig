@@ -8,6 +8,7 @@ import {Refusal} from "../commands.js";
 import {NotConverted, Stopped, convert, isGif, stopper, videoLength} from "../convert.js";
 import {kilobytes} from "./show.js";
 import * as messages from "../messages.js";
+import * as previews from "../previews.js";
 import {fileName, fits, freeId, uploading} from "../upload.js";
 import {Failure} from "../target.js";
 
@@ -171,6 +172,7 @@ function upload(message) {
         if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(external ? how.id : id, file, external));
+          previews.makeOwn(bytes);
         } else if (how.cancelled) {
           shown.textContent = "Cancelled.";
         } else {

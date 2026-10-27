@@ -12,7 +12,9 @@ teal and violet aurora, translucent rounded panels with a restrained glow, light
 a top bar with the app's name and whether the installation answers.
 
 - **Animations** says what the installation does and holds its animations. A panel says
-  what plays, the animation on the LEDs with its id and its file name, `ON` or `OFF`, the
+  what plays, the animation on the LEDs with its id and its file name, before them the
+  square of its preview as a row has it, hidden while nothing plays, while a test shows
+  and while the list does not hold the animation yet, `ON` or `OFF`, the
   brightness and the refreshes a second, with `On` and `Off` together in one pill and a
   slider for the brightness. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
@@ -39,8 +41,15 @@ a top bar with the app's name and whether the installation answers.
   level's playlist is current, and so is the folder row that leads to the current
   playlist at every level above it. The list comes back to the root when the target
   changes, when the card goes out and when the folder shown is gone from the list. Each row
+  begins its Play button with a square of 44 by 44 pixels: the preview of its animation, a
+  short GIF that loops, its pixels kept square and whole, a 60-by-6 strip as a band across
+  the middle, or an empty dark square when the animation has no preview or a fault; a tap
+  on the square plays as a tap on the name does. The previews are those of the default
+  preview catalog that comes with the app, `thumbnails/`, found by each animation's key
+  (see "The keys of the animations" below), then the phone's own. Folder rows and the
+  Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
-  not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
+  not read the file whole, and under them its `Saving…` or `⊘ Ignored`, has a badge `in` (internal storage) or `ex` (external storage,
   read-only unless the installation can write its card), and a small `...` button that
   opens its menu. Cycles are not listed. An
   animation that the installation found unavailable, because its file had a fault, is
@@ -62,7 +71,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-four command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-five command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -89,7 +98,8 @@ thirty-four command lines and no other, each as `POST /odrig` to the address tha
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
 | Opens the target screen while the installation answers | `fault` |
-| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel | `catalog` |
+| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
+| Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
 
@@ -182,7 +192,9 @@ python3 app/app.py build
 
 Runs the setup, copies the web code into `build/app/www/` with a note of the commit it
 was built from, and beside it the scripts of the converter's library, `converter/lib/`,
-into `build/app/www/converter/`; lets Capacitor copy that into the Android project
+into `build/app/www/converter/`, and the default preview catalog, `thumbnails/`, its
+`catalog.js` and its GIFs, into `build/app/www/thumbnails/`; lets Capacitor copy that into
+the Android project
 `app/android/`, lets Gradle build it, and prints three lines:
 
 ```
@@ -219,13 +231,15 @@ python3 app/app.py serve
 Serves the web code on `http://127.0.0.1:8610/`, or on the port `--port` names, for a
 browser on this computer, and runs until it is stopped. The converter's library is served
 beside it under `/converter/`, from `converter/lib/` as it is: the web code imports it
-from there, and no copy of it is kept in `app/`. With an emulator running beside
+from there, and no copy of it is kept in `app/`. The default preview catalog is served the
+same way under `/thumbnails/`, from `thumbnails/`, its GIFs as `image/gif`. With an emulator running beside
 it, write the emulator's address, `127.0.0.1:8600`, into the app's target screen.
 
 The emulator shows the app by itself as well: its page has a view `Controller`, at
 `http://127.0.0.1:8600/#controller`, with the app beside the LEDs and aimed at that
-emulator. It serves the same files of `app/www/`, and the converter's library under
-`/app/converter/`, so a change of the web code shows there after a reload. This is the quickest way to try the app: see
+emulator. It serves the same files of `app/www/`, the converter's library under
+`/app/converter/` and the default preview catalog under `/app/thumbnails/`, so a change of
+the web code shows there after a reload. This is the quickest way to try the app: see
 [emulator.md](emulator.md#the-controller-view).
 
 ## Installing on a phone
@@ -520,7 +534,41 @@ needs a card the installation can write; for one it cannot, the panel says `The
 installation cannot write this card; a computer can make its catalog.`, as
 [microsd.md](microsd.md#the-catalog-made-on-a-computer) has it. A refused rebuild is said
 in the place for messages. An installation whose software keeps no catalogs says `This
-installation's software keeps no catalogs.` and is not asked again.
+installation's software keeps no catalogs.` and is not asked again, by Settings or by the
+reading of the keys below, until the target changes.
+
+**The keys of the animations.** The app learns each animation's key, the CRC-32 and the
+size of its file, from the catalogs' pages, as [catalog.md](catalog.md) has them. It asks
+`catalog` when the target first answers, when it answers again after a silence and after
+every complete list, besides Settings' occasions, and every reply counts. When a reply
+shows a storage's catalog `ok` and the app has no read of it, or one of another generation
+or number of entries, it reads the sixteen pages of that storage with `catalog page`, each
+from offset 0 to its end, the board's before the card's, one request at a time after the
+operator's own and after `status`, an upload's lines, `list`, the saved order and `space`.
+It keeps each line's key by the file's name, a card file's by its path from `odrig`, and a
+row takes the key of its storage and name only when the key's size is the row's size. The
+keys of a read stand until the next read of that storage has ended; they go at once when
+`catalog` shows the storage in another state than `ok`, when the target answers again after
+a silence, and when the target changes. A page of another generation than the first page
+of the read starts the read again; a page refused with `busy` is asked again two seconds
+later; a page whose generation is `null`, and any other refusal, end the read without keys.
+An installation that refuses `catalog page` is from before it: it is asked for no page
+again, and `catalog` only by Settings, until the target changes. Nothing of this is said
+on the screen. A show folder that `pack` makes has no catalog, so its rows have no key
+until Settings' rebuild of the board's catalog has made one.
+
+**The phone's own previews.** After an upload from Upload, or from the form of a text or a
+clock, a new one or an edited one, has ended with success and its message is shown, the app
+makes the preview of the bytes it sent with the converter's library, a step at a time so
+that the screen keeps answering, and keeps it in the phone's own catalog of previews, in the
+web view's IndexedDB, under the key of those bytes; the row keeps its empty square until the
+preview is made, and shows it once the catalog's pages give the row that key. The app looks
+a key up in the default catalog first and in the phone's own after, and at its start drops
+each preview of its own whose key the default catalog has; the phone's catalog has no other
+limit. It never leaves the phone, and each phone has its own; the Controller view and
+`app.py serve` have that of the browser they run in. A preview that cannot be made is not
+kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
+run alone, and nothing of this is said. No plugin is added for it.
 
 **Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
@@ -764,7 +812,9 @@ installed; the phone with mobile data on.
     number; put it back: the number comes back.
 16. **The look and the menus.** On each tab, upright and sideways. *Seen:* the midnight
     background with teal and violet, the panels, every text readable; each row has its
-    `in` or `ex` badge and its `...`; a row's menu opens beside it without playing it, and
+    square, with the moving preview of its animation when the default catalog or this phone
+    has one, its `in` or `ex` badge and its `...`; the panel of what plays shows the
+    preview of the animation on the LEDs; a row's menu opens beside it without playing it, and
     an external row's menu says it is read-only. Choose `Ignore in playlist` and then
     `Restore to playlist`: the row says `Ignored`, and then not.
 17. **Moving by a finger.** Hold a row for half a second and drag it up and down a long

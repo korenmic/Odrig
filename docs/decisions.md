@@ -139,7 +139,7 @@ it stands now.
 | JSON frames | The tracked, lossless source of each animation (source code, not runtime). A list of frames; each frame is a duration in milliseconds plus one value per LED, with only the fields that are consumed. |
 | Custom binary, compressed | The runtime format the board plays. First choice. |
 | Custom binary, uncompressed | Fallback if decompression proves too slow on the board. The player may support both. |
-| GIF | Fallback of last resort: the working proof of concept on stock WLED. |
+| GIF | Fallback of last resort: the working proof of concept on stock WLED. And, never played, the preview of each animation that the operators' app shows, kept in `thumbnails/` and made by the converter. |
 
 Animated PNG, FSEQ and live streaming from a computer were considered and dropped.
 
@@ -759,3 +759,14 @@ are in [format.md](format.md), "Measured sizes".
   approved through the seed; the app's Settings show it as a checkbox, `Snake 10 is
   cross-wired`, off by default because a photo of the diagonal cannot tell which snake is
   cross-wired. The pins and their revision are unchanged by it.
+- 2026-10-27: Seed 44, the owner's request after a presentation of every conversion with
+  its preview: every animation has a short preview that loops, a GIF of 24 pictures over its
+  first loop made by the converter's `thumbnail`, named by its key, the CRC-32 and the size
+  its catalog line already keeps. The previews of every animation known on the first
+  computer are tracked in `thumbnails/`, the default preview catalog, 424 of them and 12.5 MB
+  at first, which the emulator, `app.py serve` and the APK hold and the board never does;
+  the APK grew from 4.3 MB to 16.9 MB. The app learns the keys with `catalog page`, which
+  reads the catalogs' pages, a command the owner approved through the seed, and keeps the
+  previews of what a phone uploads in that phone's IndexedDB. A GIF gains its second role
+  in the table of formats; the board's memory, the catalogs' format and every other reply
+  are unchanged. The board session and the owner's check on a phone are open.

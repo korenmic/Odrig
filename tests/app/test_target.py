@@ -151,9 +151,11 @@ class Requests(Target):
     def test_status_is_asked_once_a_second(self):
         target = entered(self, support.StandIn(support.SOUND))
         support.run("waits", address=target.address, settings={"ms": 5300})
-        # A target that does not know `order` is asked for it once, after its first list.
-        self.assertEqual(set(target.lines), {self.STATUS, self.LIST, ("/odrig", b"space"), ("/odrig", b"order get")})
+        # A target that does not know `order` is asked for it once, after its first list, and
+        # one that keeps no catalogs for them once.
+        self.assertEqual(set(target.lines), {self.STATUS, self.LIST, ("/odrig", b"space"), ("/odrig", b"order get"), ("/odrig", b"catalog")})
         self.assertEqual(target.lines.count(("/odrig", b"order get")), 1)
+        self.assertEqual(target.lines.count(("/odrig", b"catalog")), 1)
         self.assertIn(target.lines.count(self.STATUS), (6, 7), target.lines)
         self.assertEqual(target.together, 1)
 
@@ -170,7 +172,7 @@ class Requests(Target):
         with emulator_support.EventStream(emulator.port) as stream:
             support.run("answers", address=address)
             logged = emulator_support.of_kind(stream.read_until(lambda events: sum(event.kind == "log" for event in events) >= 2, 5), "log")
-        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http")})
+        self.assertLessEqual({(entry["line"], entry["transport"]) for entry in logged}, {("status", "http"), ("list 0", "http"), ("space", "http"), ("order get", "http"), ("fault", "http"), ("catalog", "http")})
         self.assertIn(("status", "http"), {(entry["line"], entry["transport"]) for entry in logged})
         self.assertTrue(all(json.loads(entry["reply"])["ok"] for entry in logged))
 

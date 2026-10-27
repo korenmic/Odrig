@@ -72,6 +72,32 @@ class Commands(WithACard):
         self.assertEqual(wanted["external"], {"state": "ok", "generation": 1, "entries": 1, "writable": True})
         self.assertEqual(wanted["internal"]["state"], "none")
 
+    def test_catalog_page_prints_the_pages_of_the_card_and_the_show_by_each_transport(self):
+        self.assertEqual(pc_tool(self.top, "import").returncode, 0)
+        # The show's own catalog, as `fw.py install-show` writes one.
+        storage = catalog.MemoryStorage({path.name: path.read_bytes() for path in self.show.iterdir()})
+        made, refused = catalog.rebuild(storage, names=["one.odrg"], canvas=(60, 60))
+        self.assertEqual((made.state, refused), ("ok", []))
+        for name, content in storage.files.items():
+            (self.show / name).write_bytes(content)
+        emulator = self.start()
+        self.catalog_when(emulator, lambda reply: reply["external"]["state"] == "ok")
+        card = {path.name: path.read_bytes() for path in (self.top / "odrig").iterdir()}
+        for transport, target in self.targets(emulator).items():
+            with self.subTest(transport=transport):
+                for storage_name, held in (("external", card), ("internal", storage.files)):
+                    page = next(number for number in range(16) if catalog.page_name(number) in held)
+                    content = held[catalog.page_name(page)]
+                    result = support.run_tool(*target, "catalog", "page", storage_name, str(page), "0")
+                    self.assertEqual((result.status, result.err), (0, ""))
+                    reply = json.loads(result.out)
+                    self.assertEqual((reply["generation"], reply["text"].encode("ascii"), reply["next"]), (1, content, len(content)))
+                    after = json.loads(support.run_tool(*target, "catalog", "page", storage_name, str(page), str(len(content))).out)
+                    self.assertEqual(after, {"ok": True, "generation": 1, "text": "", "next": None})
+        for wrong in (["page"], ["page", "both", "0", "0"], ["page", "internal", "0"], ["page", "internal", "a", "0"]):
+            result = support.run_tool(*self.targets(emulator)["http"], "catalog", *wrong)
+            self.assertEqual(result.status, 2, wrong)
+
     def test_uploads_to_the_card_by_each_transport_are_what_the_pc_tool_reads(self):
         self.assertEqual(pc_tool(self.top, "import").returncode, 0)
         emulator = self.start()

@@ -57,6 +57,8 @@ class Look(unittest.TestCase):
         folder = emulator_support.installed(pathlib.Path(cls.work.name, "show"), {"mapping.json": core_support.mapping_texts()["legs-2"], "show.json": json.dumps(show), **files})
         cls.emulator = emulator_support.Emulator(folder)
         cls.addClassCleanup(cls.emulator.stop)
+        # The row of the longest name is ignored, so that its note stands in it.
+        assert json.loads(cls.emulator.command("ignore 65535 1"))["ok"]
         address = f"127.0.0.1:{cls.emulator.port}"
         cls.measured = {size: support.run("look", address=address, settings={"rows": 3}, size=size).seen for size in SIZES}
 
@@ -75,7 +77,8 @@ class Look(unittest.TestCase):
             for control in screen["controls"]:
                 self.assertGreaterEqual(control["bottom"] - control["top"], 44 - 0.01, f"{where}: {control['what']}")
                 self.assertGreaterEqual(control["right"] - control["left"], 44 - 0.01, f"{where}: {control['what']}")
-                if control["group"] in ("screen", "nav") and not control["what"].startswith(("Actions for ", "Play ")):
+                # A row's own controls, its Play, its menu and its checkbox, are 44 high.
+                if control["group"] in ("screen", "nav") and not control["what"].startswith(("Actions for ", "Play ", "Select animation ")):
                     self.assertGreaterEqual(control["bottom"] - control["top"], 48 - 0.01, f"{where}: {control['what']}")
 
     def test_every_control_is_8_pixels_from_the_next(self):

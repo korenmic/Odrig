@@ -92,12 +92,20 @@ export function header(data) {
   return {width, height, paletteSize, frameCount, compressed: (flags & COMPRESSED) !== 0, n};
 }
 
-// Reads an ODRG file given as bytes.
+// Reads an ODRG file given as bytes, one frame record at a time.
 //
-// The result is `{width, height, paletteSize, compressed, records, modes}`. `records` has
-// one `{ms, picture}` for every frame record, in order: its duration and the picture the
-// pixel buffer holds after it. `modes` has the mode byte of every record.
-export function decode(data) {
+// The header is read, the body inflated and the palette read at once, each refused as
+// `decode` refuses it. The result has the header's `width`, `height`, `paletteSize`,
+// `frameCount` and `compressed`, and two functions:
+//
+// - `next()` reads the next frame record and gives `{ms, picture, mode}`: its duration, the
+//   picture the pixel buffer holds after it and its mode byte. After the last record it
+//   refuses bytes that follow it and gives null. Every refusal is the one `decode` gives,
+//   at the same record.
+// - `loopMs()` is the sum of the durations of the records, read from their starts alone.
+//   It refuses nothing: it stops at the first start it cannot read or whose record does not
+//   fit, a place where `next` refuses the file.
+export function reader(data) {
   const {width, height, paletteSize, frameCount, compressed, n} = header(data);
   const bpp = paletteSize > 0 ? 1 : 3;
   const body = compressed ? inflated(data.subarray(HEADER_SIZE)) : data.subarray(HEADER_SIZE);
@@ -116,11 +124,22 @@ export function decode(data) {
   for (let entry = 0; entry < paletteSize; entry += 1) {
     palette.set(take(3, "the palette"), 3 * entry);
   }
+  const firstRecord = position;
 
   let buffer = new Uint8Array(n);
-  const records = [];
-  const modes = [];
-  for (let number = 1; number <= frameCount; number += 1) {
+  let number = 0;
+  let ended = false;
+  const next = () => {
+    if (number === frameCount) {
+      if (!ended) {
+        ended = true;
+        if (position < body.length) {
+          throw new Rejection(TRAILING_BYTES, `${body.length - position} bytes follow the last frame record`);
+        }
+      }
+      return null;
+    }
+    number += 1;
     const what = `frame record ${number}`;
     const start = take(RECORD_START_SIZE, what);
     const duration = u16(start, 0);
@@ -156,13 +175,43 @@ export function decode(data) {
         picture[3 * pixel + 2] = palette[3 * index + 2];
       }
     }
-    records.push({ms: duration, picture});
-    modes.push(mode);
+    return {ms: duration, picture, mode};
+  };
+
+  const loopMs = () => {
+    let at = firstRecord;
+    let total = 0;
+    for (let counted = 0; counted < frameCount; counted += 1) {
+      if (at + RECORD_START_SIZE > body.length) {
+        break;
+      }
+      const length = u16(body, at + 2);
+      if (length < 2 || at + RECORD_START_SIZE + length - 1 > body.length) {
+        break;
+      }
+      total += u16(body, at);
+      at += RECORD_START_SIZE + length - 1;
+    }
+    return total;
+  };
+
+  return {width, height, paletteSize, frameCount, compressed, next, loopMs};
+}
+
+// Reads an ODRG file given as bytes.
+//
+// The result is `{width, height, paletteSize, compressed, records, modes}`. `records` has
+// one `{ms, picture}` for every frame record, in order: its duration and the picture the
+// pixel buffer holds after it. `modes` has the mode byte of every record.
+export function decode(data) {
+  const read = reader(data);
+  const records = [];
+  const modes = [];
+  for (let record = read.next(); record !== null; record = read.next()) {
+    records.push({ms: record.ms, picture: record.picture});
+    modes.push(record.mode);
   }
-  if (position < body.length) {
-    throw new Rejection(TRAILING_BYTES, `${body.length - position} bytes follow the last frame record`);
-  }
-  return {width, height, paletteSize, compressed, records, modes};
+  return {width: read.width, height: read.height, paletteSize: read.paletteSize, compressed: read.compressed, records, modes};
 }
 
 // The output of the one raw DEFLATE stream that follows the header.

@@ -193,7 +193,7 @@ test("the tool is the library and a command line part that is built on it", asyn
     }
   });
 
-  await t.test("what is tracked of the tool is its sources: no media file, no generated source and no package", (inner) => {
+  await t.test("what is tracked of the tool is its sources, and the only media files are the default catalog's previews", (inner) => {
     const listed = spawnSync("git", ["ls-files", "-z"], {cwd: ROOT, encoding: "utf8"});
     if (listed.status !== 0) {
       inner.skip("git does not list the files of this folder");
@@ -204,7 +204,8 @@ test("the tool is the library and a command line part that is built on it", asyn
     assert.ok(ours.includes("converter/package-lock.json"));
     const known = /^converter\/(package\.json|package-lock\.json|ffmpeg\.sha256|odrig\.js|(cli|lib|tests)\/[a-z]+\.js|tests\/[a-z]+\.test\.js|tests\/page\/(index\.html|page\.js)|tests\/expected\/[a-z_]+\.json(\.gz)?|tests\/expected\/files\/[0-9a-f]{64}\.gz)$/;
     assert.deepEqual(ours.filter((name) => !known.test(name)), []);
-    assert.deepEqual(tracked.filter((name) => /\.(mp4|mov|gif)$/i.test(name)), []);
+    const media = tracked.filter((name) => /\.(mp4|mov|gif)$/i.test(name));
+    assert.deepEqual(media.filter((name) => !/^thumbnails\/[0-9a-f]{8}-[1-9][0-9]*\.gif$/.test(name)), []);
   });
 });
 
@@ -216,10 +217,10 @@ test("the reasons are those of the Python tool", async (t) => {
   }
   const ours = new Map(Object.entries(index.errors).filter(([name, value]) => /^[A-Z][A-Z_]*$/.test(name) && typeof value === "string"));
 
-  await t.test("there are 55 of them, with the same names for the same words", () => {
-    assert.equal(expected.size, 55);
+  await t.test("there are 56 of them, with the same names for the same words", () => {
+    assert.equal(expected.size, 56);
     assert.deepEqual([...ours].sort(), [...expected].sort());
-    assert.equal(new Set(ours.values()).size, 55);
+    assert.equal(new Set(ours.values()).size, 56);
   });
 
   await t.test("the library offers nothing else but Rejection and naming", () => {

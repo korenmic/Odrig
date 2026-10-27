@@ -28,6 +28,7 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `list`, `list <from>` | Lists the items of the show, the playlists of the card's folders, and the animations of a USB drive or a card. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
+| `catalog page <storage> <page> <offset>` | Reads up to 512 bytes of a page of the catalog of the board's own storage, `internal`, or of the drive, `external`. |
 | `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
 | `catalog cancel` | Ends a rebuild; the catalog stays as it was. |
 | `remove <id>` | Removes an item from the show. |
@@ -473,6 +474,28 @@ fails ends it, logged as `catalog rebuild failed: storage-error`, with the catal
 was; a drive pulled out ends it too. **`catalog cancel`** ends a rebuild: the pages it
 wrote are removed, the catalog is as it was, and what the files read taught the core stays.
 It is `{"ok":true}` also without a rebuild.
+
+```
+catalog page external 0 0
+{"ok":true,"generation":3,"text":"1a2b3c4d 52340 60 60 12000 frames sunrise.odrg\n5e6f7a8b 1882 60 60 20000 text night/comet.odrgx\n","next":96}
+```
+
+**`catalog page <storage> <page> <offset>`** reads up to 512 bytes of a page of a storage's
+catalog, `internal` for the board's own and `external` for the drive's, page `<page>`, 0
+to 15, of [catalog.md](catalog.md), from `<offset>`, 0 to 4,294,967,295: a client learns
+from its lines the CRC-32 and the size of each file without reading the files. `generation`
+is the storage's, as `catalog` gives it. `text` holds the bytes as the inside of a JSON
+string, a line's end as `\n`, a quote and a backslash after a backslash and any other byte
+outside printable ASCII as `\u00XX`, as many as fit into the reply; `next` is the offset
+after them. At or after the page's end, and for a page that cannot be read, as a page
+without entries has no file, `text` is empty and `next` is `null`; a storage whose catalog
+is not `ok`, and a drive that is not plugged in, give `"generation":null` as well. The page
+is read with one `read_at` of the host into the chunk buffer, and no memory is asked for.
+Refused with `bad-argument` for another form, `busy` while a rebuild of that storage runs,
+and nothing else, an open upload included, and `storage-error` on a host that cannot
+change its storage. A client reads a page whole from offset 0 and then from each `next`
+until it is `null`; a page whose generation differs from that of the first page of the
+same read was changed in between.
 
 A drive with a catalog is `loading` from its plug-in until every page is read; its
 animations then join `list` together. One without a catalog is `none` and is listed and

@@ -77,7 +77,7 @@ test("docs/converter.md presents the JavaScript tool as the converter", async (t
       const usageLine = words(usage(name).slice("usage: ".length, usage(name).indexOf("\n\n")));
       assert.ok(given.map(words).includes(usageLine), `the section "## ${name}" has the usage line of the tool: ${usageLine}`);
     }
-    assert.deepEqual(NAMES, ["import", "encode", "decode", "check", "pack"]);
+    assert.deepEqual(NAMES, ["import", "encode", "decode", "check", "pack", "thumbnail"]);
   });
 
   await t.test("no command of the page starts the Python tool as the converter", () => {
@@ -91,7 +91,7 @@ test("docs/converter.md presents the JavaScript tool as the converter", async (t
     assert.notEqual(setup, null);
     assert.match(words(setup), /Node\.js 20 or later/);
     assert.ok(commands(setup).includes("npm ci --prefix converter"));
-    assert.match(words(setup), /`encode`, `decode`, `check` and `pack` need Node\.js alone/);
+    assert.match(words(setup), /`encode`, `decode`, `check`, `pack` and `thumbnail` need Node\.js alone/);
   });
 
   await t.test("the two packages are named with their versions and licences, and what their install leaves", () => {

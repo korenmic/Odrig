@@ -10586,3 +10586,175 @@ folder's playlist, shown as the playlist is. A show without cycles and a playlis
 root ask nothing more than before.
 
 **Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.
+
+## Seed 44: the preview's times, its GIF and the walk of a file
+
+**Question.** The seed gives a preview 24 pictures over the first loop, each shown for a
+twenty-fourth of it rounded to 10 ms within 20 and 120 ms, and asks that a long file be
+walked without keeping every picture and that the same file give the same bytes
+everywhere. Which time is "k twenty-fourths", how is a delay rounded, what does the GIF
+hold besides its pictures, and how is the loop known before the walk reaches its end?
+
+**Answer.** Picture `k` is the one on screen at `floor(k * loop / 24)` ms, so those at
+twelfths and sixths are the even ones and those of `k` divisible by 4, and one walk serves
+all three sizes. A delay is `floor((loop + 5N) / (10N))` hundredths, half rounded up,
+between 2 and `288 / N`. The GIF holds a global table and no local one, the loop extension
+`NETSCAPE2.0` with the count 0, and for each picture a control extension with the disposal
+"do not dispose" and no transparency, and a whole image of the canvas; its LZW starts with
+a clear code and clears again when the table is full. `odrg.reader` reads the header, the
+body and the palette at once and then one record at a time, as `decode` does, with the same
+refusals; its `loopMs` sums the durations from the records' starts alone and refuses
+nothing, since a file it cannot sum is refused by the walk at the record where `decode`
+refuses it. A container of frames gives the loop its header names, which the end of the
+walk checks. `decode` and `decodeFrames` are the readers read to their end.
+
+**Resolution.** `converter/lib/thumbnail.js`, `converter/lib/odrg.js`,
+`converter/lib/odrgx.js`; docs/converter.md, docs/reasons.md;
+converter/tests/thumbnail.test.js, converter/tests/browser.test.js.
+
+## Seed 44: what `thumbnail --catalog` does beside adding previews
+
+**Question.** The seed gives `thumbnail FILE... --catalog DIR [--card ODRIG]` and passes
+over a file the readers refuse. What does it do with a folder `DIR` that is missing, with a
+key whose line is there and whose GIF is not, with `--card` given with `--out`, and with a
+GIF or the mapping that cannot be written?
+
+**Answer.** It makes the folder and the folders above it. A key whose GIF is missing gets
+its GIF again; one whose GIF is there keeps it and only gains the name. `--card` goes with
+`--catalog` only: with `--out` it is a mistake of the command line, status 2. A file that
+cannot be read is passed over as a refused one is, with `not-found`; a GIF or a mapping
+that cannot be written ends the run with status 1 and `cannot-write`, since the catalog is
+then not what the run would leave. The tests of the subcommand are in
+`converter/tests/thumbnailtool.test.js`, as a test file's name is letters alone.
+
+**Resolution.** `converter/cli/thumbnail.js`, `converter/cli/arguments.js`;
+docs/converter.md; converter/tests/thumbnailtool.test.js.
+
+## Seed 44: what `catalog page` gives when a page's bytes do not fit, or the card is out
+
+**Question.** The seed gives `catalog page` up to 512 bytes of a page as the text of a reply
+of at most 1,024 bytes, and `"generation":null` for a storage whose catalog is not `ok`.
+What does it give when the escaped bytes would not fit, and for the card when none is
+plugged in, whose catalog the core may still hold as it was?
+
+**Answer.** The text holds the bytes one by one while each one's escaped form and the end
+of the reply still fit, and `next` counts the bytes given, so that a client reading on from
+each `next` gets every byte. A page of a sound catalog is printable ASCII with line ends,
+512 bytes and their line ends always fit; only a page changed behind the core's back can be
+given in shorter parts. A drive that is not plugged in answers as a storage without an `ok`
+catalog, as `catalog` reports it `absent`. The example of `docs/commands.md` is the one
+reply example with a space, inside its text; its test checks that the example is the
+compact JSON of its value.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`; docs/commands.md,
+docs/core.md, docs/catalog.md; tests/core/test_catalog_page.py, tests/core/test_docs.py.
+
+## Seed 44: the first content of `thumbnails/`, and how the hosts take it
+
+**Question.** The seed makes `thumbnails/` the default preview catalog, served and packed as
+the converter's library is, and fills it from every source of the first computer. What
+does the folder hold before those sources are read, which of its files do the hosts take,
+and how is it kept out of a board's storage?
+
+**Answer.** Its first commit holds the previews of the tracked animations alone,
+`test-animations/` and the valid vectors, made by `thumbnail --catalog thumbnails`, so that
+a clone can make them again and a test compares them with what the library makes; the
+sources of the first computer come in a commit of their own. The emulator, `app.py serve`
+and the APK's staging take `catalog.js` and the `.gif` files of the folder and nothing below
+it: the emulator under `/app/thumbnails/`, the server under `/thumbnails/`, both with
+`image/gif`, the staging into `thumbnails/` beside the web code. The web code may import
+`thumbnails/catalog.js` and no other file of the folder. A board's storage is made from a
+show folder, which the firmware tool refuses when it holds a folder or a file the show does
+not name, a GIF of the folder among them, and `pack` writes exactly the show's files.
+
+**Resolution.** `thumbnails/`, `emulator/httpd.py`, `app/apptool/webserver.py`,
+`app/apptool/stage.py`, `app/apptool/paths.py`; docs/emulator.md, docs/android-app.md;
+converter/tests/thumbnails.test.js, converter/tests/library.test.js,
+tests/emulator/test_page_files.py, tests/app/test_tool.py, tests/app/test_scope.py,
+tests/apk/test_apk.py, tests/firmware/test_storage.py.
+
+## Seed 44: how the app's reading of the pages fits its queue
+
+**Question.** The seed has the app ask `catalog` at the target's first answer and after every
+complete list and read the pages one request at a time after the operator's own. Where do
+`catalog` and the pages stand among the app's other requests, which generation do the keys
+carry, which replies of `catalog` count, and what of the keys is left when a reply ends a
+silence?
+
+**Answer.** `catalog` and the pages come after everything else the app sends: the
+operator's requests, `status`, an upload's lines, `list`, the saved order and `space`; one
+page part is sent at a time, so that the operator's next request goes out after the part
+under way. `catalog` is also asked when the target answers again after a silence, and every
+reply of `catalog` counts, Settings' included, so that Settings' two-second asking starts a
+read at once. The keys carry the generation of the pages they were read from and the number
+of entries of the reply that started the read; a later reply of another generation or number
+starts a read again. A reply that ends a silence drops the keys and every read, and the
+reading starts anew from `catalog`. The board's storage is read before the card's. A target
+whose catalog refuses `catalog page` is asked `catalog` only by Settings, and a target that
+refuses `catalog` by no one, until the target changes; Settings tells the second from the
+client's answer. A reply to `catalog page` that is no page's answer counts as such a refusal,
+so that the reading never marks the target as silent. The app's tests that pin the lines the
+app sends take `catalog` and its pages among the lines it sends by itself.
+
+**Resolution.** `app/www/client.js`, `app/www/commands.js`, `app/www/screens/catalogs.js`;
+docs/android-app.md; tests/app/test_keys.py, tests/app/page/scenarios/keys.js.
+
+## Seed 44: the square in a row, and the note under the name
+
+**Question.** The seed puts a square of 44 by 44 pixels at the start of each row's Play
+button and the row's `Saving…` or `⊘ Ignored` note under the name inside Play at 320 px in
+selection mode. Is the note moved only then, how does a row get its preview without being
+drawn again, and how is the row's checkbox measured?
+
+**Answer.** The note stands under the name inside Play at every width and in every mode,
+one layout for all. The square is set each time the rows' state is drawn, its image made,
+changed or taken out only when its source differs, so that a row is never drawn again for
+its preview and a press is never lost to it; the square takes no pointer itself and the
+tap goes to Play. The now-playing panel's square shows when `status` names an animation the
+list holds and something plays, which is never so during a test. The look test measures a
+row in selection mode with its note; the row's checkbox counts among the row's own controls,
+44 pixels high as its Play and its menu are.
+
+**Resolution.** `app/www/previews.js`, `app/www/screens/show.js`, `app/www/index.html`,
+`app/www/style.css`; docs/android-app.md; tests/app/test_previews.py,
+tests/app/page/scenarios/previews.js, tests/app/test_look.py.
+
+## Seed 44: the phone's own catalog in IndexedDB
+
+**Question.** The seed keeps the previews this phone makes in the web view's IndexedDB, in
+steps that leave the screen answering, the default catalog looked up first. How is the
+store laid out, what is a step, and when does a row show a preview of its own?
+
+**Answer.** One database, `odrig-previews`, with one store, `previews`, whose keys are the
+animations' keys and whose values are the GIFs as `image/gif` blobs; at the start every key
+the default catalog has is deleted and the rest are taken into the run as object addresses.
+A step is one step of the library's maker, a bounded number of records or drawings, run
+from a timer of 0 ms. The preview is made from the bytes the upload sent, keyed by their
+CRC-32 and size, the same key the installation's catalog writes for them, so the row shows
+it once the read of the changed catalog gives the row its key. The Animations screen draws
+again when the phone's catalog gains a preview.
+
+**Resolution.** `app/www/previews.js`, `app/www/convert.js`, `app/www/screens/storage.js`,
+`app/www/screens/author.js`, `app/www/main.js`; docs/android-app.md;
+tests/app/test_own_previews.py, tests/app/page/scenarios/ownpreviews.js.
+
+## Seed 44: the tracked previews are the media the repository holds
+
+**Question.** An answer of this page, that of the converter's own tests, says that no media
+file is tracked in the repository. Seed 44 tracks a GIF for every animation known on the
+first computer. What does the repository hold now, and how is the default catalog made
+again?
+
+**Answer.** Besides the images it held, the icons and splash screens of the app and the
+pictures of the seeds, the repository tracks the previews of `thumbnails/` and no other GIF,
+MP4 or MOV file; the converter's test says exactly that. The first default catalog was made
+on 2026-10-27 by `thumbnail --catalog thumbnails`, one run for each source the seed lists,
+the two card copies with `--card`: 424 previews of 609 to 65,484 bytes, 12,510,264 bytes in
+all, 409 of them of 24 pictures and 15 of 12. Every source was at hand, the share and the
+mirror of Google Drive among them. Three files were passed over, the broken test files of the
+board's session of 2026-10-25: `huge-tail-test.odrg` twice with `bad-palette-index` and
+`broken-test.odrg` with `bad-palette-size`. A later conversion adds its preview the same way
+in the commit that records it; a file whose key the folder holds only adds its name.
+
+**Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
+docs/decisions.md; converter/tests/thumbnails.test.js.

@@ -1771,4 +1771,57 @@ uint32_t catalog_reply(const Core &core, Reply &reply) {
     return reply.length;
 }
 
+uint32_t catalog_page(Core &core, uint32_t storage, uint32_t page, uint32_t offset, Reply &reply) {
+    if (!storage_changes(core)) {
+        // Only the second source reads a file beside the one that plays.
+        return refuse(reply, "storage-error");
+    }
+    if (core.rebuild == 1 + storage) {
+        return refuse(reply, "busy");
+    }
+    const bool card_out = storage == kExternal && (core.drive == nullptr || core.drive_number == 0);
+    const CatalogState &catalog = core.catalogs[storage];
+    if (card_out || catalog.state != kCatalogOk) {
+        reply.text("{\"ok\":true,\"generation\":null,\"text\":\"\",\"next\":null}\n");
+        return reply.length;
+    }
+    // The bytes are read into the chunk buffer, which holds nothing between commands.
+    const odrig_host &host = core.host;
+    const int32_t count = host.read_at(host.ctx, kPageNames[storage][page], offset, core.chunk, kFileBufferSize);
+    reply.text("{\"ok\":true,\"generation\":");
+    reply.number(catalog.generation);
+    reply.text(",\"text\":\"");
+    // The room the end of the reply needs: `","next":4294967295}` and the line's end.
+    const uint32_t tail = 22;
+    const char *digits = "0123456789abcdef";
+    uint32_t given = 0;
+    while (count > 0 && given < static_cast<uint32_t>(count)) {
+        const uint8_t byte = core.chunk[given];
+        const bool plain = byte >= 0x20 && byte <= 0x7E && byte != '"' && byte != '\\';
+        const uint32_t size = plain ? 1 : byte == '\n' || byte == '"' || byte == '\\' ? 2 : 6;
+        if (!reply.fits(size + tail)) {
+            break;
+        }
+        if (plain) {
+            reply.bytes[reply.length++] = static_cast<char>(byte);
+        } else if (size == 2) {
+            reply.bytes[reply.length++] = '\\';
+            reply.bytes[reply.length++] = byte == '\n' ? 'n' : static_cast<char>(byte);
+        } else {
+            reply.text("\\u00");
+            reply.bytes[reply.length++] = digits[byte >> 4];
+            reply.bytes[reply.length++] = digits[byte & 0x0F];
+        }
+        ++given;
+    }
+    if (given == 0) {
+        reply.text("\",\"next\":null}\n");
+        return reply.length;
+    }
+    reply.text("\",\"next\":");
+    reply.number(static_cast<uint64_t>(offset) + given);
+    reply.text("}\n");
+    return reply.length;
+}
+
 }  // namespace odrig

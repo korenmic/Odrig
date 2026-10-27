@@ -79,6 +79,12 @@ export default async function (app) {
   await shown(app, app.settings.rows);
   await app.until(() => spaceKnown(app) && storage(app).rows.length === app.settings.rows, "the list with its rows and the space");
   const animations = measure(app);
+  // Selection mode, with the note of the ignored row under its name inside Play.
+  app.press("Select");
+  await app.until(() => app.doc.querySelectorAll("#animations-list .pick").length > 0, "selection mode");
+  const selecting = measure(app);
+  app.press("Done");
+  await app.until(() => app.doc.querySelectorAll("#animations-list .pick").length === 0 || !app.doc.querySelector("#animations-list .pick").getClientRects().length, "selection mode ended");
   menuOf(app, storage(app).rows[1].id);
   const withMenu = measure(app);
   app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
@@ -100,5 +106,5 @@ export default async function (app) {
   app.press("Use");
   await app.until(() => app.text("message-text") !== null, "a message");
   const withMessage = measure(app);
-  return {animations, withMenu, withQuestion, upload, settings, target, withMessage};
+  return {animations, selecting, withMenu, withQuestion, upload, settings, target, withMessage};
 }
