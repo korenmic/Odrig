@@ -35,9 +35,9 @@ def error_of(reply):
 
 
 def list_all(session, show, command=b"list"):
-    """Asks for the items of the show, or with the command `order get` for the saved order,
-    one reply after the other for as long as a reply names a next position, and hands each
-    reply to `show`. Returns whether every reply reported success; it stops at one that
+    """Asks for the items of the show, or with the command `order get` for the saved order
+    and with `limits` for the current limits, one reply after the other for as long as a
+    reply names a next position, and hands each reply to `show`. Returns whether every reply reported success; it stops at one that
     does not."""
     line = command + b"\n"
     while True:

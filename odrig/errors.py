@@ -56,6 +56,8 @@ PREVIEW_TOO_LARGE = "preview-too-large"
 MAPPING_MISSING = "mapping-missing"
 MAPPING_MALFORMED = "mapping-malformed"
 
+LIMITS_MALFORMED = "limits-malformed"
+
 CANVAS_TOO_SMALL = "canvas-too-small"
 
 SHOW_MISSING = "show-missing"

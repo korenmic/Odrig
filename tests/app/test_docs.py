@@ -72,7 +72,7 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_thirty_five_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_thirty_nine_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
@@ -80,8 +80,9 @@ class TheAppsPage(unittest.TestCase):
                                  "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping cross on", "mapping cross off", "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "fault", "catalog",
-                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
-        self.assertIn("It sends thirty-five command lines and no other", self.said)
+                                 "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel", "limits", "limits <next>",
+                                 "limits wall <mA>", "limits snake <n> <mA>"])
+        self.assertIn("It sends thirty-nine command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],

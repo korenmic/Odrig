@@ -64,14 +64,16 @@ a top bar with the app's name and whether the installation answers.
   can write its card, an animation of a video or a GIF goes to the card unless
   `This board` is chosen, and the card's free storage is there too.
 - **Settings** has the checkbox `Show test animations`, the catalogs of the board's own
-  storage and of the card with a rebuild of each, and the mapping editor: the twenty
-  saved snake-to-pin assignments. It has no copy of the power or brightness controls.
+  storage and of the card with a rebuild of each, the mapping editor: the twenty saved
+  snake-to-pin assignments, and the current limits: a budget in mA for the wall and one for
+  each snake, each with the estimate of the current beside it. It has no copy of the power
+  or brightness controls.
 - **Target** has the address of the installation, says whether it answers, names the
   installation and the last fault it met in a file, and says how the phone's requests
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-five command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-nine command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -102,6 +104,9 @@ thirty-five command lines and no other, each as `POST /odrig` to the address tha
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
+| Opens Settings, waits two seconds while Settings is visible, and after it saved a budget | `limits`, and `limits <next>` for a mapping of many legs |
+| Changes the wall's budget in `Current limits` and presses Enter or leaves the field | `limits wall <mA>` |
+| Changes a snake's budget there and presses Enter or leaves the field | `limits snake <n> <mA>` |
 
 It uses the shared command protocol and shows only what a reply said. Mapping saves
 require firmware that supports the mapping commands; an older target gives a readable
@@ -660,6 +665,57 @@ app reads the target once to reconcile, preserves the draft and asks for Reload 
 new attempt. Storage failures, busy/invalid shows, stale revisions and unsupported targets
 have readable messages in Settings.
 
+**Current limits.** Under the Mapping panel, Settings' panel `Current limits` holds the
+budgets of the current the LEDs may draw, each a ceiling in mA on WLED's estimate of that
+current, not a measurement: a picture estimated above a budget is dimmed until it is within
+it, the wall as a whole or one snake, and a low wall budget also dims the diagonal that the
+mapping from a photo reads. [commands.md](commands.md#current-limits) has the commands and
+[core.md](core.md#current-limits) the estimate and the dimming. The field `The wall's
+budget, mA` has the wall's estimate beside it, as `Estimate 3,616 mA`; under it, while
+`mapping get` reports the installation's twenty snakes as editable, a row for each snake,
+`Snake n · columns a–b`, with its field and its estimate. For another mapping, or none, the
+panel has the wall's field alone. A field takes digits only, and a budget of 0, no limit,
+shows as an empty field that says `No limit`. The panel's explanation, before the fields,
+says so in words: `A budget of 0, or an empty field, means no limit. To remove a limit,
+clear its field or type 0.`
+
+Text that differs from the budget read last is saved when Enter is pressed in its field or
+the field is left, with `limits wall <mA>` or `limits snake <n> <mA>`; an emptied field
+saves 0, and text that is the budget read last, however written, sends nothing. Under the
+field the panel says `Saving…`, then `Saved: the wall's budget is 2,000 mA.`, `Saved: the
+wall has no limit.`, `Saved: snake 3's budget is 500 mA.` or `Saved: snake 3 has no
+limit.`. Several fields changed quickly are saved one after another. A value above its
+range is not sent: the panel says `The wall's budget is 0 to 250,000 mA, 0 for no limit.
+Its saved budget is shown.` or `A snake's budget is 0 to 65,535 mA, 0 for no limit. Its
+saved budget is shown.`, and shows the saved budget. A refused save is said under its field
+in words, and the saved budget is shown again:
+
+| The refusal | What the panel says |
+|---|---|
+| `bad-argument` | The installation cannot take this budget: the value is out of its range, or its mapping has no such snake. |
+| `busy` | The installation is busy reading its animations, uploading or rebuilding a catalog. Try again after it finishes. |
+| `show-invalid` | The installation has an invalid show. Fix its show before setting a budget. |
+| `storage-error` | The installation could not save its budgets. Its saved budget is shown. |
+| another code | The installation refused the budget: `<code>`. |
+| no reply | No confirmed reply. The budgets were read again; check this one before setting it again. |
+
+Beside a budget from 1 to the number of the LEDs, 3,600 mA for the wall and 180 mA for a
+snake, the panel says `At this budget every LED is held at its lowest level.`, and never
+beside 0. A wall or a snake that its budget dimmed at the latest refresh has `Dimmed`
+beside its estimate. While no budgets are saved the panel says `No budgets are saved: the
+wall's budget is the installation's default.`: on the board WLED's stored maximum less
+120 mA, 730 mA with the tracked 850, which holds the installation's 3,600 LEDs at their
+lowest level; in the emulator no limit. From the first save on, the budgets are saved, the
+wall's default among them. The panel reads `limits`, and `limits <next>` in the same
+request for a mapping of many legs, when Settings is opened, every two seconds while it is
+shown, and after each save. A read updates every estimate, mark and warning, but never the
+text of a field that has the focus or holds text not saved yet, and nothing is read while
+a save is out or waits. An installation whose software does not know `limits` gets the
+explanation, `This installation's software has no current limits.` and nothing to set, and
+is not asked again until the target changes. The panel is the same in the APK, in a
+browser and in the emulator's Controller view, whose LEDs show the limiting once budgets
+are saved, as the board's do.
+
 ## Messages
 
 The shared message panel gives each failure as a sentence with its code in brackets at
@@ -963,7 +1019,17 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the thirty-four lines above and no other, and names no address
+- The current limits, in Chrome against the emulator and against stand-in targets: the
+  panel's rows for the wall and the twenty snakes, their labels, fields and estimates; a
+  save by Enter and one by leaving a field, an emptied field saving 0, each saved sentence;
+  text equal to the budget read and values out of range not sent, the range said; a field
+  with the focus and text not saved kept through the reads while a budget set elsewhere is
+  shown in another field; the reads in two parts every two seconds, and none while a save
+  is out; each refusal in its own words with the saved budget shown again; the warning from
+  1 to the LEDs' count and not above it, the line while no budgets are saved, the `Dimmed`
+  marks; the wall's field alone for another mapping; an installation without limits asked
+  once; the replies checked through the native bridge.
+- That the web code sends the thirty-nine lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted

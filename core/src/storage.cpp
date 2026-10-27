@@ -3,6 +3,7 @@
 #include "catalog.h"
 #include "content.h"
 #include "crc32.h"
+#include "current_limits.h"
 #include "json_reader.h"
 #include "order.h"
 #include "playlist.h"
@@ -125,6 +126,9 @@ void storage_clear_parts(Core &core) {
     uint8_t probe;
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, "mapping.part", 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, "mapping.part");
+    }
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kLimitsPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kLimitsPart);
     }
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kOrderPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kOrderPart);

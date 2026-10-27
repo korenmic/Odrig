@@ -139,7 +139,7 @@ python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --mic
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--limits] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
@@ -188,6 +188,8 @@ with that environment's Python.
 | `limit-settings-missing` | The limit file to read is not there or is not a file. |
 | `limit-settings-malformed` | The limit file is not a JSON object with exactly the whole number `milliamps`. |
 | `limit-invalid` | The limit is not from 0 to 65,535. |
+| `limits-missing` | The folder that `install-show --limits` is to install holds no `limits.json`. Nothing was written to the board. |
+| `limits-malformed` | The `limits.json` of the folder that `install-show --limits` is to install is one the core would not read: the rules are in [reasons.md](reasons.md#limits-files). Nothing was written to the board. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 | `cancelled` | An interrupt from the keyboard, Ctrl-C, ended the command before a change of storage was committed. The board holds its storage from before. |
@@ -484,7 +486,10 @@ whether it is sound is not known yet.
    `order.txt` of [show.md](show.md#the-saved-playlist-order), and the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), may be files of the folder;
    a folder without them keeps the board's, as installing animations does not change the
-   order or the playlist the operator chose.
+   order or the playlist the operator chose. The budgets of the current limits,
+   `limits.json` of [core.md](core.md#current-limits), may be a file of the folder too, as
+   `read-show` copies it, and go to the board only with `--limits`: without it the folder's
+   copy is left out, and the board keeps its own budgets, or keeps none when it has none.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -527,6 +532,16 @@ board. `--keep-copies DIR` copies every file the install removes or replaces, as
 holds it, into `DIR`, a folder that is new or empty, before anything is written, and
 prints `kept copies: 2 files in DIR`: a file kept for a look at why it failed.
 
+`--limits` installs the folder's `limits.json` with the show, in the place of the board's.
+The budgets are for the supplies a board is fed from, so they move from one board to
+another only when asked: a folder copied from the installation by `read-show` carries
+the installation's budgets, and installed without `--limits` it leaves the board's as they
+are. The file is read before the board is touched, as strictly as the core reads it at its
+start: a folder that holds none is refused with `limits-missing`, and a file the core
+would not read with `limits-malformed`, with `--no-check` too. Budgets saved on the board
+with `limits wall` or `limits snake` stay through every `install-show` without
+`--limits`; `limits default` of [commands.md](commands.md#current-limits) removes them.
+
 From its first write to the comparison the change is named by the journal
 `build/firmware/storage/change.json`: the storage region, the new image and the blocks of
 each call, and the step reached. `set-wifi`, `set-limit` and `install-firmware` write their
@@ -539,7 +554,9 @@ storage outside `/odrig`, WLED's settings among them, keeps its content.
 
 Every show installed on the board while one 60-LED strip is fed from the board's 3.3 V pin
 must have a brightness of 40 or less in its `show.json`. The tool does not check this; the
-board tests do, for every show they install.
+board tests do, for every show they install. On such a board `install-show --limits` is
+not run with a folder of the installation, whose budgets are for its supplies: the wall's
+budget there is never 0 or above 730 mA. The tool does not check this either.
 
 ### set-wifi
 
@@ -597,9 +614,11 @@ the board, and prints two lines: `limit: <N> mA`, or `limit: off` for a limit of
 the board's reply to `status`.
 
 The limit comes from the limit file, `firmware/limit.json`, a JSON object with exactly
-the whole number `milliamps`, from 0 to 65,535. It is the maximum for all LEDs together
-that WLED's limiter works with, and 0 switches the limiter off; see
-[The current limiter stays active](#what-the-firmware-does). `--settings FILE` reads
+the whole number `milliamps`, from 0 to 65,535. It is WLED's maximum for all LEDs
+together. Stock WLED's limiter works with it, and 0 switches the limiter off; the odrig
+firmware switches WLED's limiter off and gives the core the maximum less 120 mA as the
+wall's budget while no budgets are saved, no limit for 0; see [WLED's current limiter is
+off](#what-the-firmware-does). `--settings FILE` reads
 another limit file. A file that is refused stops the command before the board is touched.
 
 WLED keeps the number as `hw.led.maxpwr` of `/cfg.json`. The command edits that file the
@@ -1108,39 +1127,64 @@ and checks at every pass that WLED is still in it. WLED's switch, its brightness
 its live override therefore do not change the LEDs; only the commands of
 [commands.md](commands.md) do.
 
-**The current limiter stays active.** WLED's limiter acts inside every send, with the
-maximum current of WLED's LED settings, 850 mA unless it was changed, less 120 mA for the
-chip, and 55 mA for one LED at full white. It counts 1 mA for every LED at rest. When its
-estimate is above the maximum it dims the refresh; `status` still reports the core's
-brightness.
+**WLED's current limiter is off; the core limits the current.** The core limits the
+current the LEDs draw by budgets in mA kept on the board, one for the wall and one for
+each leg, as [core.md](core.md#current-limits) says, and the commands of
+[commands.md](commands.md#current-limits) read and set them. Each is a ceiling on WLED's
+estimate of the draw: 55 mA for one LED at full white and 1 mA for every LED at rest,
+nothing for the chip. The firmware switches WLED's own limiter off in memory: it sets
+WLED's switch of the limiter, `BusManager::_useABL`, to false before every copy into the
+outputs and every send, and again right after it makes the outputs, since WLED switches
+the limiter on whenever it makes them. WLED then estimates nothing and dims nothing, and
+the outputs send the bytes the core gives them. An output that WLED's limiter dimmed
+before, at WLED's own start, is given its full level back at the same time, so that it
+gives back the colours it is sent. The firmware never changes WLED's maximum current or an
+output's: nothing WLED stores changes. `status` reports the core's brightness, which is
+applied before the budgets.
 
 The maximum is the limit of `firmware/limit.json`, which `set-limit` and
 `install-firmware` put into WLED's stored settings; `read-limit` prints what a board
-holds. The firmware itself never sets it. A limit of 0 switches the limiter off: WLED
-then estimates nothing and dims nothing.
+holds. The firmware itself never sets it. It reads it once at its start, as WLED loaded
+it, WLED's 850 when none is stored, and gives the core that maximum less the 120 mA WLED
+keeps for the chip as the wall's budget while no budgets are saved: 730 mA for 850, 1 mA
+for a maximum from 1 to 120 mA, which holds every LED at its lowest level, and no limit
+for 0. So a board keeps the limit it had while WLED's limiter acted, and a stored maximum
+of 0 leaves the wall without a budget until one is saved. In stock WLED, after
+`restore-stock`, the maximum is WLED's own limit again. A limit of 0 switches the limiter
+off there: WLED then estimates nothing and dims nothing. Once budgets are saved, with
+`limits wall` or `limits snake`, the saved ones hold across every restart and the maximum
+is no longer used: a first save keeps the wall's budget then in force, the default, unless
+it sets the wall's. `limits default` removes them and puts the default back.
+`firmware/usermod/odrig_limit_default.h` holds the rule, and the suite of the firmware
+tool checks it for every maximum from 0 to 65,535.
 
-| Limit | The bench: one strip fed from the board's 3.3 V pin | The installation: the LEDs fed from the supply |
+| Wall's budget | The bench: one strip fed from the board's 3.3 V pin | The installation: the LEDs fed from the supplies |
 |---|---|---|
-| 850 mA, the tracked value | The limiter is what keeps a `brightness 255` on a white picture from asking the pin for more than it gives. | Every LED is held at its lowest level: 3,600 LEDs count as 3,600 mA at rest. Nothing can be shown. |
-| What the supply gives | Not for the bench. | The limiter dims a picture that would ask the supply for more. |
-| 0, the limiter off | Not for the bench: nothing protects the pin then. | Nothing is dimmed. No LED current passes through the board, so the board is not at risk; what the supply and the wiring bear is not the tool's to judge. |
+| 730 mA, the default with the tracked 850 | The budget keeps a `brightness 255` on a white picture from asking the pin for more than it gives. | Every LED is held at its lowest level: 3,600 LEDs count as 3,600 mA at rest, and brightness 2 to 255 look the same. |
+| What the supplies give | Not for the bench. | The core dims a picture that would ask the supplies for more; the budget of each snake keeps the group of snakes on one supply within what that supply gives. |
+| 0, no limit | Not for the bench: nothing protects the pin then. | The wall is not dimmed. No LED current passes through the board, so the board is not at risk; what the supplies and the wiring bear is not the tool's to judge. |
 
-The limit stays 850 for as long as a strip is fed from the board. Which value the
-installation gets is the owner's to say: it is about power. The tool takes every whole
-number from 0 to 65,535.
+The limit stays 850 for as long as a strip is fed from the board, and on such a board the
+wall's budget is never 0 or above 730 mA. Which budgets the installation gets is the
+owner's to say: it is about power. The tool takes every whole number from 0 to 65,535 for
+the maximum, and the core 0 to 250,000 mA for the wall's budget and 0 to 65,535 mA for a
+leg's.
 
 > With the twenty legs of the target, 3,600 LEDs, the estimate at rest alone is 3,600 mA.
-> With WLED's maximum of 850 mA the limiter then holds every LED at its lowest level,
-> whatever plays: as WLED's source has it, every channel of a colour that is lit is then
-> sent as 1 of 255. The same holds for every mapping of 730 LEDs or more. Before twenty
-> legs are lit, the limit must be raised to what the power supply gives, or switched off:
-> edit `firmware/limit.json` and run `set-limit`. With two
-> legs, 360 LEDs, the limiter also dims a bright picture such as Hello world, at any
-> brightness at which the estimate passes 730 mA.
+> With the default of 730 mA the core then holds every LED at its lowest level, whatever
+> plays: every channel of a colour that is above a quarter of the colour's brightest is
+> sent as 1 of 255, and the others as 0. The same holds for every mapping of 730 LEDs or
+> more. Before twenty legs are lit, the wall's budget must be set to what the power
+> supplies give, or to 0, with `limits wall <mA>`. With two legs, 360 LEDs, the default
+> also dims a bright picture such as Hello world, at any brightness at which the estimate
+> passes 730 mA.
 
-The limiter is also part of the time a refresh takes: when it dims, it reads and writes
-every LED of every output once more. With 3,600 LEDs that is about 8 ms of the 16.3 ms a
-send takes; see [Verified on the board](#verified-on-the-board).
+The core's limiting is part of its work for a refresh, on the processor core of the
+usermod's task, beside the send of the refresh before. WLED's limiter was part of the time
+a send took: when it dimmed, it read and wrote every LED of every output once more, about
+8 ms of the 16.3 ms a send of 3,600 LEDs took; see [Verified on the
+board](#verified-on-the-board). With it off a send no longer does that. Neither time has
+been measured on the board with the core limiting.
 
 **Calls to the core** are made one at a time: a lock is held for every call after the
 start. The task holds it for as long as the core works on a refresh, 9 to 17 ms with a
@@ -1165,7 +1209,7 @@ session of seed 31 measures these budgets.
 |---|---|
 | The LEDs show only the core's data. WLED's effects, presets, playlists, its boot preset and its nightlight do not run. | Wi-Fi, the access point and all network settings. |
 | The outputs are the mapping's. WLED's LED output settings are replaced by them when WLED's LED settings are saved. | The web interface, the JSON interface and WebSocket. |
-| WLED's switch, its brightness slider and its live override do not change the LEDs. | The current limiter and its maximum in WLED's LED settings. |
+| WLED's switch, its brightness slider and its live override do not change the LEDs, and WLED's current limiter is switched off in memory: the core limits the current. | The maximum current in WLED's LED settings, as stored: the odrig firmware's default for the wall's budget, and stock WLED's limit. |
 | The USB serial port speaks only [commands.md](commands.md): WLED's serial handling, Adalight, TPM2, Improv and JSON over serial, is switched off. | The file system and every file of WLED on it. |
 | WLED's information shows the `odrig` entries and the release name `odrig_ESP32-S3_16MB_opi`. | Updates through WLED's own interface, on WLED's layout. |
 | The audio usermod of the stock build is not included. | Buttons, relay and infrared settings. |
@@ -1209,7 +1253,7 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 ```json
 {"probe":1,"start_ms":95,"heap":135736,"realtime":1,"loops":235,"sent":50,"gap_ms":20,
  "poll_us":578,"send_us":16525,"poll_total_us":28021,"send_total_us":816291,
- "overwritten":0,"limited":69,"limit_ma":730,"used_ma":3600,"wire_us":[5712,5713],
+ "overwritten":0,"limited":0,"limit_ma":730,"used_ma":0,"wire_us":[5712,5713],
  "space_us":29110,
  "store":{"calls":0,"longest_us":0,"total_us":0,"check_steps":0,"check_longest_us":0,"check_total_us":0},
  "ap":1,"ap_name":"odrig","ap_auth":3,"error":null,
@@ -1225,8 +1269,8 @@ them. It answers the line `#probe` on the port with one JSON line, shown here on
 | `gap_ms`, `poll_us`, `send_us` | The longest time between two sends, the longest request for a refresh and the longest send, since the last `#probe`. A send is the copy into the outputs and WLED's show together; the wait for the outputs between the two is not in it. |
 | `poll_total_us`, `send_total_us` | The time all requests for a refresh and all sends took, in the last full second. |
 | `overwritten` | The sends before which an output no longer held what it held after the send before it: something else wrote to the outputs. Some outputs are read back after each send and again before the next, each in its turn: as many as have 200 LEDs together, and one at least. |
-| `limited` | The sends since the last `#probe` in which WLED's current limiter dimmed the LEDs. With the limiter off it stays 0. |
-| `limit_ma`, `used_ma` | The current the limiter allows the LEDs, WLED's maximum less 120 mA for the chip, and its estimate for the last send. Both are 0 while the limiter is off, which is a maximum of 0. |
+| `limited` | The sends since the last `#probe` that WLED's current limiter counts as dimmed: while WLED's maximum is above 0, a send whose estimate is at or above the current it allows. The firmware switches WLED's limiter off, so with a maximum of 0 or above 120 mA it stays 0, which is the check that WLED dims nothing. With a maximum from 1 to 120 mA the current allowed is 0 and every send is counted: a reading of the probe, not WLED dimming. The core's limiting is read with `limits`. |
+| `limit_ma`, `used_ma` | The current WLED's limiter would allow the LEDs, WLED's maximum less 120 mA for the chip, 730 with 850 stored and 0 for a maximum of 120 mA or less; and WLED's estimate for the last send, which is 0 while its limiter is off, as the firmware keeps it. |
 | `wire_us` | The shortest and the longest time, since the last `#probe`, from the end of a send until the parallel driver had finished its transfer and could take data again, in microseconds; `null` when no output is on the parallel driver or none was sent. A timer looks at the driver every tenth of a millisecond. An output of 180 LEDs is 570 bytes on the wire with its reset, 5.7 ms. |
 | `space_us` | The time the file system took to tell its size and its used bytes, when the usermod asked before the core started, in microseconds. |
 | `store` | The storage calls since the last `#probe`, reads aside: their number in `calls`, the longest in `longest_us` and their sum in `total_us`, in microseconds. And the requests for a refresh in which the core read a second file, which is how it checks an uploaded file: their number in `check_steps`, the longest in `check_longest_us` and their sum in `check_total_us`. |
@@ -1243,9 +1287,11 @@ answered right after the show, so that a report never describes colours that wer
 sent. The report of twenty outputs is a line of 2,400 characters; the port writes it in the
 pieces it takes without waiting and reads no command until it is written.
 
-While the limiter does not dim, an output gives back exactly the bytes it was sent. When it
-dims, the output gives back the dimmed colours as WLED restores them, which at the
-limiter's lowest level is 128 for a channel that stayed lit and 0 for one that did not.
+WLED's limiter does not dim, so an output gives back exactly the bytes it was sent, which
+are the core's after its limiting. Where the core holds a leg at its lowest level, as the
+default of 730 mA does on the target, a channel that stayed lit reads 1 and one that did
+not 0. While WLED's limiter acted, it read 128, as WLED restored the colours it had
+dimmed.
 
 The probe build has a second line, `#store <bytes>`, the store trial: it tries the
 storage functions as the core would use them, without the core. It writes a small file
@@ -1638,13 +1684,15 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    ```
 
    The lit LEDs glow faintly, and their colours move along the strip towards the wired
-   end: the limiter counts the 1,200 LEDs of this mapping and holds every LED at its lowest
-   level. `python -m emulator build/lane/show` shows the same row on its page, as the row
-   of leg 1. Afterwards install the example show again, as in step 1.
+   end: no budgets are saved on the bench, and the wall's default of 730 mA is below the
+   1,200 mA the LEDs of this mapping draw at rest, so the core holds every LED at its
+   lowest level. `python -m emulator build/lane/show` shows the same row on its page, as
+   the row of leg 1, at its full level: the emulator has no default budget. Afterwards
+   install the example show again, as in step 1.
 6. **Twenty wired legs show the demo show (seed 05, 18.3).** With the twenty legs of the
-   target wired as [mapping.md](mapping.md) has them, and WLED's maximum current raised to
-   what the power supply gives, pack the demo show with the commands of
-   [emulator.md](emulator.md), "Two shows to run", giving `pack` a copy of
+   target wired as [mapping.md](mapping.md) has them, and the wall's budget set to what the
+   power supplies give, or to 0, with `limits wall <mA>`, pack the demo show with the
+   commands of [emulator.md](emulator.md), "Two shows to run", giving `pack` a copy of
    `shows/demo-20/show.json` that has the brightness chosen for the power supply. Install
    it with `python3 firmware/fw.py install-show build/demo-20/show`, switch the board's
    power off and on and send no command. *Seen:* the words HELLO WORLD stand upright in the middle of
@@ -1682,7 +1730,7 @@ refreshes a second, and the owner accepts any rate from 20 to 50. See
    `python3 firmware/fw.py test-air --http 4.3.2.1` of step 3 runs the same session by
    itself and writes the speed to `build/firmware/out/upload-air.json`.
 
-Before twenty legs are lit, raise WLED's maximum current as [What the firmware
+Before twenty legs are lit, set the wall's budget as [What the firmware
 does](#what-the-firmware-does) says.
 
 What a program established without the owner, over USB: the board plays the installed show
@@ -1889,14 +1937,12 @@ the firmware's 36 to 42.
   the core, 6.0 s. The work is the core's decoding and placing, and WLED's show.
 - A send is 4.1 ms for the copy and 12.3 ms for WLED's show, of which the limiter's
   dimming of 3,600 LEDs is about 8 ms. On the bench the limiter dims every refresh, because
-  WLED's maximum of 850 mA is below the 3,600 mA it counts for 3,600 LEDs at rest.
+  WLED's maximum of 850 mA is below the 3,600 mA it counts for 3,600 LEDs at rest. The
+  firmware now switches WLED's limiter off and the core limits, so a send no longer
+  dims; how long a send takes with the core limiting has not been measured.
 
 What could make dense content faster. None of it was tried, and nothing asks for it:
 
-- Raising WLED's maximum current to what the power supply of the installation gives, in
-  WLED's LED settings, which has to be done before twenty legs are lit anyway. The limiter
-  then dims only a picture that is too bright, and a send that it does not dim is about
-  8 ms shorter. The firmware does not change that setting.
 - Building the core alone at `-O2`, as a library of its own, and leaving WLED's files at
   the platform's `-Os`. The core is compiled at `-Os` in the firmware and at `-O2` on the
   Mac. The whole firmware must not be built at `-O2`: see the next paragraph.

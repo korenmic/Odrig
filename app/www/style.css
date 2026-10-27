@@ -862,6 +862,64 @@ label.button {
   color: var(--teal);
 }
 
+/* Current limits: a row for the wall and one for each snake, each with its field and the
+   estimate beside it. */
+#limits h3 {
+  margin: 16px 0 4px;
+  font-size: 17px;
+}
+
+.limit {
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.limit label {
+  margin: 4px 0;
+}
+
+.limit-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.limit-line input {
+  flex: 0 0 7.5em;
+  width: 7.5em;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.limit-line input::placeholder {
+  color: var(--lesser);
+  opacity: 1;
+}
+
+.limit-estimate {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  color: var(--lesser);
+  font-variant-numeric: tabular-nums;
+}
+
+.limit-dimmed {
+  color: var(--teal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.limit-warning,
+.limit-said {
+  margin: 6px 0 0;
+}
+
+.limit-said.problem {
+  color: var(--teal);
+}
+
 label.check {
   display: flex;
   align-items: center;

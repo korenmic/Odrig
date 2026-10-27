@@ -121,8 +121,8 @@ class FixedMemory(unittest.TestCase):
         # window, the chunk buffer, the pixel buffer and the window of the check, and the
         # tables of items, cycle entries and files, the first and the last with room for
         # 32 items more than the 100 of the show, and the saved order's key of each item.
-        tables = 2049 + 1024 + 20 * 12 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 10800 + 32768 + 132 * 16 + 200 * 2 + 132 * 48 + 132 * 2
-        self.assertEqual(tables, 119069)
+        tables = 2049 + 1024 + 20 * 16 + 3600 * 2 + 3600 * 3 + 8 + 10800 + 32768 + 1500 + 10800 + 32768 + 132 * 16 + 200 * 2 + 132 * 48 + 132 * 2
+        self.assertEqual(tables, 119149)
         # What the compiler settles: the core object, at most 4,096 bytes, and the second
         # source and decoders, about 2,500.
         settled = asked - tables

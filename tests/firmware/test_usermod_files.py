@@ -524,6 +524,25 @@ class Host(unittest.TestCase):
         for path in SOURCES:
             self.assertNotRegex(text_of(path), r"setMilliampsMax|_gMilliAmpsMax\s*=", path.name)
 
+    def test_wleds_limiter_is_switched_off_in_memory_before_every_fill_and_send_and_after_the_outputs_are_made(self):
+        switch = self.leds[self.leds.index("void switchWledLimiterOff() {"):]
+        switch = switch[:switch.index("\n}\n")]
+        lines = [line.strip() for line in switch.splitlines()[1:] if line.strip()]
+        self.assertEqual(lines[:2], ["if (!BusManager::_useABL) return;", "BusManager::_useABL = false;"])
+        self.assertIn("if (bus && bus->isDigital() && bus->isOk()) static_cast<BusDigital *>(bus)->applyBriLimit(255);", switch)
+        self.assertNotRegex(switch, r"setCurrentLimit|setMilliampsMax|initializeABL")
+
+        def body(head):
+            found = self.leds[self.leds.index(head):].split("{", 1)[1].split("\n}", 1)[0]
+            return [line.strip() for line in found.splitlines() if line.strip()]
+
+        self.assertEqual(body("void OdrigLeds::fill()")[0], "switchWledLimiterOff();")
+        self.assertEqual(body("void OdrigLeds::show()"), ["switchWledLimiterOff();", "BusManager::show();"])
+        self.assertEqual(body("void OdrigLeds::dark()")[0], "switchWledLimiterOff();")
+        made = body("void OdrigLeds::apply()")
+        self.assertEqual(made[made.index("strip.finalizeInit();") + 1], "switchWledLimiterOff();")
+        self.assertEqual(self.leds.count("switchWledLimiterOff();"), 4)
+
 
 class Pacing(unittest.TestCase):
     """How command lines are held back after storage calls, read in the usermod's sources."""

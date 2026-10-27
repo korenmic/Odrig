@@ -6,12 +6,6 @@
 //     input:  "config <bytes>\n" and that many bytes, or "config absent\n";
 //             then the same for "secrets".
 //     output: the settings; the name and the password in hexadecimal.
-//
-//   host limit
-//     input:  "maximum <milliamps>\n", "outputs <count>\n", and for each output
-//             "<leds>\n" and three bytes for each LED.
-//     output: what the limiter reports, and the bytes of each output afterwards, in
-//             hexadecimal.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +13,6 @@
 #include <string>
 #include <vector>
 
-#include "limit.h"
 #include "settings.h"
 
 namespace {
@@ -63,35 +56,10 @@ int settings() {
   return 0;
 }
 
-int limit() {
-  unsigned maximum = 0, count = 0;
-  if (scanf("maximum %u\noutputs %u\n", &maximum, &count) != 2) return 2;
-  // Each output is a block of exactly its size, for the same reason.
-  std::vector<OdrigLimitOutput> outputs(count);
-  for (unsigned i = 0; i < count; i++) {
-    unsigned leds = 0;
-    if (scanf("%u", &leds) != 1 || getchar() != '\n') return 2;
-    outputs[i].leds = leds;
-    outputs[i].bytes = (uint8_t *)malloc(leds ? (size_t)leds * 3 : 1);
-    if (leds && fread(outputs[i].bytes, 1, (size_t)leds * 3, stdin) != (size_t)leds * 3) return 2;
-  }
-  const OdrigLimited found = odrigLimit(outputs.data(), count, (uint16_t)maximum);
-  printf("{\"limit_ma\":%u,\"used_ma\":%u,\"limited\":%s,\"outputs\":[", (unsigned)found.limit_ma, (unsigned)found.used_ma, found.limited ? "true" : "false");
-  for (unsigned i = 0; i < count; i++) {
-    printf("%s\"", i ? "," : "");
-    for (size_t n = 0; n < (size_t)outputs[i].leds * 3; n++) printf("%02x", outputs[i].bytes[n]);
-    printf("\"");
-    free(outputs[i].bytes);
-  }
-  printf("]}\n");
-  return 0;
-}
-
 }  // namespace
 
 int main(int argc, char **argv) {
   if (argc == 2 && strcmp(argv[1], "settings") == 0) return settings();
-  if (argc == 2 && strcmp(argv[1], "limit") == 0) return limit();
-  fprintf(stderr, "usage: host settings | host limit\n");
+  fprintf(stderr, "usage: host settings\n");
   return 2;
 }

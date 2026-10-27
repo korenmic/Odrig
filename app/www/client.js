@@ -850,6 +850,30 @@ export function catalogCancel() {
   return requestOperation("catalog", () => commands.catalogCancel());
 }
 
+// The current limits, whole: every part of the reply to `limits`, asked one after another
+// in one request as a file is read, so that nothing else is sent between them. Gives
+// whether budgets are saved and the wall's entry, both of the last part, and the legs of
+// every part.
+export function limitsRead() {
+  return requestOperation("limits", async () => {
+    let part = await commands.limits(0);
+    const legs = [...part.legs];
+    while (part.next !== null) {
+      part = await commands.limits(part.next);
+      legs.push(...part.legs);
+    }
+    return {saved: part.saved, wall: part.wall, legs};
+  });
+}
+
+export function limitsWall(milliamps) {
+  return requestOperation("limits", () => commands.limitsWall(milliamps));
+}
+
+export function limitsSnake(snake, milliamps) {
+  return requestOperation("limits", () => commands.limitsSnake(snake, milliamps));
+}
+
 // Moves an animation before another, or to the end with "end", in the saved order the
 // list is shown in. The list and the order are asked for again afterwards, whatever the
 // reply.

@@ -186,6 +186,15 @@ mixes the two, breaks a rule.
 | `mapping-missing` | The mapping file does not exist. |
 | `mapping-malformed` | The mapping file breaks a rule. The detail says which. |
 
+## Limits files
+
+Rules: [python-library.md](python-library.md), "The current limits". The budgets' file is
+`limits.json`.
+
+| Reason | Condition |
+|---|---|
+| `limits-malformed` | The budgets' file breaks its form: it is not strict JSON; a member is missing, unknown or of the wrong type; `version` is not 1; `wall` is not 0 to 250,000; an entry of `legs` is not an array of a leg number from 1 to 255 and a budget from 0 to 65,535; or two entries name the same leg. The detail says which. |
+
 ## Shows
 
 Rules: [show.md](show.md). `pack` checks in the order of this table and reports the first

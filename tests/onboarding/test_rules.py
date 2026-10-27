@@ -67,16 +67,19 @@ class WorkingRules(unittest.TestCase):
 
     def test_it_gives_the_rules_of_the_board(self):
         board = self.part("If you have a board")
-        self.assertEqual(re.findall(r"(?m)^([0-9]+)\. \*\*", support.section(self.text, "If you have a board")), [str(number) for number in range(1, 10)])
+        self.assertEqual(re.findall(r"(?m)^([0-9]+)\. \*\*", support.section(self.text, "If you have a board")), [str(number) for number in range(1, 11)])
         for folder in support.FIRST_COMPUTER_ONLY:
             self.assertIn(f"`{folder}`", board)
         for phrase in ("never changed, moved, deleted or committed", "`firmware/fw.py`", "`odrigctl`", "RTS before the line DTR", "One program uses the board at a time",
-                       "Brightness 40 or less", "one strip of 60 leds", "3.3 V pin", "never erased", "no fuse", "`python3 firmware/fw.py build`", "needs a person"):
+                       "Brightness 40 or less", "one strip of 60 leds", "3.3 V pin", "never erased", "no fuse", "`python3 firmware/fw.py build`", "needs a person",
+                       "the wall's budget of the current limits is never 0 or above 730 mA", "`install-show --limits` is not run there with a folder of the installation",
+                       "ends with `limits default`"):
             self.assertIn(phrase.lower(), board.lower())
 
     def test_the_rules_of_the_board_are_those_of_the_firmware_document(self):
         firmware = flat(support.read("docs/firmware.md"))
-        for phrase in ("must have a brightness of 40 or less", "fed from the board's 3.3 V pin", "RTS lowered before DTR, does not reset the board", "The whole flash is never erased"):
+        for phrase in ("must have a brightness of 40 or less", "fed from the board's 3.3 V pin", "RTS lowered before DTR, does not reset the board", "The whole flash is never erased",
+                       "on such a board the wall's budget is never 0 or above 730 mA"):
             self.assertIn(phrase, firmware)
 
     def test_it_gives_the_frame_rate_rule_with_the_rates_that_were_measured(self):

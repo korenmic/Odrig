@@ -337,6 +337,41 @@ export async function orderMove(revision, id, before) {
   await carriedOut(`order move ${revision} ${id} ${before}`);
 }
 
+// One entry of `limits`, `[leds, budget, estimate, limited]`, as a value.
+function limitOf([leds, budget, estimate, limited]) {
+  return {leds, budget, estimate, limited: limited === 1};
+}
+
+// One part of the current limits, from a position of the mapping's legs on: whether
+// budgets are saved; for the wall, and for each leg with its number, the number of LEDs,
+// the budget in mA, the estimate of their current in mA and whether the budget dimmed the
+// latest refresh; and `next`, the position to ask for next, or null.
+export async function limits(from = 0) {
+  const reply = from === 0 ? await carriedOut("limits") : await carriedOut(`limits ${from}`);
+  const wall = reply.wall;
+  const sound =
+    typeof reply.saved === "boolean" &&
+    Array.isArray(wall) && wall.length === 4 && whole(wall[0], 0, MOST_BYTES) && whole(wall[1], 0, MOST_BYTES) && whole(wall[2], 0, MOST_BYTES) && whole(wall[3], 0, 1) &&
+    Array.isArray(reply.legs) &&
+    reply.legs.every((leg) => Array.isArray(leg) && leg.length === 5 && whole(leg[0], 1, 255) && whole(leg[1], 0, MOST_BYTES) && whole(leg[2], 0, 65535) &&
+      whole(leg[3], 0, MOST_BYTES) && whole(leg[4], 0, 1)) &&
+    (reply.next === null || whole(reply.next, from + 1, 65535));
+  if (!sound) {
+    throw new Failure("bad-reply", address());
+  }
+  return {saved: reply.saved, wall: limitOf(wall), legs: reply.legs.map(([leg, ...rest]) => ({leg, ...limitOf(rest)})), next: reply.next};
+}
+
+// Saves the wall's budget, 0 to 250,000 mA; 0 is no limit.
+export async function limitsWall(milliamps) {
+  await carriedOut(`limits wall ${milliamps}`);
+}
+
+// Saves the budget of a snake, the leg of its number, 0 to 65,535 mA; 0 is no limit.
+export async function limitsSnake(snake, milliamps) {
+  await carriedOut(`limits snake ${snake} ${milliamps}`);
+}
+
 // The states of a catalog, why a damaged one is damaged, and the two storages.
 const CATALOG_STATES = ["none", "ok", "loading", "damaged", "incompatible", "absent"];
 const DAMAGES = ["marker", "page", "line", "interrupted"];

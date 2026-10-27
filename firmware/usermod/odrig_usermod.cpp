@@ -1,12 +1,12 @@
 // The usermod that makes WLED the platform of the player. It hosts the core: it gives it
 // memory, the time, the files of the installed show and those of a USB drive on the
-// chip's own socket, carries bytes between the USB serial port and the core, and command
-// lines between the board's UART and the core and between WLED's web server and the core,
-// sets WLED's outputs from the core's legs, keeps WLED from the LEDs, sends the core's LED
-// data to the outputs, puts the lines the player logs into the log the UART writes, refuses
-// an update over Wi-Fi on a board without a second firmware slot, and reports its state in
-// WLED's information. Every decision about files, time, the layout
-// and commands is the core's.
+// chip's own socket, and the wall's default current budget, carries bytes between the USB
+// serial port and the core, and command lines between the board's UART and the core and
+// between WLED's web server and the core, sets WLED's outputs from the core's legs, keeps
+// WLED and its current limiter from the LEDs, sends the core's LED data to the outputs,
+// puts the lines the player logs into the log the UART writes, refuses an update over
+// Wi-Fi on a board without a second firmware slot, and reports its state in WLED's
+// information. Every decision about files, time, the layout and commands is the core's.
 #include "wled.h"
 
 #include "odrig_core.h"
@@ -14,6 +14,7 @@
 #include "odrig_files.h"
 #include "odrig_http.h"
 #include "odrig_leds.h"
+#include "odrig_limit_default.h"
 #include "odrig_routing.h"
 #include "odrig_log.h"
 #include "odrig_sd_config.h"
@@ -62,6 +63,14 @@ int aboutHost(void *, char *buffer, size_t capacity) {
   snprintf(buffer, capacity, "%s %s %s %s reset %s", WLED_RELEASE_NAME, __DATE__, __TIME__, storage, reset);
   return 1;
 }
+
+static_assert(ODRIG_CHIP_MA == (uint32_t)MA_FOR_ESP, "the default budget leaves the chip what WLED's limiter left it");
+
+// The wall's budget while no budgets are saved, from WLED's maximum current as WLED loaded
+// it from its settings. It is read once, at the start.
+uint32_t wallDefault = 0;
+
+uint32_t wallDefaultOf(void *) { return wallDefault; }
 
 struct Reply {
   char *text;
@@ -225,6 +234,8 @@ class OdrigUsermod : public Usermod {
     OdrigLog::retained();
     odrig_host host = OdrigLog::withLog(OdrigDrive::withDrive(OdrigFiles::host()));
     host.about = aboutHost;
+    wallDefault = odrigWallDefault(BusManager::ablMilliampsMax());
+    host.limit_default = wallDefaultOf;
     core = odrig_core_begin(&host);
     startMs = (uint32_t)(OdrigFiles::nowMs() - before);
 #ifdef ODRIG_PROBE

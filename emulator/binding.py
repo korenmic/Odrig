@@ -43,6 +43,7 @@ ABOUT = CFUNCTYPE(c_int, c_void_p, POINTER(c_char), c_size_t)
 DRIVE_LIST = CFUNCTYPE(c_int32, c_void_p, c_uint32)
 DRIVE_BIND = CFUNCTYPE(c_int, c_void_p, c_uint32, c_uint32, c_char_p)
 DRIVE_WRITABLE = CFUNCTYPE(c_int, c_void_p, c_uint32)
+LIMIT_DEFAULT = CFUNCTYPE(c_uint32, c_void_p)
 REPLY = CFUNCTYPE(None, c_void_p, POINTER(c_char), c_size_t, POINTER(c_char), c_size_t)
 
 
@@ -55,6 +56,7 @@ class HostRecord(Structure):
         ("space", SPACE), ("read_at", READ_AT), ("drive", DRIVE), ("drive_name", DRIVE_NAME), ("drive_space", DRIVE_SPACE),
         ("about", ABOUT),
         ("drive_list", DRIVE_LIST), ("drive_bind", DRIVE_BIND), ("drive_writable", DRIVE_WRITABLE),
+        ("limit_default", LIMIT_DEFAULT),
     ]
 
 
@@ -133,6 +135,9 @@ class Core:
             self._functions += (DRIVE_LIST(self._drive_list), DRIVE_BIND(self._drive_bind), DRIVE_WRITABLE(self._drive_writable))
         else:
             self._functions += (DRIVE_LIST(), DRIVE_BIND(), DRIVE_WRITABLE())
+        # No default budget for the wall: the emulator has no WLED settings and no pin to
+        # protect, so it limits nothing while no budgets are saved.
+        self._functions += (LIMIT_DEFAULT(),)
         self._on_reply = REPLY(self._collect)
         self._record = HostRecord(None, *self._functions)
         self._reply = ctypes.create_string_buffer(REPLY_MAX)

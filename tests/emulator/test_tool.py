@@ -34,6 +34,7 @@ OK = '{"ok":true}\n'
 # line.
 SESSION = (
     ("mapping", "test", "off"),
+    ("limits", "default"),
     ("status",),
     ("fault",),
     ("brightness", "77"),
@@ -69,7 +70,7 @@ def catalog_reply(files):
 def reference_replies(files, session):
     player = ReferencePlayer(files)
     player.poll(0)
-    return [b'{"ok":true}\n' if words == ("mapping", "test", "off") else b'{"ok":false,"error":"unknown-id"}\n' if words in (("ignore", "999", "1"), ("order", "move", "1", "999", "end")) else
+    return [b'{"ok":true}\n' if words in (("mapping", "test", "off"), ("limits", "default")) else b'{"ok":false,"error":"unknown-id"}\n' if words in (("ignore", "999", "1"), ("order", "move", "1", "999", "end")) else
             catalog_reply(files) if words == ("catalog",) else player.command(100, " ".join(words).encode("ascii")) for words in session]
 
 
@@ -276,6 +277,13 @@ class Usage(unittest.TestCase):
             ["--port", "a", "upload", "9", "a\n.odrg"],
             ["--port", "a", "upload begin", "9", "a.odrg"],
             ["--port", "a", "cancel"],
+            ["--port", "a", "limits", "wall"],
+            ["--port", "a", "limits", "snake", "1"],
+            ["--port", "a", "limits", "snake", "1", "2", "3"],
+            ["--port", "a", "limits", "wall", "1", "2"],
+            ["--port", "a", "limits", "1", "2"],
+            ["--port", "a", "limits", "wall", "1\n"],
+            ["--port", "a", "limits", "1\r"],
             ["--port", "a", "--timeout", "0", "status"],
             ["--port", "a", "--timeout", "soon", "status"],
             ["--port", "a", "--timeout", "inf", "status"],
@@ -291,16 +299,16 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "limits", "limits wall <mA>", "limits snake <n> <mA>", "limits default", "upload begin <id> <file> <bytes>",
                                       "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog")) and command not in ("play all", "remove many <ids>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "limits")) and command not in ("play all", "remove many <ids>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "limits")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "limits": ("[OPERATION]",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -308,6 +316,8 @@ class Usage(unittest.TestCase):
                            (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["catalog", "page", "internal", "0"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["limits", "snake", "3"], "limits takes no argument, FROM, wall MA, snake N MA, or default"),
+                           (["limits", "default", "now"], "limits takes no argument, FROM, wall MA, snake N MA, or default"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -335,6 +345,13 @@ class Usage(unittest.TestCase):
             (["catalog", "rebuild", "internal"], b"catalog rebuild internal\n"),
             (["catalog", "rebuild", "external"], b"catalog rebuild external\n"),
             (["catalog", "cancel"], b"catalog cancel\n"),
+            (["limits"], b"limits\n"),
+            (["limits", "3"], b"limits 3\n"),
+            (["limits", "x"], b"limits x\n"),
+            (["limits", "wall", "2000"], b"limits wall 2000\n"),
+            (["limits", "snake", "1", "500"], b"limits snake 1 500\n"),
+            (["limits", "snake", "abc", "-5"], b"limits snake abc -5\n"),
+            (["limits", "default"], b"limits default\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 

@@ -12,7 +12,7 @@ from littlefs.errors import LittleFSError
 
 from odrig import catalog
 from odrig import errors as show_errors
-from odrig import mapping, show
+from odrig import limits, mapping, show
 
 from . import Failure, paths
 
@@ -24,6 +24,10 @@ SHOW_NAME = "show.json"
 ORDER_NAME = "order.txt"
 PLAYLIST_NAME = "playlist.txt"
 KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME)
+# The budgets of the current limits, which a show folder may hold beside the files of the
+# show: they are for the supplies of the place a board is in, so the board keeps its own,
+# or none, unless the folder's are asked for.
+LIMITS_NAME = limits.NAME
 # The files of the internal catalog: its marker and its pages.
 CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"
@@ -364,10 +368,23 @@ def folder_files(folder, check=True):
         except show_errors.Rejection as rejection:
             raise _rejected(rejection) from None
         for name in files:
-            if name not in (MAPPING_NAME, SHOW_NAME, ORDER_NAME, *named):
+            if name not in (MAPPING_NAME, SHOW_NAME, ORDER_NAME, LIMITS_NAME, *named):
                 raise Failure("not-a-show-folder", f"{folder / name} is not a file of the show")
         files.update(made)
     return files
+
+
+def check_limits(folder, files):
+    """Refuses the budgets' file of a show folder, given with its files, when the folder
+    holds none, `limits-missing`, or when the core would not read it, `limits-malformed`."""
+    path = pathlib.Path(folder) / LIMITS_NAME
+    if LIMITS_NAME not in files:
+        raise Failure("limits-missing", f"{path} is not there; --limits installs the budgets of the folder")
+    try:
+        with show_errors.naming(path):
+            limits.loads(files[LIMITS_NAME])
+    except show_errors.Rejection as rejection:
+        raise _rejected(rejection) from None
 
 
 def _check_animation(path, data, canvas):

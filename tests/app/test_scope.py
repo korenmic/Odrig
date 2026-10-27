@@ -10,7 +10,8 @@ CONVERTER_LIBRARY = support.ROOT / "converter" / "lib"
 LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "brightness <n>", "space", "remove <n>", "remove many <n>", "ignore <n> <n>",
          "upload begin <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel", "mapping get", "mapping set <n> <n>", "mapping test <n>", "mapping cross <n>",
          "order get", "order get <n>", "order move <n> <n> <n>", "mapping test snake <n>", "read <n> <n>", "upload expect <n>", "fault",
-         "upload begin external <n> <n>", "catalog", "catalog page <n> <n> <n>", "catalog rebuild <n>", "catalog cancel"}
+         "upload begin external <n> <n>", "catalog", "catalog page <n> <n> <n>", "catalog rebuild <n>", "catalog cancel",
+         "limits", "limits <n>", "limits wall <n>", "limits snake <n> <n>"}
 
 
 def files():

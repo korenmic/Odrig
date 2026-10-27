@@ -64,6 +64,7 @@ def parser():
     install.add_argument("--wait", metavar="SECONDS", type=_seconds, default=board.SETTLE_SECONDS, help="how long to wait after the restart for the board's reply and for it to read its animations (default: 300)")
     install.add_argument("--dry-run", action="store_true", help="say what would change and write nothing")
     install.add_argument("--keep-copies", metavar="DIR", type=pathlib.Path, help="copy every file the install removes or replaces, as the board holds it, into a folder that is new or empty, before anything is written")
+    install.add_argument("--limits", action="store_true", help="also install the folder's limits.json, the budgets of the current limits; without it the board keeps its own, or none")
     recover = commands.add_parser("recover-storage", help="finish or give up a change of the board's storage that was cut")
     recover.add_argument("--port", metavar="P", help="the board's USB serial port")
     recover.add_argument("--whole", action="store_true", help="write the new image of the change whole: the last resort when storage changed since the change began")
@@ -387,6 +388,10 @@ def show_lines(present, wanted):
 def _install_show(arguments):
     from . import storage
     files = storage.folder_files(arguments.dir, check=not arguments.no_check)
+    if arguments.limits:
+        storage.check_limits(arguments.dir, files)
+    else:
+        files = {name: data for name, data in files.items() if name != storage.LIMITS_NAME}
     copies = None
     if arguments.keep_copies is not None:
         copies = paths.output(arguments.keep_copies)
@@ -402,6 +407,10 @@ def _install_show(arguments):
                 # The saved order and the saved playlist are the operator's choices: a
                 # folder without them keeps the board's.
                 files = dict(files, **{name: present[name]})
+        if not arguments.limits and storage.LIMITS_NAME in present:
+            # The budgets are for the supplies the board is fed from: without --limits the
+            # board keeps its own, as it keeps none when it has none.
+            files = dict(files, **{storage.LIMITS_NAME: present[storage.LIMITS_NAME]})
         files = storage.with_board_generation(files, present)
         for line in show_lines(present, files):
             print(line)

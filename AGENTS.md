@@ -135,7 +135,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
-- **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
+- **Current limits for the wall and each snake**, seed 45: built; the board session and the owner's check are open.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
 - **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
 - **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.

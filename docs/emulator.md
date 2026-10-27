@@ -784,6 +784,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] limits [OPERATION]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
@@ -811,6 +812,8 @@ python -m odrigctl --port build/emulator/serial remove many 9,10
 python -m odrigctl --port build/emulator/serial ignore 9 1
 python -m odrigctl --port build/emulator/serial order get
 python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
+python -m odrigctl --port build/emulator/serial limits
+python -m odrigctl --port build/emulator/serial limits snake 1 500
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -836,6 +839,8 @@ python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
 python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 order get
 python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
+python -m odrigctl --tcp 127.0.0.1:8601 limits
+python -m odrigctl --tcp 127.0.0.1:8601 limits wall 2000
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -861,6 +866,8 @@ python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
 python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
 python -m odrigctl --http 127.0.0.1:8600 order get
 python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
+python -m odrigctl --http 127.0.0.1:8600 limits
+python -m odrigctl --http 127.0.0.1:8600 limits default
 ```
 
 `status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
@@ -885,7 +892,8 @@ The tool prints the reply line to standard output:
   command front-end's.
 - `list` prints the reply, and for as long as the reply names a `next` position it sends
   `list <next>` and prints that reply too: a line of output for each part of a long show.
-  It stops at a reply that is not ok.
+  It stops at a reply that is not ok. `order get` and `limits` without a position do the
+  same with `order get <next>` and `limits <next>`.
 - `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards
@@ -1017,6 +1025,21 @@ whose drive cannot be written answers `read-only`, which is status 1. With the e
 the PC tool's `python3 -m odrig.catalog DIR import` writes one, and so does `catalog rebuild
 external`. What the emulator wrote there the PC tool reads, and a change the PC tool makes
 there the emulator takes up within ten seconds, when it reads the marker again.
+
+**`limits`** prints the current limits of [commands.md](commands.md#current-limits): the
+budgets of the wall and of each leg, and the current each is estimated to draw, a reply
+for each part, and **`limits FROM`** the one part from that position. **`limits wall MA`**
+saves the wall's budget and **`limits snake N MA`** the budget of snake N, each in mA with 0
+for no limit, and **`limits default`** removes the saved budgets. The tool sends the words
+as they are typed; `wall` without one value after it, `snake` without two, or more than one
+word after `limits` otherwise, is status 2, and nothing is sent.
+
+```
+python -m odrigctl --http 127.0.0.1:8600 limits snake 1 500
+{"ok":true}
+python -m odrigctl --http 127.0.0.1:8600 limits
+{"ok":true,"saved":true,"wall":[360,0,631,0],"legs":[[1,180,500,451,1],[2,180,0,180,0]],"next":null}
+```
 
 The mapping operation is `get`, `set REV PINS`, or `test on` / `test off`.
 The pin list is twenty comma-separated GPIO numbers, in snake order.
@@ -1450,5 +1473,11 @@ pin list, `mapping test on` or `mapping test off` for the packaged diagonal, and
 `order move REV ID BEFORE` moves one animation, with `BEFORE` an id or `end`; the tool
 sends the words as they are typed. The emulator keeps the order in `order.txt` of its show
 folder, as the board does in its storage, and plays its playlist in that order.
+
+`limits` prints the budgets of the current limits and the estimates, and `limits wall MA`,
+`limits snake N MA` and `limits default` change them. The emulator keeps the budgets in
+`limits.json` of its show folder, as the board does in its storage, and its LEDs show the
+limiting as the board's do. While none are saved it limits nothing: it has no default
+budget of the wall.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).

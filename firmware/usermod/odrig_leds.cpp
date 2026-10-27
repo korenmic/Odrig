@@ -54,6 +54,21 @@ void startOutputsAfterAFailedOne() {
   }
 }
 
+// Keeps WLED's current limiter off in memory: the core limits the current. WLED switches
+// its limiter on whenever it makes its outputs, so this is done before every fill and every
+// send. An output that the limiter dimmed at a send keeps that level for giving its colours
+// back until its limit is set again; each output the limiter acts on is given the full
+// level, which dims nothing and repaints nothing. WLED's maximum and an output's are left
+// as they are, so nothing WLED stores changes.
+void switchWledLimiterOff() {
+  if (!BusManager::_useABL) return;
+  BusManager::_useABL = false;
+  for (size_t i = 0; i < BusManager::getNumBusses(); i++) {
+    Bus *bus = BusManager::getBus(i);
+    if (bus && bus->isDigital() && bus->isOk()) static_cast<BusDigital *>(bus)->applyBriLimit(255);
+  }
+}
+
 // Writes the outputs in words, for WLED's information.
 void summarize() {
   const uint32_t count = OdrigLeds::legs();
@@ -110,6 +125,7 @@ void OdrigLeds::apply() {
   describeOutputs();
   BusManager::getColorOrderMap().reset();
   strip.finalizeInit();
+  switchWledLimiterOff();
   strip.makeAutoSegments();
   startOutputsAfterAFailedOne();
   BusManager::setBrightness(255);
@@ -133,6 +149,7 @@ void OdrigLeds::hold() {
 }
 
 void OdrigLeds::fill() {
+  switchWledLimiterOff();
   BusManager::setBrightness(255);
   Bus::setCCT(-1);
   const uint32_t count = legs();
@@ -148,9 +165,13 @@ void OdrigLeds::fill() {
   }
 }
 
-void OdrigLeds::show() { BusManager::show(); }
+void OdrigLeds::show() {
+  switchWledLimiterOff();
+  BusManager::show();
+}
 
 void OdrigLeds::dark() {
+  switchWledLimiterOff();
   strip.fill(BLACK);
   strip.show();
 }

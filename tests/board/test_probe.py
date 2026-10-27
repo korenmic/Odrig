@@ -8,6 +8,8 @@ import zlib
 
 from fwtool import storage
 
+from odrig import limits as current_limits
+
 from . import PORT, support
 
 UNKNOWN = b'{"ok":false,"error":"unknown-command"}'
@@ -23,17 +25,6 @@ STILL_MS = 60000
 
 def crc(colours):
     return f"{zlib.crc32(colours):08x}"
-
-
-def at_the_limiters_minimum(colours):
-    """What WLED gives back for colours its current limiter dimmed to its lowest level: a
-    channel stays lit when it is above a quarter of the colour's largest, and reads 128."""
-    left = bytearray()
-    for i in range(0, len(colours), 3):
-        colour = colours[i:i + 3]
-        threshold = (max(colour) >> 2) + 1
-        left += bytes(128 if value > threshold else 0 for value in colour)
-    return bytes(left)
 
 
 def report_after_a_moment():
@@ -129,16 +120,35 @@ class Outputs(unittest.TestCase):
     def test_the_target_has_twenty_working_outputs_that_carry_a_whole_refresh_49_times_a_second(self):
         with support.one_frame_show(support.TARGET, support.DIM, ms=STILL_MS) as folder:
             support.ensure_installed(folder)
-            expected = support.leg_bytes(support.recorded(folder, 1), 980)
+            unlimited = support.leg_bytes(support.recorded(folder, 1), 980)
         report = report_with_every_pulse_count()
         self.assertEqual(outputs_of(report), [(number + 1, pin, 180, True) for number, pin in enumerate(support.TARGET_PINS)])
         self.assertEqual(drivers_of(report), ["rmt"] * 4 + ["parallel"] * 16)
-        if report["limit_ma"] > 180 * LEGS:
-            self.assertEqual(held(report), [crc(colours) for colours in expected])
-        else:
-            self.assertGreater(report["limited"], 0)
-            self.assertEqual(report["used_ma"], 180 * LEGS)
-            self.assertEqual(held(report), [crc(at_the_limiters_minimum(colours)) for colours in expected])
+        # WLED's limiter is off: it counts no send as dimmed and estimates nothing.
+        self.assertEqual((report["limited"], report["used_ma"]), (0, 0))
+        # The core limits by the budgets in force, and the outputs hold what it sent.
+        limits = support.limits()
+        budgets = [leg[2] for leg in limits["legs"]]
+        wall = limits["wall"][1]
+        sent = current_limits.limit(unlimited, budgets, wall)
+        self.assertEqual(held(report), [crc(colours) for colours in sent.legs])
+        self.assertEqual(limits["legs"], [[number, 180, budget, estimate, int(dimmed)]
+                                          for number, budget, estimate, dimmed in zip(range(1, LEGS + 1), budgets, sent.estimates, sent.limited)])
+        self.assertEqual(limits["wall"], [180 * LEGS, wall, sent.wall_estimate, int(sent.wall_limited)])
+        with self.subTest("the board's default"):
+            if limits["saved"]:
+                self.skipTest("budgets are saved on the board, so its default is not in force and is not checked")
+            # The default is WLED's maximum less the 120 mA it keeps for the chip, which the
+            # probe reads as `limit_ma`: 730 mA with the tracked 850, below the 3,600 mA of
+            # the LEDs at rest, so the core holds every LED at its lowest level and a lit
+            # channel reads 1.
+            self.assertEqual(budgets, [0] * LEGS)
+            self.assertGreater(report["limit_ma"], 0, "WLED's maximum is 120 mA or less")
+            self.assertEqual(wall, report["limit_ma"])
+            self.assertLessEqual(wall, 180 * LEGS)
+            at_level_1 = [current_limits.fade(colours, 1) for colours in unlimited]
+            self.assertEqual(held(report), [crc(colours) for colours in at_level_1])
+            self.assertEqual(set(b"".join(at_level_1)), {0, 1})
         self.assertEqual(pulses_of(report), [24 * 180] * LEGS)
         status = support.command(PORT, "status")[1]
         self.assertEqual((status["brightness"], status["error"]), (support.DIM, None))

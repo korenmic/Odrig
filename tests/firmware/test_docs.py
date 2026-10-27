@@ -99,18 +99,39 @@ class Firmware(unittest.TestCase):
         for expected in ("`limit: <N> mA`", "`limit: off`", "`limit: not stored; WLED uses 850 mA`", "restarts the board", "It writes nothing"):
             self.assertIn(expected, told)
 
+    def test_it_says_what_install_show_does_with_the_budgets_and_names_their_reasons(self):
+        commands = section(self.text, "Commands")
+        for reason in ("limits-missing", "limits-malformed"):
+            self.assertRegex(commands, rf"(?m)^\| `{reason}` \| ", reason)
+        told = " ".join(commands.split("\n### install-show\n")[1].split("\n### ")[0].split())
+        for expected in ("`limits.json`", "go to the board only with `--limits`", "the board keeps its own budgets, or keeps none when it has none",
+                         "The file is read before the board is touched, as strictly as the core reads it", "`limits-missing`", "`limits-malformed`",
+                         "with `--no-check` too", "`install-show --limits` is not run with a folder of the installation", "never 0 or above 730 mA"):
+            self.assertIn(expected, told)
+
     def test_it_says_what_a_limit_means_for_the_bench_and_for_the_installation(self):
         does = section(self.text, "What the firmware does")
         told = " ".join(does.split())
         for expected in ("The maximum is the limit of `firmware/limit.json`", "`set-limit`", "`read-limit`", "The firmware itself never sets it",
                          "A limit of 0 switches the limiter off", "The limit stays 850 for as long as a strip is fed from the board",
-                         "is the owner's to say", "every whole number from 0 to 65,535"):
+                         "is the owner's to say", "every whole number from 0 to 65,535",
+                         "WLED's current limiter is off; the core limits the current", "`BusManager::_useABL`", "nothing WLED stores changes",
+                         "730 mA for 850, 1 mA for a maximum from 1 to 120 mA", "and no limit for 0", "`firmware/usermod/odrig_limit_default.h`",
+                         "the wall's budget is never 0 or above 730 mA", "`limits wall <mA>`", "`limits default`"):
             self.assertIn(expected, told)
         rows = [row for row in does.splitlines() if row.startswith("| ") and "bench" not in row.split("|")[1] and row.count("|") == 4]
         named = [row.split("|")[1].strip() for row in rows]
-        for limit in ("850 mA, the tracked value", "What the supply gives", "0, the limiter off"):
+        for limit in ("730 mA, the default with the tracked 850", "What the supplies give", "0, no limit"):
             self.assertIn(limit, named)
-        self.assertRegex(does, r"(?m)^\| Limit \| The bench: .* \| The installation: .* \|$")
+        self.assertRegex(does, r"(?m)^\| Wall's budget \| The bench: .* \| The installation: .* \|$")
+
+    def test_the_probe_report_reads_wleds_limiter_switched_off(self):
+        probe = " ".join(section(self.text, "The probe build").split())
+        self.assertRegex(probe, r'"limited":0,"limit_ma":730,"used_ma":0,')
+        for expected in ("with a maximum of 0 or above 120 mA it stays 0", "a reading of the probe, not WLED dimming", "read with `limits`",
+                         "a channel that stayed lit reads 1"):
+            self.assertIn(expected, probe)
+        self.assertNotIn("128 for a channel", probe)
 
     def test_it_names_the_three_test_commands_and_their_folders(self):
         for name, folder in TEST_COMMANDS.items():

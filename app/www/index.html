@@ -241,6 +241,14 @@
 </div>
 <p class="small">To check the wiring, turn on Show test animations and use the Tests group of Animations: the diagonal and one test for each snake, through the saved mapping. Only a person looking at the LEDs can judge them.</p>
 </div>
+<div id="limits" class="panel">
+<h2>Current limits</h2>
+<p class="small">A budget is a ceiling, in mA, on WLED's estimate of the current the LEDs draw; the estimates beside the fields are that estimate, not a measurement. A picture estimated above a budget is dimmed until it is within it, the wall as a whole or one snake. A budget of 0, or an empty field, means no limit. To remove a limit, clear its field or type 0. A low wall budget also dims the diagonal that the mapping from a photo reads.</p>
+<p id="limits-summary" role="status" aria-live="polite">Reading the current limits&hellip;</p>
+<p id="limits-default" hidden>No budgets are saved: the wall's budget is the installation's default.</p>
+<div id="limits-wall"></div>
+<div id="limits-rows"></div>
+</div>
 </section>
 <section id="target">
 <h1>Target</h1>

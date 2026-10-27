@@ -70,9 +70,10 @@ words and wait for the answer.
 - **Every addition to the command list.** There is one list of commands for every way a
   command can travel, and a command is added to all of them or to none.
 - **Anything that changes a decision** in [decisions.md](../docs/decisions.md).
-- **Anything about hardware or power**: wiring, the power supply, the limit that WLED puts
-  on the current, which LEDs are connected. Wiring and power are handled on site by the
-  operators and are not this project's work.
+- **Anything about hardware or power**: wiring, the power supply, the limits on the
+  current, WLED's stored maximum and the budgets kept on the board, which LEDs are
+  connected. Wiring and power are handled on site by the operators and are not this
+  project's work.
 
 Some checks need a person, because only a person sees what the LEDs do or holds a phone
 that has joined the board's network. The documents list them as the owner's checks, in
@@ -109,6 +110,12 @@ one. For anyone who has:
 8. **A person joins a computer to the board's Wi-Fi network**, not an agent, and an agent
    does not change WLED's settings.
 9. **Say what you left on the board** in the commit message of a task that used it.
+10. **On the bench the wall's budget stays within 730 mA.** On a board whose strip is fed
+    from its 3.3 V pin, the wall's budget of the current limits is never 0 or above
+    730 mA, the default such a board gives with the tracked maximum of 850 mA, and
+    `install-show --limits` is not run there with a folder of the installation, whose
+    budgets are for its supplies. A board test that saves budgets ends with
+    `limits default`.
 
 ## The frame rate
 

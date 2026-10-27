@@ -10587,6 +10587,431 @@ root ask nothing more than before.
 
 **Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.
 
+## Seed 12: the standalone firmware's limiter gives way to the core's
+
+**Question.** Seed 12 gave the standalone firmware a limiter of its own, WLED's arithmetic
+in `firmware/standalone/src/limit.cpp`, built by its task 4 and called by nothing yet.
+Seed 45 moves the limiting into the core, which both firmwares host. What becomes of
+seed 12's requirement 6, of the limiter's members of its probe report and of its tasks 6
+and 10?
+
+**Answer.** They give way. Requirement 6.1 stays as the source of a default: the program,
+once it hosts the core, takes `hw.led.maxpwr` of `/cfg.json`, or 850 without it, as
+`settings.limit_ma` does today, and gives the core that maximum less 120 mA, 1 mA for a
+maximum of 1 to 120 and no limit for 0, as the wall's budget while no budgets are saved,
+as the WLED-based firmware does; the core limits, by the budgets kept on the board.
+Requirements 6.2 to 6.4 give way: the core's limiting is the same on both firmwares, and
+its `limits` command reports it on both. The members `limited`, `limit_ma` and `used_ma`
+that requirement 9.2 asks of the standalone probe report give way with them, since they
+report a limiter in the firmware, which the standalone firmware no longer has. Task 6's
+"the limiter between `fill` and `show`" gives way to the default given to the core at the
+start, and task 10's test of "the limiter against the WLED-based report" to the core's
+suite. `limit.h`, `limit.cpp`, the `limit` mode of the suite's host program and
+`tests/firmware/test_standalone_limit.py` are removed; the settings, with
+`ODRIG_LIMIT_DEFAULT_MA`, stay. The estimate and the fade of that test, without the chip's
+120 mA, are kept in `odrig/limits.py`.
+
+**Resolution.** `odrig/limits.py`; `tests/firmware/host/host.cpp`,
+`tests/firmware/hostprogram.py`; docs/firmware-prerequisites.md, row 18;
+`docs/specs/45-p1-current-limits-for-the-wall-and-each-snake/requirements.md`, 4.4.
+
+## Seed 45: the last pass fades again only what the wall's fade raised
+
+**Question.** The order of requirement 1.5 ends with a third pass: "each leg with a budget
+whose estimate is now above it is faded again by its own rule". A leg whose own budget is
+at or below its LEDs at rest, N, is at level 1 after its own pass, every byte 0 or 1, and
+its estimate stays above its budget whatever the wall does. Faded at level 1 a second
+time, every byte of 1 becomes 0, since 1 is not above a quarter of an LED whose largest
+byte is 1: the leg would go dark, where requirement 6.3 and the seed say that every LED
+is then held at its lowest level. Which legs does the third pass fade?
+
+**Answer.** Only a leg that its own pass brought within its budget and that the wall's
+fade took above it, which a fade can do by raising a low even byte by 1, as the seed
+gives for the reason of the pass. A leg that its own pass left above its budget is at
+level 1, the wall's fade cannot raise its bytes of 0 and 1, and it is not faded at level 1
+a second time. So the third pass runs only after a wall that dimmed, and a leg at or
+below N with no wall budget keeps its bytes of 1. Only a leg that ends at level 1 can stay
+above its budget, as requirement 1.3 says. The reference states it in `limit`, and the
+core's limiting is to follow it.
+
+**Resolution.** `odrig/limits.py`, `limit`; docs/python-library.md, "The current limits";
+`tests/converter/test_limits.py`.
+
+## Seed 45: the halving of the level, and the reference's file
+
+**Question.** Requirement 1.3 has the level found "by halving with all eight fades", and
+the design names a reader, `read(path)` and `loads(data)`, and a writer, `dumps(wall,
+legs)`, without their form. How is the halving done, and what do the reader of an absent
+file and the writer give?
+
+**Answer.** The halving builds the level bit by bit from 128 down to 1: a candidate is
+the level found so far with the next bit added, kept when its fade is estimated within
+the budget; none kept gives 1. That is always eight fades, and a candidate of 255 is the
+bytes as they are, above the budget, since a level is sought only for bytes estimated
+above it. The estimate of the faded bytes never falls as the level rises from 1 to 254; it can stand
+above that of the bytes as they are, at 254 for a picture of low even bytes, which is why
+255 is no fade. The suite checks the halving against a search of every level. `read` of
+an absent file is `not-found`, the library's reason for an input that is not there: the
+core takes an absent file for the defaults, and the firmware tool names its own code.
+`dumps` writes the members in the order `version`, `wall`, `legs`, without spaces and
+with a line feed at the end, as the core writes `mapping.json`, the legs in the order
+given and those at 0 left out; it refuses a value the reader would refuse. The reader
+gives the budgets as `Budgets`, the wall's and the legs' `(leg, mA)` in the file's order.
+The reason `limits-malformed` stands in docs/reasons.md under "Limits files", with the
+rules in docs/python-library.md until the core's page describes the file.
+
+**Resolution.** `odrig/limits.py`; docs/python-library.md; docs/reasons.md;
+`tests/converter/test_limits.py`.
+
+## Seed 45: the name of the core's module of the limits
+
+**Question.** The design names the core's module `core/src/limits.cpp` with `limits.h`.
+The test host is compiled with `core/src` on its include path, and PlatformIO builds the
+core as a library with its `src` folder there too. Can a header of the core be named
+`limits.h`?
+
+**Answer.** No. It takes the place of the C library's `<limits.h>`, which the standard
+headers include: the test host did not compile, with `use of undeclared identifier
+'CHAR_BIT'` inside the standard library's `<algorithm>`. The module is
+`core/src/current_limits.cpp` with `current_limits.h`; its functions keep the design's
+names, `limits_read` and `limits_apply`, and its constants are `kLimitsFile`,
+`kLargestWallBudget`, `kLargestLegBudget` and `kUndimmed`.
+
+**Resolution.** `core/src/current_limits.cpp`, `core/src/current_limits.h`.
+
+## Seed 45: how the start reads the budgets' file
+
+**Question.** The design reads `limits.json` with `JsonReader` "as the mapping is", but the
+mapping is read twice, with its tables made between the two readings. It leaves open a
+file the host fails to read, where the log line stands beside the reason of a mapping
+that cannot be used, and a host whose storage cannot be changed.
+
+**Answer.** The file is read once, right after the mapping's two readings and before the
+reason of a mapping that cannot be used goes to the log. The budget of each leg the mapping
+has is set as its entry is read; a leg number is kept in a set of 256 bits to find one
+named twice; and when the file breaks a rule anywhere, every budget goes back to the
+defaults. A file the host cannot open or read, -1, counts as unreadable: the same line,
+`limits unreadable`, once, and the defaults. So with a broken budgets' file and no mapping
+the log says `limits unreadable` before `mapping-missing`. The file is read with `open`,
+`read` and `close`, which every host has, so a host whose storage cannot be changed limits
+by a folder's budgets too. The wall's budget is the host's default from
+`odrig_core_begin` on, so it holds also when the start ends before the mapping is read.
+While the legs are limited, `limited` of a leg also holds a second bit, whether its own
+pass left it above its budget, which the last pass reads; it is cleared before the
+refresh ends.
+
+**Resolution.** `core/src/current_limits.cpp`, `core/src/core.cpp`; docs/core.md, "Current
+limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the test host's default budget and the reference player's
+
+**Question.** The design gives the test host `--limit-default MA` and the record's
+`limit_default` without a range, and has the reference player limit with a host default
+it is given. Which values are taken, and how does the reference player keep every
+comparison without budgets as it was?
+
+**Answer.** The test host takes 0 to 250,000, the range of the wall's budget; any other
+value is a usage error, status 64. Without the option it has no `limit_default`. The
+core takes what a host gives as it is, 0 being no limit: the firmware's default is at
+most 65,415, and a larger value limits only a picture estimated above it. The reference
+player takes the default as `limit_default`, 0 for none, reads `limits.json` with
+`odrig.limits.loads`, logs `limits unreadable` first among the lines of the start as the
+core does, and limits with `odrig.limits.limit` only while a budget is above 0, so that
+without budgets its bytes are those of before. It limits a dark refresh as the core does
+and keeps a kept picture as it was limited.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`; docs/core.md, "The
+test host".
+
+## Seed 45: a leg held at level 1 under a wall that dims
+
+**Question.** Requirement 6.3 has the app say that a budget from 1 to the LEDs' count
+holds every LED at its lowest level. Does a leg that its own budget holds at level 1 stay
+lit when the wall's budget dims too?
+
+**Answer.** Not always. By the order of requirement 1.5, which `odrig.limits` states and
+the core follows byte for byte, every leg is faded by the wall's level after its own
+pass, and a byte of 1 faded at a level below 129 is 0, since 1 is not above a quarter of
+an LED whose largest byte is 1. So a leg held at level 1 goes dark under a wall whose
+level is below 129, and every LED a leg's budget holds at level 1 goes dark under a wall
+at level 1, which a wall's budget at or below the LEDs' count gives. On the two-leg
+mapping at full white with leg 1 at 100 mA, a wall of 5,000 mA is level 119 and leaves
+leg 1 dark; a wall of 6,000 mA is level 144 and keeps its bytes of 1, which the suite
+checks. This follows from the seed's order and is not changed here: the sentence of 6.3
+holds for a leg's budget alone. Changing the order needs the owner.
+
+**Resolution.** `odrig/limits.py` and `core/src/current_limits.cpp` as they are;
+`tests/core/test_limits.py`.
+
+## Seed 45: the reply of `limits`
+
+**Question.** Requirement 3.1 gives the reply of `limits` and the wall's LED count, budget,
+estimate and `limited`, but not what the wall's count and estimate are when the reply holds
+only some of the legs, what the estimates are before the first refresh, how much room the
+paging keeps for `next`, nor whether `limits` answers while the show is invalid.
+
+**Answer.** The wall's count and estimate are those of every leg of the mapping, whichever
+part is asked for: its count is the sum of the legs' LEDs and its estimate the sum of their
+estimates, made again from the LED data at each reply. Before the first refresh the LED data
+is dark, so each leg is estimated at its LEDs at rest and nothing is limited. The tail of the
+reply, `],"next":` with a position and `}` with a line feed, is set aside first with room for
+a position of five digits, as `order get` does, and a leg is written only while its entry and
+the tail fit. `limits` answers whatever the state of the show, an invalid one too, and of the
+check after the start; only a `<from>` that is not a whole number from 0 to 65,535 is refused.
+The legs of `limits <from>` start at that position of the mapping's order, and a position at
+or past the last leg gives no legs and `next` null.
+
+**Resolution.** `core/src/current_limits.cpp`, `limits_reply`; docs/commands.md, "Current
+limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the save of the budgets and its failures
+
+**Question.** Requirement 2.3 has a save copy the legs of the old file that the mapping lacks,
+and the design has the old file read through the second source after the check of a drive's
+file yields, as `order move` reads the old order. It leaves open when the old file is read,
+what an old file that cannot be read then comes to, what is copied of an entry at 0, and what
+`limits default` does with a file it cannot remove or a host whose storage cannot be changed.
+
+**Answer.** The old file is read only while saved budgets are in force: a missing file has
+nothing to copy, and an unreadable one is replaced whole, as requirement 2.4 says. An old file
+that cannot be read whole and by the rules at the save, which the core read or wrote itself,
+is a failure of the storage: `limits.part` is closed and removed, the reply is
+`storage-error` and nothing changes, as `order move` does not write an order again from a
+part of the old one. An entry of the old file at 0 is not copied, since the file holds the
+budgets above 0; the copied entries keep the old file's order, after the mapping's legs.
+`limits.part` is always closed before it is removed on a failure. A save on a host whose
+storage cannot be changed is `storage-error`. `limits default` removes `limits.json` when
+there is one, readable or not; when the host cannot remove it, or cannot change its storage,
+the reply is `storage-error` and the budgets in force stay; with no file it writes nothing
+and succeeds on any host. `limits default` has the refusals of the two sets but the one of a
+leg the mapping lacks.
+
+**Resolution.** `core/src/current_limits.cpp`, `save`, `limits_set`, `limits_default`;
+docs/commands.md and docs/core.md, "Current limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the command tool's forms of `limits`
+
+**Question.** Requirement 3.3 has the command tool send the five forms of `limits` and follow
+`next` for `limits` without a position. Which words does the tool itself refuse?
+
+**Answer.** As for `order`, the tool checks only the shape: `limits` alone, followed through
+every part as `list` and `order get` are; one word that is neither `wall` nor `snake`, sent as
+typed, which is `limits <from>` or `limits default`; `wall` with one more word; and `snake`
+with two more. Anything else is a usage error, status 2, "limits takes no argument, FROM, wall
+MA, snake N MA, or default", and nothing is sent; the values are judged by the core. The
+command list puts `limits` before `upload`, which stays last, and the session of
+`tests/emulator/test_tool.py` sends `limits default`, which a target without saved budgets
+answers with `{"ok":true}` and no change.
+
+**Resolution.** `odrigctl/cli.py`; docs/emulator.md, "The command tool";
+`tests/emulator/test_tool.py`, `tests/emulator/test_limits.py`.
+
+## Seed 45: the host's default before the firmware gives one
+
+**Question.** docs/core.md's row of the host's member `limit_default` said that the test host
+has none and that the firmware gives WLED's stored maximum less 120 mA. The test host has one
+with `--limit-default`, and the firmware's record sets the member to a null pointer until
+the firmware's task gives it the default. What does the row say now?
+
+**Answer.** What holds now: the emulator and the firmware have none, and the test host has
+one only when it is given `--limit-default`. The firmware's task changes the row when the
+firmware gives its default.
+
+**Resolution.** docs/core.md, "What the host supplies".
+
+## Seed 45: WLED's limiter switched off, and the outputs it leaves dimmed
+
+**Question.** Requirement 4.1 has the firmware set `BusManager::_useABL` false before every
+fill and send and after any making of its outputs, and reset an output that WLED's limiter
+left dimmed. Which outputs are reset, and how? And is WLED's own making of the outputs,
+after its LED settings are saved, caught?
+
+**Answer.** `switchWledLimiterOff()` in `odrig_leds.cpp` does nothing while `_useABL` is
+false. Otherwise it sets it false and calls `applyBriLimit(255)` on every output that is
+digital and works, `isDigital() && isOk()`: the outputs WLED's own `applyABL` acts on, for
+a placeholder output can have a digital type without being a `BusDigital`.
+`applyBriLimit(255)` sets the level at which the output gives its colours back,
+`_NPBbri`, to 255 and clears its sum of colours, and repaints nothing. Nothing else in WLED
+sets that level back, so an output that WLED's own show at its start dimmed would give
+back colours scaled up, and the probe's `crc` would not be the bytes sent. The call is the
+first statement of `fill()`, of `show()` before `BusManager::show()` and of `dark()`, and
+follows `strip.finalizeInit()` in `apply()`. When WLED's LED settings are saved, WLED makes
+its outputs again later in the same pass of its loop, after the usermod's `loop()`, and
+switches its limiter on; nothing sends before the next `fill()` or `show()` switches it
+off, since WLED runs no show of its own while the usermod holds it in its live mode
+(`wled.cpp`, the block of `strip.service()`). The rule of the default is
+`odrigWallDefault` in `firmware/usermod/odrig_limit_default.h`, with the chip's share as
+`ODRIG_CHIP_MA`, 120, which a `static_assert` in `odrig_usermod.cpp` ties to WLED's
+`MA_FOR_ESP`; the firmware suite compiles it into `tests/firmware/limit_default/` and
+checks every maximum from 0 to 65,535. None of this is compiled against WLED or run on the
+board yet: the firmware is built in the spec's last task, and the board session is open.
+
+**Resolution.** `firmware/usermod/odrig_leds.cpp`, `switchWledLimiterOff`;
+`firmware/usermod/odrig_usermod.cpp`, `setup`; `firmware/usermod/odrig_limit_default.h`;
+`tests/firmware/test_usermod_limit_default.py`, `tests/firmware/test_usermod_files.py`;
+docs/firmware.md, "What the firmware does".
+
+## Seed 45: the board suite's limiter run and the probe's target test
+
+**Question.** Requirement 4.3 has the board suite's limiter tests and the probe suite's
+target test expect WLED dimming nothing and the bytes of the core's fade, check the core's
+limiting through `limits`, check the board's default only when `limits` reports `saved`
+false at the start, and end with `limits default` when they save budgets. It leaves open
+the order of the runs, how a test copes with budgets saved before it, and what happens
+when a run stops half way.
+
+**Answer.** `tests/board/test_limit.py` first stores the limit of the limit file, so that
+the default it checks is the 730 mA of 850; reads `limits` with `limits 0`, which
+`support.limits` asks and which holds the target's twenty legs in one reply; then saves
+`limits wall 730`, stores a maximum of 0, stores 850 again and ends with `limits default`.
+Each save waits until the board has read its animations, since a save is refused with
+`busy` before. The legs keep the budgets they had at the start, and the tests expect
+them; the default is checked only when `saved` was false then, and the test says so when
+it skips. A run that stops after it began to save stores the limit of the limit file
+again before `limits default`, so that the bench never plays without a wall budget. The
+lines `set-limit` and `read-limit` print were expected without the layout line the tool has
+printed first since 2026-10-15; the test now expects it, read from the tool's own suite and
+not seen on the board. The probe's target test computes the bytes it expects with
+`odrig.limits.limit` from the emulator's recording and the budgets `limits` reports, and
+compares `limits`' estimates and `limited` with it; in a subtest that is skipped while
+budgets are saved, the default must equal the probe's `limit_ma`, WLED's maximum less
+120 mA, which needs a maximum above 120 mA, and the bytes are those of the fade at level 1.
+Neither file was run: the board was not used.
+
+**Resolution.** `tests/board/test_limit.py`, `tests/board/test_probe.py`,
+`tests/board/support.py`, `limits`.
+
+## Seed 45: the firmware page's limiter, and the bench rule's two places
+
+**Question.** The phrases `tests/firmware/test_docs.py` pins in the firmware page's
+limiter section describe WLED's limiter acting, and its table is keyed by the stored
+limit. The page also advised raising WLED's maximum before twenty legs are lit, and listed
+it among what could make dense content faster. Requirement 7.1 has the working rules and
+the firmware page carry the bench rule, of which `install-show --limits` is built by the
+next task.
+
+**Answer.** The section is now "WLED's current limiter is off; the core limits the
+current", and its table is keyed by the wall's budget: the default of 730 mA with the
+tracked 850, what the supplies give, and 0. The pinned phrases that still hold stay: the
+maximum is the limit of `firmware/limit.json`, the firmware never sets it, a limit of 0
+switches the limiter off in stock WLED, the limit stays 850 while a strip is fed from the
+board. The pins of the table's header and rows follow it, and new pins hold the switch,
+the default's rule and the bench rule. The advice to raise WLED's maximum became setting
+the wall's budget with `limits wall`, in the warning, owner's check 6 and the line after
+the checks; the item of the list of what could make dense content faster went, and the
+measurement it came from says that the firmware now switches WLED's limiter off and that
+a send with the core limiting has not been measured. The working rules' line of what needs
+the owner names the limits on the current, WLED's stored maximum and the saved budgets, in
+place of the limit WLED puts on the current. The bench rule is rule 10 of "If you have a
+board" in full, with `install-show --limits`; the firmware page states its wall's part
+beside the table, and the next task, which adds `--limits`, states the rest in the section
+of `install-show`.
+
+**Resolution.** docs/firmware.md, "What the firmware does", "What the firmware changes in
+WLED", "The probe build", "The owner's checks", "Measurements on the board";
+`tests/firmware/test_docs.py`; agent/working-rules.md, "What needs the owner" and rule 10;
+`tests/onboarding/test_rules.py`.
+
+## Seed 45: the firmware tool's `--limits`, with `--no-check` and without
+
+**Question.** Requirement 5.1 has the folder check accept `limits.json`, `install-show`
+write it only with `--limits` after reading it as the core does, and refuse
+`limits-missing` and `limits-malformed` before the board is touched. It leaves open
+whether the folder check reads the file, what `--no-check` changes, which check comes
+first, and what the refusals say.
+
+**Answer.** The folder check accepts the name and does not read the file: without
+`--limits` the folder's copy is left out, so a folder is not refused for a file that is not
+installed. `--no-check`, which installs any flat folder of files, is about the show: the
+folder's `limits.json` is left out without `--limits` there too, and with `--limits` it is
+read and refused as without `--no-check`, since the budgets are about power. The folder is
+checked first, then the budgets' file, then the folder of `--keep-copies`, all before the
+board is looked for. The file is read with `odrig.limits.loads`; the detail of
+`limits-malformed` names the file and then the library's words, and that of
+`limits-missing` names the file it looked for. The name is `storage.LIMITS_NAME`, which is
+`odrig.limits.NAME`, and the check `storage.check_limits`. Before this, `install-show`
+removed a `limits.json` the board held, as it removes every file of `/odrig` the folder
+lacks; the board's file is now carried in beside `order.txt` and `playlist.txt` when
+`--limits` is not given. In passing: the folder check refuses `playlist.txt` with
+`not-a-show-folder`, though the install-show section says it may be a file of the folder
+and `read-show` copies it; that is outside this seed and is left as it is, for the owner.
+
+**Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`; docs/firmware.md,
+"Commands" and its install-show section; `tests/firmware/test_storage.py`,
+`tests/firmware/test_docs.py`.
+
+## Seed 45: the app's panel of the current limits
+
+**Question.** Requirement 6 and the design give the panel `Current limits` its fields, its
+reads, its saves and its sentences, and name `#limits-summary` and `#limits-error` for what
+it says. They leave open where a save's sentence stands among twenty-one fields, what
+"entered" is, how a field's text is compared with the budget, what happens when a field
+is changed while a save is out, which reads are dropped, when the snakes' rows show, what
+the warning follows, the words of the labels and of the refusals, and how strictly the
+reply of `limits` is checked.
+
+**Answer.** What a save, a refusal or a value out of range says stands under its own
+field, in a line of the row (`.limit-said`), where the operator who just left the field
+sees it, and only the latest one stands; `#limits-summary` says `Reading the current
+limits...` before the first read and the sentence of software without limits, and no
+`#limits-error` was made. A field is entered by Enter, its `keydown`, and left by `change`;
+the two make one save, and Enter saves only text changed since the panel last wrote the
+field, so that a field with the focus whose budget was changed elsewhere sends nothing. Its text is taken as digits only, whatever is typed or pasted, and
+compared by value, empty being 0, with the value the field is to have: the budget read
+last, or the latest save of that field that is out or waits. Equal, nothing is sent and
+the text is written as the panel writes it (`0730` becomes `730`, `0` empty); above 250,000
+mA for the wall or 65,535 mA for a snake, nothing is sent, the range is said and the value
+the field is to have is shown. Saves are sent one after another in the order asked, and
+after the last the limits are read; nothing is read while a save is out or waits, a read's
+reply that comes after a save was begun is dropped, and the read every two seconds waits
+until 1.5 seconds after the last read began, so that the read after a save is not followed
+at once by another while a slow read still leaves two seconds between reads. A save is said `Saving...` under its field while it is out. A refusal
+keeps the field's text when other text was typed meanwhile; otherwise the saved budget is
+shown again, and `unknown-command` on a save is software without limits, as on a read. A
+failure is said `No confirmed reply. The budgets were read again; check this one before
+setting it again.`, and the limits are read. The snakes' rows show while `mapping get`
+reports the twenty snakes as editable and `limits` reports legs 1 to 20; the wall's entry
+and `saved` are those of the last part of a read. The warning follows the budget read or
+saved, not the text being typed, and stands beside the wall's default too: on the board,
+730 mA with the tracked maximum, at the start. The labels are `The wall's budget, mA`, a
+heading `Each snake's budget, mA` over the snakes' rows, `Estimate 3,616 mA` beside each
+field and `Dimmed` beside a dimmed estimate. `commands.js` takes a wall's budget up to
+4,294,967,295, since the host's default is reported as it is given and may be above what
+can be set, and a leg's LED count and every estimate up to the same; a leg's budget up to
+65,535, `limited` 0 or 1, a leg number 1 to 255, and `next` after the part asked for. The
+panel has the `.stale` look of the catalogs while the target does not answer. No control of
+the app sends `limits default`, so the app sends thirty-eight lines.
+
+**Resolution.** `app/www/screens/limits.js`, `app/www/commands.js` (`limits`,
+`limitsWall`, `limitsSnake`), `app/www/client.js` (`limitsRead`, `limitsWall`,
+`limitsSnake`), `app/www/index.html`, `app/www/style.css`, `app/www/main.js`;
+docs/android-app.md, "What it is" and "Current limits" under "Using it";
+`tests/app/test_limits.py`.
+
+## Seed 45: what its spec decided beyond the seed
+
+**Question.** The seed left its spec to choose the budgets' file, how a host gives the
+wall's default, and what is built and when. What did the spec choose?
+
+**Answer.** The file is `limits.json` beside `mapping.json`, saved through `limits.part`,
+in the form `{"version":1,"wall":<mA>,"legs":[[<leg>,<mA>],...]}`, read with the strictness
+of the mapping file; a `limits.part` left by a cut is removed at the start, and an
+unreadable file is said once in the log, `limits unreadable`, and its refusal in the
+library is `limits-malformed`. The host gives the wall's default through an optional
+member of its record, `limit_default`, absent in the emulator, given by the core's test
+host only with `--limit-default MA`, and by the board's firmware from a header the
+firmware tool's suite compiles on the computer. The Python library holds the reference
+of the limiting, `odrig.limits`, which the core's suite and the reference player of
+`tests/core/support.py` check against. The firmware tool refuses `--limits` with
+`limits-missing` and `limits-malformed` before the board is touched. The firmware is
+built with the APK and, by the owner's order, flashed only once seed 43 is merged and
+this branch is on master; the board suite on the probe build, the refresh rate of
+requirement 7.4 and the owner's checks on the installation are left to a session with
+the board. Each task's own choices are in the entries before this one.
+
+**Resolution.** `docs/specs/45-p1-current-limits-for-the-wall-and-each-snake/`, its
+requirements 2, 5 and 7.
+
 ## Seed 44: the preview's times, its GIF and the walk of a file
 
 **Question.** The seed gives a preview 24 pictures over the first loop, each shown for a
