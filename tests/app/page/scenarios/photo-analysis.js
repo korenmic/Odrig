@@ -14,8 +14,11 @@ function shows(pins, p) {
 // A photo of the wall as a phone would take it: 60 x 60 faint lenses on a wooden board in
 // a dark room, the diagonal's stubs of the mapping, the dead positions dark, turned and
 // slanted, blurred and grainy. `flash` lights every lens as a flash does; `spots` adds
-// bright spots off the grid. Gives the canvas.
-export function photoCanvas(app, {pins = DEFAULTS, dead = [], spots = 0, angle = 0, skew = 0, squeeze = 1, blur = 1.2, grain = 6, flash = false, width = 640, height = 400} = {}) {
+// bright spots off the grid. A position of `crossed` is cross-wired, its chain up its first
+// column, up its third and down its second, and shown as the core places it with the box
+// off: its second and third pixels land on the other two columns, in the rows of the snake
+// 21 - s. Gives the canvas.
+export function photoCanvas(app, {pins = DEFAULTS, dead = [], crossed = [], spots = 0, angle = 0, skew = 0, squeeze = 1, blur = 1.2, grain = 6, flash = false, width = 640, height = 400} = {}) {
   const doc = app.doc;
   const pitch = 8;
   const side = 60 * pitch;
@@ -46,8 +49,10 @@ export function photoCanvas(app, {pins = DEFAULTS, dead = [], spots = 0, angle =
       if (dead.includes(p)) continue;
       const s = shows(pins, p);
       for (let i = 0; i < 3; i += 1) {
-        const col = 3 * p - 2 + i;
-        const row = 3 * s - 2 + i;
+        let col = 3 * p - 2 + i;
+        let row = 3 * s - 2 + i;
+        if (crossed.includes(p) && i === 1) [col, row] = [3 * p, 62 - 3 * s];
+        else if (crossed.includes(p) && i === 2) [col, row] = [3 * p - 1, 61 - 3 * s];
         glowAt((col - 0.5) * pitch, side - (row - 0.5) * pitch, pitch * 0.9);
       }
     }
@@ -135,6 +140,8 @@ export default async function(app) {
     // seen from its far edge, the wires at the top.
     fromTheSide: {pins: shuffled, angle: 93, skew: 0.04},
     fromTheFarEdge: {pins: shuffled, angle: 178},
+    // Position 10 cross-wired and read with the box off.
+    crossedTen: {pins: shuffled, crossed: [10]},
   };
   const picks = {deadEnd: {xEnd: "left", yEnd: null}, fromTheFarEdge: {side: "top"}};
   for (const [name, options] of Object.entries(cases)) {

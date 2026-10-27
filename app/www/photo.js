@@ -256,21 +256,25 @@ function unslanted(points) {
 
 // The places, from 0, of sorted values on a grid whose pitch is taken from the gaps
 // between neighbours: each step from the last place's value, against the median of the
-// four nearest other gaps; a step of less than SAME_PLACE of a pitch is the same place.
-// When the span passes the grid, the sixty places that hold the most values are kept,
-// from 0 again, and the others' places are null.
+// four nearest other gaps between two places; a step of less than SAME_PLACE of a pitch is
+// the same place. A gap of less than SAME_PLACE of the typical gap lies between two values
+// at one place, two LEDs in one row, and tells nothing of the pitch. When the span passes
+// the grid, the sixty places that hold the most values are kept, from 0 again, and the
+// others' places are null.
 function places(values) {
   const order = values.map((value, at) => ({value, at})).sort((a, b) => a.value - b.value);
   const gaps = order.slice(1).map((entry, at) => entry.value - order[at].value);
+  const typical = gaps.length ? median(gaps) : 0;
+  const between = gaps.map((gap) => gap >= SAME_PLACE * typical);
   const result = new Array(values.length);
   let place = 0;
   let anchor = order[0].value;
   result[order[0].at] = 0;
   for (let at = 0; at < gaps.length; at += 1) {
     const others = [];
-    for (let near = 1; near <= 2; near += 1) {
-      if (at - near >= 0) others.push(gaps[at - near]);
-      if (at + near < gaps.length) others.push(gaps[at + near]);
+    for (let near = 1; others.length < 4 && (at - near >= 0 || at + near < gaps.length); near += 1) {
+      if (at - near >= 0 && between[at - near]) others.push(gaps[at - near]);
+      if (others.length < 4 && at + near < gaps.length && between[at + near]) others.push(gaps[at + near]);
     }
     const pitch = others.length ? median(others) : gaps[at];
     const value = order[at + 1].value;

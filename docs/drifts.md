@@ -10449,3 +10449,23 @@ are the same.
 **Resolution.** docs/commands.md, "Mapping controls"; docs/core.md; docs/mapping.md;
 `core/src/mapping_control.cpp`, `core/src/commands.cpp`; `emulator/binding.py`,
 `emulator/engine.py`; `odrigctl/cli.py`; the mapping suite.
+
+## Seed 43: the photo of a cross-wired snake read with the box off
+
+**Question.** The design said that nothing of the photo reading changes: with snake 10
+cross-wired and the box off, position 10's second and third LEDs land in the rows of the
+snake 21 - s, the position that shows that snake keeps it with more votes, and position
+10 gets the snake that remains. The test of such a wall failed instead: every position
+was read one snake off, and positions 10 and 11 had none. Why, and what changes?
+
+**Answer.** The two misplaced LEDs share their rows with the stub of snake 21 - s, so two
+rows hold two LEDs each. The grid of the rows takes its pitch at each step from the four
+nearest gaps between sorted values, and the two gaps of nearly nothing between the LEDs
+of one row halved it there: the next step counted two places, and every row above was
+one place higher. The pitch now leaves out a gap of less than 0.6 of the typical gap, two
+LEDs at one place, and takes the four nearest gaps between places. A wall with no two
+LEDs in a row reads as before; the owner's photos read as before.
+
+**Resolution.** `app/www/photo.js`, `places`; the wall of the tests with a cross-wired
+position, `tests/app/page/scenarios/photo-analysis.js`; `tests/app/test_photo.py`;
+docs/android-app.md, "The mapping from a photo".

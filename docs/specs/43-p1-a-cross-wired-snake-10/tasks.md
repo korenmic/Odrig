@@ -29,7 +29,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       the emulator reporting true, the box following a change made by another client, a
       refusal said with the box back, and the box disabled while the mapping is not
       editable. `docs/android-app.md`. Suites: app, mapping, onboarding.
-- [ ] 4. The photo reading with the bit off: the wall generator's `crossed` option in
+- [x] 4. The photo reading with the bit off: the wall generator's `crossed` option in
       `tests/app/page/scenarios/photo-analysis.js`, a case with position 10 crossed read
       with the position given the remaining snake, in `tests/app/test_photo.py`; the
       sentence in the photo's paragraph of `docs/android-app.md`. Suites: app, onboarding.

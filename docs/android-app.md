@@ -551,7 +551,12 @@ apart, and after Apply whether the diagonal begins at the bottom left; `Other re
 applies the next one. Bright spots off the grid are ignored and counted; a photo with no
 steady set of bright spots, with fewer than two lit LEDs, or with LEDs that fit no grid,
 is refused with the count found and the advice, and `Try another photo`. Nothing of the
-photo leaves the phone.
+photo leaves the phone. A photo of the installation with snake 10 cross-wired and `Snake
+10 is cross-wired` off shows position 10's stub broken: its first LED in its place, its
+other two on the position's other two lines in the rows of another snake. The reading
+leaves that snake with the position that shows it whole, gives position 10 no snake and
+then the snake no other position shows, its own, and says `Position 10 shows no snake`;
+apply the reading, then tick the box.
 
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
