@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The Python reference and the standalone limiter's end. `odrig/limits.py`: the
+- [x] 1. The Python reference and the standalone limiter's end. `odrig/limits.py`: the
       estimate, the fade, the level by halving, the order of requirement 1.5, and the
       strict reader and writer of `limits.json`; `errors.LIMITS_MALFORMED` with its row in
       `docs/reasons.md`; `limits.py` in `tests/converter/test_scope.py`'s list of the

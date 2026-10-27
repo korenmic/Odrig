@@ -10586,3 +10586,79 @@ folder's playlist, shown as the playlist is. A show without cycles and a playlis
 root ask nothing more than before.
 
 **Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.
+
+## Seed 12: the standalone firmware's limiter gives way to the core's
+
+**Question.** Seed 12 gave the standalone firmware a limiter of its own, WLED's arithmetic
+in `firmware/standalone/src/limit.cpp`, built by its task 4 and called by nothing yet.
+Seed 45 moves the limiting into the core, which both firmwares host. What becomes of
+seed 12's requirement 6, of the limiter's members of its probe report and of its tasks 6
+and 10?
+
+**Answer.** They give way. Requirement 6.1 stays as the source of a default: the program,
+once it hosts the core, takes `hw.led.maxpwr` of `/cfg.json`, or 850 without it, as
+`settings.limit_ma` does today, and gives the core that maximum less 120 mA, 1 mA for a
+maximum of 1 to 120 and no limit for 0, as the wall's budget while no budgets are saved,
+as the WLED-based firmware does; the core limits, by the budgets kept on the board.
+Requirements 6.2 to 6.4 give way: the core's limiting is the same on both firmwares, and
+its `limits` command reports it on both. The members `limited`, `limit_ma` and `used_ma`
+that requirement 9.2 asks of the standalone probe report give way with them, since they
+report a limiter in the firmware, which the standalone firmware no longer has. Task 6's
+"the limiter between `fill` and `show`" gives way to the default given to the core at the
+start, and task 10's test of "the limiter against the WLED-based report" to the core's
+suite. `limit.h`, `limit.cpp`, the `limit` mode of the suite's host program and
+`tests/firmware/test_standalone_limit.py` are removed; the settings, with
+`ODRIG_LIMIT_DEFAULT_MA`, stay. The estimate and the fade of that test, without the chip's
+120 mA, are kept in `odrig/limits.py`.
+
+**Resolution.** `odrig/limits.py`; `tests/firmware/host/host.cpp`,
+`tests/firmware/hostprogram.py`; docs/firmware-prerequisites.md, row 18;
+`docs/specs/45-p1-current-limits-for-the-wall-and-each-snake/requirements.md`, 4.4.
+
+## Seed 45: the last pass fades again only what the wall's fade raised
+
+**Question.** The order of requirement 1.5 ends with a third pass: "each leg with a budget
+whose estimate is now above it is faded again by its own rule". A leg whose own budget is
+at or below its LEDs at rest, N, is at level 1 after its own pass, every byte 0 or 1, and
+its estimate stays above its budget whatever the wall does. Faded at level 1 a second
+time, every byte of 1 becomes 0, since 1 is not above a quarter of an LED whose largest
+byte is 1: the leg would go dark, where requirement 6.3 and the seed say that every LED
+is then held at its lowest level. Which legs does the third pass fade?
+
+**Answer.** Only a leg that its own pass brought within its budget and that the wall's
+fade took above it, which a fade can do by raising a low even byte by 1, as the seed
+gives for the reason of the pass. A leg that its own pass left above its budget is at
+level 1, the wall's fade cannot raise its bytes of 0 and 1, and it is not faded at level 1
+a second time. So the third pass runs only after a wall that dimmed, and a leg at or
+below N with no wall budget keeps its bytes of 1. Only a leg that ends at level 1 can stay
+above its budget, as requirement 1.3 says. The reference states it in `limit`, and the
+core's limiting is to follow it.
+
+**Resolution.** `odrig/limits.py`, `limit`; docs/python-library.md, "The current limits";
+`tests/converter/test_limits.py`.
+
+## Seed 45: the halving of the level, and the reference's file
+
+**Question.** Requirement 1.3 has the level found "by halving with all eight fades", and
+the design names a reader, `read(path)` and `loads(data)`, and a writer, `dumps(wall,
+legs)`, without their form. How is the halving done, and what do the reader of an absent
+file and the writer give?
+
+**Answer.** The halving builds the level bit by bit from 128 down to 1: a candidate is
+the level found so far with the next bit added, kept when its fade is estimated within
+the budget; none kept gives 1. That is always eight fades, and a candidate of 255 is the
+bytes as they are, above the budget, since a level is sought only for bytes estimated
+above it. The estimate of the faded bytes never falls as the level rises from 1 to 254; it can stand
+above that of the bytes as they are, at 254 for a picture of low even bytes, which is why
+255 is no fade. The suite checks the halving against a search of every level. `read` of
+an absent file is `not-found`, the library's reason for an input that is not there: the
+core takes an absent file for the defaults, and the firmware tool names its own code.
+`dumps` writes the members in the order `version`, `wall`, `legs`, without spaces and
+with a line feed at the end, as the core writes `mapping.json`, the legs in the order
+given and those at 0 left out; it refuses a value the reader would refuse. The reader
+gives the budgets as `Budgets`, the wall's and the legs' `(leg, mA)` in the file's order.
+The reason `limits-malformed` stands in docs/reasons.md under "Limits files", with the
+rules in docs/python-library.md until the core's page describes the file.
+
+**Resolution.** `odrig/limits.py`; docs/python-library.md; docs/reasons.md;
+`tests/converter/test_limits.py`.

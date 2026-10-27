@@ -2,8 +2,9 @@
 
 `odrig` is a Python package at the repository root: a library for the tests and the tools.
 It reads and writes the project's files, JSON frames, the ODRG format of
-[format.md](format.md) and the ODRGX containers of frames, mapping files and shows, and it
-holds the generators. It converts
+[format.md](format.md) and the ODRGX containers of frames, mapping files, shows and the
+budgets' file of the [current limits](#the-current-limits), and it holds the generators.
+It converts
 nothing and is no program of its own: the converter, which imports media, encodes, decodes,
 checks and packs, is the JavaScript tool of [converter.md](converter.md).
 
@@ -169,6 +170,52 @@ core. Of a text and a clock it reads the header only: the payload is read by the
 converter and the core. `tests/vectors/widgets/` holds the clocks, made the same way by
 `node tests/vectors/widgets/build.mjs`.
 
+## The current limits
+
+`odrig/limits.py` states the rule that limits the current of the LEDs, for the suites that
+compare a player with it, and reads and writes the budgets' file. A budget is a ceiling in
+whole mA on WLED's estimate of what the LEDs draw, for one leg or for the wall, all legs
+together; 0 is no limit. A leg's bytes are those its LEDs are sent at one refresh, three
+for each LED, after the brightness.
+
+- **The estimate** of a leg of N LEDs whose bytes sum to S is floor(S x 55 / 765) + N mA:
+  55 mA for an LED at full white and 1 mA for each LED at rest. The wall's estimate is
+  the sum of its legs'.
+- **The fade** to a level from 1 to 254 is WLED's video fade: an LED whose three bytes are
+  0 stays so; each byte b of another LED becomes (b x level + 127) >> 8, with its lowest
+  bit set when b is above (the LED's largest byte >> 2) + 1. A channel at or below that
+  quarter may go dark at low levels. The level 255 changes nothing.
+- **The level** of a budget B above 0 for bytes estimated at E above B is 1 when B is N or
+  less, and otherwise the largest level from 1 to 254 whose fade gives bytes estimated at
+  B or less, or 1 when none does. Otherwise it is 255. It is found by halving with eight
+  fades, which holds because the estimate of the faded bytes never falls as the level
+  rises from 1 to 254. The wall's level is found the same way, with its budget, its
+  estimate and the LEDs of all legs.
+- **The order.** Each leg is faded by its own budget. Then every leg is faded by the
+  wall's level, found from the bytes the legs' own budgets left. A fade can raise a low
+  even byte by 1, so last a leg that its own fade brought within its budget, and that the
+  wall's fade took above it, is faded again by its own level. A leg is limited when a
+  level below 255 was used for it in either of its fades, the wall when its level was
+  below 255. Only a leg or a wall at level 1 can stay above its budget: a budget of N or
+  less holds every LED at its lowest level.
+
+A full-white leg of 180 LEDs is estimated at 10,080 mA. With a budget of 500 mA it is held
+at level 7 and estimated at 451 mA; WLED's own level, floor(B x 255 / E) + 1, would be 13
+and leave 684 mA.
+
+**The budgets' file**, `limits.json`, is one line of JSON:
+
+```
+{"version":1,"wall":730,"legs":[[1,500],[20,180]]}
+```
+
+It has exactly three members: `version`, 1; `wall`, the wall's budget from 0 to 250,000;
+and `legs`, whose every entry is an array of a leg number from 1 to 255 and that leg's
+budget from 0 to 65,535, no leg named twice. A leg the file does not name has the budget
+0. Anything else makes the file `limits-malformed`. The writer writes the members in this
+order, without spaces and with a line feed at the end, and leaves out every leg whose
+budget is 0.
+
 ## Tests
 
 ```
@@ -193,6 +240,9 @@ package, is [converter.md](converter.md), "Tests".
 | `odrig.mapping.read(path)` | The kind, the canvas size and the legs of a mapping file: for each leg its number, its pin, its `first_led`, its strips in chain order, and the end each strip starts at when the leg has `starts`, else `None`. |
 | `odrig.mapping.position(canvas, leg, n)` | The canvas position (x, y) of LED n of a leg, by the rule of [mapping.md](mapping.md). |
 | `odrig.show.read(path)` | The items of a show file. |
+| `odrig.limits.estimate(data)`, `fade(data, level)`, `level(data, budget)`, `wall_level(legs, budget)` | The estimate of a leg's bytes in mA, the fade of a leg's bytes to a level, and the level of a leg's budget or of the wall's, by the rules of [The current limits](#the-current-limits). |
+| `odrig.limits.limit(legs, budgets, wall)` | One refresh after its limiting, given the bytes and the budget of each leg and the wall's budget: the bytes each leg is sent, its estimate and whether it was limited, and the wall's estimate and whether it was limited. |
+| `odrig.limits.read(path)`, `loads(data)`, `dumps(wall, legs)` | The budgets of a `limits.json`, the wall's and each leg's as `(leg, mA)`, read strictly; and the bytes of the file for the wall's budget and the legs' `(leg, mA)`. |
 | `odrig.errors.status_of(action)` | The exit status of a command line's work, with its error line for a refusal. |
 | `odrig.catalog.read(storage)`, `add(storage, name, data)`, `remove(storage, name)`, `rebuild(storage)`, `check(storage)`, `recover(storage)` | A storage's catalog of [catalog.md](catalog.md), and the changes a computer makes to it; `Storage(folder)` is a folder, `MemoryStorage(files)` files held in a dict. |
 | `odrig.catalog.main(argv)` | The command line of `python -m odrig.catalog`, as [microsd.md](microsd.md) gives it; returns the exit status. |
