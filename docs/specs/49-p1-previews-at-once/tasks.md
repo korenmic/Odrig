@@ -88,7 +88,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 6.1 to 6.3
 
-- [ ] 5. The measurement and every suite
+- [x] 5. The measurement and every suite
   - In the emulator of the branch, with the show `scratch/seed-44-show` and the card copy
     `scratch/all-card-local`, `--drive-read-only`, the app at `/app/` in a browser: the
     rows of files the default catalog names show their previews with no `catalog page`

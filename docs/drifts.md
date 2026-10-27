@@ -10826,3 +10826,33 @@ but you may test this on an emulator". The APK of the branch is built when that 
 ended, for the owner's check on a phone.
 
 **Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 6.
+
+## Seed 49: the measurement
+
+**Question.** How many requests does the app send before its first preview, before the
+seed and after it, and what does that mean on the board?
+
+**Answer.** Measured on 2026-10-28 with two emulators side by side, one of `master` at
+`3709ce0` and one of this branch, each with the show `scratch/seed-44-show`, 116
+animations, and the card copy `scratch/all-card-local`, 235 animations of catalog
+generation 2, `--drive-read-only`; the app at `/app/` in a browser, and each emulator's
+log of commands read from `/events`.
+
+- `master`, at the first start and at the second alike: 86 requests before the first
+  preview, among them the 44 parts of `list`, `catalog` and 44 `catalog page`; 98 `catalog
+  page` in the first 15 seconds of each start; every preview of a storage asked for within
+  a few milliseconds of the first.
+- The branch, first start: 45 requests before the first preview, `status` and the 44 parts
+  of `list`, and no `catalog page` before it. The previews are asked for as soon as the
+  rows are drawn, and the pages are read after them, 98 in 15 seconds.
+- The branch, second start: 45 requests before the first preview, and no `catalog page` in
+  the first 15 seconds; `catalog` was asked twice, and the kept keys answered both times.
+
+The list itself, 44 parts for 351 animations, is what the rows wait for now; this seed
+does not change it. The round trip to the board was not measured: the board answers on its
+own Wi-Fi network, at 4.3.2.1, which this computer is not on, and joining it would change
+the computer's network. Each request costs one round trip on the board, so the first start
+waits 41 round trips less for its first preview, and a second start sends 44 or more
+requests fewer; the seconds wait for the owner's session.
+
+**Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 5.
