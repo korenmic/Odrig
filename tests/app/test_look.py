@@ -133,6 +133,28 @@ class Look(unittest.TestCase):
             nav = {control["what"] for control in screen["controls"] if control["group"] == "nav"}
             self.assertEqual(len(nav), 4, where)
 
+    def test_the_brightness_field_stands_on_one_line_with_its_label_and_the_slider_under_it(self):
+        for size in SIZES:
+            where = f"{size[0]} wide"
+            level = self.measured[size]["animations"]["level"]
+            label, field, slider = level["label"], level["field"], level["slider"]
+            # One line: the label's middle within the field's height, 8 pixels before it, and
+            # the field at the panel's right edge.
+            self.assertLessEqual(field["top"], (label["top"] + label["bottom"]) / 2, where)
+            self.assertGreaterEqual(field["bottom"], (label["top"] + label["bottom"]) / 2, where)
+            self.assertAlmostEqual(field["left"] - label["right"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(field["right"], level["right"], delta=0.5, msg=where)
+            # About 5.5 em of the field's letters, 44 pixels wide and 48 high or more, with
+            # digits of one width.
+            self.assertAlmostEqual(field["right"] - field["left"], 5.5 * level["letters"], delta=1, msg=where)
+            self.assertGreaterEqual(field["right"] - field["left"], 44, where)
+            self.assertGreaterEqual(field["bottom"] - field["top"], 48 - 0.01, where)
+            self.assertEqual(level["digits"], "tabular-nums", where)
+            # The slider 8 pixels under it, across the panel.
+            self.assertAlmostEqual(slider["top"] - field["bottom"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(slider["left"], level["left"], delta=0.5, msg=where)
+            self.assertAlmostEqual(slider["right"], level["right"], delta=0.5, msg=where)
+
     def test_nothing_scrolls_sideways(self):
         for where, size, screen in self.each():
             self.assertLessEqual(screen["scrollWidth"], screen["width"], where)

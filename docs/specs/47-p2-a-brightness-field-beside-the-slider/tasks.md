@@ -17,7 +17,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - `project-seeds/47-p2-a-brightness-field-beside-the-slider/state.json`: `in_progress`.
   - Suites: the app's.
 
-- [ ] 2. The field's look on a phone
+- [x] 2. The field's look on a phone
   - `tests/app/page/scenarios/look.js` measures the line of the label and the field and the
     slider; `tests/app/test_look.py` checks them at 320, 360 and 740 px: one line, the
     field 44 px wide or more and 48 px high or more, about 5.5 em, tabular digits, the

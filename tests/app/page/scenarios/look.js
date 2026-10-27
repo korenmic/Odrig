@@ -59,7 +59,23 @@ function measure(app) {
   const message = doc.getElementById("message");
   const question = doc.getElementById("confirm");
   const menu = doc.getElementById("row-menu");
+  // The line of the brightness: its label, its field and the slider under them, with the
+  // inside of their panel.
+  const field = doc.getElementById("level-number");
+  const panel = doc.getElementById("now-panel");
+  const panelStyle = view.getComputedStyle(panel);
+  const panelBox = panel.getBoundingClientRect();
+  const level = displayed(field) ? {
+    label: box(doc.querySelector("#level-line label")),
+    field: box(field),
+    slider: box(doc.getElementById("level")),
+    left: panelBox.left + parseFloat(panelStyle.borderLeftWidth) + parseFloat(panelStyle.paddingLeft),
+    right: panelBox.right - parseFloat(panelStyle.borderRightWidth) - parseFloat(panelStyle.paddingRight),
+    digits: view.getComputedStyle(field).fontVariantNumeric,
+    letters: parseFloat(view.getComputedStyle(field).fontSize),
+  } : null;
   return {
+    level,
     controls,
     texts,
     width: view.innerWidth,
