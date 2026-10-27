@@ -10406,6 +10406,65 @@ beside the seed, read to the mapping the stubs show by eye.
 docs/android-app.md; the spec's requirements and design; the change log of
 docs/decisions.md.
 
+## Seed 42: what the emulator takes for the position, the length and a seek
+
+**Question.** The seed asks for a seek bar in the emulator alone: the core exposes
+neither the position of the animation on the LEDs nor its length, and no command may be
+added for the emulator. Where does the emulator take the position and the length from,
+what does a seek do at the grid, and what of the rules that the page sends no command and
+the emulator holds no reader of the show?
+
+**Answer.** The core opens the file it plays through the host anew at every loop and
+every turn, and a refresh begins at a grid time, so the start of a loop is the grid time
+of the refresh in which the played file was opened, and the first open after a change of
+file, a command answered, or a restart of the emulator's own is the start of a turn; the
+emulator asks `status` once more after such a refresh, so that the animation's id is
+known at once. A numeric `playing` is a cycle, as the page reads it today; the bar shows
+nothing then, and a seek is refused with `cycle`. The length comes from the storage's
+catalog, which the emulator's `lengths` module reads itself, line by line, since the
+emulator imports nothing of the `odrig` package; else from the converter's `check` of
+the file, run in a thread when Node.js is on the path, which the emulator's suite needs
+anyway, so that the emulator's `lengths` module is the second tool, after the preview,
+that starts the converter, and only to check; else from two consecutive opens of the same file with no command answered and no
+seek between them, kept per file across a restart. A text or a clock without a catalog
+entry has no length. The numbers are `m:ss`, and `h:mm:ss` from one hour. A seek names a
+point from 0 to the length less two grid steps; the move of the clock is rounded down to
+whole grid steps, so the position lands within a grid step below the point; a move back
+is a restart with the emulator's own `play <id>`, logged with the transport `seek`, then
+one grid step so that the core takes the refresh that begins the turn, whose grid time
+is the start, then the move. The page keeps the rule that it sends no command: its one
+request, `POST /seek`, is a route of the emulator and no command of the core; the page
+files test allows that one fetch and keeps `/odrig` forbidden. The engine reads
+`animation` and `playing` off the status reply with two patterns rather than a JSON
+reader, since only the hub reads JSON in the emulator. No keyboard seeking. The word
+`length unknown` stands while the length is not known, and `clock +N s` for three seconds
+after a seek that moved the clock. The Chrome check runs a harness page served beside the
+emulator's page, since Chrome's dump of a page waits for its load, which an open event
+stream never ends: the harness frames the page, reads its numbers, drags its bar with
+pointer events, and holds its own load back with a late image.
+
+**Resolution.** `emulator/engine.py`, `emulator/lengths.py`, `emulator/host.py`,
+`emulator/hub.py`, `emulator/httpd.py`, `emulator/web/`; docs/emulator.md; the spec's
+requirements and design; tests/emulator/test_playback.py, test_seek.py,
+test_page_files.py, tests/app/test_emulator_seek.py; the change log of docs/decisions.md.
+
+## Seed 42: a seek far into a long file
+
+**Question.** The owner's look: a seek into the middle of a long animation left the LEDs
+still for seconds before the frame of the point came. The core decodes at most 128 KB of
+a file at one refresh and keeps the picture before until it has come to the picture of
+its time, so one move of the clock by minutes left it decoding the way at 128 KB a
+refresh, 8 seconds for a seek of five minutes into an 87 MB file. How is the move made so
+that the frame of the point shows at once?
+
+**Answer.** In strides: the engine moves its clock 400 ms at a time and asks the core for
+the refresh of each, under its lock, and hands the hub the last frame. A stride of 400 ms
+holds fewer bytes than the core's bound for any file the converter writes, the heaviest
+on the share being under 200 KB a second, so every refresh of the walk comes to its
+picture, and the walk of a seek by minutes takes a fraction of a second. The emulator's
+suite checks it with a file of random pixels whose seconds hold more than the bound.
+
+**Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_seek.py.
 ## Seed 41: what the spec and its tasks decided beyond the seed
 
 **Question.** The seed came with no question open, and its spec and the tasks that built it
@@ -10448,3 +10507,19 @@ since an upload from the page needs a cataloged card the emulator may write.
 **Resolution.** `docs/specs/41-p1-sub-folder-playlists-from-the-card/design.md`; the
 commits of tasks 1 to 10 on the branch `seed-41-sub-folder-playlists`; docs/show.md,
 docs/commands.md, docs/core.md, docs/microsd.md, docs/android-app.md, docs/reasons.md.
+
+## Seed 42: a folder's playlist is not a cycle
+
+**Question.** With seed 41, `status` names a folder of the card in `playing` while its
+playlist is current, a number as a cycle's id is, and the engine took any number there
+for a cycle: the bar showed nothing during a folder's playlist and a seek was refused
+with `cycle`. How does the emulator tell the two apart, without a reader of JSON and
+without asking more than it needs?
+
+**Answer.** By the cycles `list` names: the engine lists the show's items with requests of
+its own, reading each cycle's id off the reply with a pattern, when `playing` holds a
+number it has not told apart since the last command answered; any other number is a
+folder's playlist, shown as the playlist is. A show without cycles and a playlist of the
+root ask nothing more than before.
+
+**Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_playback.py.

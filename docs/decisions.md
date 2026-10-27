@@ -740,3 +740,15 @@ are in [format.md](format.md), "Measured sizes".
   the top, the folder rows that lead to the current playlist are marked, and the filters,
   moves and selection work within the level shown. The replies, the core and the firmware
   are as they were; the firmware built on 2026-10-26 stands.
+- 2026-10-26: Seed 42 is built, its tasks 1 to 4: the emulator's page gets a seek bar
+  under the LEDs that shows where the animation on the LEDs stands in its loop and is
+  dragged to move playback there, the emulator alone. The emulator takes the start of a
+  loop from the core's opening of the played file through its host, exact to the grid,
+  the length from the storage's catalog, the converter's check when Node.js is on the
+  path, or a loop seen twice, and moves playback by moving its own clock forward, with a
+  restart of its own for a move back, logged with the transport `seek`. No command: the
+  page's one request is the route `POST /seek` of the emulator, and the board and the
+  emulator accept the same commands as before. The owner's look is open.
+- 2026-10-27: Seed 42 is completed: the owner looked at the seek bar in the emulator, after
+  a seek far into a long file was made to show its frame at once by moving the clock in
+  strides of 400 ms, and the bar was made to show during a folder's playlist of seed 41.

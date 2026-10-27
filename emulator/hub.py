@@ -1,4 +1,5 @@
-"""What the page is shown: the command log, the latest status and every refresh.
+"""What the page is shown: the command log, the latest status, the position of the
+animation on the LEDs and every refresh.
 
 The hub keeps the last log entries and the latest status, and hands everything that
 happens to the connections of the pages that are open.
@@ -81,6 +82,7 @@ class Hub:
         self._entries = collections.deque(maxlen=LOG_ENTRIES)
         self._seq = 0
         self._status = None
+        self._position = None
         self._refresh = None
         self._connections = set()
 
@@ -114,6 +116,15 @@ class Hub:
             for connection in self._connections:
                 connection.put("status", self._status)
 
+    def position(self, event):
+        """Takes where the animation on the LEDs stands: its id, the starts of its loop and
+        of its turn on the engine's clock, and its length, each `None` while unknown."""
+        data = compact(event)
+        with self._lock:
+            self._position = data
+            for connection in self._connections:
+                connection.put("position", data)
+
     def mapping(self, legs):
         """Publish a complete committed routing assignment."""
         data = compact([list(leg) for leg in legs])
@@ -138,6 +149,8 @@ class Hub:
                 connection.put("log", compact(entry))
             if self._status is not None:
                 connection.put("status", self._status)
+            if self._position is not None:
+                connection.put("position", self._position)
             self._connections.add(connection)
         return connection
 
@@ -161,6 +174,10 @@ class Hub:
     def latest_status(self):
         with self._lock:
             return self._status
+
+    def latest_position(self):
+        with self._lock:
+            return self._position
 
     def newest_refresh(self):
         with self._lock:
