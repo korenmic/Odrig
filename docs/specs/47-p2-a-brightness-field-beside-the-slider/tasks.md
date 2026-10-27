@@ -25,7 +25,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
     a measure fails.
   - Suites: the app's.
 
-- [ ] 3. The documents and every suite
+- [x] 3. The documents and every suite
   - `docs/android-app.md`: the Animations bullet of "What it is", the first column of the
     slider's row in the table of lines, the slider's sentence in "Using it" step 3, the
     paragraph on the fields where a long press marks text, step 4 of "The check on a

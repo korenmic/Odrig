@@ -15,8 +15,9 @@ a top bar with the app's name and whether the installation answers.
   what plays, the animation on the LEDs with its id and its file name, before them the
   square of its preview as a row has it, hidden while nothing plays, while a test shows
   and while the list does not hold the animation yet, `ON` or `OFF`, the
-  brightness and the refreshes a second, with `On` and `Off` together in one pill and a
-  slider for the brightness. Under the refreshes, while the installation reads its
+  brightness and the refreshes a second, with `On` and `Off` together in one pill, the line
+  `Set the brightness to` with a field that holds the brightness as a number, and the big
+  slider for it under them: the field and the slider follow each other both ways. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
   read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
@@ -80,7 +81,7 @@ thirty-five command lines and no other, each as `POST /odrig` to the address tha
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
-| Moves the slider | `brightness <n>` |
+| Moves the slider, or enters a brightness in its field | `brightness <n>` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
@@ -270,7 +271,11 @@ Store. It asks for no permission that the phone shows a question for.
    makes that folder's playlist current, from its first animation; the installation
    keeps the choice across a restart. `Back` goes up one level. `Off`
    makes every LED dark and `On` lights them again; the playlist's time goes on while
-   they are off. The slider sets the brightness from 0 to 255.
+   they are off. The slider sets the brightness from 0 to 255, and so does a number typed
+   into the field above it, sent when Done or Enter is pressed or the field is left: the
+   slider stands at each number as it is typed, and the field shows where the slider
+   stands. A number above 255 is not sent, and the line under the slider says `The
+   brightness is 0 to 255.`; an emptied field sends nothing and shows the brightness again.
 
 What the screens show comes from the installation's replies, about once a second: when
 another phone changes something, this one shows it within two seconds. While the
@@ -488,12 +493,12 @@ alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulato
 it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
-field one types into: the address on the target screen, and `Start at` and `Length` on
-Upload. Anywhere else, on a word, a button, a list or an empty part of the screen, a long
+field one types into: the brightness on Animations, the address on the target screen, and
+`Start at` and `Length` on Upload. Anywhere else, on a word, a button, a list or an empty part of the screen, a long
 press marks nothing and opens nothing, and a tap works as before; on a row of the list a
 long press lifts the row to be moved, and nothing else. In a
 browser a right click does the same: the browser's menu opens only in a field. A field
-that the app gets later is the same as these three.
+that the app gets later is the same as these four.
 
 The app keeps clear of the phone's bars: its heading begins below the bar at the top,
 with the clock and the icons, and its tabs end above the bar at the bottom, with
@@ -764,8 +769,11 @@ installed; the phone with mobile data on.
    brightness, `Playlist`, the animation with its file name, about 50 refreshes a second.
    Send `python -m odrigctl --http 127.0.0.1:8600 brightness 40` on the Mac: the phone
    shows 40 within two seconds.
-4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root.
-   *Seen:* the emulator's page follows each, and its log has each line as `http`.
+4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root;
+   then type 8 into the brightness field and press Done on the keyboard, and move the
+   slider. *Seen:* the emulator's page follows each, and its log has each line as `http`;
+   after Done the brightness is 8 and the slider stands at 8, and while the slider moves the
+   field shows its number.
 5. **No answer.** Stop the emulator. *Seen:* within five seconds the app says that
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
@@ -877,7 +885,11 @@ By programs, on a Mac:
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
-  `play all`, `on`, `off`, the brightness with at most five commands a second, the free
+  `play all`, `on`, `off`, the brightness with at most five commands a second, by the slider
+  and by its field: the field following the slider and a typed number moving the slider,
+  Enter and leaving the field sending once, a slider move dropping text not sent, `080`
+  sent as 80, and nothing sent for the brightness in force, an emptied field, 256 or a
+  commit while the app is away, the free
   storage, a removal from a row's menu confirmed and one kept, each message, the back
   gesture across the four tabs and `Add animation`.
 - The Aurora Glass look, in Chrome at 360 and 320 pixels upright and 740 sideways:
@@ -1006,6 +1018,9 @@ By programs, on a Mac:
 - **Seed 41 on a phone and on the board.** Nobody has walked the card's folders on a
   phone, chosen a folder there and seen the board play it, restart and play it again, or
   seen the time left count down on a phone: the seed's board session.
+- **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
+  owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
+  and to see the field show the slider's number while it moves.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.
