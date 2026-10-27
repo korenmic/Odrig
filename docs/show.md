@@ -75,8 +75,37 @@ order of `show.json` and after them the drive's. It is what a show plays by itse
 last the first again, without end. A show with one animation plays it turn after turn. A
 show without an animation plays nothing.
 
+With a card of sub-folders there is a playlist for each folder, and one of them is
+current: the root's, the folder `odrig` with the show's animations and the loose files, or
+a sub-folder's, see [animations from a USB drive](#animations-from-a-usb-drive). A
+playlist plays its own animations in the saved order, each for its turn, then each of its
+sub-folders' playlists once the same way, depth first, and then its own animations again:
+the root exhausts the show's animations and the loose files, then each folder of the card
+once, and starts over. A file that is left out, unavailable or still to be read is passed
+over, and so is an ignored animation of the show, as always. While the current playlist
+has nothing to play, the card out or not yet read or every file of its folders
+unavailable, the root plays in its place, and the current playlist takes over at the end
+of the turn in progress, from its first animation, as soon as it has something to play.
+
+A current playlist plays for a window of 24 hours of the board's running time from the
+moment it became current, the time the LEDs are off and the time a cycle or a jump plays
+included; calendar time is never considered. When the window has passed, the turn in
+progress ends as it would, and the next playlist in the tree's order becomes current with
+a window of its own, the root after the last: a card of the folders `a`, `b` and `b/c`
+plays the root for a day, then `a`, `b`, `b/c`, and the root again. A window that ends
+while a cycle plays changes which playlist is current and not what plays; the cycle goes
+on until a command ends it. A window that ends while a mapping test shows is taken when
+the test ends. While the tree is not known, the card out or not yet read, the window's
+end makes the root current with a fresh window. With no folder on the card the root is
+the only playlist and its window changes nothing that plays. `status` says the seconds
+left in the window as `left`.
+
 At power-on a show plays the playlist, from its first animation, or from the animation
-`start` names. Only a `start` that names a cycle plays something else: that cycle.
+`start` names. Only a `start` that names a cycle plays something else: that cycle. The
+playlist that was current is current again, with the time spent in its window, from the
+board's own file `playlist.txt`: the root plays as said, and a folder of the card plays
+from its first animation once the card is read, the root in its place until then. A
+restart loses at most the last 15 minutes of the window.
 
 A cycle has no turn in the playlist, wherever it stands among the items.
 
@@ -111,11 +140,18 @@ it ended. The time of the playlist goes on while the LEDs are switched off.
 
 - `play <id>` of an animation item plays the playlist from that animation: its turn
   begins, with its first frame, and afterwards the playlist goes on with the animation
-  after it. No command plays one animation without end.
+  after it. No command plays one animation without end. With a folder current, a jump to
+  an animation of that folder or of one below it goes on from the jumped animation in the
+  playlist's order; a jump to any other animation plays its turn, and then the animation
+  whose turn the jump cut plays again, from its first frame, and the playlist goes on.
 - `play <id>` of a cycle shows each listed animation in order for `seconds`, then starts
   over, and repeats forever. Each turn starts its animation from the first frame. While
   a cycle plays, the playlist does not.
-- `play all` plays the playlist from its first animation, whatever `start` names.
+- `play all` plays the playlist from its first animation, whatever `start` names, and
+  makes the root playlist current.
+- `play <id>` of a folder of the card makes that folder's playlist current and plays its
+  first animation; when nothing at or below the folder can play, the root plays in its
+  place.
 
 ## Animations from a USB drive
 
@@ -127,9 +163,18 @@ removals, see [commands.md](commands.md#catalogs).
 On the board the drive is a USB stick or a microSD card, as
 [firmware.md](firmware.md#the-external-storage) says.
 
-- The drive's animations are the files of its folder `odrig` whose names end in `.odrg` or `.odrgx`,
-  in any case, and do not begin with a dot, in the order of their names, at most 256.
-  Folders inside `odrig` and other files are passed over.
+- The drive's animations are the animation files of its folder `odrig` and of its
+  sub-folders to three levels down: those whose names end in `.odrg` or `.odrgx`, in any
+  case, and do not begin with a dot; other files are passed over. They are listed depth
+  first, a folder's files in the order of their names and then its sub-folders in the
+  order of their names, at most 256 files and 32 sub-folders, as
+  [microsd.md](microsd.md#preparing-a-card) says; a file in a sub-folder is known by its
+  path from `odrig`, `night/comet.odrg`, in `list`, in the saved order and in the catalog.
+- The sub-folders make a tree, the folder `odrig` its root: a sub-folder with an animation
+  file at any depth below it is a playlist of its own, and `list` gives it after the show's
+  items and before the files, in the order of the listing, with its path and an id from the
+  same pool as the files', given after theirs:
+  `{"id":60007,"playlist":"night","external":true}`.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
   has been read, at its place in the saved order: without one, after the show's

@@ -1,0 +1,10 @@
+{
+  "number": 43,
+  "slug": "43-p1-a-cross-wired-snake-10",
+  "state": "remaining",
+  "title": "A cross-wired snake 10",
+  "priority": "P1",
+  "addedAt": "2026-10-27T05:06:59+02:00",
+  "addedCommit": "pending-local",
+  "summary": "Snake 10 of the installation is chained 28 up, 30 up, 29 down around a dead data output; the mapping file states the direction of each strip of a leg, the core places the LEDs by it, and the app gets a checkbox in Settings, Snake 10 is cross-wired, off by default and kept on the installation, which the snake test, the diagonal and the playback follow."
+}

@@ -78,6 +78,31 @@ class Names(unittest.TestCase):
                 pathlib.Path(folder, name).write_bytes(b"")
             self.assertEqual(catalog.Storage(folder).names(), ["C.ODRGX", "a.odrg", "b.odrgx"])
 
+    def test_a_storage_lists_its_folders_depth_first_to_three_levels(self):
+        files = {name: b"" for name in ("b.odrgx", "a.odrg", "C.ODRGX", ".hidden.odrgx", "notes.txt", "a b/x.odrg", "a-b/y.odrg", "a/z.odrg", "a/deep/w.odrg",
+                                         "a/deep/deeper/v.odrg", "a/deep/deeper/toodeep/u.odrg", ".hid/f.odrg", "System Volume Information/g.odrg",
+                                         "bad./h.odrg", "a/.hid.odrg", "zz/only/sub/k.odrg")}
+        wanted = ["C.ODRGX", "a.odrg", "b.odrgx", "a/z.odrg", "a/deep/w.odrg", "a/deep/deeper/v.odrg", "a b/x.odrg", "a-b/y.odrg", "zz/only/sub/k.odrg"]
+        self.assertEqual(catalog.MemoryStorage(files).names(), wanted)
+        with tempfile.TemporaryDirectory() as folder:
+            for name in files:
+                path = pathlib.Path(folder, *name.split("/"))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"")
+            pathlib.Path(folder, "empty").mkdir()
+            self.assertEqual(catalog.Storage(folder).names(), wanted)
+
+    def test_a_listing_takes_at_most_32_sub_folders_and_256_files(self):
+        many = {f"f{number:02d}/x.odrg": b"" for number in range(40)}
+        many.update({f"r{number:03d}.odrg": b"" for number in range(5)})
+        names = catalog.MemoryStorage(many).names()
+        self.assertEqual((len(names), names[:5], names[-1]), (37, [f"r{number:03d}.odrg" for number in range(5)], "f31/x.odrg"))
+        # A folder counts with its ancestors when its first file is kept: the 33rd stops the walk.
+        nested = {f"a/b{number:02d}/x.odrg": b"" for number in range(40)}
+        names = catalog.MemoryStorage(nested).names()
+        self.assertEqual((len(names), names[-1]), (31, "a/b30/x.odrg"))
+        self.assertEqual(len(catalog.MemoryStorage({f"{number:03d}.odrg": b"" for number in range(300)}).names()), 256)
+
 
 class Catalogs(unittest.TestCase):
     def test_a_rebuild_records_the_type_and_the_loop_of_every_file(self):

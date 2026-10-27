@@ -10465,3 +10465,45 @@ picture, and the walk of a seek by minutes takes a fraction of a second. The emu
 suite checks it with a file of random pixels whose seconds hold more than the bound.
 
 **Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_seek.py.
+## Seed 41: what the spec and its tasks decided beyond the seed
+
+**Question.** The seed came with no question open, and its spec and the tasks that built it
+still had to settle what the seed did not say. Which decisions were taken, and where are
+they?
+
+**Answer.** The firmware's log says one line for a listing, with the counts of what was
+passed over, `card opened: <n> animation files in <m> folders of odrig; <k> files and <f>
+folders passed over`, not a line per file. The path rule is one rule for both catalogs,
+since `catalog_name_allowed` serves both, and a path deeper than three folders in a catalog
+is a damaged line, as any name the rule refuses. A place whose folder would be the 33rd
+sub-folder, which only a catalog can name since every lister cuts at 32, is left out with
+the reason `too-many-folders`. `remove`, `remove many`, `ignore`, `read`, `order move` and
+`upload begin` of a folder's id answer `in-use`, the code a cycle's id gets. `play` of a
+folder while nothing at or below it and nothing in the root can play makes the folder
+current and answers ok; `play all` with an empty playlist stays `unknown-id`. `status`
+names the current folder in `playing` while the root plays in its place too. The current
+playlist takes over from its first animation at the end of the turn in progress, as soon
+as it has something to play again; at power-on with a saved folder the root plays in its
+place until the card is read and the turn ends. A jump's turn begins at the refresh after
+`play`, as every turn, and `left` is floored to whole seconds, so two statuses 5 ms apart
+may differ by one. The round shortcut of the playlist is bounded by the window's end with
+the root alone too, so that the core and the reference player agree on `left` after a gap
+of days, and a rotation that lands on the playlist that was current changes nothing that
+plays. The saved file is not written while the tree has no folder and no file exists,
+since an absent file means the root with a fresh window; a write waits while an upload
+receives its bytes or a rebuild holds a page open; the file is read and its part probed
+only on a host that has a drive; the root made current by a read card without the saved
+folder, or by the removal of the current folder's last file, is saved at the next refresh
+with the time spent since. In the app the count in a group's heading is the number of its
+rows, filters or not; a folder head's button is named `Play folder <path>` for a screen
+reader and the root's keeps the id `play-all` and the words `Play this folder`; a folder
+the list does not hold yet is named by its id with the time left and the list is asked at
+once, and a number without `left` reads `Cycle <id>` as before; a row moved down from the
+last-but-one place of its group goes to the end of the whole saved order, `order move <id>
+end`, which leaves every group's relative order as if it went after its group's last row;
+an upload's landing in the root is checked by the core's test of `upload begin external`,
+since an upload from the page needs a cataloged card the emulator may write.
+
+**Resolution.** `docs/specs/41-p1-sub-folder-playlists-from-the-card/design.md`; the
+commits of tasks 1 to 10 on the branch `seed-41-sub-folder-playlists`; docs/show.md,
+docs/commands.md, docs/core.md, docs/microsd.md, docs/android-app.md, docs/reasons.md.

@@ -130,11 +130,15 @@ class Changes(unittest.TestCase):
 
     def test_an_import_refuses_what_does_not_pass_and_lists_like_a_drive(self):
         for name, data in {"good.odrg": animation(1), "Bad.ODRG": animation(2)[:-3], "small.odrg": animation(3, 4, 3), ".hidden.odrg": animation(4),
-                           "notes.txt": b"notes", "x" * 96 + ".odrg": animation(5)}.items():
-            (self.folder / name).write_bytes(data)
+                           "notes.txt": b"notes", "x" * 96 + ".odrg": animation(5), "night/comet.odrg": animation(6), "night/deep/x.odrg": animation(7),
+                           "x" * 96 + "/y.odrg": animation(8)}.items():
+            path = self.folder.joinpath(*name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
         made, refused = catalog.rebuild(self.storage())
-        self.assertEqual([entry.name for entry in made.entries], ["good.odrg"])
-        self.assertEqual(sorted(refused), sorted([("Bad.ODRG", errors.TRUNCATED), ("small.odrg", errors.SIZE_MISMATCH), ("x" * 96 + ".odrg", errors.FILE_MALFORMED)]))
+        self.assertEqual(sorted(entry.name for entry in made.entries), ["good.odrg", "night/comet.odrg", "night/deep/x.odrg"])
+        self.assertEqual(sorted(refused), sorted([("Bad.ODRG", errors.TRUNCATED), ("small.odrg", errors.SIZE_MISMATCH), ("x" * 96 + ".odrg", errors.FILE_MALFORMED),
+                                                  ("x" * 96 + "/y.odrg", errors.FILE_MALFORMED)]))
 
     def test_a_second_import_steps_the_generation_and_removes_stale_new_pages(self):
         self.started(("one.odrg",))

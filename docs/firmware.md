@@ -326,6 +326,10 @@ more than the 1,779,280 of the same seeds without them, 55.4% of the firmware sl
 and of the sine, 1,464 for `small`, 1,952 for `medium` and 2,048 for the sine, which stay
 in the flash; the static memory is the same, 70,012 bytes, 21.4%. It was not flashed.
 
+With the folders of the card, the window and the saved playlist of seed 41, `build` made
+`odrig-firmware.bin` of 1,827,264 bytes on 2026-10-26, SHA-256
+`5b487c68492a25e133f604a2cf666e4c866ed2b1fef33ed307317f0b67ecffd3`. It was not flashed.
+
 A second build reuses what the work folder holds and fetches nothing. `--verbose` shows
 every command of the build. PlatformIO's output goes to standard error; the one line on
 standard output names the image:
@@ -477,9 +481,10 @@ whether it is sound is not known yet.
    `show: added new.odrg, 120000 bytes`, `show: replaced mapping.json, 184 bytes, was 16`,
    `show: removed bad.odrg, 65262 bytes`; for a folder that the board holds already,
    `show: kept 4 files; nothing added, replaced or removed`. The saved playlist order,
-   `order.txt` of [show.md](show.md#the-saved-playlist-order), may be a file of the folder;
-   a folder without one keeps the board's, as installing animations does not change the
-   order the operator chose.
+   `order.txt` of [show.md](show.md#the-saved-playlist-order), and the saved playlist,
+   `playlist.txt` of [core.md](core.md#the-saved-playlist), may be files of the folder;
+   a folder without them keeps the board's, as installing animations does not change the
+   order or the playlist the operator chose.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -829,7 +834,7 @@ as on the emulator:
 
 ```
 python -m odrigctl --port /dev/cu.usbmodem101 status
-{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+{"ok":true,"on":true,"brightness":32,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86400}
 ```
 
 WLED's own serial handling is switched off: no Adalight, no TPM2, no Improv, no JSON over
@@ -888,9 +893,11 @@ section says.
   `.odrg` files, made for the board's canvas as the installed ones are. Names are kept
   to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`: the firmware's file
   system reads names in the code page 850, so Hebrew letters, for one, come out as `?`,
-  and such a file cannot be opened by its name and is left out. Folders inside
-  `odrig` and other files are passed over; at most 256 files are taken, the first in the
-  order of their names.
+  and such a file cannot be opened by its name and is left out. Other files are passed
+  over. Sub-folders of `odrig` are listed too, to three levels down, depth first: a
+  folder's files in the order of their names, then each of its sub-folders in the order
+  of their names; at most 256 files and 32 sub-folders are taken, the first in that
+  order, and [microsd.md](microsd.md#preparing-a-card) has the rule in full.
 - **The adapter and the sockets.** The chip's own socket gives a plugged device no power:
   plugged in directly, a drive is not seen. Between that socket and the drive goes a
   USB-C adapter or hub with a power input of its own, which is powered. The computer
@@ -959,14 +966,18 @@ The lines of the kind `usb`, which only the USB stick's build writes:
   `stick not opened: no file system it reads (<error>)`, or
   `stick not opened: a fault in reading (<error>)`. Its folder listed, when the core asks
   for a stick without a catalog: `stick opened: <n> animation files in odrig`, or
-  `stick not opened: a fault in reading the folder odrig`.
+  `stick opened: <n> animation files in <m> folders of odrig` when sub-folders were
+  taken, with `; <k> files and <f> folders passed over` at its end when something was
+  left out; or `stick not opened: a fault in reading the folder odrig`.
 
 The lines of the kind `sd` are those of the firmware, which reads the card and has no
 line of the kind `usb`:
 
 - A card mounted: `card mounted`, or `the card has no folder odrig`. Its folder listed,
   when the core asks for a card without a catalog: `card opened: <n> animation files in
-  odrig`, or `card folder odrig could not be read`.
+  odrig`, or `card opened: <n> animation files in <m> folders of odrig`, with `; <k>
+  files and <f> folders passed over` at its end when something was left out; or `card
+  folder odrig could not be read`.
 - No card: `card not mounted; no card or unreadable file system`, once for each spell
   without a card; and `card unavailable; files closed, waiting for a card` when a card
   went.
@@ -1399,7 +1410,8 @@ renames it onto its name; for a new name or a removal it also writes the show fi
 until the old file is gone; [core.md](core.md), "The files the core writes", has every
 step. A power cut at any step leaves the old show or the new one, whole; the change is
 committed by one rename. Moving an animation in the saved order writes `order.part` and
-renames it onto `order.txt` the same way. What one change writes:
+renames it onto `order.txt` the same way, and the choice of a playlist writes
+`playlist.part` and renames it onto `playlist.txt`. What one change writes:
 
 | Change | What is written | Bytes |
 |---|---|---|

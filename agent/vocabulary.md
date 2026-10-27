@@ -60,7 +60,11 @@ the entry links to it.
   each for a number of seconds, and then starts over.
 - **playlist**: Every animation of a show, one after the other in the saved order, which
   is the order of the show file until an animation is moved, and then from the first
-  again. It is what a show plays by itself.
+  again. It is what a show plays by itself. With a card whose animation folder has
+  sub-folders there is a playlist for each folder, and one of them is current for 24
+  hours of running time before the next one is: the root's plays the show's animations
+  and the loose files of the card, then each sub-folder's once, and a folder's plays its
+  own files and then its sub-folders'. A chosen playlist stays current across a restart.
 - **turn**: The time an animation has in the playlist before the next one starts: unless
   the show says otherwise, the fewest whole loops that last 30 seconds. See
   [show.md](../docs/show.md#the-turn-of-an-animation).

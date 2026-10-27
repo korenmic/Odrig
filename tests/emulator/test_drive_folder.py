@@ -46,8 +46,14 @@ class TheDrive(unittest.TestCase):
         number = made.drive_number()
         self.assertTrue(made.drive_bind(number, 3, "Fire Swirl 2.ODRG"))
         self.assertEqual((made.drive_name(number, 3), made.drive_name(number, 1)), ("Fire Swirl 2.ODRG", None))
-        for name in ("", ".hidden.odrg", "a/b.odrg", "a?b.odrg", "x" * 101):
+        for name in ("", ".hidden.odrg", "a?b.odrg", "x" * 101, "/b.odrg", "a//b.odrg", "a/", "a/.b.odrg", "../b.odrg", "a/b/c/d/e.odrg"):
             self.assertFalse(made.drive_bind(number, 4, name), name)
+        self.assertTrue(made.drive_bind(number, 5, "night/comet.odrg"))
+        self.assertEqual(made.drive_name(number, 5), "night/comet.odrg")
+        (self.folder / "night").mkdir()
+        (self.folder / "night" / "comet.odrg").write_bytes(b"comet")
+        self.assertEqual(made.read_at("drive/5", 0, 512), b"comet")
+        self.assertEqual(made.read_at("drive/night/comet.odrg", 0, 512), b"comet")
         self.assertFalse(made.drive_bind(number + 1, 4, "a.odrg"))
         (self.folder / "Fire Swirl 2.ODRG").write_bytes(b"swirl")
         self.assertEqual(made.read_at("drive/3", 0, 512), b"swirl")

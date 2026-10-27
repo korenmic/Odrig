@@ -16,6 +16,7 @@ const char *reason_name(Reason reason) {
         case kFileMissing: return "file-missing";
         case kFileMalformed: return "file-malformed";
         case kSizeMismatch: return "size-mismatch";
+        case kTooManyFolders: return "too-many-folders";
         case kTruncated: return "truncated";
         case kBadMagic: return "bad-magic";
         case kBadVersion: return "bad-version";

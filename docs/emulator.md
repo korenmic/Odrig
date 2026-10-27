@@ -180,9 +180,14 @@ python -m emulator build/demo-20/show --drive build/stick
   is plugged in; when it goes, the drive is pulled out. A folder `DIR` that is not there
   yet is no error: the drive is plugged in once `DIR/odrig` is.
 - The folder is listed when the core asks, for a drive without a catalog: the files whose
-  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order
-  of their names, at most 256. It is not listed again while it stays. To take up files
-  added to it, move the folder `odrig` away for two seconds and back.
+  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, of `odrig`
+  and of its sub-folders to three levels, depth first, a folder's files by the bytes of
+  their names and then its sub-folders by the bytes of their names, at most 256 files and
+  32 sub-folders; a file in a sub-folder is named by its path, as `night/comet.odrg`. A
+  folder whose name begins with a dot, ends with a space or a dot, holds a character a
+  name may not, or is `System Volume Information` is passed over. The folder is not listed
+  again while it stays. To take up files added to it, move the folder `odrig` away for two
+  seconds and back.
 - The core may change the drive's files, by their names, unless `--drive-read-only` is
   given: the files a change of the drive writes go into `DIR/odrig`.
 - The core reads the drive's files after the installed ones, while the show plays. Each
@@ -726,7 +731,7 @@ event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
-data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
 
 event: position
 data: {"animation":1,"start":40020,"turn":40020,"length":5100}
@@ -856,7 +861,7 @@ system and the processor of the computer.
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
 ```
 
 | Status | Meaning |
@@ -1101,7 +1106,7 @@ after it. For each command the emulator prints one line to standard output, `rep
 time and the reply:
 
 ```
-reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
 ```
 
 The whole script is checked before the core starts. A script that breaks a rule is refused

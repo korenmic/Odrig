@@ -81,6 +81,23 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(catalog.check(catalog.Storage(self.folder)), [])
         self.assertEqual(run(self.mount, "add", star), (0, f"replaced: my star.odrg, {len(animation(3))} bytes\n", ""))
 
+    def test_a_card_with_sub_folders_is_imported_checked_and_counted_by_the_paths_of_its_files(self):
+        for name, data in {"night/comet.odrg": animation(3), "night/deep/x.odrg": animation(4), "a b/c.odrg": animation(5)}.items():
+            path = self.folder.joinpath(*name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        (self.folder / "empty").mkdir()
+        self.assertEqual(run(self.mount, "status"), (0, "catalog: none; 6 animation files; import writes the catalog\n", ""))
+        self.assertEqual(self.imported(), "refused: bad.odrg: truncated\nimported: 5 animations, generation 1\n")
+        made = catalog.read(catalog.Storage(self.folder))
+        self.assertEqual(sorted(entry.name for entry in made.entries), ["a b/c.odrg", "moon.odrg", "night/comet.odrg", "night/deep/x.odrg", "sun.odrg"])
+        self.assertEqual(run(self.mount, "check"), (0, "checked: 5 entries, 0 differ\n", ""))
+        (self.folder / "night" / "deep" / "x.odrg").unlink()
+        self.assertEqual(run(self.mount, "check"), (1, "differs: night/deep/x.odrg: missing\nchecked: 5 entries, 1 differ\n", ""))
+        self.assertEqual(run(self.mount, "remove", "night/comet.odrg"), (0, "removed: night/comet.odrg\n", ""))
+        self.assertFalse((self.folder / "night" / "comet.odrg").exists())
+        self.assertEqual(run(self.mount, "status"), (0, "catalog: ok, generation 2, 4 entries; 4 animation files, 1 without an entry\n", ""))
+
     def test_remove_takes_out_each_file_and_its_entry(self):
         self.imported()
         self.assertEqual(run(self.mount, "remove", "moon.odrg", "none.odrg"), (1, "removed: moon.odrg\nrefused: none.odrg: file-missing\n", ""))

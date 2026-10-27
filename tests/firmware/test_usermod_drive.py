@@ -69,8 +69,11 @@ class TheDrive(unittest.TestCase):
         self.assertIn("if (namesAPlace(name)) return pathAt(placeOf(name), path);", made)
         self.assertIn("if (number == 0 || !isDriveName(given)) return false;", made)
         named = function_body(card, "isDriveName")
-        for expected in ("length > LONGEST_DRIVE_NAME", "name[0] == '.'", 'strchr("/\\\\:*?\\"<>|", c)', "c < 0x20 || c > 0x7e"):
+        for expected in ("length > LONGEST_DRIVE_NAME", "name[0] == '.'", 'strchr("\\\\:*?\\"<>|", c)', "c < 0x20 || c > 0x7e", "++folders > DEEPEST",
+                         "atStart && c == '.'"):
             self.assertIn(expected, named)
+        self.assertIn("const uint32_t DEEPEST = 3;", self.drive)
+        self.assertIn("const uint32_t MOST_FOLDERS = 32;", self.drive)
         self.assertIn("const size_t LONGEST_DRIVE_NAME = 100;", self.drive)
 
     def test_a_rename_on_the_card_removes_the_file_that_has_the_new_name_only_once_the_old_one_is_there(self):
@@ -88,11 +91,13 @@ class TheDrive(unittest.TestCase):
     def test_its_list_is_the_animation_files_of_the_folder_odrig_the_first_256_in_the_order_of_their_bytes(self):
         self.assertIn('const char FOLDER[] = "/usb/odrig";', self.drive)
         self.assertIn("const uint32_t MOST_FILES = 256;", self.drive)
-        named = self.drive[self.drive.index("bool isAnimation(const char *name) {"):self.drive.index("void keepName(")]
+        named = self.drive[self.drive.index("bool isAnimation(const char *name) {"):self.drive.index("bool keepName(")]
         for expected in ("name[0] == '.'", 'strcasecmp(name + length - 5, ".odrg") == 0', 'strcasecmp(name + length - 6, ".odrgx") == 0'):
             self.assertIn(expected, named)
         self.assertIn("strcmp(names[at - 1], name) > 0", self.drive)
         self.assertIn("entry->d_type == DT_REG", self.drive)
+        self.assertIn("entry->d_type == DT_DIR", self.drive)
+        self.assertIn("depth >= DEEPEST || !isFolderName(entry->d_name)", self.drive)
 
     def test_only_the_names_the_core_gives_the_drives_files_reach_the_drive(self):
         self.assertIn('const char PREFIX[] = "drive/";', self.drive)

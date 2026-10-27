@@ -217,34 +217,38 @@ folder on with one tap.
    before the card's files, and names a file in a folder by its path. `order.txt`, the
    catalog and `drive_name` name a file in a folder by its path; a card cataloged before
    this seed, whose files are all loose, reads as before.
-8. The Animations tab shows the list as groups in the order they play: the root's group
-   first, under the heading `Root` with the count of its rows, then one group per folder,
-   the groups following one another in the depth-first order of the tree, each heading
-   carrying the folder's whole path and the count of the files directly in it; the groups
-   are not indented and do not fold. A folder with no file directly in it keeps its
-   heading, its count `0` and its button, since it is the playlist of its sub-folders; a
-   group that has rows and none of which the filters show is not shown, heading included.
-   Every group, the root's included, has the same button, `Play this folder`: a folder's
-   sends `play <id>` of the folder, the root's sends `play all`, and on the current
-   playlist it restarts it with a fresh window. The button `Playlist from the start` of
-   seed 36 goes, the root's button being it. The pinned Tests group of seed 36 stays above
-   the list, outside the folder groups: it is no playlist, has no button, no mark and no
-   count of this seed, and the filters leave it alone as today.
+8. The Animations tab shows the card's folders as a file explorer shows folders: one
+   level at a time. At the root the list holds the root's own rows, the board's
+   animations and the card's loose files in the saved order, then one row per sub-folder
+   of `odrig`, in the tree's order, each with the folder's name, the count of the files
+   directly in it and a way in. A tap on a folder row enters it: the list then holds that
+   folder's own files and one row per sub-folder of it, under a heading with the folder's
+   whole path and a `Back` control that goes up one level, the root reached the same way.
+   The level's button `Play this folder` stands at the top, above the list: inside a
+   folder it sends `play <id>` of the folder, at the root `play all`, and on the current
+   playlist it restarts it with a fresh window; a file row plays as today. A folder with
+   no file of its own keeps its row, its count `0` and its way in, since it is the
+   playlist of its sub-folders. The button `Playlist from the start` of seed 36 goes, the
+   root's `Play this folder` being it. The pinned Tests group of seed 36 stays above the
+   list, outside the levels: it is no playlist, has no button, no mark and no count of
+   this seed, and the filters leave it alone as today. The list is never shown as groups
+   of every folder at once.
 9. The now-playing line names the current playlist and the time its window has left in
    whole hours and minutes: `Playlist night · 23 h 12 min left` for a folder, by its path,
    or by its id while the list has no item of it; `Playlist · 23 h 12 min left` for the
-   root while the list holds a folder group; `Playlist` as today, without a time, while
-   `playing` is `"all"` and the list holds no folder group. The current playlist's group
-   is marked, the root's group when the root is current. While the
+   root while the list holds a folder; `Playlist` as today, without a time, while
+   `playing` is `"all"` and the list holds no folder. The heading of the level shown is
+   marked while its playlist is current, the root's at the root, and at every level above
+   the current folder the folder row that leads to it is marked. While the
    root plays in place of the current folder the line reads `Playlist night, the root
-   plays for now · 23 h 12 min left` and the folder's group keeps its mark; the app knows
+   plays for now · 23 h 12 min left` and the marks stay; the app knows
    it from `status`, `playing` a folder's id and `animation` no file of that folder nor of
    a folder below it, read from the paths, and a jump by `play <id>` to an animation
    outside the current playlist shows the same words for its turn, since `status` does not
    tell a jump from the root in its place.
-10. In the app, the filters of seed 39 work within the groups, dragging and the menu's
-    moves work within one group and not across groups, selection for deletion takes rows
-    only, the counts of animations take rows only, a folder item being no animation, and
+10. In the app, the filters of seed 39, dragging and the menu's moves, and selection for
+    deletion work within the level that is shown, a folder row being no animation and
+    never filtered, moved or selected; the counts of animations take rows only; and
     uploads go to the root, as the board makes no folder.
 11. The emulator's `--drive` folder and the core's test host give sub-folders of `odrig`
     the same meaning as the card's, and the PC tool `odrig.catalog` imports and checks a
@@ -274,11 +278,12 @@ folder on with one tap.
    core and `odrig.catalog` write the same bytes from such a card, and
    `tests/vectors/catalog/` gains a storage with folders and its outcome in `cases.json`.
    The firmware's suite checks the depth-first listing of folders on the Mac with the
-   stand-in card. The app's suite checks the groups, the headings and counts, the root's
-   group and its button, the current playlist's mark and time left, `Play this folder` on
-   a folder and on the root, the line while the root plays in place, the filters, moves
-   within a group only, the Tests group left alone, and the card out and in, in Chrome
-   against the emulator.
+   stand-in card. The app's suite checks the explorer: the root's rows and folder rows
+   with their counts, entering a folder and `Back`, the heading of a level, the current
+   playlist's marks and time left, `Play this folder` in a folder and at the root, the
+   line while the root plays in place, the filters, moves and selection within the level
+   shown, the Tests group left alone, and the card out and in, in Chrome against the
+   emulator.
 2. The microSD firmware is built with `fw.py build`, and in a session with the owner the
    board plays a card prepared with sub-folders: the groups show on a phone, a folder is
    chosen there and plays, the board is restarted and plays the same folder, the root is
@@ -319,3 +324,13 @@ owner's word on the two additions to replies, the folder items of `list` and `st
 `left` with `playing` as a folder's id, since every addition to the command list needs the
 owner, and on the change of the playlist decision in `docs/decisions.md` that the
 constraints name.
+
+On 2026-10-26, after the emulator review of the app built by tasks 1 to 10, the owner
+rejected the flat groups of every folder at once: "I do not like how you implemented
+entering a folder, instead of entering it uncollapse its contents into the root hierarchy,
+I rather a folder be "entered" like a file explorer and THEN the user can select to start
+playing items in it. fix it in the PR." Required Behavior 8, 9 and 10 say what that means:
+one level at a time, a folder row entered with a tap, a heading with the path and `Back`,
+the level's `Play this folder` at the top, the marks on the folder rows that lead to the
+current playlist, and the filters, moves and selection within the level shown. Nothing
+changes in the replies, the core or the firmware: the firmware built by task 10 stands.

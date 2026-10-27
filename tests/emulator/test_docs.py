@@ -185,7 +185,7 @@ class EmulatorDocument(unittest.TestCase):
         self.assertEqual(sorted(json.loads(events["hello"])), ["drive", "error", "legs", "page", "serial", "show", "t0", "tcp"])
         entry = hub.Hub().log(5, "serial", b"play 2", False, b'{"ok":true}\n')
         self.assertEqual(sorted(json.loads(events["log"])), sorted(entry))
-        self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "height", "ok", "on", "playing", "seed", "width"])
+        self.assertEqual(sorted(json.loads(events["status"])), ["animation", "brightness", "error", "fps", "height", "left", "ok", "on", "playing", "seed", "width"])
         self.assertRegex(events["frame"], r"\A[0-9]+ ")
         self.assertEqual(sorted(json.loads(events["position"])), ["animation", "length", "start", "turn"])
         self.assertIn(str(hub.LOG_ENTRIES), text)

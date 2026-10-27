@@ -227,6 +227,24 @@ inline bool is_drive(uint32_t position) {
     return position >= kDriveBase && position < kDriveBase + kDriveMost;
 }
 
+// One folder of the drive's tree: its id, a place whose path is at or below it, its depth
+// below the drive's folder, 1 to 3, and the index after its last descendant in the table.
+// The table is in the listing's order, depth first, so the subtree of a folder is the
+// index range from it to `end`.
+struct Folder {
+    uint16_t id;
+    uint16_t place;
+    uint8_t depth;
+    uint8_t end;
+    uint8_t spare[2];
+};
+
+// The most folders of the table, the root among them; what a place's folder byte holds for
+// a place of no folder; and the room for the current playlist's path, with its 0.
+const uint32_t kFolderMost = 33;
+const uint8_t kNoFolder = 255;
+const uint32_t kPlaylistPathRoom = 104;
+
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
 struct Core {
@@ -325,6 +343,33 @@ struct Core {
     uint8_t order_due;
     uint8_t order_reading;
     OrderReader order_reader;
+
+    // The tree of the drive's folders, for a host with a drive, in the block of the saved
+    // order: for each place the index of its folder in the table, kNoFolder for a place of
+    // none; the table, the root at index 0 and the sub-folders after it in the listing's
+    // order, `folder_count` of them; whether the table is built for the drive's places;
+    // the index of the current playlist's folder, 0 for the root; and the room for the
+    // current playlist's path, empty for the root.
+    uint8_t *drive_folder;
+    Folder *folders;
+    char *playlist_path;
+    uint8_t folder_count;
+    uint8_t tree_known;
+    uint8_t current;
+    // Whether the root plays in the current playlist's place, since that has nothing to
+    // play: judged where a turn ends. And the animation whose turn a jump outside the
+    // current playlist cut, which plays again after the jumped turn; kNothing for none.
+    uint8_t in_place;
+    uint32_t resume_item;
+    // The current playlist's window: the moment it became current, a timestamp, and the
+    // milliseconds spent in the window before that moment, from the saved file.
+    uint64_t window_started;
+    uint32_t window_spent;
+    // The saved file: when it was last written, whether a change waits to be written, and
+    // whether the file exists.
+    uint64_t playlist_saved;
+    uint8_t save_due;
+    uint8_t file_present;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
@@ -489,9 +534,12 @@ void drive_touch(Core &core);
 // A drive without a catalog: listed, each file given its id and its key, to be checked.
 void drive_take_listed(Core &core);
 
-// The lowest id from kDriveFirstId up that no item of the show and no file of the drive
-// has, or 0 when there is none.
+// The lowest id from kDriveFirstId up that no item of the show, no file of the drive and
+// no folder of its tree has, or 0 when there is none.
 uint16_t free_drive_id(const Core &core);
+
+// Whether a file of the drive, whatever its state, or a folder of its tree has this id.
+bool drive_id_taken(const Core &core, uint32_t id);
 
 // A file of the drive is left out: its state says so, and the host's log says why.
 void drive_left_out(Core &core, uint32_t place, Reason reason);

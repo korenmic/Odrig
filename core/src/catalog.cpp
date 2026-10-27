@@ -723,6 +723,7 @@ void drive_unusable(Core &core, uint8_t state, uint8_t detail) {
     core.catalog_open = 0;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     core.catalog_phase = kLoadIdle;
     CatalogState &catalog = core.catalogs[kExternal];
     catalog.state = state;
@@ -816,6 +817,7 @@ __attribute__((noinline)) void page_step(Core &core) {
             // The marker changed while it was read: everything is read again.
             catalog_drive_plugged(core);
             core.drive_count = 0;
+            tree_clear(core);
             return;
         }
         core.catalog_first_place = static_cast<uint16_t>(core.drive_count);
@@ -886,8 +888,10 @@ __attribute__((noinline)) void page_step(Core &core) {
 }
 
 // Every place read from the catalog becomes an animation of the playlist at once, or is
-// left out for its fault.
+// left out for its fault; the tree is built from them first, since the pages name a
+// folder's files in any order.
 void publish(Core &core) {
+    tree_build(core);
     for (uint32_t place = 0; place < core.drive_count; ++place) {
         DriveEntry &entry = core.drive[place];
         if (entry.state != kDriveStaged) {
@@ -910,21 +914,43 @@ void publish(Core &core) {
 }  // namespace
 
 bool catalog_name_allowed(const char *name, uint32_t length) {
-    if (length < 6 || length > kCatalogNameMost || name[0] == '.' || name[0] == ' ') {
+    // A path from the card's folder: the names of at most kCatalogDeepest folders and the
+    // file's name, joined by `/`, 1 to kCatalogNameMost bytes in all. Each part is printable
+    // ASCII other than \ : * ? " < > |, neither beginning nor ending with a space or a dot;
+    // a folder's may be digits alone, the file's is not and ends in `.odrg` or `.odrgx`.
+    if (length < 6 || length > kCatalogNameMost) {
         return false;
     }
-    bool digits_only = true;
-    for (uint32_t at = 0; at < length; ++at) {
-        const char c = name[at];
-        if (c < 0x20 || c > 0x7E || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+    uint32_t folders = 0;
+    uint32_t start = 0;
+    for (uint32_t at = 0; at <= length; ++at) {
+        if (at < length && name[at] != '/') {
+            const char c = name[at];
+            if (c < 0x20 || c > 0x7E || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+                return false;
+            }
+            continue;
+        }
+        // A part ends here: at a `/` or at the end of the name.
+        if (at == start || name[start] == '.' || name[start] == ' ' || name[at - 1] == '.' || name[at - 1] == ' ') {
             return false;
         }
-        digits_only = digits_only && c >= '0' && c <= '9';
+        if (at < length) {
+            if (++folders > kCatalogDeepest) {
+                return false;
+            }
+            start = at + 1;
+        }
     }
-    // The name ends in `.odrg` or `.odrgx`, in any case.
+    // The file's part: not digits alone, and ending in `.odrg` or `.odrgx`, in any case.
+    const uint32_t file_length = length - start;
+    bool digits_only = true;
+    for (uint32_t at = start; at < length; ++at) {
+        digits_only = digits_only && name[at] >= '0' && name[at] <= '9';
+    }
     const uint32_t ending = (name[length - 1] == 'x' || name[length - 1] == 'X') ? 6 : 5;
     const char tail[] = ".odrgx";
-    if (length < ending + 1) {
+    if (file_length < ending + 1) {
         return false;
     }
     const char *end = name + length - ending;
@@ -1185,6 +1211,7 @@ void catalog_drive_yields(Core &core) {
         // The page is read again from its start; what was taken of it is dropped.
         core.catalog_open = 0;
         core.drive_count = core.catalog_first_place;
+        tree_clear(core);
     }
 }
 
@@ -1203,6 +1230,7 @@ void catalog_drive_look(Core &core) {
     // Another marker: the drive's animations go, and its catalog is read again.
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     player_drive_changed(core);
     order_drive_found(core);
     catalog_drive_plugged(core);
@@ -1318,6 +1346,10 @@ bool catalog_install_external(Core &core, uint16_t *id) {
         core.host.drive_bind(core.host.ctx, core.drive_number, place, upload.name);
         order_drive_named(core, place, upload.name);
         entry.id = free_drive_id(core);
+        // The file goes into the drive's folder itself: the root's.
+        if (core.drive_folder != nullptr) {
+            core.drive_folder[place] = 0;
+        }
     }
     entry.bytes = upload.size;
     entry.total_ms = drive_length(upload.total_ms);
@@ -1358,6 +1390,7 @@ bool catalog_remove_external(Core &core, uint32_t place) {
     DriveEntry &entry = core.drive[place];
     entry.state = kDriveGone;
     entry.id = 0;
+    tree_place_gone(core, place);
     player_drive_changed(core);
     return true;
 }
