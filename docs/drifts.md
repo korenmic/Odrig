@@ -10447,3 +10447,21 @@ pointer events, and holds its own load back with a late image.
 `emulator/hub.py`, `emulator/httpd.py`, `emulator/web/`; docs/emulator.md; the spec's
 requirements and design; tests/emulator/test_playback.py, test_seek.py,
 test_page_files.py, tests/app/test_emulator_seek.py; the change log of docs/decisions.md.
+
+## Seed 42: a seek far into a long file
+
+**Question.** The owner's look: a seek into the middle of a long animation left the LEDs
+still for seconds before the frame of the point came. The core decodes at most 128 KB of
+a file at one refresh and keeps the picture before until it has come to the picture of
+its time, so one move of the clock by minutes left it decoding the way at 128 KB a
+refresh, 8 seconds for a seek of five minutes into an 87 MB file. How is the move made so
+that the frame of the point shows at once?
+
+**Answer.** In strides: the engine moves its clock 400 ms at a time and asks the core for
+the refresh of each, under its lock, and hands the hub the last frame. A stride of 400 ms
+holds fewer bytes than the core's bound for any file the converter writes, the heaviest
+on the share being under 200 KB a second, so every refresh of the walk comes to its
+picture, and the walk of a seek by minutes takes a fraction of a second. The emulator's
+suite checks it with a file of random pixels whose seconds hold more than the bound.
+
+**Resolution.** `emulator/engine.py`; docs/emulator.md; tests/emulator/test_seek.py.

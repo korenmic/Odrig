@@ -64,6 +64,17 @@ Rules for every task:
     beyond the seed; `docs/emulator.md` read through once for the whole.
   - Requirements: 5.1, 6.4
 
+- [x] 6. A seek far into a long file shows its frame at once
+  - The owner's look of 2026-10-27 found a seek into the middle of a long animation
+    leaving the LEDs still for seconds: the core decodes a bounded part at one refresh.
+    The engine moves its clock in strides of 400 ms with a refresh at each.
+  - Tests: `tests/emulator/test_seek.py`, a file of random pixels whose seconds hold more
+    bytes than the core's bound; the frame after the seek is the frame of the point.
+  - `docs/emulator.md` says the move is made in strides; `docs/drifts.md` records why.
+  - Prove it fails first: with one stride for the whole move the frame after the seek is
+    the picture before.
+  - Requirements: 3.2
+
 - [ ] 5. The owner's look
   - The owner opens the emulator on a long animation, sees the bar move, drags it and
     sees the LEDs follow; then `state.json` becomes `completed` and the seed's line in

@@ -696,8 +696,10 @@ What the emulator knows goes to the page as the `position` event of the
 A seek names a point of the loop, from 0 to the length less two grid steps, and the
 emulator moves playback there with what it has. When the point is at or after the
 position, it moves its own clock forward by the difference, rounded down to whole grid
-steps, and asks the core for a refresh: the core shows the frame of that time, as it
-does after a late refresh, and nothing is replayed. When the point is before the
+steps, in strides of 400 ms with a refresh asked of the core at each, so that the core,
+which decodes a bounded part of a file at one refresh, comes to the picture of each
+stride at once and the LEDs show the frame of the point as soon as the move is done;
+nothing is replayed. When the point is before the
 position, the emulator first restarts the animation with a `play <id>` of its own, which
 the log shows with the transport `seek`, moves its clock one grid step so that the core
 takes the refresh that begins the turn, and then moves to the point. A move of the clock

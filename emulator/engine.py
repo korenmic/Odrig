@@ -11,6 +11,9 @@ from . import binding
 from .lengths import Lengths
 
 GRID_MS = 20
+# A seek moves the clock in strides of this much, so that the core comes to the picture
+# of each stride's time within one refresh.
+SEEK_STRIDE_MS = 400
 # The two members of the status reply the engine reads, as the core writes them.
 ANIMATION = re.compile(rb'"animation":([0-9]+|null)')
 PLAYING = re.compile(rb'"playing":("all"|[0-9]+|null)')
@@ -209,15 +212,30 @@ class Engine:
             }
 
     def _move(self, ms):
-        """Moves the clock forward by a whole number of grid steps and asks the core for
-        the refresh of the new time. Returns the move."""
-        self.start_ns -= ms * 1_000_000
-        now = self.now_ms()
-        self._opened = None
-        if self.core.poll(now):
-            self.hub.refresh(now, self.core.frame())
-        if self._opened is not None:
-            self._take_open(now)
+        """Moves the clock forward by a whole number of grid steps, in strides the core
+        catches up with at one refresh, and asks it for the refresh of each; the hub gets
+        the last. Returns the move.
+
+        A refresh decodes a bounded part of a file and keeps the picture before until it
+        has come to the picture of its time, so one long jump would leave the LEDs still
+        for seconds; a stride of 400 ms holds fewer bytes than that bound for any file the
+        converter writes, and the core's decoding of the whole way takes a fraction of the
+        time it stands for.
+        """
+        left = ms
+        frame = None
+        while left > 0:
+            stride = min(left, SEEK_STRIDE_MS)
+            self.start_ns -= stride * 1_000_000
+            left -= stride
+            now = self.now_ms()
+            self._opened = None
+            if self.core.poll(now):
+                frame = (now, self.core.frame())
+            if self._opened is not None:
+                self._take_open(now)
+        if frame is not None:
+            self.hub.refresh(*frame)
         return ms
 
     def take_lengths(self):

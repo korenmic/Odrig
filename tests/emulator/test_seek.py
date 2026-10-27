@@ -188,3 +188,39 @@ class RecordMode(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeavyFile(unittest.TestCase):
+    """A file whose seconds hold more bytes than the core decodes at one refresh: a seek
+    far into it must show the frame of the point at once, not seconds later."""
+
+    def setUp(self):
+        import random
+        from odrig import jsonframes, odrg
+        rng = random.Random("noise for the seek")
+        frames = tuple((GRID, bytes(rng.randrange(256) for _ in range(60 * 6 * 3))) for _ in range(500))
+        self.folder = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()), "show")
+        self.folder.mkdir()
+        (self.folder / "noise.odrg").write_bytes(odrg.encode(jsonframes.Animation(60, 6, frames)))
+        (self.folder / "mapping.json").write_bytes(support.TWO_LEGS.read_bytes())
+        (self.folder / "show.json").write_text('{"version": 1, "brightness": 128, "items": [{"id": 1, "file": "noise.odrg"}]}\n', encoding="utf-8")
+        self.assertGreater((self.folder / "noise.odrg").stat().st_size, 400_000)
+        self.now = 0
+        self.files = host.FolderHost(self.folder)
+        self.addCleanup(self.files.close)
+        self.core = binding.Core(support.LIBRARY, self.files)
+        self.hub = hub.Hub()
+        self.reference = ReferencePlayer(support.files_of(self.folder))
+        self.engine = engine.Engine(self.core, self.hub, clock=lambda: self.now * 1_000_000, host=self.files, lengths=lengths.Lengths(node=None))
+
+    def test_a_seek_far_into_it_shows_the_frame_of_the_point_at_once(self):
+        for _ in range(50):
+            self.now += GRID
+            self.engine.tick()
+            self.reference.poll(self.now)
+        self.engine.playback.length = 10_000
+        reply = self.engine.seek(8_000)
+        self.assertEqual(reply["ok"], True)
+        ms, frame = self.hub.newest_refresh()
+        self.assertEqual(ms, self.engine.now_ms())
+        self.assertEqual(frame, b"".join(rgb for _, rgb in self.reference.poll(ms)), "the frame after the seek is not the frame of the point")
