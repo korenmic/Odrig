@@ -557,6 +557,19 @@ again, and `catalog` only by Settings, until the target changes. Nothing of this
 on the screen. A show folder that `pack` makes has no catalog, so its rows have no key
 until Settings' rebuild of the board's catalog has made one.
 
+**The phone's own previews.** After an upload from Upload, or from the form of a text or a
+clock, a new one or an edited one, has ended with success and its message is shown, the app
+makes the preview of the bytes it sent with the converter's library, a step at a time so
+that the screen keeps answering, and keeps it in the phone's own catalog of previews, in the
+web view's IndexedDB, under the key of those bytes; the row keeps its empty square until the
+preview is made, and shows it once the catalog's pages give the row that key. The app looks
+a key up in the default catalog first and in the phone's own after, and at its start drops
+each preview of its own whose key the default catalog has; the phone's catalog has no other
+limit. It never leaves the phone, and each phone has its own; the Controller view and
+`app.py serve` have that of the browser they run in. A preview that cannot be made is not
+kept, a web view without IndexedDB, or one that refuses a write, keeps the preview for the
+run alone, and nothing of this is said. No plugin is added for it.
+
 **Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;
 beside each snake stands the data pin that drives it, `GPIO p`. Only the installed 60x60

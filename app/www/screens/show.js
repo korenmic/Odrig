@@ -618,6 +618,7 @@ export function isVisible() {
 // is written again every second.
 export function start(options) {
   message = options.message;
+  previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: (state) => shownOrder(state).filter((animation) => folderOf(animation) === opened)});

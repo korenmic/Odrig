@@ -152,7 +152,7 @@ Rules for every task:
   - `docs/android-app.md`: the previews in the rows and the panel.
   - Suites: the app's, onboarding.
 
-- [ ] 8. The phone's own previews
+- [x] 8. The phone's own previews
   - `app/www/convert.js` (`previewMaker`), `app/www/previews.js` (IndexedDB, `makeOwn`),
     `app/www/screens/storage.js` and `app/www/screens/author.js`.
   - Tests in Chrome against the emulator: an animation uploaded from the Upload screen and

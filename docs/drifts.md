@@ -10718,3 +10718,22 @@ row in selection mode with its note; the row's checkbox counts among the row's o
 **Resolution.** `app/www/previews.js`, `app/www/screens/show.js`, `app/www/index.html`,
 `app/www/style.css`; docs/android-app.md; tests/app/test_previews.py,
 tests/app/page/scenarios/previews.js, tests/app/test_look.py.
+
+## Seed 44: the phone's own catalog in IndexedDB
+
+**Question.** The seed keeps the previews this phone makes in the web view's IndexedDB, in
+steps that leave the screen answering, the default catalog looked up first. How is the
+store laid out, what is a step, and when does a row show a preview of its own?
+
+**Answer.** One database, `odrig-previews`, with one store, `previews`, whose keys are the
+animations' keys and whose values are the GIFs as `image/gif` blobs; at the start every key
+the default catalog has is deleted and the rest are taken into the run as object addresses.
+A step is one step of the library's maker, a bounded number of records or drawings, run
+from a timer of 0 ms. The preview is made from the bytes the upload sent, keyed by their
+CRC-32 and size, the same key the installation's catalog writes for them, so the row shows
+it once the read of the changed catalog gives the row its key. The Animations screen draws
+again when the phone's catalog gains a preview.
+
+**Resolution.** `app/www/previews.js`, `app/www/convert.js`, `app/www/screens/storage.js`,
+`app/www/screens/author.js`, `app/www/main.js`; docs/android-app.md;
+tests/app/test_own_previews.py, tests/app/page/scenarios/ownpreviews.js.
