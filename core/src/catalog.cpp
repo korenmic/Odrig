@@ -301,7 +301,7 @@ bool rename_there(Core &core, const char *from, const char *to) {
 // after it: `upload.part` moved onto it, or it removed. False when the call failed. Kept
 // apart from the reading of the record, whose frame has the line, as it may need room for
 // the host's name of the file.
-__attribute__((noinline)) bool act(Core &core, uint32_t storage, bool moves, const char *name, uint32_t length) {
+ODRIG_NOINLINE bool act(Core &core, uint32_t storage, bool moves, const char *name, uint32_t length) {
     char given[6 + kCatalogNameMost + 1];
     const char *host_name = name;
     if (storage == kExternal) {
@@ -332,7 +332,7 @@ struct Action {
 // it has one, in `action`. Returns whether the record is whole; `mask` is its pages and
 // `actions` the number of its actions. Nothing is done while it is read: the source reads one
 // file at a time.
-__attribute__((noinline)) bool read_record(Core &core, const Place &place, uint32_t *mask, uint32_t *actions, uint32_t wanted, Action *action) {
+ODRIG_NOINLINE bool read_record(Core &core, const Place &place, uint32_t *mask, uint32_t *actions, uint32_t wanted, Action *action) {
     FileSource &source = source_of(core, place);
     *actions = 0;
     if (open_for(core, place, kRecordNames[place.storage]) != kNone) {
@@ -399,7 +399,7 @@ uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker 
 // written: its actions, its pages, its marker, and the record removed, each step once the
 // one before it is done. Returns whether no whole record is left: false when a call failed,
 // and the record stays for the next attempt, which goes on where this one stopped.
-__attribute__((noinline)) bool finish(Core &core, const Place &place) {
+ODRIG_NOINLINE bool finish(Core &core, const Place &place) {
     uint32_t mask = 0;
     uint32_t actions = 0;
     if (!read_record(core, place, &mask, &actions, kNothing, nullptr)) {
@@ -557,7 +557,7 @@ const uint32_t kPageFlush = 1200;
 
 // Writes the new page of a change from the old one: every line but the dropped ones, the
 // added entry in the place of the line of its name, or last. Gives its count and CRC-32.
-__attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t page, const Marker &old, const CatalogChange &change, uint16_t *count, uint32_t *crc) {
+ODRIG_NOINLINE bool write_page(Core &core, uint32_t storage, uint32_t page, const Marker &old, const CatalogChange &change, uint16_t *count, uint32_t *crc) {
     const odrig_host &host = core.host;
     const char *fresh = kNewPageNames[storage][page];
     const Place place = {storage, true};
@@ -755,7 +755,7 @@ const Remembered *remembered_entry(const Core &core, const char *name, uint32_t 
 
 // An entry of the drive's catalog becomes a place, published later; a name twice makes the
 // page's lines unsound.
-__attribute__((noinline)) void stage(Core &core, const EntryLine &entry) {
+ODRIG_NOINLINE void stage(Core &core, const EntryLine &entry) {
     if (core.drive_count >= kDriveMost) {
         return;
     }
@@ -804,7 +804,7 @@ bool page_expected(Core &core) {
 }
 
 // One step of the pages: the next page's line of the marker, or one read of the page.
-__attribute__((noinline)) void page_step(Core &core) {
+ODRIG_NOINLINE void page_step(Core &core) {
     FileSource &source = core.checker->file;
     if (!core.catalog_open) {
         if (core.catalog_page >= kCatalogPages) {
@@ -1106,7 +1106,7 @@ void catalog_read_internal(Core &core) {
     if (catalog.state == kCatalogNone && opened == kFileMissing) {
         return;
     }
-    Marker marker;
+    Marker marker = {};
     if (catalog.state == kCatalogNone) {
         catalog.state = opened == kNone ? read_marker(source, marker) : kCatalogDamaged;
         catalog.detail = catalog.state == kCatalogDamaged ? kDamagedMarker : 0;

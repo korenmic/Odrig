@@ -33,7 +33,7 @@ Rules for every task:
   - Suites: core, onboarding.
   - Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.3
 
-- [ ] 2. The core compiles with Microsoft's compiler
+- [x] 2. The core compiles with Microsoft's compiler
   - `tests/emulator/test_build_script.py`: the class `MicrosoftsCompiler` of the design,
     skipped where the script finds no Microsoft compiler.
   - `core/src/core_state.h`: the macro `ODRIG_NOINLINE`; the nine functions of
