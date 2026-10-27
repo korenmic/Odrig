@@ -76,10 +76,11 @@ function group(filter, choices) {
   }));
 }
 
-// Draws the choices with the number of rows each would show, the other filter as it is.
-export function draw(state) {
-  const animations = state.animations === null ? [] : state.animations;
-  byId("filters").hidden = animations.length === 0;
+// Draws the choices with the number of rows each would show, the other filter as it is:
+// the rows of the level shown when the screen gives them, else every animation.
+export function draw(state, rows = state.animations) {
+  const animations = rows === null ? [] : rows;
+  byId("filters").hidden = (state.animations === null ? [] : state.animations).length === 0;
   for (const [filter, choices, counted] of [["storage", STORAGE, (name) => animations.filter((item) => storageIs(item, name) && typeIs(item, chosen.type)).length],
                                             ["type", TYPE, (name) => animations.filter((item) => typeIs(item, name) && storageIs(item, chosen.storage)).length]]) {
     for (const button of byId(`filter-${filter}`).children) {

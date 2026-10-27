@@ -16,8 +16,10 @@ const uint32_t kCatalogPages = 16;
 const uint32_t kMarkerSize = 409;
 // The longest line of a page, with its line feed, and of a commit record without it.
 const uint32_t kCatalogLineRoom = 162;
-// The longest name a catalog holds.
+// The longest name a catalog holds, a path from the card's folder, and the most folders a
+// path may have.
 const uint32_t kCatalogNameMost = 100;
+const uint32_t kCatalogDeepest = 3;
 
 // What the start or a drive's plug-in found of a catalog.
 struct Marker {

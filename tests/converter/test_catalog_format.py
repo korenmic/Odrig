@@ -21,7 +21,7 @@ def animation(seed, width=60, height=60, durations=(40, 60, 100)):
 
 class TheVectors(unittest.TestCase):
     def test_every_vector_reads_as_its_case_says(self):
-        self.assertEqual(len(CASES), 23)
+        self.assertEqual(len(CASES), 27)
         for name, wanted in sorted(CASES.items()):
             with self.subTest(vector=name):
                 found = catalog.read(catalog.Storage(VECTORS / "catalog" / name))
@@ -86,9 +86,18 @@ class Names(unittest.TestCase):
     def test_the_names_a_catalog_may_hold(self):
         for name in ("a.odrg", "Fire Swirl 2.ODRG", "x" * 95 + ".odrg", "clip-01_b.odrg", "#1 (new).odrg"):
             self.assertTrue(catalog.name_allowed(name), name)
-        for name in ("", ".hidden.odrg", " a.odrg", "a.odrg ", "a.odrg.", "x" * 96 + ".odrg", "a/b.odrg", "a\\b.odrg", "a:b.odrg", "a*b.odrg", "a?b.odrg",
+        for name in ("", ".hidden.odrg", " a.odrg", "a.odrg ", "a.odrg.", "x" * 96 + ".odrg", "a\\b.odrg", "a:b.odrg", "a*b.odrg", "a?b.odrg",
                      'a"b.odrg', "a<b.odrg", "a>b.odrg", "a|b.odrg", "a.txt", "caf\u00e9.odrg", "a\tb.odrg", "123"):
             self.assertFalse(catalog.name_allowed(name), name)
+
+    def test_a_name_may_be_a_path_of_at_most_three_folders(self):
+        for name in ("night/comet.odrg", "night/deep/x.odrg", "a/b/c/d.odrg", "2026/day.odrg", "a b/c.ODRGX", "x" * 50 + "/" + "y" * 44 + ".odrg"):
+            self.assertTrue(catalog.name_allowed(name), name)
+        for name in ("/a.odrg", "a/", "a//b.odrg", "a /b.odrg", "a. /b.odrg", ".a/b.odrg", "a/.b.odrg", "../b.odrg", "night/../x.odrg", "a/b/c/d/e.odrg",
+                     "x" * 96 + "/a.odrg", "a/123", "a/b.txt", 'a"b/c.odrg', "a\\b/c.odrg", "a/b.odrg "):
+            self.assertFalse(catalog.name_allowed(name), name)
+        self.assertEqual(catalog.page_of("night/comet.odrg"), catalog.page_of("night/comet.odrg"))
+        self.assertNotEqual(catalog.page_of("night/comet.odrg"), catalog.page_of("comet.odrg"))
 
 
 class TheCommitRecord(unittest.TestCase):

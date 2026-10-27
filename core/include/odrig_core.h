@@ -75,8 +75,10 @@ typedef struct odrig_host {
        at place p of the drive's list as `drive/p` to open and read_at, and the file of the
        drive's folder `odrig` with the name n as `drive/n`, n not made of digits alone, to
        open, read_at, write_open, rename and remove; no name of the installed file set has a
-       slash. A name of the drive is 1 to 100 bytes of printable ASCII other than
-       / \ : * ? " < > |, and does not begin with a dot. */
+       slash. A name of the drive is the path of a file from the folder odrig: the names of
+       at most three folders and the file's, joined by /, 1 to 100 bytes in all, each part
+       printable ASCII other than \ : * ? " < > | that neither begins nor ends with a space
+       or a dot. */
 
     /* The number of the drive that is plugged in now: a number other than 0 that changes
        each time a drive is plugged in, or 0 while none is. Called at refreshes. */
@@ -84,9 +86,12 @@ typedef struct odrig_host {
 
     /* The name of the animation file at this place of the drive's list, as the drive has it,
        into buffer with a 0 after it, cut to capacity - 1 bytes. The list is the files of the
-       drive's folder `odrig` whose names end in `.odrg` or `.odrgx`, in any case, and do not begin with
-       a dot, in the order of their names, the first 256. Returns 1, or 0 when that drive
-       has no file at that place or is not plugged in any more. */
+       drive's folder `odrig` and of its sub-folders to three levels whose names end in
+       `.odrg` or `.odrgx`, in any case, and do not begin with a dot: depth first, a folder's
+       files by the bytes of their names and then its sub-folders by the bytes of their
+       names, at most 256 files and 32 sub-folders; a file in a sub-folder is named by its
+       path from odrig. Returns 1, or 0 when that drive has no file at that place or is not
+       plugged in any more. */
     int (*drive_name)(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity);
     /* Optional capacity of this mounted drive, in bytes. Returns 1, or -1 when
        unavailable or the generation changed. No writes are performed. */

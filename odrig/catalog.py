@@ -24,6 +24,11 @@ PART = "upload.part"
 MARKER_SIZE = 409
 LONGEST_NAME = 100
 LONGEST_LIST = 256
+# The most sub-folders of a card's folder `odrig` that are taken, how deep below it a
+# folder may lie, and the folder of the file system that is never one of them.
+MOST_FOLDERS = 32
+DEEPEST = 3
+SYSTEM_FOLDER = "System Volume Information"
 # The canvas of the installation, which a card's animations are for.
 CANVAS = (60, 60)
 TYPES = ("frames", "text", "widget")
@@ -68,15 +73,86 @@ def page_of(name):
     return value & 15
 
 
+def part_sound(part):
+    """Whether one part of a path, a folder's name or a file's, keeps the rule of its
+    characters: printable ASCII other than / \\ : * ? " < > |, neither beginning nor ending
+    with a space or a dot, and not empty."""
+    if not part or not part.isascii():
+        return False
+    if any(not 0x20 <= ord(character) <= 0x7E or character in FORBIDDEN for character in part):
+        return False
+    return part[0] not in ". " and part[-1] not in ". "
+
+
 def name_allowed(name):
-    """Whether a catalog may hold a file of this name."""
+    """Whether a catalog may hold a file of this name: a path from the card's folder `odrig`,
+    the names of at most three folders and the file's name joined by `/`, 1 to 100 bytes in
+    all. A folder's name keeps the rule of its characters and may be digits alone; the
+    file's name keeps it, is not digits alone, and ends in `.odrg` or `.odrgx`."""
     if not 1 <= len(name) <= LONGEST_NAME or not name.isascii():
         return False
-    if any(not 0x20 <= ord(character) <= 0x7E or character in FORBIDDEN for character in name):
+    parts = name.split("/")
+    if len(parts) > DEEPEST + 1 or not all(part_sound(part) for part in parts):
         return False
-    if name[0] in ". " or name[-1] in ". " or name.isdigit():
+    return not parts[-1].isdigit() and parts[-1].lower().endswith(ENDINGS)
+
+
+def listed(path):
+    """Whether a lister takes a file of this path from the card: its name ends in `.odrg` or
+    `.odrgx` in any case and does not begin with a dot, and every folder of the path, at
+    most three, keeps the rule of a folder's name, does not begin with a dot and is not
+    `System Volume Information`."""
+    *folders, file = path.split("/")
+    if len(folders) > DEEPEST or not file.lower().endswith(ENDINGS) or file.startswith("."):
         return False
-    return name.lower().endswith(ENDINGS)
+    return all(part_sound(folder) and folder != SYSTEM_FOLDER for folder in folders)
+
+
+def listing_key(path):
+    """The place of a path in the depth-first order of a listing: a folder's files by the
+    bytes of their names, then its sub-folders by the bytes of their names, each listed the
+    same way. A tuple that is a prefix of another sorts first, so a folder's files come
+    before its sub-folders' and siblings sort by their bytes."""
+    *folders, file = path.split("/")
+    return tuple(folder.encode("utf-8", "surrogateescape") for folder in folders), file.encode("utf-8", "surrogateescape")
+
+
+def cut_listing(paths):
+    """The paths of a sorted listing that the limits take: at most 256 files and at most 32
+    sub-folders, a folder counted with each of its ancestors not yet counted when the first
+    file at or below it is kept. The files after the 256th, and every file from the one
+    whose folder would be counted past the 32nd on, are passed over."""
+    kept, counted = [], set()
+    for path in paths:
+        folders = path.split("/")[:-1]
+        new = {"/".join(folders[:depth]) for depth in range(1, len(folders) + 1)} - counted
+        if len(kept) >= LONGEST_LIST or len(counted) + len(new) > MOST_FOLDERS:
+            break
+        counted |= new
+        kept.append(path)
+    return kept
+
+
+def walk(folder):
+    """The paths of the animation files of a folder and of its sub-folders to three levels,
+    as `listed` takes them, in no order; empty when the folder cannot be listed."""
+    found = []
+    pending = [("", 0)]
+    while pending:
+        prefix, depth = pending.pop()
+        try:
+            with os.scandir(os.path.join(folder, *prefix.split("/")) if prefix else folder) as entries:
+                for entry in entries:
+                    path = f"{prefix}/{entry.name}" if prefix else entry.name
+                    if entry.is_dir():
+                        if depth < DEEPEST and part_sound(entry.name) and entry.name != SYSTEM_FOLDER:
+                            pending.append((path, depth + 1))
+                    elif entry.is_file() and listed(path):
+                        found.append(path)
+        except OSError:
+            if not prefix:
+                return []
+    return found
 
 
 class Unusable(Exception):
@@ -276,16 +352,11 @@ class Storage:
         return True
 
     def names(self):
-        """The animation files of the folder as a drive lists them: names ending in `.odrg`
-        or `.odrgx` in any case and not beginning with a dot, in the order of their bytes, the
-        first 256."""
-        try:
-            with os.scandir(self.folder) as entries:
-                found = [entry.name for entry in entries if entry.is_file()]
-        except OSError:
-            return []
-        kept = [name for name in found if name.lower().endswith(ENDINGS) and not name.startswith(".")]
-        return sorted(kept, key=os.fsencode)[:LONGEST_LIST]
+        """The animation files of the folder and of its sub-folders as a drive lists them, by
+        their paths from the folder: a folder's files by the bytes of their names, then its
+        sub-folders by the bytes of their names, each the same way, within the limits of
+        `cut_listing`."""
+        return cut_listing(sorted(walk(self.folder), key=listing_key))
 
 
 class MemoryStorage(Storage):
@@ -310,8 +381,7 @@ class MemoryStorage(Storage):
         return self.files.pop(name, None) is not None
 
     def names(self):
-        kept = [name for name in self.files if name.lower().endswith(ENDINGS) and not name.startswith(".")]
-        return sorted(kept, key=lambda name: name.encode("utf-8", "surrogateescape"))[:LONGEST_LIST]
+        return cut_listing(sorted((name for name in self.files if listed(name)), key=listing_key))
 
 
 @dataclasses.dataclass

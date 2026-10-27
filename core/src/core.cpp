@@ -8,6 +8,7 @@
 #include "odrig_core.h"
 #include "order.h"
 #include "player.h"
+#include "playlist.h"
 #include "reasons.h"
 #include "show.h"
 #include "storage.h"
@@ -221,14 +222,25 @@ bool same_name(const char *one, const char *other) {
 
 }  // namespace
 
+bool drive_id_taken(const Core &core, uint32_t id) {
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        if (core.drive[place].id == id) {
+            return true;
+        }
+    }
+    for (uint32_t folder = 1; core.folders != nullptr && folder <= core.folder_count; ++folder) {
+        if (core.folders[folder].id == id) {
+            return true;
+        }
+    }
+    return false;
+}
+
 uint16_t free_drive_id(const Core &core) {
     for (uint32_t id = kDriveFirstId; id <= 65535; ++id) {
-        bool taken = false;
+        bool taken = drive_id_taken(core, id);
         for (uint32_t item = 0; item < core.item_count && !taken; ++item) {
             taken = core.items[item].id == id;
-        }
-        for (uint32_t place = 0; place < core.drive_count && !taken; ++place) {
-            taken = core.drive[place].id == id;
         }
         if (!taken) {
             return static_cast<uint16_t>(id);
@@ -341,6 +353,12 @@ void drive_step(Core &core) {
 }
 
 void start(Core &core) {
+    // The current playlist's window and its saved file, before the file is read.
+    core.window_started = 0;
+    core.window_spent = 0;
+    core.playlist_saved = 0;
+    core.save_due = 0;
+    core.file_present = 0;
     // A change of the catalog that was committed is finished before the parts of a change
     // are cleared away: its upload's part may be the file it puts in place.
     catalog_finish_internal(core);
@@ -429,6 +447,7 @@ void start(Core &core) {
     }
     if (!core.invalid) {
         order_start(core);
+        playlist_start(core);
     }
 }
 
@@ -477,6 +496,7 @@ void drive_touch(Core &core) {
     core.drive_number = number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     catalog_drive_went(core);
     catalog_drive_plugged(core);
     if (catalog_drive_loading(core)) {
@@ -492,6 +512,7 @@ void drive_take_listed(Core &core) {
     const uint32_t number = core.drive_number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    tree_clear(core);
     if (number != 0 && core.host.drive_list != nullptr) {
         // A host that lists the folder only when asked.
         core.host.drive_list(core.host.ctx, number);
@@ -507,10 +528,12 @@ void drive_take_listed(Core &core) {
         entry.state = kDriveToCheck;
         entry.fault = kNone;
     }
-    // Every file has its id at once, in the order of the list, before it is checked.
+    // Every file has its id at once, in the order of the list, before it is checked; the
+    // folders come after them.
     for (uint32_t place = 0; place < core.drive_count; ++place) {
         core.drive[place].id = free_drive_id(core);
     }
+    tree_build(core);
     // The playlist goes on after an animation that left by the keys it had.
     player_drive_changed(core);
     order_drive_found(core);

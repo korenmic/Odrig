@@ -86,10 +86,10 @@ Every function receives `ctx` as its first argument.
 | `space` | `int space(void *ctx, uint32_t *free_bytes, uint32_t *total_bytes)`: the free and the total bytes of the storage the files are in; a value above 4,294,967,295 is given as that. Returns 1, or -1 when the host cannot tell. |
 | `read_at` | `int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity)`: reads a file apart from the one that `open`, `read` and `close` hold: up to `capacity` bytes from this offset. Returns the number read, 0 at or after the end of the file, -1 on a failure and when there is no such file. `capacity` is never above 512. |
 | `drive` | `uint32_t drive(void *ctx)`: the number of the drive of animations that is plugged in now: a number other than 0 that changes each time a drive is plugged in, or 0 while none is. The core calls it at each refresh, before the LED data is made. `NULL` for a host without a drive; see [a drive](#a-drive). |
-| `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
+| `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes; for a file in a sub-folder of the drive's folder, its path from that folder, the parts joined by `/`. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
 | `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
-| `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` now, as `drive_name` describes the list, and returns the number of its animation files, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
+| `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, at most 256 files and 32 sub-folders, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
 
@@ -126,9 +126,10 @@ The last seven members are the storage functions: three that write a file, `rena
 The drive and drive_name members describe the drive. A host with a drive sets both, and has storage that
 can be changed; with either of them `NULL`, or with `write_open` `NULL`, the core has no
 drive and calls neither. To `open` and `read_at` the core names the file at place `p` of
-the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash. A
-host that is given such a name for a drive that is gone answers as for a file that is not
-there.
+the drive's list `drive/p`, as `drive/0`; no name of the installed file set has a slash,
+and a drive's file is named by its path from the drive's folder, `drive/night/comet.odrg`
+for one in a sub-folder. A host that is given such a name for a drive that is gone answers
+as for a file that is not there.
 
 ### What the core offers
 
@@ -585,6 +586,41 @@ needs it.
 - A drive's file gets its id when the drive is taken up, before it is checked: the lowest
   from 60001 up that no item of the show and no file of the drive before it has. The same
   files with the same show get the same ids, and a file left out keeps its id.
+- The drive's sub-folders make a tree, built from the names of the places once every file
+  has its id: a table of at most 32 folders beside the root, in the listing's order, each
+  with a place at or below it, its depth and the index after its last descendant, so that
+  a folder's subtree is one range of the table; and for each place the index of its
+  folder. A listed drive's tree is built at once; a cataloged drive's when its places are
+  published, since its pages name a folder's files in any order: a folder is put before
+  the folders below it and among its siblings by the bytes of its name, one part of the
+  path at a time, not by the bytes of the whole paths. A place whose folder would be the
+  33rd sub-folder, which only a catalog can name, is left out with `too-many-folders`. The
+  folders get ids after the files', from the same pool, in the order of the table, and
+  `list` gives each as `{"id":<id>,"playlist":"<path>","external":true}` after the show's
+  items and before the files. The tree is dropped with the places; a removal takes the
+  folders left without a file out of it, the others keeping their ids and their order; a
+  file uploaded to the drive lies in the drive's folder itself, the root's.
+- The playlist is walked by the exhausting key of each animation: the index of its folder
+  in the table, 0 for an item of the show, then its key in the saved order. The range
+  walked is the current playlist's, the folders of its subtree, or the root's, the whole
+  table, while the current one has nothing to play; which it is is judged where a turn
+  ends, so that the current playlist takes over at the end of the turn in progress, from
+  its first animation. The current playlist is kept as its path and its index in the
+  table, found again from the path whenever the tree is built, and the root stands for a
+  path the tree has not. A jump by `play` outside the range keeps the animation whose turn
+  it cut, which plays again after the jumped turn. `status` names the current folder's id
+  as `playing` while the tree holds it.
+- The window: a playlist becomes current at a timestamp, by a choice or by the rotation,
+  and the core keeps that moment and the milliseconds spent in the window before it; the
+  window is kWindowMs, 86,400,000, of running time. Whether it has passed is judged by the
+  turn's end time where a turn of the playlist ends, by the refresh's time at a refresh
+  while a cycle or nothing plays, and when a mapping test ends; the rotation makes the
+  next folder of the table current, the root after the last and while the tree is not
+  known, and the new playlist plays from its first animation, or a cycle goes on. The
+  whole rounds that a long time without a refresh takes off at once end before the
+  window's end, and a rotation sums the new playlist's round anew; the root alone,
+  current again at its window's end, goes on as it was with a fresh window. `status`
+  writes the seconds left as `left`, its last member.
 - A drive whose host says it can be written, with a catalog that is `ok`, is changed by
   the core: an upload to it is written as `drive/upload.part`, checked, and moved onto its
   name with its entry in one commit of the drive's catalog; a removal takes the entry out
@@ -657,6 +693,11 @@ tables. The core keeps three names in the folder for itself:
 | `upload.part` | The bytes of the open upload. |
 | `show.part` | The next `show.json`, until it is renamed. |
 | `pending.txt` | The names of `.odrg` files that a change makes or is about to delete, one on a line, each ended by a line feed. A file named here that no item of `show.json` names is not part of the show. |
+
+The saved order and the saved playlist have files of their own, `order.txt` and
+`playlist.txt`, each written as `order.part` or `playlist.part` and renamed: see [the saved
+order](#the-saved-order) and [the saved playlist](#the-saved-playlist). No show names any
+of these: a name in `show.json` ends in `.odrg` or `.odrgx`.
 
 There are four kinds of change. Each line is one call to the host; "write X" is
 `write_open`, one or more `write` of at most 1,500 bytes, and `write_close`.
@@ -797,7 +838,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,808 |
+| The core object | fixed | 3,872 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -814,17 +855,19 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,341** |
+| **Total** | | **125,405** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,818 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,545 bytes for the target file. A host with a drive
+of the check and the saved order: 77,609 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
-out, 40 bytes each, 640 bytes; and the block of the saved order holds 3 bytes more for
-each place, 768. With it the target file takes 129,821 bytes, 99 percent. The size and the number of frames
+out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
+each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
+8 bytes and 104 bytes of room for the current playlist's path, 368.
+With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -913,7 +956,7 @@ leg; and `ready`.
 | `--trace-store` | Prints `store <call> <arguments> <result>` for every storage call: `store write_open upload.part 1`, `store write 1500 1`, `store write_close 1`, `store rename show.part show.json 1`, `store remove pending.txt 0`. |
 | `--read-back-fails OFFSET` | `read_at` returns -1 when it is asked for bytes of `upload.part` at or after that offset. |
 | `--read-back-differs OFFSET` | `read_at` gives the byte at that offset of `upload.part` with one bit changed. |
-| `--drive DIR` | The host has a drive, plugged in at the start: its list is the files of the folder `DIR/odrig` by the rules of `drive_name`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
+| `--drive DIR` | The host has a drive, plugged in at the start: its list is the animation files of the folder `DIR/odrig` and of its sub-folders to three levels, depth first by the rules of `drive_list`, each named by its path from `odrig`. The core then reads them as `drive/0`, `drive/1` and so on. With `--check-first` they are read before the startup lines too. |
 | `--drive-pulled` | With `--drive`: no drive is plugged in at the start. |
 | `--command-read-fails FILE OFFSET` | `read_at` returns -1 for that file at or after that offset when it is called inside a command, as `read` and `upload expect` call it; the checks read the file whole. |
 | `--drive-read-fails NAME OFFSET` | With `--drive`: `read` fails at that offset of the drive's file of that name. `read_at` is not touched, so the check finds the file sound and the player meets the fault. |
@@ -1026,3 +1069,29 @@ for and a drive's name stand after them.
 Then the core reads `order.txt` again and sets every key. A call that fails before the
 arrow removes `order.part` and answers `storage-error`; the keys are as they were. The
 start removes an `order.part` that a power cut left.
+
+## The saved playlist
+
+The current playlist and the time spent in its window live in `playlist.txt`, beside
+`order.txt`, on a host with a drive whose storage can be changed. Its text is three lines:
+`odrig-playlist 1`, the playlist's path from the drive's folder or an empty line for the
+root, and the milliseconds spent in its window, as `odrig-playlist 1`, `night/deep`,
+`5400000`. An absent file, or one that is not of this form, means the root with a fresh
+window.
+
+The core reads it at the start, once the show is read and after `order.txt`, through the
+second source, and keeps the path and the time: the root is current until the tree is
+known, and plays in the folder's place meanwhile; when the tree is built the folder of the
+path is current again, or the root when the card has no playlist of that path, with a
+fresh window, saved as such. The removal of the current folder's last file makes the root
+current the same way.
+
+The file is written as `playlist.part`, one `write` of at most 130 bytes from a buffer on
+the stack, `write_close` and `rename`, when the current playlist changes by a choice or by
+the rotation, and at most once in 900,000 ms while the tree has a folder, from the
+refresh, so that a restart loses at most 15 minutes of the window. A write while an upload
+receives its bytes, or while a rebuild holds a page open, waits for the next refresh that
+is free. Nothing is written while the tree has no folder and no file exists: a show
+without a card, or with a flat card, makes no storage call more than before. When the
+host fails the part is removed and nothing is refused. The start probes `playlist.part`
+with `read_at` and removes it when it is there, as it does `order.part`.
