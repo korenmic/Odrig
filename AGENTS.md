@@ -129,8 +129,7 @@ present, and do not build on them.
 - **The app's count of installed and external animations**, seed 28: a dashboard line.
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
-- **Bounded decoding and responsive fault handling**, seed 31: no bad file may freeze the board.
-- **Boot-local animation quarantine and recovery**, seed 32: boot completes; bad files grayed.
+- **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
 - **Managed internal and external animation catalogs**, seed 35: built; the board session and the owner's phone check are open.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
@@ -139,6 +138,7 @@ present, and do not build on them.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
 - **A cross-wired snake 10**, seed 43: its strips chained up, up, down; a checkbox in Settings.
 - **Previews of the animations**, seed 44: a preview catalog in git for the app and the emulator.
+- **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 
 The state of every seed is in the `state.json` of its folder.
 
