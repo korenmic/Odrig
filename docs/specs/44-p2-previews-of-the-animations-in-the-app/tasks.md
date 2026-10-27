@@ -171,7 +171,7 @@ Rules for every task:
     `docs/drifts.md`: the tracked previews as the media the repository holds.
   - Suites: the converter's, onboarding.
 
-- [ ] 10. Every suite, the firmware and the APK
+- [x] 10. Every suite, the firmware and the APK
   - Every suite this computer runs; `python3 firmware/fw.py build`; the APK built and its
     suite run; the APK's size, the number of previews and their size in the commit
     message and in the change-log entry.
