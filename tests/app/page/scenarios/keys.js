@@ -1,13 +1,26 @@
 // The keys the app learns from the catalogs' pages, as its client holds them, followed
-// through the plan the test gives: waits for a condition, steps of the test, sleeps,
-// presses, another address, and a snapshot of the client by a name at each `snap`.
+// through the plan the test gives: waits for a condition or for rows, steps of the test,
+// sleeps, presses, a folder entered, another address, and a snapshot of the client and of
+// the rows' squares by a name at each `snap`.
 
 function keysOf(kept) {
   return kept === null ? null : {generation: kept.generation, entries: kept.entries, byName: Object.fromEntries(kept.byName)};
 }
 
-function snapshot(client) {
+// Each row of the level shown: its file, the source of its square's image, or null, and the
+// square's background colour.
+function squares(app) {
+  const view = app.frame.contentWindow;
+  return [...app.doc.querySelectorAll("#animations-list > .row")].map((row) => {
+    const square = row.querySelector(".thumb");
+    const image = square === null ? null : square.querySelector("img");
+    return {file: row.dataset.file, src: image === null ? null : image.getAttribute("src"), background: square === null ? null : view.getComputedStyle(square).backgroundColor};
+  });
+}
+
+function snapshot(client, app) {
   return {
+    squares: squares(app),
     internal: keysOf(client.state.keys.internal),
     external: keysOf(client.state.keys.external),
     version: client.state.keysVersion,
@@ -56,6 +69,11 @@ export default async function (app) {
       await app.step();
     } else if (step.sleep !== undefined) {
       await app.sleep(step.sleep);
+    } else if (step.untilRows !== undefined) {
+      await app.until(() => app.doc.querySelectorAll("#animations-list > .row").length >= step.untilRows, `${step.untilRows} rows`, step.ms || 8000);
+    } else if (step.enter !== undefined) {
+      app.doc.querySelector(`#animations-list > .folder-row[data-path="${step.enter}"]`).click();
+      await app.until(() => app.text("level-title") === step.enter, `the folder ${step.enter}`);
     } else if (step.press !== undefined) {
       app.press(step.press);
     } else if (step.address !== undefined) {
@@ -65,7 +83,7 @@ export default async function (app) {
       await app.until(() => app.kept() === step.address, "the new address kept");
       app.press("Animations");
     } else if (step.snap !== undefined) {
-      seen[step.snap] = snapshot(client);
+      seen[step.snap] = snapshot(client, app);
     } else if (step.say !== undefined) {
       seen[step.say] = app.text(step.id);
     }

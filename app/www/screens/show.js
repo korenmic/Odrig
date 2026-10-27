@@ -208,6 +208,15 @@ function now(status, animations) {
   return found === undefined ? `Now ${status.animation}` : `Now ${found.id} ${found.file}`;
 }
 
+// The source of an animation's preview: by the key the board gives it, else by its name and
+// size in the default catalog; none for a row with a fault.
+function previewOf(animation) {
+  if (typeof animation.fault === "string") {
+    return null;
+  }
+  return previews.sourceOf(client.keyOf(animation) ?? previews.keyByName(animation.file, animation.bytes));
+}
+
 // The panel of what plays: the words of `now`, and before them the square of the preview of
 // the animation on the LEDs while something plays and the list holds it, which is no test.
 function drawNow(status, state) {
@@ -218,7 +227,7 @@ function drawNow(status, state) {
     undefined : state.animations.find((animation) => animation.id === status.animation);
   const square = byId("now-thumb");
   square.hidden = shown === undefined;
-  previews.show(square, shown === undefined || typeof shown.fault === "string" ? null : previews.sourceOf(client.keyOf(shown)));
+  previews.show(square, shown === undefined ? null : previewOf(shown));
 }
 
 // The animations in the order the list shows them: the saved order when another part of
@@ -383,7 +392,7 @@ function rowsState(state, animations, here) {
     const note = made.querySelector(".row-state");
     note.textContent = saving ? "Saving\u2026" : animation.ignored === true ? "\u2298 Ignored" : "";
     note.hidden = note.textContent === "";
-    previews.show(made.querySelector(".thumb"), typeof animation.fault === "string" ? null : previews.sourceOf(client.keyOf(animation)));
+    previews.show(made.querySelector(".thumb"), previewOf(animation));
     const check = made.querySelector(".pick input");
     if (check) {
       check.checked = selection.has(animation.id);

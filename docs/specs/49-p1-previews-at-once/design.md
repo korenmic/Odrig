@@ -120,10 +120,10 @@ reply or by the kept keys.
   under `/thumbnails/` in place of `thumbnails/`, its `catalog.js` and its GIFs, by
   `_Pages`.
 - `tests/app/page/scenarios/keys.js`: its snapshot gains each row's file, the source of
-  its square's image and the square's background colour; its plan gains `{"until":
-  "rows"}`, rows drawn, `{"until": "some-keys"}`, a row with a key while the storage has
-  no keys, and `{"reload": true}`, the app loaded again and its client taken again from
-  the new frame.
+  its square's image and the square's background colour; its plan gains `{"untilRows":
+  n}`, n rows drawn, `{"enter": folder}`, a folder opened, `{"until": "some-keys"}`, a row
+  with a key while the storage has no keys, and `{"reload": true}`, the app loaded again
+  and its client taken again from the new frame.
 - `tests/app/test_previews.py`:
   - rows named as files of the default catalog, with their sizes, show those previews
     while every `catalog page` is refused with `busy`, by `Paged.busy_always` of

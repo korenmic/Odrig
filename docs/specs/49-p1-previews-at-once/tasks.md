@@ -22,7 +22,7 @@ Rules for every task:
 - The decisions a task takes beyond the seed go into `docs/drifts.md` under "Seed 49" in
   the task's commit or in task 4's.
 
-- [ ] 1. A preview by name and size
+- [x] 1. A preview by name and size
   - Set the seed's `state.json` to `in_progress`.
   - `app/www/previews.js`: `named` and `keyByName(file, bytes)`.
   - `app/www/screens/show.js`: `previewOf(animation)`, used by `rowsState()` and
@@ -30,7 +30,7 @@ Rules for every task:
   - `tests/app/support.py`: `run(..., thumbnails=None)`, a folder served under
     `/thumbnails/` in place of `thumbnails/`.
   - `tests/app/page/scenarios/keys.js`: the squares in its snapshot (file, source,
-    background colour) and the plan's `{"until": "rows"}`.
+    background colour) and the plan's `{"untilRows": n}` and `{"enter": folder}`.
   - `tests/app/test_keys.py`: `Paged.busy_always`, every `catalog page` refused with
     `busy`.
   - `tests/app/test_previews.py`: the rows by name and size while every page is `busy`;

@@ -23,8 +23,9 @@ def files(prefix, count, seed):
 
 class Paged:
     """A target with two catalogs whose pages it gives `piece` bytes at a time. Each page
-    answer can wait, be refused once with `busy`, be refused with a code, have a `null`
-    generation, or come with the generation one more after `bump_after` pages."""
+    answer can wait, be refused once with `busy`, or always while `busy_always` is set, be
+    refused with a code, have a `null` generation, or come with the generation one more
+    after `bump_after` pages. Its list names the card's folders of `folders` too."""
 
     def __init__(self, internal, external, piece=512):
         self.lock = threading.Lock()
@@ -34,6 +35,8 @@ class Paged:
         self.piece = piece
         self.delay = 0.0
         self.busy_once = set()
+        self.busy_always = False
+        self.folders = []
         self.refused_at = {}
         self.null_at = set()
         self.bump_after = None
@@ -69,6 +72,8 @@ class Paged:
             self.asked_pages.append((time.monotonic(), storage, page, offset))
             if self.refuse_pages:
                 return refusal("bad-argument")
+            if self.busy_always:
+                return refusal("busy")
             if (storage, page) in self.busy_once:
                 self.busy_once.discard((storage, page))
                 return refusal("busy")
@@ -93,6 +98,7 @@ class Paged:
         with self.lock:
             items = [{"id": number + 1, "file": name, "bytes": size, "ignored": False, "external": False} for number, (name, size, crc) in enumerate(self.files["internal"])]
             items += [{"id": 60001 + number, "file": name, "bytes": size, "external": True} for number, (name, size, crc) in enumerate(self.files["external"])]
+            items += [{"id": 60501 + number, "playlist": folder, "external": True} for number, folder in enumerate(self.folders)]
         return (200, json.dumps({"ok": True, "items": items, "next": None}) + "\n")
 
     def space(self, line):

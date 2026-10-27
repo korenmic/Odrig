@@ -1,8 +1,9 @@
 // The previews of the animations: the default preview catalog that comes with the app,
-// `thumbnails/`, which maps the key of an animation's file to its GIF; the phone's own
-// catalog of previews, those this phone made of what it uploaded, kept in the web view's
-// IndexedDB; and the square of a row or of the panel of what plays, which shows the preview
-// of a key or stays empty.
+// `thumbnails/`, which maps the key of an animation's file to its GIF and to the names it
+// was given, so that a name and a size find a key too; the phone's own catalog of previews,
+// those this phone made of what it uploaded, kept in the web view's IndexedDB; and the
+// square of a row or of the panel of what plays, which shows the preview of a key or stays
+// empty.
 
 import {previewMaker} from "./convert.js";
 import {crc32} from "./crc32.js";
@@ -17,9 +18,34 @@ const own = new Map();
 let database = null;
 const watchers = new Set();
 
+// The keys of the default catalog by each of the names it gives them.
+const named = new Map();
+for (const [key, entry] of Object.entries(defaults)) {
+  for (const name of entry.names) {
+    if (!named.has(name)) {
+      named.set(name, []);
+    }
+    named.get(name).push(key);
+  }
+}
+
 // Whether the default catalog holds a key.
 export function inDefaults(key) {
   return Object.prototype.hasOwnProperty.call(defaults, key);
+}
+
+// The key of the default catalog that a file's name and size find, for a row whose key is
+// not known: the one key of that size that the catalog gives the name, or, for a file of the
+// card whose path the catalog does not name, its own name. Null when none or more than one
+// is found.
+export function keyByName(file, bytes) {
+  if (typeof file !== "string" || typeof bytes !== "number") {
+    return null;
+  }
+  const own = file.slice(file.lastIndexOf("/") + 1);
+  const keys = named.get(file) ?? (file.includes("/") ? named.get(own) : undefined) ?? [];
+  const sized = keys.filter((key) => key.endsWith(`-${bytes}`));
+  return sized.length === 1 ? sized[0] : null;
 }
 
 // The source of the preview of a key: the GIF of the default catalog beside the app, else the
