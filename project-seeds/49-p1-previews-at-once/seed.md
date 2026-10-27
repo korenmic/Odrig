@@ -1,20 +1,21 @@
-# Previews at once, without the dark squares
+# Previews at once, each as soon as it is known
 
 ## Summary
 
 In the operators' app, each animation row shows its preview as soon as the row is shown,
-and no square is black while the app waits for it. Today a row's preview is found by the
-key of its file, and the app learns the keys only by reading the catalogs of the board,
-512 bytes a request, after the whole list and after every other request, and uses the
-keys of a storage only once all 16 pages of its catalog are read. Every start of the app
-reads them again. In between, every square is a black square. In the emulator, with the
-card of 2026-10-27 and a show of 116 animations, the app sent 86 requests before the
-first preview, and then all of them appeared at once. This seed shows a preview from what
-the app already holds: the default preview catalog names the files of each key, so a row
-whose name and size match one key shows its preview at once. The phone keeps the keys it
-has read, and uses them at its next start when the board's catalog has not changed. The
-keys of a page are used as soon as that page is read. A square with no preview takes the
-row's own background instead of black. Nothing changes on the board or in the commands.
+or as soon as its own preview is known, without waiting for the others. Today a row's
+preview is found by the key of its file, and the app learns the keys only by reading the
+catalogs of the board, 512 bytes a request, after the whole list and after every other
+request, and uses the keys of a storage only once all 16 pages of its catalog are read.
+Every start of the app reads them again. In between, every square is the empty black
+square. In the emulator, with the card of 2026-10-27 and a show of 116 animations, the app
+sent 86 requests before the first preview, and then all of them appeared at once. This
+seed shows a preview from what the app already holds: the default preview catalog names
+the files of each key, so a row whose name and size match one key shows its preview at
+once. The phone keeps the keys it has read, and uses them at its next start when the
+board's catalog has not changed. The keys of a page are used as soon as that page is read.
+A square whose preview is not known yet, or that has none, stays the black square of seed
+44. Nothing changes on the board or in the commands.
 
 ## Priority
 
@@ -41,6 +42,12 @@ unreasonable delay between the time I opened the app and till the previews start
 rendering and till then there was a black box in their previews icon area which is
 unacceptable and probably a bug that can be fixed in a continuation seed if you can
 detect it." The owner confirmed that the previews work well otherwise.
+
+Then, in their words: "if the preview is missing the box should remain black, the fix
+shouldn't be able replacing a blank preview with a transparent/row's own color, it is
+about making the preview appear faster without delays even when not 100% of them are
+loaded (best effort show as soon as a preview has been loaded even before all previews
+been loaded)".
 
 The cause was found the same day, in the code and in a measurement, and is set out in
 "What happens today". It is not a fault of one line: the app was built to learn every key
@@ -122,23 +129,22 @@ from the board before it shows any preview, and the board answers in small parts
     from the storage's keys before this read (they stand meanwhile, `client.js:313-315`),
     else null; a row with null keeps what point 1 gives it.
   - `catalog page` keeps its place in `due()`, after every other request.
-- **4. No black square.**
-  - `.thumb` has no background of its own: a square without a preview is the row's own
-    background, and it keeps its size, so that the rows do not move when a preview comes.
-    It holds no text and no icon. The black moves to the preview's image, which fills the
-    square, so a preview that does not fill it, such as a 60-by-6 strip, still stands on
-    black as seed 44 drew it.
-  - This changes seed 44's requirement 7.3, "an empty dark square", and its sentence in
-    `docs/android-app.md`. The panel of what plays now follows the same rule.
+- **4. Each square on its own, and the black square kept.**
+  - Each square shows its preview as soon as its own row's key is known, by point 1, 2 or
+    3, and its GIF is loaded, without waiting for any other row, page or storage. A
+    preview that is known is never held back until the others are.
+  - A square whose preview is not known yet, or that has none, stays the empty black
+    square of seed 44's requirement 7.3, `.thumb` with `background: #000000`, as today.
+    The look of the square does not change.
 - **What stays.** The board, the firmware, the core, the emulator, every command and every
   reply, `thumbnails/` and `catalog.js`, the phone's own previews, a tap on the square
   that plays, and the folder rows and the Tests group, which have no square.
-- **The pages.** `docs/android-app.md`: the square (`:46`), the keys and the three ways a
-  preview is found, in that order: the board's key, then the name and size in the default
-  catalog, then none; and its sentence that rows have no key until Settings' rebuild
-  (`:557-558`), which no longer holds for a file the default catalog names.
-  `docs/drifts.md` gains an entry at its end, "Seed 49: the previews at once", with the
-  measurement above and the round trip measured on the board.
+- **The pages.** `docs/android-app.md`: the keys and the three ways a preview is found, in
+  that order: the board's key, then the name and size in the default catalog, then none;
+  and its sentence that rows have no key until Settings' rebuild (`:557-558`), which no
+  longer holds for a file the default catalog names. `docs/drifts.md` gains an entry at
+  its end, "Seed 49: the previews at once", with the measurement above and the round trip
+  measured on the board.
 - **Tests.** In `tests/app`, with the fake targets the suite has:
   - a row of a file the default catalog names, with one key of its size, shows its
     preview before any `catalog page` is answered, with a target that answers no page;
@@ -151,9 +157,8 @@ from the board before it shows any preview, and the board answers in small parts
     pages are read, when it gives another;
   - after the first page of a storage is read, the rows of that page have their keys
     while the other pages are still unread;
-  - a square without a preview has a transparent background of its own, and the colour
-    behind it, by `look.js`'s `behind`, is the row's; a square with a preview has black
-    behind its image.
+  - while one storage is read, a row whose key is read shows its preview while other rows
+    still have none; a square whose preview is not known stays black, as today.
   The suite's existing tests of the keys and the previews keep passing, changed only
   where they pinned the keys arriving whole, no preview without a key
   (`test_previews.py:93`), or the database at version 1 (`ownpreviews.js:30` and `:47`).
@@ -168,7 +173,8 @@ from the board before it shows any preview, and the board answers in small parts
    start, without reading a page, when `catalog` gives the same generation and number of
    entries.
 4. The keys of a page are used as soon as the page is read.
-5. No square is black: a square without a preview is the row's own background.
+5. Each square shows its preview as soon as its own is known, before the others are. A
+   square whose preview is not known, or that has none, stays black.
 6. No command, reply or byte of the board changes.
 
 ## Definition Of Done
@@ -184,14 +190,17 @@ from the board before it shows any preview, and the board answers in small parts
    reachable, the report says so, and this point waits for it.
 4. The APK is built from the branch.
 5. The owner's check, on a phone with that APK against the board and its card: the
-   previews show with the rows, no square is black, and at the second opening of the app
-   the previews show at once.
+   previews show with the rows or each soon after, without waiting for all of them; a
+   square stays black only for an animation whose preview is not known; and at the
+   second opening of the app the previews show at once.
 
 ## Open Questions
 
-None. The owner called the black box unacceptable; a square without a preview takes the
-row's own background, which keeps the rows from moving when a preview arrives.
+None.
 
 ## The Owner's Answers
 
-None yet.
+On 2026-10-27, after the seed was first pushed with the square drawn in the row's own
+background: the black square stays for a preview that is missing, and the seed is about
+showing the previews sooner, each one as soon as it is loaded, before all of them are
+(see "Product Context").

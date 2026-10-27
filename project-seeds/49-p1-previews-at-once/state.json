@@ -1,0 +1,10 @@
+{
+  "number": 49,
+  "slug": "49-p1-previews-at-once",
+  "state": "remaining",
+  "title": "Previews at once, each as soon as it is known",
+  "priority": "P1",
+  "addedAt": "2026-10-27T23:03:02+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The app shows each row's preview as soon as its own is known, without waiting for the others: from the default preview catalog by the file's name and size, from keys the phone kept from its last start when the board's catalog is unchanged, and page by page as the board's catalog is read; a square whose preview is not known stays the black square of seed 44; nothing changes on the board."
+}
