@@ -123,8 +123,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 present, and do not build on them.
 
 - **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
-- **A USB log on the serial port**, seed 23: built; the plug-in and pull-out check is open.
-- **A bigger animation space**, seed 24: the board was moved to it on 2026-10-16; checks open.
+- **A USB log on the serial port, and a bigger animation space**, seeds 23 and 24: built; their checks on the board are open.
 - **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
 - **The app's count of installed and external animations**, seed 28: a dashboard line.
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
@@ -137,6 +136,7 @@ present, and do not build on them.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
+- **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
 - **Previews of the animations**, seed 44: built; the board session and the owner's phone check are open.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 

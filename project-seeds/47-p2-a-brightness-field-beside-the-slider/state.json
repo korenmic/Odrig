@@ -1,0 +1,10 @@
+{
+  "number": 47,
+  "slug": "47-p2-a-brightness-field-beside-the-slider",
+  "state": "remaining",
+  "title": "A brightness field beside the slider",
+  "priority": "P2",
+  "addedAt": "2026-10-27T18:30:29+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The number in the Animations screen's `Set the brightness to N` becomes a text field with the big slider under it, the two synced both ways; a typed value is sent when the field is entered or left, by the slider's path and spacing, with the same `brightness <n>` line, so nothing changes outside the app."
+}
