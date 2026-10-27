@@ -10,6 +10,7 @@ import {TOOL, UsageError, parse, usage} from "./arguments.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
 import * as gif from "./gif.js";
+import * as thumbnails from "./thumbnail.js";
 import * as video from "./video.js";
 
 // The reader of each kind of media file, by the ending of its name.
@@ -211,6 +212,7 @@ export const SUBCOMMANDS = new Map([
   ["decode", decode],
   ["check", check],
   ["pack", folder.pack],
+  ["thumbnail", thumbnails.thumbnail],
 ]);
 
 // White space as Python's `str.split` knows it.

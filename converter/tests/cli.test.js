@@ -126,7 +126,7 @@ test("the error line", async (t) => {
 });
 
 test("--help", async (t) => {
-  await t.test("alone, it names the five subcommands on standard output", async () => {
+  await t.test("alone, it names the six subcommands on standard output", async () => {
     for (const flag of ["--help", "-h"]) {
       const to = streams();
       assert.equal(await main([flag], to, new Map()), 0);
@@ -145,6 +145,7 @@ test("--help", async (t) => {
       decode: ["IN.odrg", "OUT.json"],
       check: ["FILE", "--format", "json", "odrg"],
       pack: ["--show", "--mapping", "--sources", "--out", "--uncompressed"],
+      thumbnail: ["FILE...", "--catalog", "DIR", "--card", "ODRIG", "--out", "OUT.gif"],
     };
     assert.deepEqual(Object.keys(expected), NAMES);
     for (const name of NAMES) {

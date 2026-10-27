@@ -3,6 +3,7 @@
 
 import * as client from "./client.js";
 import * as messages from "./messages.js";
+import * as previews from "./previews.js";
 import * as authoring from "./screens/author.js";
 import * as catalogs from "./screens/catalogs.js";
 import * as limitsScreen from "./screens/limits.js";
@@ -126,6 +127,8 @@ window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
 targetScreen.start({message, shown: () => screen === "target"});
 animationsScreen.start({message});
+// The phone's own previews are taken up while the app starts; the rows show them when they come.
+previews.start();
 uploadScreen.start({message});
 authoring.start({message, go});
 settingsScreen.start();

@@ -51,6 +51,8 @@ DOES_NOT_FIT = "does-not-fit"
 UNSUPPORTED_CHARACTER = "unsupported-character"
 UNKNOWN_WIDGET = "unknown-widget"
 
+PREVIEW_TOO_LARGE = "preview-too-large"
+
 MAPPING_MISSING = "mapping-missing"
 MAPPING_MALFORMED = "mapping-malformed"
 

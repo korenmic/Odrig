@@ -234,6 +234,15 @@ cycle.
 |---|---|
 | `canvas-too-small` | The canvas of the mapping file is too small for the animation: below 53 x 6 for Hello world, below 3 x 3 for DVD bounce. |
 
+## Previews
+
+A preview is read as `decode` reads the file; its reasons are those of "ODRG files" and of
+"ODRGX files".
+
+| Reason | Condition |
+|---|---|
+| `preview-too-large` | The preview of six pictures is above 65,536 bytes, after those of 24 and of 12 pictures were. |
+
 ## Any output
 
 | Reason | Condition |

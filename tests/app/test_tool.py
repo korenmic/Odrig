@@ -81,6 +81,19 @@ class Serve(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(get(self.server.port, path)[0], 404)
 
+    def test_the_default_preview_catalog_is_given_beside_the_web_code_and_nothing_below_it(self):
+        kept = sorted(path for path in support.THUMBNAILS.iterdir() if path.is_file())
+        self.assertIn(support.THUMBNAILS / "catalog.js", kept)
+        for path in kept:
+            with self.subTest(path=path.name):
+                status, headers, body = get(self.server.port, "/thumbnails/" + path.name)
+                self.assertEqual((status, body), (200, path.read_bytes()))
+                wanted = "image/gif" if path.suffix == ".gif" else "text/javascript; charset=utf-8"
+                self.assertEqual((headers["Content-Type"], headers["Cache-Control"]), (wanted, "no-store"))
+        for path in ("/thumbnails", "/thumbnails/", "/thumbnails/none.gif", "/thumbnails/../index.html", "/thumbnails/x/catalog.js", "/catalog.js", "/thumbnails/index.html"):
+            with self.subTest(path=path):
+                self.assertEqual(get(self.server.port, path)[0], 404)
+
     def test_the_address_alone_gives_the_page(self):
         status, headers, body = get(self.server.port, "/")
         self.assertEqual((status, headers["Content-Type"], body), (200, "text/html; charset=utf-8", (support.WWW / "index.html").read_bytes()))
@@ -412,9 +425,11 @@ class TheStagedFolder(unittest.TestCase):
         staged = {path.relative_to(made).as_posix(): path.read_bytes() for path in made.rglob("*") if path.is_file()}
         note = json.loads(staged.pop("build.json"))
         library = {f"converter/{path.name}": path.read_bytes() for path in support.CONVERTER_LIBRARY.glob("*.js")}
+        previews = {f"thumbnails/{path.name}": path.read_bytes() for path in support.THUMBNAILS.iterdir() if path.suffix in (".js", ".gif")}
         self.assertGreater(len(library), 5)
-        self.assertEqual(staged, source | library)
-        self.assertFalse(set(source) & set(library))
+        self.assertIn("thumbnails/catalog.js", previews)
+        self.assertEqual(staged, source | library | previews)
+        self.assertFalse(set(source) & (set(library) | set(previews)))
         self.assertEqual(sorted(note), ["changed", "commit"])
         head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=support.ROOT, capture_output=True, text=True).stdout.strip()
         self.assertEqual((note["commit"], type(note["changed"])), (head, bool))

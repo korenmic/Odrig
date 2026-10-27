@@ -135,19 +135,56 @@ export function checkLoop(header, loopMs) {
   }
 }
 
-// Reads a container of frames given as bytes: its header and the ODRG file of its payload,
-// decoded as `odrg.decode` does. The canvas of the payload's header is compared before its
-// frame records are read.
-export function decodeFrames(data, header = readHeader(data)) {
+// Reads a container of frames given as bytes, one frame record at a time, as `odrg.reader`
+// reads a file: the canvas of the payload's header is compared at once, and after the last
+// record the payload's size and the loop are checked. The result is that of `odrg.reader`
+// for the payload, with `header`, and `loopMs()` the loop of the container's header.
+export function framesReader(data, header = readHeader(data)) {
   const payload = payloadOf(data);
   const inner = odrg.header(payload);
   if (inner.width !== header.width || inner.height !== header.height) {
     throw new Rejection(CANVAS_MISMATCH, `the container's canvas is ${header.width} x ${header.height} and its frames' ${inner.width} x ${inner.height}`);
   }
-  const decoded = odrg.decode(payload);
-  checkPayloadSize(header, data);
-  checkLoop(header, decoded.records.reduce((sum, record) => sum + record.ms, 0));
-  return {...decoded, header};
+  const read = odrg.reader(payload);
+  let total = 0;
+  let ended = false;
+  const next = () => {
+    const record = read.next();
+    if (record !== null) {
+      total += record.ms;
+      return record;
+    }
+    if (!ended) {
+      ended = true;
+      checkPayloadSize(header, data);
+      checkLoop(header, total);
+    }
+    return null;
+  };
+  return {
+    width: read.width,
+    height: read.height,
+    paletteSize: read.paletteSize,
+    frameCount: read.frameCount,
+    compressed: read.compressed,
+    header,
+    next,
+    loopMs: () => header.loopMs,
+  };
+}
+
+// Reads a container of frames given as bytes: its header and the ODRG file of its payload,
+// decoded as `odrg.decode` does. The canvas of the payload's header is compared before its
+// frame records are read.
+export function decodeFrames(data, header = readHeader(data)) {
+  const read = framesReader(data, header);
+  const records = [];
+  const modes = [];
+  for (let record = read.next(); record !== null; record = read.next()) {
+    records.push({ms: record.ms, picture: record.picture});
+    modes.push(record.mode);
+  }
+  return {width: read.width, height: read.height, paletteSize: read.paletteSize, compressed: read.compressed, records, modes, header};
 }
 
 // A container of a type with this canvas, loop and payload.

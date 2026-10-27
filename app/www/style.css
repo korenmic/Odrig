@@ -281,11 +281,40 @@ button[aria-pressed="true"] {
 }
 
 #now {
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 20px;
   font-weight: 600;
+}
+
+#now-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* The square of a preview: the GIF's pixels kept square and whole, a 60-by-6 strip as a
+   band across the middle, or the dark square alone. */
+.thumb {
+  flex: 0 0 auto;
+  display: block;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000000;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
 }
 
 #playing {
@@ -456,14 +485,23 @@ input[type="range"] {
 }
 
 .row button.play {
+  display: flex;
   flex: 1 1 auto;
-  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 44px;
   margin: 0;
   padding: 6px 4px;
   border: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
+}
+
+.row .words {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .row .name {
@@ -499,7 +537,7 @@ input[type="range"] {
 }
 
 .row-state {
-  flex: 0 0 auto;
+  display: block;
   font-size: 14px;
   color: var(--lesser);
 }

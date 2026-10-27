@@ -170,6 +170,21 @@ class ShowFolders(Temporary):
         self.assertEqual(self.reason(), "not-a-show-folder")
         self.assertEqual(self.reason(check=False), "not-a-show-folder")
 
+    def test_the_previews_never_reach_an_image(self):
+        # The default preview catalog is a folder of the repository beside the shows; a show
+        # folder that held it, or one of its GIFs, would be refused before an image is made.
+        previews = support.ROOT / "thumbnails"
+        self.assertTrue((previews / "catalog.js").is_file())
+        shutil.copytree(previews, self.show / "thumbnails")
+        self.assertEqual(self.reason(), "not-a-show-folder")
+        self.assertEqual(self.reason(check=False), "not-a-show-folder")
+        shutil.rmtree(self.show / "thumbnails")
+        gif = next(previews.glob("*.gif"))
+        shutil.copyfile(gif, self.show / gif.name)
+        self.assertEqual(self.reason(), "not-a-show-folder")
+        (self.show / gif.name).unlink()
+        self.assertFalse(any(name.endswith((".gif", ".js")) for name in storage.folder_files(self.show)))
+
     def test_what_is_no_folder_is_refused(self):
         self.show = self.folder / "absent"
         self.assertEqual(self.reason(), "not-a-show-folder")

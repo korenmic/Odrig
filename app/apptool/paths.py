@@ -9,6 +9,10 @@ WWW = APP / "www"
 # files: served from here, and copied into the package by the build.
 CONVERTER_LIB = ROOT / "converter" / "lib"
 LIBRARY_FOLDER = "converter"
+# The default preview catalog, which the web code imports from `thumbnails/` beside its own
+# files: served from here, and copied into the package by the build.
+THUMBNAILS = ROOT / "thumbnails"
+THUMBNAILS_FOLDER = "thumbnails"
 TOOLCHAIN = APP / "toolchain.json"
 PACKAGE = APP / "package.json"
 LOCK = APP / "package-lock.json"

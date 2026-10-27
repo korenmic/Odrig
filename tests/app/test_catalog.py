@@ -56,6 +56,11 @@ class Catalogs:
     def catalog(self, line):
         words = line.decode("ascii").split(" ")
         with self.lock:
+            if words[:2] == ["catalog", "page"]:
+                # Its pages hold no line.
+                part = self.internal if words[2] == "internal" else self.external
+                generation = part["generation"] if part["state"] == "ok" else None
+                return (200, json.dumps({"ok": True, "generation": generation, "text": "", "next": None}) + "\n")
             if words == ["catalog", "cancel"]:
                 self.rebuild = None
                 return OK
@@ -94,7 +99,7 @@ class TheCatalogsOfSettings(unittest.TestCase):
     progress and a cancel, while the rest of the app goes on."""
 
     def sent(self, target, start):
-        return [line for _, line in target.lines if line.startswith(start)]
+        return [line for _, line in target.lines if line.startswith(start) and not line.startswith(b"catalog page ")]
 
     def test_each_catalog_is_said_and_a_rebuild_shows_its_progress_while_the_app_goes_on_and_can_be_cancelled(self):
         target = Catalogs(INTERNAL_OK, EXTERNAL_OK, step=5)

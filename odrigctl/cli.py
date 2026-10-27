@@ -103,8 +103,9 @@ def checked(made, arguments):
         return ["upload", "external", arguments.arguments[0]]
     if arguments.command == "catalog":
         words = arguments.arguments
-        if words not in ([], ["cancel"], ["rebuild", "internal"], ["rebuild", "external"]):
-            made.error("catalog takes no argument, rebuild internal, rebuild external, or cancel")
+        page = len(words) == 4 and words[0] == "page" and words[1] in ("internal", "external") and all(word.isascii() and word.isdigit() for word in words[2:])
+        if words not in ([], ["cancel"], ["rebuild", "internal"], ["rebuild", "external"]) and not page:
+            made.error("catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET")
         return [arguments.command, *words]
     if arguments.command == "remove" and len(arguments.arguments) == 2 and arguments.arguments[0] == "many":
         if any("\n" in word or "\r" in word for word in arguments.arguments):

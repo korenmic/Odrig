@@ -416,6 +416,21 @@ export async function catalog() {
 
 // Starts the rebuild of the catalog of a storage, "internal" or "external": the target
 // reads every animation of it whole while the show plays.
+// Up to 512 bytes of a page of a storage's catalog from an offset: `{generation, text,
+// next}`, the generation null for a catalog that is not `ok`, `next` the offset to ask for
+// next or null at the page's end.
+export async function catalogPage(storage, page, offset) {
+  const reply = await carriedOut(`catalog page ${storage} ${page} ${offset}`);
+  const sound =
+    (reply.generation === null || whole(reply.generation, 0, MOST_BYTES)) &&
+    typeof reply.text === "string" &&
+    (reply.next === null || whole(reply.next, 1, 2 * MOST_BYTES));
+  if (!sound) {
+    throw new Failure("bad-reply", address());
+  }
+  return {generation: reply.generation, text: reply.text, next: reply.next};
+}
+
 export async function catalogRebuild(storage) {
   await carriedOut(`catalog rebuild ${storage}`);
 }

@@ -8,6 +8,13 @@ const STATUS_EVERY_MS = 1000;
 const LIST_EVERY_MS = 10000;
 const LIST_WHEN_BUSY_MS = 1000;
 const SPACE_EVERY_MS = 10000;
+// How long a page of a catalog that was refused with `busy` waits before it is asked again.
+const PAGE_AGAIN_MS = 2000;
+const STORAGES = ["internal", "external"];
+const PAGES = 16;
+// A line of a catalog's page: the CRC-32, the size, the canvas, the length, the type and the
+// name of a file.
+const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/;
 
 // `link` is "checking" until the first request has ended, then "answers" or "no-answer",
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
@@ -20,8 +27,14 @@ const SPACE_EVERY_MS = 10000;
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
+// `catalog` is the newest reply of `catalog`, or null. `keys` holds, for each storage, the
+// keys of its files learnt from its catalog's pages, `{generation, entries, byName}`, or
+// null while none is known; `keysVersion` grows when they change. `catalogNone` says that
+// the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
+// from before either.
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], folders: [], space: null,
-  listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true};
+  listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
+  catalogNone: false, pagesRefused: false};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -55,6 +68,11 @@ let spaceDue = false;
 let spaceTimer = null;
 // The upload under way, a job of `upload.js`, or null.
 let job = null;
+// Whether `catalog` is due, the reads of catalogs' pages that wait, the first under way,
+// internal before external, and the timer of a page that waits after `busy`.
+let catalogDue = false;
+const reads = [];
+let pageWait = null;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 let contentLocked = false;
@@ -71,12 +89,26 @@ function changed() {
   }
 }
 
+// Forgets the keys of every storage and every read of a page.
+function dropKeys() {
+  reads.length = 0;
+  clearTimeout(pageWait);
+  pageWait = null;
+  if (state.keys.internal !== null || state.keys.external !== null) {
+    state.keys = {internal: null, external: null};
+    state.keysVersion += 1;
+  }
+}
+
 function heard() {
   if (state.link !== "answers") {
-    // The target answers, for the first time or again: what it has installed is asked.
+    // The target answers, for the first time or again: what it has installed is asked, and
+    // its catalogs, whose keys may be of another storage now.
     listDue = true;
     listing = null;
     spaceDue = true;
+    dropKeys();
+    catalogDue = !state.catalogNone && !state.pagesRefused;
   }
   state.link = "answers";
   state.failure = null;
@@ -200,6 +232,7 @@ async function askListPart() {
       orderDue = state.orderKnown;
       ordering = null;
       if (!state.orderKnown) state.order = null;
+      catalogDue = !state.catalogNone && !state.pagesRefused;
       listAgainLater();
     }
   } catch (error) {
@@ -275,6 +308,160 @@ async function askOrderPart() {
     }
   }
   changed();
+}
+
+// Takes what a reply of `catalog` says: a storage whose catalog is not `ok` has no keys
+// any more; one that is `ok` is read again when its keys, or the read under way, are of
+// another generation or another number of entries. The keys stand meanwhile.
+export function noteCatalog(reply) {
+  state.catalog = reply;
+  for (const storage of STORAGES) {
+    const part = reply[storage];
+    const at = reads.findIndex((read) => read.storage === storage);
+    if (part.state !== "ok") {
+      if (at !== -1) {
+        reads.splice(at, 1);
+      }
+      if (state.keys[storage] !== null) {
+        state.keys[storage] = null;
+        state.keysVersion += 1;
+      }
+      continue;
+    }
+    const kept = state.keys[storage];
+    const same = (read) => read.generation === part.generation && read.entries === part.entries;
+    if (state.pagesRefused || (at !== -1 && same(reads[at])) || (at === -1 && kept !== null && same(kept))) {
+      continue;
+    }
+    const read = {storage, generation: part.generation, entries: part.entries, pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()};
+    if (at !== -1) {
+      reads[at] = read;
+    } else {
+      reads.push(read);
+      reads.sort((a, b) => STORAGES.indexOf(a.storage) - STORAGES.indexOf(b.storage));
+    }
+  }
+}
+
+// Says that the target keeps no catalogs: it is asked for none again until it changes.
+export function noCatalogs() {
+  state.catalogNone = true;
+  catalogDue = false;
+  dropKeys();
+}
+
+async function askCatalog() {
+  const asked = target;
+  try {
+    const reply = await commands.catalog();
+    if (asked !== target) {
+      return;
+    }
+    heard();
+    noteCatalog(reply);
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+      if (["unknown-command", "bad-argument"].includes(error.code)) {
+        noCatalogs();
+      }
+    } else {
+      failed(error);
+    }
+  }
+  changed();
+}
+
+// Asks for the next part of the page the first read is at. A read whose pages answer
+// another generation than its first starts again; one that meets `null` or a refusal ends
+// without keys, but for `busy`, after which the page is asked again later. A target that
+// does not know the command is asked for no page again.
+async function askPage() {
+  const asked = target;
+  const read = reads[0];
+  try {
+    const reply = await commands.catalogPage(read.storage, read.page, read.offset);
+    if (asked !== target) {
+      return;
+    }
+    // A reply after a silence drops every read, this one too.
+    heard();
+    if (reads[0] !== read) {
+      changed();
+      return;
+    }
+    if (reply.generation === null) {
+      reads.shift();
+    } else if (read.pageGeneration !== null && reply.generation !== read.pageGeneration) {
+      Object.assign(read, {pageGeneration: null, page: 0, offset: 0, tail: "", byName: new Map()});
+    } else {
+      read.pageGeneration = reply.generation;
+      const parts = (read.tail + reply.text).split("\n");
+      read.tail = reply.next === null ? "" : parts.pop();
+      for (const line of parts) {
+        const found = CATALOG_LINE.exec(line);
+        if (found !== null) {
+          read.byName.set(found[3], `${found[1]}-${found[2]}`);
+        }
+      }
+      if (reply.next !== null) {
+        read.offset = reply.next;
+      } else if (read.page + 1 < PAGES) {
+        read.page += 1;
+        read.offset = 0;
+      } else {
+        reads.shift();
+        state.keys[read.storage] = {generation: read.pageGeneration, entries: read.entries, byName: read.byName};
+        state.keysVersion += 1;
+      }
+    }
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+      if (reads[0] !== read) {
+        changed();
+        return;
+      }
+      if (error.code === "busy") {
+        pageWait = setTimeout(() => {
+          pageWait = null;
+          next();
+        }, PAGE_AGAIN_MS);
+      } else if (["unknown-command", "bad-argument"].includes(error.code)) {
+        state.pagesRefused = true;
+        catalogDue = false;
+        reads.length = 0;
+      } else {
+        reads.shift();
+      }
+    } else if (error instanceof Failure && error.kind === "bad-reply") {
+      // A target that answers the command with no page of a catalog is from before it.
+      state.pagesRefused = true;
+      catalogDue = false;
+      reads.length = 0;
+    } else {
+      failed(error);
+    }
+  }
+  changed();
+}
+
+// The key of an animation, `<crc32>-<bytes>`, as the catalog of its storage names its file,
+// when that key's size is the animation's; otherwise null.
+export function keyOf(animation) {
+  const external = typeof animation.external === "boolean" ? animation.external : typeof animation.ignored !== "boolean";
+  const kept = state.keys[external ? "external" : "internal"];
+  if (kept === null || typeof animation.bytes !== "number") {
+    return null;
+  }
+  const key = kept.byName.get(animation.file);
+  return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
 // Sends what the operator asked for, once. A status is due at once after its reply, and
@@ -353,8 +540,8 @@ async function sendJobLine(running, line) {
 
 // The request to send now, or null when nothing is due: what the operator asked for,
 // then a status that is due, then the next line of an upload, then a list that is due or
-// the next part of one, then the space. Nothing is due while the app is not on the
-// screen.
+// the next part of one, then the saved order, then the space, then `catalog`, then the
+// next part of a catalog's page. Nothing is due while the app is not on the screen.
 function due() {
   if (document.hidden) {
     return null;
@@ -391,6 +578,13 @@ function due() {
   if (spaceDue) {
     spaceDue = false;
     return askSpace;
+  }
+  if (catalogDue) {
+    catalogDue = false;
+    return askCatalog;
+  }
+  if (reads.length > 0 && pageWait === null) {
+    return askPage;
   }
   return null;
 }
@@ -437,6 +631,11 @@ export function begin() {
   state.orderKnown = true;
   orderDue = false;
   ordering = null;
+  state.catalog = null;
+  state.catalogNone = false;
+  state.pagesRefused = false;
+  catalogDue = false;
+  dropKeys();
   cancelWaiting();
   statusDue = true;
   listDue = false;

@@ -17,6 +17,7 @@ export * as pack from "./pack.js";
 export * as show from "./show.js";
 export * as strictjson from "./strictjson.js";
 export * as textlayout from "./textlayout.js";
+export * as thumbnail from "./thumbnail.js";
 export * as timeline from "./timeline.js";
 export * as whole from "./whole.js";
 export {Rejection} from "./errors.js";

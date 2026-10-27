@@ -299,7 +299,7 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "limits", "limits wall <mA>", "limits snake <n> <mA>", "limits default", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "limits", "limits wall <mA>", "limits snake <n> <mA>", "limits default", "upload begin <id> <file> <bytes>",
                                       "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
         one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "limits")) and command not in ("play all", "remove many <ids>")]
@@ -313,8 +313,9 @@ class Usage(unittest.TestCase):
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
                            (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line"),
-                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
-                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["catalog", "page", "internal", "0"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["limits", "snake", "3"], "limits takes no argument, FROM, wall MA, snake N MA, or default"),
                            (["limits", "default", "now"], "limits takes no argument, FROM, wall MA, snake N MA, or default"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),

@@ -1,6 +1,8 @@
 // Settings' catalogs: what the catalog of the board's own storage and that of the card
 // say, and the rebuild of either, asked about first, with its progress and its cancel.
-// `catalog` is asked when Settings is shown and every two seconds while it is.
+// `catalog` is asked when Settings is shown and every two seconds while it is, unless the
+// target keeps no catalogs, which the client knows from any of its answers; each reply is
+// handed to the client, whose previews follow the catalogs.
 
 import * as client from "../client.js";
 import {Refusal} from "../commands.js";
@@ -14,12 +16,11 @@ const WHOSE = {internal: "the board", external: "the card"};
 const DAMAGES = {marker: "its marker", page: "a page", line: "a line", interrupted: "a change was cut off"};
 
 // Whether Settings is on the screen of the phone; the newest reply of `catalog`, or null;
-// whether the target's software keeps no catalogs; whether a `catalog` is under way, and
+// whether a `catalog` is under way, and
 // whether another is due after it; the storage whose rebuild is asked about, or null;
 // whether a rebuild or a cancel is under way; and the target all this belongs to.
 let visible = false;
 let known = null;
-let none = false;
 let asking = false;
 let again = false;
 let question = null;
@@ -82,7 +83,6 @@ export function ofRebuild(rebuild) {
 function forget() {
   version = client.targetVersion();
   known = null;
-  none = false;
   question = null;
   sending = false;
 }
@@ -94,7 +94,7 @@ async function ask() {
     again = true;
     return;
   }
-  if (!visible || none || document.hidden || client.state.link !== "answers") {
+  if (!visible || client.state.catalogNone || document.hidden || client.state.link !== "answers") {
     return;
   }
   asking = true;
@@ -108,10 +108,11 @@ async function ask() {
         client.refreshContent();
       }
       known = reply;
+      client.noteCatalog(reply);
     }
   } catch (error) {
     if (asked === client.targetVersion() && error instanceof Refusal && ["unknown-command", "bad-argument"].includes(error.code)) {
-      none = true;
+      client.noCatalogs();
     }
   } finally {
     asking = false;
@@ -149,6 +150,7 @@ function draw() {
     forget();
   }
   const answers = client.state.link === "answers";
+  const none = client.state.catalogNone;
   say("catalog-summary", none ? "This installation's software keeps no catalogs." : known === null ? "Reading the catalogs\u2026" : null);
   const shown = known !== null && !none;
   const rebuild = shown ? known.rebuild : null;

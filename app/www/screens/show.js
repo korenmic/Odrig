@@ -1,6 +1,6 @@
 // Animations: what the installation does, power and brightness, the capacity of each
 // storage, and the one list of animations, one level of the card's folders at a time as
-// a file explorer shows them, each row with its storage badge and its menu.
+// a file explorer shows them, each row with its preview, its storage badge and its menu.
 
 import * as client from "../client.js";
 import * as capacity from "../capacity.js";
@@ -8,6 +8,7 @@ import * as filters from "./filters.js";
 import {Refusal} from "../commands.js";
 import {Failure} from "../target.js";
 import * as messages from "../messages.js";
+import * as previews from "../previews.js";
 import * as reorder from "./reorder.js";
 import * as selection from "./selection.js";
 import * as tests from "./tests.js";
@@ -207,6 +208,19 @@ function now(status, animations) {
   return found === undefined ? `Now ${status.animation}` : `Now ${found.id} ${found.file}`;
 }
 
+// The panel of what plays: the words of `now`, and before them the square of the preview of
+// the animation on the LEDs while something plays and the list holds it, which is no test.
+function drawNow(status, state) {
+  const words = status === null ? null : now(status, state.animations);
+  byId("now").hidden = words === null;
+  byId("now-text").textContent = words === null ? "" : words;
+  const shown = status === null || status.animation === null || status.playing === null || state.animations === null ?
+    undefined : state.animations.find((animation) => animation.id === status.animation);
+  const square = byId("now-thumb");
+  square.hidden = shown === undefined;
+  previews.show(square, shown === undefined || typeof shown.fault === "string" ? null : previews.sourceOf(client.keyOf(shown)));
+}
+
 // The animations in the order the list shows them: the saved order when another part of
 // the screen gives it, else the order of `list`.
 export function shownOrder(state) {
@@ -238,17 +252,24 @@ function row(animation) {
   play.type = "button";
   play.className = "play";
   play.dataset.id = String(animation.id);
+  // The square of the preview first, then the name, the meta and the row's note under it.
+  const square = document.createElement("span");
+  square.className = "thumb";
+  square.setAttribute("aria-hidden", "true");
+  const words = document.createElement("span");
+  words.className = "words";
   const name = document.createElement("span");
   name.className = "name";
   name.textContent = animation.file;
   const meta = document.createElement("span");
   meta.className = "meta";
   meta.textContent = metaOf(animation);
-  play.append(name, meta);
-  play.setAttribute("aria-label", `Play ${animation.id} ${animation.file}`);
-  play.addEventListener("click", () => client.play(animation.id));
   const note = document.createElement("span");
   note.className = "row-state";
+  words.append(name, meta, note);
+  play.append(square, words);
+  play.setAttribute("aria-label", `Play ${animation.id} ${animation.file}`);
+  play.addEventListener("click", () => client.play(animation.id));
   const badge = document.createElement("span");
   badge.className = `badge ${isExternal(animation) ? "ex" : "in"}`;
   badge.textContent = isExternal(animation) ? "ex" : "in";
@@ -271,7 +292,7 @@ function row(animation) {
       openMenu(animation.id, more);
     }
   });
-  made.append(play, note, badge, more);
+  made.append(play, badge, more);
   if (typeof animation.fault === "string") {
     // An animation whose file had a fault: grayed, its reason in words, and no Play.
     made.classList.add("unavailable");
@@ -362,6 +383,7 @@ function rowsState(state, animations, here) {
     const note = made.querySelector(".row-state");
     note.textContent = saving ? "Saving\u2026" : animation.ignored === true ? "\u2298 Ignored" : "";
     note.hidden = note.textContent === "";
+    previews.show(made.querySelector(".thumb"), typeof animation.fault === "string" ? null : previews.sourceOf(client.keyOf(animation)));
     const check = made.querySelector(".pick input");
     if (check) {
       check.checked = selection.has(animation.id);
@@ -381,14 +403,14 @@ function draw(state) {
     for (const id of ["power", "brightness", "playing", "fps"]) {
       byId(id).textContent = "-";
     }
-    say("now", null);
+    drawNow(null, state);
     byId("on").setAttribute("aria-pressed", "false");
     byId("off").setAttribute("aria-pressed", "false");
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
     byId("brightness").textContent = `Brightness ${status.brightness}`;
     byId("playing").textContent = playing(status, state);
-    say("now", now(status, state.animations));
+    drawNow(status, state);
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
     byId("off").setAttribute("aria-pressed", String(!status.on));
@@ -596,6 +618,7 @@ export function isVisible() {
 // is written again every second.
 export function start(options) {
   message = options.message;
+  previews.watch(redraw);
   filters.start({redraw});
   selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
   reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: (state) => shownOrder(state).filter((animation) => folderOf(animation) === opened)});

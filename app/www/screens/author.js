@@ -7,6 +7,7 @@ import {Refusal} from "../commands.js";
 import {NotConverted, makeContainer, pictureOf, readContainer} from "../convert.js";
 import {crc32} from "../crc32.js";
 import * as messages from "../messages.js";
+import * as previews from "../previews.js";
 import {Failure} from "../target.js";
 import {fileName, fits, freeId, textName, uploading} from "../upload.js";
 import {answers, extend, isEditable} from "./show.js";
@@ -319,9 +320,11 @@ function upload(message) {
           // What is on the target now is what was saved.
           saving.crc = crc32(bytes);
           message(messages.ofSaved(id, file));
+          previews.makeOwn(bytes);
         } else if (how.done) {
           shown.hidden = true;
           message(messages.ofUploaded(id, file));
+          previews.makeOwn(bytes);
         } else if (how.cancelled) {
           shown.textContent = "Cancelled.";
         } else {

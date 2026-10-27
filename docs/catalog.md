@@ -56,6 +56,11 @@ stand in the order their entries came in: a rebuild writes them in the storage's
 addition puts its line last on its page, a replacement keeps its line's place, a removal
 takes its line out. A line is at most 161 bytes.
 
+The first two words of a line are the file's key, its CRC-32 and its size joined by a dash,
+`1a2b3c4d-52340`: two files of the same bytes have one key whatever their names. The
+operators' app learns the keys of a storage by reading its pages with `catalog page`
+([commands.md](commands.md#catalogs)) and finds the preview of each animation by its key.
+
 A name is the path of the file from the storage's folder: the names of at most three
 folders and the file's name, joined by `/`, 1 to 100 bytes in all. Each part is printable
 ASCII other than `/ \ : * ? " < > |`, neither beginning nor ending with a space or a dot. A

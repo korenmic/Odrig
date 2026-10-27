@@ -17,28 +17,35 @@ TYPES = {
     ".js": "text/javascript; charset=utf-8",
     ".json": "application/json",
 }
+# What the server hands out of the default preview catalog, by the ending of the file's name.
+THUMBNAIL_TYPES = {".js": "text/javascript; charset=utf-8", ".gif": "image/gif"}
 # One part of a path: a name without a path separator that does not begin with a dot.
 PART = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*")
 
 
-def file_of(folder, path):
+def file_of(folder, path, types=TYPES):
     """The file of a folder that a request path names, or None. A path names a file by the
     names of the folders that lead to it; `/` is the index."""
     parts = [part for part in path.split("/") if part != ""] or [INDEX]
     if path.endswith("/") and path != "/":
         return None
-    if not all(PART.fullmatch(part) for part in parts) or "." + parts[-1].rsplit(".", 1)[-1] not in TYPES:
+    if not all(PART.fullmatch(part) for part in parts) or "." + parts[-1].rsplit(".", 1)[-1] not in types:
         return None
     found = folder.joinpath(*parts)
     return found if found.is_file() else None
 
 
-def file_of_the_app(folder, path, library=paths.CONVERTER_LIB):
-    """The file a request path names: one of the web code of a folder, or under
-    `/converter/` one of the converter's library."""
+def file_of_the_app(folder, path, library=paths.CONVERTER_LIB, thumbnails=paths.THUMBNAILS):
+    """The file a request path names: one of the web code of a folder, under
+    `/converter/` one of the converter's library, or under `/thumbnails/` the mapping or a GIF
+    of the default preview catalog, none of a folder below it."""
     beside = "/" + paths.LIBRARY_FOLDER + "/"
     if path.startswith(beside):
         return file_of(library, path[len(beside) - 1:])
+    previews = "/" + paths.THUMBNAILS_FOLDER + "/"
+    if path.startswith(previews):
+        rest = path[len(previews) - 1:]
+        return file_of(thumbnails, rest, THUMBNAIL_TYPES) if rest.count("/") == 1 else None
     return file_of(folder, path)
 
 
@@ -62,7 +69,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if found is None:
             self.answer(404)
         else:
-            self.answer(200, TYPES[found.suffix], found.read_bytes())
+            self.answer(200, {**TYPES, **THUMBNAIL_TYPES}[found.suffix] if found.parent == paths.THUMBNAILS else TYPES[found.suffix], found.read_bytes())
 
 
 class Server(http.server.ThreadingHTTPServer):

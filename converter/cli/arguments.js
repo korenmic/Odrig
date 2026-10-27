@@ -1,4 +1,4 @@
-// The arguments of the command line: the five subcommands, their options and their usage
+// The arguments of the command line: the six subcommands, their options and their usage
 // texts.
 //
 // An option is given as `--name value` or `--name=value`, before, between or after the
@@ -6,7 +6,7 @@
 
 export const TOOL = "node converter/odrig.js";
 
-export const NAMES = ["import", "encode", "decode", "check", "pack"];
+export const NAMES = ["import", "encode", "decode", "check", "pack", "thumbnail"];
 
 // A command line that was not understood. `subcommand` is the subcommand it was for, or
 // null when none was recognised.
@@ -29,6 +29,8 @@ subcommands:
   decode   Turns an ODRG file or an ODRGX container back into its JSON source.
   check    Validates a JSON frames, ODRG or ODRGX file and summarises it.
   pack     Builds the folder of files that is installed for a show.
+  thumbnail Makes the preview of an animation, or adds previews to a preview
+           catalog.
 
 ${TOOL} <subcommand> --help shows the arguments of a subcommand.
 `;
@@ -45,7 +47,9 @@ function seconds(text) {
 }
 
 // For each subcommand: its usage text, the names of its positional arguments with the
-// words the usage text has for them, its options that take a value, and its flags.
+// words the usage text has for them, its options that take a value, and its flags. A
+// subcommand whose `variadic` is true takes one positional argument or more, as a list; its
+// `check` refuses values that do not go together.
 const SPECS = {
   import: {
     usage: `usage: ${TOOL} import MEDIA OUT.json --mapping MAPPING [--fit fill|fit|stretch]
@@ -138,6 +142,40 @@ Builds the folder of files that is installed for a show.
       "--out": {name: "out", required: true},
     },
     flags: {"--uncompressed": "uncompressed"},
+  },
+  thumbnail: {
+    usage: `usage: ${TOOL} thumbnail FILE... (--catalog DIR [--card ODRIG] | --out OUT.gif)
+
+Makes the preview of an animation, a GIF of its pictures over its first loop: with
+--catalog the preview of each file is added to the preview catalog of a folder, with
+--out the preview of one file is written.
+
+  FILE           an ODRG file or an ODRGX container
+  --catalog DIR  the folder of the preview catalog, made when it is missing
+  --card ODRIG   the folder odrig of a card: a file inside it is named in the
+                 catalog by its path from that folder
+  --out OUT.gif  the GIF file to write, for one file
+  --help         shows this text
+`,
+    positionals: [["files", "FILE"]],
+    variadic: true,
+    options: {
+      "--catalog": {name: "catalog", initial: null},
+      "--card": {name: "card", initial: null},
+      "--out": {name: "out", initial: null},
+    },
+    flags: {},
+    check(values, refuse) {
+      if ((values.catalog === null) === (values.out === null)) {
+        throw refuse("give one of --catalog and --out");
+      }
+      if (values.out !== null && values.files.length !== 1) {
+        throw refuse(`--out takes one FILE, and ${values.files.length} are given`);
+      }
+      if (values.out !== null && values.card !== null) {
+        throw refuse("--card goes with --catalog");
+      }
+    },
   },
 };
 
@@ -254,7 +292,8 @@ export function parse(argv, available = NAMES) {
     given.add(flag);
   }
 
-  const missing = spec.positionals.slice(positionals.length).map(([, word]) => word);
+  const variadic = spec.variadic === true;
+  const missing = variadic ? (positionals.length === 0 ? [spec.positionals[0][1]] : []) : spec.positionals.slice(positionals.length).map(([, word]) => word);
   for (const [flag, option] of Object.entries(spec.options)) {
     if (option.required && !given.has(flag)) {
       missing.push(flag);
@@ -266,12 +305,19 @@ export function parse(argv, available = NAMES) {
   if (unknown.length > 0) {
     throw refuse(`there is no option ${unknown[0]}`);
   }
-  if (positionals.length > spec.positionals.length) {
+  if (!variadic && positionals.length > spec.positionals.length) {
     const extra = positionals.slice(spec.positionals.length);
     throw refuse(`${extra.length > 1 ? "there are arguments" : "there is an argument"} too many: ${extra.join(" ")}`);
   }
-  spec.positionals.forEach(([name], place) => {
-    values[name] = positionals[place];
-  });
+  if (variadic) {
+    values[spec.positionals[0][0]] = positionals;
+  } else {
+    spec.positionals.forEach(([name], place) => {
+      values[name] = positionals[place];
+    });
+  }
+  if (spec.check !== undefined) {
+    spec.check(values, refuse);
+  }
   return {subcommand, values};
 }
