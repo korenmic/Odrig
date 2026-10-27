@@ -55,7 +55,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `tests/converter/test_scope.py`'s list of what a tool may read; tests;
       `docs/firmware.md`'s usage line, error table and install-show section. Suites:
       firmware, converter's Python, onboarding.
-- [ ] 6. The app's panel. `screens/limits.js`, `commands.js`, `client.js`, `index.html`,
+- [x] 6. The app's panel. `screens/limits.js`, `commands.js`, `client.js`, `index.html`,
       `style.css`, `main.js`: the panel of requirement 6, its reads, saves, refusals,
       warnings and marks, focus and unsaved text kept, an older installation. Tests in
       `tests/app/test_limits.py` with a scenario against the emulator and stand-ins; the

@@ -5,6 +5,7 @@ import * as client from "./client.js";
 import * as messages from "./messages.js";
 import * as authoring from "./screens/author.js";
 import * as catalogs from "./screens/catalogs.js";
+import * as limitsScreen from "./screens/limits.js";
 import * as animationsScreen from "./screens/show.js";
 import * as uploadScreen from "./screens/storage.js";
 import * as settingsScreen from "./screens/mapping.js";
@@ -34,6 +35,7 @@ function show(name) {
   settingsScreen.showing(name === "settings");
   photomap.showing(name === "settings");
   catalogs.showing(name === "settings");
+  limitsScreen.showing(name === "settings");
   animationsScreen.showing(name === "animations");
   targetScreen.showing(name === "target");
 }
@@ -129,6 +131,7 @@ authoring.start({message, go});
 settingsScreen.start();
 photomap.start();
 catalogs.start({message});
+limitsScreen.start();
 client.onRefusal((refusal) => message(messages.ofRefusal(refusal, client.state.status === null ? null : client.state.status.error)));
 client.watch((state) => {
   const pill = byId("top-link");

@@ -10939,3 +10939,51 @@ and `read-show` copies it; that is outside this seed and is left as it is, for t
 **Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`; docs/firmware.md,
 "Commands" and its install-show section; `tests/firmware/test_storage.py`,
 `tests/firmware/test_docs.py`.
+
+## Seed 45: the app's panel of the current limits
+
+**Question.** Requirement 6 and the design give the panel `Current limits` its fields, its
+reads, its saves and its sentences, and name `#limits-summary` and `#limits-error` for what
+it says. They leave open where a save's sentence stands among twenty-one fields, what
+"entered" is, how a field's text is compared with the budget, what happens when a field
+is changed while a save is out, which reads are dropped, when the snakes' rows show, what
+the warning follows, the words of the labels and of the refusals, and how strictly the
+reply of `limits` is checked.
+
+**Answer.** What a save, a refusal or a value out of range says stands under its own
+field, in a line of the row (`.limit-said`), where the operator who just left the field
+sees it, and only the latest one stands; `#limits-summary` says `Reading the current
+limits...` before the first read and the sentence of software without limits, and no
+`#limits-error` was made. A field is entered by Enter, its `keydown`, and left by `change`;
+the two make one save, and Enter saves only text changed since the panel last wrote the
+field, so that a field with the focus whose budget was changed elsewhere sends nothing. Its text is taken as digits only, whatever is typed or pasted, and
+compared by value, empty being 0, with the value the field is to have: the budget read
+last, or the latest save of that field that is out or waits. Equal, nothing is sent and
+the text is written as the panel writes it (`0730` becomes `730`, `0` empty); above 250,000
+mA for the wall or 65,535 mA for a snake, nothing is sent, the range is said and the value
+the field is to have is shown. Saves are sent one after another in the order asked, and
+after the last the limits are read; nothing is read while a save is out or waits, a read's
+reply that comes after a save was begun is dropped, and the read every two seconds waits
+until 1.5 seconds after the last read began, so that the read after a save is not followed
+at once by another while a slow read still leaves two seconds between reads. A save is said `Saving...` under its field while it is out. A refusal
+keeps the field's text when other text was typed meanwhile; otherwise the saved budget is
+shown again, and `unknown-command` on a save is software without limits, as on a read. A
+failure is said `No confirmed reply. The budgets were read again; check this one before
+setting it again.`, and the limits are read. The snakes' rows show while `mapping get`
+reports the twenty snakes as editable and `limits` reports legs 1 to 20; the wall's entry
+and `saved` are those of the last part of a read. The warning follows the budget read or
+saved, not the text being typed, and stands beside the wall's default too: on the board,
+730 mA with the tracked maximum, at the start. The labels are `The wall's budget, mA`, a
+heading `Each snake's budget, mA` over the snakes' rows, `Estimate 3,616 mA` beside each
+field and `Dimmed` beside a dimmed estimate. `commands.js` takes a wall's budget up to
+4,294,967,295, since the host's default is reported as it is given and may be above what
+can be set, and a leg's LED count and every estimate up to the same; a leg's budget up to
+65,535, `limited` 0 or 1, a leg number 1 to 255, and `next` after the part asked for. The
+panel has the `.stale` look of the catalogs while the target does not answer. No control of
+the app sends `limits default`, so the app sends thirty-eight lines.
+
+**Resolution.** `app/www/screens/limits.js`, `app/www/commands.js` (`limits`,
+`limitsWall`, `limitsSnake`), `app/www/client.js` (`limitsRead`, `limitsWall`,
+`limitsSnake`), `app/www/index.html`, `app/www/style.css`, `app/www/main.js`;
+docs/android-app.md, "What it is" and "Current limits" under "Using it";
+`tests/app/test_limits.py`.
