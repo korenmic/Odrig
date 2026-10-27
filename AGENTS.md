@@ -138,7 +138,7 @@ present, and do not build on them.
 - **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
 - **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
 - **Current limits for the wall and each snake**, seed 45: built; the board session and the owner's check are open.
-- **Every animation file tracked with its preview and its source**, seed 46: the installation's ODRG files in git, each with its GIF and a readme of its source.
+- **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
 
 The state of every seed is in the `state.json` of its folder.
 

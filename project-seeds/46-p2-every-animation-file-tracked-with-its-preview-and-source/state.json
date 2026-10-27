@@ -2,9 +2,9 @@
   "number": 46,
   "slug": "46-p2-every-animation-file-tracked-with-its-preview-and-source",
   "state": "remaining",
-  "title": "Every animation file tracked with its preview and its source",
+  "title": "Every animation kept with its preview and its source, outside git",
   "priority": "P2",
   "addedAt": "2026-10-27T18:00:00+02:00",
   "addedCommit": "pending-local",
-  "summary": "Every animation file the installation has been given is tracked in a new folder collection/ as its ODRG or ODRGX file, never its JSON, with a copy of its preview GIF and a readme of its source beside it, written with a new --beside option of the converter's thumbnail subcommand and kept in shape by a new test; the decision that every animation's JSON source is committed gives way for these files, and the spec is written for Git LFS until the owner chooses between it and plain git."
+  "summary": "Every animation file the installation has been given is kept outside git, in collection/ on the first computer and its copy on the share, as its ODRG file with its preview GIF and a readme of its source beside it, built by hand on 2026-10-27, while only the previews are tracked in thumbnails/; the seed makes .gitignore ignore the folder in every clone, adds --beside to the converter's thumbnail subcommand, and corrects the pages for the owner's answers, the repository being public."
 }
