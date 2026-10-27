@@ -132,7 +132,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
-- **Previews at once, without the dark squares**, seed 49: from the default catalog by name and size, and keys kept on the phone.
+- **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
