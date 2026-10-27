@@ -120,7 +120,7 @@ Rules for every task:
     the folder's first content.
   - Suites: the converter's, the emulator's, the app's, the firmware tool's, onboarding.
 
-- [ ] 6. The app reads the pages
+- [x] 6. The app reads the pages
   - `app/www/commands.js`: `catalogPage(storage, page, offset)` with its reply checked.
     `app/www/client.js`: the catalog's occasions, `noteCatalog`, the read, the keys,
     `keyOf`. `app/www/screens/catalogs.js`: the shared answer and its replies noted.

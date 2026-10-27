@@ -184,8 +184,9 @@ class ATargetThatStillReads(unittest.TestCase):
     BUSY = {"status": support.PLAYING, "list": (200, '{"ok":false,"error":"busy"}\n')}
 
     def test_the_list_is_asked_for_again_a_second_later_and_the_rows_come(self):
-        # Two rounds of status and list, together with capacity, find the target reading.
-        with support.StandIn(self.BUSY, self.BUSY, self.BUSY, self.BUSY, self.BUSY, support.SOUND) as target:
+        # Two rounds of status and list, together with capacity and the catalogs, find the
+        # target reading.
+        with support.StandIn(self.BUSY, self.BUSY, self.BUSY, self.BUSY, self.BUSY, self.BUSY, support.SOUND) as target:
             found = support.run("reads", address=target.address, settings={"rows": 2})
         before, after = found.seen["before"], found.seen["after"]
         self.assertEqual((before["power"], before["playing"], before["rows"], before["none"], before["message"]), ("ON", "Playlist", [], None, None))

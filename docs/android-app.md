@@ -62,7 +62,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-four command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-five command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -89,7 +89,8 @@ thirty-four command lines and no other, each as `POST /odrig` to the address tha
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
 | Opens the target screen while the installation answers | `fault` |
-| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel | `catalog` |
+| Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
+| Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
 | Presses `Rebuild the board's catalog` or `Rebuild the card's catalog`, and then `Rebuild` | `catalog rebuild internal`, `catalog rebuild external` |
 | Presses `Cancel the rebuild` | `catalog cancel` |
 
@@ -524,7 +525,28 @@ needs a card the installation can write; for one it cannot, the panel says `The
 installation cannot write this card; a computer can make its catalog.`, as
 [microsd.md](microsd.md#the-catalog-made-on-a-computer) has it. A refused rebuild is said
 in the place for messages. An installation whose software keeps no catalogs says `This
-installation's software keeps no catalogs.` and is not asked again.
+installation's software keeps no catalogs.` and is not asked again, by Settings or by the
+reading of the keys below, until the target changes.
+
+**The keys of the animations.** The app learns each animation's key, the CRC-32 and the
+size of its file, from the catalogs' pages, as [catalog.md](catalog.md) has them. It asks
+`catalog` when the target first answers, when it answers again after a silence and after
+every complete list, besides Settings' occasions, and every reply counts. When a reply
+shows a storage's catalog `ok` and the app has no read of it, or one of another generation
+or number of entries, it reads the sixteen pages of that storage with `catalog page`, each
+from offset 0 to its end, the board's before the card's, one request at a time after the
+operator's own and after `status`, an upload's lines, `list`, the saved order and `space`.
+It keeps each line's key by the file's name, a card file's by its path from `odrig`, and a
+row takes the key of its storage and name only when the key's size is the row's size. The
+keys of a read stand until the next read of that storage has ended; they go at once when
+`catalog` shows the storage in another state than `ok`, when the target answers again after
+a silence, and when the target changes. A page of another generation than the first page
+of the read starts the read again; a page refused with `busy` is asked again two seconds
+later; a page whose generation is `null`, and any other refusal, end the read without keys.
+An installation that refuses `catalog page` is from before it: it is asked for no page
+again, and `catalog` only by Settings, until the target changes. Nothing of this is said
+on the screen. A show folder that `pack` makes has no catalog, so its rows have no key
+until Settings' rebuild of the board's catalog has made one.
 
 **Mapping.** The twenty snakes stand in a fixed column, `Snake n · columns a–b`, left to
 right when viewed from the front, each starting at the bottom and running up, down, up;

@@ -84,7 +84,7 @@ class TheListOfAnimations(unittest.TestCase):
         self.assertEqual(found["question"], "Remove animation 1 one.odrg from the installation?")
         self.assertEqual([row["id"] for row in found["after"]["rows"]], [1, 2, 3])
         self.assertIsNone(found["message"])
-        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space", "order get"))], [])
+        self.assertEqual([line for line in lines_of(events) if not line.startswith(("status", "list", "space", "order get", "catalog"))], [])
 
     def test_an_animation_a_cycle_lists_is_refused_in_words(self):
         emulator, address = self.emulator(entered(self, emulator_support.example_show()))

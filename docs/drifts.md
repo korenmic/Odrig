@@ -10672,3 +10672,29 @@ not name, a GIF of the folder among them, and `pack` writes exactly the show's f
 converter/tests/thumbnails.test.js, converter/tests/library.test.js,
 tests/emulator/test_page_files.py, tests/app/test_tool.py, tests/app/test_scope.py,
 tests/apk/test_apk.py, tests/firmware/test_storage.py.
+
+## Seed 44: how the app's reading of the pages fits its queue
+
+**Question.** The seed has the app ask `catalog` at the target's first answer and after every
+complete list and read the pages one request at a time after the operator's own. Where do
+`catalog` and the pages stand among the app's other requests, which generation do the keys
+carry, which replies of `catalog` count, and what of the keys is left when a reply ends a
+silence?
+
+**Answer.** `catalog` and the pages come after everything else the app sends: the
+operator's requests, `status`, an upload's lines, `list`, the saved order and `space`; one
+page part is sent at a time, so that the operator's next request goes out after the part
+under way. `catalog` is also asked when the target answers again after a silence, and every
+reply of `catalog` counts, Settings' included, so that Settings' two-second asking starts a
+read at once. The keys carry the generation of the pages they were read from and the number
+of entries of the reply that started the read; a later reply of another generation or number
+starts a read again. A reply that ends a silence drops the keys and every read, and the
+reading starts anew from `catalog`. The board's storage is read before the card's. A target
+whose catalog refuses `catalog page` is asked `catalog` only by Settings, and a target that
+refuses `catalog` by no one, until the target changes; Settings tells the second from the
+client's answer. A reply to `catalog page` that is no page's answer counts as such a refusal,
+so that the reading never marks the target as silent. The app's tests that pin the lines the
+app sends take `catalog` and its pages among the lines it sends by itself.
+
+**Resolution.** `app/www/client.js`, `app/www/commands.js`, `app/www/screens/catalogs.js`;
+docs/android-app.md; tests/app/test_keys.py, tests/app/page/scenarios/keys.js.
