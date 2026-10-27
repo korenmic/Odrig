@@ -10758,3 +10758,50 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 47: the slider taken while the field holds text not sent
+
+**Question.** The seed has the slider's move win over text typed and not sent, "whatever
+the browser does with the focus", by the slider's own `input` handler. A browser that moves
+the focus to the slider when a finger lands on it fires the field's `change` before the
+slider's first `input`. What is sent then?
+
+**Answer.** The field's `change` is a commit, and it sends the typed value by the slider's
+path; the slider's first `input` then writes its own value into the field and sends it
+through the same `sendLevel`, which spaces the two by 200 ms and replaces a brightness that
+still waits. The slider's value is the one that stands, on the installation and in the
+field. Where the browser keeps the focus in the field, as Chrome does for a programmatic
+move, the handler drops the text first, so that nothing typed is sent; the field gives up
+the focus only after it holds the slider's value, so that leaving it finds nothing to send.
+
+**Resolution.** `app/www/screens/show.js`;
+`docs/specs/47-p2-a-brightness-field-beside-the-slider/design.md`.
+
+## Seed 47: the field and the slider with no value in force
+
+**Question.** The field and the slider "show the value in force" after a commit that sends
+nothing. Before the first `status` there is none. What do they show then, and where does
+the range line stand?
+
+**Answer.** The field is emptied, with its placeholder `-`, and the slider stands at 0, as
+before the first `status` today. The line `The brightness is 0 to 255.` is the paragraph
+`#level-range`, in the small lettering of the app's notes, hidden while it says nothing;
+it is said for a value above 255 whether the field was entered or left, and goes at the next
+keystroke in the field, at a move of the slider and at the next value sent.
+
+**Resolution.** `app/www/index.html`, `app/www/screens/show.js`;
+`docs/specs/47-p2-a-brightness-field-beside-the-slider/requirements.md`.
+
+## Seed 47: the APK and the seed's state
+
+**Question.** Seed 47 asks for a new APK with the artifacts, and the working rules have the
+last task of a spec make the seed `completed`. Seed 48 is built on the same branch right
+after it, and the owner's check on a phone is open. When is the APK built, and what is the
+seed's state?
+
+**Answer.** One APK is built from the branch's tip once seed 48 is built too, and put with
+the artifacts on the share and on Drive; it holds both seeds. The seed stays `in_progress`
+while the owner's check on a phone is open, as seed 43 does; the owner's check closes it.
+
+**Resolution.** `docs/specs/47-p2-a-brightness-field-beside-the-slider/tasks.md`,
+`project-seeds/47-p2-a-brightness-field-beside-the-slider/state.json`.

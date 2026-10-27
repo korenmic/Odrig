@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The field, its sync with the slider and its sends
+- [x] 1. The field, its sync with the slider and its sends
   - `app/www/index.html`: `#level-line` with the label and the field, the slider's
     accessible name `Brightness`, the line `#level-range` under the slider.
   - `app/www/screens/show.js`: `inForce`, `writeLevel`, `unsent`, `typingIn`,
