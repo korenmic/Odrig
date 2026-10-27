@@ -10911,3 +10911,31 @@ of `install-show`.
 WLED", "The probe build", "The owner's checks", "Measurements on the board";
 `tests/firmware/test_docs.py`; agent/working-rules.md, "What needs the owner" and rule 10;
 `tests/onboarding/test_rules.py`.
+
+## Seed 45: the firmware tool's `--limits`, with `--no-check` and without
+
+**Question.** Requirement 5.1 has the folder check accept `limits.json`, `install-show`
+write it only with `--limits` after reading it as the core does, and refuse
+`limits-missing` and `limits-malformed` before the board is touched. It leaves open
+whether the folder check reads the file, what `--no-check` changes, which check comes
+first, and what the refusals say.
+
+**Answer.** The folder check accepts the name and does not read the file: without
+`--limits` the folder's copy is left out, so a folder is not refused for a file that is not
+installed. `--no-check`, which installs any flat folder of files, is about the show: the
+folder's `limits.json` is left out without `--limits` there too, and with `--limits` it is
+read and refused as without `--no-check`, since the budgets are about power. The folder is
+checked first, then the budgets' file, then the folder of `--keep-copies`, all before the
+board is looked for. The file is read with `odrig.limits.loads`; the detail of
+`limits-malformed` names the file and then the library's words, and that of
+`limits-missing` names the file it looked for. The name is `storage.LIMITS_NAME`, which is
+`odrig.limits.NAME`, and the check `storage.check_limits`. Before this, `install-show`
+removed a `limits.json` the board held, as it removes every file of `/odrig` the folder
+lacks; the board's file is now carried in beside `order.txt` and `playlist.txt` when
+`--limits` is not given. In passing: the folder check refuses `playlist.txt` with
+`not-a-show-folder`, though the install-show section says it may be a file of the folder
+and `read-show` copies it; that is outside this seed and is left as it is, for the owner.
+
+**Resolution.** `firmware/fwtool/storage.py`, `firmware/fwtool/cli.py`; docs/firmware.md,
+"Commands" and its install-show section; `tests/firmware/test_storage.py`,
+`tests/firmware/test_docs.py`.

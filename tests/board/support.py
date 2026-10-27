@@ -342,8 +342,15 @@ def storage_image():
 
 
 def installed():
-    """The files of the show installed on the board: the content of each by its name."""
-    return storage.show_of(storage_image())
+    """The files of the show installed on the board: the content of each by its name. The
+    board's budgets file is left out: an install keeps it, and a show folder does not
+    carry it."""
+    return show_files(storage.show_of(storage_image()))
+
+
+def show_files(files):
+    """The files of `/odrig` without the board's budgets file."""
+    return {name: content for name, content in files.items() if name != storage.LIMITS_NAME}
 
 
 def read_back():

@@ -99,6 +99,16 @@ class Firmware(unittest.TestCase):
         for expected in ("`limit: <N> mA`", "`limit: off`", "`limit: not stored; WLED uses 850 mA`", "restarts the board", "It writes nothing"):
             self.assertIn(expected, told)
 
+    def test_it_says_what_install_show_does_with_the_budgets_and_names_their_reasons(self):
+        commands = section(self.text, "Commands")
+        for reason in ("limits-missing", "limits-malformed"):
+            self.assertRegex(commands, rf"(?m)^\| `{reason}` \| ", reason)
+        told = " ".join(commands.split("\n### install-show\n")[1].split("\n### ")[0].split())
+        for expected in ("`limits.json`", "go to the board only with `--limits`", "the board keeps its own budgets, or keeps none when it has none",
+                         "The file is read before the board is touched, as strictly as the core reads it", "`limits-missing`", "`limits-malformed`",
+                         "with `--no-check` too", "`install-show --limits` is not run with a folder of the installation", "never 0 or above 730 mA"):
+            self.assertIn(expected, told)
+
     def test_it_says_what_a_limit_means_for_the_bench_and_for_the_installation(self):
         does = section(self.text, "What the firmware does")
         told = " ".join(does.split())

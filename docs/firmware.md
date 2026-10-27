@@ -139,7 +139,7 @@ python3 firmware/fw.py build [--stock | --probe] [--standalone | --stick | --mic
 python3 firmware/fw.py flash [--port P] [--image PATH] [--standalone] [--expect status|wled|probe] [--wait SECONDS]
 python3 firmware/fw.py restore-stock [--port P] [--full] [--stock-dir DIR]
 python3 firmware/fw.py big-storage [--port P] [--wait SECONDS]
-python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
+python3 firmware/fw.py install-show DIR [--port P] [--no-check] [--limits] [--wait SECONDS] [--dry-run] [--keep-copies DIR]
 python3 firmware/fw.py set-wifi [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py set-limit [--port P] [--settings FILE] [--wait SECONDS]
 python3 firmware/fw.py read-limit [--port P]
@@ -188,6 +188,8 @@ with that environment's Python.
 | `limit-settings-missing` | The limit file to read is not there or is not a file. |
 | `limit-settings-malformed` | The limit file is not a JSON object with exactly the whole number `milliamps`. |
 | `limit-invalid` | The limit is not from 0 to 65,535. |
+| `limits-missing` | The folder that `install-show --limits` is to install holds no `limits.json`. Nothing was written to the board. |
+| `limits-malformed` | The `limits.json` of the folder that `install-show --limits` is to install is one the core would not read: the rules are in [reasons.md](reasons.md#limits-files). Nothing was written to the board. |
 | a reason of [reasons.md](reasons.md), "Shows" | The folder to install is not a valid installed file set: `mapping-missing`, `show-malformed`, `file-missing`, `size-mismatch` and the others. |
 | `backup-protected` | An output path lies in the factory backup of the board, which no tool writes. |
 | `cancelled` | An interrupt from the keyboard, Ctrl-C, ended the command before a change of storage was committed. The board holds its storage from before. |
@@ -484,7 +486,10 @@ whether it is sound is not known yet.
    `order.txt` of [show.md](show.md#the-saved-playlist-order), and the saved playlist,
    `playlist.txt` of [core.md](core.md#the-saved-playlist), may be files of the folder;
    a folder without them keeps the board's, as installing animations does not change the
-   order or the playlist the operator chose.
+   order or the playlist the operator chose. The budgets of the current limits,
+   `limits.json` of [core.md](core.md#current-limits), may be a file of the folder too, as
+   `read-show` copies it, and go to the board only with `--limits`: without it the folder's
+   copy is left out, and the board keeps its own budgets, or keeps none when it has none.
 5. In that image it changes only what differs. A file of the folder that `/odrig` holds
    with the same bytes stays where it is, neither read nor written. A new file is written
    under its name, and a changed one under a spare name, `~0`, `~1` and so on, which then
@@ -527,6 +532,16 @@ board. `--keep-copies DIR` copies every file the install removes or replaces, as
 holds it, into `DIR`, a folder that is new or empty, before anything is written, and
 prints `kept copies: 2 files in DIR`: a file kept for a look at why it failed.
 
+`--limits` installs the folder's `limits.json` with the show, in the place of the board's.
+The budgets are for the supplies a board is fed from, so they move from one board to
+another only when asked: a folder copied from the installation by `read-show` carries
+the installation's budgets, and installed without `--limits` it leaves the board's as they
+are. The file is read before the board is touched, as strictly as the core reads it at its
+start: a folder that holds none is refused with `limits-missing`, and a file the core
+would not read with `limits-malformed`, with `--no-check` too. Budgets saved on the board
+with `limits wall` or `limits snake` stay through every `install-show` without
+`--limits`; `limits default` of [commands.md](commands.md#current-limits) removes them.
+
 From its first write to the comparison the change is named by the journal
 `build/firmware/storage/change.json`: the storage region, the new image and the blocks of
 each call, and the step reached. `set-wifi`, `set-limit` and `install-firmware` write their
@@ -539,7 +554,9 @@ storage outside `/odrig`, WLED's settings among them, keeps its content.
 
 Every show installed on the board while one 60-LED strip is fed from the board's 3.3 V pin
 must have a brightness of 40 or less in its `show.json`. The tool does not check this; the
-board tests do, for every show they install.
+board tests do, for every show they install. On such a board `install-show --limits` is
+not run with a folder of the installation, whose budgets are for its supplies: the wall's
+budget there is never 0 or above 730 mA. The tool does not check this either.
 
 ### set-wifi
 

@@ -6,8 +6,22 @@ import unittest
 from unittest import mock
 
 from fwtool import paths, storage
+from odrig import limits
 
 from . import support
+
+# Budgets' files as the core writes them: the installation's, and another the board holds.
+INSTALLATION_BUDGETS = limits.dumps(60000, [(1, 3000), (2, 3000)])
+BOARD_BUDGETS = limits.dumps(730, [(2, 400)])
+# Budgets' files the core would not read.
+UNREADABLE_BUDGETS = (
+    b'{"version":1,"wall":730',
+    b'{"version":2,"wall":730,"legs":[]}',
+    b'{"version":1,"wall":250001,"legs":[]}',
+    b'{"version":1,"wall":730,"legs":[[1,400],[1,500]]}',
+    b'{"version":1,"wall":730}',
+    b'{"version":1,"wall":730,"legs":[],"extra":1}',
+)
 
 
 def disk_version(image):
@@ -116,6 +130,12 @@ class ShowFolders(Temporary):
         (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 2\n")
         self.assertEqual(storage.folder_files(self.show)["order.txt"], b"odrig-order 1\ni 2\n")
 
+    def test_a_budgets_file_is_a_file_of_the_show_and_is_read_only_when_it_is_installed(self):
+        for content in (INSTALLATION_BUDGETS, UNREADABLE_BUDGETS[0]):
+            with self.subTest(content=content):
+                (self.show / "limits.json").write_bytes(content)
+                self.assertEqual(storage.folder_files(self.show)["limits.json"], content)
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -191,6 +211,11 @@ class Commands(Temporary):
         """The storage as the recorded writes leave it."""
         return applied(self.old, [(address - 0x610000, content) for address, content in esptool.wrote])
 
+    def another_board(self, files=None):
+        """A board that holds other files: its storage, and no image kept from the last."""
+        self.old = support.storage_image(files)
+        shutil.rmtree(self.folder / "storage", ignore_errors=True)
+
     def test_install_show_puts_the_folder_into_storage_and_prints_the_reply(self):
         esptool = self.esptool()
         result = self.install(esptool)
@@ -236,6 +261,89 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"playlist.txt": playlist}))
         self.assertIn("show: kept 1 files\n", result.out)
+
+    def test_with_limits_the_folders_budgets_file_is_installed(self):
+        (self.show / "limits.json").write_bytes(INSTALLATION_BUDGETS)
+        for board_budgets in (None, BOARD_BUDGETS):
+            with self.subTest(board_budgets=board_budgets):
+                self.another_board(support.WLED_FILES if board_budgets is None else dict(support.WLED_FILES, **{"/odrig/limits.json": board_budgets}))
+                esptool = self.esptool()
+                result = self.install(esptool, "--limits")
+                self.assertEqual(result.status, 0, result.err)
+                self.assertEqual(storage.show_of(self.on_the_board(esptool))["limits.json"], INSTALLATION_BUDGETS)
+                self.assertEqual(storage.show_of(self.on_the_board(esptool)), storage.folder_files(self.show))
+                said = f"show: added limits.json, {len(INSTALLATION_BUDGETS)} bytes\n" if board_budgets is None else f"show: replaced limits.json, {len(INSTALLATION_BUDGETS)} bytes, was {len(BOARD_BUDGETS)}\n"
+                self.assertIn(said, result.out)
+
+    def test_without_limits_the_boards_budgets_file_is_kept_and_the_folders_left_out(self):
+        for content in (None, INSTALLATION_BUDGETS, UNREADABLE_BUDGETS[0]):
+            for extra in ((), ("--no-check",)):
+                with self.subTest(content=content, extra=extra):
+                    self.another_board(dict(support.WLED_FILES, **{"/odrig/limits.json": BOARD_BUDGETS}))
+                    if content is not None:
+                        (self.show / "limits.json").write_bytes(content)
+                    esptool = self.esptool()
+                    result = self.install(esptool, *extra)
+                    self.assertEqual(result.status, 0, result.err)
+                    on_the_board = storage.show_of(self.on_the_board(esptool))
+                    self.assertEqual(on_the_board["limits.json"], BOARD_BUDGETS)
+                    self.assertEqual({name: data for name, data in on_the_board.items() if name not in storage.CATALOG_NAMES},
+                                     dict({name: data for name, data in support.files_of(self.show).items() if name != "limits.json"}, **{"limits.json": BOARD_BUDGETS}))
+                    self.assertIn("show: kept 1 files\n", result.out)
+                    self.assertNotIn("limits.json", "".join(line for line in result.out.splitlines(True) if line.startswith("show: ")))
+
+    def test_without_limits_a_board_without_a_budgets_file_keeps_none(self):
+        for content in (INSTALLATION_BUDGETS, UNREADABLE_BUDGETS[0]):
+            for extra in ((), ("--no-check",)):
+                with self.subTest(content=content, extra=extra):
+                    self.another_board()
+                    (self.show / "limits.json").write_bytes(content)
+                    esptool = self.esptool()
+                    result = self.install(esptool, *extra)
+                    self.assertEqual(result.status, 0, result.err)
+                    self.assertNotIn("limits.json", storage.show_of(self.on_the_board(esptool)))
+                    self.assertNotIn("limits.json", result.out)
+
+    def test_limits_with_a_folder_without_a_budgets_file_is_refused_before_the_board_is_touched(self):
+        for extra in ((), ("--no-check",)):
+            with self.subTest(extra=extra):
+                with support.untouched_board():
+                    result = support.run_main("install-show", self.show, "--limits", *extra)
+                self.assertEqual((result.status, result.out), (1, ""))
+                self.assertRegex(result.err, r"\Aerror: limits-missing: .*limits\.json")
+
+    def test_limits_with_a_budgets_file_the_core_would_not_read_is_refused_before_the_board_is_touched(self):
+        for content in UNREADABLE_BUDGETS:
+            for extra in ((), ("--no-check",)):
+                with self.subTest(content=content, extra=extra):
+                    (self.show / "limits.json").write_bytes(content)
+                    with support.untouched_board():
+                        result = support.run_main("install-show", self.show, "--limits", *extra)
+                    self.assertEqual((result.status, result.out), (1, ""))
+                    self.assertRegex(result.err, r"\Aerror: limits-malformed: .*limits\.json: ")
+
+    def test_read_show_keeps_the_budgets_file_and_its_copy_goes_back_only_with_limits(self):
+        (self.show / "limits.json").write_bytes(BOARD_BUDGETS)
+        installed = self.esptool()
+        self.assertEqual(self.install(installed, "--limits").status, 0)
+        board = self.on_the_board(installed)
+        with support.no_board(self.esptool(board)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), storage.show_of(board))
+        self.assertEqual(support.files_of(self.folder / "copy")["limits.json"], BOARD_BUDGETS)
+        self.assertIn(f"limits.json: {len(BOARD_BUDGETS)} bytes\n", result.out)
+        self.show = self.folder / "copy"
+        self.assertEqual(storage.folder_files(self.show)["limits.json"], BOARD_BUDGETS)
+        self.another_board()
+        without = self.esptool()
+        self.assertEqual(self.install(without).status, 0)
+        self.assertNotIn("limits.json", storage.show_of(self.on_the_board(without)))
+        self.old = self.on_the_board(without)
+        again = self.esptool()
+        self.assertEqual(self.install(again, "--limits").status, 0)
+        self.assertEqual(storage.show_of(self.on_the_board(again))["limits.json"], BOARD_BUDGETS)
+        self.assertEqual(storage.show_of(self.on_the_board(again)), storage.show_of(board))
 
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()

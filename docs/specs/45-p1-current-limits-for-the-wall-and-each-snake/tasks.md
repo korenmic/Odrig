@@ -49,7 +49,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       bench rule as rule 10 of "If you have a board" in `agent/working-rules.md`, with
       `tests/onboarding/test_rules.py`'s count of the board rules. Suites: firmware,
       onboarding; the board suite needs the flashed firmware and is left open.
-- [ ] 5. The firmware tool. The folder check's name, `install-show --limits` with
+- [x] 5. The firmware tool. The folder check's name, `install-show --limits` with
       `limits-missing` and `limits-malformed` before the board is touched, the board's file
       kept without it, `read-show` keeping the file; `odrig.limits` in
       `tests/converter/test_scope.py`'s list of what a tool may read; tests;
