@@ -65,7 +65,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -111,10 +111,10 @@ def checked(made, arguments):
         return [arguments.command, *arguments.arguments]
     if arguments.command == "mapping":
         words = arguments.arguments
-        valid = words == ["get"] or (len(words) == 2 and words[0] == "test" and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
+        valid = words == ["get"] or (len(words) == 2 and words[0] in ("test", "cross") and words[1] in ("on", "off")) or (len(words) == 3 and words[0] == "set") or (
             len(words) == 3 and words[:2] == ["test", "snake"])
         if not valid:
-            made.error("mapping takes get, set REV PINS, test on|off, or test snake N")
+            made.error("mapping takes get, set REV PINS, cross on|off, test on|off, or test snake N")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]

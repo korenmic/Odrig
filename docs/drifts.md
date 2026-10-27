@@ -10425,3 +10425,27 @@ one block more, of one bit a strip, with it.
 **Resolution.** docs/mapping.md, rule 6 and "Where each LED is"; `core/src/mapping.cpp`,
 `odrig/mapping.py`, `emulator/web/layout.js`; the tests of the core, the library and the
 emulator.
+
+## Seed 43: the bit of the cross-wired snake, its command and its revision
+
+**Question.** How does the app set the bit that snake 10 is cross-wired: a member of
+`mapping set`, or a command of its own? Is the bit part of the revision that guards a
+save? And what does the snake test of snake 10 show with the bit on?
+
+**Answer.** A command of its own, `mapping cross on|off`: `mapping set` keeps its form,
+which every client and the command tool send, and the bit is not a pin. The revision
+stays the CRC-32 of the twenty pins: the app computes it from the pins it shows, and the
+bit is idempotent, so a stale app can only set the bit it means to set; `mapping set`
+keeps the bit as it is. The bit is nothing but the form of leg 10 in the mapping file,
+`"columns":[28,30,29]` with `"starts":["bottom","bottom","top"]`, so a restart, the
+emulator and every app agree, and a hand-written file with that leg reads as the bit on.
+The snake test and the diagonal are drawn on the canvas as before: with the bit on, on
+the installation as wired, the block of snake 10 climbs its three lines together and the
+stub of position 10 rises like the others; with it off the block climbs line 28 and
+descends lines 29 and 30. The emulator publishes the mapping again after every successful
+`mapping cross`, so that its page reads the file again, although the legs and their pins
+are the same.
+
+**Resolution.** docs/commands.md, "Mapping controls"; docs/core.md; docs/mapping.md;
+`core/src/mapping_control.cpp`, `core/src/commands.cpp`; `emulator/binding.py`,
+`emulator/engine.py`; `odrigctl/cli.py`; the mapping suite.

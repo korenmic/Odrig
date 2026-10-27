@@ -12,7 +12,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       that is not `first_led`. `docs/python-library.md` and `docs/emulator.md` name it;
       `docs/drifts.md` records the vocabulary of the ends. Suites: core, converter's
       Python, emulator, onboarding.
-- [ ] 2. The bit on the installation: `mapping cross on|off`, `cross` in `mapping get`,
+- [x] 2. The bit on the installation: `mapping cross on|off`, `cross` in `mapping get`,
       `mapping_editable` with leg 10 crossed, `persist` with the bit, `place_leg_10`.
       Tests in `tests/mapping/test_core.py`: `cross` false on the target's file; `on`
       rewrites the file with leg 10 as `[28,30,29]` and `starts`, reports true, and the

@@ -948,7 +948,10 @@ It validates geometry against its LED-to-pixel table and keeps mapping entry ord
 The pin-list CRC revision prevents a stale client from replacing another edit.
 The bounded writer uses the existing storage chunk, and commits mapping.part with
 one atomic rename before changing in-memory pins. Startup discards a leftover
-mapping.part without touching the installed mapping.
+mapping.part without touching the installed mapping. `mapping cross` writes the
+same file with snake 10's leg cross-wired or not, and then writes the 180 entries
+of that leg's LED-to-pixel table anew; the geometry check accepts snake 10 in
+either wiring and no other leg in another.
 
 Diagnostic entry saves the current playlist or cycle selection, closes playback,
 and decodes the embedded converter-built ODRG through the ordinary decoder into

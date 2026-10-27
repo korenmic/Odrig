@@ -401,6 +401,10 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count == 4 && words.is(1, "test") && words.is(2, "snake") && number_word(words, 3, 1, 20, &snake)) {
             return mapping_test(core, true, snake, reply);
         }
+        if (words.count == 3 && words.is(1, "cross") && (words.is(2, "on") || words.is(2, "off"))) {
+            if (catalog_rebuilding(core)) return refuse(reply, "busy");
+            return mapping_cross(core, words.is(2, "on"), reply);
+        }
         uint32_t revision;
         if (words.count == 4 && words.is(1, "set") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision)) {
             if (catalog_rebuilding(core)) return refuse(reply, "busy");

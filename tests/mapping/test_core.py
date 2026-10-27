@@ -28,9 +28,9 @@ def files():
 class MappingCommands(unittest.TestCase):
     def test_get_returns_current_assignments_and_bench_is_unsupported(self):
         reply = answers(support.start(files(), [support.line(1000, 'mapping get')]))[0]
-        self.assertEqual(reply, dict(ok=True, editable=True, pins=PINS, revision=REVISION, test=False, snake=None))
+        self.assertEqual(reply, dict(ok=True, editable=True, pins=PINS, revision=REVISION, cross=False, test=False, snake=None))
         reply = answers(support.start(support.example_show(), [support.line(1000, 'mapping get')]))[0]
-        self.assertEqual(reply, dict(ok=True, editable=False, pins=[], revision=0, test=False, snake=None))
+        self.assertEqual(reply, dict(ok=True, editable=False, pins=[], revision=0, cross=False, test=False, snake=None))
 
     def test_save_is_durable_and_does_not_change_the_show_or_animations(self):
         source = files()
@@ -150,3 +150,121 @@ class MappingCommands(unittest.TestCase):
         self.assertEqual(answers(run)[2],dict(ok=False,error='busy'))
         produced,_=refreshes([l for l in run.lines if l.startswith(('refresh ','data ','idle '))])
         self.assertEqual({v for data in produced[0][1].values() for v in data},{0,7})
+
+
+CROSSED_LEG = {"leg": 10, "pin": 10, "first_led": "bottom", "columns": [28, 30, 29], "starts": ["bottom", "bottom", "top"]}
+
+
+def leg_ten(text):
+    return [leg for leg in json.loads(text)["legs"] if leg["leg"] == 10][0]
+
+
+def crossed_files():
+    source = files()
+    listed = json.loads(source["mapping.json"])
+    listed["legs"] = [CROSSED_LEG if leg["leg"] == 10 else leg for leg in listed["legs"]]
+    source["mapping.json"] = json.dumps(listed).encode()
+    return source
+
+
+def place(crossed, n):
+    """The canvas column and row, from 1, of LED n, from 0, of snake 10."""
+    strip, along = divmod(n, 60)
+    column = (28, 30, 29)[strip] if crossed else (28, 29, 30)[strip]
+    down = strip == (2 if crossed else 1)
+    return column, 60 - along if down else 1 + along
+
+
+class CrossWiredSnakeTen(unittest.TestCase):
+    """Snake 10 chained up column 28, up column 30 and down column 29, with `mapping cross`."""
+
+    def test_on_rewrites_snake_ten_with_its_starts_and_get_reports_it(self):
+        run, left = support.start_and_keep(files(), [support.line(1000, 'mapping cross on'), support.line(1001, 'mapping get')])
+        self.assertEqual(answers(run), [dict(ok=True), dict(ok=True, editable=True, pins=PINS, revision=REVISION, cross=True, test=False, snake=None)])
+        self.assertEqual(leg_ten(left['mapping.json']), CROSSED_LEG)
+        written = json.loads(left['mapping.json'])
+        self.assertEqual([leg for leg in written['legs'] if leg['leg'] != 10], [leg for leg in json.loads(files()['mapping.json'])['legs'] if leg['leg'] != 10])
+        self.assertEqual({name: data for name, data in left.items() if name != 'mapping.json'}, {name: data for name, data in files().items() if name != 'mapping.json'})
+
+    def test_a_crossed_file_is_read_as_crossed_and_off_restores_the_wiring_of_the_others(self):
+        run, left = support.start_and_keep(crossed_files(), [support.line(1000, 'mapping get'), support.line(1001, 'mapping cross off'), support.line(1002, 'mapping get')])
+        self.assertEqual([reply.get('cross') for reply in answers(run)], [True, None, False])
+        self.assertEqual(answers(run)[1], dict(ok=True))
+        self.assertEqual(leg_ten(left['mapping.json']), {"leg": 10, "pin": 10, "first_led": "bottom", "columns": [28, 29, 30]})
+
+    def test_the_same_word_again_writes_nothing(self):
+        for source, word in ((files(), 'off'), (crossed_files(), 'on')):
+            with self.subTest(word=word):
+                run = support.start(source, [support.line(1000, f'mapping cross {word}')], ['--trace-store'])
+                self.assertEqual(answers(run), [dict(ok=True)])
+                self.assertFalse([line for line in run.lines if line.startswith('store ')])
+
+    def test_the_pixels_go_to_the_leds_of_the_wiring_from_the_next_refresh(self):
+        # The diagonal lights pixel (x, x): in snake 10, (28, 28), (29, 29) and (30, 30).
+        script = ['poll 1000', support.line(1001, 'mapping test on'), 'poll 1020', support.line(1021, 'mapping cross on'), 'poll 1040']
+        produced, _ = refreshes([line for line in support.start(files(), script).lines if line.startswith(('refresh ', 'data ', 'idle '))])
+        for at, crossed in ((1, False), (len(produced) - 1, True)):
+            data = produced[at][1][10]
+            lit = sorted(place(crossed, n) for n in range(180) if data[3 * n] != 0)
+            self.assertEqual(lit, [(28, 28), (29, 29), (30, 30)], crossed)
+
+    def test_the_snake_test_runs_its_block_along_the_wiring_saved(self):
+        for source, crossed in ((files(), False), (crossed_files(), True)):
+            with self.subTest(crossed=crossed):
+                script = ['poll 1000', support.line(1001, 'mapping test snake 10'), 'poll 1020', 'poll 1060', 'poll 1100']
+                produced, _ = refreshes([line for line in support.start(source, script).lines if line.startswith(('refresh ', 'data ', 'idle '))])
+                for _, legs in produced[1:]:
+                    data = legs[10]
+                    lit = sorted(place(crossed, n) for n in range(180) if data[3 * n] != 0)
+                    rows = sorted({row for _, row in lit})
+                    # The block lights three rows of the three columns of the canvas.
+                    self.assertEqual(len(lit), 9)
+                    self.assertEqual(sorted({column for column, _ in lit}), [28, 29, 30])
+                    self.assertEqual(rows, list(range(rows[0], rows[0] + 3)))
+
+    def test_mapping_set_keeps_the_wiring(self):
+        swapped = PINS.copy(); swapped[0], swapped[9] = swapped[9], swapped[0]
+        run, left = support.start_and_keep(crossed_files(), [support.line(1000, set_line(swapped)), support.line(1001, 'mapping get')])
+        self.assertEqual(answers(run)[0], dict(ok=True))
+        self.assertEqual((answers(run)[1]['pins'], answers(run)[1]['cross']), (swapped, True))
+        self.assertEqual(leg_ten(left['mapping.json']), {**CROSSED_LEG, "pin": swapped[9]})
+
+    def test_the_wiring_is_kept_across_a_restart(self):
+        _, left = support.start_and_keep(files(), [support.line(1000, 'mapping cross on')])
+        self.assertTrue(answers(support.start(left, [support.line(1000, 'mapping get')]))[0]['cross'])
+
+    def test_the_refusals(self):
+        commands = ['mapping cross', 'mapping cross maybe', 'mapping cross on off', 'mapping cross ON']
+        run, left = support.start_and_keep(files(), [support.line(1000, line) for line in commands])
+        self.assertEqual(answers(run), [dict(ok=False, error='bad-argument')] * len(commands))
+        self.assertEqual(left, files())
+        bench = support.start({'mapping.json': support.mapping_texts()['legs-2'], 'show.json': files()['show.json']}, [support.line(1000, 'mapping cross on'), support.line(1001, 'mapping get')])
+        self.assertEqual(answers(bench)[0], dict(ok=False, error='bad-argument'))
+        self.assertFalse(answers(bench)[1]['cross'])
+        upload = support.start(files(), [support.line(1000, 'upload begin 99 new.odrg 100'), support.line(1001, 'mapping cross on')])
+        self.assertEqual(answers(upload)[1], dict(ok=False, error='busy'))
+        refused = 0
+        for at in range(2, 7):
+            with self.subTest(fail=at):
+                failed, kept = support.start_and_keep(files(), [support.line(1000, 'mapping cross on'), support.line(1001, 'mapping get')], ['--store-fails-at', str(at)])
+                if not answers(failed)[0]['ok']:
+                    refused += 1
+                    self.assertEqual(answers(failed)[0], dict(ok=False, error='storage-error'))
+                    self.assertFalse(answers(failed)[1]['cross'])
+                    self.assertEqual(kept['mapping.json'], files()['mapping.json'])
+        self.assertGreater(refused, 0)
+
+    def test_a_power_loss_at_every_step_of_the_save_leaves_a_whole_file(self):
+        command = support.line(1000, 'mapping cross on')
+        observed = support.start(files(), [command], ['--trace-store'])
+        calls = sum(line.startswith('store ') for line in observed.lines)
+        self.assertGreater(calls, 0)
+        for at in range(3, 3 + calls):
+            for keeps in (0, 1):
+                with self.subTest(at=at, keeps=keeps):
+                    _, left = support.start_and_keep(files(), [command], ['--cut-at', str(at), '--cut-keeps', str(keeps)], status=75)
+                    recovered, settled = support.start_and_keep(left, [support.line(1000, 'mapping get')])
+                    reply = answers(recovered)[0]
+                    self.assertEqual((reply['editable'], reply['pins']), (True, PINS))
+                    self.assertIn(leg_ten(settled['mapping.json']), [CROSSED_LEG, {"leg": 10, "pin": 10, "first_led": "bottom", "columns": [28, 29, 30]}])
+                    self.assertNotIn('mapping.part', settled)
