@@ -1,0 +1,10 @@
+{
+  "number": 50,
+  "slug": "50-p2-more-than-256-files-on-a-drive",
+  "state": "suspended",
+  "title": "More than 256 files on a drive",
+  "priority": "P2",
+  "addedAt": "2026-10-27T23:23:58+02:00",
+  "addedCommit": "pending-local",
+  "summary": "DRAFT, not to be taken to a spec: a drive lists at most 256 files because the core's fixed 131,072-byte budget holds a 16-byte entry per place and is 99 percent used; two ways to lift it, a bigger budget or a window over the card's catalog, wait for the owner's choice."
+}

@@ -119,8 +119,7 @@ commands of Windows.
 
 ## What is coming
 
-These are planned as seeds and are not in the repository yet. Do not describe them as
-present, and do not build on them.
+These are planned as seeds and are not in the repository yet. Do not describe them as present, and do not build on them.
 
 - **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
 - **A USB log on the serial port, and a bigger animation space**, seeds 23 and 24: built; their checks on the board are open.
@@ -139,6 +138,7 @@ present, and do not build on them.
 - **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
+- **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
 
 The state of every seed is in the `state.json` of its folder.
 
