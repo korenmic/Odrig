@@ -857,7 +857,7 @@ __attribute__((noinline)) void page_step(Core &core) {
         }
         core.catalog_page_crc = crc_add(core.catalog_page_crc, static_cast<uint8_t>(got));
         if (got != '\n') {
-            if (line.length + 1 < kOrderLineRoom) {
+            if (static_cast<uint32_t>(line.length) + 1 < kOrderLineRoom) {
                 line.line[line.length++] = static_cast<char>(got);
             } else {
                 line.over = 1;
