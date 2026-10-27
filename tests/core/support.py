@@ -231,7 +231,8 @@ MADE_UP_MAPPINGS = {
 
 
 # Column-leg mappings: a leg that starts at the top, legs of two and of four columns of 5
-# LEDs, columns that are not neighbours and not in order, and one LED.
+# LEDs, columns that are not neighbours and not in order, one LED, and legs whose `starts`
+# name the end of each column: one chained up, up, down and one that runs down twice.
 MADE_UP_COLUMN_MAPPINGS = {
     "top-start": {"version": 1, "height": 7, "legs": [{"leg": 1, "pin": 4, "first_led": "top", "columns": [1, 2, 3]}]},
     "two-and-four-columns": {
@@ -251,6 +252,14 @@ MADE_UP_COLUMN_MAPPINGS = {
         ],
     },
     "one-led-column": {"version": 1, "height": 1, "legs": [{"leg": 255, "pin": 255, "first_led": "top", "columns": [1]}]},
+    "crossed-columns": {
+        "version": 1,
+        "height": 4,
+        "legs": [
+            {"leg": 1, "pin": 5, "first_led": "bottom", "columns": [1, 3, 2], "starts": ["bottom", "bottom", "top"]},
+            {"leg": 2, "pin": 6, "first_led": "top", "columns": [4, 5], "starts": ["top", "top"]},
+        ],
+    },
 }
 
 
@@ -547,7 +556,7 @@ def led_pixels(canvas, leg):
             i = (n - 1) % width
             y = leg.strips[r]
             on_the_first_side = r % 2 == 0
-            starts_right = (leg.first_led == "right") == on_the_first_side
+            starts_right = leg.starts[r] == "right" if leg.starts else (leg.first_led == "right") == on_the_first_side
             x = width - i if starts_right else 1 + i
             places.append((y - 1) * width + (x - 1))
     else:
@@ -556,7 +565,7 @@ def led_pixels(canvas, leg):
             i = (n - 1) % height
             x = leg.strips[s]
             at_the_first_end = s % 2 == 0
-            starts_at_the_bottom = (leg.first_led == "bottom") == at_the_first_end
+            starts_at_the_bottom = leg.starts[s] == "bottom" if leg.starts else (leg.first_led == "bottom") == at_the_first_end
             y = 1 + i if starts_at_the_bottom else height - i
             places.append((y - 1) * width + (x - 1))
     return places

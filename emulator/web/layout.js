@@ -77,13 +77,17 @@ var OdrigLayout = (function () {
     var legs = file.legs.map(function (leg) {
       var strips = (columns ? leg.columns : leg.rows).slice();
       total += strips.length;
-      return {
+      var entry = {
         leg: leg.leg,
         pin: leg.pin,
         first_led: leg.first_led,
         strips: strips,
         count: length * strips.length
       };
+      if (leg.starts !== undefined) {
+        entry.starts = leg.starts.slice();
+      }
+      return entry;
     });
     return {
       kind: columns ? "columns" : "rows",
@@ -110,9 +114,13 @@ var OdrigLayout = (function () {
 
   /* Whether strip s of a leg, counted in chain order from 0, starts at the end where the
      canvas coordinate along it is 1: the left end of a row, the bottom end of a column.
-     The first strip starts at the `first_led` end, and every strip after it at the end
-     opposite to the one before. */
+     With `starts` each strip starts at the end it names. Without it the first strip starts
+     at the `first_led` end, and every strip after it at the end opposite to the one
+     before. */
   function startsLow(leg, s) {
+    if (leg.starts !== undefined) {
+      return leg.starts[s] === "left" || leg.starts[s] === "bottom";
+    }
     return (leg.first_led === "left" || leg.first_led === "bottom") === (s % 2 === 0);
   }
 

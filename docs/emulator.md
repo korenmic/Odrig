@@ -360,8 +360,8 @@ kind of the file.
 - **The page places the LEDs itself.** A refresh arrives as the bytes the core produced for
   each leg, in chain order, without coordinates. The page works out where LED n of a pin
   is from that pin, n and the show's `mapping.json`, by the rule of
-  [mapping.md](mapping.md) for the kind of the file, and never reorders or corrects the
-  data. A mapping mistake in the core therefore shows as a scrambled picture. The rule is
+  [mapping.md](mapping.md) for the kind of the file, a leg's `starts` included, and never
+  reorders or corrects the data. A mapping mistake in the core therefore shows as a scrambled picture. The rule is
   in `emulator/web/layout.js`, which needs no browser, so the suite compares it with the
   reference for every LED.
 - Each leg has one colour, and a faint band of the colour lies behind its rows or its

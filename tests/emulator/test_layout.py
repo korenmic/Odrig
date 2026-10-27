@@ -76,7 +76,7 @@ class Positions(unittest.TestCase):
 
     def test_the_mappings_are_of_both_kinds_with_the_target_file_and_made_up_column_leg_files(self):
         columns = {name for name, canvas in self.canvases.items() if canvas.kind == mapping.COLUMNS}
-        self.assertEqual(columns, {"legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column"})
+        self.assertEqual(columns, {"legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column", "crossed-columns"})
         self.assertGreaterEqual(len(self.canvases) - len(columns), 5)
         self.assertEqual([leg.strips for leg in self.canvases["columns-apart"].legs], [(2, 4), (1, 5, 3)])
         self.assertEqual([(leg.first_led, len(leg.strips)) for leg in self.canvases["two-and-four-columns"].legs], [("bottom", 2), ("top", 4)])
@@ -92,10 +92,10 @@ class Positions(unittest.TestCase):
                 self.assertEqual(read["kind"], canvas.kind)
                 self.assertEqual((read["width"], read["height"]), (canvas.width, canvas.height))
                 strip_length = canvas.width if read["kind"] == "rows" else canvas.height
-                self.assertEqual([(leg["leg"], leg["pin"], leg["first_led"], tuple(leg["strips"]), leg["count"]) for leg in read["legs"]],
-                                 [(leg.leg, leg.pin, leg.first_led, tuple(leg.strips), strip_length * len(leg.strips)) for leg in canvas.legs])
-                for leg in read["legs"]:
-                    self.assertEqual(sorted(leg), ["count", "first_led", "leg", "pin", "strips"])
+                self.assertEqual([(leg["leg"], leg["pin"], leg["first_led"], tuple(leg["strips"]), leg["count"], tuple(leg.get("starts", ()))) for leg in read["legs"]],
+                                 [(leg.leg, leg.pin, leg.first_led, tuple(leg.strips), strip_length * len(leg.strips), leg.starts or ()) for leg in canvas.legs])
+                for leg, listed in zip(read["legs"], canvas.legs):
+                    self.assertEqual(sorted(leg), sorted(["count", "first_led", "leg", "pin", "strips"] + (["starts"] if listed.starts else [])))
 
     def test_position_of_every_led_is_the_rule_of_the_mapping_document(self):
         for name, canvas in self.canvases.items():
@@ -160,8 +160,10 @@ class Positions(unittest.TestCase):
                         if canvas.height > 1:
                             self.assertEqual(column["start"], "bottom" if first_y == 1 else "top")
                             self.assertEqual((first_y, last_y), (1, canvas.height) if column["start"] == "bottom" else (canvas.height, 1))
-                    # The columns of a leg start at the two ends in turn, the first at the first LED's.
+                    # The columns of a leg start at the two ends in turn, the first at the first LED's,
+                    # or each at the end its `starts` names.
                     self.assertEqual([column["start"] for column in columns],
+                                     list(leg.starts) if leg.starts else
                                      [leg.first_led if s % 2 == 0 else {"bottom": "top", "top": "bottom"}[leg.first_led] for s in range(len(columns))])
 
     def test_strips_gives_the_end_numbers_of_the_columns_of_the_target_file(self):
@@ -447,11 +449,12 @@ class UprightLeds(unittest.TestCase):
     def target(self, area):
         return self.dumps["legs-20"]["fits"][self.areas.index(list(area))]
 
-    def test_the_mappings_are_the_target_file_and_the_four_made_up_column_leg_files(self):
-        self.assertEqual(self.names, ["legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column"])
+    def test_the_mappings_are_the_target_file_and_the_five_made_up_column_leg_files(self):
+        self.assertEqual(self.names, ["legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column", "crossed-columns"])
         self.assertEqual({name: dumped["mapping"]["kind"] for name, dumped in self.dumps.items()}, dict.fromkeys(self.names, "columns"))
         self.assertEqual({name: (dumped["mapping"]["width"], dumped["mapping"]["height"]) for name, dumped in self.dumps.items()},
-                         {"legs-20": (60, 60), "top-start": (3, 7), "two-and-four-columns": (6, 5), "columns-apart": (5, 4), "one-led-column": (1, 1)})
+                         {"legs-20": (60, 60), "top-start": (3, 7), "two-and-four-columns": (6, 5), "columns-apart": (5, 4), "one-led-column": (1, 1),
+                          "crossed-columns": (5, 4)})
 
     def test_the_target_file_is_whole_in_an_area_of_1280_x_546_with_cells_of_7_or_more(self):
         f = self.target((1280, 546))
@@ -546,7 +549,8 @@ class UprightLeds(unittest.TestCase):
 
     def test_the_leg_band_is_on_the_side_of_the_canvas_away_from_the_feed_edge(self):
         feeds = {name: dumped["side"] for name, dumped in self.dumps.items()}
-        self.assertEqual(feeds, {"legs-20": "bottom", "top-start": "top", "two-and-four-columns": "bottom", "columns-apart": "bottom", "one-led-column": "top"})
+        self.assertEqual(feeds, {"legs-20": "bottom", "top-start": "top", "two-and-four-columns": "bottom", "columns-apart": "bottom", "one-led-column": "top",
+                                 "crossed-columns": "bottom"})
         for name, area, dumped, index in self.each():
             with self.subTest(name=name, area=area):
                 f = dumped["fits"][index]
@@ -1027,11 +1031,11 @@ class UprightMapping(UprightCase):
     PARTS = ("header", "legBand", "legWords", "yLabel", "numberTop", "numberBottom", "canvas", "level", "upright", "nearLabel", "board", "farZone")
 
     def test_the_mappings_are_the_target_file_made_up_ones_and_ones_for_what_those_leave_out(self):
-        self.assertEqual(list(self.dumps), ["legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column", "a leg of the target from the top",
+        self.assertEqual(list(self.dumps), ["legs-20", "top-start", "two-and-four-columns", "columns-apart", "one-led-column", "crossed-columns", "a leg of the target from the top",
                                             "the target from the top", "pins the board lacks, columns apart", "the same, turned over", "the right row"])
         self.assertEqual({dumped["mapping"]["kind"] for dumped in self.dumps.values()}, {"columns"})
         self.assertEqual({name: dumped["side"] for name, dumped in self.dumps.items()}, {
-            "legs-20": "bottom", "top-start": "top", "two-and-four-columns": "bottom", "columns-apart": "bottom", "one-led-column": "top",
+            "legs-20": "bottom", "top-start": "top", "two-and-four-columns": "bottom", "columns-apart": "bottom", "one-led-column": "top", "crossed-columns": "bottom",
             "a leg of the target from the top": "bottom", "the target from the top": "top", "pins the board lacks, columns apart": "bottom",
             "the same, turned over": "top", "the right row": "bottom"})
         board = self.dumps["legs-20"]["board"]

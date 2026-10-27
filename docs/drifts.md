@@ -10405,3 +10405,23 @@ beside the seed, read to the mapping the stubs show by eye.
 `photos/05-the-diagonal-from-the-side-screenshot.jpg` and `06-…-darkened-screenshot.jpg`;
 docs/android-app.md; the spec's requirements and design; the change log of
 docs/decisions.md.
+
+## Seed 43: how a leg says that its strips do not alternate
+
+**Question.** Snake 10 of the installation runs up column 28, up column 30 and down column
+29, where the mapping's rule has the strips of a leg alternate from the `first_led` end.
+How does the mapping file say so, and in which words?
+
+**Answer.** A leg may have `starts`, one word for each strip in chain order, the end the
+strip starts at, in the words of `first_led`: `bottom` or `top` for a column, `left` or
+`right` for a row, not `up` and `down`, which the format does not use. Its first word
+repeats `first_led`, so a reader that knows only `first_led` still places the first strip
+right, and a difference is malformed. Without `starts` the strips alternate as before, so
+every file written before is the same file. The member is general, for any leg of either
+kind; only the app's checkbox is particular to snake 10. The core takes the bits of the
+ends only when the file has a `starts`, so the memory of a file without one is unchanged:
+one block more, of one bit a strip, with it.
+
+**Resolution.** docs/mapping.md, rule 6 and "Where each LED is"; `core/src/mapping.cpp`,
+`odrig/mapping.py`, `emulator/web/layout.js`; the tests of the core, the library and the
+emulator.

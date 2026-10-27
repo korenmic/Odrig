@@ -125,6 +125,7 @@ A column-leg file:
 | `first_led` | `"left"` or `"right"`: the side of the leg's first row where its first LED sits. | `"bottom"` or `"top"`: the end of the leg's first column where its first LED sits. |
 | `rows` | The canvas row (y) of each strip, in chain order. | Absent. |
 | `columns` | Absent. | The canvas column (x) of each strip, in chain order. |
+| `starts` | Optional: for each row in chain order, `"left"` or `"right"`, the side it starts at. | Optional: for each column in chain order, `"bottom"` or `"top"`, the end it starts at. |
 
 The kind of a file is told by its top level: a file with `width` and without `height` is a
 row-leg file, a file with `height` and without `width` is a column-leg file. Nothing else is
@@ -155,10 +156,12 @@ A mapping file is valid when all of these hold:
 4. W * H is at most 65,534, the largest canvas an ODRG file can have.
 5. The top level has exactly the members `version`, `legs` and one of `width` and `height`.
    That member is an integer from 1 to 65,535.
-6. In a row-leg file every leg has exactly the members `leg`, `pin`, `first_led` and
-   `rows`, and `first_led` is `"left"` or `"right"`. In a column-leg file every leg has
-   exactly the members `leg`, `pin`, `first_led` and `columns`, and `first_led` is
-   `"bottom"` or `"top"`.
+6. In a row-leg file every leg has the members `leg`, `pin`, `first_led` and `rows`, may
+   have `starts`, and has no other; `first_led` and every word of `starts` are `"left"`
+   or `"right"`. In a column-leg file every leg has the members `leg`, `pin`,
+   `first_led` and `columns`, may have `starts`, and has no other; `first_led` and every
+   word of `starts` are `"bottom"` or `"top"`. `starts` has one word for each strip of
+   its leg, and its first word is the leg's `first_led`.
 7. `rows` or `columns` is an array of one or more integers. A leg may have any number of
    strips, and the legs need not have the same number.
 8. The strips of all legs together hold every number from 1 to their total exactly once:
@@ -198,6 +201,13 @@ that leg:
 Both rules are one rule with the two axes exchanged: a strip has a place across the strips,
 `rows[r]` or `columns[s]`, and LEDs along it; the strips of a leg alternate their direction
 along the chain.
+
+A leg with `starts` does not alternate: its row r starts on the side `starts[r]` names, and
+its column s at the end `starts[s]` names, and the rest of the rule is as above. It is for
+a leg wired in another order, as snake 10 of the installation is when its chain runs up
+column 28, up column 30 and down column 29 around a dead output:
+`"columns": [28, 30, 29], "starts": ["bottom", "bottom", "top"]`. Starts that alternate
+place the LEDs as a leg without them.
 
 In the two files below every strip has 60 LEDs and every leg has three strips, so each leg
 has 180 LEDs.

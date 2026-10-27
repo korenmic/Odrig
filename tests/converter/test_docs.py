@@ -351,7 +351,7 @@ class BothKindsOfLeg(unittest.TestCase):
     def test_the_mapping_document_gives_the_members_of_both_kinds_of_file(self):
         described = self.part("## Mapping file")
         rows = {name: (of_rows, of_columns) for name, of_rows, of_columns in re.findall(r"(?m)^\| `([a-z_]+)` \| (.+) \| (.+) \|$", described)}
-        self.assertEqual(sorted(rows), ["columns", "first_led", "height", "leg", "legs", "pin", "rows", "version", "width"])
+        self.assertEqual(sorted(rows), ["columns", "first_led", "height", "leg", "legs", "pin", "rows", "starts", "version", "width"])
         self.assertEqual((rows["width"][1], rows["height"][0], rows["rows"][1], rows["columns"][0]), ("Absent.",) * 4)
         self.assertIn('`"left"` or `"right"`', rows["first_led"][0])
         self.assertIn('`"bottom"` or `"top"`', rows["first_led"][1])

@@ -83,6 +83,7 @@ ALLOWED = {
     "a width of 65,534": {"version": 1, "width": 65534, "legs": [{"leg": 1, "pin": 1, "first_led": "right", "rows": [1]}]},
     "255 legs": {"version": 1, "width": 2, "legs": [{"leg": 255 - n, "pin": n, "first_led": "left", "rows": [n + 1]} for n in range(255)]},
     "rows before the side": {"legs": [{"rows": [2, 1], "pin": 3, "leg": 9, "first_led": "left"}], "width": 3, "version": 1},
+    "a row leg with starts": {"version": 1, "width": 5, "legs": [{"leg": 1, "pin": 1, "first_led": "left", "rows": [1, 2, 3], "starts": ["left", "left", "right"]}]},
 }
 
 
@@ -178,6 +179,14 @@ BROKEN_COLUMNS = {
     "a column above the width": column_file(legs=[column_leg(columns=(1, 2, 4))]),
     "column 0": column_file(legs=[column_leg(columns=(0, 1, 2))]),
     "column -1": column_file(legs=[column_leg(columns=(-1,))]),
+    "starts empty": column_file(legs=[column_leg(columns=(1,), starts=[])]),
+    "starts shorter than the columns": column_file(legs=[column_leg(columns=(1, 2, 3), starts=["bottom", "top"])]),
+    "starts longer than the columns": column_file(legs=[column_leg(columns=(1, 2), starts=["bottom", "top", "bottom"])]),
+    "starts whose first is not first_led": column_file(legs=[column_leg(first_led="bottom", columns=(1, 2), starts=["top", "bottom"])]),
+    "starts as a word": column_file(legs=[column_leg(columns=(1,), starts="bottom")]),
+    "starts with a number": column_file(legs=[column_leg(columns=(1, 2), starts=["bottom", 1])]),
+    "starts with up": column_file(legs=[column_leg(columns=(1, 2), starts=["bottom", "up"])]),
+    "starts in capitals": column_file(legs=[column_leg(columns=(1, 2), starts=["bottom", "TOP"])]),
 }
 
 # Files that are of no kind, of both, or that hold a member or a word of the other kind.
@@ -208,6 +217,9 @@ MIXED_KINDS = {
     "top in a row-leg file": row_file(legs=[row_leg(first_led="top")]),
     "right in the second leg of a column-leg file": column_file(legs=[column_leg(1, 1, columns=(1,)), column_leg(2, 2, "right", columns=(2,))]),
     "top in the second leg of a row-leg file": row_file(legs=[row_leg(1, 1, rows=(1,)), row_leg(2, 2, "top", rows=(2,))]),
+    "starts of rows in a column-leg file": column_file(legs=[column_leg(columns=(1, 2), starts=["left", "right"])]),
+    "starts of columns in a row-leg file": row_file(legs=[row_leg(first_led="left", rows=(1, 2), starts=["left", "top"])]),
+    "starts of both kinds": column_file(legs=[column_leg(columns=(1, 2), starts=["bottom", "right"])]),
 }
 
 # Column-leg files that break two rules.
@@ -252,10 +264,15 @@ ALLOWED_COLUMNS = {
     "a canvas of 2 x 32,767": column_file(height=32767, legs=[column_leg(columns=(1, 2))]),
     "a canvas of 65,534 x 1": column_file(height=1, legs=[column_leg(columns=list(range(1, 65535)))]),
     "columns before the end": {"legs": [{"columns": [2, 1], "pin": 3, "leg": 9, "first_led": "top"}], "height": 3, "version": 1},
+    "a leg with starts": column_file(height=4, legs=[column_leg(columns=(1, 3, 2), starts=["bottom", "bottom", "top"])]),
+    "starts that alternate": column_file(height=4, legs=[column_leg(first_led="top", columns=(1, 2, 3), starts=["top", "bottom", "top"])]),
+    "starts before columns and first_led": {"legs": [{"starts": ["top", "top"], "columns": [2, 1], "pin": 3, "leg": 9, "first_led": "top"}], "height": 3, "version": 1},
+    "a leg with starts and one without": column_file(height=2, legs=[column_leg(1, 1, columns=(1, 2), starts=["bottom", "bottom"]), column_leg(2, 2, "top", columns=(3, 4))]),
 }
 
 # What the core lists for each made-up column-leg mapping: `(leg, pin, LED count)`.
 LEGS_OF_THE_COLUMN_MAPPINGS = {
+    "crossed-columns": ((1, 5, 12), (2, 6, 8)),
     "top-start": ((1, 4, 21),),
     "two-and-four-columns": ((3, 9, 10), (1, 0, 20)),
     "columns-apart": ((7, 12, 8), (2, 3, 12)),
@@ -433,6 +450,53 @@ class RefusedMappings(unittest.TestCase):
         self.assertEqual(cut.memory, missing.memory)
 
 
+class Starts(unittest.TestCase):
+    """A leg whose `starts` names the end each strip starts at, as a snake that is chained
+    around a dead output is."""
+
+    def leds(self, listed, width, height):
+        """The canvas pixel each LED of the one leg of a file shows: pixel (x, y) has the
+        colour (x, y, 200)."""
+        picture = b"".join(bytes((x, y, 200)) for y in range(1, height + 1) for x in range(1, width + 1))
+        files = {
+            "mapping.json": json.dumps(listed),
+            "show.json": support.show_text([{"id": 1, "file": "clip.odrg"}], 255, 1),
+            "clip.odrg": odrg.encode(jsonframes.Animation(width, height, ((20, picture),))),
+        }
+        run = support.start(files, ["error", "poll 0"])
+        self.assertEqual(run.lines[:2], ["error none", "refresh 0"])
+        word, leg, data = run.lines[2].split(" ")
+        self.assertEqual((word, leg), ("data", "1"))
+        leds = bytes.fromhex(data)
+        return [tuple(leds[at:at + 2]) for at in range(0, len(leds), 3)]
+
+    def test_each_column_starts_at_the_end_its_word_names(self):
+        listed = {"version": 1, "height": 3, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [1, 3, 2], "starts": ["bottom", "bottom", "top"]}]}
+        self.assertEqual(self.leds(listed, 3, 3), [(1, 1), (1, 2), (1, 3), (3, 1), (3, 2), (3, 3), (2, 3), (2, 2), (2, 1)])
+
+    def test_each_row_starts_at_the_side_its_word_names(self):
+        listed = {"version": 1, "width": 3, "legs": [{"leg": 1, "pin": 1, "first_led": "left", "rows": [1, 2, 3], "starts": ["left", "left", "right"]}]}
+        self.assertEqual(self.leds(listed, 3, 3), [(1, 1), (2, 1), (3, 1), (1, 2), (2, 2), (3, 2), (3, 3), (2, 3), (1, 3)])
+
+    def test_starts_that_alternate_place_the_leds_as_a_leg_without_them(self):
+        plain = {"version": 1, "height": 3, "legs": [{"leg": 1, "pin": 1, "first_led": "top", "columns": [2, 1, 3]}]}
+        listed = {"version": 1, "height": 3, "legs": [{**plain["legs"][0], "starts": ["top", "bottom", "top"]}]}
+        self.assertEqual(self.leds(listed, 3, 3), self.leds(plain, 3, 3))
+
+    def test_a_member_given_twice_is_refused(self):
+        text = '{"version": 1, "height": 60, "legs": [{"leg": 1, "pin": 1, "first_led": "bottom", "columns": [1], "starts": ["bottom"], "starts": ["bottom"]}]}'
+        run = support.start({"mapping.json": text}, ["error"])
+        self.assertEqual(run.error, "mapping-malformed")
+        with self.assertRaises(errors.Rejection) as refused:
+            mapping.loads(text.encode("utf-8"))
+        self.assertEqual(refused.exception.reason, "mapping-malformed")
+
+    def test_a_file_without_starts_asks_for_no_block_more_and_one_with_them_for_one(self):
+        plain = support.start({"mapping.json": json.dumps(column_file())})
+        crossed = support.start({"mapping.json": json.dumps(column_file(legs=[column_leg(1, 1, columns=(1, 3, 2), starts=["bottom", "bottom", "top"]), column_leg(2, 2, columns=(4, 5, 6))]))})
+        self.assertEqual(crossed.memory[1], plain.memory[1] + 1)
+
+
 class ChangedBetweenTheReadings(unittest.TestCase):
     """The core reads the mapping file twice. The test host gives the second reading
     another file, and stops the run when the core writes outside a block of its memory."""
@@ -449,6 +513,18 @@ class ChangedBetweenTheReadings(unittest.TestCase):
         self.assertEqual(run.error, "mapping-malformed")
         self.assertEqual(run.legs, ())
         self.assertEqual(run.lines, ["error mapping-malformed", "idle 0"])
+
+    def test_starts_that_appear_only_at_the_second_reading_are_refused(self):
+        first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2, 3))])
+        second = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 3, 2), starts=["bottom", "bottom", "top"])])
+        self.assert_refused(first, second)
+
+    def test_starts_of_more_columns_at_the_second_reading_are_refused(self):
+        first = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2), starts=["bottom", "top"])])
+        second = column_file(height=4, legs=[column_leg(1, 1, columns=(1, 2, 3), starts=["bottom", "top", "bottom"])])
+        self.assert_refused(first, second)
+        second = column_file(height=4, legs=[column_leg(1, 1, starts=["bottom", "top", "bottom"], columns=(1, 2, 3))])
+        self.assert_refused(first, second)
 
     def test_a_file_of_the_other_kind_at_the_second_reading_is_refused(self):
         rows = row_file(width=3, legs=[row_leg(1, 1, "left", rows=(1, 2))])

@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The member `starts` of the format, in the three readers. `docs/mapping.md`: rule
+- [x] 1. The member `starts` of the format, in the three readers. `docs/mapping.md`: rule
       6 and "Where each LED is" with the member, the vocabulary of the ends. The core's
       `read_leg` and `read_mapping` with `starts_far`; `odrig/mapping.py` with `starts`
       on `Leg` and in `position`; `emulator/web/layout.js` with `starts` in `read` and
