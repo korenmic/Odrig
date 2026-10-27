@@ -138,7 +138,7 @@ present, and do not build on them.
 - **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **Previews of the animations**, seed 44: a preview catalog in git for the app and the emulator.
-- **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
+- **Current limits for the wall and each snake**, seed 45: built; the board session and the owner's check are open.
 
 The state of every seed is in the `state.json` of its folder.
 

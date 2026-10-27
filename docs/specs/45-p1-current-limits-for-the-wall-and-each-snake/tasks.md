@@ -61,7 +61,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `tests/app/test_limits.py` with a scenario against the emulator and stand-ins; the
       app's docs and scope tests' lines; `docs/android-app.md`. Suites: app, mapping,
       onboarding.
-- [ ] 7. Every suite, the firmware and the APK. `docs/decisions.md`'s dated line, the seed
+- [x] 7. Every suite, the firmware and the APK. `docs/decisions.md`'s dated line, the seed
       in AGENTS.md's list, `docs/drifts.md`'s entry of what this spec decided beyond the
       seed, every suite that runs on this computer, `fw.py build` kept without flashing,
       `app/app.py build` put with the artifacts on the share and on Drive, and the open

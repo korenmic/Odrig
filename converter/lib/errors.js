@@ -51,6 +51,8 @@ export const UNKNOWN_WIDGET = "unknown-widget";
 export const MAPPING_MISSING = "mapping-missing";
 export const MAPPING_MALFORMED = "mapping-malformed";
 
+export const LIMITS_MALFORMED = "limits-malformed";
+
 export const CANVAS_TOO_SMALL = "canvas-too-small";
 
 export const SHOW_MISSING = "show-missing";

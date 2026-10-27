@@ -10987,3 +10987,27 @@ the app sends `limits default`, so the app sends thirty-eight lines.
 `limitsSnake`), `app/www/index.html`, `app/www/style.css`, `app/www/main.js`;
 docs/android-app.md, "What it is" and "Current limits" under "Using it";
 `tests/app/test_limits.py`.
+
+## Seed 45: what its spec decided beyond the seed
+
+**Question.** The seed left its spec to choose the budgets' file, how a host gives the
+wall's default, and what is built and when. What did the spec choose?
+
+**Answer.** The file is `limits.json` beside `mapping.json`, saved through `limits.part`,
+in the form `{"version":1,"wall":<mA>,"legs":[[<leg>,<mA>],...]}`, read with the strictness
+of the mapping file; a `limits.part` left by a cut is removed at the start, and an
+unreadable file is said once in the log, `limits unreadable`, and its refusal in the
+library is `limits-malformed`. The host gives the wall's default through an optional
+member of its record, `limit_default`, absent in the emulator, given by the core's test
+host only with `--limit-default MA`, and by the board's firmware from a header the
+firmware tool's suite compiles on the computer. The Python library holds the reference
+of the limiting, `odrig.limits`, which the core's suite and the reference player of
+`tests/core/support.py` check against. The firmware tool refuses `--limits` with
+`limits-missing` and `limits-malformed` before the board is touched. The firmware is
+built with the APK and, by the owner's order, flashed only once seed 43 is merged and
+this branch is on master; the board suite on the probe build, the refresh rate of
+requirement 7.4 and the owner's checks on the installation are left to a session with
+the board. Each task's own choices are in the entries before this one.
+
+**Resolution.** `docs/specs/45-p1-current-limits-for-the-wall-and-each-snake/`, its
+requirements 2, 5 and 7.

@@ -759,3 +759,20 @@ are in [format.md](format.md), "Measured sizes".
   approved through the seed; the app's Settings show it as a checkbox, `Snake 10 is
   cross-wired`, off by default because a photo of the diagonal cannot tell which snake is
   cross-wired. The pins and their revision are unchanged by it.
+- 2026-10-27: Seed 45, the owner's request after finding that on the installation every
+  brightness from 2 to 255 looked the same: the limiting of the LEDs' current moves from
+  WLED's own limiter into the core, because WLED applies its limit for each output only
+  while its limit for the whole is 0, and does not run in the emulator. The single limit
+  of `firmware/limit.json` becomes budgets kept on the installation, in `limits.json`: one
+  for the wall, 0 to 250,000 mA, and one for each snake by its leg number, 0 to 65,535 mA,
+  0 being no limit. A budget is a ceiling on WLED's estimate of the LEDs' draw, held by the
+  largest level of WLED's video fade whose estimate stays within it, the snakes' first and
+  the wall's after them. While no budgets are saved the board's wall budget is WLED's
+  stored maximum less 120 mA, 730 mA for 850, and the emulator has no limit. The odrig
+  firmware switches WLED's limiter off in memory and changes nothing WLED stores. The
+  commands `limits`, `limits <from>`, `limits wall <mA>`, `limits snake <n> <mA>` and
+  `limits default`, and the reply of `limits`, the owner approved through the seed.
+  Settings gets a panel, `Current limits`, under the Mapping panel; `install-show` writes a
+  show folder's budgets only with `--limits`. A board rule is added: on a board whose
+  strip is fed from its 3.3 V pin, the wall's budget is never 0 or above 730 mA, and
+  `install-show --limits` is not run there with a folder of the installation.
