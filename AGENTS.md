@@ -133,12 +133,12 @@ present, and do not build on them.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
-- **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
+- **Sub-folder playlists and previews of the animations**, seeds 41 and 44: built; for each, a session with the board and the owner's check on a phone are open.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
 - **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
-- **Previews of the animations**, seed 44: built; the board session and the owner's phone check are open.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
+- **Every animation file tracked with its preview and its source**, seed 46: the installation's ODRG files in git, each with its GIF and a readme of its source.
 
 The state of every seed is in the `state.json` of its folder.
 
