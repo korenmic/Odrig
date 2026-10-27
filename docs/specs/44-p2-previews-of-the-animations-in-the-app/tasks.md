@@ -77,7 +77,7 @@ Rules for every task:
     table of subcommands, the status table. Drift: `--catalog` makes its folder.
   - Suites: `npm test --prefix converter`, onboarding.
 
-- [ ] 3. The command `catalog page` in the core
+- [x] 3. The command `catalog page` in the core
   - `core/src/commands.cpp`, `core/src/catalog.h`, `core/src/catalog.cpp`:
     `catalog_page` as the design has it.
   - Tests in `tests/core/test_catalog_page.py`, with the test host: both storages' pages

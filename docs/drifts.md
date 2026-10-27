@@ -10629,3 +10629,22 @@ then not what the run would leave. The tests of the subcommand are in
 
 **Resolution.** `converter/cli/thumbnail.js`, `converter/cli/arguments.js`;
 docs/converter.md; converter/tests/thumbnailtool.test.js.
+
+## Seed 44: what `catalog page` gives when a page's bytes do not fit, or the card is out
+
+**Question.** The seed gives `catalog page` up to 512 bytes of a page as the text of a reply
+of at most 1,024 bytes, and `"generation":null` for a storage whose catalog is not `ok`.
+What does it give when the escaped bytes would not fit, and for the card when none is
+plugged in, whose catalog the core may still hold as it was?
+
+**Answer.** The text holds the bytes one by one while each one's escaped form and the end
+of the reply still fit, and `next` counts the bytes given, so that a client reading on from
+each `next` gets every byte. A page of a sound catalog is printable ASCII with line ends,
+512 bytes and their line ends always fit; only a page changed behind the core's back can be
+given in shorter parts. A drive that is not plugged in answers as a storage without an `ok`
+catalog, as `catalog` reports it `absent`. The example of `docs/commands.md` is the one
+reply example with a space, inside its text; its test checks that the example is the
+compact JSON of its value.
+
+**Resolution.** `core/src/catalog.cpp`, `core/src/commands.cpp`; docs/commands.md,
+docs/core.md, docs/catalog.md; tests/core/test_catalog_page.py, tests/core/test_docs.py.

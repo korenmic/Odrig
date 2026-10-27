@@ -108,7 +108,8 @@ The last seven members are the storage functions: three that write a file, `rena
   `order.txt` and `order.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
-  that file ended; only the command `read` begins at the offset it is given. Between two
+  that file ended; only the commands `read` and `catalog page` begin at the offset they are
+  given. Between two
   calls for one file there may be calls for another.
   It renames and removes no file that `open` holds or that is being written.
 - A host without storage that can be changed sets `write_open` to `NULL`. The core then
@@ -682,6 +683,12 @@ it, or after a cancel, the files neither read nor quarantined. While a rebuild r
 commands that write storage are `busy`; `catalog cancel`, a failed call and a drive pulled
 out end it without its commit, and the pages it wrote so far are removed, but from a drive
 that is gone, where they stay and are never read without a record.
+
+`catalog page` reads one page of the board's catalog, or of the drive's through `drive/`,
+from the offset it is given, with one `read_at` of at most 512 bytes into the chunk buffer,
+which holds nothing between commands: it asks for no memory and keeps nothing. It is `busy`
+while a rebuild of that storage runs, and answers an empty text for a catalog that is not
+`ok`.
 
 ## The files the core writes
 

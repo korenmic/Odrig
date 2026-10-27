@@ -434,6 +434,12 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
             }
             return catalog_rebuild(core, words.is(2, "internal") ? kInternal : kExternal, reply);
         }
+        uint32_t page;
+        uint32_t offset;
+        if (words.count == 5 && words.is(1, "page") && (words.is(2, "internal") || words.is(2, "external")) &&
+            number_word(words, 3, 0, kCatalogPages - 1, &page) && number_word(words, 4, 0, 0xFFFFFFFFu, &offset)) {
+            return catalog_page(core, words.is(2, "internal") ? kInternal : kExternal, page, offset, reply);
+        }
         return refuse(reply, "bad-argument");
     }
     if (words.is(0, "status")) {

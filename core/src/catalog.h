@@ -149,6 +149,15 @@ void catalog_drive_went(Core &core);
 // The reply to `catalog`.
 uint32_t catalog_reply(const Core &core, Reply &reply);
 
+// `catalog page <storage> <page> <offset>`: up to kFileBufferSize bytes of that page of the
+// storage's catalog from the offset, read into the chunk buffer with one `read_at`, as the
+// text of the reply with the storage's generation and the offset that follows them. The
+// text is empty and `next` null at or after the page's end, for a page that cannot be read,
+// and with the generation null for a catalog that is not `ok`; a text holds fewer bytes
+// when their escaped form would not fit into the reply. `busy` while a rebuild of that
+// storage runs, `storage-error` on a host that cannot change its storage.
+uint32_t catalog_page(Core &core, uint32_t storage, uint32_t page, uint32_t offset, Reply &reply);
+
 }  // namespace odrig
 
 #endif
