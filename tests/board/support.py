@@ -228,6 +228,16 @@ def command(port, *words, timeout=3.0):
     return status, json.loads(out.getvalue())
 
 
+def limits(port=PORT):
+    """The reply of `limits 0`: whether budgets are saved, the wall's and each leg's LED
+    count, budget, estimate and `limited`, of the latest refresh that wrote the LEDs. The
+    mappings of the suite fit into one reply."""
+    status, reply = command(port, "limits", "0")
+    if status != 0 or reply.get("next") is not None:
+        raise AssertionError(f"`limits 0` on {port} did not give every leg in one reply: {reply}")
+    return reply
+
+
 def without_fps(reply):
     """A reply without the one member that differs between a board and an emulator."""
     return {name: value for name, value in reply.items() if name != "fps"}
@@ -407,8 +417,8 @@ def legs_mapping(length, legs=10, strips_per_leg=3, pins=None, columns=False):
 
 def own_colour(position):
     """A colour for the pixel at a position that no other pixel of a canvas has. The values
-    are small, so that a whole canvas of them stays below what WLED's current limiter
-    allows two legs."""
+    are small, so that at a brightness of 40 or less a whole canvas of them on two legs is
+    estimated within the wall's default budget of 730 mA."""
     return bytes([(position * 5) % 53, (position * 3) % 47, (position * 11) % 41])
 
 

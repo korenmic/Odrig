@@ -10818,3 +10818,96 @@ one only when it is given `--limit-default`. The firmware's task changes the row
 firmware gives its default.
 
 **Resolution.** docs/core.md, "What the host supplies".
+
+## Seed 45: WLED's limiter switched off, and the outputs it leaves dimmed
+
+**Question.** Requirement 4.1 has the firmware set `BusManager::_useABL` false before every
+fill and send and after any making of its outputs, and reset an output that WLED's limiter
+left dimmed. Which outputs are reset, and how? And is WLED's own making of the outputs,
+after its LED settings are saved, caught?
+
+**Answer.** `switchWledLimiterOff()` in `odrig_leds.cpp` does nothing while `_useABL` is
+false. Otherwise it sets it false and calls `applyBriLimit(255)` on every output that is
+digital and works, `isDigital() && isOk()`: the outputs WLED's own `applyABL` acts on, for
+a placeholder output can have a digital type without being a `BusDigital`.
+`applyBriLimit(255)` sets the level at which the output gives its colours back,
+`_NPBbri`, to 255 and clears its sum of colours, and repaints nothing. Nothing else in WLED
+sets that level back, so an output that WLED's own show at its start dimmed would give
+back colours scaled up, and the probe's `crc` would not be the bytes sent. The call is the
+first statement of `fill()`, of `show()` before `BusManager::show()` and of `dark()`, and
+follows `strip.finalizeInit()` in `apply()`. When WLED's LED settings are saved, WLED makes
+its outputs again later in the same pass of its loop, after the usermod's `loop()`, and
+switches its limiter on; nothing sends before the next `fill()` or `show()` switches it
+off, since WLED runs no show of its own while the usermod holds it in its live mode
+(`wled.cpp`, the block of `strip.service()`). The rule of the default is
+`odrigWallDefault` in `firmware/usermod/odrig_limit_default.h`, with the chip's share as
+`ODRIG_CHIP_MA`, 120, which a `static_assert` in `odrig_usermod.cpp` ties to WLED's
+`MA_FOR_ESP`; the firmware suite compiles it into `tests/firmware/limit_default/` and
+checks every maximum from 0 to 65,535. None of this is compiled against WLED or run on the
+board yet: the firmware is built in the spec's last task, and the board session is open.
+
+**Resolution.** `firmware/usermod/odrig_leds.cpp`, `switchWledLimiterOff`;
+`firmware/usermod/odrig_usermod.cpp`, `setup`; `firmware/usermod/odrig_limit_default.h`;
+`tests/firmware/test_usermod_limit_default.py`, `tests/firmware/test_usermod_files.py`;
+docs/firmware.md, "What the firmware does".
+
+## Seed 45: the board suite's limiter run and the probe's target test
+
+**Question.** Requirement 4.3 has the board suite's limiter tests and the probe suite's
+target test expect WLED dimming nothing and the bytes of the core's fade, check the core's
+limiting through `limits`, check the board's default only when `limits` reports `saved`
+false at the start, and end with `limits default` when they save budgets. It leaves open
+the order of the runs, how a test copes with budgets saved before it, and what happens
+when a run stops half way.
+
+**Answer.** `tests/board/test_limit.py` first stores the limit of the limit file, so that
+the default it checks is the 730 mA of 850; reads `limits` with `limits 0`, which
+`support.limits` asks and which holds the target's twenty legs in one reply; then saves
+`limits wall 730`, stores a maximum of 0, stores 850 again and ends with `limits default`.
+Each save waits until the board has read its animations, since a save is refused with
+`busy` before. The legs keep the budgets they had at the start, and the tests expect
+them; the default is checked only when `saved` was false then, and the test says so when
+it skips. A run that stops after it began to save stores the limit of the limit file
+again before `limits default`, so that the bench never plays without a wall budget. The
+lines `set-limit` and `read-limit` print were expected without the layout line the tool has
+printed first since 2026-10-15; the test now expects it, read from the tool's own suite and
+not seen on the board. The probe's target test computes the bytes it expects with
+`odrig.limits.limit` from the emulator's recording and the budgets `limits` reports, and
+compares `limits`' estimates and `limited` with it; in a subtest that is skipped while
+budgets are saved, the default must equal the probe's `limit_ma`, WLED's maximum less
+120 mA, which needs a maximum above 120 mA, and the bytes are those of the fade at level 1.
+Neither file was run: the board was not used.
+
+**Resolution.** `tests/board/test_limit.py`, `tests/board/test_probe.py`,
+`tests/board/support.py`, `limits`.
+
+## Seed 45: the firmware page's limiter, and the bench rule's two places
+
+**Question.** The phrases `tests/firmware/test_docs.py` pins in the firmware page's
+limiter section describe WLED's limiter acting, and its table is keyed by the stored
+limit. The page also advised raising WLED's maximum before twenty legs are lit, and listed
+it among what could make dense content faster. Requirement 7.1 has the working rules and
+the firmware page carry the bench rule, of which `install-show --limits` is built by the
+next task.
+
+**Answer.** The section is now "WLED's current limiter is off; the core limits the
+current", and its table is keyed by the wall's budget: the default of 730 mA with the
+tracked 850, what the supplies give, and 0. The pinned phrases that still hold stay: the
+maximum is the limit of `firmware/limit.json`, the firmware never sets it, a limit of 0
+switches the limiter off in stock WLED, the limit stays 850 while a strip is fed from the
+board. The pins of the table's header and rows follow it, and new pins hold the switch,
+the default's rule and the bench rule. The advice to raise WLED's maximum became setting
+the wall's budget with `limits wall`, in the warning, owner's check 6 and the line after
+the checks; the item of the list of what could make dense content faster went, and the
+measurement it came from says that the firmware now switches WLED's limiter off and that
+a send with the core limiting has not been measured. The working rules' line of what needs
+the owner names the limits on the current, WLED's stored maximum and the saved budgets, in
+place of the limit WLED puts on the current. The bench rule is rule 10 of "If you have a
+board" in full, with `install-show --limits`; the firmware page states its wall's part
+beside the table, and the next task, which adds `--limits`, states the rest in the section
+of `install-show`.
+
+**Resolution.** docs/firmware.md, "What the firmware does", "What the firmware changes in
+WLED", "The probe build", "The owner's checks", "Measurements on the board";
+`tests/firmware/test_docs.py`; agent/working-rules.md, "What needs the owner" and rule 10;
+`tests/onboarding/test_rules.py`.

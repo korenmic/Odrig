@@ -38,12 +38,14 @@ void apply();
 // A refresh goes to the outputs in two halves. fill() copies the legs' LED data into the
 // outputs: LED n of leg i to position n of output i. An output keeps what it is sending
 // apart from what it is given, so fill() may be called while the refresh before is still
-// on the wire. show() has the outputs send what they were given: WLED's current limiter
-// acts and the transfer starts. It is called only when every output can take data.
+// on the wire. show() has the outputs send what they were given, and the transfer starts.
+// It is called only when every output can take data. WLED's current limiter is switched
+// off in memory before each, and after apply() makes the outputs: the LED data is already
+// limited by the core, and the outputs send it as it is.
 void fill();
 void show();
 
-// Sends one dark picture through WLED's own path.
+// Sends one dark picture through WLED's own path, with WLED's current limiter off.
 void dark();
 
 // The number of legs, and how many of their outputs work.

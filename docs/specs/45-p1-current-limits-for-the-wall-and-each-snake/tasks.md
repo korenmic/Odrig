@@ -38,7 +38,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       reference replies and pinned lists. `docs/commands.md`, `docs/core.md`,
       `docs/emulator.md`, `agent/vocabulary.md` and the docs tests' pinned lists.
       Suites: core, mapping, emulator, onboarding.
-- [ ] 4. The firmware. `firmware/usermod/odrig_limit_default.h` and its test, the default
+- [x] 4. The firmware. `firmware/usermod/odrig_limit_default.h` and its test, the default
       given at setup, WLED's limiter switched off in memory before every fill and send with
       the outputs' dimming reset, the board suite's limiter tests and the probe suite's
       target test as requirement 4.3 says, with the run of a stored maximum of 0 saving
