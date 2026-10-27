@@ -1,0 +1,10 @@
+{
+  "number": 45,
+  "slug": "45-p1-current-limits-for-the-wall-and-each-snake",
+  "state": "remaining",
+  "title": "Current limits for the wall and each snake",
+  "priority": "P1",
+  "addedAt": "2026-10-27T06:09:02+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The LED current gets a budget for the whole wall and one for each snake, set in a new Settings panel under the Mapping panel and kept on the installation; the core limits by WLED's arithmetic so the board and the emulator dim alike, the firmware switches WLED's own limiter off in memory, and each board keeps today's limit until budgets are saved."
+}
