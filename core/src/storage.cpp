@@ -5,6 +5,7 @@
 #include "crc32.h"
 #include "json_reader.h"
 #include "order.h"
+#include "playlist.h"
 #include "player.h"
 #include "show.h"
 
@@ -127,6 +128,9 @@ void storage_clear_parts(Core &core) {
     }
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kOrderPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kOrderPart);
+    }
+    if (core.host.drive != nullptr && core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kPlaylistPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kPlaylistPart);
     }
     if (!catalog_left(core, kInternal)) {
         // A change of the catalog that is not finished may move the upload's part yet.

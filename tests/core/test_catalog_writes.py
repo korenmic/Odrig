@@ -38,12 +38,15 @@ def a_card(files):
         folder = pathlib.Path(top, "odrig")
         folder.mkdir()
         for name, data in files.items():
-            (folder / name).write_bytes(data)
+            path = folder.joinpath(*name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
         yield top
 
 
 def folder_of(top):
-    return {path.name: path.read_bytes() for path in pathlib.Path(top, "odrig").iterdir()}
+    """The files of the card's folder `odrig` and of its sub-folders, by their paths."""
+    return support.folder_files(pathlib.Path(top, "odrig"))
 
 
 def run_on_card(files, script, options=()):
@@ -151,6 +154,20 @@ class SameAsThePcLibrary(unittest.TestCase):
         catalog.add(storage, "sun.odrg", again, canvas=CANVAS)
         catalog.remove(storage, removed)
         self.assertEqual(left, storage.files)
+
+    def test_a_card_with_sub_folders_leaves_the_same_files_too(self):
+        start = card({"sun.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(3, 6), "night/deep/x.odrg": loop_of(2, 7), "a b/c.odrg": loop_of(3, 8)})
+        new = loop_of(4, 9)
+        names = [entry.name for entry in catalog.read(catalog.MemoryStorage(start)).entries]
+        removed = 60001 + names.index("night/comet.odrg")
+        script = upload_external("new.odrg", new, T0) + asked(1500, f"remove {removed}")
+        _, left = run_on_card(start, script)
+        storage = catalog.MemoryStorage(start)
+        catalog.add(storage, "new.odrg", new, canvas=CANVAS)
+        catalog.remove(storage, "night/comet.odrg")
+        self.assertEqual(left, storage.files)
+        self.assertNotIn("night/comet.odrg", left)
+        self.assertIn("night/deep/x.odrg", left)
 
 
 def card_calls(script, options=()):

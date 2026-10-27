@@ -242,13 +242,14 @@ rejected `.odrg` file as "ODRG files" does, and a rejected container as "ODRGX f
 does. A fault of one `.odrg` or `.odrgx` file, `file-missing`, `size-mismatch`, `read-error`
 or a reason of "ODRG files" or "ODRGX files", does not make the show invalid:
 the file is quarantined, the log says `file <name> unavailable: <reason>`, and `list` gives
-the reason's name as the animation's `fault`. It adds two reasons that only a running
+the reason's name as the animation's `fault`. It adds three reasons that only a running
 player can meet:
 
 | Reason | Condition |
 |---|---|
 | `read-error` | The host reports a failure while a file is read. |
 | `out-of-memory` | The host cannot supply the memory the core asks for when it starts. |
+| `too-many-folders` | A file of a drive's catalog lies in a folder that would be the 33rd sub-folder of the drive's folder, which only a catalog can name: the file is left out, the log says `drive file <path> left out: too-many-folders`, and the show plays on. |
 
 The text is the reason name, followed for most reasons by what it is about:
 

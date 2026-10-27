@@ -17,15 +17,15 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 | Command | Effect |
 |---|---|
-| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id. An unavailable animation is refused. |
-| `play all` | Plays the playlist, from its first animation. |
+| `play <id>` | Plays the animation with that id, from its first frame, and then goes on with the playlist; plays the cycle with that id; makes the playlist of the card's folder with that id current and plays its first animation. An unavailable animation is refused. |
+| `play all` | Plays the playlist, from its first animation, and makes the root playlist current. |
 | `on` | Switches the LEDs on. |
 | `off` | Switches the LEDs off: every LED is dark. Playback time keeps running. |
 | `brightness <n>` | Sets brightness, 0 to 255. |
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show, and the animations of a USB drive. |
+| `list`, `list <from>` | Lists the items of the show, the playlists of the card's folders, and the animations of a USB drive or a card. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog rebuild <storage>` | Reads every animation of the board's own storage, `internal`, or of the drive, `external`, and writes its catalog anew. |
@@ -51,8 +51,11 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 
 At power-on the LEDs are on, brightness is the value in `show.json`, and the show plays
 what [show.md](show.md) says it plays by itself: the playlist of its included animations, or
-the cycle its `start` names. What `play`, `on`, `off` and `brightness` change is not kept
-across a restart. What `remove` and `upload` change is: they change the installed show.
+the cycle its `start` names. What `on`, `off` and `brightness` change is not kept across a
+restart, nor is a `play` of an animation or a cycle; the playlist that `play` makes
+current, a folder of the card or the root, is kept with the time spent in its window, see
+[show.md](show.md#the-playlist). What `remove` and `upload` change is: they change the
+installed show.
 
 Brightness scales every colour value v to `(v * brightness + 127) / 255`, rounded down.
 
@@ -61,14 +64,14 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86399}
 ```
 
 | Member | Meaning |
 |---|---|
 | `on` | Whether the LEDs are switched on. |
 | `brightness` | Current brightness, 0 to 255. |
-| `playing` | What is being played: `"all"` for the playlist, the id of a cycle, or `null`. |
+| `playing` | What is being played: `"all"` for the root playlist, the id of the card's folder whose playlist is current while the card is in and holds it, the id of a cycle, or `null`. |
 | `animation` | The id of the animation item, or of the drive's animation, on the LEDs right now, or `null`. |
 | `fps` | LED refreshes in the last full second. |
 | `error` | `null`, or the reason the show is invalid. |
@@ -80,6 +83,7 @@ A number in a command is written in decimal digits.
 | `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
 | `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
+| `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
 is invalid.
@@ -138,14 +142,22 @@ gives no items and `null`, and so does a show without items:
 `"cycle":[]`.
 
 The files of a USB drive or of the card come after the items of the show, in the order of
-their file names, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+the drive's listing, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+A file in a sub-folder of the card's folder `odrig` has its path from `odrig` as its
+`file`: `{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}`.
+The sub-folders themselves come between the items of the show and the files, in the
+order of the listing, depth first, each as a playlist item with its path:
+`{"id":60007,"playlist":"night","external":true}`, then
+`{"id":60008,"playlist":"night/deep","external":true}`. Their ids come after the files',
+from the same pool, in the order of the items. [show.md](show.md#animations-from-a-usb-drive)
+says what a folder of the card is to the player.
 A file left out for a fault is listed in its place as
 `{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
-character outside printable ASCII as `\u` and four hexadecimal digits. The positions of
-`<from>` and `next` count both kinds. An animation of the drive is listed once the player
+character outside printable ASCII as `\u` and four hexadecimal digits, and so is
+`playlist`. The positions of `<from>` and `next` count the three kinds. An animation of the drive is listed once the player
 has read it whole; while the drive is read, `list` answers without the ones still to be
 read, and is not refused with `busy` for them. [show.md](show.md#animations-from-a-usb-drive)
 says what the board does with a drive.
@@ -190,6 +202,7 @@ The item leaves the show, and the items after it move up.
 
 - An animation that a cycle lists is refused with `in-use`: remove the cycle first.
 - An animation of a USB drive is refused with `in-use`: the drive holds it.
+- A folder of the card is refused with `in-use`: it is a playlist, not a file.
 - If the item is the `start` item, the show has no `start` afterwards.
 - If the item is the animation whose turn it is in the playlist, the playlist goes on
   with the animation after it, from its first frame. If it was the only animation of the
@@ -227,7 +240,7 @@ whichever route its commands arrive by.
 - `<bytes>` is the size of the file, 1 to 4,294,967,295.
 - The reply's `chunk` is the most bytes one `upload data` line may carry.
 - It is refused with `busy` when an upload is open; with `in-use` when the id belongs to a
-  cycle or to an animation of a USB drive, or another item already names `<file>`; and with `no-space` when the file would
+  cycle, to an animation of a USB drive or to a folder of the card, or another item already names `<file>`; and with `no-space` when the file would
   not fit into the free storage, or the show has no room for another item.
 
 **`upload begin <id> <file> <bytes> <crc32>`** is the same with the CRC-32 of the file, as
@@ -305,9 +318,9 @@ succeeds.
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
 | `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation of a USB drive; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has. |
+| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
@@ -541,8 +554,10 @@ itself, writes nothing.
 - `show-invalid`: the show is invalid.
 - `busy`: until the player has read every installed animation after a start, and while
   an upload is open.
-- `unknown-id`: `<id>` or `<before>` is the id of no listed animation and of no cycle.
-- `in-use`: `<id>` or `<before>` is the id of a cycle, which has no place in the order.
+- `unknown-id`: `<id>` or `<before>` is the id of no listed animation, of no cycle and of
+  no folder of the card.
+- `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the card, which
+  have no place in the order.
 - `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
   `order get` again.
 - `storage-error`: the order could not be saved. It is as it was.

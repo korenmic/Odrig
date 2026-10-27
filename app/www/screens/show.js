@@ -1,5 +1,6 @@
 // Animations: what the installation does, power and brightness, the capacity of each
-// storage, and the one list of animations, each row with its storage badge and its menu.
+// storage, and the one list of animations, one level of the card's folders at a time as
+// a file explorer shows them, each row with its storage badge and its menu.
 
 import * as client from "../client.js";
 import * as capacity from "../capacity.js";
@@ -70,15 +71,131 @@ function metaOf(animation) {
   return `${animation.id} \u00b7 ${animation.bytes === null ? "size not read yet" : `${kilobytes(animation.bytes)} KB`}`;
 }
 
-// What plays, in words: the playlist, a cycle by its id, or nothing.
-function playing(status) {
+// The folder of an animation of the card, read from its path: the part before its last
+// `/`, or the root, "", for a loose file and for every animation of the board.
+export function folderOf(animation) {
+  return isExternal(animation) && animation.file.includes(`/`) ? animation.file.slice(0, animation.file.lastIndexOf(`/`)) : "";
+}
+
+// Whether a file of the card lies in a folder of the tree or in one below it.
+function under(file, path) {
+  return file.startsWith(`${path}/`);
+}
+
+// The time left in the window of the current playlist, in words.
+export function timeLeft(left) {
+  return `${Math.floor(left / 3600)} h ${Math.floor((left % 3600) / 60)} min left`;
+}
+
+// What plays, in words: the root playlist, or a folder's by its path, each with the time
+// left in its window, the root playing in a folder's place said so; a cycle by its id;
+// or nothing.
+function playing(status, state) {
   if (status.error !== null) {
     return messages.ofInvalidShow(status.error);
   }
-  if (status.playing === "all") {
-    return "Playlist";
+  if (status.playing === null) {
+    return "Nothing plays";
   }
-  return status.playing === null ? "Nothing plays" : `Cycle ${status.playing}`;
+  if (status.playing === "all") {
+    return state.folders.length > 0 && status.left !== null ? `Playlist \u00b7 ${timeLeft(status.left)}` : "Playlist";
+  }
+  if (state.cycles.includes(status.playing)) {
+    return `Cycle ${status.playing}`;
+  }
+  const folder = state.folders.find((item) => item.id === status.playing);
+  if (folder !== undefined) {
+    const shown = status.animation === null || state.animations === null ? undefined : state.animations.find((animation) => animation.id === status.animation);
+    const elsewhere = shown !== undefined && !(isExternal(shown) && under(shown.file, folder.playlist));
+    const words = `Playlist ${folder.playlist}${elsewhere ? ", the root plays for now" : ""}`;
+    return status.left === null ? words : `${words} \u00b7 ${timeLeft(status.left)}`;
+  }
+  // A number the list has neither as a cycle nor as a folder: a folder of a card just put
+  // in, while the list is asked for again; a cycle, for a target without the time left.
+  return status.left === null ? `Cycle ${status.playing}` : `Playlist ${status.playing} \u00b7 ${timeLeft(status.left)}`;
+}
+
+// The playlist that is current: "" for the root, a folder's path, or null while a cycle
+// or nothing plays.
+function markedPath(status, state) {
+  if (status === null || status.playing === null) {
+    return null;
+  }
+  if (status.playing === "all") {
+    return "";
+  }
+  const folder = state.folders.find((item) => item.id === status.playing);
+  return folder === undefined ? null : folder.playlist;
+}
+
+// The level shown, as a file explorer shows one folder at a time: the path of the folder
+// opened, "" for the root.
+let opened = "";
+
+// The parent of a folder's path: the part before its last `/`, the root for a folder of
+// the card's folder itself; and a folder's own name, the part after it.
+function parentOf(path) {
+  return path.includes(`/`) ? path.slice(0, path.lastIndexOf(`/`)) : "";
+}
+
+function nameOf(path) {
+  return path.includes(`/`) ? path.slice(path.lastIndexOf(`/`) + 1) : path;
+}
+
+// The level shown and what it holds: its folder of the list, null at the root; its own
+// rows in the shown order and those of them the filters show; and its sub-folders in the
+// order of the list, each with the count of the files directly in it.
+function levelOf(state, all) {
+  const folder = opened === "" ? null : state.folders.find((item) => item.playlist === opened) ?? null;
+  const rows = all.filter((animation) => folderOf(animation) === opened);
+  const folders = state.folders.filter((item) => parentOf(item.playlist) === opened).map((item) => ({
+    path: item.playlist, id: item.id, name: nameOf(item.playlist), count: all.filter((animation) => folderOf(animation) === item.playlist).length,
+  }));
+  return {path: opened, folder, rows, shown: rows.filter(filters.matches), folders};
+}
+
+// The level shown, for the other parts of the screen.
+export function shownLevel() {
+  return opened;
+}
+
+// Enters a folder of the card, or the root for "", as a tap on a folder row or on Back
+// does.
+export function enter(path) {
+  opened = path;
+  closeMenu();
+  draw(client.state);
+}
+
+function countWords(count) {
+  return count === 1 ? "1 animation" : `${count} animations`;
+}
+
+// The row of a sub-folder of the level: its name, the count of its own files, and a way
+// in. It is no row of an animation: the filters, the moves and the selection pass it by.
+function folderRow(entry) {
+  const made = document.createElement("button");
+  made.type = "button";
+  made.className = "folder-row";
+  made.dataset.path = entry.path;
+  made.dataset.id = String(entry.id);
+  made.setAttribute("aria-label", `Open folder ${entry.path}`);
+  const text = document.createElement("span");
+  text.className = "folder-text";
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = entry.name;
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = countWords(entry.count);
+  text.append(name, meta);
+  const chevron = document.createElement("span");
+  chevron.className = "chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  chevron.textContent = "\u203a";
+  made.append(text, chevron);
+  made.addEventListener("click", () => enter(entry.path));
+  return made;
 }
 
 // The animation on the LEDs: its id, and its file name when the list has it.
@@ -175,20 +292,38 @@ function row(animation) {
   return made;
 }
 
-// Shows the rows anew only when the list is another one, so that a press is never lost
-// to a reply that arrives.
-function drawRows(animations) {
-  const place = byId("animations-list");
-  const shown = [...place.querySelectorAll(":scope > .row")];
-  const same =
-    shown.length === animations.length &&
-    shown.every((made, at) => made.dataset.id === String(animations[at].id) && made.dataset.file === animations[at].file &&
-      made.dataset.external === String(isExternal(animations[at])) && made.dataset.editable === String(isEditable(animations[at])) &&
-      made.dataset.writable === String(onWritableCard(animations[at])) && made.dataset.fault === (animations[at].fault ?? "") &&
-      made.querySelector(".meta").textContent === metaOf(animations[at]));
-  if (!same) {
-    place.replaceChildren(...animations.map(row));
+// What tells a row of the list from another, as the list holds it and as the rows would
+// be drawn now.
+function rowKey(animation) {
+  return [animation.id, animation.file, isExternal(animation), isEditable(animation), onWritableCard(animation), animation.fault ?? "", metaOf(animation)].join("|");
+}
+
+function keyOfChild(child) {
+  if (child.classList.contains("folder-row")) {
+    return `#${child.dataset.path}|${child.dataset.id}`;
   }
+  if (!child.classList.contains("row")) {
+    return "?";
+  }
+  return [child.dataset.id, child.dataset.file, child.dataset.external, child.dataset.editable, child.dataset.writable, child.dataset.fault,
+    child.querySelector(".meta").textContent].join("|");
+}
+
+// Shows the rows and the folder rows of the level anew only when they are others, so that
+// a press is never lost to a reply that arrives: the rows the filters show, then the
+// sub-folders.
+function drawRows(here) {
+  const place = byId("animations-list");
+  const wanted = [...here.shown.map(rowKey), ...here.folders.map((entry) => `#${entry.path}|${entry.id}`)];
+  const shown = [...place.children].map(keyOfChild);
+  if (shown.length === wanted.length && shown.every((key, at) => key === wanted[at])) {
+    return;
+  }
+  place.replaceChildren(...here.shown.map((animation) => {
+    const made = row(animation);
+    made.dataset.group = here.path;
+    return made;
+  }), ...here.folders.map(folderRow));
 }
 
 // Whether the target can be asked to change something now.
@@ -196,9 +331,23 @@ export function answers() {
   return client.state.link === "answers";
 }
 
-function rowsState(state, animations) {
+function rowsState(state, animations, here) {
   const onTheLeds = state.status === null || state.status.playing === null ? null : state.status.animation;
   const version = client.targetVersion();
+  // The level's head: its title, Back inside a folder, and the mark while its playlist is
+  // current; each folder row's count, and its mark when it leads to the current playlist.
+  const marked = markedPath(state.status, state);
+  byId("level-title").textContent = here.path === "" ? "Root" : here.path;
+  byId("level-back").hidden = here.path === "";
+  byId("level-head").setAttribute("aria-current", String(marked === here.path));
+  for (const made of byId("animations-list").querySelectorAll(":scope > .folder-row")) {
+    const entry = here.folders.find((item) => item.path === made.dataset.path);
+    if (entry === undefined) {
+      continue;
+    }
+    made.querySelector(".meta").textContent = countWords(entry.count);
+    made.setAttribute("aria-current", String(marked !== null && (marked === entry.path || marked.startsWith(`${entry.path}/`))));
+  }
   for (const made of byId("animations-list").querySelectorAll(":scope > .row")) {
     const animation = animations.find((item) => String(item.id) === made.dataset.id);
     if (animation === undefined) {
@@ -238,7 +387,7 @@ function draw(state) {
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
     byId("brightness").textContent = `Brightness ${status.brightness}`;
-    byId("playing").textContent = playing(status);
+    byId("playing").textContent = playing(status, state);
     say("now", now(status, state.animations));
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
@@ -250,15 +399,21 @@ function draw(state) {
     }
   }
   const all = shownOrder(state);
-  const animations = all.filter(filters.matches);
-  filters.draw(state);
+  // A folder gone from the list, with the card or with a new target, brings the list to
+  // the root.
+  if (opened !== "" && !state.folders.some((item) => item.playlist === opened)) {
+    opened = "";
+  }
+  const here = levelOf(state, all);
+  const animations = here.shown;
+  filters.draw(state, here.rows);
   // A row that is held keeps the rows as they are until it is let go.
   if (!reorder.dragging()) {
-    drawRows(animations);
-    rowsState(state, animations);
+    drawRows(here);
+    rowsState(state, animations, here);
   }
   byId("none").hidden = state.animations === null || all.length > 0;
-  byId("filter-empty").hidden = all.length === 0 || animations.length > 0;
+  byId("filter-empty").hidden = here.rows.length === 0 || animations.length > 0;
   selection.draw(state);
   if (menuFor !== null && !animations.some((animation) => animation.id === menuFor)) {
     closeMenu();
@@ -442,14 +597,20 @@ export function isVisible() {
 export function start(options) {
   message = options.message;
   filters.start({redraw});
-  selection.start({message, redraw});
-  reorder.start({message, redraw, shownOrder});
+  selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
+  reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: (state) => shownOrder(state).filter((animation) => folderOf(animation) === opened)});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});
   extend({draw: tests.draw});
   byId("on").addEventListener("click", () => client.switchOn());
   byId("off").addEventListener("click", () => client.switchOff());
-  byId("play-all").addEventListener("click", () => client.playAll());
+  // The level's button: the root's playlist at the root, the folder's inside one.
+  byId("play-all").addEventListener("click", () => {
+    const folder = opened === "" ? undefined : client.state.folders.find((item) => item.playlist === opened);
+    if (folder === undefined) client.playAll();
+    else client.play(folder.id);
+  });
+  byId("level-back").addEventListener("click", () => enter(parentOf(opened)));
   const level = byId("level");
   level.addEventListener("input", () => {
     held = true;

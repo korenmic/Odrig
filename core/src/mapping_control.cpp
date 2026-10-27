@@ -257,6 +257,9 @@ void mapping_test_stop(Core &core) {
     core.mapping_test = 0;
     core.mapping_snake = 0;
     if (core.invalid) return;
+    // A window that ended under the test is taken now: the next playlist plays from its
+    // first animation in place of the saved one; a saved cycle goes on.
+    const bool rotated = player_window_passed(core, core.latest);
     if (core.mapping_saved_playing < core.item_count && core.items[core.mapping_saved_playing].is_cycle) {
         const uint32_t saved = core.mapping_saved_playing;
         player_play_cycle(core, saved);
@@ -269,7 +272,7 @@ void mapping_test_stop(Core &core) {
             }
         }
     } else {
-        const uint32_t from = available(core, core.mapping_saved_shown) ? core.mapping_saved_shown : player_first_in_playlist(core);
+        const uint32_t from = !rotated && available(core, core.mapping_saved_shown) ? core.mapping_saved_shown : player_first_in_playlist(core);
         if (from != kNothing) player_play_all(core, from);
         else player_halt(core);
     }

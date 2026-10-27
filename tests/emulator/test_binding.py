@@ -161,7 +161,8 @@ class ExampleShow(unittest.TestCase):
         reply = self.core.command(0, b"status")
         self.assertEqual(support.without_fps(reply), support.without_fps(self.reference.command(0, b"status")))
         self.assertEqual(support.without_fps(reply), {"ok": True, "on": True, "brightness": 128, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
-        self.assertEqual(self.core.command(5, b"status\r\n"), reply)
+        # A line ended by a carriage return too; the seconds left in the window count on.
+        self.assertEqual(support.without_fps(self.core.command(5, b"status\r\n")), support.without_fps(reply))
 
     def test_command_gives_the_reply_of_a_line_that_is_no_command(self):
         self.assertEqual(self.core.command(0, b"dance"), b'{"ok":false,"error":"unknown-command"}\n')

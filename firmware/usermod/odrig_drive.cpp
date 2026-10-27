@@ -37,6 +37,14 @@ const size_t PREFIX_LENGTH = sizeof(PREFIX) - 1;
 const uint32_t MOST_FILES = 256;
 const size_t NAME_ROOM = 256;
 const size_t PATH_ROOM = sizeof(FOLDER) + 1 + NAME_ROOM;
+// The most sub-folders of the folder odrig that are taken, how deep below it a folder may
+// lie, the folder of the file system that is never one of them, and the table of the
+// folders still to be walked: so many paths of so much room each, with the 0.
+const uint32_t MOST_FOLDERS = 32;
+const uint32_t DEEPEST = 3;
+const char SYSTEM_FOLDER[] = "System Volume Information";
+const uint32_t MOST_PENDING = 256;
+const size_t PENDING_ROOM = 104;
 // The buffer of each file that is read: one request to the drive brings this many bytes.
 const size_t READ_BUFFER = 4096;
 // The longest name of a file of the drive that the core gives, and the room for a name
@@ -101,6 +109,12 @@ uint32_t number = 0;
 uint32_t plugged = 0;
 uint32_t listed = 0;
 char (*names)[NAME_ROOM] = nullptr;
+// The folders still to be walked while the folder is listed, and what the last listing
+// counted: the sub-folders taken, and the files and the folders passed over.
+char (*pending)[PENDING_ROOM] = nullptr;
+uint32_t foldersListed = 0;
+uint32_t passedFiles = 0;
+uint32_t passedFolders = 0;
 
 // The file `open` holds, with its path, and the one `read_at` holds, with the name the core
 // gave it and the place its next read begins at.
@@ -198,16 +212,35 @@ bool namesAPlace(const char *name) {
   return true;
 }
 
-// Whether a name is one the core may give a file of the drive: 1 to 100 bytes of printable
-// ASCII other than / \ : * ? " < > |, not beginning with a dot.
+// Whether a name is one the core may give a file of the drive: a path from the folder
+// odrig, the names of at most DEEPEST folders and the file's name joined by /, 1 to 100
+// bytes in all, each part printable ASCII other than \ : * ? " < > |, not empty and not
+// beginning with a dot.
 bool isDriveName(const char *name) {
   const size_t length = strlen(name);
   if (length == 0 || length > LONGEST_DRIVE_NAME || name[0] == '.') return false;
+  uint32_t folders = 0;
+  bool atStart = true;
   for (const char *at = name; *at != 0; at++) {
     const unsigned char c = (unsigned char)*at;
-    if (c < 0x20 || c > 0x7e || strchr("/\\:*?\"<>|", c) != nullptr) return false;
+    if (c == '/') {
+      if (atStart || ++folders > DEEPEST) return false;
+      atStart = true;
+      continue;
+    }
+    if (c < 0x20 || c > 0x7e || strchr("\\:*?\"<>|", c) != nullptr || (atStart && c == '.')) return false;
+    atStart = false;
   }
-  return true;
+  return !atStart;
+}
+
+// Whether a folder of the drive is walked: its name is sound as a part of a path, neither
+// ends with a space or a dot, and is not the file system's own folder.
+bool isFolderName(const char *name) {
+  const size_t length = strlen(name);
+  if (!isDriveName(name) || strchr(name, '/') != nullptr) return false;
+  if (name[length - 1] == ' ' || name[length - 1] == '.') return false;
+  return strcmp(name, SYSTEM_FOLDER) != 0;
 }
 
 // The path of the file at a place of the list of the drive that is plugged in. With the
@@ -359,28 +392,116 @@ bool isAnimation(const char *name) {
   return (length >= 5 && strcasecmp(name + length - 5, ".odrg") == 0) || (length >= 6 && strcasecmp(name + length - 6, ".odrgx") == 0);
 }
 
-// Puts a name into the list, which holds the first MOST_FILES names in the order of their
-// bytes.
-void keepName(const char *name, uint32_t *kept) {
+// Puts a name into the list among the names of its folder, which fill the slots from
+// `first` to `*kept`, in the order of their bytes, so that the list holds the first
+// MOST_FILES names of the listing. False when a name is left out of the list for it: this
+// one, or the last of a full list that it comes before.
+bool keepName(const char *name, uint32_t *kept, uint32_t first) {
   uint32_t at = *kept;
-  while (at > 0 && strcmp(names[at - 1], name) > 0) at--;
-  if (at >= MOST_FILES) return;
+  while (at > first && strcmp(names[at - 1], name) > 0) at--;
+  if (at >= MOST_FILES) return false;
   const uint32_t moved = (*kept < MOST_FILES ? *kept : MOST_FILES - 1) - at;
   memmove(names[at + 1], names[at], moved * NAME_ROOM);
   strcpy(names[at], name);
-  if (*kept < MOST_FILES) (*kept)++;
+  if (*kept >= MOST_FILES) return false;
+  (*kept)++;
+  return true;
 }
 
-// The list of the drive's folder odrig, made with the guard held. Its length, NO_FOLDER
-// when the drive has no folder odrig, or NOT_LISTED when the folder could not be read.
+// Puts a folder's path among the folders still to be walked, below those that come after
+// it by their bytes, so that the first by bytes is taken next. False when there is no room.
+bool pushPending(const char *path, uint32_t *count) {
+  if (*count >= MOST_PENDING || strlen(path) >= PENDING_ROOM) return false;
+  uint32_t at = *count;
+  while (at > 0 && strcmp(pending[at - 1], path) < 0) at--;
+  memmove(pending[at + 1], pending[at], (*count - at) * PENDING_ROOM);
+  strcpy(pending[at], path);
+  (*count)++;
+  return true;
+}
+
+// The folders of the paths kept so far, counted as the limit counts them: a folder with
+// its uncounted ancestors when the first file at or below it is kept. The names are cut
+// at the first whose folder would be counted past MOST_FOLDERS; the rest are passed over.
+// With the walk ended, the pending table is free and holds the folders counted.
+void cutFolders(uint32_t *kept, uint32_t *folders, uint32_t *passedFiles) {
+  uint32_t counted = 0;
+  for (uint32_t at = 0; at < *kept; at++) {
+    uint32_t added = 0;
+    for (const char *slash = strchr(names[at], '/'); slash != nullptr; slash = strchr(slash + 1, '/')) {
+      const size_t length = (size_t)(slash - names[at]);
+      bool known = false;
+      for (uint32_t folder = 0; folder < counted + added && !known; folder++) {
+        known = strlen(pending[folder]) == length && memcmp(pending[folder], names[at], length) == 0;
+      }
+      if (known || counted + added >= MOST_PENDING) continue;
+      memcpy(pending[counted + added], names[at], length);
+      pending[counted + added][length] = 0;
+      added++;
+    }
+    if (counted + added > MOST_FOLDERS) {
+      *passedFiles += *kept - at;
+      *kept = at;
+      break;
+    }
+    counted += added;
+  }
+  *folders = counted;
+}
+
+// The list of the drive's folder odrig, made with the guard held: the paths of its
+// animation files and of its sub-folders' to DEEPEST levels, depth first, a folder's files
+// by the bytes of their names and then its sub-folders by the bytes of their names, at
+// most MOST_FILES files and MOST_FOLDERS sub-folders. Its length, NO_FOLDER when the drive
+// has no folder odrig, or NOT_LISTED when the folder could not be read. What was passed
+// over is counted for the log: the files beyond the limits, and the folders beyond them,
+// too deep, or not walked for their names.
 int32_t listFolder() {
   uint32_t kept = 0;
-  DIR *folder = opendir(FOLDER);
-  if (folder == nullptr) return errno == ENOENT ? NO_FOLDER : NOT_LISTED;
-  while (const dirent *entry = readdir(folder)) {
-    if (entry->d_type == DT_REG && isAnimation(entry->d_name)) keepName(entry->d_name, &kept);
+  uint32_t pendingCount = 0;
+  char path[PATH_ROOM];
+  char relative[PENDING_ROOM + 1 + NAME_ROOM];
+  pending[0][0] = 0;
+  pendingCount = 1;
+  bool rootRead = false;
+  passedFiles = passedFolders = 0;
+  while (pendingCount > 0) {
+    pendingCount--;
+    strcpy(relative, pending[pendingCount]);
+    const bool root = relative[0] == 0;
+    uint32_t depth = 0;
+    for (const char *at = relative; *at != 0; at++) depth += *at == '/';
+    if (!root) depth++;
+    snprintf(path, PATH_ROOM, root ? "%s%s" : "%s/%s", FOLDER, relative);
+    DIR *folder = opendir(path);
+    if (folder == nullptr) {
+      if (root) return errno == ENOENT ? NO_FOLDER : NOT_LISTED;
+      passedFolders++;
+      continue;
+    }
+    rootRead = true;
+    const uint32_t first = kept;
+    while (const dirent *entry = readdir(folder)) {
+      const size_t relativeLength = strlen(relative);
+      if (entry->d_type == DT_REG && isAnimation(entry->d_name)) {
+        if (relativeLength + 1 + strlen(entry->d_name) >= NAME_ROOM) continue;
+        snprintf(relative + (root ? 0 : relativeLength), NAME_ROOM, root ? "%s" : "/%s", entry->d_name);
+        if (!keepName(relative, &kept, first)) passedFiles++;
+        relative[relativeLength] = 0;
+      } else if (entry->d_type == DT_DIR && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+        if (depth >= DEEPEST || !isFolderName(entry->d_name)) {
+          passedFolders++;
+          continue;
+        }
+        snprintf(relative + (root ? 0 : relativeLength), NAME_ROOM, root ? "%s" : "/%s", entry->d_name);
+        if (!pushPending(relative, &pendingCount)) passedFolders++;
+        relative[relativeLength] = 0;
+      }
+    }
+    closedir(folder);
   }
-  closedir(folder);
+  if (!rootRead) return NOT_LISTED;
+  cutFolders(&kept, &foldersListed, &passedFiles);
   return (int32_t)kept;
 }
 
@@ -418,18 +539,26 @@ void setSummary() {
 // or why there is none. A drive without the folder was said when it was mounted.
 void sayListed(int32_t found) {
 #ifdef ODRIG_DRIVE_SD_SPI
-  if (found == NOT_LISTED) {
-    say("card folder odrig could not be read");
-  } else if (found >= 0) {
-    say("card opened: %u animation files in odrig", (unsigned)found);
-  }
+  const char *medium = "card";
+  if (found == NOT_LISTED) say("card folder odrig could not be read");
 #else
-  if (found == NOT_LISTED) {
-    say("stick not opened: a fault in reading the folder odrig");
-  } else if (found >= 0) {
-    say("stick opened: %u animation files in odrig", (unsigned)found);
-  }
+  const char *medium = "stick";
+  if (found == NOT_LISTED) say("stick not opened: a fault in reading the folder odrig");
 #endif
+  if (found < 0) return;
+  char where[48];
+  char passed[64];
+  if (foldersListed == 0) {
+    strcpy(where, "odrig");
+  } else {
+    snprintf(where, sizeof where, "%u folders of odrig", (unsigned)foldersListed);
+  }
+  if (passedFiles == 0 && passedFolders == 0) {
+    passed[0] = 0;
+  } else {
+    snprintf(passed, sizeof passed, "; %u files and %u folders passed over", (unsigned)passedFiles, (unsigned)passedFolders);
+  }
+  say("%s opened: %u animation files in %s%s", medium, (unsigned)found, where, passed);
 }
 
 // Lists the folder of the drive that is plugged in, as the core asks: its names take the
@@ -899,9 +1028,10 @@ void OdrigDrive::begin() {
   events = xQueueCreate(EVENTS, sizeof(msc_host_event_t));
 #endif
   names = static_cast<char (*)[NAME_ROOM]>(heap_caps_malloc(MOST_FILES * NAME_ROOM, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  pending = static_cast<char (*)[PENDING_ROOM]>(heap_caps_malloc(MOST_PENDING * PENDING_ROOM, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   playedBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
   secondBuffer = static_cast<char *>(heap_caps_malloc(READ_BUFFER, MALLOC_CAP_DMA | MALLOC_CAP_8BIT));
-  if (guard == nullptr || names == nullptr || playedBuffer == nullptr || secondBuffer == nullptr) return;
+  if (guard == nullptr || names == nullptr || pending == nullptr || playedBuffer == nullptr || secondBuffer == nullptr) return;
 #ifndef ODRIG_DRIVE_SD_SPI
   if (events == nullptr) return;
 #endif

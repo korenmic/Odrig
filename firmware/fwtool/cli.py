@@ -397,9 +397,11 @@ def _install_show(arguments):
     before = before_path.read_bytes()
     try:
         present = storage.show_of(before)
-        if storage.ORDER_NAME in present and storage.ORDER_NAME not in files:
-            # The saved order is the operator's choice: a folder without one keeps the board's.
-            files = dict(files, **{storage.ORDER_NAME: present[storage.ORDER_NAME]})
+        for name in storage.KEPT_NAMES:
+            if name in present and name not in files:
+                # The saved order and the saved playlist are the operator's choices: a
+                # folder without them keeps the board's.
+                files = dict(files, **{name: present[name]})
         files = storage.with_board_generation(files, present)
         for line in show_lines(present, files):
             print(line)

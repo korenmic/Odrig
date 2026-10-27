@@ -2,7 +2,8 @@
 
 The emulator is a program for macOS and Windows that runs the core of [core.md](core.md) on an installed show,
 the folder that [show.md](show.md) describes. It is the Python package `emulator` at the
-repository root and uses only the Python standard library. It loads the core as a shared
+repository root and uses only the Python standard library and the repository's own
+`odrig` package, pure Python, which reads the catalogs. It loads the core as a shared
 library, built from the same `core/src/*.cpp` the firmware compiles, and leaves every
 decision about files, time and commands to it. So it plays texts and clocks as the board
 does, drawn by the core at every refresh, a clock with the seed `status` reports; its
@@ -179,9 +180,14 @@ python -m emulator build/demo-20/show --drive build/stick
   is plugged in; when it goes, the drive is pulled out. A folder `DIR` that is not there
   yet is no error: the drive is plugged in once `DIR/odrig` is.
 - The folder is listed when the core asks, for a drive without a catalog: the files whose
-  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order
-  of their names, at most 256. It is not listed again while it stays. To take up files
-  added to it, move the folder `odrig` away for two seconds and back.
+  names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, of `odrig`
+  and of its sub-folders to three levels, depth first, a folder's files by the bytes of
+  their names and then its sub-folders by the bytes of their names, at most 256 files and
+  32 sub-folders; a file in a sub-folder is named by its path, as `night/comet.odrg`. A
+  folder whose name begins with a dot, ends with a space or a dot, holds a character a
+  name may not, or is `System Volume Information` is passed over. The folder is not listed
+  again while it stays. To take up files added to it, move the folder `odrig` away for two
+  seconds and back.
 - The core may change the drive's files, by their names, unless `--drive-read-only` is
   given: the files a change of the drive writes go into `DIR/odrig`.
 - The core reads the drive's files after the installed ones, while the show plays. Each
@@ -272,6 +278,7 @@ curl --data-binary 'play 2' http://127.0.0.1:8600/odrig
 | `POST /odrig` without a `Content-Length` that is a whole number | Status 411. The core is not called. |
 | `GET /`, `GET /<name>` for a file of `emulator/web/` | The page and its files. See [The page](#the-page). |
 | `GET /events`, `GET /show/mapping.json` | See [The event stream](#the-event-stream). |
+| `POST /seek` | The page's seek, see [Seeking](#seeking): the body is `{"ms": <point>}`, the point of the loop in milliseconds, and the answer is `{"ok":true,"animation":1,"start":40020,"turn":40020,"length":5100,"position":3000,"moved":2980}` or `{"ok":false,"error":"<reason>"}`, status 200 in both cases, with `Allow: POST` and 405 for another method and 411 without a `Content-Length` that is a whole number, as `/odrig`. It is no command of the core: the command list is unchanged. |
 | Any other path | Status 404. |
 
 - The body is the command line, with or without a final newline. A body of up to 4,096
@@ -318,10 +325,11 @@ warning: --lan: anyone on the local network can send commands to this emulator a
 
 The address the emulator prints is a web page: open it in Safari or Chrome. It is made of
 plain files in `emulator/web/`, loads nothing from another host, and works without a
-network connection. The page itself only shows: it sends no command. Every change on it
-comes from the [event stream](#the-event-stream), so a command sent by any tool is seen
-at once. Its third view holds the operators' app, which does send commands, as it does on
-a phone.
+network connection. The page itself only shows: it sends no command, and its one
+control, the seek bar, asks the emulator to move playback, which is no command. Every
+change on it comes from the [event stream](#the-event-stream), so a command sent by any
+tool is seen at once. Its third view holds the operators' app, which does send commands,
+as it does on a phone.
 
 From top to bottom the page has:
 
@@ -338,6 +346,13 @@ From top to bottom the page has:
 - **The drawing**, in the views chosen by the tabs `LEDs`, `Mapping` and `Controller`,
   each described below, with a readout at its top right that names what the pointer is
   on: `leg 2, pin 2, LED 61 (1,2)`.
+- **The seek bar**, under the drawing in every view that shows it: the id of the
+  animation on the LEDs, a bar of where it is in its loop, and `m:ss / m:ss`, the time
+  played and the loop's length, `h:mm:ss` from one hour. It says `length unknown` while
+  the length is not known, and shows nothing while nothing plays or a cycle plays.
+  Dragging the bar, or pressing on it, moves playback to that point, see
+  [Seeking](#seeking); for three seconds after it the row says by how much the
+  emulator's clock moved, `clock +12 s`.
 - **The command log.** One line for each command that arrived, by the serial port or over
   HTTP: the time it arrived, how it came, the line, and the reply. A line of more than
   200 characters is shown with its first 200, the mark `…` and the number of characters it
@@ -663,13 +678,52 @@ the Controller view shows and what the phone shows is a fault, by the working ru
 app, in the emulator and on the phone"; the first thing to check is that the emulator and
 the APK come from one commit.
 
+### Seeking
+
+The emulator knows where the animation on the LEDs stands, which the core does not tell:
+the core opens the file it plays through the emulator's host anew at the start of every
+loop and of every turn, and so the emulator takes the grid time of the refresh in which
+the played file was opened as the start of the loop that shows, and the first such open
+after the animation changed, after a command was answered, or after a restart of the
+emulator's own as the start of the turn. The position is the time since the loop's start
+on the clock of the frames' timestamps.
+
+The loop's length comes from three sources, the first that answers: the catalog of the
+storage the file is in, when it has one; the converter's `check` of the file, run once
+per file in a thread of the emulator, when Node.js is on the path; and the loop itself,
+once the emulator has seen two consecutive opens of the same file with no command
+answered and no seek between them. A text or a clock without a catalog entry has no
+length. Reading a catalog or running the converter never delays a refresh.
+
+What the emulator knows goes to the page as the `position` event of the
+[event stream](#the-event-stream). A cycle shows nothing: the emulator tells a cycle's id
+in `playing` from a folder's of the card, whose playlist shows its animation as the
+playlist does, by the cycles that `list` names, asked of the core when `playing` holds a
+number not yet told apart since the last command answered.
+
+A seek names a point of the loop, from 0 to the length less two grid steps, and the
+emulator moves playback there with what it has. When the point is at or after the
+position, it moves its own clock forward by the difference, rounded down to whole grid
+steps, in strides of 400 ms with a refresh asked of the core at each, so that the core,
+which decodes a bounded part of a file at one refresh, comes to the picture of each
+stride at once and the LEDs show the frame of the point as soon as the move is done;
+nothing is replayed. When the point is before the
+position, the emulator first restarts the animation with a `play <id>` of its own, which
+the log shows with the transport `seek`, moves its clock one grid step so that the core
+takes the refresh that begins the turn, and then moves to the point. A move of the clock
+is running time for the core: the turn and whatever else the core counts in time advance
+by it, and the clock never goes back. The answer to a seek is refused with
+`nothing-plays` while no animation is on the LEDs, `cycle` while a cycle plays,
+`length-unknown` while the length is unknown, `beyond-length` for a point out of reach,
+and `bad-argument` for a body that is not `{"ms": <whole number>}`.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
 and from the mapping file of the show, `GET /show/mapping.json`, which is served byte for
 byte (404 when the folder has none). Another program may read both in the same way.
 
-The stream is a response of type `text/event-stream` that stays open. It has four kinds of
+The stream is a response of type `text/event-stream` that stays open. It has five kinds of
 event:
 
 ```
@@ -680,7 +734,10 @@ event: log
 data: {"seq":17,"ms":123456,"time":"14:03:22.512","transport":"serial","line":"play 2","length":6,"cut":false,"reply":"{\"ok\":true}"}
 
 event: status
-data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+data: {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
+
+event: position
+data: {"animation":1,"start":40020,"turn":40020,"length":5100}
 
 event: frame
 data: 123460 <base64 of the refresh>
@@ -689,14 +746,15 @@ data: 123460 <base64 of the refresh>
 | Event | What it carries |
 |---|---|
 | `hello` | First on every connection. `drive` is the folder of `--drive`, or `null` without it. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
-| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp` or `http`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
+| `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp`, `http` or, for a restart the emulator made for a seek, `seek`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |
+| `position` | Where the animation on the LEDs stands, for the [seek bar](#seeking): its id, the start of the loop that shows and the start of its turn, both on the clock of the frames' timestamps, and the loop's length in milliseconds; each `null` while unknown, and all four `null` while nothing plays or a cycle plays. It is sent to a new connection after the latest status, and at every change: a turn's start, a loop's start, a seek, a length learned. |
 
-A new connection gets `hello`, the log entries kept so far, the latest status, and then
-everything that happens. The emulator keeps the last 500 log entries.
+A new connection gets `hello`, the log entries kept so far, the latest status, the latest
+position, and then everything that happens. The emulator keeps the last 500 log entries.
 
-Log and status events are never dropped. Refreshes do not queue: each connection has one
+Log, status and position events are never dropped. Refreshes do not queue: each connection has one
 place for the newest refresh, and a newer one replaces it, so a page that cannot keep up
 skips refreshes and does not fall behind. What the system has already taken for a
 connection, about half a megabyte on a Mac, is sent as it is. A connection with nothing to
@@ -806,7 +864,7 @@ system and the processor of the computer.
 The tool prints the reply line to standard output:
 
 ```
-{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+{"ok":true,"on":true,"brightness":40,"playing":"all","animation":2,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
 ```
 
 | Status | Meaning |
@@ -1051,7 +1109,7 @@ after it. For each command the emulator prints one line to standard output, `rep
 time and the reply:
 
 ```
-reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null}
+reply 1010 {"ok":true,"on":false,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"seed":null,"left":86399}
 ```
 
 The whole script is checked before the core starts. A script that breaks a rule is refused

@@ -24,6 +24,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core_state.h"
@@ -247,47 +248,120 @@ public:
         drive_number_ = ++drives_plugged_;
     }
 
-    // Lists the folder `odrig` of the drive as it is now.
-    void list_drive() {
-        drive_names_.clear();
-        const std::string folder = options_.drive + "/odrig";
+    // Whether a folder of the drive is walked: its name is sound, does not end with a space
+    // or a dot, and is not the file system's own folder.
+    static bool folder_walked(const std::string &name) {
+        return drive_name_sound(name.c_str()) && name.find('/') == std::string::npos && name.back() != ' ' && name.back() != '.' &&
+               name != "System Volume Information";
+    }
+
+    // Whether a file of the drive is listed: its name ends in `.odrg` or `.odrgx`, in any
+    // case, and does not begin with a dot.
+    static bool file_listed(const std::string &name) {
+        std::string lower = name;
+        for (char &letter : lower) {
+            letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
+        }
+        const bool odrg = lower.size() >= 5 && lower.compare(lower.size() - 5, 5, ".odrg") == 0;
+        const bool odrgx = lower.size() >= 6 && lower.compare(lower.size() - 6, 6, ".odrgx") == 0;
+        return name[0] != '.' && (odrg || odrgx);
+    }
+
+    // The entries of one folder of the drive: its regular files and its sub-folders, by name.
+    static void read_folder(const std::string &folder, std::vector<std::string> &files, std::vector<std::string> &folders) {
 #ifdef _WIN32
         std::error_code failed;
         for (const auto &entry : std::filesystem::directory_iterator(folder, failed)) {
             if (entry.is_regular_file(failed)) {
-                drive_names_.push_back(entry.path().filename().string());
+                files.push_back(entry.path().filename().string());
+            } else if (entry.is_directory(failed)) {
+                folders.push_back(entry.path().filename().string());
             }
         }
 #else
         if (DIR *opened = opendir(folder.c_str())) {
             while (const dirent *entry = readdir(opened)) {
+                const std::string name = entry->d_name;
+                if (name == "." || name == "..") {
+                    continue;
+                }
                 struct stat status;
-                if (stat((folder + "/" + entry->d_name).c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
-                    drive_names_.push_back(entry->d_name);
+                if (stat((folder + "/" + name).c_str(), &status) != 0) {
+                    continue;
+                }
+                if (S_ISREG(status.st_mode)) {
+                    files.push_back(name);
+                } else if (S_ISDIR(status.st_mode)) {
+                    folders.push_back(name);
                 }
             }
             closedir(opened);
         }
 #endif
-        // Files whose names end in `.odrg` or `.odrgx`, in any case, and do not begin with a
-        // dot, in the order of their names, the first 256.
-        std::vector<std::string> kept;
-        for (const std::string &name : drive_names_) {
-            std::string lower = name;
-            for (char &letter : lower) {
-                letter = static_cast<char>(std::tolower(static_cast<unsigned char>(letter)));
+    }
+
+    // The depth-first order of two paths: a folder's files before its sub-folders', and
+    // siblings by the bytes of their names. At the first differing byte, the path whose
+    // part there is its last comes first when the other's is a folder; else the bytes
+    // decide, the end of a part ranking below every byte.
+    static bool before(const std::string &a, const std::string &b) {
+        size_t at = 0;
+        while (at < a.size() && at < b.size() && a[at] == b[at]) {
+            ++at;
+        }
+        const bool a_file = a.find('/', at) == std::string::npos;
+        const bool b_file = b.find('/', at) == std::string::npos;
+        if (a_file != b_file) {
+            return a_file;
+        }
+        const int byte_a = at < a.size() && a[at] != '/' ? static_cast<unsigned char>(a[at]) + 1 : 0;
+        const int byte_b = at < b.size() && b[at] != '/' ? static_cast<unsigned char>(b[at]) + 1 : 0;
+        return byte_a < byte_b;
+    }
+
+    // Lists the folder `odrig` of the drive as it is now: the paths of its animation files
+    // and of its sub-folders' to three levels, depth first, at most 256 files and 32
+    // sub-folders, a folder counted with its uncounted ancestors when its first file is kept.
+    void list_drive() {
+        drive_names_.clear();
+        const std::string root = options_.drive + "/odrig";
+        std::vector<std::string> found;
+        std::vector<std::pair<std::string, int>> pending;
+        pending.emplace_back("", 0);
+        while (!pending.empty()) {
+            const std::pair<std::string, int> taken = pending.back();
+            pending.pop_back();
+            std::vector<std::string> files, folders;
+            read_folder(taken.first.empty() ? root : root + "/" + taken.first, files, folders);
+            for (const std::string &name : files) {
+                if (file_listed(name)) {
+                    found.push_back(taken.first.empty() ? name : taken.first + "/" + name);
+                }
             }
-            const bool odrg = lower.size() >= 5 && lower.compare(lower.size() - 5, 5, ".odrg") == 0;
-            const bool odrgx = lower.size() >= 6 && lower.compare(lower.size() - 6, 6, ".odrgx") == 0;
-            if (name[0] != '.' && (odrg || odrgx)) {
-                kept.push_back(name);
+            if (taken.second < 3) {
+                for (const std::string &name : folders) {
+                    if (folder_walked(name)) {
+                        pending.emplace_back(taken.first.empty() ? name : taken.first + "/" + name, taken.second + 1);
+                    }
+                }
             }
         }
-        std::sort(kept.begin(), kept.end());
-        if (kept.size() > 256) {
-            kept.resize(256);
+        std::sort(found.begin(), found.end(), before);
+        std::vector<std::string> counted;
+        for (const std::string &path : found) {
+            std::vector<std::string> added;
+            for (size_t slash = path.find('/'); slash != std::string::npos; slash = path.find('/', slash + 1)) {
+                const std::string folder = path.substr(0, slash);
+                if (std::find(counted.begin(), counted.end(), folder) == counted.end()) {
+                    added.push_back(folder);
+                }
+            }
+            if (drive_names_.size() >= 256 || counted.size() + added.size() > 32) {
+                break;
+            }
+            counted.insert(counted.end(), added.begin(), added.end());
+            drive_names_.push_back(path);
         }
-        drive_names_ = kept;
     }
 
     void pull() {
@@ -303,7 +377,7 @@ public:
 #ifdef _WIN32
         std::error_code failed;
         std::filesystem::remove_all(folder, failed);
-        std::filesystem::copy(source, folder, failed);
+        std::filesystem::copy(source, folder, std::filesystem::copy_options::recursive, failed);
         return !failed;
 #else
         const std::string command = "rm -rf '" + folder + "' && cp -R '" + source + "' '" + folder + "'";
@@ -383,19 +457,31 @@ private:
         return drive != 0 && drive == host.drive_number_ && !host.options_.drive_read_only ? 1 : 0;
     }
 
-    // Whether a name is one a file of the drive may have: 1 to 100 bytes of printable
-    // ASCII other than / \ : * ? " < > |, not beginning with a dot.
+    // Whether a name is one a file of the drive may have: a path from the folder `odrig`,
+    // the names of at most three folders and the file's name joined by `/`, 1 to 100 bytes
+    // in all, each part printable ASCII other than \ : * ? " < > |, not empty and not
+    // beginning with a dot.
     static bool drive_name_sound(const char *name) {
         const size_t length = std::strlen(name);
-        if (length == 0 || length > 100 || name[0] == '.') {
+        if (length == 0 || length > 100) {
             return false;
         }
+        int parts = 0;
+        bool at_start = true;
         for (const char *at = name; *at != '\0'; ++at) {
-            if (*at < 0x20 || *at > 0x7E || std::strchr("/\\:*?\"<>|", *at) != nullptr) {
+            if (*at == '/') {
+                if (at_start || ++parts > 3) {
+                    return false;
+                }
+                at_start = true;
+                continue;
+            }
+            if (*at < 0x20 || *at > 0x7E || std::strchr("\\:*?\"<>|", *at) != nullptr || (at_start && *at == '.')) {
                 return false;
             }
+            at_start = false;
         }
-        return true;
+        return !at_start;
     }
 
     // Whether a name of the drive names a place, `drive/<digits>`, and not a file by its name.
@@ -751,7 +837,7 @@ private:
                           (given.compare(10, 4, ".txt") == 0 || given.compare(10, 4, ".new") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
-                           given == "order.txt" || given == "order.part" || given == "catalog.txt" ||
+                           given == "order.txt" || given == "order.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);

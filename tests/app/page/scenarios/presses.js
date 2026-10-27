@@ -8,6 +8,8 @@ export default async function (app) {
   for (const step of app.settings.presses) {
     if (step.row !== undefined) {
       playRow(app, step.row);
+    } else if (step.pressIn !== undefined) {
+      app.pressIn(step.pressIn, step.press);
     } else {
       app.press(step.press);
     }

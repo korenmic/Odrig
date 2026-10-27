@@ -209,24 +209,35 @@ class Files(unittest.TestCase):
         self.assertLess(loaded.scripts.index("layout.js"), loaded.scripts.index("view.js"))
         self.assertLess(loaded.scripts.index("view.js"), loaded.scripts.index("app.js"))
 
-    def test_the_scripts_and_styles_fetch_only_the_events_and_the_mapping_file(self):
+    def test_the_scripts_and_styles_fetch_only_the_seek_the_events_and_the_mapping_file(self):
         asked = {}
         for path in page_files():
             text = path.read_text(encoding="utf-8")
             found = re.findall(r"(?:fetch|EventSource|import|url)\(\s*[\"']?([^\"')]+)", text)
             asked[path.name] = [address for address in found if not address.startswith("#")]
-        self.assertEqual({name: found for name, found in asked.items() if found}, {"app.js": ["show/mapping.json", "events"]})
+        self.assertEqual({name: found for name, found in asked.items() if found}, {"app.js": ["seek", "show/mapping.json", "events"]})
 
-    def test_the_page_sends_no_command(self):
+    def test_the_page_sends_no_command_and_its_one_request_is_the_seek(self):
         for path in page_files():
             if path.suffix != ".js":
                 continue
             text = path.read_text(encoding="utf-8")
-            for forbidden in ("POST", "XMLHttpRequest", "sendBeacon", "WebSocket", "odrig\"", "/odrig", "<form", "method:"):
+            for forbidden in ("XMLHttpRequest", "sendBeacon", "WebSocket", "odrig\"", "/odrig", "<form"):
                 self.assertNotIn(forbidden, text, f"{path.name} holds {forbidden!r}")
+            self.assertEqual(text.count("method:"), 1 if path.name == "app.js" else 0, path.name)
+            self.assertEqual(text.count('fetch("seek", {method: "POST", body: JSON.stringify({ms: '), 1 if path.name == "app.js" else 0, path.name)
         index = (WEB / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("<form", index)
         self.assertNotIn("<input", index)
+
+    def test_the_seek_bar_stands_between_the_drawing_and_the_note(self):
+        index = (WEB / "index.html").read_text(encoding="utf-8")
+        for part in ('id="drawing"', 'id="seek"', 'id="seek-name"', 'id="seek-bar"', 'role="slider"', 'id="seek-fill"', 'id="seek-knob"', 'id="seek-time"', 'id="seek-note"', 'id="note"'):
+            self.assertIn(part, index)
+        self.assertLess(index.index('id="drawing"'), index.index('id="seek"'))
+        self.assertLess(index.index('id="seek"'), index.index('id="note"'))
+        app = (WEB / "app.js").read_text(encoding="utf-8")
+        self.assertIn('source.addEventListener("position", onPosition);', app)
 
     def syntax(self, path):
         """What the JavaScript shell makes of the syntax of a script: its exit status and
@@ -258,14 +269,14 @@ class Files(unittest.TestCase):
         self.assertEqual(re.findall(r'"rgb\(" \+ (.+?) \+ "\)"', view), ['CURVE[red] + "," + CURVE[green] + "," + CURVE[blue]'])
         self.assertEqual(len(re.findall(r"fillStyle\s*=", view)), 1)
 
-    def test_the_drawing_is_made_again_for_the_size_the_stage_has_whenever_that_size_changes(self):
+    def test_the_drawing_is_made_again_for_the_room_its_host_has_whenever_that_room_changes(self):
         app = (WEB / "app.js").read_text(encoding="utf-8")
-        self.assertIn("new ResizeObserver(resized).observe(stage);", app)
+        self.assertIn("new ResizeObserver(resized).observe(host);", app)
         self.assertIn('window.addEventListener("resize", resized);', app)
         resized = app[app.index("function resized() {"):app.index("if (window.ResizeObserver) {")]
         self.assertEqual(resized.count("build();"), 1)
         build = app[app.index("function build() {"):app.index("function shortPath(")]
-        steps = [build.index(step) for step in ("var f = OdrigLayout.fit(mapping, stage.clientWidth, stage.clientHeight, board);", "drawing = OdrigView.build(host, mapping, hello.legs, f, board);", "drawing.paint(newest);")]
+        steps = [build.index(step) for step in ("var f = OdrigLayout.fit(mapping, host.clientWidth, host.clientHeight, board);", "drawing = OdrigView.build(host, mapping, hello.legs, f, board);", "drawing.paint(newest);")]
         self.assertEqual(steps, sorted(steps))
 
     def test_the_header_reads_playlist_where_the_status_says_all(self):

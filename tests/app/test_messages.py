@@ -100,21 +100,21 @@ class OnTheScreen(unittest.TestCase):
         emulator, address = self.emulator(folder)
         for line in ("remove 3", "remove 2", "remove 1"):
             self.assertEqual(emulator.command(line), b'{"ok":true}\n')
-        found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Playlist from the start"}]})
+        found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Play this folder", "pressIn": "#level-head"}]})
         self.assertEqual(found.seen[0]["message"], "No animation is installed. (unknown-id)")
 
     def test_an_invalid_show_is_said_with_its_reason(self):
         folder = entered(self, emulator_support.example_show())
         emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
-        found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Playlist from the start", "wait": 1500}]})
+        found = support.run("refusals", address=address, settings={"rows": 0, "presses": [{"press": "Play this folder", "pressIn": "#level-head", "wait": 1500}]})
         self.assertEqual(found.seen[0]["message"], "The installed show is invalid: undefined-id 99. Nothing can be played until a show is installed over USB. (show-invalid)")
         # The message stays while statuses come and go.
         self.assertEqual(found.seen[0]["playing"], "The installed show is invalid: undefined-id 99.")
 
     def test_a_target_that_does_not_know_a_command_and_one_that_refuses_with_another_code(self):
         old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("weird"), "on": OK}))
-        presses = [{"press": "Playlist from the start"}, {"press": "Off", "not": NOT_UNDERSTOOD.format("bad-argument")}, {"press": "On", "wait": 800}, {"dismiss": True}]
+        presses = [{"press": "Play this folder", "pressIn": "#level-head"}, {"press": "Off", "not": NOT_UNDERSTOOD.format("bad-argument")}, {"press": "On", "wait": 800}, {"dismiss": True}]
         found = support.run("refusals", address=old.address, settings={"rows": 2, "presses": presses[:2] + presses[3:]})
         self.assertEqual(found.seen[0]["message"], NOT_UNDERSTOOD.format("bad-argument"))
         # A second message takes the place of the first, and goes when it is dismissed.

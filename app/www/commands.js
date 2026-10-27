@@ -63,11 +63,13 @@ function progressOf(reply) {
 }
 
 // What `status` reports: whether the LEDs are on, the brightness, what plays, which is
-// "all" for the playlist, the id of a cycle or null, the id of the animation on the
-// LEDs or null, the refreshes in the last second, the reason of an invalid show or null,
-// the width and the height of the canvas, each null when the target gives none; in
-// `progress`, how far it has read its files after its start, and in `host`, the text
-// that names it, each null when the target gives none.
+// "all" for the root playlist, the id of a folder of the card whose playlist is current,
+// the id of a cycle or null, the id of the animation on the LEDs or null, the refreshes
+// in the last second, the reason of an invalid show or null, the width and the height of
+// the canvas, each null when the target gives none; in `progress`, how far it has read
+// its files after its start, in `host`, the text that names it, and in `left`, the whole
+// seconds left in the window of the current playlist, each null when the target gives
+// none.
 export async function status() {
   const reply = await carriedOut("status");
   const sound =
@@ -79,7 +81,8 @@ export async function status() {
     (reply.error === null || typeof reply.error === "string") &&
     (side(reply.width) === null || whole(reply.width, 1, 65535)) &&
     (side(reply.height) === null || whole(reply.height, 1, 65535)) &&
-    (reply.host === undefined || reply.host === null || typeof reply.host === "string");
+    (reply.host === undefined || reply.host === null || typeof reply.host === "string") &&
+    (reply.left === undefined || whole(reply.left, 0, MOST_BYTES));
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
@@ -94,6 +97,7 @@ export async function status() {
     height: side(reply.height),
     progress: progressOf(reply),
     host: typeof reply.host === "string" ? reply.host : null,
+    left: reply.left === undefined ? null : reply.left,
   };
 }
 
@@ -118,9 +122,9 @@ export async function fault() {
 // One part of the items of the show, in its order, from a position on: each animation
 // as `{id, file, bytes}` with the booleans `ignored` and `external` and the text `type`
 // when the target gives them and `fault`, the reason it is unavailable, when it has one,
-// and `bytes` null while the installation has not read it whole; each cycle as
-// `{id, cycle: true}`; and `next`, the position to ask for next, or null when the part
-// holds the last item.
+// and `bytes` null while the installation has not read it whole; each folder of the card
+// as `{id, playlist}` with its path; each cycle as `{id, cycle: true}`; and `next`, the
+// position to ask for next, or null when the part holds the last item.
 export async function list(from = 0) {
   const reply = await carriedOut(`list ${from}`);
   const sound =
@@ -135,9 +139,11 @@ export async function list(from = 0) {
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
         (item.fault === undefined || typeof item.fault === "string") &&
-        ((typeof item.file === "string" && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
-          (Array.isArray(item.cycle) && item.file === undefined && item.ignored === undefined && item.external === undefined && item.type === undefined &&
-            item.fault === undefined)),
+        ((typeof item.file === "string" && item.playlist === undefined && (item.bytes === null || whole(item.bytes, 0, MOST_BYTES))) ||
+          (typeof item.playlist === "string" && item.playlist.length > 0 && item.external === true && item.file === undefined && item.cycle === undefined &&
+            item.bytes === undefined && item.ignored === undefined && item.type === undefined && item.fault === undefined) ||
+          (Array.isArray(item.cycle) && item.file === undefined && item.playlist === undefined && item.ignored === undefined && item.external === undefined &&
+            item.type === undefined && item.fault === undefined)),
     );
   if (!sound) {
     throw new Failure("bad-reply", address());
@@ -145,7 +151,7 @@ export async function list(from = 0) {
   return {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : {id: item.id, cycle: true})),
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist} : {id: item.id, cycle: true})),
     next: reply.next,
   };
 }

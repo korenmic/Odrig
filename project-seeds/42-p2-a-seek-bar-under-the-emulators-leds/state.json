@@ -1,10 +1,11 @@
 {
   "number": 42,
   "slug": "42-p2-a-seek-bar-under-the-emulators-leds",
-  "state": "remaining",
+  "state": "completed",
   "title": "A seek bar under the emulator's LEDs",
   "priority": "P2",
   "addedAt": "2026-10-26T15:50:00+02:00",
   "addedCommit": "pending-local",
-  "summary": "The emulator's page gets a progress bar under the LEDs that shows where the animation on the LEDs is within its loop and can be dragged to move playback there; the emulator infers the position and the length and moves its own clock, with nothing changed in the core, the firmware, the command list or the app."
+  "summary": "The emulator's page gets a progress bar under the LEDs that shows where the animation on the LEDs is within its loop and can be dragged to move playback there; the emulator infers the position and the length and moves its own clock, with nothing changed in the core, the firmware, the command list or the app.",
+  "completedAt": "2026-10-27T06:00:00+02:00"
 }

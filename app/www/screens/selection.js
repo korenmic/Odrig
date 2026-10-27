@@ -19,15 +19,17 @@ let awaitingRefresh = null;
 let version = -1;
 let message = () => {};
 let redraw = () => {};
+// Whether an animation is in the level the screen shows.
+let visible = () => true;
 
 function byId(id) {
   return document.getElementById(id);
 }
 
 // Whether an animation can be selected: an internal one of a target that reports its
-// inclusion, which the filters show.
+// inclusion, in the level the screen shows, which the filters show.
 function selectable(item) {
-  return typeof item.ignored === "boolean" && item.external !== true && filters.matches(item);
+  return typeof item.ignored === "boolean" && item.external !== true && visible(item) && filters.matches(item);
 }
 
 // Whether a deletion, a refresh after one, an upload or the link keeps the list's
@@ -154,6 +156,7 @@ export function draw(state) {
 export function start(options) {
   message = options.message;
   redraw = options.redraw;
+  if (options.visible) visible = options.visible;
   byId("select-mode").addEventListener("click", () => enter());
   byId("selection-done").addEventListener("click", leave);
   byId("select-all").addEventListener("click", () => {

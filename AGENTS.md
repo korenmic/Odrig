@@ -136,9 +136,9 @@ present, and do not build on them.
 - **ODRGX text and clock animations**, seed 37: built, its types in seed 35's catalogs; the board and the owner's look are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
-- **Sub-folder playlists from the card**, seed 41: a folder of the card as the playlist, a day each.
-- **A seek bar under the emulator's LEDs**, seed 42: a draggable progress bar, the emulator alone.
+- **Sub-folder playlists from the card**, seed 41: built; the session with the board and a phone is open.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
+- **Previews of the animations**, seed 44: a preview catalog in git for the app and the emulator.
 
 The state of every seed is in the `state.json` of its folder.
 

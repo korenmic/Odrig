@@ -34,10 +34,17 @@ card is missing, and plays the rest from the card.
   or any card formatted FAT32 on a computer. A card above 32 GB comes as exFAT, which the
   firmware does not promise to read: format it FAT32 on a computer first.
 - **The folder.** A folder `odrig` at the top of the card holds the `.odrg` and `.odrgx`
-  files, made for the board's canvas as the installed ones are. Names ending in `.odrg` or
-  `.odrgx`, in any case,
-  and not beginning with a dot are taken, in the order of their names, at most 256.
-  Folders inside `odrig` and other files are passed over.
+  files, made for the board's canvas as the installed ones are, in the folder itself and
+  in its sub-folders, to three levels down. Names ending in `.odrg` or `.odrgx`, in any
+  case, and not beginning with a dot are taken; other files are passed over. The files
+  are listed depth first: a folder's files in the order of their names, then each of its
+  sub-folders in the order of their names, the same way. At most 256 files and 32
+  sub-folders are taken, the first in that order; a sub-folder counts when its first
+  file is taken, with the folders above it that were not counted yet. What is beyond
+  the limits is passed over, as is a sub-folder deeper than three levels, one whose name
+  begins with a dot or is not sound, and `System Volume Information`. The log line of
+  the listing counts what was passed over. Each file is known by its path from `odrig`,
+  `night/comet.odrg` for one, and [catalog.md](catalog.md) has the rule of the names.
 - **The names.** Keep names to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`.
   Another letter, a Hebrew one for instance, may come out as `?`; such a file cannot be
   opened by its name and is left out, with its line in the log.
@@ -175,8 +182,7 @@ task of the firmware, `odrig-drive`, makes one step a second:
   catalog, as [catalog.md](catalog.md) describes, and its folder is not listed. The folder
   `odrig` of a card without one is listed once, when the core asks: the core reads the
   card's files while the show plays and adds each sound one to the playlist as it
-  finishes reading it. For 16 MB that takes minutes, and `list` answers `busy`
-  meanwhile; that is no fault.
+  finishes reading it. For 16 MB that takes minutes.
 - **A card mounted.** It reads the card's first sector. When that read fails, or a read
   of a file has failed since the last step, the card's files are closed, the card is
   unmounted, and the core gets the drive number 0: the card's animations leave the
@@ -212,8 +218,11 @@ kind `sd`:
 ```
 
 - `card mounted`, or `the card has no folder odrig`, when a card is mounted.
-- `card opened: <n> animation files in odrig`, or `card folder odrig could not be read`,
-  when the core has the folder of a card without a catalog listed.
+- `card opened: <n> animation files in odrig`, or `card opened: <n> animation files in
+  <m> folders of odrig` when sub-folders were taken, when the core has the folder of a
+  card without a catalog listed; with `; <k> files and <f> folders passed over` at its
+  end when the limits, the depth or a name left something out. `card folder odrig could
+  not be read` when the folder could not be read.
 - `card not mounted; no card or unreadable file system`, once for each spell without a
   card.
 - `card unavailable; files closed, waiting for a card`, when a card went.

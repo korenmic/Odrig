@@ -1,0 +1,10 @@
+{
+  "number": 44,
+  "slug": "44-p2-previews-of-the-animations-in-the-app",
+  "state": "remaining",
+  "title": "Previews of the animations in the app",
+  "priority": "P2",
+  "addedAt": "2026-10-27T06:30:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "Every animation gets a short looping GIF preview, named by the CRC-32 and size its catalog line already keeps, in a default preview catalog tracked in git under thumbnails/ that the firmware never sees; the app learns the keys with one new command that reads the catalogs' pages and shows each row's preview, and keeps the previews of what the phone uploads in its own catalog on the phone."
+}

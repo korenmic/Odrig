@@ -48,6 +48,19 @@ class Stream(unittest.TestCase):
         self.assertLess(hello["t0"], support.frames(events)[0][0])
         self.assertEqual(events[1].kind, "status")
 
+    def test_a_connection_gets_the_position_right_after_the_latest_status(self):
+        self.emulator.command("play all")
+        stream = self.stream()
+        events = stream.read_until(has("frame"))
+        kinds = [event.kind for event in events]
+        self.assertIn("position", kinds)
+        self.assertEqual(kinds.index("position"), kinds.index("status") + 1)
+        position = json.loads(events[kinds.index("position")].data)
+        self.assertEqual(sorted(position), ["animation", "length", "start", "turn"])
+        self.assertEqual(position["animation"], 1)
+        self.assertEqual(position["start"] % 20, 0)
+        self.assertEqual(position["turn"], position["start"])
+
     def test_100_refreshes_in_a_row_each_equal_the_reference_for_their_timestamp(self):
         stream = self.stream()
         events = stream.read_until(has("frame", 100))

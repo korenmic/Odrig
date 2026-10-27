@@ -25,9 +25,20 @@ a top bar with the app's name and whether the installation answers.
   present without animations says `0 animations`; an absent one says `absent` with no
   number. While the board still reads its animations after a start, the external number
   is `animations not known yet`, and while the show is invalid the internal one is
-  `animations not known`. Below them are `Playlist from the start` and `Add animation`,
-  which opens Upload; then, when Settings says so, the pinned Tests group; then two
-  filters and the one list of animations, in the saved order of the playlist. Each row
+  `animations not known`. Below them is `Add animation`, which opens Upload; then, when
+  Settings says so, the pinned Tests group; then two filters and the one list of
+  animations, one level of the card's folders at a time, as a file explorer shows them.
+  Above the list stands the level's heading, `Root` or the folder's whole path, as
+  `night/deep`, with `Back` inside a folder and the button `Play this folder`, which
+  makes the level's playlist current. At the root the list holds the board's own
+  animations and the loose files of the card, in the saved order of the playlist, then
+  one row for each folder of the card, with the folder's name, how many animations it
+  holds itself and a chevron; a tap on a folder row enters it, and the list then holds
+  that folder's own files and the rows of its sub-folders. A folder with no file of its
+  own keeps its row, `0 animations` and its way in. The heading is marked while the
+  level's playlist is current, and so is the folder row that leads to the current
+  playlist at every level above it. The list comes back to the root when the target
+  changes, when the card goes out and when the folder shown is gone from the list. Each row
   names its file, its id and its size, or `size not read yet` while the installation has
   not read the file whole, has a badge `in` (internal storage) or `ex` (external storage,
   read-only unless the installation can write its card), and a small `...` button that
@@ -57,8 +68,8 @@ thirty-four command lines and no other, each as `POST /odrig` to the address tha
 |---|---|
 | Nothing: once a second while the app is on the screen | `status` |
 | Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
-| Taps a row of the list | `play <id>` |
-| Presses `Playlist from the start` | `play all` |
+| Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
+| Presses `Play this folder` at the root | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
 | Moves the slider | `brightness <n>` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
@@ -240,7 +251,10 @@ Store. It asks for no permission that the phone shows a question for.
    `4.3.2.1`, and says `Checking`, then `Answers` or `No answer`. As soon as the
    installation has answered once, the app shows Animations.
 3. On Animations, tap an animation to play it: the playlist goes on with the
-   animation after it. `Playlist from the start` goes back to the first animation. `Off`
+   animation after it. `Play this folder` at the root goes back to the first animation
+   of the root playlist; a tap on a folder's row enters it, and `Play this folder` there
+   makes that folder's playlist current, from its first animation; the installation
+   keeps the choice across a restart. `Back` goes up one level. `Off`
    makes every LED dark and `On` lights them again; the playlist's time goes on while
    they are off. The slider sets the brightness from 0 to 255.
 
@@ -252,7 +266,7 @@ phone it sends nothing, and the phone's screen stays on while the app is in fron
 
 Right after the installation was switched on, Animations has the state and the rows
 at once, in the saved order: the installation plays from its first moment, and `On`,
-`Off`, the slider and `Playlist from the start` work. The installation reads what it has
+`Off`, the slider and `Play this folder` work. The installation reads what it has
 installed while it plays; until it has read a file whole, its row says `size not read
 yet`, and a file in which it finds a fault turns unavailable. Moving an animation waits
 until it has read them all: the installation refuses a move with `busy` until then, and
@@ -284,7 +298,23 @@ names nothing, or met no fault, or whose software does not know `fault`, shows n
 line.
 
 A cycle of the show is not in the list and cannot be started from the app. While one
-plays, Animations says `Cycle` with its id, and `Playlist from the start` leaves it.
+plays, Animations says `Cycle` with its id, and `Play this folder` leaves it.
+
+The filters count the rows of the level shown and hide only rows: a folder row stays
+whatever the filters, and `No animation matches the filters.` speaks of the level's rows.
+`Select` and `Select all` take the rows of the level shown. An upload to the card puts
+the file in the card's folder `odrig` itself, the root level; a folder row is no
+animation, so it is not counted in the storage lines, not offered by the filters and not
+taken by `Select all`.
+
+The line that says what plays names the current playlist and the time left in its window
+of 24 hours of running time, from `status`: `Playlist · 23 h 12 min left` for the root
+while the card has folders, `Playlist night · 23 h 12 min left` for a folder by its
+path, and `Playlist night, the root plays for now · 23 h 12 min left` while the root
+plays in a folder's place, because the folder has nothing to play yet or an animation
+outside it was tapped. With no folder on the card, or none in, the line is `Playlist`
+without a time, as before. A folder the list does not hold yet, right after a card is put
+in, is named by its id until the list has come.
 
 A tap on a row plays its animation. Its `...` button opens the row's menu and plays
 nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
@@ -328,7 +358,10 @@ tabs the list scrolls. Letting go saves the order on the installation; the row s
 `Saving...` until the installation's order comes back. Letting go where it began, or a
 cancelled touch, moves nothing. `Move up` and `Move down` in the row's menu do the same
 without holding. A mouse drags as a finger does, in a browser and in the emulator's
-Controller view. Internal and external animations stand in one order, which the
+Controller view. A row moves within the level shown only: the dashed place stays among
+the rows of the level, above its folder rows, `Move up` is off for the first row of the
+level and `Move down` for the last, and a row let go where it began, or at the level's
+edge where it already stands, sends nothing. Internal and external animations stand in one order, which the
 installation keeps; an external animation keeps its place by its file name while its
 medium is out. The order cannot be changed, and the list says why, while the installation
 does not answer, keeps no order (older software, whose list stays in its show's order), a
@@ -594,7 +627,7 @@ it is dismissed with `OK` or another takes its place.
 | `line-too-long`, `unknown-command`, `bad-argument` | The installation's software is older or newer than the app. | The installation did not understand the app. Its software and this app do not match. |
 | `show-invalid` | The installed show cannot be played. | The installed show is invalid: `<reason>`. Nothing can be played until a show is installed over USB. |
 | `unknown-id` | The animation that was pressed was removed meanwhile. The list is asked for again. | Animation `<id>` is not installed any more. |
-| `unknown-id` | `Playlist from the start` on a show without an animation. | No animation is installed. |
+| `unknown-id` | `Play this folder` at the root on a show without an animation. | No animation is installed. |
 | `unavailable` | A play of an animation whose file had a fault in this boot, or of a cycle of only such. | Animation `<id>` cannot be played until it is replaced: its file has a fault. The list says which. |
 | `busy` | A removal while the installation still reads what it has installed after a start, or while an upload is open; a rebuild while another runs or an upload is open; an upload to the card while its catalog is read. | The installation is busy. Try again in a moment. |
 | `in-use` | A removal of an animation that a cycle plays or that a USB stick holds. | Animation `<id>` cannot be removed: a cycle plays it, or it is on a USB stick. |
@@ -683,7 +716,7 @@ installed; the phone with mobile data on.
    brightness, `Playlist`, the animation with its file name, about 50 refreshes a second.
    Send `python -m odrigctl --http 127.0.0.1:8600 brightness 40` on the Mac: the phone
    shows 40 within two seconds.
-4. **Controls.** `Off`, `On`, the slider, each animation, `Playlist from the start`.
+4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root.
    *Seen:* the emulator's page follows each, and its log has each line as `http`.
 5. **No answer.** Stop the emulator. *Seen:* within five seconds the app says that
    nothing answers, in words. Start it again: the app recovers by itself.
@@ -817,6 +850,16 @@ By programs, on a Mac:
   `Show all`, the choices kept across a reload, moving off while a filter hides rows,
   `Select all` and a filter change, the Tests group not filtered, a card pulled out and
   plugged in, a row without a type, and no request more than without the filters.
+- The playlists of the card's folders, in Chrome against the emulator with a card of
+  nested folders and against stand-in targets with a fixed time left: the root's rows
+  and folder rows with their names and counts, a folder without a file of its own,
+  entering a folder and `Back` up to the root, the heading of a level, the marks of the
+  current playlist's level and of the folder rows that lead to it, the forms of the line
+  that says what plays, `Play this folder` inside a folder and at the root, the Tests
+  group left alone, the card out and in bringing the list to the root, a drag and `Move
+  up` and `Move down` within the level only and nothing sent for a drop in place, the
+  filter counts of the level, a folder row under every filter, `Select all` and the
+  counts on rows only.
 - The test animations, in Chrome against the emulator: the checkbox off at first and
   remembered across a reload, 21 entries pinned above the list, a snake test, stopping,
   the diagonal, a play that ends a test, a test of another controller named with the
@@ -910,6 +953,9 @@ By programs, on a Mac:
 - **Texts and clocks on a phone and on the LEDs.** No phone has made, previewed, uploaded
   or edited a text or a clock, and nobody has looked at one on the LEDs: step 20 above, and
   seed 37's board session.
+- **Seed 41 on a phone and on the board.** Nobody has walked the card's folders on a
+  phone, chosen a folder there and seen the board play it, restart and play it again, or
+  seen the time left count down on a phone: the seed's board session.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

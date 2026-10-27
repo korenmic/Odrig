@@ -15,12 +15,13 @@ const SPACE_EVERY_MS = 10000;
 // and `answered` whether the target of this address has answered at least once.
 // `animations` is the animation items of the newest complete list, in the order of the
 // show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
-// its cycles. `space` holds internal and external capacity from the newest reply, or null.
+// its cycles, and `folders` its folders of the card, each `{id, playlist}` with its path,
+// in the order they play. `space` holds internal and external capacity from the newest reply, or null.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], space: null, listVersion: 0, listBusy: false,
-  order: null, orderVersion: 0, orderKnown: true};
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], folders: [], space: null,
+  listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -111,6 +112,13 @@ async function askStatus() {
       askedFor = named;
       listDue = true;
     }
+    const playing = reply.playing;
+    if (typeof playing === "number" && state.animations !== null && playing !== askedFor && !state.cycles.includes(playing) &&
+      !state.folders.some((folder) => folder.id === playing)) {
+      // The target plays a playlist the list does not have: a folder of a card just put in.
+      askedFor = playing;
+      listDue = true;
+    }
   } catch (error) {
     if (asked !== target) {
       return;
@@ -186,7 +194,8 @@ async function askListPart() {
     } else {
       state.listVersion += 1;
       state.listBusy = false;
-      state.animations = items.filter((item) => item.cycle !== true);
+      state.animations = items.filter((item) => typeof item.file === "string");
+      state.folders = items.filter((item) => typeof item.playlist === "string");
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
       orderDue = state.orderKnown;
       ordering = null;
@@ -209,6 +218,7 @@ async function askListPart() {
       state.listBusy = false;
       state.animations = null;
       state.cycles = [];
+      state.folders = [];
       listAgainLater();
     } else {
       failed(error);
@@ -420,6 +430,7 @@ export function begin() {
   state.answered = false;
   state.animations = null;
   state.cycles = [];
+  state.folders = [];
   state.space = null;
   state.listBusy = false;
   state.order = null;

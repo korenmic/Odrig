@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "catalog.h"
 #include "crc32.h"
 #include "storage.h"
 
@@ -209,8 +210,11 @@ bool order_begin(Core &core) {
     if (!storage_changes(core) || core.checker == nullptr) {
         return true;
     }
+    // The block: a key for each item and for each place, a hash byte and a folder byte for
+    // each place, the folder table and the room for the current playlist's path.
     const uint32_t places = core.drive != nullptr ? kDriveMost : 0;
-    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + places * 3));
+    const uint32_t tree = places != 0 ? kFolderMost * sizeof(Folder) + kPlaylistPathRoom : 0;
+    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + places * 4 + tree));
     if (block == nullptr) {
         return false;
     }
@@ -219,9 +223,293 @@ bool order_begin(Core &core) {
     if (places != 0) {
         core.order_drive = reinterpret_cast<uint16_t *>(block + core.item_capacity * 2);
         core.order_hash = block + core.item_capacity * 2 + places * 2;
+        core.drive_folder = block + core.item_capacity * 2 + places * 3;
+        core.folders = reinterpret_cast<Folder *>(block + core.item_capacity * 2 + places * 4);
+        core.playlist_path = reinterpret_cast<char *>(block + core.item_capacity * 2 + places * 4 + kFolderMost * sizeof(Folder));
+        core.playlist_path[0] = '\0';
         clear_drive(core);
+        tree_clear(core);
     }
     return true;
+}
+
+namespace {
+
+// A byte of a path as the listing's order ranks it: a `/` and the end below every other
+// byte, so that a folder comes before the folders below it and siblings go by the bytes
+// of their names.
+int path_byte(char c) {
+    return c == '/' || c == '\0' ? 0 : static_cast<unsigned char>(c);
+}
+
+// The length of the first `parts` parts of a path, without the `/` after them: of the
+// whole path when it has no more parts.
+uint32_t parts_length(const char *path, uint32_t parts) {
+    if (parts == 0) {
+        return 0;
+    }
+    uint32_t length = 0;
+    uint32_t seen = 0;
+    while (path[length] != '\0') {
+        if (path[length] == '/' && ++seen == parts) {
+            break;
+        }
+        ++length;
+    }
+    return length;
+}
+
+// Compares the first `a_parts` parts of one path with the first `b_parts` of another in
+// the listing's order: negative when the first comes first, 0 when they are one path.
+int paths_compare(const char *a, uint32_t a_parts, const char *b, uint32_t b_parts) {
+    const uint32_t a_length = parts_length(a, a_parts);
+    const uint32_t b_length = parts_length(b, b_parts);
+    for (uint32_t at = 0; at < a_length && at < b_length; ++at) {
+        const int difference = path_byte(a[at]) - path_byte(b[at]);
+        if (difference != 0) {
+            return difference;
+        }
+    }
+    return a_length < b_length ? -1 : a_length > b_length ? 1 : 0;
+}
+
+// Compares the path of a folder of the table with the first `parts` parts of a name. A
+// folder whose place has no name now comes first.
+int folder_compare(const Core &core, uint32_t folder, const char *name, uint32_t parts) {
+    if (folder == 0) {
+        return parts == 0 ? 0 : -1;
+    }
+    char path[kDriveListedName];
+    if (core.host.drive_name(core.host.ctx, core.drive_number, core.folders[folder].place, path, sizeof path) != 1) {
+        return -1;
+    }
+    return paths_compare(path, core.folders[folder].depth, name, parts);
+}
+
+// The folder of the table whose path is the first `parts` parts of a name, or kFolderMost.
+uint32_t find_folder(const Core &core, const char *name, uint32_t parts) {
+    if (parts == 0) {
+        return 0;
+    }
+    for (uint32_t folder = 1; folder <= core.folder_count; ++folder) {
+        if (core.folders[folder].depth == parts && folder_compare(core, folder, name, parts) == 0) {
+            return folder;
+        }
+    }
+    return kFolderMost;
+}
+
+// Puts the folder of the first `parts` parts of a name into the table at its index in the
+// listing's order, with this place as its; the folders after it move up by one, and so do
+// the bytes of the places in them. Returns its index.
+uint32_t insert_folder(Core &core, const char *name, uint32_t parts, uint32_t place) {
+    uint32_t at = 1;
+    while (at <= core.folder_count && folder_compare(core, at, name, parts) < 0) {
+        ++at;
+    }
+    memmove(core.folders + at + 1, core.folders + at, (core.folder_count + 1 - at) * sizeof(Folder));
+    Folder &made = core.folders[at];
+    made.id = 0;
+    made.place = static_cast<uint16_t>(place);
+    made.depth = static_cast<uint8_t>(parts);
+    made.end = 0;
+    made.spare[0] = made.spare[1] = 0;
+    ++core.folder_count;
+    for (uint32_t other = 0; other < core.drive_count; ++other) {
+        if (core.drive_folder[other] != kNoFolder && core.drive_folder[other] >= at) {
+            ++core.drive_folder[other];
+        }
+    }
+    if (core.current >= at) {
+        ++core.current;
+    }
+    return at;
+}
+
+// The index after the last descendant of a folder: the folders after it are its
+// descendants while they are deeper than it.
+uint32_t subtree_end(const Core &core, uint32_t folder) {
+    uint32_t end = folder + 1;
+    while (end <= core.folder_count && core.folders[end].depth > core.folders[folder].depth) {
+        ++end;
+    }
+    return end;
+}
+
+void set_ends(Core &core) {
+    for (uint32_t folder = 0; folder <= core.folder_count; ++folder) {
+        core.folders[folder].end = static_cast<uint8_t>(subtree_end(core, folder));
+    }
+}
+
+// A place at or below a folder, or kDriveMost when none is.
+uint32_t place_within(const Core &core, uint32_t folder) {
+    const uint32_t end = subtree_end(core, folder);
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        const uint8_t byte = core.drive_folder[place];
+        if (byte != kNoFolder && byte >= folder && byte < end) {
+            return place;
+        }
+    }
+    return kDriveMost;
+}
+
+}  // namespace
+
+void tree_clear(Core &core) {
+    core.folder_count = 0;
+    core.tree_known = 0;
+    core.current = 0;
+    if (core.folders == nullptr) {
+        return;
+    }
+    for (uint32_t place = 0; place < kDriveMost; ++place) {
+        core.drive_folder[place] = kNoFolder;
+    }
+    Folder &root = core.folders[0];
+    root.id = 0;
+    root.place = static_cast<uint16_t>(kDriveMost);
+    root.depth = 0;
+    root.end = 1;
+    root.spare[0] = root.spare[1] = 0;
+}
+
+void tree_build(Core &core) {
+    tree_clear(core);
+    if (core.folders == nullptr || core.drive == nullptr || core.drive_number == 0) {
+        return;
+    }
+    char name[kDriveListedName];
+    for (uint32_t place = 0; place < core.drive_count; ++place) {
+        DriveEntry &entry = core.drive[place];
+        if (entry.state == kDriveGone || core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {
+            continue;
+        }
+        uint32_t depth = 0;
+        for (uint32_t at = 0; name[at] != '\0'; ++at) {
+            depth += name[at] == '/' ? 1 : 0;
+        }
+        if (depth > kCatalogDeepest) {
+            continue;
+        }
+        // The folders of the path that the table has, from the top down, and the index of
+        // the deepest of them.
+        uint32_t known = 0;
+        uint32_t folder = 0;
+        for (uint32_t parts = 1; parts <= depth; ++parts) {
+            const uint32_t found = find_folder(core, name, parts);
+            if (found == kFolderMost) {
+                break;
+            }
+            known = parts;
+            folder = found;
+        }
+        if (core.folder_count + (depth - known) > kFolderMost - 1) {
+            entry.fault = kTooManyFolders;
+            if (entry.state != kDriveStaged) {
+                entry.state = kDriveLeftOut;
+                drive_left_out(core, place, kTooManyFolders);
+            }
+            continue;
+        }
+        for (uint32_t parts = known + 1; parts <= depth; ++parts) {
+            folder = insert_folder(core, name, parts, place);
+        }
+        core.drive_folder[place] = static_cast<uint8_t>(folder);
+    }
+    set_ends(core);
+    // The folders' ids come after the files', in the order of the table.
+    for (uint32_t folder = 1; folder <= core.folder_count; ++folder) {
+        core.folders[folder].id = free_drive_id(core);
+    }
+    core.tree_known = 1;
+    // The current playlist's folder, found from its path; a path that no folder of the
+    // tree has makes the root current.
+    core.current = 0;
+    if (core.playlist_path[0] != '\0') {
+        uint32_t parts = 1;
+        for (const char *at = core.playlist_path; *at != '\0'; ++at) {
+            parts += *at == '/' ? 1 : 0;
+        }
+        const uint32_t found = find_folder(core, core.playlist_path, parts);
+        if (found != kFolderMost) {
+            core.current = static_cast<uint8_t>(found);
+        } else {
+            // The card has no playlist of the saved path: the root is current, with a
+            // fresh window, and is saved as such at the next refresh.
+            core.playlist_path[0] = '\0';
+            core.window_started = core.latest;
+            core.window_spent = 0;
+            core.save_due = 1;
+        }
+    }
+}
+
+void tree_place_gone(Core &core, uint32_t place) {
+    if (core.folders == nullptr || !core.tree_known || place >= kDriveMost) {
+        return;
+    }
+    core.drive_folder[place] = kNoFolder;
+    for (uint32_t folder = core.folder_count; folder >= 1; --folder) {
+        const uint32_t within = place_within(core, folder);
+        if (within != kDriveMost) {
+            if (core.folders[folder].place == place) {
+                core.folders[folder].place = static_cast<uint16_t>(within);
+            }
+            continue;
+        }
+        // Nothing is at or below the folder: it leaves the table, and the bytes of the
+        // places in the folders after it, and the current index, move down by one.
+        memmove(core.folders + folder, core.folders + folder + 1, (core.folder_count - folder) * sizeof(Folder));
+        --core.folder_count;
+        for (uint32_t other = 0; other < core.drive_count; ++other) {
+            if (core.drive_folder[other] != kNoFolder && core.drive_folder[other] > folder) {
+                --core.drive_folder[other];
+            }
+        }
+        if (core.current == folder) {
+            // The current playlist is gone: the root is current, with a fresh window,
+            // saved at the next refresh.
+            core.current = 0;
+            core.playlist_path[0] = '\0';
+            core.window_started = core.latest;
+            core.window_spent = 0;
+            core.save_due = 1;
+        } else if (core.current > folder) {
+            --core.current;
+        }
+    }
+    set_ends(core);
+}
+
+uint32_t tree_folder_with_id(const Core &core, uint32_t id) {
+    for (uint32_t folder = 1; core.folders != nullptr && core.tree_known && folder <= core.folder_count; ++folder) {
+        if (core.folders[folder].id == id) {
+            return folder;
+        }
+    }
+    return kFolderMost;
+}
+
+void tree_choose(Core &core, uint32_t folder) {
+    core.current = static_cast<uint8_t>(folder);
+    if (core.playlist_path != nullptr) {
+        tree_folder_path(core, folder, core.playlist_path, kPlaylistPathRoom);
+    }
+}
+
+uint32_t tree_folder_path(const Core &core, uint32_t folder, char *into, uint32_t room) {
+    into[0] = '\0';
+    if (core.folders == nullptr || folder == 0 || folder > core.folder_count) {
+        return 0;
+    }
+    if (core.host.drive_name(core.host.ctx, core.drive_number, core.folders[folder].place, into, room) != 1) {
+        into[0] = '\0';
+        return 0;
+    }
+    const uint32_t length = parts_length(into, core.folders[folder].depth);
+    into[length] = '\0';
+    return length;
 }
 
 uint32_t order_key(const Core &core, uint32_t position) {
@@ -601,7 +889,9 @@ uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before,
     }
     const uint32_t moved = listed_with(core, id);
     const uint32_t target = before == 0 ? kNothing : listed_with(core, before);
-    if ((moved == kNothing && !is_cycle_id(core, id)) || (before != 0 && target == kNothing && !is_cycle_id(core, before))) {
+    // A cycle and a folder of the drive's tree have ids and no place in the order.
+    if ((moved == kNothing && !is_cycle_id(core, id) && tree_folder_with_id(core, id) == kFolderMost) ||
+        (before != 0 && target == kNothing && !is_cycle_id(core, before) && tree_folder_with_id(core, before) == kFolderMost)) {
         return refuse(reply, "unknown-id");
     }
     if (moved == kNothing || (before != 0 && target == kNothing)) {

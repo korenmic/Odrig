@@ -23,16 +23,62 @@ NAME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_.")
 DRIVE_MOST = 256
 DRIVE_LOOK_SECONDS = 1.0
 DRIVE_PREFIX = "drive/"
-# What a name of a file of a drive may not hold, and its longest length.
+# What a part of a name of a file of a drive may not hold, the longest length of a whole
+# name, how many sub-folders of the drive's folder are taken, how deep below it a folder
+# may lie, and the folder of the file system that is never one of them.
 DRIVE_FORBIDDEN = frozenset('/\\:*?"<>|')
 DRIVE_LONGEST_NAME = 100
+DRIVE_MOST_FOLDERS = 32
+DRIVE_DEEPEST = 3
+DRIVE_SYSTEM_FOLDER = "System Volume Information"
+
+
+def drive_part_sound(part):
+    """Whether one part of a drive file's name, a folder's name or the file's, is sound:
+    printable ASCII other than / \\ : * ? " < > |, not empty, not beginning with a dot."""
+    return (part != "" and part.isascii() and not part.startswith(".")
+            and all(" " <= character <= "~" and character not in DRIVE_FORBIDDEN for character in part))
 
 
 def drive_name_sound(name):
-    """Whether a name is one a file of a drive's folder may have: 1 to 100 bytes of printable
-    ASCII other than / \\ : * ? " < > |, not beginning with a dot."""
-    return (0 < len(name) <= DRIVE_LONGEST_NAME and name.isascii() and not name.startswith(".")
-            and all(" " <= character <= "~" and character not in DRIVE_FORBIDDEN for character in name))
+    """Whether a name is one a file of a drive's folder may have: a path from the folder
+    `odrig`, the names of at most three folders and the file's name joined by `/`, 1 to 100
+    bytes in all, each part sound."""
+    parts = name.split("/")
+    return 0 < len(name) <= DRIVE_LONGEST_NAME and len(parts) <= DRIVE_DEEPEST + 1 and all(drive_part_sound(part) for part in parts)
+
+
+def drive_listed(path):
+    """Whether a listing takes a file of this path: its name ends in `.odrg` or `.odrgx` in any
+    case and does not begin with a dot, and every folder of the path is sound, does not end
+    with a space or a dot, and is not the file system's own folder."""
+    *folders, file = path.split("/")
+    if not file.lower().endswith((".odrg", ".odrgx")) or file.startswith("."):
+        return False
+    return all(drive_part_sound(folder) and folder[-1] not in ". " and folder != DRIVE_SYSTEM_FOLDER for folder in folders)
+
+
+def drive_listing_key(path):
+    """The place of a path in the depth-first order: a folder's files by the bytes of their
+    names, then its sub-folders by the bytes of their names, each the same way."""
+    *folders, file = path.split("/")
+    return tuple(os.fsencode(folder) for folder in folders), os.fsencode(file)
+
+
+def drive_cut(paths):
+    """The paths of a sorted listing within the limits: at most 256 files and at most 32
+    sub-folders, a folder counted with its uncounted ancestors when the first file at or
+    below it is kept; from the file whose folder would be counted past the 32nd, and from
+    the 257th, the rest is passed over."""
+    kept, counted = [], set()
+    for path in paths:
+        folders = path.split("/")[:-1]
+        new = {"/".join(folders[:depth]) for depth in range(1, len(folders) + 1)} - counted
+        if len(kept) >= DRIVE_MOST or len(counted) + len(new) > DRIVE_MOST_FOLDERS:
+            break
+        counted |= new
+        kept.append(path)
+    return kept
 
 # Windows refuses to remove a file that a program holds open, and its folder, unless the
 # program let others do so when it opened the file. The host lets them, as macOS does: a
@@ -58,16 +104,27 @@ def reading(path):
 
 
 def drive_list(folder):
-    """The names of the animation files of a drive's folder `odrig`: those that end in
-    `.odrg` or `.odrgx`, in any case, and do not begin with a dot, in the order of their
-    bytes, the first 256. Empty when the folder cannot be listed."""
-    try:
-        with os.scandir(folder) as entries:
-            names = [entry.name for entry in entries if entry.is_file()]
-    except OSError:
-        return []
-    kept = [name for name in names if name.lower().endswith((".odrg", ".odrgx")) and not name.startswith(".")]
-    return sorted(kept, key=os.fsencode)[:DRIVE_MOST]
+    """The paths of the animation files of a drive's folder `odrig` and of its sub-folders
+    to three levels, depth first: a folder's files by the bytes of their names, then its
+    sub-folders by the bytes of their names, each listed the same way, at most 256 files
+    and 32 sub-folders. Empty when the folder cannot be listed."""
+    found = []
+    pending = [("", 0)]
+    while pending:
+        prefix, depth = pending.pop()
+        try:
+            with os.scandir(os.path.join(folder, *prefix.split("/")) if prefix else folder) as entries:
+                for entry in entries:
+                    path = f"{prefix}/{entry.name}" if prefix else entry.name
+                    if entry.is_dir():
+                        if depth < DRIVE_DEEPEST and drive_part_sound(entry.name) and entry.name[-1] not in ". " and entry.name != DRIVE_SYSTEM_FOLDER:
+                            pending.append((path, depth + 1))
+                    elif entry.is_file() and drive_listed(path):
+                        found.append(path)
+        except OSError:
+            if not prefix:
+                return []
+    return drive_cut(sorted(found, key=drive_listing_key))
 
 
 class Drive:
@@ -165,6 +222,9 @@ class FolderHost:
         self._written_name = None
         self._second = None
         self._second_name = None
+        # Told of every open of an animation file, with the name the core used and the
+        # file's path, when set: the engine learns the start of a loop from it.
+        self.on_open = None
 
     def open(self, name):
         """1 when the file is open, 0 when the folder has no file of that name, -1 otherwise."""
@@ -179,16 +239,28 @@ class FolderHost:
                 return 0
             except OSError:
                 return -1
+            self._opened(name, path)
             return 1
         if not name or "/" in name or "\\" in name or os.sep in name or (os.altsep and os.altsep in name):
             return -1
+        path = os.path.join(self.folder, name)
         try:
-            self._file = reading(os.path.join(self.folder, name))
+            self._file = reading(path)
         except FileNotFoundError:
             return 0
         except OSError:
             return -1
+        self._opened(name, path)
         return 1
+
+    def _opened(self, name, path):
+        """Tells of an open of an animation file: a show file by its ending, a drive file
+        by its place."""
+        if self.on_open is None:
+            return
+        rest = name[len(DRIVE_PREFIX):] if name.startswith(DRIVE_PREFIX) else None
+        if name.lower().endswith((".odrg", ".odrgx")) or (rest is not None and rest.isascii() and rest.isdigit()):
+            self.on_open(name, path)
 
     def read(self, capacity):
         """Up to `capacity` bytes of the open file, none at its end, `None` on a failure."""
