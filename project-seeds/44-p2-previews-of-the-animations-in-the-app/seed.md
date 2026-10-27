@@ -59,21 +59,27 @@ An operator scrolling a card of two hundred animations reads file names like
   `python3 -m odrig.catalog <card> import`. A show folder that `pack` makes for the
   emulator has no catalog; Settings' rebuild, `catalog rebuild internal`, makes one, after
   which its rows have keys.
-- **The command.** The core keeps no checksum in memory and has some 560 bytes left with a
-  drive, so no reply member can carry one. The app reads the catalogs themselves, page by
-  page, with one new command, `catalog page <storage> <page> <offset>`, `<storage>` being
-  `internal` or `external`, `<page>` 0 to 15 and `<offset>` 0 to 41,216, the most a page
-  holds, else `bad-argument`. Its reply is `{"ok":true,"generation":<n>,"text":"<up to 512
-  bytes of the page from the offset>","next":<offset or null>}`, `<n>` the storage's
-  generation as a number, as `catalog` gives it, or `null` when its catalog is not `ok`.
-  The bytes are read into the chunk buffer through the host's `read_at`, as `read` reads a
-  file, so the command asks for no memory and takes one host read a call; a host whose
-  storage cannot be changed answers `storage-error`, as `read` does. An offset at or after
-  the page's end, a page that cannot be read, as a page without entries has no file, and a
+- **The command.** The core keeps no checksum in memory and has only some hundreds of
+  bytes left with a drive, so no reply member can carry one. The app reads the catalogs
+  themselves, page by page, with one new command, `catalog page <storage> <page>
+  <offset>`, `<storage>` being `internal` or `external`, `<page>` 0 to 15 and `<offset>` 0
+  to 4,294,967,295, as `read` takes an offset, else `bad-argument`. Its reply is
+  `{"ok":true,"generation":<n>,"text":"<up to 512 bytes of the page from the
+  offset>","next":<offset or null>}`, `next` being the offset plus the bytes given when
+  the text is not empty and `null` only with an empty text, `<n>` the storage's generation
+  as a number, as `catalog` gives it, or `null` when its catalog is not `ok`. The bytes
+  are read into the chunk buffer through the host's `read_at`, as `read` reads a file, so
+  the command asks for no memory and takes one host read a call; a host whose storage
+  cannot be changed answers `storage-error`, as `read` does. An offset at or after the
+  page's end, a page that cannot be read, as a page without entries has no file, and a
   storage whose catalog is not `ok` answer `"text":""` and `"next":null`. It is refused
-  with `busy` while that storage's catalog is changed or rebuilt. The command tool
-  `odrigctl` takes it as `catalog page internal|external PAGE OFFSET`. This is the one
-  addition to the command list; the owner gives it by accepting this seed.
+  with `busy` while a rebuild of that storage runs, the one `catalog` names in `rebuild`;
+  nothing else makes it `busy`, an open upload included, since every other change of a
+  catalog is made whole within the command that makes it. A change whose finishing a
+  failed call left is not looked for: the storage's pages are answered as they are until
+  its next change, or the next start, finishes it. The command tool `odrigctl` takes it as
+  `catalog page internal|external PAGE OFFSET`. This is the one addition to the command
+  list; the owner gives it by accepting this seed.
 - **When the app reads the pages.** The app asks `catalog` when the target first answers
   and after every complete `list`. It reads a storage's sixteen pages, one request at a
   time after the operator's own, when `catalog` shows the storage `ok` and the app has no
@@ -87,10 +93,18 @@ An operator scrolling a card of two hundred animations reads file names like
   install-show` on a board without a catalog it can read. A page that answers another
   generation than the first page of the same read starts the read again, and one refused
   with `busy` is asked again two seconds later. A row takes the key of its storage and
-  name only when the key's size is the row's `bytes`. A target that answers `catalog page
-  internal 0 0` with `bad-argument`, or `catalog` with `unknown-command`, is one from
-  before this seed: its rows have no preview, nothing is said, and the app asks it for no
-  page again until the target changes. The app's table of command lines gains these
+  name only when the key's size is the row's `bytes`. A target that answers any `catalog
+  page`, of either storage, with `bad-argument` (the app never sends an argument out of
+  range), or `catalog` with `unknown-command` or `bad-argument`, is one from before this
+  seed: its rows have no preview, nothing is said, and the app asks it for no page again
+  until the target changes. A page whose generation is `null` ends the read without keys,
+  and the storage then counts as unread; any other refusal but `busy` ends it the same
+  way, and nothing is said. A target that answers `catalog` with `unknown-command` or
+  `bad-argument` is asked no `catalog` again until the target changes, neither for the
+  previews nor by Settings: Settings uses that same answer and says `This installation's
+  software keeps no catalogs.` without asking, so such a target is still asked `catalog`
+  once, as today. A target that answers `catalog` but refuses `catalog page` is asked
+  `catalog` only on Settings' occasions. The app's table of command lines gains these
   occasions of `catalog` and the line `catalog page`: one line more than the table holds
   then, thirty-three when no seed between has added one.
 - **The preview.** A GIF89a that loops forever, of the animation's own canvas, 60 by 60 on
@@ -110,27 +124,41 @@ An operator scrolling a card of two hundred animations reads file names like
   still above with 6 at sixths, each at most 480 ms; one above even then gets no preview,
   and is named. The same file gives the same bytes in Node.js and in a web view.
 - **The converter makes previews.** The library gains a module that walks the records of
-  an ODRG file or an ODRGX container with the reader `odrg.decode` uses, refusing what it
-  refuses, keeping only the pixel buffer and the sampled pictures, chooses the palette and
-  writes the GIF: the library's own code, with no package, as its DEFLATE compressor is.
-  The command line gains a sixth subcommand, `node converter/odrig.js thumbnail FILE...
-  --catalog DIR`, which adds the preview of each file to the preview catalog in `DIR`, a
-  key it already holds gaining only the file's name, and `node converter/odrig.js
-  thumbnail FILE --out OUT.gif` for one file; it runs no separate check. In the app the
-  module is reached through `convert.js`, which stays the one script that imports the
+  an ODRG file or an ODRGX container with the readers the library's `odrg.decode` and its
+  reader of ODRGX containers use, refusing what they refuse, keeping only the pixel buffer
+  and the sampled pictures, chooses the palette and writes the GIF: the library's own
+  code, with no package, as its DEFLATE compressor is. The command line gains a sixth
+  subcommand, `node converter/odrig.js thumbnail FILE... --catalog DIR [--card ODRIG]`,
+  which adds the preview of each file to the preview catalog in `DIR`, a key it already
+  holds gaining only the file's name, and `node converter/odrig.js thumbnail FILE --out
+  OUT.gif` for one file; `--out` takes exactly one FILE and is not given with `--catalog`,
+  else status 2; it runs no separate check. `--card` names a card's folder `odrig`; like
+  every option of the tool, given twice it takes its last value. `thumbnail` writes
+  nothing on standard output. With `--catalog` it goes through every file: each file it
+  passes over is named on standard error by one line `passed over: <FILE>: <reason>:
+  <detail>`, and the run ends with status 0 once the mapping is written; the table of
+  statuses of `docs/converter.md` says so. With `--out`, a file the reader refuses ends
+  with status 1 and the reader's reason, and no file is written. A preview still above
+  65,536 bytes at 6 pictures has the new reason `preview-too-large`, listed in
+  `docs/reasons.md`: status 1 with `--out`, a passed-over line with `--catalog`. The key's
+  CRC-32 is computed by the library's own code, and the subcommand reads and writes
+  `thumbnails/catalog.js` as text and never imports it, so Node.js 20 runs it. In the app
+  the module is reached through `convert.js`, which stays the one script that imports the
   library.
 - **The default preview catalog.** A folder at the top of the repository, `thumbnails/`,
   tracked in git and nowhere else: `thumbnails/<key>.gif` for each preview, and
   `thumbnails/catalog.js`, the mapping, written by the `thumbnail` subcommand only:
   `export default {`, then one line for each key in the order of its bytes, `
   "1a2b3c4d-52340": {"gif": "1a2b3c4d-52340.gif", "names": ["foo.odrg"]},`, then `};`,
-  plain ASCII. A name is the file's own name, or for a file in a card's sub-folder its
-  path from `odrig`, each once, in the order of their bytes: never a folder of the
-  computer, a mount point or an account. The firmware's build, `pack`, `fw.py
-  install-show`, the card's catalog and every lister of the board never read the folder:
-  it is in no show and on no storage. The first catalog is some 400 previews of 25 to 36
-  KB each, 10 to 13 MB: the repository's pack grows from 14 MiB to about 25 MiB and the
-  APK from 4.3 MB to about 15 to 17 MB.
+  plain ASCII. A name is, for a FILE inside the folder `--card` names, its path from that
+  folder, its parts joined by `/`, as a card's file is named in its catalog; for every
+  other FILE its own file name; each once, in the order of their bytes: never a folder of
+  the computer, a mount point or an account. The subcommand never guesses a card from a
+  folder's name or contents. The names are for people: the app finds a preview by its key
+  alone. The firmware's build, `pack`, `fw.py install-show`, the card's catalog and every
+  lister of the board never read the folder: it is in no show and on no storage. The first
+  catalog is some 400 previews of 25 to 36 KB each, 10 to 13 MB: the repository's pack
+  grows from 14 MiB to about 25 MiB and the APK from 4.3 MB to about 15 to 17 MB.
 - **The sources of the first default catalog.** The animation files of the first computer
   in the places listed here, read where they live and never copied or changed there: in
   the owner's checkout `/Users/koren/src/odrig`, `scratch/all-card-local/odrig` with its
@@ -140,12 +168,15 @@ An operator scrolling a card of two hundred animations reads file names like
   `agent/getting-started.md` packs; the mirror of Google Drive, `My
   Drive/artifacts/odrig/animations`; the share `/Volumes/192.168.0.1/artifacts/odrig/`,
   its root and `animations/new animations/` with its sub-folders; and of the repository,
-  `test-animations/` and the valid vectors of `tests/vectors/`. The invalid vectors and
-  every file the reader refuses are passed over and named. When the share is not mounted
-  while the catalog is made, it is made from the rest, and the report says in words that
-  the share's files are not in it yet; the same subcommand adds them in a commit of their
-  own when it is mounted next. A later conversion adds its previews the same way, in the
-  commit that records it.
+  `test-animations/` and the valid vectors of `tests/vectors/`. The two card copies are
+  each given in a run of their own, with `--card scratch/all-card-local/odrig` and with
+  `--card scratch/seed-41-card/odrig`; every other source, the share's and the Drive's
+  sub-folders, `build/` and the checkout's other folders included, is given without
+  `--card`. The invalid vectors and every file the reader refuses are passed over and
+  named. When the share is not mounted while the catalog is made, it is made from the
+  rest, and the report says in words that the share's files are not in it yet; the same
+  subcommand adds them in a commit of their own when it is mounted next. A later
+  conversion adds its previews the same way, in the commit that records it.
 - **The app shows them.** The default catalog reaches the app in each of its hosts as the
   converter's library does: the emulator and `app.py serve` serve `thumbnails/` beside the
   app, `.gif` among the types they serve, and the APK's build copies it into the APK,
@@ -155,27 +186,27 @@ An operator scrolling a card of two hundred animations reads file names like
   the GIF's path, so that it fetches nothing itself. Each animation row of the Animations
   tab, at every level of the explorer, has a square of 44 by 44 pixels as the first part
   of its Play button, before the name, so that a tap on it plays as the name does, the
-  selection checkbox staying first: the preview drawn with `image-rendering: pixelated`,
-  as the Upload screen's preview is, its pixels kept square, scaled to fit in its own
-  ratio, a 60-by-6 strip as a band across the middle; or an empty dark square when the
-  animation has none or the row has a `fault`. At 320 px a row in selection mode keeps its
-  Play button at least 44 px wide: its `Ignored` or `Saving` note stands under the name
-  inside Play. The now-playing panel shows the preview of the animation on the LEDs before
-  its words, the same way, hidden while `status` names no animation, while a test shows
-  and while the list does not hold the animation yet. Folder rows and the Tests group have
-  none.
+  selection checkbox staying first: the preview drawn with `image-rendering: pixelated`
+  and not draggable, as the Upload screen's preview is, its pixels kept square, scaled to
+  fit in its own ratio, a 60-by-6 strip as a band across the middle; or an empty dark
+  square when the animation has none or the row has a `fault`. At 320 px a row in
+  selection mode keeps its Play button at least 44 px wide: its `Ignored` or `Saving` note
+  stands under the name inside Play. The now-playing panel shows the preview of the
+  animation on the LEDs before its words, the same way, hidden while `status` names no
+  animation, while a test shows and while the list does not hold the animation yet. Folder
+  rows and the Tests group have none.
 - **The phone's own previews.** When the app has uploaded an animation, from the Upload
-  screen or by `Save` in the form of a text or a clock, a new one or an edited one, after
-  `upload end` succeeded and its message is shown, it makes the preview of the bytes it
-  sent with the converter's library, in steps that leave the screen answering, and keeps
-  it on the phone in the web view's IndexedDB, in the phone's own catalog of previews,
-  keyed by the CRC-32 the upload computed and the size; the row keeps the empty square
-  until it is made. The app looks a key up in the default catalog first and in the phone's
-  own after, and at its start drops each phone preview whose key the default catalog has;
-  the phone's catalog has no other limit. It never leaves the phone, each phone has its
-  own, and the emulator's Controller view and `app.py serve` have the one of the browser
-  they run in. When the web view has no IndexedDB or refuses a write, the preview is kept
-  for the run only and nothing is said. No plugin is added to the APK.
+  screen or from the form of a text or a clock, a new one or an edited one, after `upload
+  end` succeeded and its message is shown, it makes the preview of the bytes it sent with
+  the converter's library, in steps that leave the screen answering, and keeps it on the
+  phone in the web view's IndexedDB, in the phone's own catalog of previews, keyed by the
+  CRC-32 the upload computed and the size; the row keeps the empty square until it is
+  made. The app looks a key up in the default catalog first and in the phone's own after,
+  and at its start drops each phone preview whose key the default catalog has; the phone's
+  catalog has no other limit. It never leaves the phone, each phone has its own, and the
+  emulator's Controller view and `app.py serve` have the one of the browser they run in.
+  When the web view has no IndexedDB or refuses a write, the preview is kept for the run
+  only and nothing is said. No plugin is added to the APK.
 - **What stays.** The catalogs' format, the board's memory, every other command, and every
   reply; the board never holds a GIF. The emulator's own page shows no preview; it serves
   them to the app. The decision that the JSON source of every animation is committed
@@ -187,9 +218,9 @@ An operator scrolling a card of two hundred animations reads file names like
    file or an ODRGX container as the constraints say; the same file always gives the same
    bytes, in Node.js and in a web page.
 2. `node converter/odrig.js thumbnail FILE... --catalog thumbnails` adds each file's
-   preview under its key and the file's name to the mapping; a key it holds keeps its GIF
-   and gains the name; a file the reader refuses or that has no preview within the size
-   rule is passed over and named.
+   preview under its key and its name as the constraints say to the mapping; a key it
+   holds keeps its GIF and gains the name; a file the reader refuses or that has no
+   preview within the size rule is passed over and named.
 3. `thumbnails/` holds the default preview catalog made from every source the constraints
    list, one GIF per distinct key, and `thumbnails/catalog.js` maps every key to its GIF
    and every GIF has its key.
@@ -206,7 +237,12 @@ An operator scrolling a card of two hundred animations reads file names like
 7. The emulator, `app.py serve` and the APK hold the same default catalog; the board, the
    firmware's build and the card hold none of it.
 8. The pages of the project describe it: `docs/converter.md` the subcommand and the
-   module, `docs/commands.md` the command, `docs/catalog.md` the key,
+   module, `docs/commands.md` the command, `docs/catalog.md` the key, `docs/core.md` the
+   command: in its rules for hosts, that `read` and `catalog page` are the commands whose
+   `read_at` begins at the offset it is given, and in its catalogs, that `catalog page`
+   reads one page of the board's catalog, or of the card's through `drive/`, into the
+   chunk buffer with one `read_at` a call, asks for no memory, and is `busy` while a
+   rebuild of that storage runs, `docs/reasons.md` the reason `preview-too-large`,
    `docs/android-app.md` the previews, the phone's catalog and its table of lines,
    `docs/emulator.md` what it serves and the command tool's new form,
    `agent/vocabulary.md` the preview, the GIF of `thumbnails/` beside a row, told apart
@@ -262,8 +298,14 @@ and the APK app have and the board never transmits, pre-cached by the repository
 uncached animation having no preview unless the phone uploaded it, which updates the
 phone's own hash-to-preview, and for all the animations' short previews to be tracked in
 the repository in a catalog of their own that the firmware does not see, the default
-preview catalog, made from every path where the animations live. The owner's acceptance
-of this seed is the owner's word on the one addition to the command list, `catalog
-page`, and on the change it makes to what is decided, a GIF's second role in the table of
-formats; the answer of `docs/drifts.md` that no media file is tracked gives way, in a new
-entry at its end, to the folder of previews.
+preview catalog, made from every path where the animations live. The owner's acceptance of
+this seed is the owner's word on the one addition to the command list, `catalog page`, and
+on the change it makes to what is decided, a GIF's second role in the table of formats;
+the answer of `docs/drifts.md` that no media file is tracked gives way, in a new entry at
+its end, to the folder of previews. Later on 2026-10-27 the owner asked for this seed to
+be specified, built and opened as a pull request without a question pass: that is the
+acceptance. A review of the seed against the code before the specification found no
+question for the owner and closed seven gaps an agent may decide: the `--card` option and
+the names, what `thumbnail` prints and its statuses, `catalog` asked once of a target that
+keeps no catalogs, `busy` only during a rebuild, a refusal of either storage's page and a
+`null` generation, `docs/core.md` among the pages, and the offset's range.
