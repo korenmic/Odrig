@@ -305,8 +305,9 @@ class Usage(unittest.TestCase):
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
                            (["upload", "9"], "upload takes two arguments: ID FILE"), (["play", "1\n"], "a command is one line"),
-                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
-                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, or cancel"),
+                           (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["catalog", "page", "internal", "0"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):

@@ -96,7 +96,7 @@ Rules for every task:
     the reply holds fewer bytes when their escaped form would not fit.
   - Suites: the core's, onboarding.
 
-- [ ] 4. The command through the emulator and the command tool
+- [x] 4. The command through the emulator and the command tool
   - `odrigctl/cli.py`: `catalog page internal|external PAGE OFFSET`.
   - Tests: `tests/emulator/` runs the emulator on a show folder with a catalog and a
     `--drive` with one and reads a page of each over the serial link and over HTTP with
