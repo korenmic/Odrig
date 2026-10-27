@@ -119,8 +119,7 @@ commands of Windows.
 
 ## What is coming
 
-These are planned as seeds and are not in the repository yet. Do not describe them as
-present, and do not build on them.
+These are planned as seeds and are not in the repository yet. Do not describe them as present, and do not build on them.
 
 - **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
 - **A USB log on the serial port, and a bigger animation space**, seeds 23 and 24: built; their checks on the board are open.
@@ -133,12 +132,13 @@ present, and do not build on them.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
-- **Sub-folder playlists and previews of the animations**, seeds 41 and 44: built; for each, a session with the board and the owner's check on a phone are open.
+- **Previews at once, without the dark squares**, seed 49: from the default catalog by name and size, and keys kept on the phone.
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
-- **A brightness field beside the slider**, seed 47: the brightness typed or slid, the two synced; the app alone.
-- **A bar for the animation playing now, and a frozen top**, seed 48: its actions and `repeat <id> <n>`.
+- **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
 - **Current limits for the wall and each snake**, seed 45: built; the board session and the owner's check are open.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
+- **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
+- **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
 
 The state of every seed is in the `state.json` of its folder.
 

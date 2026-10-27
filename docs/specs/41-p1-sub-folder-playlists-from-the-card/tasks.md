@@ -281,7 +281,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 7.6, 8.1, 10.4
 
-- [ ] 13. The owner's check on the board and a phone
+- [x] 13. The owner's check on the board and a phone
   - In a session with the owner, with the firmware of task 10 flashed and the APK on the
     phone, a card prepared with sub-folders: the groups on the phone, a folder chosen and
     playing, the board restarted and playing the same folder, the root chosen and playing,

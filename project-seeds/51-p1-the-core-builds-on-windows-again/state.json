@@ -1,0 +1,10 @@
+{
+  "number": 51,
+  "slug": "51-p1-the-core-builds-on-windows-again",
+  "state": "remaining",
+  "title": "The core builds on Windows again",
+  "priority": "P1",
+  "addedAt": "2026-10-27T23:19:53+02:00",
+  "addedCommit": "pending-local",
+  "summary": "The core builds on Windows again with both compilers the build script takes there: a comparison GCC 16 refuses, a not-inlined mark and a structure Microsoft's compiler refuses are mended without changing what the core does, and a test compiles the core with Microsoft's compiler wherever the suite finds it; nothing else changes."
+}

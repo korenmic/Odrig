@@ -177,7 +177,7 @@ Rules for every task:
     message and in the change-log entry.
   - `AGENTS.md`: seed 44's line, built with the owner's session open.
 
-- [ ] 11. The owner's session
+- [x] 11. The owner's session
   - The firmware flashed; `odrigctl catalog page external 0 0` compared with the card's
     `catalog-00.txt`; the previews on a phone with the APK against the board, and the
     preview of an animation uploaded from the phone.

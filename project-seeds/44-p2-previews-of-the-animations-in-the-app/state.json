@@ -1,7 +1,8 @@
 {
   "number": 44,
   "slug": "44-p2-previews-of-the-animations-in-the-app",
-  "state": "in_progress",
+  "state": "completed",
+  "completedAt": "2026-10-27T23:03:02+02:00",
   "title": "Previews of the animations in the app",
   "priority": "P2",
   "addedAt": "2026-10-27T06:30:00+02:00",
