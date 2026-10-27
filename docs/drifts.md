@@ -10758,3 +10758,71 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 49: the lines of each reply, not each page
+
+**Question.** The seed says that the keys of a page are used as soon as that page is read.
+A page of the card's catalog takes several replies of 512 bytes. Is a key used when its
+page has ended, or sooner?
+
+**Answer.** Sooner: the whole lines of each reply give their rows their keys as soon as
+the reply has come, which is what the owner asked for, each preview as soon as it can be.
+A line is whole when it is taken, so no half key is used. A page of another generation
+starts the read again and drops what it had taken, and a read that ends without keys
+leaves `reads`, so that no line of either gives a key. The keys of the storage,
+`state.keys`, are still set only when the read has ended whole, and only those are kept on
+the phone.
+
+**Resolution.** `app/www/client.js`; docs/android-app.md; tests/app/test_keys.py,
+tests/app/page/scenarios/keys.js.
+
+## Seed 49: the keys kept on the phone
+
+**Question.** How are the keys kept between two starts of the app, and what if they come
+later than the first reply of `catalog`?
+
+**Answer.** In the database of the phone's own previews, `odrig-previews`, at version 2,
+whose upgrade creates each of its stores, `previews` and `keys`, that it lacks, so that a
+phone of version 1 keeps its previews. A record of `keys` is named `<address> <storage>`,
+the address as the app keeps it, and holds `{generation, entries, names}`, `names` the
+pairs of name and key; a record of another shape is skipped. One connection serves both
+stores. An open that an older connection blocks is given up for this run, and is closed if
+it succeeds later; the connection closes on `versionchange`. Keys kept in this run before
+the database is open are not replaced by older ones, and are written when it opens. No
+page of a catalog is asked before the kept keys have been taken or found missing, so that
+a reply of `catalog` that comes first does not start a read the kept keys would have
+spared; a read it started ends when they come. Should IndexedDB never answer, the pages
+are asked three seconds after the start, as before this seed.
+
+**Resolution.** `app/www/previews.js`, `app/www/client.js`, `app/www/main.js`;
+docs/android-app.md; tests/app/test_keys.py, tests/app/page/scenarios/keys.js,
+tests/app/page/scenarios/ownpreviews.js.
+
+## Seed 49: a preview by name and size, and the test's own catalog
+
+**Question.** Which key does a file's name find, and how is a name of two keys tested when
+the default catalog has none?
+
+**Answer.** The keys the default catalog gives the file's name, of the row's size; when
+the catalog does not name the file at all and the file holds a `/`, those of its own name,
+the part after the last `/`, since a run of `thumbnail` without `--card` names a card file
+by its own name only. Exactly one key is used; none or more than one give no preview until
+the board's key is read. The suite's server serves a folder of the test's own in place of
+`thumbnails/` when `support.run` is given `thumbnails=`, with a `catalog.js` and GIFs the
+test writes; the stand-in `Paged` can refuse every page with `busy` and list the card's
+folders. The plan of `keys.js` waits for a number of rows, `untilRows`, rather than the
+spec's `{"until": "rows"}`, and opens a folder with `enter`.
+
+**Resolution.** `app/www/previews.js`, `app/www/screens/show.js`; tests/app/support.py,
+tests/app/test_previews.py, tests/app/test_keys.py, tests/app/page/scenarios/keys.js.
+
+## Seed 49: the APK waits
+
+**Question.** The seed's Definition Of Done builds the APK from the branch. Is it built?
+
+**Answer.** No, not by this seed's tasks. On 2026-10-28 the owner asked: "do not rebuild
+apk, another agent is working on apk changes so only after they finish we can rebuild apk,
+but you may test this on an emulator". The APK of the branch is built when that work has
+ended, for the owner's check on a phone.
+
+**Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 6.

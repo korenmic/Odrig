@@ -46,8 +46,11 @@ a top bar with the app's name and whether the installation answers.
   the middle, or an empty dark square when the animation has no preview or a fault; a tap
   on the square plays as a tap on the name does. The previews are those of the default
   preview catalog that comes with the app, `thumbnails/`, found by each animation's key
-  (see "The keys of the animations" below), then the phone's own. Folder rows and the
-  Tests group have none. The row then
+  (see "The keys of the animations" below), then the phone's own; while a row's key is not
+  known yet, the preview its file's name and size find in the default catalog, so that a
+  file of other bytes with the same name and size shows that preview until its own key is
+  read. Each square shows its preview as soon as its own row has one, without waiting for
+  the others. Folder rows and the Tests group have none. The row then
   names its file, its id and its size, or `size not read yet` while the installation has
   not read the file whole, and under them its `Saving…` or `⊘ Ignored`, has a badge `in` (internal storage) or `ex` (external storage,
   read-only unless the installation can write its card), and a small `...` button that
@@ -547,15 +550,29 @@ from offset 0 to its end, the board's before the card's, one request at a time a
 operator's own and after `status`, an upload's lines, `list`, the saved order and `space`.
 It keeps each line's key by the file's name, a card file's by its path from `odrig`, and a
 row takes the key of its storage and name only when the key's size is the row's size. The
-keys of a read stand until the next read of that storage has ended; they go at once when
-`catalog` shows the storage in another state than `ok`, when the target answers again after
-a silence, and when the target changes. A page of another generation than the first page
+lines of each reply give their rows their keys at once, before the read has ended; until
+then a row keeps the key of the storage's last read. The keys of a read stand until the
+next read of that storage has ended; they go at once when `catalog` shows the storage in
+another state than `ok`, when the target answers again after a silence, and when the
+target changes. A page of another generation than the first page
 of the read starts the read again; a page refused with `busy` is asked again two seconds
 later; a page whose generation is `null`, and any other refusal, end the read without keys.
 An installation that refuses `catalog page` is from before it: it is asked for no page
-again, and `catalog` only by Settings, until the target changes. Nothing of this is said
-on the screen. A show folder that `pack` makes has no catalog, so its rows have no key
-until Settings' rebuild of the board's catalog has made one.
+again, and `catalog` only by Settings, until the target changes. The keys of each read
+that has ended whole are kept on the phone, in the web view's IndexedDB beside its own
+previews, by the target's address and the storage. When `catalog` shows a storage `ok`
+with the generation and number of entries of its kept keys, at a start, after a silence or
+after another address, those keys are the storage's at once and none of its pages is read;
+a read of it under way ends. No page is asked before the kept keys have been taken, and at
+most three seconds after the start. A storage shown `damaged`, `incompatible` or `none`
+loses its kept keys; one shown `loading` or `absent` keeps them. A web view without
+IndexedDB reads the pages at every start. Nothing of this is said on the screen. A show
+folder that `pack` makes has no catalog, so its rows have no key until Settings' rebuild
+of the board's catalog has made one; meanwhile they show what their names and sizes find
+in the default catalog. A row's preview is found in this order: by the key the board gives
+it, its read under way first; else by its file's name and size in the default catalog, the
+one key of that size the catalog gives the name, or, for a card file whose path it does
+not name, its own name; else none, and the square stays empty and dark.
 
 **The phone's own previews.** After an upload from Upload, or from the form of a text or a
 clock, a new one or an edited one, has ended with success and its message is shown, the app

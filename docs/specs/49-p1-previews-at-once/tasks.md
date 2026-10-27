@@ -77,7 +77,7 @@ Rules for every task:
   - Suites: app.
   - Requirements: 3.1 to 3.8
 
-- [ ] 4. The pages
+- [x] 4. The pages
   - `docs/android-app.md`: the square's sentence; "The keys of the animations", with how a
     row's preview is found, the keys kept by address and storage and the states that drop
     them; and its sentence on a show that `pack` makes.
