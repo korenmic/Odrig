@@ -128,7 +128,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
 - **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
 - **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
-- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open.
+- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open. A hundred picture clocks, seed 52: 8-colour widgets that tick at random, from the owner's picture.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.
@@ -137,7 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: the brightness typed or slid; the bar's actions and `repeat <id> <n>`, under a frozen top.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
-- **More than 256 files on a drive**, seed 50: a draft, suspended for the owner's choice.
+- **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
 - **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
 
 The state of every seed is in the `state.json` of its folder.
