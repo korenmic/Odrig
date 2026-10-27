@@ -401,11 +401,17 @@ async function askPage() {
       read.pageGeneration = reply.generation;
       const parts = (read.tail + reply.text).split("\n");
       read.tail = reply.next === null ? "" : parts.pop();
+      let taken = 0;
       for (const line of parts) {
         const found = CATALOG_LINE.exec(line);
         if (found !== null) {
           read.byName.set(found[3], `${found[1]}-${found[2]}`);
+          taken += 1;
         }
+      }
+      // The rows these lines name have their keys from now on, before the read ends.
+      if (taken > 0) {
+        state.keysVersion += 1;
       }
       if (reply.next !== null) {
         read.offset = reply.next;
@@ -452,15 +458,18 @@ async function askPage() {
   changed();
 }
 
-// The key of an animation, `<crc32>-<bytes>`, as the catalog of its storage names its file,
-// when that key's size is the animation's; otherwise null.
+// The key of an animation, `<crc32>-<bytes>`, as the catalog of its storage names its file:
+// the read of that catalog under way first, as far as it has come, then the keys of its last
+// read; only when that key's size is the animation's, otherwise null.
 export function keyOf(animation) {
   const external = typeof animation.external === "boolean" ? animation.external : typeof animation.ignored !== "boolean";
-  const kept = state.keys[external ? "external" : "internal"];
-  if (kept === null || typeof animation.bytes !== "number") {
+  const storage = external ? "external" : "internal";
+  if (typeof animation.bytes !== "number") {
     return null;
   }
-  const key = kept.byName.get(animation.file);
+  const read = reads.find((one) => one.storage === storage);
+  const kept = state.keys[storage];
+  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 

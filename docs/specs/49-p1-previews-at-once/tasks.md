@@ -42,7 +42,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 1.1 to 1.5, 4.2, 6.4
 
-- [ ] 2. The keys of each reply used at once
+- [x] 2. The keys of each reply used at once
   - `app/www/client.js`: `askPage()` makes `keysVersion` grow when a reply adds a name;
     `keyOf()` looks in the read under way of the row's storage first.
   - `tests/app/page/scenarios/keys.js`: the plan's `{"until": "some-keys"}`.

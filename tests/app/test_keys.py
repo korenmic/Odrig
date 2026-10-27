@@ -4,6 +4,8 @@ silence and after every complete list, the sixteen pages of each storage whose c
 longer hold, and a target from before `catalog page` or before catalogs."""
 
 import json
+import pathlib
+import tempfile
 import threading
 import time
 import unittest
@@ -11,6 +13,7 @@ import zlib
 
 from . import support
 from .test_messages import refusal
+from .test_target import entered
 
 STATUS = (200, '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60}\n')
 NULL_PAGE = {"ok": True, "generation": None, "text": "", "next": None}
@@ -207,6 +210,42 @@ class Reading(unittest.TestCase):
         self.assertNotIn("catalog page external 2 0", lines)
         self.assertIn("catalog page external 1 0", lines)
         self.assertIsNone(seen["message"])
+
+
+class AtOnce(unittest.TestCase):
+    def test_the_lines_of_each_reply_give_their_rows_keys_and_previews_before_the_storage_is_read_whole(self):
+        target = Paged(INTERNAL, EXTERNAL, piece=40)
+        target.delay = 0.15
+        early = {}
+
+        def look():
+            with target.lock:
+                early["asked"] = [(storage, page) for _, storage, page, offset in target.asked_pages]
+
+        work = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        folder = work / "thumbnails"
+        folder.mkdir()
+        gif = next(support.THUMBNAILS.glob("*.gif")).read_bytes()
+        shown = {name: f"{crc}-{size}" for name, size, crc in INTERNAL[:3]}
+        entries = [f'  "{key}": {{"gif": "{key}.gif", "names": ["other-{number}.odrg"]}},' for number, key in enumerate(sorted(shown.values()))]
+        (folder / "catalog.js").write_text("\n".join(["export default {", *entries, "};", ""]), encoding="ascii")
+        for key in shown.values():
+            (folder / f"{key}.gif").write_bytes(gif)
+        plan = [{"until": "some-keys", "ms": 20000}, {"snap": "early"}, {"step": True}, {"until": "both", "ms": 40000}, {"snap": "all"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[look], thumbnails=folder).seen
+        self.assertIsNone(seen["early"]["internal"], "the storage's keys wait for its last page")
+        given = {name: key for name, key in seen["early"]["rowKeys"] if key is not None}
+        self.assertTrue(given)
+        self.assertEqual(given, {name: target.keys("internal")[name] for name in given})
+        self.assertNotIn(("internal", 15), early["asked"], "keys before the last page was asked")
+        for row in seen["early"]["squares"]:
+            if row["file"] in given and row["file"] in shown:
+                self.assertEqual(row["src"], f"thumbnails/{shown[row['file']]}.gif", row["file"])
+            else:
+                self.assertIsNone(row["src"], row["file"])
+                self.assertEqual(row["background"], "rgb(0, 0, 0)", row["file"])
+        self.assertEqual(dict(seen["all"]["rowKeys"]), {**target.keys("internal"), **target.keys("external")})
 
 
 class OlderTargets(unittest.TestCase):

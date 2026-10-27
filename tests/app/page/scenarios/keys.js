@@ -37,6 +37,7 @@ const CONDITIONS = {
   both: (client) => client.state.keys.internal !== null && client.state.keys.external !== null,
   "no-internal": (client) => client.state.keys.internal === null,
   "no-keys": (client) => client.state.keys.internal === null && client.state.keys.external === null,
+  "some-keys": (client) => client.state.keys.internal === null && (client.state.animations || []).some((animation) => client.keyOf(animation) !== null),
   "pages-refused": (client) => client.state.pagesRefused,
   "catalog-none": (client) => client.state.catalogNone,
   "no-answer": (client) => client.state.link === "no-answer",
