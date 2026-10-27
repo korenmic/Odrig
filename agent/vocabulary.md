@@ -76,8 +76,8 @@ the entry links to it.
   `play <id>`, `play all`, `on`, `off`, `brightness <n>`, `status`, `fault`, `space`, `list`,
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
-  playlist, `mapping` for assignments and the diagonal check, and `upload`, which
-  sends a file as several lines. Each is answered by one
+  playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
+  the turn in progress, and `upload`, which sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
 

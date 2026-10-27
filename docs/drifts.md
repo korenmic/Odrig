@@ -10805,3 +10805,99 @@ while the owner's check on a phone is open, as seed 43 does; the owner's check c
 
 **Resolution.** `docs/specs/47-p2-a-brightness-field-beside-the-slider/tasks.md`,
 `project-seeds/47-p2-a-brightness-field-beside-the-slider/state.json`.
+
+## Seed 48: when the turn in progress is reported
+
+**Question.** The seed has `status` give `repeat`, `loop` and `saved` only while a playlist
+turn plays and `animation` names that turn's animation, null at a turn's change until the
+new animation's first picture, and has `repeat <id> <n>` refused with `stale` "while they
+are null"; but `repeat` alone is also null while the loop's length is not known. When is a
+turn reported, which nulls make `stale`, and what does `repeat <id> <n>` do while the length
+is not known?
+
+**Answer.** A turn is reported while the show is valid, no test of the mapping shows, the
+playlist plays, the animation the latest refresh chose is the one whose turn it is, and the
+turn's first refresh has been made. `stale` comes exactly when `loop` would be null: no turn
+of that id is reported. While the length of the loop is not known the turn is in its first
+loop, `loop` is 1, and `repeat <id> <n>` gives the turn `n` loops, which `repeat` then
+reports. Between the end of a turn's time and the refresh that moves on, `loop` is at most
+`repeat`, and a `repeat` then keeps that count, so that the turn ends at that refresh.
+
+**Resolution.** `core/src/player.cpp` (`player_reported`, `player_counts`),
+`docs/commands.md`; `docs/specs/48-p2-a-bar-for-the-animation-playing-now/requirements.md`.
+
+## Seed 48: Restore default after the turn's own count has passed
+
+**Question.** `repeat <id> default` drops the turn's own value and gives it "the larger of
+the default count and the loop now playing". When the default's end lies at or before the
+moment, as when 10 loops were saved and the turn is in its ninth of a default of eight, the
+turn would end at once in the middle of a loop. And a save or a restore reads the count
+after it has changed it. What counts?
+
+**Answer.** Both saving forms act on the turn with the loop that was in progress before the
+count changed. A restore whose default turn ends at or before the moment ends the turn at
+the end of the loop in progress, never in the middle of one and never in the past; one whose
+default ends later plays the default, `max_seconds` cutting as for any default. A save gives
+the turn the larger of its `n` and that loop.
+
+**Resolution.** `core/src/player.cpp` (`player_hold_turn`, `player_default_again`),
+`core/src/repeats.cpp`, `tests/core/support.py`; `docs/commands.md`.
+
+## Seed 48: the old file of saved repeats cannot be read
+
+**Question.** The host's `read_at` answers -1 both for a missing file and for a failure. A
+save reads `repeats.txt` before it writes the next one; a failure taken for a missing file
+would write a file with one line and lose every other saved repeat. And how does a host
+whose storage cannot be changed answer?
+
+**Answer.** A read that fails after the first byte is `storage-error`, as for `order.txt`;
+one that fails at the first byte is `storage-error` too while a saved repeat is in force,
+and a missing file otherwise. A host whose storage cannot be changed keeps no saved repeat
+and answers the saving forms `storage-error`, after `unknown-id` and `in-use`, as `order
+move` does.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 48: the 512 lines of the file
+
+**Question.** A save is `no-space` when the file "already holds 512 lines once a save has
+dropped the lines of the board's own files that `show.json` no longer names, which it does
+whenever it finds the file full". Which lines count, and which are dropped?
+
+**Answer.** The lines of other animations count; the animation's own line, or lines, are
+replaced, so a save of an animation the file names is never `no-space` for the file. When
+the other lines number 512, the save drops those `f` lines whose names no item of the show
+names, and is `no-space` when 512 remain. `x` lines are never dropped: a card that is out
+keeps its lines. A file out of form is written anew with the new line alone.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/commands.md`, `docs/show.md`.
+
+## Seed 48: `repeats over` at a take-up only
+
+**Question.** A drive's lines are matched to its files at its take-up, and the file is read
+whole again after every save, upload and rebuild of the drive's catalog. The log is to say
+`repeats over` when more than 32 lines match. Does every reading say it?
+
+**Answer.** Only the take-up of a drive, the drive's check reading its part of the file in
+steps, says it, once; the whole readings after a save, an upload or a rebuild match the same
+first 32 lines and say nothing. `repeats unreadable` is said by every reading that finds the
+file out of form.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/core.md`.
+
+## Seed 48: the firmware is built and not put with the artifacts
+
+**Question.** The seed's definition of done has a new firmware put with the artifacts on the
+share and on Drive. The owner ordered this run on 2026-10-27 not to upload a firmware: the
+board runs seed 45's firmware with the owner's saved budgets, and a firmware without seed 45
+would drop them.
+
+**Answer.** The firmware is built, `python3 firmware/fw.py build`, only to prove that it
+compiles, and is neither flashed nor uploaded; the APK is put with the artifacts. The commands
+`repeat` and the members of `status` need a firmware with this seed on the board, which waits
+for seed 45 and this seed to be merged; the app hides `Repeat this`, `Save` and `Restore
+default` on a board whose `status` has no `repeat` or `saved`. The seed stays `in_progress`
+until the owner's checks on a phone are made.
+
+**Resolution.** `docs/specs/48-p2-a-bar-for-the-animation-playing-now/requirements.md`,
+`project-seeds/48-p2-a-bar-for-the-animation-playing-now/state.json`.

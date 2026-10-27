@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The ad hoc repeat and the counts in `status`
+- [x] 1. The ad hoc repeat and the counts in `status`
   - `core/src/core_state.h` (`turn_repeat`), `core/src/player.cpp` and `player.h` (the
     counts, `current_turn_ms`, the clearing, `player_reported`, `player_counts`,
     `player_set_repeat`), `core/src/commands.cpp` (`repeat <id> <n>` and its refusals; the

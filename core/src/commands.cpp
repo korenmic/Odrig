@@ -204,6 +204,28 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The loops of the playlist's turn in progress, its loop in progress and its saved
+    // repeat, while the turn is reported.
+    TurnCounts turn;
+    const bool reported = player_counts(core, now, &turn);
+    reply.text(",\"repeat\":");
+    if (reported && turn.repeat != 0) {
+        reply.number(turn.repeat);
+    } else {
+        reply.text("null");
+    }
+    reply.text(",\"loop\":");
+    if (reported) {
+        reply.number(turn.loop);
+    } else {
+        reply.text("null");
+    }
+    reply.text(",\"saved\":");
+    if (reported && turn.saved != 0) {
+        reply.number(turn.saved);
+    } else {
+        reply.text("null");
+    }
     // The seconds left in the current playlist's window, the last member.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
@@ -615,6 +637,20 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_remove(core, id, reply);
+    }
+    if (words.is(0, "repeat")) {
+        uint32_t id;
+        uint32_t loops;
+        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 1, 65535, &loops)) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (!player_set_repeat(core, id, loops, now)) {
+            return refuse(reply, "stale");
+        }
+        return succeed(reply);
     }
     if (words.is(0, "upload")) {
         if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");

@@ -24,9 +24,10 @@ struct LegInfo {
     uint32_t count;
 };
 
-// One item of the show. An animation item: `first` is its entry of the file table, `count`
-// the number of loops of its turn and `seconds` the longest its turn lasts, each 0 when
-// the show gives none. A cycle item: its animations are `count` entries of the entry
+// One item of the show. An animation item: `first` is its entry of the file table, the low
+// 16 bits of `count` the number of loops of its turn as the show gives it and its high 16
+// bits the loops of its saved repeat, and `seconds` the longest its turn lasts, each 0
+// when there is none. A cycle item: its animations are `count` entries of the entry
 // table, from `first` on, each the position of an animation item in the item table, and
 // `seconds` is the length of each of its turns.
 struct ItemInfo {
@@ -416,6 +417,7 @@ struct Core {
     uint32_t noise;         // what the timestamps of the polls were mixed into
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
     uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
+    uint32_t turn_repeat;   // of that turn: the loops a `repeat` gave it, 0 while none did
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
     // The file that is open for playback: an animation item in one turn and one loop. A
