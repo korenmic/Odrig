@@ -69,3 +69,8 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       board suite on the probe build with the refresh rate of requirement 7.4, and the
       owner's checks on the installation, after seed 43 is merged and this branch brought
       onto master.
+- [ ] 8. The panel says that 0 means no limit, by the owner's order of 2026-10-27. The
+      explanation of `Current limits`, before its fields, says in words that a budget of
+      0, or an empty field, is no limit, and how to put a limit back to none; the
+      fields' placeholder stays `No limit`. `docs/android-app.md`'s paragraph and the
+      app's test of the panel's words follow. Suites: app, onboarding.
