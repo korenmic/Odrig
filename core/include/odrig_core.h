@@ -115,6 +115,10 @@ typedef struct odrig_host {
     /* Optional: 1 when the core may change the files of this drive with the storage
        functions, 0 otherwise. A host without it has a drive that is read only. */
     int (*drive_writable)(void *ctx, uint32_t drive);
+
+    /* Optional: the wall's budget in mA while no budgets are saved. Called once, inside
+       odrig_core_begin. NULL, or 0, is no limit. */
+    uint32_t (*limit_default)(void *ctx);
 } odrig_host;
 
 /* One leg, as the mapping file lists it, and its LED data from the last refresh:

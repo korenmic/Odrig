@@ -257,6 +257,7 @@ static uint32_t drive_number(void *ctx) { (void)ctx; return 0; }
 static int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity) {
     (void)ctx; (void)drive; (void)place; (void)buffer; (void)capacity; return 0;
 }
+static uint32_t wall_default(void *ctx) { (void)ctx; return 730; }
 static void on_reply(void *ctx, const char *line, size_t line_length, const char *reply, size_t reply_length) {
     (void)ctx; (void)line; (void)line_length; (void)reply; (void)reply_length;
 }
@@ -264,8 +265,8 @@ static void on_reply(void *ctx, const char *line, size_t line_length, const char
 int main(void) {
     odrig_host host = {0, give, open_file, read_file, close_file, log_line,
                        begin_file, add_bytes, end_file, rename_file, remove_file, tell_space, read_part,
-                       drive_number, drive_name, 0, 0, 0, 0, 0};
-    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+                       drive_number, drive_name, 0, 0, 0, 0, 0, wall_default};
+    odrig_host plain = {0, give, open_file, read_file, close_file, log_line, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     odrig_leg leg;
     char line[ODRIG_LINE_MAX + 1] = "status";
     char reply[ODRIG_REPLY_MAX];

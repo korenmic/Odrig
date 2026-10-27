@@ -10662,3 +10662,83 @@ rules in docs/python-library.md until the core's page describes the file.
 
 **Resolution.** `odrig/limits.py`; docs/python-library.md; docs/reasons.md;
 `tests/converter/test_limits.py`.
+
+## Seed 45: the name of the core's module of the limits
+
+**Question.** The design names the core's module `core/src/limits.cpp` with `limits.h`.
+The test host is compiled with `core/src` on its include path, and PlatformIO builds the
+core as a library with its `src` folder there too. Can a header of the core be named
+`limits.h`?
+
+**Answer.** No. It takes the place of the C library's `<limits.h>`, which the standard
+headers include: the test host did not compile, with `use of undeclared identifier
+'CHAR_BIT'` inside the standard library's `<algorithm>`. The module is
+`core/src/current_limits.cpp` with `current_limits.h`; its functions keep the design's
+names, `limits_read` and `limits_apply`, and its constants are `kLimitsFile`,
+`kLargestWallBudget`, `kLargestLegBudget` and `kUndimmed`.
+
+**Resolution.** `core/src/current_limits.cpp`, `core/src/current_limits.h`.
+
+## Seed 45: how the start reads the budgets' file
+
+**Question.** The design reads `limits.json` with `JsonReader` "as the mapping is", but the
+mapping is read twice, with its tables made between the two readings. It leaves open a
+file the host fails to read, where the log line stands beside the reason of a mapping
+that cannot be used, and a host whose storage cannot be changed.
+
+**Answer.** The file is read once, right after the mapping's two readings and before the
+reason of a mapping that cannot be used goes to the log. The budget of each leg the mapping
+has is set as its entry is read; a leg number is kept in a set of 256 bits to find one
+named twice; and when the file breaks a rule anywhere, every budget goes back to the
+defaults. A file the host cannot open or read, -1, counts as unreadable: the same line,
+`limits unreadable`, once, and the defaults. So with a broken budgets' file and no mapping
+the log says `limits unreadable` before `mapping-missing`. The file is read with `open`,
+`read` and `close`, which every host has, so a host whose storage cannot be changed limits
+by a folder's budgets too. The wall's budget is the host's default from
+`odrig_core_begin` on, so it holds also when the start ends before the mapping is read.
+While the legs are limited, `limited` of a leg also holds a second bit, whether its own
+pass left it above its budget, which the last pass reads; it is cleared before the
+refresh ends.
+
+**Resolution.** `core/src/current_limits.cpp`, `core/src/core.cpp`; docs/core.md, "Current
+limits"; `tests/core/test_limits.py`.
+
+## Seed 45: the test host's default budget and the reference player's
+
+**Question.** The design gives the test host `--limit-default MA` and the record's
+`limit_default` without a range, and has the reference player limit with a host default
+it is given. Which values are taken, and how does the reference player keep every
+comparison without budgets as it was?
+
+**Answer.** The test host takes 0 to 250,000, the range of the wall's budget; any other
+value is a usage error, status 64. Without the option it has no `limit_default`. The
+core takes what a host gives as it is, 0 being no limit: the firmware's default is at
+most 65,415, and a larger value limits only a picture estimated above it. The reference
+player takes the default as `limit_default`, 0 for none, reads `limits.json` with
+`odrig.limits.loads`, logs `limits unreadable` first among the lines of the start as the
+core does, and limits with `odrig.limits.limit` only while a budget is above 0, so that
+without budgets its bytes are those of before. It limits a dark refresh as the core does
+and keeps a kept picture as it was limited.
+
+**Resolution.** `tests/core/host/host.cpp`; `tests/core/support.py`; docs/core.md, "The
+test host".
+
+## Seed 45: a leg held at level 1 under a wall that dims
+
+**Question.** Requirement 6.3 has the app say that a budget from 1 to the LEDs' count
+holds every LED at its lowest level. Does a leg that its own budget holds at level 1 stay
+lit when the wall's budget dims too?
+
+**Answer.** Not always. By the order of requirement 1.5, which `odrig.limits` states and
+the core follows byte for byte, every leg is faded by the wall's level after its own
+pass, and a byte of 1 faded at a level below 129 is 0, since 1 is not above a quarter of
+an LED whose largest byte is 1. So a leg held at level 1 goes dark under a wall whose
+level is below 129, and every LED a leg's budget holds at level 1 goes dark under a wall
+at level 1, which a wall's budget at or below the LEDs' count gives. On the two-leg
+mapping at full white with leg 1 at 100 mA, a wall of 5,000 mA is level 119 and leaves
+leg 1 dark; a wall of 6,000 mA is level 144 and keeps its bytes of 1, which the suite
+checks. This follows from the seed's order and is not changed here: the sentence of 6.3
+holds for a leg's budget alone. Changing the order needs the owner.
+
+**Resolution.** `odrig/limits.py` and `core/src/current_limits.cpp` as they are;
+`tests/core/test_limits.py`.

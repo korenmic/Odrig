@@ -76,7 +76,7 @@ int usage() {
         "       --store-fails-at N  --cut-at N  --cut-keeps K  --trace-store\n"
         "       --read-back-fails OFFSET  --read-back-differs OFFSET\n"
         "       --drive DIR  --drive-pulled  --drive-read-fails NAME OFFSET  --drive-read-only  --trace-drive  --trace-read-at  --about TEXT\n"
-        "       --command-read-fails FILE OFFSET\n",
+        "       --command-read-fails FILE OFFSET  --limit-default MA\n",
         stderr);
     return kUsage;
 }
@@ -169,6 +169,7 @@ struct Options {
     bool trace_read_at = false;     // print `read_at <name> <offset> <count>` for every `read_at`
     bool trace_calls = false;       // print `call <bytes>` after every poll and command: what `read` and `read_at` gave in it
     std::string about;              // the text `about` gives; without one the host has no `about`
+    long limit_default = -1;        // the wall's default budget `limit_default` gives; without one, below 0, the host has none
 };
 
 // What the core is given: memory, files, and a place for its diagnostic text. The files are
@@ -231,6 +232,7 @@ public:
         functions.drive_list = drive ? drive_list : nullptr;
         functions.drive_bind = drive ? drive_bind : nullptr;
         functions.drive_writable = drive ? drive_writable : nullptr;
+        functions.limit_default = options_.limit_default >= 0 ? limit_default : nullptr;
         if (drive && !options_.drive_pulled) {
             plug();
         }
@@ -761,6 +763,11 @@ private:
         return 1;
     }
 
+    static uint32_t limit_default(void *ctx) {
+        guard::InHost lowered;
+        return static_cast<uint32_t>(static_cast<Host *>(ctx)->options_.limit_default);
+    }
+
     static int32_t read_at(void *ctx, const char *name, uint32_t offset, uint8_t *buffer, size_t capacity) {
         guard::InHost lowered;
         Host &host = *static_cast<Host *>(ctx);
@@ -818,7 +825,8 @@ private:
 
     // Stops the program when a name the core gives is not one of its names: 1 to 32
     // characters of a-z, 0-9, `-`, `_` and `.`, and either the name of an `.odrg` or `.odrgx`
-    // file or one of the fixed names: the files of the show, of changes and of the catalog.
+    // file or one of the fixed names: the files of the show, of changes, of the budgets and
+    // of the catalog.
     void check_name(const char *name) const {
         if (!options_.check_names) {
             return;
@@ -837,7 +845,8 @@ private:
                           (given.compare(10, 4, ".txt") == 0 || given.compare(10, 4, ".new") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
-                           given == "order.txt" || given == "order.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
+                           given == "order.txt" || given == "order.part" || given == "playlist.txt" || given == "playlist.part" ||
+                           given == "limits.json" || given == "limits.part" || given == "catalog.txt" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);
@@ -1779,6 +1788,9 @@ int main(int argc, char **argv) {
             } else if (arguments[at] == "--trace-calls") {
                 options.trace_calls = true;
                 at += 1;
+            } else if (arguments[at] == "--limit-default" && at + 1 < arguments.size() &&
+                       whole_number(arguments[at + 1], &options.limit_default) && options.limit_default <= 250000) {
+                at += 2;
             } else if (arguments[at] == "--about" && at + 1 < arguments.size()) {
                 options.about = arguments[at + 1];
                 at += 2;

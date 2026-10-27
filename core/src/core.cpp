@@ -4,6 +4,7 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "core_state.h"
+#include "current_limits.h"
 #include "mapping.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -372,6 +373,8 @@ void start(Core &core) {
     }
 
     Reason reason = read_mapping(core);
+    // The budgets, whatever came of the mapping: they are known without legs too.
+    limits_read(core);
     if (reason != kNone) {
         core_fail(core, reason, reason == kReadError ? "mapping.json" : nullptr, kNone);
         return;
@@ -750,6 +753,9 @@ odrig_core *odrig_core_begin(const odrig_host *host) {
         return nullptr;
     }
     core->state.host = *host;
+    // The wall's default budget, the host's, in force until the budgets' file is read.
+    core->state.wall_default = host->limit_default != nullptr ? host->limit_default(host->ctx) : 0;
+    core->state.wall_budget = core->state.wall_default;
     core->state.starting = 1;
     odrig::start(core->state);
     odrig::player_start(core->state);

@@ -13,7 +13,8 @@ object, takes its memory once at startup, and never calls itself.
 
 This page covers the [commands](#commands) that build and test it, the
 [host interface](#the-host-interface), [time and refreshes](#time-the-grid-and-refreshes),
-the [LED data](#led-data), [command lines](#command-lines), [startup](#startup),
+the [LED data](#led-data), the [current limits](#current-limits),
+[command lines](#command-lines), [startup](#startup),
 [a drive](#a-drive), [texts](#texts), [clocks](#clocks), [memory](#memory), the
 [benchmark](#benchmark) and the [test host](#the-test-host).
 
@@ -74,10 +75,10 @@ Every function receives `ctx` as its first argument.
 |---|---|
 | `ctx` | Any pointer of the host's. The core only hands it back. |
 | `alloc` | `void *alloc(void *ctx, size_t bytes)`: memory of that size, aligned for any object, or `NULL` when the host has none. The core calls it only inside `odrig_core_begin`, never frees what it got, and clears each block itself. |
-| `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `show.json` and the `.odrg` and `.odrgx` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
+| `open` | `int open(void *ctx, const char *name)`: opens a file of the installed file set by its name, for reading from its start. Returns 1 when it is open, 0 when there is no such file, and -1 on any other failure. The names are `mapping.json`, `limits.json`, `show.json` and the `.odrg` and `.odrgx` names of the show, which hold only `a`-`z`, `0`-`9`, `-`, `_` and `.`. |
 | `read` | `int32_t read(void *ctx, uint8_t *buffer, size_t capacity)`: the next bytes of the open file. Returns how many it put into `buffer`, from 1 to `capacity`; 0 at the end of the file; -1 on a failure. `capacity` is never above 512. Fewer bytes than asked for are fine. |
 | `close` | `void close(void *ctx)`: closes the open file. |
-| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. The core logs three things: the reason text when the show becomes invalid, `file <name> unavailable: <reason>` when it quarantines a file of the show, and `drive file <name> left out: <reason>` when it leaves out a file of a drive. |
+| `log` | `void log(void *ctx, const char *text)`: one line of diagnostic text without a newline. May be `NULL`. Among what the core logs are the reason text when the show becomes invalid, `file <name> unavailable: <reason>` when it quarantines a file of the show, `drive file <name> left out: <reason>` when it leaves out a file of a drive, and `limits unreadable` when the start finds a budgets' file it cannot read. |
 | `write_open` | `int write_open(void *ctx, const char *name)`: begins a new, empty file of this name, in place of one that has it. A file that was being written is given up and removed. Returns 1, or -1 on a failure. `NULL` for a host without storage that can be changed. |
 | `write` | `int write(void *ctx, const uint8_t *bytes, size_t length)`: adds bytes to the file being written. `length` is 1 to 1,500. Returns 1, or -1. |
 | `write_close` | `int write_close(void *ctx)`: ends the writing. When it has returned 1, the file is whole in storage and stays so through a power cut. Returns 1, or -1 on a failure. |
@@ -92,12 +93,13 @@ Every function receives `ctx` as its first argument.
 | `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, at most 256 files and 32 sub-folders, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
+| `limit_default` | `uint32_t limit_default(void *ctx)`: optional; the wall's budget in mA while no budgets are saved, see [current limits](#current-limits). The core calls it once, inside `odrig_core_begin`. `NULL`, or 0, is no limit: the emulator and the test host have none, and the firmware gives WLED's stored maximum less 120 mA. |
 
 The core has at most one file open. It reads a file from its first byte towards its last,
 never goes back, and closes it before it opens another. It reads `mapping.json` and
-`show.json` twice each at startup, and reads no clock. With the storage functions it
-writes, renames and removes files of the folder, as [the files the core
-writes](#the-files-the-core-writes) says, and nothing outside it.
+`show.json` twice each at startup and `limits.json` once, and reads no clock. With the
+storage functions it writes, renames and removes files of the folder, as [the files the
+core writes](#the-files-the-core-writes) says, and nothing outside it.
 
 The last seven members are the storage functions: three that write a file, `rename`,
 `remove`, `space`, and `read_at`, which reads a second file beside the one that plays.
@@ -237,8 +239,59 @@ board. The host sends them to the leg's pin as they are.
   startup; nothing else defines the layout.
 - Brightness is already applied: a colour value v is given as
   `(v * brightness + 127) / 255`, rounded down. The host applies no brightness of its own.
+- The [current limits](#current-limits) are applied after the brightness: a budget lowers
+  only what passes it, and the host applies no limit of its own.
 - Every byte is 0 while the show is invalid, nothing is playing, or the LEDs are switched
   off.
+
+## Current limits
+
+The core limits the current the LEDs draw by budgets in whole mA: one for each leg and one
+for the wall, all legs together; 0 is no limit. A budget is a ceiling on WLED's estimate of
+what the LEDs draw, not a measurement and not a cap on brightness: it dims a leg, or the
+wall, only at a refresh whose bytes would be estimated above it, and then to within it.
+The rule is stated a second time by the Python library, `odrig/limits.py`, which the suite
+compares the core with; see [python-library.md](python-library.md#the-current-limits).
+
+- **The estimate** of a leg of N LEDs whose bytes add up to S is floor(S * 55 / 765) + N
+  mA: 55 mA for an LED at full white and 1 mA for each LED at rest. The wall's is the sum
+  of its legs'. Nothing is counted for the board.
+- **The fade** to a level from 1 to 254 is WLED's video fade: an LED whose three bytes are
+  0 stays so, and each byte b of another LED becomes `(b * level + 127) >> 8`, with its
+  lowest bit set when b is above a quarter of the LED's largest byte, `(largest >> 2) + 1`.
+- **The level** of a budget B for bytes estimated at E is 255, which changes nothing, when
+  B is 0 or E is B or less; 1 when B is N or less; and otherwise the largest level from 1
+  to 254 whose fade is estimated at B or less, 1 when none is. It is found by halving with
+  eight fades: from 128 down, each bit is added to the level found so far and kept when
+  that fade is within the budget. The wall's level is found the same way over all its LEDs.
+- **The order.** At every refresh that writes the LEDs, a picture, a test of the mapping or
+  a dark one, each leg is faded by its own budget first. Then every leg is faded by the
+  wall's level, found from the bytes the legs' budgets left. Last, a leg that its own
+  budget had brought within it and that the wall's fade took above it, as a fade can raise
+  a low even byte by 1, is faded again by its own budget. A leg is limited at a refresh
+  when a level below 255 was used for it, the wall when its level was below 255. Only at
+  level 1 can a leg or the wall stay above its budget. A refresh that keeps the picture
+  before keeps its bytes as they were limited.
+
+A full-white leg of 180 LEDs is estimated at 10,080 mA; with a budget of 500 mA it is held
+at level 7, every byte 7, and estimated at 451 mA.
+
+**The budgets** are read at the start from `limits.json`, beside `mapping.json`:
+
+```
+{"version":1,"wall":730,"legs":[[1,500],[20,180]]}
+```
+
+The file is read as strictly as the mapping: exactly the three members `version`, 1;
+`wall`, the wall's budget from 0 to 250,000; and `legs`, whose every entry is an array of
+a leg number from 1 to 255 and that leg's budget from 0 to 65,535, no leg named twice. A
+leg the file does not name has no budget, and a leg it names that the mapping lacks is
+passed over. While there is no `limits.json`, or it cannot be read, the budgets are the
+defaults: no leg has a budget, and the wall's is what the host's `limit_default` gives, no
+limit for a host without it. A file that cannot be read is said once in the log at the
+start, `limits unreadable`. A leg's budget and whether it was limited are kept in the
+legs' table, and the wall's in the core object: the budgets take no block of memory of
+their own.
 
 ## Command lines
 
@@ -274,13 +327,13 @@ upload they are about.
 
 ## Startup
 
-`odrig_core_begin` reads `mapping.json`, then `show.json`, and then opens every different
-`.odrg` file the show names, in the order in which the show first names them. Of each
-file it reads the header, the first 16 bytes, and compares the canvas with the mapping's.
-It decodes no frame record, so the time the start takes does not grow with the files. A
-file that is missing or cannot be read, a header that is not sound and another canvas
-quarantine that file, as "Unavailable animations" below says, and the start goes on with
-the next one.
+`odrig_core_begin` reads `mapping.json`, then `limits.json`, whatever came of the mapping,
+then `show.json`, and then opens every different `.odrg` file the show names, in the order
+in which the show first names them. Of each file it reads the header, the first 16 bytes,
+and compares the canvas with the mapping's. It decodes no frame record, so the time the
+start takes does not grow with the files. A file that is missing or cannot be read, a
+header that is not sound and another canvas quarantine that file, as "Unavailable
+animations" below says, and the start goes on with the next one.
 
 The bodies of the files are read after the start, while the show plays: see "The check
 after the start". A host whose storage cannot be changed has no second decoders for
@@ -315,8 +368,8 @@ change left:
    items; see [the saved order](#the-saved-order).
 
 A folder with none of the three files is asked to remove two names that are not there and
-to open three that are not there, `catalog.do`, `pending.txt` and `catalog.txt`, and for
-nothing else.
+to open four that are not there, `catalog.do`, `limits.json`, `pending.txt` and
+`catalog.txt`, and for nothing else.
 
 A show whose mapping file or show file cannot be used, whose ids are wrong, or for which
 the host has too little memory is refused as a whole: the LEDs stay dark, `play` is
@@ -838,10 +891,10 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,872 |
+| The core object | fixed | 3,896 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
-| Legs | 12 for each leg | 240 |
+| Legs | 16 for each leg, with its budget | 320 |
 | The pixel of each LED | 2 for each LED | 7,200 |
 | LED data | 3 for each LED | 10,800 |
 | Strip check | 1 bit for each strip: each row of a row-leg file, each column of a column-leg file | 8 |
@@ -855,19 +908,19 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,405** |
+| **Total** | | **125,509** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,914 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,609 bytes for the target file. A host with a drive
+of the check and the saved order: 77,713 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
 each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
 8 bytes and 104 bytes of room for the current playlist's path, 368.
-With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
+With it the target file takes 130,613 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -945,6 +998,7 @@ leg; and `ready`.
 | `--trace-reads` | Prints `read <name> <bytes>` for every call of `close`: how many bytes of the file `read` gave since it was opened. |
 | `--trace-calls` | Prints `call <bytes>` after every `poll` and every command: how many bytes `read` and `read_at` gave during that call of the core. |
 | `--about TEXT` | The host has `about`, which gives this text. |
+| `--limit-default MA` | The host has `limit_default`, which gives this budget of the wall in mA, 0 to 250,000; any other value is a usage error. Without it the host has none, and nothing is limited while no budgets are saved. |
 | `--check-first` | The check after the start takes all its steps before the startup lines are printed, with no refresh between them. The session then begins as a core that has run for a while: every file is read. |
 | `--storage BYTES` | The total space `space` reports, 0 to 4,294,967,295. The free space is the total less the sizes of the files, each rounded up to 4,096, and not below 0. Without it the total is 13,500,416, the size of the board's storage on its bigger layout. |
 | `--no-storage` | The seven storage functions are `NULL`. |

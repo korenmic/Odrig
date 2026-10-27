@@ -5,6 +5,7 @@
 #include "catalog.h"
 #include "odrig_core.h"
 #include "clock.h"
+#include "current_limits.h"
 #include "mapping_control.h"
 #include "order.h"
 #include "playlist.h"
@@ -884,10 +885,14 @@ int player_poll(Core &core, uint64_t now_ms) {
         }
         shows = advance(core, now);
     }
+    // The budgets limit what this refresh writes; a refresh that keeps the picture before
+    // keeps its bytes as they were limited.
     if (shows == kShowsPicture && core.on) {
         fill_leds(core);
+        limits_apply(core);
     } else if (shows != kShowsBefore || !core.on) {
         memset(core.led_data, 0, 3u * core.led_total);
+        limits_apply(core);
     }
     // The LED data is complete. The check of an uploaded file takes one step now, and
     // none when the host was late for this refresh. The check after the start takes its
@@ -902,6 +907,7 @@ int player_poll(Core &core, uint64_t now_ms) {
     playlist_touch(core, now);
     if (was_valid && core.invalid) {
         memset(core.led_data, 0, 3u * core.led_total);
+        limits_apply(core);
     }
     return 1;
 }

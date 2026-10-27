@@ -12,7 +12,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `tests/firmware/hostprogram.py` and `tests/firmware/test_standalone_limit.py` go;
       `docs/drifts.md` records seed 12's requirement 6, its probe members and its tasks 6
       and 10 giving way. Suites: converter's Python, firmware, onboarding.
-- [ ] 2. The core's limiting, the budgets' file read at the start, and the host's default.
+- [x] 2. The core's limiting, the budgets' file read at the start, and the host's default.
       `LegInfo`'s budget and `limited`, `Core`'s wall fields, `odrig_host`'s
       `limit_default` in the header and in every record that builds one (the test host
       with `--limit-default MA`, the firmware's shared record at `nullptr`, the emulator's

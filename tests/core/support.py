@@ -17,7 +17,7 @@ import tempfile
 import unittest
 import zlib
 
-from odrig import errors, jsonframes, mapping, odrg, odrgx, show
+from odrig import errors, jsonframes, limits, mapping, odrg, odrgx, show
 from odrig.generators import dense, dvd_bounce, hello_world
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -710,12 +710,14 @@ class ReferencePlayer:
     RESERVE = 16384
     BASE64 = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
-    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True):
+    def __init__(self, files, storage=BOARD_STORAGE, changeable=True, check_first=True, limit_default=0):
         """`files` maps the name of each installed file to its content. `storage` is the
         total space the host reports, or None for a host that cannot tell its space.
         `changeable` says whether the host's storage can be changed. With `check_first`
         the check after the start has ended before the first call, as the test host's
-        option of that name has it; without, the player is as after power-on."""
+        option of that name has it; without, the player is as after power-on.
+        `limit_default` is the wall's budget the host gives while no budgets are saved, 0
+        for none, as the test host's option `--limit-default` gives it."""
         self.storage = storage
         self.changeable = changeable
         self.error = None       # the reason the show is invalid, or None
@@ -761,6 +763,12 @@ class ReferencePlayer:
         self.logged = []        # the texts of the log since the last refresh was printed
         self.start_logs = []    # the texts of the log of the start
         self.last_sent = None   # the LED data of the latest refresh
+        # The budgets in force: the wall's, and each leg's by its number; whether they are
+        # those of `limits.json`; and the limiting of the latest refresh that wrote the LEDs.
+        self.wall_budget = limit_default
+        self.leg_budgets = {}
+        self.limits_saved = False
+        self.limiting = None
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
         if changeable:
@@ -795,6 +803,7 @@ class ReferencePlayer:
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
+        self._read_limits(files)
         if "mapping.json" not in files:
             raise _Invalid("mapping-missing")
         try:
@@ -855,6 +864,31 @@ class ReferencePlayer:
             if self.changeable:
                 self.checks.append([name, steps, reason, steps])
         return listed.start
+
+    def _read_limits(self, files):
+        """Takes the budgets of `limits.json`, when it is there and can be read; otherwise
+        the defaults stay, and a file that cannot be read is said in the log."""
+        if limits.NAME not in files:
+            return
+        try:
+            budgets = limits.loads(files[limits.NAME])
+        except errors.Rejection:
+            self.start_logs.append("limits unreadable")
+            return
+        self.wall_budget = budgets.wall
+        self.leg_budgets = dict(budgets.legs)
+        self.limits_saved = True
+
+    def _limited(self, sent):
+        """The LED data of a refresh that writes the LEDs, `(leg, bytes)` for each leg,
+        limited by the budgets in force: each leg by its own, then by the wall's, in the
+        order of `odrig.limits.limit`. Without a budget nothing changes."""
+        budgets = [self.leg_budgets.get(leg, 0) for leg, _ in sent]
+        if self.wall_budget == 0 and not any(budgets):
+            self.limiting = None
+            return sent
+        self.limiting = limits.limit([data for _, data in sent], budgets, self.wall_budget)
+        return [(leg, data) for (leg, _), data in zip(sent, self.limiting.legs)]
 
     def _usable(self, number):
         """Whether an item can be played: an animation whose file is not quarantined, or a
@@ -1078,15 +1112,18 @@ class ReferencePlayer:
                         self._quarantine(check[0], check[2])
                     if self.error is not None or not self.checks:
                         break
-        if picture is self.KEEP:
-            dark = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
-            self.last_sent = self.last_sent if self.on and self.last_sent is not None else dark
+        dark = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+        if picture is self.KEEP and self.on:
+            # The picture before is kept as it was limited; before the first refresh the
+            # LEDs are dark.
+            if self.last_sent is None:
+                self.last_sent = dark
             return self.last_sent
-        if picture is None:
-            self.last_sent = [(leg, bytes(3 * len(places))) for leg, _, places in self.legs]
+        if picture is self.KEEP or picture is None:
+            self.last_sent = self._limited(dark)
             return self.last_sent
         sent = picture.translate(bytes((value * self.brightness + 127) // 255 for value in range(256)))
-        self.last_sent = [(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs]
+        self.last_sent = self._limited([(leg, b"".join(sent[3 * place:3 * place + 3] for place in places)) for leg, _, places in self.legs])
         return self.last_sent
 
     CHECK_MOST_STEPS = 16

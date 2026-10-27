@@ -17,11 +17,15 @@ namespace odrig {
 const uint32_t kErrorTextSize = 96;
 
 // One leg of the mapping: its LEDs are `count` entries of the LED tables, from `first` on.
+// `budget` is its current budget in mA, 0 for none, and `limited` says whether a level
+// below 255 was used for it at the latest refresh that wrote the LEDs.
 struct LegInfo {
     uint16_t leg;
     uint16_t pin;
     uint32_t first;
     uint32_t count;
+    uint16_t budget;
+    uint8_t limited;
 };
 
 // One item of the show. An animation item: `first` is its entry of the file table, `count`
@@ -265,6 +269,16 @@ struct Core {
     LegInfo *legs;
     uint16_t *led_pixel;    // for each LED, the position of its pixel in pixel order
     uint8_t *led_data;      // for each LED, red, green and blue of the last refresh
+
+    // The current limits: the wall's budget in mA, 0 for none, and the host's default, which
+    // is the wall's budget while no budgets are saved; whether the wall's level was below
+    // 255 at the latest refresh that wrote the LEDs; whether the budgets of `limits.json`
+    // are in force; and whether a `limits.json` is there, readable or not.
+    uint32_t wall_budget;
+    uint32_t wall_default;
+    uint8_t wall_limited;
+    uint8_t limits_saved;
+    uint8_t limits_present;
 
     // From the show file. The item table and the file table have room for
     // `item_capacity` entries, more than the show has at startup, so that an item can be
