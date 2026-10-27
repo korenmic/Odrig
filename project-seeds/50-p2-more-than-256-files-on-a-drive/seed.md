@@ -48,6 +48,13 @@ the limit, costs 4 KB of the chip's scarce internal memory for each 256 files, a
 the 32 folders. The owner also asked that each folder's pages be precomputed and saved,
 as the catalog is, so that any page of any folder can be read without a scan.
 
+The owner's answers, 2026-10-28, to the four points the draft left open: ids of a drive's
+files and folders are 32-bit from 60001 up, without a ceiling; the index is the saved
+order of the drive's files, and `order.txt` keeps the show's items; `list in <folder-id>`
+gives one level and `status` names the playing animation, approved as forms of the
+command list; a drive without a catalog keeps today's limit of 256. Each is a
+constraint below.
+
 ## Technical Constraints
 
 - **The index is part of the catalog.** It lives in the drive's folder `odrig` beside
@@ -100,7 +107,7 @@ as the catalog is, so that any page of any folder can be read without a scan.
   `list in <folder-id> <from>` give one folder's level: its folder rows and its own files,
   with `next` as `list` has it. `status` names the playing animation's path, so that the
   app need not hold the whole list. `order get` takes `in <folder-id>` the same way. The
-  owner approves these forms by approving this seed; the spec records the approval in
+  owner approved these forms on 2026-10-28; the spec records the approval in
   `docs/decisions.md`.
 - **The app reads a level when it enters it**, and again when the list is out of date,
   with `list in`; it keeps nothing of the other levels. Its filters, selection, moves
@@ -111,8 +118,8 @@ as the catalog is, so that any page of any folder can be read without a scan.
   host, which keeps the drive's names where it keeps them; the show's items, `show.json`
   and the board's own storage.
 - **The budget decision.** This seed changes the decision of `docs/decisions.md` on the
-  core's memory with a drive, which the owner approved on 2026-10-28 by approving this
-  seed; the spec writes the change log entry.
+  core's memory with a drive, which the owner approved on 2026-10-28; the spec writes
+  the change log entry.
 
 ## Required Behavior
 
