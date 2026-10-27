@@ -20,5 +20,7 @@ export default async function(app) {
   await commands.mappingTest(true);
   await commands.mappingTest(false);
   await commands.mappingTestSnake(9);
+  await commands.mappingCross(true);
+  await commands.mappingCross(false);
   return {found, sent};
 }

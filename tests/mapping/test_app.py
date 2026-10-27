@@ -88,17 +88,55 @@ class MappingApp(unittest.TestCase):
     def test_mapping_protocol_checks_full_replies_through_the_native_bridge_contract(self):
         good = {"ok":True,"editable":True,"pins":PINS,"revision":0xffffffff,"test":True}
         replies = [good, {**good,'pins':[1]*20}, {**good,'revision':-1}, {**good,'test':'on'}, {**good,'pins':PINS[:-1]}, {**good,'pins':[*PINS[:-1],256]}, {"ok":False,"error":"mapping-conflict"}, {**good,"editable":False,"pins":[]}, {**good,"editable":False},
-                   {**good,'snake':7}, {**good,'snake':21}, {**good,'snake':'7'}, {**good,'test':False,'snake':7}]
+                   {**good,'snake':7}, {**good,'snake':21}, {**good,'snake':'7'}, {**good,'test':False,'snake':7},
+                   {**good,'cross':True}, {**good,'cross':False}, {**good,'cross':'on'}, {**good,'cross':None}]
         found = browser.run('mapping-protocol',settings={'replies':replies}).seen
-        self.assertEqual(found['found'][0],{**{k:v for k,v in good.items() if k!='ok'},'snake':None})
+        # An older target gives no `cross`: snake 10 is wired as the others.
+        self.assertEqual(found['found'][0],{**{k:v for k,v in good.items() if k!='ok'},'snake':None,'cross':False})
+        self.assertEqual([entry.get('cross', entry.get('error')) for entry in found['found'][13:]],[True,False,'bad-reply','bad-reply'])
         self.assertEqual(found['found'][9]['snake'],7)
-        self.assertEqual(found['found'][10:],[{'error':'bad-reply'}]*3)
+        self.assertEqual(found['found'][10:13],[{'error':'bad-reply'}]*3)
         self.assertEqual(found['found'][1:6],[{'error':'bad-reply'}]*5)
         self.assertEqual(found['found'][6],{'error':'mapping-conflict'})
         self.assertEqual(found['found'][7]['pins'],[])
         self.assertEqual(found['found'][8],{'error':'bad-reply'})
-        self.assertEqual(found['sent'][-4:],['mapping set 123 1,2,3','mapping test on','mapping test off','mapping test snake 9'])
+        self.assertEqual(found['sent'][-6:],['mapping set 123 1,2,3','mapping test on','mapping test off','mapping test snake 9','mapping cross on','mapping cross off'])
 
+
+    def test_the_cross_wired_box_is_off_by_default_saves_on_a_tap_and_follows_the_target(self):
+        target = self.opened()
+        found = browser.run('mapping-cross', address=f'127.0.0.1:{target.port}', steps=[lambda: target.command('mapping cross off')]).seen
+        self.assertEqual(found['label'], 'Snake 10 is cross-wired')
+        self.assertIn('up line 28, up line 30 and down line 29', found['small'])
+        self.assertFalse(found['before'])
+        self.assertTrue(found['disabledWhileSaving'])
+        self.assertEqual(found['said'], 'Saved: snake 10 is cross-wired.')
+        self.assertFalse(found['error'])
+        self.assertTrue(found['after'])
+        # The target turned it off meanwhile; the box followed, and a tap turned it on again.
+        self.assertFalse(found['followed'])
+        self.assertEqual(found['saidAgain'], 'Saved: snake 10 is cross-wired.')
+        self.assertTrue(found['last'])
+        reply = json.loads(target.command('mapping get'))
+        self.assertEqual((reply['cross'], reply['pins']), (True, PINS))
+
+    def test_a_refused_wiring_is_said_and_the_box_shows_the_target_again(self):
+        state = {"ok": True, "editable": True, "pins": PINS, "revision": 123, "cross": False, "test": False, "snake": None}
+
+        def mapping(line):
+            if line.decode().split()[1] == 'cross':
+                return (200, json.dumps({"ok": False, "error": "storage-error"}))
+            return (200, json.dumps(state))
+        with browser.StandIn({**browser.SOUND, 'mapping': mapping}) as target:
+            found = browser.run('mapping-cross', address=target.address, settings={'refused': True}).seen
+        self.assertIn('could not save its mapping', found['error'])
+        self.assertFalse(found['after'])
+
+    def test_the_box_is_disabled_while_the_mapping_is_not_editable(self):
+        with browser.StandIn(browser.SOUND) as target:
+            found = browser.run('mapping-cross', address=target.address, settings={'unsupported': True}).seen
+        self.assertTrue(found['disabled'])
+        self.assertFalse(found['checked'])
 
     def test_target_change_shows_the_new_targets_assignment(self):
         first = self.opened()

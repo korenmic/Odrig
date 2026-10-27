@@ -22,7 +22,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       across a restart. `docs/commands.md` and `docs/core.md`; `docs/drifts.md` records
       the snake test's meaning with the bit and the revision left to the pins. Suites:
       core, mapping, onboarding.
-- [ ] 3. The checkbox in the app: `mappingCross` in `commands.js` and `client.js`, the
+- [x] 3. The checkbox in the app: `mappingCross` in `commands.js` and `client.js`, the
       label in `index.html`, `latest.cross`, the poll, the draw and the `change` handler
       in `screens/mapping.js`. Tests in `tests/mapping/test_app.py` with the mapping
       scenario: off by default, on after a tap with `Saved: snake 10 is cross-wired.` and
