@@ -11132,3 +11132,69 @@ the same day?
 **Resolution.** `app/www/style.css`; `tests/app/page/reading.js`,
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
+
+## Seed 46: the installation's animations in git, the heavy ones on the share
+
+**Question.** The decision committed the JSON source of every animation; seed 10's answer
+committed an imported source in `animations/` up to 50 MB; the pages called the remote
+private; and "Seed 44: the tracked previews are the media the repository holds" let no GIF
+be tracked but the previews, and since 2026-10-28 GIFs beside a seed. Where is an
+animation the installation is given kept now, and what does git track of it?
+
+**Answer.** By the owner's answers of 2026-10-27 and 2026-10-28: git tracks `collection/`,
+each small animation file of `card/`, `earlier/` and `others/` with its `X.gif`, a copy of
+its preview, and its readme `X.md`; of a heavy file, a group of a long video or a file
+over 50,000,000 bytes, only its GIF and readme in `long/`, its key and its path on the
+card being in `thumbnails/catalog.js`. The share's collection, at `ODRIG_ANIMATIONS` of
+`env`, holds every file. No JSON of these animations is committed. The remote is public,
+and the tracked collection is published with it. The decisions this work took beyond the
+seed:
+
+- The collection built by hand in the owner's checkout was moved whole to
+  `scratch/collection-built-2026-10-27/`, and its line of `.git/info/exclude` removed, in
+  the first task: that line held for every worktree and hid every path of `collection/`
+  from `.gitignore`, so the files could only have been staged with `-f`. The archive is
+  only read since; the share holds every file.
+- The moves on the share were made and checked by a script of the agent's in
+  `scratch/collection-46/`, reading every file back against the archive; the share's path
+  came from `env`.
+- `collection/README.md` is a tracked file now; the share's copy has its bytes.
+- The test of the collection is in the onboarding suite, which checks what a clone holds;
+  it asks a git of its own about the lines of `.gitignore`, so that no exclude of one
+  computer counts.
+- The converter's test of tracked media lets the collection's GIFs be tracked, besides
+  those of `thumbnails/` and of a seed's folder.
+- `env` and `../../env` are names a page may give although no clone holds them, matched as
+  whole words, so that `env.template` is still looked for.
+
+**Resolution.** `.gitignore`, `collection/`, `converter/cli/`, docs/converter.md,
+docs/decisions.md, agent/animation-guide.md, agent/vocabulary.md,
+agent/getting-started.md, agent/working-rules.md, agent/README.md, docs/format.md;
+tests/onboarding/, converter/tests/library.test.js, converter/tests/thumbnailtool.test.js.
+
+## Seed 46: the measurement
+
+**Question.** How large is the repository with the collection, and is every animation
+available?
+
+**Answer.** Measured on 2026-10-28 on the branch of the seed. Before the commit of the
+collection, `git count-objects -vH` gave 33.24 MiB of packs; after it, 607.54 MiB. What
+`master` reaches is 28,910,112 bytes; what the branch reaches, 631,177,331, about 602 MB
+more. A clone of the branch, `git clone --no-local --single-branch`, holds 629,060 KiB of
+git and 672,136 KiB of files, 2,963 tracked files, 1,002 of them in `collection/`, and no
+animation file of `collection/long/`.
+
+A check of every animation, `scratch/collection-46/available.py` of the first computer,
+ended with `AVAILABLE 359`: each of the 359 animation files of the collection built on
+2026-10-27, by its key, is on the share's collection with its bytes; the 283 small ones
+are tracked with their bytes; the 76 heavy ones have their GIFs, their readmes and their
+keys tracked, each key with the file's path on the card among its names.
+
+Every suite that works on the first computer passed: the converter's 1,435, the Python
+library's 534, the core's 886, the emulator's 639 (10 skipped), the app's 344, the
+onboarding suite's 86, the mapping's 43, the walk-through's 5 and the firmware tool's 623.
+The walk-through, which clones the repository, took 1,418 seconds.
+
+**Resolution.**
+docs/specs/46-p2-every-animation-file-tracked-with-its-preview-and-source/tasks.md, task
+6.
