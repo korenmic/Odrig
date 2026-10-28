@@ -87,7 +87,7 @@ Rules for every task:
   - Suites: core, emulator, onboarding.
   - Requirements: 2.4, 6.1 to 6.4, 9.3
 
-- [ ] 3. The app reads one level at a time
+- [x] 3. The app reads one level at a time
   - `app/www/commands.js`: `list(from, folder)` and `orderGet(from, folder)`.
     `app/www/client.js`: the level's path, folder id, items and order, read in parts with
     `list`/`list in` and `order get`/`order get in`, read anew when a folder is entered or

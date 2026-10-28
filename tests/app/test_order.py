@@ -35,10 +35,12 @@ class TheSavedOrder(unittest.TestCase):
     def order_of(self, emulator):
         return json.loads(emulator.command("order get"))["ids"]
 
-    def test_the_rows_stand_in_the_saved_order_with_card_animations_among_them(self):
+    def test_the_rows_stand_in_the_saved_order_and_the_cards_after_them(self):
+        # The line that names a file of the card is passed over: the card's files follow the
+        # show's animations in the order of their names.
         emulator, _ = self.emulator(3, ["x b.odrg", "i 3", "i 1"], drive=["a.odrg", "b.odrg"])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 5}).seen
-        self.assertEqual(found["first"], [60002, 3, 1, 2, 60001])
+        self.assertEqual(found["first"], [3, 1, 2, 60001, 60002])
         self.assertEqual(found["first"], self.order_of(emulator))
         self.assertEqual(found["note"], HINT)
 
@@ -90,11 +92,12 @@ class TheSavedOrder(unittest.TestCase):
         self.assertEqual(found["after"], [3, 1, 4, 2])
         self.assertEqual(self.order_of(emulator), [3, 1, 4, 2])
 
-    def test_the_first_row_cannot_move_up_nor_the_last_down_and_a_card_row_moves(self):
+    def test_the_first_row_cannot_move_up_nor_the_last_down(self):
         emulator, _ = self.emulator(2, drive=["c.odrg"])
-        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "menu": [60001, "Move up", [1, 60001, 2]]}).seen
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "look": 60001}).seen
         self.assertEqual(found["menu"], ["Move up", "Move down (disabled)", "External storage is read-only: this animation cannot be ignored or deleted from the app."])
-        self.assertEqual(self.order_of(emulator), [1, 60001, 2])
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "menu": [2, "Move up", [2, 1, 60001]]}).seen
+        self.assertEqual(self.order_of(emulator), [2, 1, 60001])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "older": True}).seen
         self.assertEqual(found["menu"][1:3], ["Move up (disabled)", "Move down"])
 

@@ -13,8 +13,9 @@ export class Refusal extends Error {
   }
 }
 
-// The most bytes a size in a reply has.
+// The most bytes a size in a reply has, and the highest id of an item or of a card's file.
 const MOST_BYTES = 4294967295;
+const MOST_ID = 4294967295;
 
 function whole(value, low, high) {
   return Number.isInteger(value) && value >= low && value <= high;
@@ -69,14 +70,19 @@ function progressOf(reply) {
 // the canvas, each null when the target gives none; in `progress`, how far it has read
 // its files after its start, in `host`, the text that names it, and in `left`, the whole
 // seconds left in the window of the current playlist, each null when the target gives
-// none.
+// none; in `file`, the file of the animation on the LEDs, a card's by its path, and in
+// `playlist`, the path of the card's folder whose playlist is current, each null when the
+// target names none, and undefined from a target that does not name them.
 export async function status() {
   const reply = await carriedOut("status");
+  const named = (value) => value === undefined || value === null || typeof value === "string";
   const sound =
     typeof reply.on === "boolean" &&
     whole(reply.brightness, 0, 255) &&
-    (reply.playing === null || reply.playing === "all" || whole(reply.playing, 1, 65535)) &&
-    (reply.animation === null || whole(reply.animation, 1, 65535)) &&
+    (reply.playing === null || reply.playing === "all" || whole(reply.playing, 1, MOST_ID)) &&
+    (reply.animation === null || whole(reply.animation, 1, MOST_ID)) &&
+    named(reply.file) &&
+    named(reply.playlist) &&
     whole(reply.fps, 0, 1000000) &&
     (reply.error === null || typeof reply.error === "string") &&
     (side(reply.width) === null || whole(reply.width, 1, 65535)) &&
@@ -98,6 +104,8 @@ export async function status() {
     progress: progressOf(reply),
     host: typeof reply.host === "string" ? reply.host : null,
     left: reply.left === undefined ? null : reply.left,
+    file: reply.file,
+    playlist: reply.playlist,
   };
 }
 
@@ -119,22 +127,26 @@ export async function fault() {
   return found === null ? null : {work: found.work, file: found.file, record: found.record, bytes: found.bytes, reason: found.reason};
 }
 
-// One part of the items of the show, in its order, from a position on: each animation
-// as `{id, file, bytes}` with the booleans `ignored` and `external` and the text `type`
-// when the target gives them and `fault`, the reason it is unavailable, when it has one,
-// and `bytes` null while the installation has not read it whole; each folder of the card
-// as `{id, playlist}` with its path; each cycle as `{id, cycle: true}`; and `next`, the
-// position to ask for next, or null when the part holds the last item.
-export async function list(from = 0) {
-  const reply = await carriedOut(`list ${from}`);
+// One part of the items of a level, in its order, from a position on: of the root, the
+// show's items and the root's folders and files of the card; of the card's folder with the
+// id `folder`, its sub-folders and its own files. Each animation as `{id, file, bytes}`
+// with the booleans `ignored` and `external` and the text `type` when the target gives
+// them and `fault`, the reason it is unavailable, when it has one, and `bytes` null while
+// the installation has not read it whole; each folder of the card as `{id, playlist}`
+// with its path, and `files`, the number of its own files, when the target gives it; each
+// cycle as `{id, cycle: true}`; and `next`, the position to ask for next, or
+// null when the part holds the last item.
+export async function list(from = 0, folder = null) {
+  const reply = folder === null ? await carriedOut(`list ${from}`) : await carriedOut(`list in ${folder} ${from}`);
   const sound =
     Array.isArray(reply.items) &&
-    (reply.next === null || whole(reply.next, from + 1, 65535)) &&
+    (reply.next === null || whole(reply.next, from + 1, MOST_ID)) &&
     reply.items.every(
       (item) =>
         item !== null &&
         typeof item === "object" &&
-        whole(item.id, 1, 65535) &&
+        whole(item.id, 1, MOST_ID) &&
+        (item.files === undefined || (typeof item.playlist === "string" && whole(item.files, 0, MOST_ID))) &&
         (item.ignored === undefined || typeof item.ignored === "boolean") &&
         (item.external === undefined || typeof item.external === "boolean") &&
         (item.type === undefined || typeof item.type === "string") &&
@@ -151,7 +163,8 @@ export async function list(from = 0) {
   return {
     items: reply.items.map((item) => (typeof item.file === "string" ? {id: item.id, file: item.file, bytes: item.bytes, ...(item.ignored === undefined ? {} : {ignored: item.ignored}),
       ...(item.external === undefined ? {} : {external: item.external}), ...(item.type === undefined ? {} : {type: item.type}),
-      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist} : {id: item.id, cycle: true})),
+      ...(item.fault === undefined ? {} : {fault: item.fault})} : typeof item.playlist === "string" ? {id: item.id, playlist: item.playlist, ...(item.files === undefined ? {} : {files: item.files})} :
+      {id: item.id, cycle: true})),
     next: reply.next,
   };
 }
@@ -236,7 +249,7 @@ export async function read(id, offset) {
 // null.
 export async function uploadEnd(crc) {
   const reply = await carriedOut(`upload end ${crc}`);
-  if (!(reply.id === undefined || whole(reply.id, 1, 65535))) {
+  if (!(reply.id === undefined || whole(reply.id, 1, MOST_ID))) {
     throw new Failure("bad-reply", address());
   }
   return reply.id === undefined ? null : reply.id;
@@ -322,9 +335,14 @@ export async function removeMany(ids) {
 // One part of the saved playlist order, from a position on: the ids of the listed
 // animations in their order, `next`, the position to ask for next or null, and the
 // order's revision.
-export async function orderGet(from = 0) {
-  const reply = from === 0 ? await carriedOut("order get") : await carriedOut(`order get ${from}`);
-  if (!Array.isArray(reply.ids) || !reply.ids.every((id) => whole(id, 1, 65535)) || !(reply.next === null || whole(reply.next, from + 1, 65535)) ||
+export async function orderGet(from = 0, folder = null) {
+  let reply;
+  if (folder === null) {
+    reply = from === 0 ? await carriedOut("order get") : await carriedOut(`order get ${from}`);
+  } else {
+    reply = from === 0 ? await carriedOut(`order get in ${folder}`) : await carriedOut(`order get in ${folder} ${from}`);
+  }
+  if (!Array.isArray(reply.ids) || !reply.ids.every((id) => whole(id, 1, MOST_ID)) || !(reply.next === null || whole(reply.next, from + 1, MOST_ID)) ||
       !whole(reply.revision, 0, MOST_BYTES)) {
     throw new Failure("bad-reply", address());
   }

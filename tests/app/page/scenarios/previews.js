@@ -62,7 +62,8 @@ export default async function (app) {
     await app.until(() => app.text("level-title") === path && previewed(app) >= 1, `the folder ${path}`);
     seen[path] = squares(app);
     app.press("Back");
-    await app.until(() => app.text("level-title") === "Root", "the root");
+    // The root's level is read anew.
+    await app.until(() => app.text("level-title") === "Root" && squares(app).length >= settings.rows, "the root");
   }
   if (settings.tap !== undefined) {
     const row = app.doc.querySelector(`#animations-list > .row[data-id="${settings.tap}"]`);

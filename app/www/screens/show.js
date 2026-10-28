@@ -88,9 +88,9 @@ export function timeLeft(left) {
   return `${Math.floor(left / 3600)} h ${Math.floor((left % 3600) / 60)} min left`;
 }
 
-// What plays, in words: the root playlist, or a folder's by its path, each with the time
-// left in its window, the root playing in a folder's place said so; a cycle by its id;
-// or nothing.
+// What plays, in words: the root playlist, or a folder's by its path as `status` names
+// it, each with the time left in its window, the root playing in a folder's place said so
+// when the file on the LEDs is not of the folder; a cycle by its id; or nothing.
 function playing(status, state) {
   if (status.error !== null) {
     return messages.ofInvalidShow(status.error);
@@ -99,73 +99,48 @@ function playing(status, state) {
     return "Nothing plays";
   }
   if (status.playing === "all") {
-    return state.folders.length > 0 && status.left !== null ? `Playlist \u00b7 ${timeLeft(status.left)}` : "Playlist";
+    const folders = state.folders.length > 0 || state.level.id !== null;
+    return folders && status.left !== null ? `Playlist \u00b7 ${timeLeft(status.left)}` : "Playlist";
   }
-  if (state.cycles.includes(status.playing)) {
-    return `Cycle ${status.playing}`;
-  }
-  const folder = state.folders.find((item) => item.id === status.playing);
-  if (folder !== undefined) {
-    const shown = status.animation === null || state.animations === null ? undefined : state.animations.find((animation) => animation.id === status.animation);
-    const elsewhere = shown !== undefined && !(isExternal(shown) && under(shown.file, folder.playlist));
-    const words = `Playlist ${folder.playlist}${elsewhere ? ", the root plays for now" : ""}`;
+  if (typeof status.playlist === "string") {
+    const elsewhere = typeof status.file === "string" && !under(status.file, status.playlist);
+    const words = `Playlist ${status.playlist}${elsewhere ? ", the root plays for now" : ""}`;
     return status.left === null ? words : `${words} \u00b7 ${timeLeft(status.left)}`;
   }
-  // A number the list has neither as a cycle nor as a folder: a folder of a card just put
-  // in, while the list is asked for again; a cycle, for a target without the time left.
-  return status.left === null ? `Cycle ${status.playing}` : `Playlist ${status.playing} \u00b7 ${timeLeft(status.left)}`;
+  return `Cycle ${status.playing}`;
 }
 
 // The playlist that is current: "" for the root, a folder's path, or null while a cycle
 // or nothing plays.
-function markedPath(status, state) {
+function markedPath(status) {
   if (status === null || status.playing === null) {
     return null;
   }
   if (status.playing === "all") {
     return "";
   }
-  const folder = state.folders.find((item) => item.id === status.playing);
-  return folder === undefined ? null : folder.playlist;
+  return typeof status.playlist === "string" ? status.playlist : null;
 }
 
-// The level shown, as a file explorer shows one folder at a time: the path of the folder
-// opened, "" for the root.
-let opened = "";
-
-// The parent of a folder's path: the part before its last `/`, the root for a folder of
-// the card's folder itself; and a folder's own name, the part after it.
-function parentOf(path) {
-  return path.includes(`/`) ? path.slice(0, path.lastIndexOf(`/`)) : "";
-}
-
+// A folder's own name: the part of its path after its last `/`.
 function nameOf(path) {
   return path.includes(`/`) ? path.slice(path.lastIndexOf(`/`) + 1) : path;
 }
 
-// The level shown and what it holds: its folder of the list, null at the root; its own
-// rows in the shown order and those of them the filters show; and its sub-folders in the
-// order of the list, each with the count of the files directly in it.
+// The level shown and what it holds, as the list of the level gives it: its path; its rows
+// in the shown order and those of them the filters show; and its sub-folders in the order
+// of the list, each with the count of the files directly in it.
 function levelOf(state, all) {
-  const folder = opened === "" ? null : state.folders.find((item) => item.playlist === opened) ?? null;
-  const rows = all.filter((animation) => folderOf(animation) === opened);
-  const folders = state.folders.filter((item) => parentOf(item.playlist) === opened).map((item) => ({
-    path: item.playlist, id: item.id, name: nameOf(item.playlist), count: all.filter((animation) => folderOf(animation) === item.playlist).length,
-  }));
-  return {path: opened, folder, rows, shown: rows.filter(filters.matches), folders};
+  const folders = state.folders.map((item) => ({path: item.playlist, id: item.id, name: nameOf(item.playlist), count: item.files ?? 0}));
+  return {path: state.level.path, rows: all, shown: all.filter(filters.matches), folders};
 }
 
-// The level shown, for the other parts of the screen.
-export function shownLevel() {
-  return opened;
-}
-
-// Enters a folder of the card, or the root for "", as a tap on a folder row or on Back
-// does.
-export function enter(path) {
-  opened = path;
+// Enters a folder of the card, as a tap on a folder row does, or goes up a level for null,
+// as Back does: the client reads the new level.
+function enter(entry) {
   closeMenu();
-  draw(client.state);
+  if (entry === null) client.back();
+  else client.enter({id: entry.id, playlist: entry.path});
 }
 
 function countWords(count) {
@@ -195,14 +170,18 @@ function folderRow(entry) {
   chevron.setAttribute("aria-hidden", "true");
   chevron.textContent = "\u203a";
   made.append(text, chevron);
-  made.addEventListener("click", () => enter(entry.path));
+  made.addEventListener("click", () => enter(entry));
   return made;
 }
 
-// The animation on the LEDs: its id, and its file name when the list has it.
+// The animation on the LEDs: its id, and its file name as `status` names it or the list
+// has it.
 function now(status, animations) {
   if (status.animation === null) {
     return null;
+  }
+  if (typeof status.file === "string") {
+    return `Now ${status.animation} ${status.file}`;
   }
   const found = animations === null ? undefined : animations.find((animation) => animation.id === status.animation);
   return found === undefined ? `Now ${status.animation}` : `Now ${found.id} ${found.file}`;
@@ -357,7 +336,7 @@ function rowsState(state, animations, here) {
   const version = client.targetVersion();
   // The level's head: its title, Back inside a folder, and the mark while its playlist is
   // current; each folder row's count, and its mark when it leads to the current playlist.
-  const marked = markedPath(state.status, state);
+  const marked = markedPath(state.status);
   byId("level-title").textContent = here.path === "" ? "Root" : here.path;
   byId("level-back").hidden = here.path === "";
   byId("level-head").setAttribute("aria-current", String(marked === here.path));
@@ -421,11 +400,6 @@ function draw(state) {
     }
   }
   const all = shownOrder(state);
-  // A folder gone from the list, with the card or with a new target, brings the list to
-  // the root.
-  if (opened !== "" && !state.folders.some((item) => item.playlist === opened)) {
-    opened = "";
-  }
   const here = levelOf(state, all);
   const animations = here.shown;
   filters.draw(state, here.rows);
@@ -620,8 +594,8 @@ export function start(options) {
   message = options.message;
   previews.watch(redraw);
   filters.start({redraw});
-  selection.start({message, redraw, visible: (animation) => folderOf(animation) === opened});
-  reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: (state) => shownOrder(state).filter((animation) => folderOf(animation) === opened)});
+  selection.start({message, redraw, visible: () => true});
+  reorder.start({message, redraw, shownOrder, groupOf: folderOf, levelRows: shownOrder});
   extend({menu: reorder.menu, draw: reorder.draw, order: reorder.order});
   tests.start({message, isVisible});
   extend({draw: tests.draw});
@@ -629,11 +603,11 @@ export function start(options) {
   byId("off").addEventListener("click", () => client.switchOff());
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
-    const folder = opened === "" ? undefined : client.state.folders.find((item) => item.playlist === opened);
-    if (folder === undefined) client.playAll();
-    else client.play(folder.id);
+    const level = client.state.level;
+    if (level.id === null) client.playAll();
+    else client.play(level.id);
   });
-  byId("level-back").addEventListener("click", () => enter(parentOf(opened)));
+  byId("level-back").addEventListener("click", () => enter(null));
   const level = byId("level");
   level.addEventListener("input", () => {
     held = true;
