@@ -39,7 +39,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - `docs/commands.md`, `docs/show.md`, `docs/core.md`.
   - Suites: the core's, the emulator's, onboarding.
 
-- [ ] 3. The saved repeats of the drive's files
+- [x] 3. The saved repeats of the drive's files
   - `core/src/repeats.cpp` (the table, the steps after the order's), `core/src/order.cpp`
     (the block, the phase, the yield), `core/src/core_state.h` (`repeats_drive`).
   - Tests in `tests/core/test_repeat.py` with a drive: a card's file saved and played by

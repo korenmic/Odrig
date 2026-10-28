@@ -846,7 +846,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,872 |
+| The core object | fixed | 3,880 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -863,19 +863,20 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,405** |
+| **Total** | | **125,413** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,890 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,609 bytes for the target file. A host with a drive
+of the check and the saved order: 77,617 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
 each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
-8 bytes and 104 bytes of room for the current playlist's path, 368.
-With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
+8 bytes and 104 bytes of room for the current playlist's path, 368, and the saved repeats of
+32 of the drive's files, 4 bytes each, 128.
+With it the target file takes 130,645 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -1096,6 +1097,17 @@ form clears every saved repeat and gives the log `repeats unreadable` once for t
 It is read at startup after `order.txt`, and again wherever `order.txt` is read again as a
 whole, and after an upload gives an item another file name. A line `f <name>` gives its
 loops to every item whose file has that name and has none yet.
+
+On a host with a drive the block of the saved order holds a table of 32 entries of 4 bytes,
+the place of a drive's file and its loops, for the saved repeats of the drive's files. A
+line `x <name>` gives its loops to the place whose name it is, found as an entry of
+`order.txt` is, by the hash and `drive_name`, while that place has none yet and an entry is
+free. When a drive is counted or leaves, the table is emptied; the drive's check reads the
+drive's lines of `repeats.txt` right after its part of `order.txt`, in steps of one read of
+at most 512 bytes, before any of its files joins the playlist, and begins again when the
+second source is taken meanwhile. A take-up that would match more than 32 lines uses the
+first 32, and the log says `repeats over` once. A save that would add a 33rd is refused
+with `no-space`.
 
 `repeat <id> <n> save` and `repeat <id> default` read the file twice through the second
 source, after the drive's check has yielded it: once to count the lines of the other

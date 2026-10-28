@@ -97,8 +97,60 @@ void clear_items(Core &core) {
     }
 }
 
+void clear_drive(Core &core) {
+    for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
+        core.repeats_drive[at].place = 0;
+        core.repeats_drive[at].loops = 0;
+    }
+}
+
 void clear_all(Core &core) {
     clear_items(core);
+    clear_drive(core);
+}
+
+// The entry of the drive's table for a place, or kRepeatsDriveMost.
+uint32_t entry_of(const Core &core, uint32_t place) {
+    for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
+        if (core.repeats_drive[at].loops != 0 && core.repeats_drive[at].place == place) {
+            return at;
+        }
+    }
+    return kRepeatsDriveMost;
+}
+
+// Whether every entry of the drive's table is taken.
+bool drive_full(const Core &core) {
+    for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
+        if (core.repeats_drive[at].loops == 0) {
+            return false;
+        }
+    }
+    return core.repeats_drive != nullptr;
+}
+
+// Gives a line `x` to the place of the drive whose file has its name, when that place has
+// no saved repeat yet: a new entry, or with every entry taken none; at the take-up of a
+// drive, `taking_up`, the log says `repeats over` once then.
+void apply_drive(Core &core, const Line &line, bool taking_up) {
+    if (line.kind != 'x' || core.repeats_drive == nullptr) {
+        return;
+    }
+    const uint32_t place = order_place_named(core, line.name, line.length);
+    if (place == kDriveMost || entry_of(core, place) != kRepeatsDriveMost) {
+        return;
+    }
+    for (uint32_t at = 0; at < kRepeatsDriveMost; ++at) {
+        if (core.repeats_drive[at].loops == 0) {
+            core.repeats_drive[at].place = static_cast<uint16_t>(place);
+            core.repeats_drive[at].loops = static_cast<uint16_t>(line.loops);
+            return;
+        }
+    }
+    if (taking_up && !core.order_reader.over && core.host.log != nullptr) {
+        core.host.log(core.host.ctx, "repeats over");
+    }
+    core.order_reader.over = 1;
 }
 
 // Gives a line read to the items that name its file and have no saved repeat yet: the first
@@ -189,9 +241,19 @@ void unreadable(Core &core) {
     }
 }
 
-void read_whole(Core &core) {
-    clear_all(core);
-    const Ending ending = read_through(core, [&core](const Line &line, uint32_t) { apply(core, line); });
+// Reads the whole file and gives its lines to the items, and with `drive` to the drive's
+// places too.
+void read_whole(Core &core, bool drive) {
+    clear_items(core);
+    if (drive) {
+        clear_drive(core);
+    }
+    const Ending ending = read_through(core, [&core, drive](const Line &line, uint32_t) {
+        apply(core, line);
+        if (drive) {
+            apply_drive(core, line, false);
+        }
+    });
     if (ending == kEndBad || ending == kEndFailed) {
         unreadable(core);
     }
@@ -201,6 +263,11 @@ void read_whole(Core &core) {
 bool any_saved(const Core &core) {
     for (uint32_t position = 0; position < core.item_count; ++position) {
         if (!core.items[position].is_cycle && (core.items[position].count >> kSavedShift) != 0) {
+            return true;
+        }
+    }
+    for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
+        if (core.repeats_drive[at].loops != 0) {
             return true;
         }
     }
@@ -369,6 +436,9 @@ uint32_t change(Core &core, uint32_t id, uint32_t loops, uint64_t now, Reply &re
     // The turn of the animation as it was before its count changes.
     TurnCounts before;
     const bool reported = player_counts(core, now, &before) && before.id == id;
+    if (loops != 0 && is_drive(position) && repeats_of(core, position) == 0 && drive_full(core)) {
+        return refuse(reply, "no-space");
+    }
     if (repeats_of(core, position) != loops) {
         Plan plan;
         plan.kind = is_drive(position) ? 'x' : 'f';
@@ -406,7 +476,8 @@ uint32_t change(Core &core, uint32_t id, uint32_t loops, uint64_t now, Reply &re
 
 uint32_t repeats_of(const Core &core, uint32_t position) {
     if (is_drive(position)) {
-        return 0;
+        const uint32_t at = entry_of(core, position - kDriveBase);
+        return at == kRepeatsDriveMost ? 0 : core.repeats_drive[at].loops;
     }
     return core.items[position].count >> kSavedShift;
 }
@@ -415,14 +486,50 @@ void repeats_start(Core &core) {
     if (core.checker == nullptr || core.order_items == nullptr) {
         return;
     }
-    read_whole(core);
+    read_whole(core, false);
 }
 
 void repeats_reload(Core &core) {
     if (core.checker == nullptr || core.order_items == nullptr) {
         return;
     }
-    read_whole(core);
+    read_whole(core, true);
+}
+
+void repeats_drive_found(Core &core) {
+    clear_drive(core);
+}
+
+void repeats_drive_step(Core &core) {
+    FileSource &source = core.checker->file;
+    OrderReader &reader = core.order_reader;
+    if (!core.order_reading) {
+        clear_drive(core);
+        source.open_at(core.host, kRepeatsFile);
+        reader_clear(core);
+        core.order_reading = 1;
+    }
+    Taken taken = kTakenOn;
+    int got = source.get();
+    while (got >= 0) {
+        taken = take_byte(core, static_cast<uint8_t>(got), [&core](const Line &line, uint32_t) { apply_drive(core, line, true); });
+        if (taken == kTakenBad) {
+            break;
+        }
+        if (source.position >= source.length) {
+            // The rest at the next step.
+            return;
+        }
+        got = source.get();
+    }
+    const uint32_t read = source.taken;
+    source.close();
+    core.order_reading = 0;
+    core.order_due = 0;
+    const bool missing = taken == kTakenOn && got == -kReadError && read == 0;
+    if (!missing && (taken == kTakenBad || got == -kReadError || reader.header == 0 || reader.length != 0)) {
+        unreadable(core);
+    }
 }
 
 uint32_t repeats_save(Core &core, uint32_t id, uint32_t loops, uint64_t now, Reply &reply) {

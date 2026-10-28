@@ -178,6 +178,14 @@ const uint32_t kDriveNameSize = 16;
 // Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
 const uint32_t kDriveListedName = 128;
 
+// A saved repeat of a file of the drive: its place and its loops, 0 for a free entry. The
+// core keeps kRepeatsDriveMost of them.
+struct RepeatOf {
+    uint16_t place;
+    uint16_t loops;
+};
+const uint32_t kRepeatsDriveMost = 32;
+
 // The reading of `order.txt` line by line: the entries taken so far, whether its first line
 // was read and was the header, and the line so far without its line feed. A line longer
 // than kOrderLineMost is no entry. The line's room is a catalog's longest line: the reading
@@ -336,11 +344,14 @@ struct Core {
     // The saved playlist order, for a host whose storage can be changed: for each item of
     // the item table, and for each place of a drive, the number of the entry of `order.txt`
     // that names it, or kOrderUnnamed; for each place the low byte of its name's hash. While
-    // `order_due` is set the drive's check reads the file before the drive's files, and
-    // `order_reading` while it is in the middle of it.
+    // `order_due` is set the drive's check reads the file before the drive's files, 1 while
+    // it reads `order.txt` and 2 while it reads `repeats.txt`, and `order_reading` while it
+    // is in the middle of one. In the same block, for a host with a drive, the saved repeats
+    // of the drive's files.
     uint16_t *order_items;
     uint16_t *order_drive;
     uint8_t *order_hash;
+    RepeatOf *repeats_drive;
     uint8_t order_due;
     uint8_t order_reading;
     OrderReader order_reader;

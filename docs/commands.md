@@ -654,8 +654,8 @@ saved, and restoring an animation that has none, write nothing and still act on 
 - `unknown-id`: `<id>` is the id of no animation `list` lists, of no cycle and of no folder
   of the card.
 - `in-use`: `<id>` is the id of a cycle or of a folder of the card, which keep no repeat.
-- `no-space`, for a save only: the file holds 512 lines of other animations once the
-  lines of files `show.json` no longer names are dropped, which a save does whenever it
-  finds the file full.
+- `no-space`, for a save only: the drive's files would have more than 32 saved repeats, or
+  the file holds 512 lines of other animations once the lines of files `show.json` no
+  longer names are dropped, which a save does whenever it finds the file full.
 - `storage-error`: the file could not be read or written, or the board's storage cannot be
   changed. Nothing changes. A file out of form is no failure: a save writes it anew.

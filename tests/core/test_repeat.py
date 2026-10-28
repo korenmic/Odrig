@@ -2,13 +2,15 @@ import json
 import unittest
 
 from . import support
+from .test_catalog_drive import card, polls
+from .test_catalog_writes import a_card
 from .test_clocks import CANVAS as DRAWN_CANVAS
 from .test_clocks import clock_of
 from .test_clocks import show_of as drawn_show_of
-from .test_drive import DONE, DRIVE, SHOW, asked, pictures, refusal, replies, with_drive
+from .test_drive import DONE, DRIVE, SHOW, a_drive, asked, pictures, refusal, replies, with_drive
 from .test_folders import WINDOW, WINDOWED
 from .test_playback import T0, Playback
-from .test_playlist import CANVAS, show_of, three, with_a_cycle
+from .test_playlist import CANVAS, loop_of, show_of, three, with_a_cycle
 from .test_texts import pass_of, text_of
 from .test_upload import Script
 
@@ -458,6 +460,62 @@ class TheFile(Playback):
         script = first_poll() + asked(1000, "repeat 1 5 save", "status") + asked(25_000, "status", "repeat 2 2 save", "repeat 1 default", "status")
         script += asked(40_000, "status") + asked(130_000, "status", "repeat 3 default", "status") + asked(200_000, "status")
         self.assert_as_the_reference(files, script)
+
+
+class TheDrivesFiles(Playback):
+    def test_a_cards_file_is_saved_by_its_name_and_plays_its_count_across_a_restart(self):
+        with a_drive(DRIVE) as top:
+            run, kept = support.start_and_keep(SHOW, asked(0, "play 60001") + asked(20, "repeat 60001 3 save", "status") + asked(9_000, "status") + asked(9_020, "status"),
+                                               ["--drive", top])
+            self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n3 x A.ODRG\n")
+            self.assertEqual(counts(run), [(60001, 3, 1), (60001, 3, 3), (60002, 2, 1)])
+            self.assertEqual(saved_of(run), [(60001, 3), (60001, 3), (60002, None)])
+            again = support.start(kept, asked(0, "play 60001") + asked(20, "status"), ["--drive", top])
+        self.assertEqual(counts(again), [(60001, 3, 1)])
+        self.assertEqual(saved_of(again), [(60001, 3)])
+
+    def test_the_drives_lines_are_read_before_any_of_its_files_plays(self):
+        files = repeats(SHOW, "2 x b.odrg", "3 x A.ODRG", "4 x absent.odrg")
+        # The show's animation plays one loop of 4 seconds, then `A.ODRG` and `b.odrg` their
+        # saved counts: 3 loops of 3 seconds and 2 of 2.
+        script = asked(0) + [line for time in (100, 4_100, 12_900, 13_100, 16_900, 17_100) for line in asked(time, "status")]
+        run = with_drive(files, DRIVE, script)
+        self.assertEqual([(animation, repeat) for animation, repeat, _ in counts(run)], [(1, 1), (60001, 3), (60001, 3), (60002, 2), (60002, 2), (1, 1)])
+
+    def test_a_card_pulled_out_keeps_its_lines_and_put_back_has_them_again(self):
+        files = repeats(SHOW, "3 x A.ODRG")
+        script = asked(0, "play 60001") + asked(20, "status") + ["drive pull"] + asked(40, "status") + ["drive plug"]
+        script += [f"poll {T0 + 40 + 20 * step}" for step in range(1, 40)] + asked(1000, "play 60001") + asked(1020, "status")
+        with a_drive(DRIVE) as top:
+            run, kept = support.start_and_keep(files, script, ["--drive", top])
+        self.assertEqual(saved_of(run), [(60001, 3), (1, None), (60001, 3)])
+        self.assertEqual(kept["repeats.txt"], files["repeats.txt"].encode())
+
+    def test_a_rebuild_of_the_cards_catalog_matches_them_again(self):
+        drive = {**card({"sun.odrg": loop_of(2, 5), "moon.odrg": loop_of(3, 6)}), "copied.odrg": loop_of(2, 7)}
+        files = repeats(SHOW, "4 x copied.odrg")
+        script = polls(0, 300) + asked(6100, "list") + asked(6120, "catalog rebuild external") + polls(6140, 400) + asked(14200, "list")
+        with a_card(drive) as top:
+            run = support.start(files, script, ["--drive", top])
+        copied = next(item["id"] for item in replies(run)[-1]["items"] if item.get("file") == "copied.odrg")
+        script += asked(14_220, f"play {copied}") + asked(14_240, "status")
+        with a_card(drive) as top:
+            run = support.start(files, script, ["--drive", top])
+        self.assertEqual(saved_of(run), [(copied, 4)])
+
+    def test_32_of_the_drives_files_keep_saved_repeats_and_more_is_no_space(self):
+        drive = {f"f{number:02d}.odrg": loop_of(2, number) for number in range(34)}
+        files = repeats(SHOW, *(f"{number + 1} x f{number:02d}.odrg" for number in range(33)))
+        with a_drive(drive) as top:
+            run, kept = support.start_and_keep(files, asked(0, "list") + asked(20, "repeat 60032 5 save", "repeat 60034 5 save", "repeat 60033 5 save",
+                                                                           "repeat 60001 9 save", "play 60032") + asked(40, "status"), ["--drive", top])
+        # The drive's files have their ids in the order of their names, from 60,001 on.
+        self.assertEqual(replies(run)[0]["items"][1]["file"], "f00.odrg")
+        self.assertEqual(replies(run)[1:5], [DONE, refusal("no-space"), refusal("no-space"), DONE])
+        self.assertEqual(logs_of(run).count("repeats over"), 1)
+        self.assertEqual(saved_of(run), [(60032, 5)])
+        lines = kept["repeats.txt"].decode().splitlines()
+        self.assertEqual((lines[1], lines[32], lines[33]), ("9 x f00.odrg", "5 x f31.odrg", "33 x f32.odrg"))
 
 
 if __name__ == "__main__":

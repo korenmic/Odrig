@@ -377,6 +377,9 @@ never writes two.
 - A saved repeat belongs to the file name, not to the id. A removal keeps its line, and an
   item or a file that has that name again has it again; an upload under another name, or a
   new name, starts from the animation's own count. Two items that name one file share it.
+- A drive's lines are matched to its files by name when it is read, before any of them
+  plays: of its files, 32 at most have a saved repeat, the first 32 the file names; a drive
+  that would have more gives the others none, and the log says `repeats over`.
 - The player writes the file whole as `repeats.part` and renames it, as it writes
   `order.txt`: a power cut leaves the old file or the new one, and a `repeats.part` left by
   one is removed at the next start.

@@ -27,6 +27,14 @@ void repeats_start(Core &core);
 // drive's places.
 void repeats_reload(Core &core);
 
+// A drive's places were counted, or it left: its saved repeats are dropped until its lines
+// are read.
+void repeats_drive_found(Core &core);
+
+// One step of the drive's part of the file: the bytes of one read at most. At its end the
+// drive's check goes on with the drive's files.
+void repeats_drive_step(Core &core);
+
 // The reply to `repeat <id> <n> save`: the listed animation with the id keeps `n` loops for
 // every later turn, and its reported turn plays them. The whole file is saved before the
 // reply.
