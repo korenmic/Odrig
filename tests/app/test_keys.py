@@ -348,6 +348,11 @@ class KeptOnThePhone(unittest.TestCase):
                 target.state["internal"] = "damaged"
                 target.state["external"] = "absent"
             marks.append(len(stand_in.lines))
+            # The app has to see the damage before the catalog is whole again: on a loaded
+            # computer its next question may come later than the scenario's pause.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline and not any(line.startswith(b"catalog") for _, line in stand_in.lines[marks[-1]:]):
+                time.sleep(0.05)
 
         def loading():
             with target.lock:
