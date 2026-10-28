@@ -11132,3 +11132,26 @@ the same day?
 **Resolution.** `app/www/style.css`; `tests/app/page/reading.js`,
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
+
+## Seed 53: isolation under load, and the slowest tests
+
+**Question.** Task 2 of seed 53 mends every failure that comes from two workers or two
+suites sharing a file, a port or a build. What did the first loaded run show, and where
+does the work go that brings the slowest tests within requirement 8.1?
+
+**Answer.** The first run of `tests/run.py` with its default eight workers, on db81baa with
+the runner of task 1, failed in nothing shared: every failure of the emulator's, the
+app's, the core's and the converter's suites was absent, and the one failure, of
+`tests.firmware.test_paths`, came from the firmware tool's Python environment linked into
+the checkout from another one, which task 6's `ODRIG_TOOLS` settles. The suites already
+take their ports from the system, their folders from temporary directories and their
+Chrome profiles from temporary folders, and the firmware suite compiles its host program
+into a temporary folder; the emulator's package no longer builds the core under the
+runner (task 1). Its wall time was 631 s, against 1,954 s for the same suites one after
+another; the core's suite, 598 s, was bound by one test of 492 s,
+`test_the_memory_does_not_depend_on_the_length_of_a_clip`, whose time is the test host's
+`read_at` reading the whole of a 10.8 MB file again for every call of at most 512 bytes.
+That and the other tests that keep a suite above a third of its time alone are task 3's,
+with the timing: requirement 8.1 is met there.
+
+**Resolution.** No code changes for task 2; task 3 takes the slowest tests with the timing.

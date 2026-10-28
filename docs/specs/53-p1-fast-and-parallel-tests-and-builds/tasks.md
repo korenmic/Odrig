@@ -10,7 +10,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       under `core/build/.lock`. `tests/runner` with stand-in suites. The page's command
       of the new suite and the onboarding suite's table of suites. Suites: runner,
       onboarding, emulator.
-- [ ] 2. Isolation under load. Run `tests/run.py` with the default workers and mend
+- [x] 2. Isolation under load. Run `tests/run.py` with the default workers and mend
       every failure that comes from two workers or two suites sharing a file, a port or
       a build: each test made to take its own, the failure seen first in the loaded run
       and quoted in the commit. Suites: runner, then every suite through the runner.
