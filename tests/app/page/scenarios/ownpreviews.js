@@ -1,7 +1,8 @@
 // The previews this phone makes of what it uploads: an animation made on Upload, or a text
 // made in its form, uploaded and then shown in its row, again after the app is loaded anew;
 // the phone's catalog at the start, its copy of a key of the default catalog dropped; a
-// preview that cannot be made; and a web view without IndexedDB.
+// preview that cannot be made; a web view without IndexedDB; and a start that a later one
+// overtakes.
 
 // The app's own modules, through a module script in its frame.
 async function modules(app) {
@@ -39,6 +40,55 @@ async function storedKeys(app) {
     };
     request.onerror = () => reject(request.error);
   });
+}
+
+// The names of the keys of the catalogs kept in IndexedDB, at the version the database has.
+async function keptNames(app) {
+  const view = app.frame.contentWindow;
+  return new Promise((resolve, reject) => {
+    const request = view.indexedDB.open("odrig-previews");
+    request.onsuccess = () => {
+      const names = request.result.transaction("keys").objectStore("keys").getAllKeys();
+      names.onsuccess = () => {
+        request.result.close();
+        resolve(names.result.map(String).sort());
+      };
+      names.onerror = () => reject(names.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// IndexedDB of the app's frame, whose opens wait until `let()` is called.
+function held(view) {
+  const waiting = [];
+  return {
+    open(name, version) {
+      const request = {};
+      waiting.push(() => {
+        const real = view.indexedDB.open(name, version);
+        real.onupgradeneeded = () => {
+          request.result = real.result;
+          if (request.onupgradeneeded) request.onupgradeneeded();
+        };
+        real.onsuccess = () => {
+          request.result = real.result;
+          if (request.onsuccess) request.onsuccess();
+        };
+        real.onerror = () => {
+          request.error = real.error;
+          if (request.onerror) request.onerror();
+        };
+        real.onblocked = () => {
+          if (request.onblocked) request.onblocked();
+        };
+      });
+      return request;
+    },
+    let() {
+      for (const open of waiting.splice(0)) open();
+    },
+  };
 }
 
 async function storeKeys(app, keys) {
@@ -112,6 +162,21 @@ export default async function (app) {
     seen.stored = await storedKeys(app);
     seen.defaultSource = previews.sourceOf(settings.defaultKey);
     seen.ownSource = previews.sourceOf("0badcafe-12");
+    return seen;
+  }
+  if (settings.mode === "overtaken") {
+    // A start that a later one overtakes, here one without IndexedDB, leaves the database it
+    // opens: the keys kept afterwards are written nowhere.
+    const {previews} = await modules(app);
+    await app.sleep(1000);
+    const slow = held(app.frame.contentWindow);
+    const overtaken = previews.start(slow);
+    await previews.start(null);
+    slow.let();
+    await overtaken;
+    previews.keeper.keep("overtaken", "internal", {generation: 1, entries: 1, byName: new Map([["a.odrg", "00000000-1"]])});
+    await app.sleep(500);
+    seen.kept = await keptNames(app);
     return seen;
   }
   if (settings.mode === "refused") {

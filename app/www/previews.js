@@ -23,6 +23,8 @@ const watchers = new Set();
 // ${storage}`, each `{generation, entries, byName}`; in the store `keys` each is kept as
 // `{generation, entries, names}`, `names` the pairs of `byName`.
 const kept = new Map();
+// The starts so far: only the latest keeps the database it opens.
+let starts = 0;
 
 // The keys of the default catalog by each of the names it gives them.
 const named = new Map();
@@ -168,6 +170,8 @@ export const keeper = {
 // it ends stay, and are written then. A web view without IndexedDB, or one that refuses it,
 // keeps the previews and the keys of this run alone, and nothing is said.
 export async function start(factory = typeof indexedDB === "undefined" ? null : indexedDB) {
+  starts += 1;
+  const mine = starts;
   database = null;
   if (factory === null) {
     return;
@@ -205,10 +209,17 @@ export async function start(factory = typeof indexedDB === "undefined" ? null : 
       const keys = kept.get(name);
       store.put({generation: keys.generation, entries: keys.entries, names: [...keys.byName]}, name);
     }
+    // A later start replaces this one: the database it opened is left.
+    if (mine !== starts) {
+      found.close();
+      return;
+    }
     database = found;
     told();
   } catch {
-    database = null;
+    if (mine === starts) {
+      database = null;
+    }
   }
 }
 
