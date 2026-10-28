@@ -401,6 +401,36 @@ class Emulator:
         self.stop()
 
 
+# More connections than a browser opens to one server at once, with room to spare.
+AT_ONCE = 32
+
+
+def connected_at_once(port, count=AT_ONCE, seconds=2):
+    """How many of `count` connections made at the same moment to a port of 127.0.0.1 are
+    taken within `seconds`, while its server accepts none of them."""
+    taken = []
+    made = []
+
+    def connect():
+        connection = socket.socket()
+        made.append(connection)
+        connection.settimeout(seconds)
+        try:
+            connection.connect(("127.0.0.1", port))
+        except OSError:
+            return
+        taken.append(connection)
+
+    threads = [threading.Thread(target=connect) for _ in range(count)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    for connection in made:
+        connection.close()
+    return len(taken)
+
+
 def raw_request(port, data, seconds=5):
     """Sends bytes to the page address and gives everything that comes back until the
     server closes the connection or stays silent."""

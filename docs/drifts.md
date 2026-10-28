@@ -12011,3 +12011,28 @@ the tool's line came after that reading; on Windows it often came during it, wit
 included, as an operator's tool would, and the core is as it was.
 
 **Resolution.** `tests/emulator/test_catalog.py`.
+
+## The tests that fail only when every suite runs at once on Windows
+
+**Question.** With `tests/run.py` on Windows, the emulator's LAN test and the lost-reply
+tests of the command tool failed now and then with WinError 10055 at a connect, and
+scenarios of the app and the mapping, a different few in each run, with the app still on
+`Checking` when their wait ran out; each passes alone. What gives way?
+
+**Answer.** Two things, both of Windows. The emulator's tests sent every command on a
+connection of its own, and each closed connection holds a port of the computer's 16,384 for
+two minutes; a run of the emulator's, the app's and the mapping's suites held 8,790 at its
+peak, and the full run and other work on the computer more, until a connect had no port
+left. The tests' helper now keeps its connection to the emulator from one command to the
+next, as a browser does, and the same run held 3,422; the command tool still opens one for
+each exchange, as `docs/emulator.md` says. And a server of Python's library lets five
+connections wait to be taken; when the queue is full, macOS and Linux leave the next one
+to try again, and Windows refuses it. A loaded computer is slow to take them, Chrome asks
+for the app's modules all at once, and one refused module leaves the app as its page
+stands, on `Checking`, even after 30 seconds. The emulator's server, the app tool's server
+and the app tests' stand-in target now let 64 wait. The waits of the scenarios were not
+lengthened: with the app stopped no length would do.
+
+**Resolution.** `tests/emulator/support.py`, `emulator/httpd.py`,
+`app/apptool/webserver.py`, `tests/app/support.py`, `tests/emulator/test_http.py`,
+`tests/app/test_tool.py`.

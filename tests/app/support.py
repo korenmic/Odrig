@@ -97,6 +97,9 @@ class _Answer(http.server.BaseHTTPRequestHandler):
 
 
 class _Quiet(http.server.ThreadingHTTPServer):
+    # Chrome's requests that come together wait to be taken, as the emulator's do.
+    request_queue_size = webserver.Server.request_queue_size
+
     def handle_error(self, request, client_address):
         # A browser that went away in the middle of a request is no fault of the target.
         if not isinstance(sys.exc_info()[1], (ConnectionError, TimeoutError)):
