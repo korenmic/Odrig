@@ -12,7 +12,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the converter's, onboarding.
   - Requirements: 1.2, 1.3
 
-- [ ] 2. The settings in the core
+- [x] 2. The settings in the core
   - `core/src/breaks.cpp` and `breaks.h` (the settings, the file, the commands),
     `core/src/commands.cpp` (the lines, `status`), `core/src/core.cpp` (`breaks_start`),
     `core/src/core_state.h`, `core/build.py` and `core/Makefile` when they list sources,

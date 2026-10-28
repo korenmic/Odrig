@@ -11785,3 +11785,18 @@ work that lifts that limit.
 **Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
 `thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
 `design.md`.
+
+## Seed 54: the two members of `status` and the longest reply
+
+**Question.** `clocks` and `clock_message` add 37 bytes to every reply of `status`. The
+suite's bound of the longest reply added the longest reason text of an invalid show to a
+file being checked and a seed, and came to 1,059 bytes with them, above the 1,024 of a
+reply. Does the reply still fit?
+
+**Answer.** Yes. The core writes a reason text only while the show is invalid, and then
+`checking` and `seed` are `null`; the bound took both at once. Taken apart, a valid show
+with a file of 32 characters being checked and a seed of ten digits comes to 996 bytes,
+an invalid one with a reason text of 65 characters to 999, each with the longest name of
+a host, every byte of it escaped. The suite's bound now takes the two cases apart.
+
+**Resolution.** `tests/core/test_commands.py`, `LineEndings`.

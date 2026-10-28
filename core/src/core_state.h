@@ -497,6 +497,11 @@ struct Core {
     uint8_t save_due;
     uint8_t file_present;
 
+    // The two settings of `clocks.txt`: the clocks between the animations, and the message
+    // after each clock.
+    uint8_t clocks_on;
+    uint8_t clock_message_on;
+
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder
 

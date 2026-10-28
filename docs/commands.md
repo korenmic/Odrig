@@ -48,6 +48,10 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `repeat <id> <n>` | Makes the playlist's turn in progress of that animation `n` loops long, for that turn alone. |
 | `repeat <id> <n> save` | Keeps `n` loops as the animation's saved repeat, for every later turn, and gives them to its turn in progress. |
 | `repeat <id> default` | Removes the animation's saved repeat: its turns play its own count again, the one in progress too. |
+| `clocks on` | Switches the clocks between the animations on, and saves it. |
+| `clocks off` | Switches them off, and saves it. |
+| `clocks message on` | Switches the message after each clock on, and saves it. |
+| `clocks message off` | Switches it off, and saves it. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
@@ -70,7 +74,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
 ```
 
 | Member | Meaning |
@@ -94,6 +98,7 @@ A number in a command is written in decimal digits.
 | `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
 | `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
 | `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
+| `clocks`, `clock_message` | The two settings in force, `true` or `false`: the clocks between the animations, and the message after each clock, see [Clocks between the animations](#clocks-between-the-animations). A reply without them comes from a player before them. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -333,11 +338,11 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `read`, `remove`, `repeat` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `show-invalid` | `play`, `list`, `read`, `remove`, `repeat`, `clocks` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `repeat <id> <n> save` and `repeat <id> default` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
+| `busy` | `repeat <id> <n> save`, `repeat <id> default` and the four lines of `clocks` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
@@ -683,3 +688,42 @@ saved, and restoring an animation that has none, write nothing and still act on 
   longer names are dropped, which a save does whenever it finds the file full.
 - `storage-error`: the file could not be read or written, or the board's storage cannot be
   changed. Nothing changes. A file out of form is no failure: a save writes it anew.
+
+## Clocks between the animations
+
+```
+clocks on
+{"ok":true}
+clocks message on
+{"ok":true}
+```
+
+`clocks on` switches the clocks between the animations on, and `clocks off` switches them
+off; `clocks message on` switches the message after each clock on, and `clocks message off`
+off. Both settings are off until they are switched on, and both are kept across a restart.
+Each line replies `{"ok":true}` once its setting is saved; a setting already in force
+writes nothing and replies the same. While both are off the player plays as
+[show.md](show.md) says without them. `status` reports them as `clocks` and
+`clock_message`.
+
+The settings are kept in `clocks.txt` of the board's own storage, beside `order.txt` and
+`repeats.txt`, in three lines each ended by LF and nothing more:
+
+```
+odrig-clocks 1
+clocks on
+message off
+```
+
+The second line is `clocks on` or `clocks off`, the third `message on` or `message off`. The
+file is written whole as `clocks.part` and renamed, so a power cut leaves the old settings
+or the new ones; a `clocks.part` is removed at the start. The file is read once, at the
+start: a missing file is both settings off, and a file out of that form is both off, with
+the log saying `clocks unreadable` once; the next change writes it anew. No show names it.
+
+- `bad-argument`: the words are not one of the four lines.
+- `show-invalid`: the show is invalid.
+- `busy`: while a rebuild of a catalog runs, until the player has read every installed
+  animation after a start, and while an upload is open.
+- `storage-error`: the file could not be written, or the board's storage cannot be
+  changed. Nothing changes.

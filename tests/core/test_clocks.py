@@ -7,7 +7,9 @@ from odrig import odrgx
 
 from . import support
 from .test_content import animation, small_show
+from .test_drive import DONE, asked, logged, refusal, replies
 from .test_playback import T0, Playback, refreshes
+from .test_playlist import three
 from .test_upload import Script, Uploads, bad_file
 
 WIDGETS = support.ROOT / "tests" / "vectors" / "widgets"
@@ -173,3 +175,123 @@ class UploadsOfClocks(Uploads):
             with self.subTest(reason=reason):
                 given = self.play(files, Script().polls(5).upload(7, "new.odrgx", data))
                 self.assertEqual(given[-1], bad_file(reason))
+
+
+SETTINGS = ["clocks on", "clocks off", "clocks message on", "clocks message off"]
+
+
+def clocks_file(clocks, message):
+    return f"odrig-clocks 1\nclocks {clocks}\nmessage {message}\n".encode("ascii")
+
+
+def settings_of(run):
+    """The two settings each `status` of a session reports."""
+    return [(state["clocks"], state["clock_message"]) for state in replies(run) if "on" in state]
+
+
+def answers_of(run):
+    """The replies of a session that are no `status`."""
+    return [reply for reply in replies(run) if "on" not in reply]
+
+
+class TheSettings(Playback):
+    BAD = ["clocks", "clocks x", "clocks on x", "clocks  on", "clocks On", "clocks message", "clocks message x", "clocks message on x", "clocks messages on", "clocks off message",
+           "clocks on message"]
+
+    def test_words_out_of_the_four_lines_are_refused_first_and_an_invalid_show_next(self):
+        invalid = support.with_show_fault(three())
+        for files in (three(), invalid):
+            printed = self.assert_as_the_reference(files, [f"poll {T0}"] + asked(100, *self.BAD))
+            self.assertEqual([json.loads(line[len("reply "):]) for line in printed if line.startswith("reply ")], [refusal("bad-argument")] * len(self.BAD))
+        run = support.start(invalid, [f"poll {T0}"] + asked(100, *SETTINGS))
+        self.assertEqual(replies(run), [refusal("show-invalid")] * 4)
+
+    def test_busy_until_the_check_after_the_start_ends_and_while_an_upload_is_open(self):
+        script = [support.line(T0, "clocks on"), support.line(T0, "status")]
+        printed = self.assert_as_the_reference(three(), script, check_first=False)
+        self.assertEqual(printed[0], 'reply {"ok":false,"error":"busy"}')
+        script = [f"poll {T0}"] + asked(100, "upload begin 9 new.odrg 100", "clocks message on", "upload cancel", "clocks message on", "status")
+        run = support.start(three(), script)
+        self.assertEqual(answers_of(run)[1:], [refusal("busy"), DONE, DONE])
+        self.assertEqual(settings_of(run), [(False, True)])
+
+    def test_each_line_is_saved_and_reported_and_kept_across_a_restart(self):
+        script = [f"poll {T0}"] + asked(100, "status", "clocks on", "status", "clocks message on", "status", "clocks off", "status")
+        self.assert_as_the_reference(three(), script)
+        run, kept = support.start_and_keep(three(), script)
+        self.assertEqual(answers_of(run), [DONE] * 3)
+        self.assertEqual(settings_of(run), [(False, False), (True, False), (True, True), (False, True)])
+        self.assertEqual(kept["clocks.txt"], clocks_file("off", "on"))
+        restarted = support.start({**three(), "clocks.txt": kept["clocks.txt"]}, asked(0, "status"))
+        self.assertEqual(settings_of(restarted), [(False, True)])
+
+    def test_a_setting_in_force_writes_nothing(self):
+        run, kept = support.start_and_keep(three(), [f"poll {T0}"] + asked(100, "clocks off", "clocks message off"), ["--trace-store"])
+        self.assertEqual(answers_of(run), [DONE] * 2)
+        self.assertFalse(any(line.startswith("store ") for line in run.lines))
+        self.assertNotIn("clocks.txt", kept)
+        files = {**three(), "clocks.txt": clocks_file("on", "off")}
+        run = support.start(files, [f"poll {T0}"] + asked(100, "clocks on", "clocks message off"), ["--trace-store"])
+        self.assertFalse(any(line.startswith("store ") for line in run.lines))
+
+    def test_the_file_is_read_whole_and_strictly(self):
+        for clocks in ("on", "off"):
+            for message in ("on", "off"):
+                run = support.start({**three(), "clocks.txt": clocks_file(clocks, message)}, asked(0, "status"))
+                self.assertEqual(settings_of(run), [(clocks == "on", message == "on")])
+                self.assertNotIn("clocks unreadable", logged(run))
+        whole = clocks_file("on", "on")
+        for data in (b"", whole[:-1], whole + b"\n", whole.replace(b"\n", b"\r\n"), whole.replace(b" 1", b" 2"), b"odrig-clocks 1\nmessage on\nclocks on\n",
+                     b"odrig-clocks 1\nclocks yes\nmessage on\n", whole + b"x" * 60, b"odrig-clocks 1\nclocks on\n"):
+            with self.subTest(data=data):
+                files = {**three(), "clocks.txt": data}
+                run, kept = support.start_and_keep(files, asked(0, "status", "clocks message on", "status"))
+                self.assertEqual(logged(run).count("clocks unreadable"), 1)
+                self.assertEqual(list(run.logs), support.ReferencePlayer(files).start_logs)
+                self.assertEqual(settings_of(run), [(False, False), (False, True)])
+                self.assertEqual(kept["clocks.txt"], clocks_file("off", "on"))
+
+    def test_a_part_left_by_a_cut_is_removed_at_the_start(self):
+        run, kept = support.start_and_keep({**three(), "clocks.part": clocks_file("on", "on")}, asked(0, "status"))
+        self.assertNotIn("clocks.part", kept)
+        self.assertEqual(settings_of(run), [(False, False)])
+
+    def test_a_failed_call_says_storage_error_and_changes_nothing(self):
+        files = {**three(), "clocks.txt": clocks_file("off", "on")}
+        script = [f"poll {T0}"] + asked(1000, "clocks on", "status")
+        observed = support.start(files, script, ["--trace-store"])
+        first = len(observed.stored) + 1
+        calls = sum(line.startswith("store ") for line in observed.lines)
+        self.assertGreaterEqual(calls, 4)
+        for at in range(first, first + calls):
+            with self.subTest(at=at):
+                run, kept = support.start_and_keep(files, script, ["--store-fails-at", str(at)])
+                self.assertEqual(answers_of(run), [refusal("storage-error")])
+                self.assertEqual(settings_of(run), [(False, True)])
+                self.assertEqual(kept["clocks.txt"], files["clocks.txt"])
+                self.assertNotIn("clocks.part", kept)
+
+    def test_a_cut_at_any_call_leaves_the_old_settings_or_the_new(self):
+        files = {**three(), "clocks.txt": clocks_file("off", "on")}
+        script = [f"poll {T0}"] + asked(1000, "clocks on")
+        observed = support.start(files, script, ["--trace-store"])
+        first = len(observed.stored) + 1
+        calls = sum(line.startswith("store ") for line in observed.lines)
+        for at in range(first, first + calls):
+            for keeps in (0, 1):
+                with self.subTest(at=at, keeps=keeps):
+                    _, left = support.start_and_keep(files, script, ["--cut-at", str(at), "--cut-keeps", str(keeps)], status=75)
+                    recovered, settled = support.start_and_keep(left, asked(0, "status"))
+                    self.assertIn(settings_of(recovered)[0], [(False, True), (True, True)])
+                    self.assertNotIn("clocks unreadable", logged(recovered))
+                    self.assertNotIn("clocks.part", settled)
+
+    def test_a_host_whose_storage_cannot_be_changed_says_storage_error(self):
+        files = {**three(), "clocks.txt": clocks_file("on", "on")}
+        run = support.start(files, [f"poll {T0}"] + asked(100, "status", "clocks on", "clocks off", "status"), ["--no-storage"])
+        self.assertEqual(answers_of(run), [refusal("storage-error")] * 2)
+        self.assertEqual(settings_of(run), [(False, False)] * 2)
+
+    def test_the_members_stand_before_left_which_stays_last(self):
+        run = support.start(three(), asked(0, "status"))
+        self.assertEqual(list(replies(run)[0])[-3:], ["clocks", "clock_message", "left"])
