@@ -84,7 +84,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
     of the messages; `tests/app/test_docs.py` and `tests/app/test_scope.py` follow.
   - Suites: the app's.
 
-- [ ] 7. The frozen top and the bar's look
+- [x] 7. The frozen top and the bar's look
   - `app/www/style.css`, `app/www/screens/show.js` (`freeze`), `app/www/screens/reorder.js`
     (the top edge).
   - Tests in `tests/app/test_frozen.py`: the panel sticking at 412 x 915 with the list

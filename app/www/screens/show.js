@@ -46,6 +46,9 @@ let awaiting = null;
 const FIELD_RESTS_MS = 1000;
 // The loops a repeat may have.
 const MOST_REPEAT = 65535;
+// The room a whole row of the list takes: the panel stays at the top only while it is left
+// between the panel and the tabs.
+const ROW_ROOM = 80;
 // The row whose menu is open, and the button that opened it.
 let menuFor = null;
 let menuButton = null;
@@ -452,12 +455,33 @@ function selectFromBar(animation) {
   }
 }
 
+// The height of the band that keeps the room of the phone's bar at the top.
+function bandHeight() {
+  return parseFloat(window.getComputedStyle(document.body, "::before").height) || 0;
+}
+
 // Where the screen's room for the list begins: under the panel while it stays at the top,
 // else under the band at the top of the screen.
 function panelBottom() {
-  const band = parseFloat(window.getComputedStyle(document.body, "::before").height) || 0;
   const panel = byId("now-panel");
-  return panel.classList.contains("frozen") ? band + panel.getBoundingClientRect().height : band;
+  return panel.classList.contains("frozen") ? bandHeight() + panel.getBoundingClientRect().height : bandHeight();
+}
+
+// The panel stays at the top of the screen while Animations is shown, the keyboard is closed
+// and a whole row of the list fits between it and the tabs; a field brought into view stops
+// under it then.
+function freeze() {
+  const panel = byId("now-panel");
+  const nav = document.querySelector("nav");
+  const room = window.innerHeight - bandHeight() - panel.getBoundingClientRect().height - nav.getBoundingClientRect().height;
+  const frozen = visible && !document.body.classList.contains("typing") && room >= ROW_ROOM;
+  if (panel.classList.contains("frozen") !== frozen) {
+    panel.classList.toggle("frozen", frozen);
+  }
+  const padding = frozen ? `${bandHeight() + panel.getBoundingClientRect().height}px` : "";
+  if (document.documentElement.style.scrollPaddingTop !== padding) {
+    document.documentElement.style.scrollPaddingTop = padding;
+  }
 }
 
 // The animations in the order the list shows them: the saved order when another part of
@@ -693,6 +717,7 @@ function draw(state) {
   byId("animations-list").classList.toggle("stale", silent);
   say("silent", silent ? messages.ofSilence(Math.floor((Date.now() - (state.heardAt === null ? state.since : state.heardAt)) / 1000)) : null);
   say("silent-why", silent ? messages.ofFailure(state.failure) : null);
+  freeze();
 }
 
 // Sends an inclusion change and shows it as saving until the target has answered.
@@ -899,6 +924,7 @@ export function redraw() {
 export function showing(shown) {
   visible = shown;
   if (!shown) closeMenu();
+  freeze();
 }
 
 export function isVisible() {
@@ -982,6 +1008,7 @@ export function start(options) {
     }
   });
   window.addEventListener("resize", placeMenu);
+  window.addEventListener("resize", freeze);
   window.addEventListener("scroll", placeMenu);
   client.watch(draw);
   setInterval(() => {

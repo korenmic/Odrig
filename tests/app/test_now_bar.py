@@ -279,5 +279,22 @@ class RepeatThis(unittest.TestCase):
         self.assertIsNone(seen["none"]["field"])
 
 
+
+class ItsSize(unittest.TestCase):
+    def test_it_has_one_height_for_every_kind_of_animation_at_every_width(self):
+        # Three lines of 48 pixels, 8 apart, while the installation reports both counts;
+        # two lines otherwise.
+        for size in ((320, 640), (360, 740), (740, 360)):
+            for members, height in (({"repeat": 8, "loop": 3, "saved": None}, 3 * 48 + 2 * 8), ({}, 2 * 48 + 8)):
+                heights = set()
+                for animation, writable in ((1, True), (2, True), (3, True), (60001, True), (60001, False)):
+                    target = Target(self, writable=writable)
+                    target.status = status_of(animation, **members)
+                    seen = run(target, [{"wait": 1500, "look": "bar"}], size=size)
+                    heights.add(seen["bar"]["bar"]["height"])
+                with self.subTest(size=size, members=members):
+                    self.assertEqual(heights, {height})
+
+
 if __name__ == "__main__":
     unittest.main()

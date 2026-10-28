@@ -43,7 +43,14 @@ function measure(app) {
     const rect = element.getBoundingClientRect();
     return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom};
   };
-  const controls = [...doc.querySelectorAll("button, input, select, label.button")].filter(displayed).map((element) => ({
+  // A control that the panel staying at the top covers is not seen: the list scrolls under it.
+  const top = doc.getElementById("now-panel");
+  const topBox = top.getBoundingClientRect();
+  const covered = (element) => {
+    const at = element.getBoundingClientRect();
+    return top.classList.contains("frozen") && !top.contains(element) && at.top < topBox.bottom && at.bottom > topBox.top;
+  };
+  const controls = [...doc.querySelectorAll("button, input, select, label.button")].filter((element) => displayed(element) && !covered(element)).map((element) => ({
     what: element.id || element.getAttribute("aria-label") || element.textContent.trim(),
     group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" :
       element.closest("#row-menu") !== null ? "menu" : "screen",

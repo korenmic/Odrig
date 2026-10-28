@@ -432,6 +432,16 @@ input[type="range"] {
   opacity: 0.45;
 }
 
+/* The panel of what plays stays at the top of the screen, under the band of the phone's bar,
+   while the list scrolls under it: opaque, the panel's colour over the midnight, and under
+   the band, the tabs, the menus, a lifted row and the messages. */
+#now-panel.frozen {
+  position: sticky;
+  top: var(--bar-top);
+  z-index: 2;
+  background: #0f1630;
+}
+
 #silent {
   color: var(--teal);
 }

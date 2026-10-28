@@ -175,11 +175,14 @@ function rows() {
   return [...byId("animations-list").querySelectorAll(":scope > .row")];
 }
 
-// Where the list may be scrolled to by a drag: between the bar at the top and the tabs.
+// Where the list may be scrolled to by a drag: between the bar at the top, or the panel that
+// stays there, and the tabs.
 function edges() {
   const top = byId("top").getBoundingClientRect().bottom;
+  const panel = byId("now-panel");
+  const frozen = panel.classList.contains("frozen") ? panel.getBoundingClientRect().bottom : 0;
   const nav = document.querySelector("nav").getBoundingClientRect().top;
-  return {top: Math.max(0, top), bottom: nav};
+  return {top: Math.max(0, top, frozen), bottom: nav};
 }
 
 function lift() {
@@ -218,7 +221,8 @@ function lift() {
 // Puts the placeholder where a row held at this height would land, within its group.
 function place(y) {
   const held = press.row;
-  held.style.top = `${y - press.offset}px`;
+  // The held row's top edge stops under the panel that stays at the top.
+  held.style.top = `${Math.max(y - press.offset, edges().top)}px`;
   const inPage = y + window.scrollY;
   const mark = press.marks.find((other) => inPage < other.middle);
   const before = mark === undefined ? null : mark.row;
