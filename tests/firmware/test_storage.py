@@ -124,6 +124,10 @@ class ShowFolders(Temporary):
         (self.show / "repeats.txt").write_bytes(b"odrig-repeats 1\n5 f hello.odrg\n")
         self.assertEqual(storage.folder_files(self.show)["repeats.txt"], b"odrig-repeats 1\n5 f hello.odrg\n")
 
+    def test_the_clocks_settings_are_a_file_of_the_show(self):
+        (self.show / "clocks.txt").write_bytes(b"odrig-clocks 1\nclocks on\nmessage off\n")
+        self.assertEqual(storage.folder_files(self.show)["clocks.txt"], b"odrig-clocks 1\nclocks on\nmessage off\n")
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -303,6 +307,29 @@ class Commands(Temporary):
             result = support.run_main("read-show", self.folder / "copy")
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(support.files_of(self.folder / "copy"), dict(storage.folder_files(self.show), **{"repeats.txt": repeats}))
+
+    def test_the_boards_clocks_settings_are_kept_for_a_folder_without_them(self):
+        clocks = b"odrig-clocks 1\nclocks on\nmessage on\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/clocks.txt": clocks}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"clocks.txt": clocks}))
+        self.assertIn("show: kept 1 files\n", result.out)
+        (self.show / "clocks.txt").write_bytes(b"odrig-clocks 1\nclocks off\nmessage off\n")
+        esptool = self.esptool()
+        self.install(esptool)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool))["clocks.txt"], b"odrig-clocks 1\nclocks off\nmessage off\n")
+
+    def test_read_show_copies_the_clocks_settings_with_the_files_of_the_show(self):
+        clocks = b"odrig-clocks 1\nclocks on\nmessage off\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/clocks.txt": clocks}))
+        esptool = self.esptool()
+        self.install(esptool)
+        with support.no_board(self.esptool(self.on_the_board(esptool), failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), dict(storage.folder_files(self.show), **{"clocks.txt": clocks}))
 
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()

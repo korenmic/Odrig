@@ -788,6 +788,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] clocks OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
@@ -818,6 +819,8 @@ python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
 python -m odrigctl --port build/emulator/serial repeat 1 8
 python -m odrigctl --port build/emulator/serial repeat 1 8 save
 python -m odrigctl --port build/emulator/serial repeat 1 default
+python -m odrigctl --port build/emulator/serial clocks on
+python -m odrigctl --port build/emulator/serial clocks message on
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -846,6 +849,8 @@ python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8 save
 python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
+python -m odrigctl --tcp 127.0.0.1:8601 clocks on
+python -m odrigctl --tcp 127.0.0.1:8601 clocks message off
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -874,6 +879,8 @@ python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
 python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
+python -m odrigctl --http 127.0.0.1:8600 clocks off
+python -m odrigctl --http 127.0.0.1:8600 clocks message off
 ```
 
 `status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
@@ -1472,5 +1479,10 @@ keeps them for every later turn and `repeat ID default` brings its own count bac
 tool sends the words as they are typed. The emulator keeps the saved repeats in
 `repeats.txt` of its show folder through its host, as the board does in its storage: it
 has no code of its own for them.
+
+`clocks on` and `clocks off` switch the clocks between the animations on and off, and
+`clocks message on` and `clocks message off` the message after each clock; the tool takes
+those four forms only. The emulator keeps the two settings in `clocks.txt` of its show
+folder through its host, as the board does in its storage.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).

@@ -47,6 +47,7 @@ SESSION = (
     ("status",),
     ("read", "1", "0"),
     ("catalog",),
+    ("clocks", "off"),
     ("repeat", "99", "2"),
     ("play", "99"),
     ("play", "abc"),
@@ -296,6 +297,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "--timeout", "inf", "status"],
             ["--port", "a", "--emulator", "status"],
             ["--port", "a", "--board", "status"],
+            ["--port", "a", "clocks"],
+            ["--port", "a", "clocks", "message"],
+            ["--port", "a", "clocks", "yes"],
+            ["--port", "a", "clocks", "on", "now"],
+            ["--port", "a", "clocks", "message", "on\n"],
         ):
             result = support.run_tool(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -316,7 +322,7 @@ class Usage(unittest.TestCase):
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
-                          "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -326,6 +332,7 @@ class Usage(unittest.TestCase):
                            (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["repeat", "1"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8", "keep"], "repeat takes ID N, ID N save, or ID default"),
                            (["repeat", "1", "8", "save", "x"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8\n"], "a command is one line"),
+                           (["clocks"], "clocks takes on, off, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, message on, or message off"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -360,6 +367,10 @@ class Usage(unittest.TestCase):
             (["repeat", "1", "8"], b"repeat 1 8\n"),
             (["repeat", "1", "8", "save"], b"repeat 1 8 save\n"),
             (["repeat", "60001", "default"], b"repeat 60001 default\n"),
+            (["clocks", "on"], b"clocks on\n"),
+            (["clocks", "off"], b"clocks off\n"),
+            (["clocks", "message", "on"], b"clocks message on\n"),
+            (["clocks", "message", "off"], b"clocks message off\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 

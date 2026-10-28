@@ -41,7 +41,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the emulator's, onboarding.
   - Requirements: 8.1 to 8.3
 
-- [ ] 5. The command tool and the firmware tool
+- [x] 5. The command tool and the firmware tool
   - `odrigctl/cli.py`, `firmware/fwtool/storage.py` and their tests; `docs/firmware.md`;
     `docs/decisions.md`: the commands' bullet and the change log.
   - Suites: the emulator's, the firmware tool's, onboarding.
