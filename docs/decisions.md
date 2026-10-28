@@ -806,3 +806,15 @@ are in [format.md](format.md), "Measured sizes".
   previews and readmes tracked; no JSON of them is committed. `env.template`, tracked, and
   `env`, ignored, name the share's collection. The remote is public, and the tracked
   collection is published with it. The sources of the earlier set are unknown for now.
+- 2026-10-28: Seed 50: a drive's catalog is of version 2 and keeps an index of its files
+  beside its pages, one file of rows for each folder in the playlist's order, a table of
+  the folders and a map of the ids, written by the PC tool's `import` and by the board's
+  `catalog rebuild external`, which keeps the order the rows were moved into. The core
+  keeps no entry for each file of an indexed drive: a cursor of 972 bytes reads a row when
+  it needs it, so the card alone bounds the number of its files and folders; a drive
+  without a catalog is taken as before, at most 256 files and 32 folders. The target file
+  with a drive takes 130,761 bytes, 116 more than before, because a saved repeat keeps the
+  file's position in 32 bits. New: `list in <folder-id> [<from>]` and `order get in
+  <folder-id> [<from>]`, `order move` of a drive's file, approved through the seed; `list`
+  gives the root's level only. The app reads one level at a time. The board session and
+  the owner's check on a phone are open.

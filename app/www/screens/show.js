@@ -240,7 +240,7 @@ function barAnimation(state) {
   if (status === null || status.error !== null || status.animation === null || state.animations === null) {
     return null;
   }
-  if (status.playing !== "all" && !state.folders.some((folder) => folder.id === status.playing)) {
+  if (status.playing !== "all" && typeof status.playlist !== "string") {
     return null;
   }
   return state.animations.find((animation) => animation.id === status.animation) ?? null;
@@ -434,7 +434,6 @@ function drawBar(state) {
 // from the root, where every internal animation stands, with the filters showing it, and
 // scrolls its row to just below the panel.
 function selectFromBar(animation) {
-  opened = "";
   filters.reveal(animation);
   selection.enter(animation.id);
   const row = byId("animations-list").querySelector(`:scope > .row[data-id="${animation.id}"]`);

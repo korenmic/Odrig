@@ -11451,3 +11451,32 @@ The walk-through, which clones the repository, took 1,418 seconds.
 **Resolution.**
 docs/specs/46-p2-every-animation-file-tracked-with-its-preview-and-source/tasks.md, task
 6.
+
+## Seed 50: the memory with a drive, after seed 48
+
+**Question.** Requirement 8 asks the core's memory with a drive to stay below 130,509 bytes,
+the figure before seed 48. Seed 48's saved repeats came in on the way, with 4 bytes for each
+of 32 entries, and an indexed drive's positions do not fit in their 16 bits. Is the
+requirement kept?
+
+**Answer.** Against the same core without the index, it is: the cursor of 972 bytes and 40
+bytes more of the core object take the place of the saved order's 4 bytes for each of 256
+places, 1,024. The saved repeats' entries grow to 8 bytes, a position of 32 bits and the loops,
+128 bytes more, so the target file with a drive takes 130,761 bytes, 116 more than master's
+130,645 and within the 131,072 the core may use. Nothing else is cut to win the 116 back.
+
+**Resolution.** docs/core.md, "Memory"; docs/decisions.md, the change log of 2026-10-28.
+
+## Seed 50 and seed 48: the bar of the animation playing now, one level at a time
+
+**Question.** Seed 48's bar names the animation playing now from the whole list, and its
+`Select` went back to the root to select it there. Seed 50's app holds only the level
+shown. Where does the bar show, and what does its `Select` do?
+
+**Answer.** The bar shows while the level shown holds the animation that plays, the root
+playlist or a folder's playing, as `status` names it; on another level it is hidden. Its
+`Select` selects the animation in the level shown, the filters showing it, as a row's menu
+does. The stand-in of the app's tests answers `list` and `list in` one level at a time.
+
+**Resolution.** `app/www/screens/show.js` (`barAnimation`, `selectFromBar`);
+`tests/app/test_now_bar.py`.

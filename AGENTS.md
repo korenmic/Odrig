@@ -135,7 +135,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **A cross-wired snake 10**, seed 43: built; the owner's check on the installation is open.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
-- **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
 - **Fast and parallel tests and builds**, seed 53: one runner for every suite and both builds at once; no process left behind.
 - **Clocks between the animations**, seed 54: a clock of the card's folder `clocks` after every 5 animations or 5 minutes, and the installation's name after it; two checkboxes in Settings.
 
