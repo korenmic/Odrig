@@ -1027,6 +1027,10 @@ label.check .title {
   display: block;
 }
 
+label.check + label.check {
+  margin-top: 8px;
+}
+
 input[type="checkbox"] {
   width: 26px;
   min-width: 26px;

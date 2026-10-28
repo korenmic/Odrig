@@ -36,7 +36,7 @@ export function behind(view, element) {
   return `rgb(${mixed.map((value) => Math.round(value)).join(", ")})`;
 }
 
-function measure(app) {
+export function measure(app) {
   const doc = app.doc;
   const view = app.frame.contentWindow;
   const box = (element) => {

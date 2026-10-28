@@ -72,7 +72,7 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_thirty_eight_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_forty_two_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
@@ -80,9 +80,9 @@ class TheAppsPage(unittest.TestCase):
                                  "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping cross on", "mapping cross off", "mapping test on",
                                  "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
-                                 "repeat <id> <n> save", "repeat <id> default", "fault", "catalog",
+                                 "repeat <id> <n> save", "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "fault", "catalog",
                                  "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
-        self.assertIn("It sends thirty-eight command lines and no other", self.said)
+        self.assertIn("It sends forty-two command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
@@ -136,8 +136,8 @@ class TheAppsPage(unittest.TestCase):
     def test_the_check_on_a_phone_is_numbered_steps_that_say_what_must_be_seen(self):
         check = section(self.text, "The check on a phone")
         steps = re.findall(r"(?m)^([0-9]+)\. \*\*([^*]+)\*\*", check)
-        self.assertEqual([int(number) for number, _ in steps], list(range(1, 24)))
-        self.assertEqual(check.count("*Seen:*"), 25)
+        self.assertEqual([int(number) for number, _ in steps], list(range(1, 25)))
+        self.assertEqual(check.count("*Seen:*"), 26)
         for expected in ("This is the owner's. No program can do it.", "python3 app/app.py install", "python -m emulator build/demo-20/show --lan", "`lan:` line",
                          "press `Board`", "Leave mobile data on", "Switch mobile data off", "**A long press.**", "in the address a word is marked",
                          "**The phone's bars.**", "wholly above Android's buttons or the line of gesture navigation", "the tabs go away and the address stays in view",

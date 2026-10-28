@@ -19,12 +19,14 @@ from . import Failure, paths
 FOLDER = "/odrig"
 MAPPING_NAME = "mapping.json"
 SHOW_NAME = "show.json"
-# The saved playlist order, the saved playlist and the saved repeats, which a show folder
-# may hold beside the files of the show: the board keeps its own when the folder has none.
+# The saved playlist order, the saved playlist, the saved repeats and the clocks' settings,
+# which a show folder may hold beside the files of the show: the board keeps its own when the
+# folder has none.
 ORDER_NAME = "order.txt"
 PLAYLIST_NAME = "playlist.txt"
 REPEATS_NAME = "repeats.txt"
-KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME)
+CLOCKS_NAME = "clocks.txt"
+KEPT_NAMES = (ORDER_NAME, PLAYLIST_NAME, REPEATS_NAME, CLOCKS_NAME)
 # The files of the internal catalog: its marker and its pages.
 CATALOG_NAMES = (catalog.MARKER, *(catalog.page_name(number) for number in range(catalog.PAGES)))
 MARK = b"littlefs"

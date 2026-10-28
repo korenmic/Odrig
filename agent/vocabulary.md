@@ -77,7 +77,8 @@ the entry links to it.
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
-  the turn in progress, and `upload`, which sends a file as several lines. Each is answered by one
+  the turn in progress, `clocks` for the clocks between the animations, and `upload`, which
+  sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
 

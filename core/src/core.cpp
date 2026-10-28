@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "arena.h"
+#include "breaks.h"
 #include "catalog.h"
 #include "crc32.h"
 #include "core_state.h"
@@ -372,6 +373,7 @@ void start(Core &core) {
     // are cleared away: its upload's part may be the file it puts in place.
     catalog_finish_internal(core);
     storage_clear_parts(core);
+    breaks_start(core);
 
     core.line = static_cast<char *>(arena_take(core, ODRIG_LINE_MAX + 1));
     core.feed_reply = static_cast<char *>(arena_take(core, ODRIG_REPLY_MAX));

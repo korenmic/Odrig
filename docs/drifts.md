@@ -11804,3 +11804,53 @@ key `5218d8e1-120969`, far from heavy; `check` accepts it.
 
 **Resolution.** `project-seeds/54-p2-clocks-between-the-animations/source/render-message.mjs`;
 `collection/card/clocks/message/`; `thumbnails/catalog.js`.
+## Seed 54: the two members of `status` and the longest reply
+
+**Question.** `clocks` and `clock_message` add 37 bytes to every reply of `status`. The
+suite's bound of the longest reply added the longest reason text of an invalid show to a
+file being checked and a seed, and came to 1,059 bytes with them, above the 1,024 of a
+reply. Does the reply still fit?
+
+**Answer.** Yes. The core writes a reason text only while the show is invalid, and then
+`checking` and `seed` are `null`; the bound took both at once. Taken apart, a valid show
+with a file of 32 characters being checked and a seed of ten digits comes to 996 bytes,
+an invalid one with a reason text of 65 characters to 999, each with the longest name of
+a host, every byte of it escaped. The suite's bound now takes the two cases apart.
+
+**Resolution.** `tests/core/test_commands.py`, `LineEndings`.
+
+## Seed 54: the settings and the breaks in the core
+
+**Question.** The design of seed 54 names the core's code for the two settings of the
+clocks and for the breaks. What does the code do where the design leaves a point open or
+the code differs from it?
+
+**Answer.**
+
+- `clocks.txt` is read at the start only by a core whose storage can be changed, as
+  `order.txt` and `repeats.txt` are; on a host whose storage cannot be changed both
+  settings are off, and the four lines answer `storage-error`, as `repeat`'s saving forms
+  do, before a setting already in force is looked at.
+- A failed read of `clocks.txt` at offset 0 is taken as a missing file, both off without a
+  log line; one that fails later, or a file of 64 bytes or more, is out of form.
+- A `play` that cuts a turn of the playlist counts it only when the turn had its first
+  refresh; two `play`s before a refresh count one. A cut never begins a break: once 5
+  turns are counted by cuts, the break comes at the end of the next turn. A `play` of a
+  cycle cuts the turn and counts it as a `play` of an animation does.
+- "The message as it was set then": the message follows a clock when it was on as the
+  break began, or when `clocks message on` comes during the clock's turn; `clocks message
+  off` during the break takes it from no break that has begun.
+- The design calls `breaks_tree` in `player_drive_changed` too. Every path of the code that
+  changes the tree calls `tree_clear`, `tree_build` or `tree_find_current` before it, and
+  the moves of the walk call `player_drive_moved` and `player_drive_shifted`; those five
+  find the clocks' folders again, and a fault of one file draws no new order.
+- An upload that replaces the file of the paused turn's animation during a break makes it
+  play from its first frame after the break, as a turn of a replaced file begins again.
+  When the paused animation is removed, ignored, quarantined or leaves with the card, the
+  playlist goes on after the break with the animation after it.
+- The test host's `shuffle KEY COUNT` takes a count of 1 to 65,536 and prints the
+  permutation on one line.
+
+**Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`, `core/src/order.cpp`,
+`core/src/mapping_control.cpp`, `tests/core/host/host.cpp`; `docs/show.md`,
+`docs/core.md`, `docs/commands.md`.

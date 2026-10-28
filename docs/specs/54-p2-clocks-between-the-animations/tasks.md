@@ -12,7 +12,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the converter's, onboarding.
   - Requirements: 1.2, 1.3
 
-- [ ] 2. The settings in the core
+- [x] 2. The settings in the core
   - `core/src/breaks.cpp` and `breaks.h` (the settings, the file, the commands),
     `core/src/commands.cpp` (the lines, `status`), `core/src/core.cpp` (`breaks_start`),
     `core/src/core_state.h`, `core/build.py` and `core/Makefile` when they list sources,
@@ -25,7 +25,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the core's, the emulator's, onboarding.
   - Requirements: 2.1 to 2.5
 
-- [ ] 3. The breaks in the core
+- [x] 3. The breaks in the core
   - `core/src/breaks.cpp` (the folders, the order, the message), `core/src/clock.cpp`
     (`clock_shuffle`), `core/src/player.cpp` and `player.h`, `core/src/mapping_control.cpp`,
     `core/src/order.cpp` and `drive.cpp` where the tree changes, `core/src/core_state.h`;
@@ -41,13 +41,13 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the emulator's, onboarding.
   - Requirements: 8.1 to 8.3
 
-- [ ] 5. The command tool and the firmware tool
+- [x] 5. The command tool and the firmware tool
   - `odrigctl/cli.py`, `firmware/fwtool/storage.py` and their tests; `docs/firmware.md`;
     `docs/decisions.md`: the commands' bullet and the change log.
   - Suites: the emulator's, the firmware tool's, onboarding.
   - Requirements: 8.4, 10.1
 
-- [ ] 6. The app's panel
+- [x] 6. The app's panel
   - `app/www/index.html`, `screens/clocks.js`, `commands.js`, `client.js`, `main.js`,
     `style.css`; `tests/app/test_clocks.py`; `docs/android-app.md`.
   - Suites: the app's.
