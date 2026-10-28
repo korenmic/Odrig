@@ -11785,3 +11785,22 @@ work that lifts that limit.
 **Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
 `thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
 `design.md`.
+
+## Seed 54: the message's frames, colours and size
+
+**Question.** The requirements ask for 120 frames of 50 ms from the owner's page
+`horror-text-60x60.html`, its colours as the page draws them. The page anti-aliases its
+Hebrew text, blends a dark red edge and scanlines over it, and lays a noise that changes 12
+times a second; what does the file hold, and is it light enough for the card?
+
+**Answer.** `render-message.mjs` steps the page's clock to 0, 50, ... 5,950 ms and takes
+120 frames of 50 ms; two runs gave the same bytes. Six of them, at 50, 150, 300, 1,550, 4,650
+and 4,800 ms, are the same as the frame before: the page's noise holds for 83 ms, and the
+text then stands still while its scanline is off the canvas. The converter merges them as
+the format says, so the file has 114 frames, 6,000 ms in all.
+The page draws 855 colours, kept as they are, not reduced to 8: the file has no palette,
+3 bytes a pixel, and its body is compressed. `its-not-the-time.odrg` has 120,969 bytes,
+key `5218d8e1-120969`, far from heavy; `check` accepts it.
+
+**Resolution.** `project-seeds/54-p2-clocks-between-the-animations/source/render-message.mjs`;
+`collection/card/clocks/message/`; `thumbnails/catalog.js`.

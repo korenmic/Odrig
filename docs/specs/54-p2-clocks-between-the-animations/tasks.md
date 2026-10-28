@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The message
+- [x] 1. The message
   - `project-seeds/54-p2-clocks-between-the-animations/source/render-message.mjs`, run from
     `scratch/`; `collection/card/clocks/message/its-not-the-time.odrg` with its GIF and
     readme; `thumbnails/catalog.js` and its GIF; the same three files in the share's
