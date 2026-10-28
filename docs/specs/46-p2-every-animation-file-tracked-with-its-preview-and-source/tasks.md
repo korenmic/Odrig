@@ -54,7 +54,7 @@ Rules for every task:
   - Suites: converter (npm), onboarding.
   - Requirements: 2.1 to 2.5, 7.6, 8.3
 
-- [ ] 3. The moves on the share
+- [x] 3. The moves on the share
   - `scratch/collection-46/move_on_share.py` as the design says; it ends with
     `MOVED-OK`. The counts and the comparison go into the commit message.
   - Commit the ticked checkbox alone: the moves are outside git.
