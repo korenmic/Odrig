@@ -100,7 +100,7 @@ of the Python library of [python-library.md](python-library.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR] [--parent PID]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -130,6 +130,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 | `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
 | `--drive-folder DIR` | The folder `DIR` stands for the card's folder `odrig` itself, and the drive is read-only. Not with `--drive`. See [A folder as the card](#a-folder-as-the-card). | No drive |
+| `--parent PID` | The emulator ends, as on an interrupt, within a second or two after the process with this id ends, even when that process was killed without ending it. The preview and the tests give their own id, so that no emulator outlives them. | It runs until it is stopped |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or

@@ -760,10 +760,21 @@ private:
         if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
         }
-        std::string content;
-        if (of_the_drive(name) ? !host.drive_content(name, &content) : !host.whole_file(name, &content)) {
-            return -1;
+        // A read that goes on where the last of the same file ended, with no storage call and
+        // no change of the drive since, reads the content the last one read; any other reads
+        // the file anew.
+        const bool kept = goes_on && host.read_at_kept_name_ == name && host.read_at_kept_calls_ == host.store_calls_ &&
+                          host.read_at_kept_drive_ == host.drive_number_;
+        if (!kept) {
+            host.read_at_kept_name_.clear();
+            if (of_the_drive(name) ? !host.drive_content(name, &host.read_at_kept_) : !host.whole_file(name, &host.read_at_kept_)) {
+                return -1;
+            }
+            host.read_at_kept_name_ = name;
+            host.read_at_kept_calls_ = host.store_calls_;
+            host.read_at_kept_drive_ = host.drive_number_;
         }
+        const std::string &content = host.read_at_kept_;
         size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
@@ -791,11 +802,12 @@ private:
             }
             count = static_cast<size_t>(fails) - offset;
         }
-        const long differs = uploaded ? options.read_back_differs : -1;
-        if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
-            content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
-        }
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
+        const long differs = uploaded ? options.read_back_differs : -1;
+        if (differs >= 0 && static_cast<size_t>(differs) < content.size() && static_cast<size_t>(differs) >= offset &&
+            static_cast<size_t>(differs) < offset + count) {
+            buffer[static_cast<size_t>(differs) - offset] = static_cast<uint8_t>(buffer[static_cast<size_t>(differs) - offset] ^ 0x01);
+        }
         host.read_at_ends_[name] = offset + static_cast<uint32_t>(count);
         host.call_bytes_ += count;
         if (options.trace_read_at) {
@@ -1048,6 +1060,10 @@ public:
     std::FILE *written_ = nullptr;
     long store_calls_ = 0;
     std::map<std::string, uint32_t> read_at_ends_;   // where the last `read_at` of each file ended
+    std::string read_at_kept_;          // the content the last `read_at` read, of the file named
+    std::string read_at_kept_name_;     // by this name, empty when none is kept
+    long read_at_kept_calls_ = 0;       // the storage calls made when it was read
+    uint32_t read_at_kept_drive_ = 0;   // and the drive then
     size_t reads_at_ = 0;
     bool in_command_ = false;       // a command line is being carried out
 

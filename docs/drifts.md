@@ -11491,6 +11491,74 @@ the same day?
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
 
+## Seed 53: isolation under load, and the slowest tests
+
+**Question.** Task 2 of seed 53 mends every failure that comes from two workers or two
+suites sharing a file, a port or a build. What did the first loaded run show, and where
+does the work go that brings the slowest tests within requirement 8.1?
+
+**Answer.** The first run of `tests/run.py` with its default eight workers, on db81baa with
+the runner of task 1, failed in nothing shared: every failure of the emulator's, the
+app's, the core's and the converter's suites was absent, and the one failure, of
+`tests.firmware.test_paths`, came from the firmware tool's Python environment linked into
+the checkout from another one, which task 6's `ODRIG_TOOLS` settles. The suites already
+take their ports from the system, their folders from temporary directories and their
+Chrome profiles from temporary folders, and the firmware suite compiles its host program
+into a temporary folder; the emulator's package no longer builds the core under the
+runner (task 1). Its wall time was 631 s, against 1,954 s for the same suites one after
+another; the core's suite, 598 s, was bound by one test of 492 s,
+`test_the_memory_does_not_depend_on_the_length_of_a_clip`, whose time is the test host's
+`read_at` reading the whole of a 10.8 MB file again for every call of at most 512 bytes.
+That and the other tests that keep a suite above a third of its time alone are task 3's,
+with the timing: requirement 8.1 is met there.
+
+**Resolution.** No code changes for task 2; task 3 takes the slowest tests with the timing.
+
+## Seed 53: the slowest tests, a module split by its classes, and timing under load
+
+**Question.** Task 3 makes the tests that fail under load robust and brings the core's,
+the emulator's and the app's suites within a third of their time alone (requirement 8.1).
+What did that take?
+
+**Answer.** Three things. The core's test host read a whole file from storage again for
+every `read_at` of at most 512 bytes; a 10.8 MB clip took 193 s to play. It now keeps the
+content it read while the next call goes on where the last ended, with no storage call
+and no change of the drive in between, and reads anew otherwise; the clip plays in 0.6 s
+and the core's suite alone takes 368 s instead of 564. The runner gives a module that took
+more than a worker's share in the previous report by its test classes, and the report
+keeps the times of the suites a run did not run. And under load the app asked an
+installation that keeps no catalogs twice: the client asks once the target answers, and
+Settings' question, queued behind that answer, was sent after it; a queued question is now
+not sent once the installation is known to keep none (`client.catalog`), with a test whose
+stand-in answers in three seconds. Three passes in a row with eight workers then took 435,
+377 and 399 s, against 1,954 s one after another, with no failure but the linked Python
+environment of task 2's entry. Alone through the runner: core 95 s (564), emulator 58 s
+(387), app 271 s (854, its four workers kept).
+
+**Resolution.** `tests/core/host/host.cpp`'s `read_at`; `tests/run.py`'s `split` and report;
+`app/www/client.js`'s `catalog`; `tests/runner/test_runner.py`; `tests/app/test_catalog.py`.
+
+## Seed 53: no process left behind, without a helper of its own
+
+**Question.** Task 4 names `tests/children.py`, a marker set to `manual` outside the runner,
+and process groups for every starter. What was needed?
+
+**Answer.** The emulators found running for days were left by starters killed without a
+chance to clean up, which no cleanup can mend; the emulator now takes `--parent PID` and
+ends within two seconds after that process ends, and the preview and the emulator suite's
+starter give their own id. The starters already put their children in a group of their
+own. The runner sets `ODRIG_RUN` for its children, which every child inherits, ends at a
+run's end what still carries its id, and `--sweep` ends every process that carries any id
+and every emulator of a temporary or a preview's folder; outside the runner no id is set,
+and the sweep's second rule finds those emulators. So no helper module and no `manual` id.
+A preview also removes, at its start, the work folders of previews no longer running, and
+the preview's tests look at their own folder only. Under load, a test of the app's kept
+keys found the board's pages read again after the card was back rather than before; it now
+looks for them from the moment the board's catalog is whole.
+
+**Resolution.** `emulator/parent.py`, `emulator/app.py`'s `--parent`, `preview/__init__.py`,
+`tests/run.py`'s `strays`, `end` and `--sweep`, `tests/emulator/test_parent.py`,
+`tests/app/test_keys.py`.
 ## Seed 52: the inventory, its motions and the subcommand `clocks`
 
 **Question.** The seed asks for one inventory that the converter reads, and for the motions

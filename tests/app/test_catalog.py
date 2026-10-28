@@ -2,6 +2,7 @@ import json
 import pathlib
 import tempfile
 import threading
+import time
 import unittest
 
 from odrig import catalog
@@ -185,6 +186,19 @@ class TheCatalogsOfSettings(unittest.TestCase):
             found = support.run("catalogs", address=stand_in.address, settings={"wait": 4500}).seen
             asked = [line for _, line in stand_in.lines if line.startswith(b"catalog")]
         self.assertEqual(found["after"], {"summary": "This installation's software keeps no catalogs.", "internal": None, "external": None, "note": None, "progress": None, "buttons": []})
+        self.assertEqual(asked, [b"catalog"])
+
+    def test_a_slow_answer_that_it_keeps_no_catalogs_is_still_asked_for_once(self):
+        # The app asks for the catalogs of itself once the target answers, and Settings asks
+        # when it is shown; Settings is shown while that first question is still out.
+        def slowly(line):
+            time.sleep(3)
+            return (200, '{"ok":false,"error":"unknown-command"}\n')
+
+        with support.StandIn(dict(support.SOUND, catalog=slowly)) as stand_in:
+            found = support.run("catalogs", address=stand_in.address, settings={"wait": 4500}).seen
+            asked = [line for _, line in stand_in.lines if line.startswith(b"catalog")]
+        self.assertEqual(found["after"]["summary"], "This installation's software keeps no catalogs.")
         self.assertEqual(asked, [b"catalog"])
 
     def test_against_the_emulator_a_board_without_a_catalog_and_with_one(self):

@@ -130,7 +130,9 @@ class OneAnimation(unittest.TestCase):
     def assert_nothing_left(self, page=None):
         if page is not None:
             self.assertFalse(listening(page), "the emulator still listens")
-        self.assertEqual(previews_left(), self.before)
+        # Nothing of its own is left; a folder left before by a preview that was killed may
+        # have gone meanwhile, since a preview removes those at its start.
+        self.assertLessEqual(set(previews_left()), set(self.before))
 
     def test_a_file_plays_alone_until_the_preview_is_interrupted(self):
         data = core_support.example_show()["hello.odrg"]
@@ -145,7 +147,10 @@ class OneAnimation(unittest.TestCase):
         status = answer(page, "status")
         self.assertEqual((status["on"], status["brightness"], status["playing"], status["animation"], status["error"]), (True, 255, "all", 1, None))
         self.assertGreaterEqual(status["fps"], 45)
-        shown = [path for path in (support.ROOT / "build" / "preview").glob("*/show/preview.odrg")]
+        # Its own work folder, named by its process id; on Windows, where the interpreter of
+        # an environment starts another process, the only one left.
+        own = support.ROOT / "build" / "preview" / str(started.process.pid)
+        shown = list(own.glob("show/preview.odrg")) if own.is_dir() else list((support.ROOT / "build" / "preview").glob("*/show/preview.odrg"))
         self.assertEqual([path.read_bytes() for path in shown], [data])
         self.assertEqual(started.interrupt(), (0, self.said_on_starting(page)))
         self.assert_nothing_left(page)

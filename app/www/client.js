@@ -1033,7 +1033,9 @@ export function removeMany(ids) {
 
 // The catalogs of the target, the rebuild of one of them and its cancel.
 export function catalog() {
-  return requestOperation("catalog", () => commands.catalog());
+  // A question that waited its turn behind the answer that the installation keeps no
+  // catalogs is not sent: that answer is its answer.
+  return requestOperation("catalog", () => (state.catalogNone ? Promise.reject(new commands.Refusal("unknown-command", "catalog")) : commands.catalog()));
 }
 
 export function catalogRebuild(storage) {
