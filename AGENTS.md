@@ -124,9 +124,8 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **A USB drive, and one USB port for it or a computer**, seeds 20 and 21: built; neither tried on the board.
 - **A USB log on the serial port, and a bigger animation space**, seeds 23 and 24: built; their checks on the board are open.
 - **A second firmware that does not use WLED**, seed 12: a fallback for the event; paused.
-- **The app's count of installed and external animations**, seed 28: a dashboard line.
+- **The app's count of animations, and app mapping with a diagonal check**, seeds 28 and 30: merged; the owner's LED check is open.
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
-- **App mapping and a diagonal check**, seed 30: merged; the owner's LED check is open.
 - **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
 - **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open. A hundred picture clocks, seed 52: 8-colour widgets that tick at random, from the owner's picture.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
@@ -139,6 +138,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Every animation kept with its preview and its source, outside git**, seed 46: the installation's animation files with their GIFs and readmes, on the first computer and the share; only the previews tracked.
 - **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
 - **The core builds on Windows again**, seed 51: with GCC and Microsoft's compiler; nothing else changes.
+- **Fast and parallel tests and builds**, seed 53: one runner for every suite and both builds at once; no process left behind.
 
 The state of every seed is in the `state.json` of its folder.
 
