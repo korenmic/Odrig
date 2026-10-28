@@ -33,6 +33,9 @@ void order_drive_found(Core &core);
 // Takes the hash of the name of the file at a place of the drive, as it is counted.
 void order_drive_named(Core &core, uint32_t place, const char *name);
 
+// The place of the drive whose file has this name, as the drive gives it, or kDriveMost.
+uint32_t order_place_named(const Core &core, const char *name, uint32_t length);
+
 // Whether the drive's check is to read the file before the drive's files.
 bool order_drive_due(const Core &core);
 

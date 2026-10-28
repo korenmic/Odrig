@@ -15,6 +15,7 @@ from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 
 from . import support
+from .test_keys import Paged
 from .test_target import entered
 
 ANIMATIONS = support.ROOT / "test-animations"
@@ -91,11 +92,71 @@ class Previews(unittest.TestCase):
         self.assertEqual(seen["tapped"]["src"], self.source("rainbow-lines-01.odrg"))
         self.assertIn("play 2", [entry["line"] for entry in logged])
 
-    def test_a_show_without_a_catalog_has_no_previews_until_settings_rebuilds_its_catalog(self):
+    def test_a_show_without_a_catalog_shows_by_name_and_size_before_settings_rebuilds_its_catalog_and_after(self):
         emulator = entered(self, emulator_support.Emulator(self.show(cataloged=False, broken=False)))
         seen = support.run("previews", address=f"127.0.0.1:{emulator.port}", settings={"rebuild": True, "rows": 3, "previews": 2}).seen
-        self.assertEqual([row["src"] for row in seen["before"]], [None, None, None])
-        self.assertEqual([row["src"] for row in seen["after"]], [self.source("lines-test.odrg"), self.source("rainbow-lines-01.odrg"), None])
+        wanted = [self.source("lines-test.odrg"), self.source("rainbow-lines-01.odrg"), None]
+        self.assertEqual([row["src"] for row in seen["before"]], wanted)
+        self.assertEqual([row["src"] for row in seen["after"]], wanted)
+
+
+BLACK = "rgb(0, 0, 0)"
+
+
+def square_of(snapshot, name):
+    return next(row for row in snapshot["squares"] if row["file"] == name)
+
+
+class ByNameAndSize(unittest.TestCase):
+    def test_rows_show_the_default_catalogs_previews_by_name_and_size_while_every_page_is_busy(self):
+        known = {name: (ANIMATIONS / name).read_bytes() for name in ("lines-test.odrg", "rainbow-lines-01.odrg", "rainbow-lines-03.odrg")}
+        internal = [("lines-test.odrg", len(known["lines-test.odrg"]), "0badf00d"), ("rainbow-lines-01.odrg", len(known["rainbow-lines-01.odrg"]) + 1, "0badf00d"),
+                    ("unknown-file.odrg", 1234, "0badf00d")]
+        external = [("rainbow-lines-03.odrg", len(known["rainbow-lines-03.odrg"]), "0badf00d")]
+        target = Paged(internal, external)
+        target.busy_always = True
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": [{"untilRows": 4, "ms": 15000}, {"sleep": 500}, {"snap": "rows"}]}).seen
+            lines = [line.decode("ascii") for _, line in stand_in.lines]
+        self.assertTrue(any(line.startswith("catalog page ") for line in lines))
+        self.assertEqual((seen["rows"]["internal"], seen["rows"]["external"]), (None, None))
+        self.assertEqual(square_of(seen["rows"], "lines-test.odrg")["src"], f"thumbnails/{key_of(known['lines-test.odrg'])}.gif")
+        self.assertEqual(square_of(seen["rows"], "rainbow-lines-03.odrg")["src"], f"thumbnails/{key_of(known['rainbow-lines-03.odrg'])}.gif")
+        self.assertIsNone(square_of(seen["rows"], "rainbow-lines-01.odrg")["src"], "another size finds nothing")
+        self.assertIsNone(square_of(seen["rows"], "unknown-file.odrg")["src"])
+        self.assertEqual(square_of(seen["rows"], "unknown-file.odrg")["background"], BLACK)
+
+    def test_a_made_up_catalog_finds_one_key_of_the_rows_size_the_card_files_own_name_and_gives_way_to_the_boards_key(self):
+        work = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        folder = work / "thumbnails"
+        folder.mkdir()
+        gif = next(support.THUMBNAILS.glob("*.gif")).read_bytes()
+        entries = {"aaaaaaa1-100": ["twin.odrg"], "aaaaaaa2-100": ["twin.odrg"], "bbbbbbb1-200": ["sized.odrg"], "ccccccc1-300": ["deep.odrg"],
+                   "ddddddd1-400": ["late.odrg"], "eeeeeee1-400": ["other.odrg"]}
+        lines = ["export default {"] + [f'  "{key}": {{"gif": "{key}.gif", "names": {json.dumps(names)}}},' for key, names in sorted(entries.items())] + ["};", ""]
+        (folder / "catalog.js").write_text("\n".join(lines), encoding="ascii")
+        for key in entries:
+            (folder / f"{key}.gif").write_bytes(gif)
+        internal = [("twin.odrg", 100, "12345678"), ("sized.odrg", 999, "12345678"), ("late.odrg", 400, "eeeeeee1")]
+        external = [("night/deep.odrg", 300, "99999999")]
+        target = Paged(internal, external)
+        target.busy_always = True
+        target.folders = ["night"]
+
+        def pages():
+            target.busy_always = False
+
+        plan = [{"untilRows": 3, "ms": 15000}, {"sleep": 500}, {"snap": "before"}, {"enter": "night"}, {"untilRows": 1}, {"snap": "night"}, {"press": "Back"},
+                {"step": True}, {"untilKeys": "internal", "ms": 20000}, {"sleep": 300}, {"snap": "after"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[pages], thumbnails=folder).seen
+        self.assertIsNone(square_of(seen["before"], "twin.odrg")["src"], "two keys of the row's size")
+        self.assertIsNone(square_of(seen["before"], "sized.odrg")["src"], "a key of another size")
+        self.assertEqual(square_of(seen["before"], "twin.odrg")["background"], BLACK)
+        self.assertEqual(square_of(seen["before"], "late.odrg")["src"], "thumbnails/ddddddd1-400.gif")
+        self.assertEqual(square_of(seen["night"], "night/deep.odrg")["src"], "thumbnails/ccccccc1-300.gif")
+        self.assertEqual(square_of(seen["after"], "late.odrg")["src"], "thumbnails/eeeeeee1-400.gif", "the board's key decides")
+        self.assertIsNone(square_of(seen["after"], "twin.odrg")["src"])
 
 
 if __name__ == "__main__":

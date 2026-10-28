@@ -214,7 +214,12 @@ are in [format.md](format.md), "Measured sizes".
   once, the playlist chosen by `play` is current for 24 hours of the board's running time
   and then the next in the tree's order is, calendar time never considered, the choice is
   kept across a restart, and the saved order names a card file by its path from `odrig`
-  (the owner, 2026-10-26, seed 41).
+  (the owner, 2026-10-26, seed 41). An operator gives the turn in progress another count
+  of loops with `repeat <id> <n>`, for that turn alone, keeps a count for every later turn
+  of an animation in the board's `repeats.txt` by its file name with `repeat <id> <n>
+  save`, and brings its own count back with `repeat <id> default`; `status` reports the
+  turn's `repeat`, `loop` and `saved`, and `show.json` is never changed for a repeat (the
+  owner, 2026-10-27, seed 48).
 - Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
   characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
 - An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
@@ -770,3 +775,13 @@ are in [format.md](format.md), "Measured sizes".
   previews of what a phone uploads in that phone's IndexedDB. A GIF gains its second role
   in the table of formats; the board's memory, the catalogs' format and every other reply
   are unchanged. The board session and the owner's check on a phone are open.
+- 2026-10-28: Seed 48, the owner's request of 2026-10-27 for a bar of the animation playing
+  now: the command `repeat` in three forms, `repeat <id> <n>`, which the owner approved on
+  2026-10-27, `repeat <id> <n> save` and `repeat <id> default`, the `status` members
+  `repeat`, `loop` and `saved`, and the board's file `repeats.txt`, which the owner approved
+  through the seed by ordering it built as written. A turn plays the count `repeat` gave it,
+  else the saved repeat, else the show's own count; neither of the first two is cut by
+  `max_seconds`. The firmware tool keeps the board's `repeats.txt` as it keeps `order.txt`.
+- 2026-10-28: The owner's ruling: GIFs may be tracked beside a seed, in its folder, as its
+  references, besides the previews of `thumbnails/`; MP4 and MOV files are tracked nowhere.
+  Seed 52's two text files of references end their lines with a line feed alone.

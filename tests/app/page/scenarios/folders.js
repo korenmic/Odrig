@@ -175,7 +175,7 @@ export default async function (app) {
         found.steps.push({selected: [], held: step.select.filter((id) => selection.has(id)), offered: false, ...seen(app)});
         continue;
       }
-      app.press("Select");
+      app.pressIn("#list-head", "Select");
       const selectAll = app.byId("select-all");
       if (!selectAll.disabled) app.press("Select all");
       const selected = [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));

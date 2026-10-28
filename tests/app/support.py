@@ -175,6 +175,14 @@ class _Pages(webserver.Handler):
         if self.elsewhere():
             return
         path = self.path.split("?", 1)[0]
+        if path.startswith("/thumbnails/") and self.server.thumbnails is not None:
+            rest = path[len("/thumbnails"):]
+            found = webserver.file_of(pathlib.Path(self.server.thumbnails), rest, webserver.THUMBNAIL_TYPES) if rest.count("/") == 1 else None
+            if found is None:
+                self.answer(404)
+            else:
+                self.answer(200, webserver.THUMBNAIL_TYPES[found.suffix], found.read_bytes())
+            return
         if path.startswith("/t/"):
             found = webserver.file_of(PAGE, path[len("/t"):])
             if found is None:
@@ -279,7 +287,7 @@ def commands_elsewhere(found):
     return sent
 
 
-def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None):
+def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None, thumbnails=None):
     """Runs one scenario of `page/scenarios/` against the web code in Chrome without a
     window, and gives what the scenario found and what the pages asked other computers
     for, each as `(method, address, body)`.
@@ -287,10 +295,12 @@ def run(scenario, address=None, settings=None, steps=(), size=SIZE, media=None):
     `address` is the address the app is to use, kept before the app starts; without one
     the app starts as on a new phone. `settings` reach the scenario as they are. Each
     time the scenario asks for a step, the next function of `steps` is called. The files
-    of the folder `media` are served to the scenario under `/m/`.
+    of the folder `media` are served to the scenario under `/m/`. A folder `thumbnails` is
+    served as the default preview catalog, in place of the repository's.
     """
     server = webserver.Server(0, handler=_Pages)
     server.media = media
+    server.thumbnails = thumbnails
     server.results = queue.Queue()
     server.steps = list(steps)
     server.elsewhere = []

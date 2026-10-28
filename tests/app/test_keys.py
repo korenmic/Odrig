@@ -4,6 +4,8 @@ silence and after every complete list, the sixteen pages of each storage whose c
 longer hold, and a target from before `catalog page` or before catalogs."""
 
 import json
+import pathlib
+import tempfile
 import threading
 import time
 import unittest
@@ -11,6 +13,7 @@ import zlib
 
 from . import support
 from .test_messages import refusal
+from .test_target import entered
 
 STATUS = (200, '{"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60}\n')
 NULL_PAGE = {"ok": True, "generation": None, "text": "", "next": None}
@@ -23,8 +26,9 @@ def files(prefix, count, seed):
 
 class Paged:
     """A target with two catalogs whose pages it gives `piece` bytes at a time. Each page
-    answer can wait, be refused once with `busy`, be refused with a code, have a `null`
-    generation, or come with the generation one more after `bump_after` pages."""
+    answer can wait, be refused once with `busy`, or always while `busy_always` is set, be
+    refused with a code, have a `null` generation, or come with the generation one more
+    after `bump_after` pages. Its list names the card's folders of `folders` too."""
 
     def __init__(self, internal, external, piece=512):
         self.lock = threading.Lock()
@@ -34,6 +38,8 @@ class Paged:
         self.piece = piece
         self.delay = 0.0
         self.busy_once = set()
+        self.busy_always = False
+        self.folders = []
         self.refused_at = {}
         self.null_at = set()
         self.bump_after = None
@@ -69,6 +75,8 @@ class Paged:
             self.asked_pages.append((time.monotonic(), storage, page, offset))
             if self.refuse_pages:
                 return refusal("bad-argument")
+            if self.busy_always:
+                return refusal("busy")
             if (storage, page) in self.busy_once:
                 self.busy_once.discard((storage, page))
                 return refusal("busy")
@@ -93,6 +101,7 @@ class Paged:
         with self.lock:
             items = [{"id": number + 1, "file": name, "bytes": size, "ignored": False, "external": False} for number, (name, size, crc) in enumerate(self.files["internal"])]
             items += [{"id": 60001 + number, "file": name, "bytes": size, "external": True} for number, (name, size, crc) in enumerate(self.files["external"])]
+            items += [{"id": 60501 + number, "playlist": folder, "external": True} for number, folder in enumerate(self.folders)]
         return (200, json.dumps({"ok": True, "items": items, "next": None}) + "\n")
 
     def space(self, line):
@@ -203,6 +212,42 @@ class Reading(unittest.TestCase):
         self.assertIsNone(seen["message"])
 
 
+class AtOnce(unittest.TestCase):
+    def test_the_lines_of_each_reply_give_their_rows_keys_and_previews_before_the_storage_is_read_whole(self):
+        target = Paged(INTERNAL, EXTERNAL, piece=40)
+        target.delay = 0.15
+        early = {}
+
+        def look():
+            with target.lock:
+                early["asked"] = [(storage, page) for _, storage, page, offset in target.asked_pages]
+
+        work = pathlib.Path(entered(self, tempfile.TemporaryDirectory()))
+        folder = work / "thumbnails"
+        folder.mkdir()
+        gif = next(support.THUMBNAILS.glob("*.gif")).read_bytes()
+        shown = {name: f"{crc}-{size}" for name, size, crc in INTERNAL[:3]}
+        entries = [f'  "{key}": {{"gif": "{key}.gif", "names": ["other-{number}.odrg"]}},' for number, key in enumerate(sorted(shown.values()))]
+        (folder / "catalog.js").write_text("\n".join(["export default {", *entries, "};", ""]), encoding="ascii")
+        for key in shown.values():
+            (folder / f"{key}.gif").write_bytes(gif)
+        plan = [{"until": "some-keys", "ms": 20000}, {"snap": "early"}, {"step": True}, {"until": "both", "ms": 40000}, {"snap": "all"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[look], thumbnails=folder).seen
+        self.assertIsNone(seen["early"]["internal"], "the storage's keys wait for its last page")
+        given = {name: key for name, key in seen["early"]["rowKeys"] if key is not None}
+        self.assertTrue(given)
+        self.assertEqual(given, {name: target.keys("internal")[name] for name in given})
+        self.assertNotIn(("internal", 15), early["asked"], "keys before the last page was asked")
+        for row in seen["early"]["squares"]:
+            if row["file"] in given and row["file"] in shown:
+                self.assertEqual(row["src"], f"thumbnails/{shown[row['file']]}.gif", row["file"])
+            else:
+                self.assertIsNone(row["src"], row["file"])
+                self.assertEqual(row["background"], "rgb(0, 0, 0)", row["file"])
+        self.assertEqual(dict(seen["all"]["rowKeys"]), {**target.keys("internal"), **target.keys("external")})
+
+
 class OlderTargets(unittest.TestCase):
     def test_a_target_that_refuses_the_pages_is_asked_for_none_again_and_catalog_only_by_settings(self):
         target = Paged(INTERNAL, EXTERNAL)
@@ -228,23 +273,114 @@ class OlderTargets(unittest.TestCase):
 
 
 class Dropped(unittest.TestCase):
-    def test_the_keys_go_at_a_silence_and_at_another_target_and_come_back_from_a_new_read(self):
+    def test_the_keys_go_at_a_silence_and_at_another_target_and_come_back_kept_on_the_phone(self):
         target = Paged(INTERNAL, EXTERNAL)
+        marks = []
 
         def quiet():
             target.silent = True
 
         def back():
+            marks.append(len(stand_in.lines))
             target.silent = False
 
         with support.StandIn(target.replies()) as stand_in, support.StandIn(support.SOUND) as other:
             plan = [{"until": "both"}, {"snap": "before"}, {"step": True}, {"until": "no-answer", "ms": 15000}, {"step": True}, {"until": "answers", "ms": 15000},
                     {"snap": "again"}, {"until": "both", "ms": 15000}, {"snap": "read"}, {"address": other.address}, {"snap": "other"}]
             seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[quiet, back]).seen
+            after = sent(stand_in)[marks[0]:]
+        self.assertIn("catalog", after)
+        self.assertEqual(page_lines(after), [], "the kept keys come back with no page read")
         self.assertGreater(seen["again"]["version"], seen["before"]["version"])
         self.assertTrue(seen["again"]["internal"] is None or seen["again"]["version"] >= seen["before"]["version"] + 2)
         self.assertEqual(seen["read"]["internal"]["byName"], target.keys("internal"))
         self.assertEqual((seen["other"]["internal"], seen["other"]["external"]), (None, None))
+
+
+class KeptOnThePhone(unittest.TestCase):
+    def test_after_a_reload_the_keys_come_from_the_phone_and_no_page_is_asked(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def mark():
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"snap": "first"}, {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "again"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[mark]).seen
+            after = sent(stand_in)[marks[0]:]
+        self.assertIn("catalog", after)
+        self.assertEqual(page_lines(after), [])
+        self.assertEqual(seen["again"]["internal"]["byName"], target.keys("internal"))
+        self.assertEqual(seen["again"]["external"]["byName"], target.keys("external"))
+        self.assertEqual(dict(seen["again"]["rowKeys"]), dict(seen["first"]["rowKeys"]))
+
+    def test_a_new_generation_is_read_and_kept_and_the_next_start_reads_no_page(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def changed():
+            with target.lock:
+                target.files["internal"][3] = ("file-03.odrg", 7777, "0badf00d")
+                target.generation["internal"] = 4
+            marks.append(len(stand_in.lines))
+
+        def mark():
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"step": True}, {"reload": True}, {"untilKeys": "internal", "generation": 4, "ms": 20000}, {"sleep": 500},
+                {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "last"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[changed, mark]).seen
+            lines = sent(stand_in)
+        read = page_lines(lines[marks[0]:marks[1]])
+        self.assertTrue(read)
+        self.assertEqual({line.split(" ")[2] for line in read}, {"internal"}, "the card's kept keys still hold")
+        self.assertEqual(page_lines(lines[marks[1]:]), [])
+        self.assertEqual(seen["last"]["internal"]["byName"]["file-03.odrg"], "0badf00d-7777")
+
+    def test_loading_and_absent_keep_the_kept_keys_and_damaged_forgets_them(self):
+        target = Paged(INTERNAL, EXTERNAL)
+        marks = []
+
+        def away():
+            with target.lock:
+                target.state["internal"] = "damaged"
+                target.state["external"] = "absent"
+            marks.append(len(stand_in.lines))
+
+        def loading():
+            with target.lock:
+                target.state["internal"] = "ok"
+                target.state["external"] = "loading"
+            marks.append(len(stand_in.lines))
+
+        def back():
+            with target.lock:
+                target.state["external"] = "ok"
+            marks.append(len(stand_in.lines))
+
+        plan = [{"until": "both", "ms": 20000}, {"step": True}, {"reload": True}, {"sleep": 2000}, {"step": True}, {"reload": True},
+                {"untilKeys": "internal", "ms": 20000}, {"step": True}, {"reload": True}, {"until": "both", "ms": 20000}, {"sleep": 1500}, {"snap": "back"}]
+        with support.StandIn(target.replies()) as stand_in:
+            seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[away, loading, back]).seen
+            lines = sent(stand_in)
+        while_ok_again = page_lines(lines[marks[1]:marks[2]])
+        self.assertTrue(while_ok_again, "the damaged catalog's keys were forgotten and read again")
+        self.assertEqual({line.split(" ")[2] for line in while_ok_again}, {"internal"})
+        self.assertEqual(page_lines(lines[marks[2]:]), [], "absent and loading kept the card's keys")
+        self.assertEqual(seen["back"]["external"]["byName"], target.keys("external"))
+
+    def test_another_address_has_keys_of_its_own(self):
+        first = Paged(INTERNAL, EXTERNAL)
+        second = Paged(files("other-", 20, 7), [(f"night/{name}", size, crc) for name, size, crc in files("dusk-", 10, 8)])
+        with support.StandIn(first.replies()) as one, support.StandIn(second.replies()) as two:
+            plan = [{"until": "both", "ms": 20000}, {"address": two.address}, {"until": "both", "ms": 20000}, {"snap": "other"}]
+            seen = support.run("keys", address=one.address, settings={"plan": plan}).seen
+            asked = page_lines(sent(two))
+        self.assertTrue(asked, "the second address reads its own pages")
+        self.assertEqual(seen["other"]["internal"]["byName"], second.keys("internal"))
+        self.assertEqual(seen["other"]["external"]["byName"], second.keys("external"))
 
 
 class TheOperatorFirst(unittest.TestCase):

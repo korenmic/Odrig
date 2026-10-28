@@ -114,7 +114,7 @@ export default async function (app) {
     seen.after = ids(app);
   }
   if (settings.blocked) {
-    app.press("Select");
+    app.pressIn("#list-head", "Select");
     seen.selecting = {note: app.text("order-note"), menu: menuOf(app, seen.first[1])};
     app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
     const play = rowOf(app, seen.first[1]).querySelector(".play");
