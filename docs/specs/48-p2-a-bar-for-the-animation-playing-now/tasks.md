@@ -95,7 +95,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
     and 740 px, and the look rules with the bar.
   - Suites: the app's.
 
-- [ ] 8. The documents, every suite, the firmware and the APK
+- [x] 8. The documents, every suite, the firmware and the APK
   - `docs/android-app.md`: the bar and the frozen top in "What it is" and "Using it", the
     check on a phone, what is verified and what is open; `AGENTS.md`: the line of seeds 47
     and 48, built with the owner's checks open.

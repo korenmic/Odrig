@@ -17,7 +17,18 @@ a top bar with the app's name and whether the installation answers.
   and while the list does not hold the animation yet, `ON` or `OFF`, the
   brightness and the refreshes a second, with `On` and `Off` together in one pill, the line
   `Set the brightness to` with a field that holds the brightness as a number, and the big
-  slider for it under them: the field and the slider follow each other both ways. Under the refreshes, while the installation reads its
+  slider for it under them: the field and the slider follow each other both ways. Between
+  the name of the animation on the LEDs and the line of what plays stands its bar while a
+  playlist turn plays it, the root's or a folder's, and the list holds it: its row menu's
+  actions but the moves, in short words, `Ignore` or `Restore`, `Select`, `Delete` and,
+  for a text or a clock, `Edit`, or a line that says why it has none; `Repeat this` with a
+  field that holds the loops of the turn in progress; and `Save` and `Restore default`,
+  which keep a count for every later turn of that animation on the installation or remove
+  it. The bar has three lines of 48 pixels on an installation that reports the counts of
+  the turn, two on one that does not, whatever the animation. The panel, from `Now playing`
+  down to the slider, stays at the top of the screen while the rest scrolls under it,
+  whenever a whole row of the list, 80 pixels, still fits between it and the tabs; held
+  sideways, on a short phone or with the keyboard open, the whole screen scrolls. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
   read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
@@ -279,6 +290,15 @@ Store. It asks for no permission that the phone shows a question for.
    slider stands at each number as it is typed, and the field shows where the slider
    stands. A number above 255 is not sent, and the line under the slider says `The
    brightness is 0 to 255.`; an emptied field sends nothing and shows the brightness again.
+4. The bar under the name of the animation on the LEDs acts on that animation as its row's
+   menu does, whichever folder the list shows: `Ignore` ends its turn at once, `Delete`
+   asks first, `Select` shows the selection with its row ticked, at the root and with the
+   filters showing it. Its field shows how many loops the turn in progress plays; type
+   another number and press `Repeat this`, or Done, and the turn plays that many loops from
+   its first frame, or ends with the loop in progress when that is already the last, for
+   this turn alone; the app then says how many loops it plays and which is playing. `Save`
+   keeps the field's number for every later turn of the animation, also after a restart,
+   and `Restore default` brings the show's own count back. Leaving the field sends nothing.
 
 What the screens show comes from the installation's replies, about once a second: when
 another phone changes something, this one shows it within two seconds. While the
@@ -873,7 +893,14 @@ installed; the phone with mobile data on.
     LEDs play on; `Cancel the rebuild` ends it, and a second rebuild that runs to its end
     leaves `Card: <n> animations, cataloged.` Keep the brightness at 40 or less while one
     strip is fed from the board itself.
-22. **Note** the phone's model, its Android version, the web view's version from the
+22. **The bar of the animation playing now.** With firmware that has the command
+    `repeat`, on Animations while the playlist plays. *Seen:* the bar under the name of the
+    animation on the LEDs, with its field holding the turn's loops; `Repeat this` with 3
+    plays it three loops and then the next; `Save` with 3 makes its next turn three loops
+    too, also after a restart of the board; `Restore default` brings its own count back;
+    `Ignore` moves on at once; the panel stays at the top while the list scrolls under it,
+    and with the phone held sideways the whole screen scrolls.
+23. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -914,6 +941,19 @@ By programs, on a Mac:
   panels composited onto the midnight background, every control at least 44 pixels and
   the main ones 48, 8 pixels apart, the four tabs at equal width along the bottom, a
   row's menu, a message and a question above the tabs, nothing scrolling sideways.
+- The bar of the animation playing now, in Chrome against the emulator and against stand-in
+  targets: its place and when it shows, its actions for each kind of animation, `Ignore`
+  moving on, `Delete` asking first, `Select` from another folder and through a filter with
+  the row just below the panel, `Repeat this` by its button and by Done, `Save` with a typed
+  number and with the one in force, `Restore default`, numbers out of range and an empty
+  field sending nothing, the field kept while it has the focus and its text dropped a
+  second after it is left, every sentence and refusal, a missing reply, the buttons
+  disabled while the installation does not answer, while the selection is locked and while
+  a line is out, an installation without the counts, and the bar's one height for every
+  kind of animation at 320, 360 and 740 pixels. The panel staying at the top at 412 by 915
+  and at 360 by 740 with and without the room of the phone's bars, exactly while 80 pixels
+  are left under it, and not sideways, on a short phone or with the keyboard open; a row
+  lifted under it stopping below it.
 - The rows and their menus, in Chrome against the emulator: `in` and `ex` badges by
   `external` of `list`, Ignore in playlist and Restore to playlist shown as saving until
   confirmed, a refused change read again, the selection mode with more than 32
@@ -1035,6 +1075,10 @@ By programs, on a Mac:
 - **Seed 41 on a phone and on the board.** Nobody has walked the card's folders on a
   phone, chosen a folder there and seen the board play it, restart and play it again, or
   seen the time left count down on a phone: the seed's board session.
+- **Seed 48 on a phone and on the board.** The board runs a firmware without the command
+  `repeat`, so its app shows the bar without `Repeat this`, `Save` and `Restore default`;
+  those need a firmware with seed 48. Nobody has seen the bar or the frozen panel on a
+  phone: step 22 above.
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.
