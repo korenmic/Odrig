@@ -48,6 +48,11 @@ card is missing, and plays the rest from the card.
   begins with a dot or is not sound, and `System Volume Information`. The log line of
   the listing counts what was passed over. Each file is known by its path from `odrig`,
   `night/comet.odrg` for one, and [catalog.md](catalog.md) has the rule of the names.
+- **The clocks.** The folder `clocks` holds the clocks that play between the animations,
+  and its sub-folder `message` the message after each, as [show.md](show.md#clocks-between-the-animations)
+  says; `collection/card/clocks/` holds them, 113 files. A card with them and the
+  installation's other files holds more than 256 files: it needs its catalog, or, without
+  one, only the clocks and the files to play, at most 256 in all.
 - **The names.** Keep names to the letters `a`-`z` and `A`-`Z`, digits, `-`, `_` and `.`.
   Another letter, a Hebrew one for instance, may come out as `?`; such a file cannot be
   opened by its name and is left out, with its line in the log.

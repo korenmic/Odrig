@@ -390,3 +390,55 @@ never writes two.
   one is removed at the next start.
 - `ignore`, a move of the order and the brightness leave the saved repeats alone, and
   `show.json` is never changed for a repeat.
+
+## Clocks between the animations
+
+While the clocks are on, `clocks on` of [commands.md](commands.md#clocks-between-the-animations),
+the playlist has a break now and then: a turn of a clock, and, while the message is on and
+there is one, one loop of the message after it. The clocks are the animation files directly
+in the folder `clocks` of a card's folder `odrig`, at its first level, and the message is the
+first animation file directly in `clocks/message` that can play; the show's own animations
+are never clocks, nor is a file of another sub-folder of `clocks`. While both settings are
+off, the player plays as the rest of this page says.
+
+- **The folders are the breaks'.** While the clocks are on, every playlist passes over the
+  folder `clocks` and every folder below it, as it passes over an ignored animation: the
+  root's walk, a folder's, the first animation of a playlist, and a folder whose files are
+  all in them, which has nothing to play, so that the root plays in its place. A `play
+  <id>` of one of their files plays its turn as a jump; a `play <id>` of one of the folders
+  makes it current, and the root plays in its place. While the clocks are off they are
+  folders of the card like any other.
+- **When a break comes.** The player counts the playlist's turns that end, at their end or
+  cut by `play`, `play all`, `ignore`, `remove`, an upload, the quarantine of its file or
+  the card pulled out, and the playlist's time: the running time while the playlist plays,
+  the LEDs off included, but not while a cycle plays, a test of the mapping shows or
+  nothing plays. A break begins at the end of a turn once 5 turns are counted, or once 5
+  minutes, 300,000 ms, are counted at that end or before it. When the 5 minutes are counted
+  within a turn, the turn is paused at that moment; after the break it goes on from the
+  same point of its time, with its frame, its loop, a clock's seed and the count a `repeat`
+  gave it, for the rest of its turn. Both counts start from zero at the start with the
+  clocks on, at `clocks on`, at the end of every break, when a break is cut, and when a
+  break is due and no clock can play; then nothing plays in its place.
+- **A break.** The clock's turn is as long as its turn in the playlist would be: its saved
+  repeat, else the fewest whole loops that last `min_seconds`; its seed is drawn when its
+  turn begins. The message plays once: one loop, a text's pass, never cut. After the
+  break the playlist goes on with the paused turn, or with the animation whose turn was to
+  begin, or with the one after it when that can no longer play. `status` reports a break's
+  turns as turns: `animation`, `repeat`, `loop` and `saved` are the clock's or the
+  message's, and `playing` stays the playlist's.
+- **The order of the clocks.** Each break takes the next clock of an order drawn at random
+  among all the orders of the clocks there are, each once; a clock that cannot play when
+  its place comes is passed over. When the order is used up a new one is drawn, and the
+  last clock of one may be the first of the next. A new order is drawn at the start, when a
+  card is taken up or dropped, and when its tree changes.
+- **What cuts a break.** Whatever cuts a turn of the playlist cuts a break, its paused turn
+  not resumed: a `play` of any kind, `play all`, `ignore`, `remove`, an upload, the
+  quarantine of its file, the card pulled out; and a test of the mapping, after which the
+  playlist plays, from its first frame, the animation the break was to give way to.
+  `clocks off` and `clocks message off` let a break in progress play to its end, with the
+  message as it was when the break began; `clocks message on` during a clock's turn gives
+  that clock its message. `on`, `off`, `brightness`, `order move` and `list` change nothing
+  of a break.
+- **The window.** A playlist's window that passes during a break is taken at the break's
+  end: the paused turn is not resumed, and the next playlist plays from its first
+  animation. A restart forgets a break.

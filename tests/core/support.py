@@ -458,7 +458,7 @@ def demo_show():
 # in the current playlist's window, which runs with the time, the counts of the turn in
 # progress, and the names of the file and the folder that play, which the tests of what
 # plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "left")
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "clocks", "clock_message", "left")
 
 
 def without_readiness(state):
@@ -646,6 +646,28 @@ def mix(value):
     return value ^ (value >> 16)
 
 
+def clock_shuffle(key, count, index):
+    """The place of `index` in the permutation of 0 to count - 1 that a key draws, as the
+    core orders the clocks of a break: a balanced Feistel network of four rounds over the
+    fewest even bits that hold `count`, walked again on its own output while that is
+    `count` or more."""
+    if count <= 1:
+        return 0
+    bits = 2
+    while bits < 32 and (1 << bits) < count:
+        bits += 2
+    half = bits // 2
+    mask = (1 << half) - 1
+    value = index
+    while True:
+        left, right = value >> half, value & mask
+        for round_ in range(4):
+            left, right = right, left ^ (mix(key ^ ((round_ * 0x9E3779B9) & 0xFFFFFFFF) ^ right) & mask)
+        value = (left << half) | right
+        if value < count:
+            return value
+
+
 def seed_of(noise, number, start):
     """The seed of the turn of a clock: the noise, the item's id and the turn's start."""
     return mix(noise ^ mix((number ^ start) & 0xFFFFFFFF)) or 1
@@ -706,7 +728,7 @@ class ReferencePlayer:
 
     GRID = 20
     WINDOW = 86_400_000     # the window of a current playlist, in ms
-    PARTS = ("upload.part", "show.part")
+    PARTS = ("upload.part", "show.part", "clocks.part")
     PENDING = "pending.txt"
     CHUNK = 1500
     QUIET = 60000
@@ -768,11 +790,14 @@ class ReferencePlayer:
         self.logged = []        # the texts of the log since the last refresh was printed
         self.start_logs = []    # the texts of the log of the start
         self.last_sent = None   # the LED data of the latest refresh
+        self.clocks = False     # the clocks between the animations are on
+        self.clock_message = False  # the message after each clock is on
         content = {name: data if isinstance(data, bytes) else data.encode("utf-8") for name, data in files.items()}
         self.files = content    # the files of the folder by name
         if changeable:
             for name in self.PARTS:
                 content.pop(name, None)
+            self._read_clocks()
         try:
             start = self._check(content)
         except _Invalid as invalid:
@@ -800,6 +825,40 @@ class ReferencePlayer:
                 self.checks = []
             self.start_logs += self.logged
             self.logged = []
+
+    CLOCKS = "clocks.txt"
+    CLOCKS_FORMS = {b"odrig-clocks 1\nclocks %s\nmessage %s\n" % (clocks, message): (clocks == b"on", message == b"on")
+                    for clocks in (b"on", b"off") for message in (b"on", b"off")}
+
+    def _read_clocks(self):
+        """Reads `clocks.txt` whole and strictly: a missing file is both settings off, a file
+        out of its one form both off, and the log says so."""
+        data = self.files.get(self.CLOCKS)
+        if data is None:
+            return
+        if data not in self.CLOCKS_FORMS:
+            self.start_logs.append("clocks unreadable")
+            return
+        self.clocks, self.clock_message = self.CLOCKS_FORMS[data]
+
+    def _clocks(self, arguments):
+        """`clocks on|off` and `clocks message on|off`: the setting is saved in the file,
+        written whole, before it takes effect; one already in force writes nothing."""
+        message = len(arguments) == 2 and arguments[0] == b"message"
+        if (len(arguments) != 1 and not message) or arguments[-1] not in (b"on", b"off"):
+            return "bad-argument"
+        if self.error is not None:
+            return "show-invalid"
+        if self.checks or self.upload is not None:
+            return "busy"
+        if not self.changeable:
+            return "storage-error"
+        on = arguments[-1] == b"on"
+        settings = (self.clocks, on) if message else (on, self.clock_message)
+        if settings != (self.clocks, self.clock_message):
+            self.files[self.CLOCKS] = next(text for text, form in self.CLOCKS_FORMS.items() if form == settings)
+            self.clocks, self.clock_message = settings
+        return None
 
     REPEATS = "repeats.txt"
     REPEATS_HEADER = b"odrig-repeats 1"
@@ -1152,7 +1211,7 @@ class ReferencePlayer:
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
+    COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048), b"clocks": range(0, 2048)}
     READ_MOST = 600
     EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
@@ -1198,6 +1257,8 @@ class ReferencePlayer:
             return self._read(arguments)
         if name == b"repeat":
             return self._repeat(arguments)
+        if name == b"clocks":
+            return self._clocks(arguments)
         if name == b"play" and arguments == [b"all"]:
             if self.error is not None:
                 return "show-invalid"
@@ -1664,6 +1725,7 @@ class ReferencePlayer:
         # playlist is current, which the reference has none of.
         state["file"] = self.items[self.shown].file if self.playing is not None and self.shown in self.items else None
         state["playlist"] = None
+        state["clocks"], state["clock_message"] = self.clocks, self.clock_message
         state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 

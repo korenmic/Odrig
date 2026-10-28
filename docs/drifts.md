@@ -11881,3 +11881,89 @@ work that lifts that limit.
 **Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
 `thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
 `design.md`.
+
+## Seed 54: the message's frames, colours and size
+
+**Question.** The requirements ask for 120 frames of 50 ms from the owner's page
+`horror-text-60x60.html`, its colours as the page draws them. The page anti-aliases its
+Hebrew text, blends a dark red edge and scanlines over it, and lays a noise that changes 12
+times a second; what does the file hold, and is it light enough for the card?
+
+**Answer.** `render-message.mjs` steps the page's clock to 0, 50, ... 5,950 ms and takes
+120 frames of 50 ms; two runs gave the same bytes. Six of them, at 50, 150, 300, 1,550, 4,650
+and 4,800 ms, are the same as the frame before: the page's noise holds for 83 ms, and the
+text then stands still while its scanline is off the canvas. The converter merges them as
+the format says, so the file has 114 frames, 6,000 ms in all.
+The page draws 855 colours, kept as they are, not reduced to 8: the file has no palette,
+3 bytes a pixel, and its body is compressed. `its-not-the-time.odrg` has 120,969 bytes,
+key `5218d8e1-120969`, far from heavy; `check` accepts it.
+
+**Resolution.** `project-seeds/54-p2-clocks-between-the-animations/source/render-message.mjs`;
+`collection/card/clocks/message/`; `thumbnails/catalog.js`.
+## Seed 54: the two members of `status` and the longest reply
+
+**Question.** `clocks` and `clock_message` add 37 bytes to every reply of `status`. The
+suite's bound of the longest reply added the longest reason text of an invalid show to a
+file being checked and a seed, and came to 1,059 bytes with them, above the 1,024 of a
+reply. Does the reply still fit?
+
+**Answer.** Yes. The core writes a reason text only while the show is invalid, and then
+`checking` and `seed` are `null`; the bound took both at once. Taken apart, a valid show
+with a file of 32 characters being checked and a seed of ten digits comes to 996 bytes,
+an invalid one with a reason text of 65 characters to 999, each with the longest name of
+a host, every byte of it escaped. The suite's bound now takes the two cases apart.
+
+**Resolution.** `tests/core/test_commands.py`, `LineEndings`.
+
+## Seed 54: the settings and the breaks in the core
+
+**Question.** The design of seed 54 names the core's code for the two settings of the
+clocks and for the breaks. What does the code do where the design leaves a point open or
+the code differs from it?
+
+**Answer.**
+
+- `clocks.txt` is read at the start only by a core whose storage can be changed, as
+  `order.txt` and `repeats.txt` are; on a host whose storage cannot be changed both
+  settings are off, and the four lines answer `storage-error`, as `repeat`'s saving forms
+  do, before a setting already in force is looked at.
+- A failed read of `clocks.txt` at offset 0 is taken as a missing file, both off without a
+  log line; one that fails later, or a file of 64 bytes or more, is out of form.
+- A `play` that cuts a turn of the playlist counts it only when the turn had its first
+  refresh; two `play`s before a refresh count one. A cut never begins a break: once 5
+  turns are counted by cuts, the break comes at the end of the next turn. A `play` of a
+  cycle cuts the turn and counts it as a `play` of an animation does.
+- "The message as it was set then": the message follows a clock when it was on as the
+  break began, or when `clocks message on` comes during the clock's turn; `clocks message
+  off` during the break takes it from no break that has begun.
+- The design calls `breaks_tree` in `player_drive_changed` too. Every path of the code that
+  changes the tree calls `tree_clear`, `tree_build` or `tree_find_current` before it, and
+  the moves of the walk call `player_drive_moved` and `player_drive_shifted`; those five
+  find the clocks' folders again, and a fault of one file draws no new order.
+- An upload that replaces the file of the paused turn's animation during a break makes it
+  play from its first frame after the break, as a turn of a replaced file begins again.
+  When the paused animation is removed, ignored, quarantined or leaves with the card, the
+  playlist goes on after the break with the animation after it.
+- The test host's `shuffle KEY COUNT` takes a count of 1 to 65,536 and prints the
+  permutation on one line.
+
+**Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`, `core/src/order.cpp`,
+`core/src/mapping_control.cpp`, `tests/core/host/host.cpp`; `docs/show.md`,
+`docs/core.md`, `docs/commands.md`.
+
+## Seed 54: the clocks on the card, and the proof on the emulator
+
+**Question.** Are the clocks of `collection/card/clocks/` those of the share, and do the
+breaks play on the collection's card as the seed says?
+
+**Answer.** The 339 files of `collection/card/clocks/`, the 112 clocks and the message with
+their GIFs and readmes, have the bytes of the share's `card/clocks/`. The demo show with
+`--drive-folder collection/card`, the clocks and the message switched on by their lines:
+the folder `clocks` was passed over by the playlist; when 5 minutes were counted, the
+frames clock `clock-013` cut the turn of `archive/vjmorph-nurave-kali_fit.odrg` after 10 s
+of it, the message played once for 6 s, and that turn went on for the 17.5 s it had left;
+five turns later the picture dial `clock-064` played between two turns. The card's folder
+has more than 256 files without a catalog, so its last files are passed over; the clocks
+come early in the walk and all 113 play.
+
+**Resolution.** `docs/microsd.md`, `agent/vocabulary.md` (`clock break`).

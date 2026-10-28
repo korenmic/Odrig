@@ -68,6 +68,10 @@ the entry links to it.
 - **turn**: The time an animation has in the playlist before the next one starts: unless
   the show says otherwise, the fewest whole loops that last 30 seconds. See
   [show.md](../docs/show.md#the-turn-of-an-animation).
+- **clock break**: While the clocks are on, a turn of a clock from the card's folder `clocks`,
+  after every 5 turns or when 5 minutes have passed, then the message of its sub-folder
+  `message` once while it is on. A turn the 5 minutes cut goes on after it from where it was. See
+  [show.md](../docs/show.md#clocks-between-the-animations).
 - **installed file set**: The one folder of files that a show is installed as:
   `mapping.json`, `show.json` and the `.odrg` files the show names. Whatever plays a show
   reads this folder and nothing else. A folder made this way is also called a packed show.
@@ -77,7 +81,8 @@ the entry links to it.
   `read <id> <offset>`, which reads a file back, `catalog` for the catalogs of storage,
   `remove <id>`, `ignore` for playlist inclusion, `order` for the saved order of the
   playlist, `mapping` for assignments and the diagonal check, `repeat` for the loops of
-  the turn in progress, and `upload`, which sends a file as several lines. Each is answered by one
+  the turn in progress, `clocks` for the clocks between the animations, and `upload`, which
+  sends a file as several lines. Each is answered by one
   line of JSON. See
   [commands.md](../docs/commands.md).
 
