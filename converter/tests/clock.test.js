@@ -185,7 +185,7 @@ test("the clocks draw the virtual time", async (t) => {
   });
 
   await t.test("a canvas too small for a dial shows the background", () => {
-    for (const widget of draw.WIDGETS) {
+    for (const widget of draw.WIDGETS.filter((name) => !draw.PICTURE_WIDGETS.includes(name))) {
       const picture = draw.drawClock(clockOf({widget, background: 0x010203}), 3, 0, {width: 2, height: 1}, new Uint8Array(6));
       assert.deepEqual([...picture], widget === "digital" ? [...picture] : [1, 2, 3, 1, 2, 3]);
     }
@@ -270,12 +270,16 @@ test("the vectors of clocks", async (t) => {
     }
   });
 
-  await t.test("an invalid one is refused with the reason of its name, and they have every reason of a widget", () => {
+  await t.test("an invalid one is refused with the reason of its name, and with those of picture clocks they have every reason of a widget", () => {
     const names = fs.readdirSync(path.join(folder, "invalid"));
     for (const name of names) assert.equal(reasonOf(() => odrgx.decode(read("invalid", name))), name.split(".")[0], name);
     const text = fs.readFileSync(path.join(ROOT, "docs", "reasons.md"), "utf8");
     const section = text.split("\n## Widgets in ODRGX\n")[1].split("\n## ")[0];
     const listed = new Set([...section.matchAll(/^\| `([a-z0-9-]+)` \|/gm)].map((match) => match[1]));
-    assert.deepEqual(new Set(names.map((name) => name.split(".")[0])), listed);
+    const ofWidgets = new Set(names.map((name) => name.split(".")[0]));
+    const pictures = fs.readdirSync(path.join(ROOT, "tests", "vectors", "pictures", "invalid"));
+    const ofPictures = new Set(pictures.map((name) => name.split(".")[0]).filter((reason) => listed.has(reason)));
+    assert.ok([...ofWidgets].every((reason) => listed.has(reason)));
+    assert.deepEqual(ofWidgets.union(ofPictures), listed);
   });
 });

@@ -331,8 +331,8 @@ class List(Content):
             printed = self.run_both(files, [support.line(T0, line) for line in ("list", "list 0", "list 2", "list 65535")])
             self.assertEqual(replies(printed), [refused("show-invalid")] * 4)
 
-    def test_a_from_that_is_no_number_from_0_to_65535_is_a_bad_argument(self):
-        lines = ["list ", "list  1", "list 1 ", "list -1", "list +1", "list 65536", "list 99999999999", "list a", "list 1a", "list 0x1", "list 1.0", "list 1 2", "list 0 0 0 0 0 0"]
+    def test_a_from_that_is_no_number_from_0_to_4294967295_is_a_bad_argument(self):
+        lines = ["list ", "list  1", "list 1 ", "list -1", "list +1", "list 4294967296", "list 99999999999", "list a", "list 1a", "list 0x1", "list 1.0", "list 1 2", "list 0 0 0 0 0 0"]
         for files in (support.example_show(), invalid_show()):
             printed = self.run_both(files, [support.line(T0, line) for line in lines])
             self.assertEqual(replies(printed), [refused("bad-argument")] * len(lines))
@@ -485,8 +485,8 @@ class Remove(Content):
         self.removed(files, 3, before=[support.line(T0, "brightness 255"), support.line(T0, "off")])
         self.assertEqual(json.loads(self.left["show.json"])["brightness"], 31)
 
-    def test_an_id_that_is_no_number_from_1_to_65535_is_a_bad_argument(self):
-        lines = ["remove", "remove ", "remove  1", "remove 1 ", "remove 0", "remove 65536", "remove -1", "remove a", "remove 1 2", "remove 1.0", "remove 0x1", "remove 3 3 3 3 3 3"]
+    def test_an_id_that_is_no_number_from_1_to_4294967295_is_a_bad_argument(self):
+        lines = ["remove", "remove ", "remove  1", "remove 1 ", "remove 0", "remove 4294967296", "remove -1", "remove a", "remove 1 2", "remove 1.0", "remove 0x1", "remove 3 3 3 3 3 3"]
         for files in (small_show(self.ITEMS), invalid_show()):
             printed = self.run_both(files, [support.line(T0, line) for line in lines])
             self.assertEqual(replies(printed), [refused("bad-argument")] * len(lines))

@@ -75,6 +75,9 @@ export function ofLastFault(fault) {
 // change.
 export const MENDED_ELSEWHERE = "Fix it on a computer: the card is read-only here.";
 
+// The words in place of the form of a clock that is made from a picture.
+export const PICTURE_CLOCK = "This clock is made from a picture: it cannot be edited here.";
+
 // The line of the show screen while the target does not answer.
 export function ofSilence(seconds) {
   return `The installation has not answered for ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;

@@ -10759,6 +10759,364 @@ in the commit that records it; a file whose key the folder holds only adds its n
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
 
+## Seed 52: the bytes of a picture clock
+
+**Question.** Seed 52 asks for two widgets that carry their base picture, "compressed as the
+format compresses a picture", with their geometry, and leaves the bytes to the spec. How
+are they laid out, how large may a widget's payload be, and how is a widget of 20 bytes
+told from one with a picture?
+
+**Answer.** The widget's first byte tells it: 1 to 3 keep their 20 bytes, 4
+`picture-dial` and 5 `picture-display` have a head of 12 bytes, their parts (hands of 10
+bytes and caps of 6, or fields of 22) and then the picture, an ODRG file of one frame and
+a palette of 1 to 8 colours, to the end of the payload. The ODRG file is how the format
+compresses a picture, and the core already decodes it. A widget's payload may have 32,768
+bytes, more than the largest picture needs. So the widget's byte is read before the
+payload's length is compared: a file of widget 1 with a length of 21 is still refused with
+`payload-size`, and the vector `unknown-widget.four` is now `unknown-widget.six`. A
+picture whose frames or palette are not those of a picture clock is refused with a new
+reason, `bad-picture`. A hand has a tail behind its pivot and an offset of whole hours, and
+a cap is a disc of a colour over the hands, so that a tile's pivot cap or a second clock
+of another time zone can be drawn; a field shows a pattern of the hour, the minutes and
+the seconds, and a display has up to 4 fields, for tiles whose time is in several boxes.
+`check` prints a picture clock's `direction` and the size of its `palette`.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `docs/reasons.md`;
+`converter/lib/odrgx.js`; `docs/converter.md`.
+
+## Seed 52: the direction and the slowest points
+
+**Question.** A picture clock runs forward, backward, or in a way chosen by the seed of its
+turn, which "may also turn at the swing's slowest point, at a chance the seed fixes". What
+does the seed draw, where are the slowest points, and how is the time found so that a time
+of the turn has one picture however the refreshes come?
+
+**Answer.** The seed draws the eleven values of the other clocks, in their order, and then
+`back`, r % 2, and `chance`, r % (turns + 1). The swing's speed is least where the angle of
+its cosine is three quarters of a turn, once in each period P, the first at
+`t0 = floor(P * ((3 * 2^24 - Φ) mod 2^26) / 2^26)`. Whether the way turns at the k-th
+slowest point is `mix(seed ^ k) % 100 < chance`, a fact of the seed and k alone, and the
+time is the sum of the ways over the whole periods before it, each b * P long, so it needs
+no state. At a slowest point itself the time is the turn's point: the step that ends there
+still goes the earlier way.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `converter/lib/draw.js`,
+`pictureTime`.
+
+## Seed 52: the font of small displays
+
+**Question.** Many tiles show their time in a display a few pixels high once the tile is
+60 x 60: the small font, 7 rows, does not fit them. Which font do they use?
+
+**Answer.** A fourth font, `tiny`: the ten digits, the colon and the space, 3 by 5, in
+`fonts/tiny.txt`, generated with the others into the tables of the core and the
+converter. A font file may now name its repertoire, `digits`; the fonts of texts keep the
+whole one. A text cannot name it: the texts' fonts stay 1 to 3, and a text of font 4 is
+refused with `unknown-font` as before.
+
+**Resolution.** `fonts/tiny.txt`, `fonts/generate.mjs`, `core/src/font_tables.cpp`,
+`converter/lib/fonttables.js`; `docs/format.md`.
+
+## Seed 52: the vectors of picture clocks, and which task holds them
+
+**Question.** The tasks of seed 52 put the vectors of picture clocks with the core, task 2.
+But the converter's suite checks that the invalid vectors of widgets have every reason of
+"Widgets in ODRGX", the Python library's that every listed reason is one of its own, and
+the core's that it has every reason of a widget: once task 1 lists `bad-picture`, those
+suites need its vector and its name. Where do the vectors go, and how is each commit whole?
+
+**Answer.** The vectors of picture clocks are a folder of their own,
+`tests/vectors/pictures/`, with its builder, valid clocks with their sources and an
+invalid vector for each refusal; they come with task 1, which the converter's suite reads.
+The name `bad-picture` comes with task 1 in the converter, the Python library and the
+core's list of reasons; the core produces it, and its suite reads the folder, with task 2.
+The folder of the clocks of 20 bytes keeps its vectors.
+
+**Resolution.** `tests/vectors/pictures/build.mjs`; `converter/tests/picture.test.js`,
+`converter/tests/clock.test.js`; `odrig/errors.py`; `core/src/reasons.h`,
+`core/src/reasons.cpp`.
+
+## Seed 52: where the core keeps a picture clock
+
+**Question.** Seed 52 asks that a picture clock cost the core no memory: its picture
+decoded once a turn into the pixel buffer, its hands or digits drawn over it as the LED
+data is made, the pixel buffer never written meanwhile. Where are the head, the parts and
+the hands of a refresh kept, and what decodes the picture at each check?
+
+**Answer.** The picture is decoded into the pixel buffer as palette indices by the
+player's decoder, which keeps its palette; the window of the DEFLATE decoder, which a
+drawn type leaves free, keeps the head and the parts from its first byte and, from byte
+128, a layer of a byte for each pixel, written at each refresh with the hands and caps or
+the digits; `fill_leds` takes the layer's colour where it has one. The window serves the
+picture's inflate first: the head is read onto the stack and copied there afterwards.
+Each check decodes the picture with the decoder, the window and the pixel buffer it has
+for frames, so it needs nothing more. The Python library's header reader allows a widget
+32,768 bytes, as the converter and the core do.
+
+**Resolution.** `core/src/clock.h`, `core/src/clock.cpp`, `core/src/container.h`,
+`core/src/player.cpp`; `docs/core.md`, "Clocks" and "Memory"; `odrig/odrgx.py`.
+
+## Seed 52: the reference pictures are written the same on every computer
+
+**Question.** The builder of `tests/vectors/procedural/` wrote its PNG files with the zlib
+of Node.js, and Node.js on Windows gives other bytes than on the Mac that made them: 18 of
+the 35 pictures came out different with the same pixels, and the converter's suite failed
+on Windows on one of them. Seed 52 adds pictures of picture clocks; made on Windows, they
+would fail on the Mac. How are they written?
+
+**Answer.** The builder compresses with the library's own DEFLATE, which writes the same
+bytes everywhere, in a zlib stream of its own making. All the pictures were written again:
+every one keeps its pixels, which the core's and the emulator's suites read, and the
+converter's suite finds them what their builder makes on Windows too.
+
+**Resolution.** `tests/vectors/procedural/build.mjs` and its pictures.
+
+## Seed 52: what the app does with a picture clock
+
+**Question.** The app lists a picture clock as a `widget`, as `list` says, and so offers
+its `Edit`; the form of a clock has no fields for a picture, hands or fields. What does
+`Edit` do with it?
+
+**Answer.** `list` says only the type, so the menu keeps `Edit`; the app reads the file as
+for any clock, and when it holds a picture, says "This clock is made from a picture: it
+cannot be edited here." in place of the form, and sends nothing. The app does not make
+one either: the converter's `clocks` does, from an inventory.
+
+**Resolution.** `app/www/screens/author.js`, `app/www/messages.js`;
+`docs/android-app.md`; `tests/app/test_authoring.py`.
+## Seed 50: which catalogs are of version 2
+
+**Question.** The seed takes the marker's format to version 2 and says a reader of version
+1 finds it incompatible. The board's own storage has a catalog too, with no folder and no
+index. Does its marker go to version 2 as well, which would make every board's catalog
+incompatible after the update?
+
+**Answer.** No. Version 2 is the marker of a catalog with an index, a drive's: the marker
+of version 1 with the lines `folders` and `ids` before its `crc` line, 461 bytes. The board's
+own catalog stays of version 1, 409 bytes, as it has no index. Each reader takes only its
+storage's version: a drive's catalog of version 1, the cards made before the index, is
+`incompatible` until `import` or `catalog rebuild external` writes it anew, and a catalog of
+version 2 in the board's own storage is `incompatible` too.
+
+**Resolution.** `odrig/catalog.py` (`parse_marker(data, drive)`, `Storage(folder, drive)`);
+docs/catalog.md, "The marker"; docs/specs/50-p2-more-than-256-files-on-a-drive/design.md.
+
+## Seed 50: the index's files and lines
+
+**Question.** The seed asks for fixed-width lines and three kinds of file, but names
+neither the files, the widths nor the fields beyond a list, and does not say where a
+folder's file's CRC-32 stands, since the marker cannot name a number of files that grows
+with the folders.
+
+**Answer.** `index-<id>.txt` for each folder, the root's `index-0.txt`, `index-folders.txt`
+for the table and `index-ids.txt` for the map. Lines of 180 bytes in a folder's file and
+in the table, 36 in the map, padded with spaces before the line feed; a line's last field
+is what follows its fixed fields with the padding cut off, which a name never ends in. A
+file's line has the fields of its catalog line after its id and `f`, its canvas among
+them, so that the core leaves out a file of another canvas without a page; a folder's line
+has its id, `d`, its number of own files, which the app shows on a folder's row, and its
+path. The table's line has, besides the seed's fields, the ordinal after the folder's last
+descendant, the number of files of the folders before it, and the CRC-32 of its file; the
+marker names the table and the map with their lines and CRC-32s, so any change of a
+folder's file changes the table's CRC-32 and the marker.
+
+**Resolution.** `odrig/catalog.py` (`Index`, `parse_index`); docs/catalog.md, "The index of
+a drive".
+
+## Seed 50: the ids the writers give, and the show's
+
+**Question.** The seed keeps the ids stable "as today": the lowest free id when a file is
+added, the same files with the same show the same ids. Today the core skips the ids of the
+show's items. The PC tool, which writes the index on a computer, does not know the show,
+and the two writers must leave the same bytes. And what does a rebuild give, which sorts
+nothing in memory?
+
+**Answer.** Neither writer looks at the show. A rebuild and an import give the files the
+ids from 60001 in the walk's order and the folders the ids after them in the table's order,
+as a listed drive's files and folders get theirs today with an empty show; an upload of a
+new file takes the lowest id the map does not hold, a replacement keeps its file's, a
+removal frees its own and those of the folders it empties. Where an item of the show has a
+drive's id, every command means the item, as `play` finds the show's items first today;
+an upload to the show of an id the drive's index holds stays `in-use`. A rebuild that
+gives the ids anew in the walk's order keeps the same files in the same order on the same
+ids, and writes the map in one pass, without a sort.
+
+**Resolution.** `odrig/catalog.py` (`build_index`, `lowest_free_id`); docs/catalog.md, "The
+index of a drive".
+
+## Seed 50: the order a rebuild keeps, and the old index it trusts
+
+**Question.** A rebuild and an import keep the order of the rows they find for the files
+still there and put new files after them. Which old index is trusted, and how is a "new"
+file told apart in the core, which cannot hold the old rows of a big folder?
+
+**Answer.** The old index is taken when its marker is of version 2 and every page, the
+table, the map and each folder's file agree with their CRC-32s and each line is in its
+form, the check the core can make by reading each once; otherwise every folder's files are
+by the bytes of their names. A folder's old rows are those of the first line of the old
+table with its path. A new file is one the old pages have no line for, which the core
+finds by reading one page; both writers ask the pages, not the old rows, so that they
+agree on every card.
+
+**Resolution.** `odrig/catalog.py` (`_sound_old`, `build_index`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: the record's actions of an index
+
+**Question.** The commit record of version 1 knows `move upload.part <name>` and `remove
+<name>`. How does it put a change's index files in place, and in what order?
+
+**Answer.** `move <from> <to>` takes any file of the catalog as `<from>`, and `remove` an
+index file too; the record's first line stays `odrig-catalog-do 1`. A change writes each
+index file it changes as `.new` before the marker, and the record names them in a fixed
+order, so that both writers write the same record: the removals of the files of the folders
+that left, the animation's own action, each folder's file in the table's order, the table,
+then the map. A file of the index left without a line, the root's or the map, is removed.
+
+**Resolution.** `odrig/catalog.py` (`_index_actions`, `commit`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: where the PC tool adds a file to a drive
+
+**Question.** `add` puts a file into the folder under the last part of its path, so always
+into the root. The library's `add` takes any name a catalog may hold. Where does a file
+with a folder in its name go in a drive's index, whose folder may not be in the table?
+
+**Answer.** Into the root only, as the board's uploads: the library refuses a name with a
+`/` for a drive with `file-malformed`. A file put into a folder on a computer joins the
+index with `import`.
+
+**Resolution.** `odrig/catalog.py` (`add`).
+
+## Seed 50: what `status` names, and a folder's count in `list`
+
+**Question.** The seed approves that `status` names the playing animation's path, so that
+the app need not hold the whole list. The app also marks the levels that lead to the
+current playlist and shows on a folder's row the count of its own files, both of which it
+took from the whole list. Which members carry them, and where do they stand?
+
+**Answer.** `status` gains two members before `left`, which stays its last: `file`, the
+file of the animation `animation` names, an item's file or a drive's by its path, and
+`playlist`, the path of the card's folder whose playlist is current while `playing` is its
+id; each `null` otherwise. A folder's item of `list` and `list in` gains `files`, the number
+of its own files that `list in` of it gives. All three are parts of the forms the owner
+approved, the playing animation named and one level given with its folder rows, and add
+no command.
+
+**Resolution.** `core/src/commands.cpp` (`status`), `core/src/content.cpp`
+(`content_list`); docs/commands.md, "Status reply" and "Storage and the installed items".
+
+## Seed 50: the revision of a level's order
+
+**Question.** `order get` now gives one level, and `order get in <folder-id>` another. The
+revision was the CRC-32 of every listed animation's id and key. Of what is a level's
+revision made, and which revision does `order move` compare?
+
+**Answer.** A level's revision is the CRC-32 of the ids of its animations in the saved
+order, each as four bytes, low byte first: it changes whenever the level's order or its
+animations change, and is the same after a restart for the same files. `order move`
+compares the revision of the level of `<id>`, the root's for a show's item.
+
+**Resolution.** `core/src/order.cpp` (`revision_of`, `order_get`, `order_move`);
+docs/commands.md, "The saved playlist order".
+
+## Seed 50: what the core checks of a drive's index
+
+**Question.** The PC tool reads a drive's index whole and checks every file's CRC-32 and
+every line against the pages. The core may not read the whole index: it publishes the drive
+from its marker and reads lines as it needs them. What does it check, and what does it say
+of a damage it meets?
+
+**Answer.** The core checks the marker, of version 2, at the plug-in and at each look. It
+reads neither the pages nor the CRC-32s of the index's files. A line it reads that is not
+in its form, or a file shorter than the lines the marker or the table gives it, makes the
+catalog `damaged` with `line` at the next refresh, and the drive's animations go; the PC
+tool says `page` for a file of the wrong length. A damage the core does not read is found
+by the PC tool's `check`.
+
+**Resolution.** `core/src/drive.cpp` (`index_line`, `drive_row`), `core/src/catalog.cpp`
+(`catalog_drive_look`); docs/catalog.md, "The index of a drive"; docs/core.md, "A drive".
+
+## Seed 50: the files a rebuild of a drive's catalog writes for itself
+
+**Question.** The design names `rebuild.tmp` and `rebuild-folders.tmp` and the phases that
+write them, but not every field of their lines, nor what the draft of the table holds when
+a folder's end and counts are known only after its subtree.
+
+**Answer.** Both have lines of 180 bytes, padded as the index's. A line of `rebuild.tmp` is
+`1 <crc> <bytes> <width> <height> <length> <type> <path>` for a file that passed, so that
+what follows `1 ` is its page line, and `0 00000000 0 0 0 0 frames <path>` for one that did
+not. A line of `rebuild-folders.tmp` is `<ordinal> <depth> <first> <path>`, the root's
+`0 0 0`: a folder's own files are the next line's first position less its own, and its end
+and its sub-folders are found by reading on until a line of its depth or less, so that no
+line is written before it is known. Each phase takes at most eight lines at a step. A
+plug-in of a drive that can be written removes both files, as it removes `upload.part`.
+
+**Resolution.** `core/src/catalog.cpp` (`scan_step`, `draft_step`, `folders_step`,
+`map_step`, `table_step`, `commit_drive`, `catalog_drive_step`).
+
+## Seed 50: a drive after its rebuild
+
+**Question.** A rebuild used to leave the drive listed, its refused files in `list` with
+their faults until the next plug-in. The design reads the drive again from its new index at
+the end. What of the files the rebuild refused, and of a drive that is pulled out while it
+runs?
+
+**Answer.** At the commit the drive's animations are dropped and its catalog read again at
+once, as after another marker: the playlist plays from its first animation, and only the
+files of the index are listed. A refused file is logged when the scan meets it, `drive file
+<name> left out: <reason>`, for a drive without a catalog as before. While the rebuild
+runs, an indexed drive plays from its old index and its catalog stays `ok`; a listed drive
+is listed again and its catalog is `none`, as before. A drive pulled out ends the rebuild
+without removing anything, since another drive may be in by then; its files are never read
+without a record, and the next plug-in of it removes the two files of the rebuild.
+
+**Resolution.** `core/src/catalog.cpp` (`drive_rebuild_step`, `catalog_drive_went`).
+
+## Seed 50: the hosts list every file
+
+**Question.** The core takes a listed drive's first 256 files and 32 sub-folders. Should the
+hosts still cut their listings?
+
+**Answer.** The test host and the emulator list every animation file of the drive's folder
+to three levels, so that a rebuild reads every file and the core's own cut is tested; the
+firmware still stops at 256 files and 32 sub-folders, which the host interface allows. The
+emulator's `drive_cut` goes, and the interface's comment says a host may stop there.
+
+**Resolution.** `tests/core/host/host.cpp` (`list_drive`), `emulator/host.py`
+(`drive_list`), `core/include/odrig_core.h` (`drive_name`).
+
+## Seed 50: reads of a drive's index at any offset
+
+**Question.** The host interface says the core reads a file with `read_at` from offset 0
+on, each call where the last ended, but for the commands `read` and `catalog page`. The
+design reads the index's lines by their numbers and finds ids and folders by binary search.
+May the core begin a read anywhere in those files?
+
+**Answer.** Yes, in the files of a drive's index, `drive/index-...`, and in the two files a
+rebuild writes for itself, `drive/rebuild...`: every host with a drive seeks there already,
+the firmware's `readPart` with `fseek` and the emulator's with `seek`. Every other file is
+read as before, and the test host still stops on a read of another file that does not go on
+where the last ended. The emulator opens and closes a file of the drive's catalog or
+index at each read, so that the PC tool may replace it on Windows while the emulator has
+the card: the core no longer reads `order.txt` after the marker, which used to let go of
+the last file of the catalog it read.
+
+**Resolution.** `core/include/odrig_core.h` (`read_at`), `tests/core/host/host.cpp`
+(`read_at`), `emulator/host.py` (`read_at`); docs/core.md, "Rules of use".
+
+## Seed 50: where the cursor's code lives
+
+**Question.** The tasks name `core/src/index.h` and `index.cpp` for the index's rows. The
+same calls answer for a drive without a catalog, from its table and its tree. Where do they
+go?
+
+**Answer.** Into `core/src/drive.h` and `drive.cpp`, the drive as the rest of the core reads
+it, whatever keeps it; the reading and writing of the fields of a catalog's and an index's
+lines into `core/src/fields.h`, which the catalog shares. The writers of the index's files
+stay in `core/src/catalog.cpp` beside the commit they belong to.
+
+**Resolution.** `core/src/drive.h`, `core/src/drive.cpp`, `core/src/fields.h`.
 ## Seed 51: the core builds on Windows again
 
 **Question.** Microsoft's compiler does not know `__attribute__((noinline))` and doubts the
@@ -11133,6 +11491,207 @@ the same day?
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
 
+## Seed 52: the inventory, its motions and the subcommand `clocks`
+
+**Question.** The seed asks for one inventory that the converter reads, and for the motions
+of the tiles that show no time, of the kinds it names, and leaves their form, the reading
+and the place of the code to the spec. What are they?
+
+**Answer.** A subcommand of the converter, `clocks INVENTORY.json --out DIR`, so that the
+files can be made again from a clone, with `converter/lib/inventory.js` and
+`converter/lib/motion.js` beside the other modules. The inventory holds each tile's
+palette and picture as a picture clock's source does, rows of palette digits, so it needs
+no reader of images; a tile's base picture is that picture. A motion is up to 8 parts,
+each working on what the ones before it made: a level that falls and rises again in a
+triangle over the loop, so that it loops without a jump; a flicker of 2 or 3 recolourings;
+a pulse through up to 8 recolourings and back; a turn and a swing of the pixels of some
+colours about a point. Turns and swings are made in whole numbers with the sine table of
+the clocks, so the same inventory gives the same bytes on every computer, and they keep
+the palette's colours, as a recolouring does: no motion makes a colour. Every file is made
+before one is written. The design's `from` and `to` of a level are named `start` and
+`half`, its share at the start of the loop and at its half: the library's test of its own
+imports reads a quoted `from` as one.
+
+**Resolution.** `converter/lib/motion.js`, `converter/lib/inventory.js`,
+`converter/cli/clocks.js`; `docs/converter.md`, "clocks".
+
+## Seed 52: the tiles reduced to 8 colours
+
+**Question.** Each tile is to be "scaled to 60 x 60 and reduced to" at most 8 colours,
+"black among them when the clock has black". The cut tiles are not square: those of the
+lower rows of the owner's picture are 103 to 114 pixels high and about 122 wide, because
+the picture's rows are. How is a tile scaled, how are its colours chosen, and where is the
+tool?
+
+**Answer.** Each cut tile is scaled to 60 x 60 as it is, with Pillow's box filter: the
+lower rows' tiles are stretched up to 17 percent in height, which pixel art bears, rather
+than given bands that are not in the picture. Its colours are a median cut of the scaled
+tile, refined by k-means, 8 or fewer; when the tile has a pixel darker than 24 in each
+channel, the colour nearest black becomes black. Each pixel takes the nearest colour,
+without dithering, and the colours are ordered from dark to light. The tool, `prep.py`,
+and every other tool of the inventory are kept with the collection in
+`clocks/source/tools/`, as the inventory is, and were run from `scratch/clocks52/` of the
+first checkout on the Windows computer; the kinds came from a look at the picture: 38
+dials, 28 displays and 34 motions, the list of
+`docs/specs/52-p2-a-hundred-picture-clocks/design.md`.
+
+**Resolution.** The collection's `clocks/source/tools/prep.py` and
+`clocks/source/inventory.json`.
+
+## Seed 52: the dials of the inventory
+
+**Question.** For each of the 38 dials: which hands it has, where its pivot is, how its
+painted hands are erased, and how fast it runs. The seed calls a sundial's shadow "a dial
+with one hand" and lists sundials among the tiles that show no time.
+
+**Answer.** The sundials and the obelisk, tiles 1 to 3, are dials of one hour hand in the
+shadow's colour about the foot of the gnomon: the hand the seed names; it hides behind the
+gnomon for part of its turn, as a shadow would. A dial's numerals and marks stay: they are
+its face; only its hands are erased, painted with the colours of the face around them, a
+column's own grain on the wooden tile 38. Hands are drawn in the colours the tile's hands
+had, an hour hand of half width 2 and a minute hand of 1 where the dial is big enough; a
+second hand only where the tile had one (33, 39, 45, 58 and 76), and those dials run 2 to
+30 times real time so that the second hand can be followed, the others 60 to 600. Several
+pivots where the tile has several dials: the world map, tile 59, with three clocks 5 hours
+behind, at and 3 hours ahead; the chess clock, tile 70, two hours apart; the chronograph's
+four small dials, tile 33. Where the palette lost a hand's colour (the red hands of 39 and
+58) the nearest colour of the palette draws it, and on the busy faces of 34 and 50 a light
+hand is drawn over a wider dark one so that it reads. The kitchen timer, tile 68, has one
+hand, a minute hand of its pointer's two colours; the stopwatch, 76, a second hand only.
+Every dial runs 30 seconds a loop in a random direction, turns 30.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the scripts of each tile
+in `clocks/source/tools/helpers-dials/`.
+
+## Seed 52: the displays of the inventory
+
+**Question.** For each of the 28 displays: the box of its time, the font that fits it,
+what it shows, and its colours; and the tiles whose time is not one line.
+
+**Answer.** The time is erased by painting its box with the display's background, labels
+that are not the time kept (GPS, NTP, the date of tile 64, the cities of tile 60, the
+battery's charge bar of 89). The font is the largest whose widest time fits the box whole,
+checked over every time of a day: `medium` for most clocks of 10 rows, `small` for
+watches, the holograms and the lines of seconds, `large` only for the LED matrix 26,
+`tiny` for the parking meter 86. The flip clock 24 and the band 29 have a field for the
+hours and one for the minutes; the nixie tubes 25 a field for each tube; the three cities
+of 60 three fields at offsets 0, -7 and -2 hours. The time sources 51 to 53 show
+`hh:mm:ss`, the timers 66, 67, 75 and 83 minutes and seconds (`m:ss` on 83, as its picture
+shows `5:00`), the traffic light 84 its seconds; those run 2 to 30 times real time, the
+others 60 to 600. The colons of the digital clocks blink; those of the flaps, tubes and
+lights do not.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of the
+displays in `clocks/source/tools/helpers-displays/`.
+
+## Seed 52: the motions of the inventory
+
+**Question.** For each of the 34 tiles that show no time: its motion, of the kinds the seed
+names, and how far its picture may be changed to make the motion read.
+
+**Answer.** Hourglasses (4, 5, 6, 74, 79, 87, 88) and water clocks (7, 8, 9) are levels:
+the upper sand or water falls while the lower rises, and in the second half of the loop
+the sand goes back up, which is the installation's "this is not the time" and loops
+without a jump; a falling stream is a flicker of three variants that moves down a pixel a
+step. Flames, smoke, the lava lamp, the bulb, the waves of the mast, the satellite and the
+tuning fork, the calendars, the moon displays, the drum machine, the music box, the atom's
+electrons and the zen garden's rings are flickers or slow pulses of palette colours. The
+metronome 71 swings and the egg timer 69 rocks; the gears 92, the water wheel 93 and the
+spinner 80 turn. Where the reduced picture of a moving part was too ragged to turn
+cleanly, the part was drawn again in its own colours about one centre (the metronome's
+arm, the spinner's dots, the gears, the water wheel, the zen garden's rings, the window's
+hourglass 88); every other tile keeps its picture but for a few stray pixels. Every motion
+runs 12 to 16 seconds, its frames 50 ms apart, the spinner's 150 ms, one dot a frame.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of each tile in
+`clocks/source/tools/helpers-motions/`.
+
+## Seed 52: the hundred made and kept
+
+**Question.** Where do the 100 files go, with what, and how are they known to work?
+
+**Answer.** `clocks` made them from the inventory in one run: 38 picture dials and 28
+picture displays of 393 to 1,218 bytes each, and 34 frames files of up to 45,633, 153,655
+bytes in all.
+`check` accepts each, and each has at most 8 colours, counted over the pictures of a
+frames file and over a clock's pictures every 250 ms of its loop with three seeds: 97 of
+them 8, the others 5 to 7. Their previews, made by `thumbnail --catalog thumbnails`, are
+100 GIFs in `thumbnails/`, 1,775,742 bytes, committed; the collection's folder `clocks/` on the share holds
+each file with its preview `X.gif`, the copy of its GIF in `thumbnails/`, and its readme
+`X.md` in the shape of seed 46, which names the owner's picture, the tile and its place;
+and `source/` with the owner's picture, the 100 cut tiles, the inventory, each base picture
+as a PNG and the tools. Nothing of it is committed. The emulator, given a drive whose
+folder `odrig` held the 100, listed all of them and played each with `play <id>`, `status`
+naming it with a seed. A recording of 16 seconds played the wall clock, tile 15, and the
+red alarm clock, tile 21, twice each, each turn begun by `play`: the wall clock went
+backward at about 7.5 minutes a second, then forward at 2.5; the alarm clock backward at
+1.4, then backward at 3; 7 to 59 LEDs changed in each second.
+
+**Resolution.** `thumbnails/`; the collection's `clocks/`.
+
+## Seed 52: the original six of the twelve
+
+**Question.** The original six are to be rendered from `references/original/animation.js`
+"by calling the script's drawing at each frame's time", 8 colours each: "black, then the
+colours its script draws with, most used first". The script draws only on its own timer
+and keeps its drawings inside its closure; and on its 60 x 60 canvas almost no pixel has a
+named colour exactly, every dot and line being soft at its edges. How are the frames taken,
+which colours count as used, and how near are the files to the reference GIFs?
+
+**Answer.** The page that renders adds one name after the script's own list of its six
+drawing functions, which are pure functions of the time, and calls them at 0, 50, 100 ms
+and so on, on the script's own canvas after its own background: so each frame is the
+script's picture at that time exactly. The colours the script names are `#d6e3e8`,
+`#51e6df`, `#ef80bd`, `#ffc577` and `#354953` and its background `#040609`, which is black;
+each pixel counts for the named colour whose blend with the background comes nearest it,
+and the colours that a scene uses come after black, the most used first: 4 to 6 colours.
+Every other pixel takes the nearest of them. At 50 ms a frame every file is far below
+2 MB, so none is taken at 100 ms: the largest, every row 720 s, has 471,095 bytes, the
+others 1,443 to 23,875. Compared with the reference GIFs at their 100 ms frames, mapped to
+the same colours, two times and every row differ in no pixel, the clock that melts in at
+most 4 of 3,600, sand in at most 93 and we were here in 58, both at single frames; never
+zero differs at each whole second, up to 792 pixels, a digit: the GIFs were rendered by
+adding steps of 0.1 s, which lands just before the second, where the file shows the
+script's time exactly. Every row is compared over the GIF's 144 seconds of its 720.
+
+**Resolution.** The collection's `clocks/time-original-*.odrg` with their readmes;
+`clocks/source/tools/render12.mjs`, `make12.mjs` and `compare12.mjs`.
+
+## Seed 52: the standalone six of the twelve
+
+**Question.** The same for the standalone six, whose script names many colours.
+
+**Answer.** `TimeAnimations.draw(ctx, scene, seconds)` of
+`references/standalone/standalone-script.js` draws a scene at a time on a canvas of the
+page's own; its frames are taken at 0, 50, 100 ms and so on for 18 seconds. Of the colours
+the script names, the seven a scene uses most, by the same count, follow black: 8 colours
+each. Every file is below 26 KB at 50 ms. Compared with the GIFs the page held, at their
+times, mapped to the same colours, they differ in 24 to 73 pixels of 3,600 on average, at
+most 45 to 109: the page made its GIFs another way, and the colours of a soft edge fall to
+one side or the other of a nearest colour.
+
+**Resolution.** The collection's `clocks/time-standalone-*.odrg` with their readmes; the
+same tools.
+## Seed 50 and seed 48: the saved repeats of a drive's files
+
+**Question.** Seed 48 keeps the saved repeats of 32 of the drive's files by their places,
+found by the hash of `order.txt`'s entries, and reads the drive's lines of `repeats.txt` in
+steps after the drive's part of `order.txt`. Seed 50 takes the places, the hashes and the
+drive's part of `order.txt` away: an indexed drive has positions in its walk and no listing.
+How do the two meet?
+
+**Answer.** An entry holds the position of the drive's file in its walk and its loops, 8
+bytes. A line `x <name>` finds its file by its path: a listed drive's by the host's names of
+its places, an indexed drive's in the rows of the folder of its path. The file is read whole
+at once when the drive is taken up: a listed drive's at its first step, before its files are
+checked; an indexed drive's when it is published, before any of its files plays. An upload
+to the drive and a removal from it read the file again, since the positions after them
+move; a rebuild reads it with the drive read anew. The limits stay: 32 entries, `repeats
+over` once, `no-space` for a 33rd.
+
+**Resolution.** `core/src/repeats.cpp` (`apply_drive`, `repeats_drive_taken`),
+`core/src/drive.cpp` (`drive_position_named`), `core/src/core.cpp` (`drive_step`),
+`core/src/catalog.cpp` (`publish`); docs/core.md, "The saved repeats".
 ## Seed 46: the installation's animations in git, the heavy ones on the share
 
 **Question.** The decision committed the JSON source of every animation; seed 10's answer
@@ -11198,3 +11757,31 @@ The walk-through, which clones the repository, took 1,418 seconds.
 **Resolution.**
 docs/specs/46-p2-every-animation-file-tracked-with-its-preview-and-source/tasks.md, task
 6.
+
+## Seed 52: the clocks placed as the collection says
+
+**Question.** The tasks of seed 52 kept the 112 files outside git, in the share's
+collection `clocks/`, with their sources there too. Then the collection's standard was
+merged with seed 46, `collection/README.md`: an animation the installation is given is
+tracked in `collection/`, at its path on the card, with its GIF and readme beside it. The
+owner asked on 2026-10-28 that seed 52 follow it. Where do the files and their sources go?
+
+**Answer.** The 112 files are in `collection/card/clocks/`, their path on the card
+`clocks/`, none of them heavy: the largest has 471,095 bytes. Each has `X.gif`, written
+by `thumbnail --catalog thumbnails --card collection/card --beside`, so the line of its
+key in `thumbnails/catalog.js` holds `clocks/X` too; and `X.md` of the 16 lines, its
+Platform `unknown`, as none of the platforms the standard lists made it. Their sources,
+the owner's picture, the 100 cut tiles, the inventory, the base pictures and the tools,
+are tracked beside the seed in `project-seeds/52-p2-a-hundred-picture-clocks/source/`,
+with `twelve.json` and `comparison.json`, what the twelve's colours were and how near
+they came to their GIFs: they make the files, and the collection holds animations only.
+On the share, the same files are in the collection's `card/clocks/`, and its earlier
+`clocks/` was moved, not deleted, to artifacts/odrig/archived/collection/clocks/; every
+file was read back. The earlier entries of this seed name `clocks/source/` of the
+collection: that is now the seed's `source/`. With the clocks the card's folder `odrig`
+of the collection holds more than 256 files, the most a card takes today; seed 50 is the
+work that lifts that limit.
+
+**Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
+`thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
+`design.md`.

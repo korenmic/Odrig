@@ -38,10 +38,13 @@ card is missing, and plays the rest from the card.
   in its sub-folders, to three levels down. Names ending in `.odrg` or `.odrgx`, in any
   case, and not beginning with a dot are taken; other files are passed over. The files
   are listed depth first: a folder's files in the order of their names, then each of its
-  sub-folders in the order of their names, the same way. At most 256 files and 32
-  sub-folders are taken, the first in that order; a sub-folder counts when its first
-  file is taken, with the folders above it that were not counted yet. What is beyond
-  the limits is passed over, as is a sub-folder deeper than three levels, one whose name
+  sub-folders in the order of their names, the same way. A card with a catalog has every
+  file of its index, which the PC tool's `import` writes for a card of any size. Of a
+  card without one at most 256 files and 32 sub-folders are taken, the first in that
+  order; a sub-folder counts when its first file is taken, with the folders above it that
+  were not counted yet, and the board's listing, which a rebuild reads too, stops at the
+  same limits. What is beyond the limits is passed over, as is a sub-folder deeper than
+  three levels, one whose name
   begins with a dot or is not sound, and `System Volume Information`. The log line of
   the listing counts what was passed over. Each file is known by its path from `odrig`,
   `night/comet.odrg` for one, and [catalog.md](catalog.md) has the rule of the names.
@@ -73,7 +76,7 @@ catalog: ok, generation 1, 2 entries; 3 animation files, 1 without an entry
 | Command | What it does |
 |---|---|
 | `status` | Says what the catalog is, `none`, `ok` with its generation and its entries, `damaged` or `incompatible` with what, and how many animation files the folder holds and how many of them have no entry. |
-| `import` | Checks every animation file of the folder, as the board lists them, and writes the catalog anew: `refused: NAME: REASON` for each file the check refuses, then `imported: N animations, generation G`. |
+| `import` | Checks every animation file of the folder and its sub-folders, depth first as the board lists them and without a limit of files or folders, and writes the catalog and its index anew, keeping the order its files were moved into: `refused: NAME: REASON` for each file the check refuses, then `imported: N animations, generation G`. |
 | `add FILE...` | Puts each file into the folder under the last part of its path, in place of a file of that name, checked and with its entry in the same change: `added: NAME, BYTES bytes`, `replaced: NAME, BYTES bytes` or `refused: NAME: REASON`. |
 | `remove NAME...` | Takes each animation out of the folder with its entry: `removed: NAME` or `refused: NAME: file-missing`. |
 | `check` | Compares each file's size and CRC-32 with its entry: `differs: NAME: missing`, `size` or `crc` for each file that does, then `checked: N entries, M differ`. |

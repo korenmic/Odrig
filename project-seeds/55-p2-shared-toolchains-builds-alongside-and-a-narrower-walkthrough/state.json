@@ -1,0 +1,10 @@
+{
+  "number": 55,
+  "slug": "55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough",
+  "state": "remaining",
+  "title": "Shared toolchains, builds alongside, and a narrower walkthrough",
+  "priority": "P2",
+  "addedAt": "2026-10-28T18:00:00+02:00",
+  "addedCommit": "pending-local",
+  "summary": "Seed 53's tasks 5 to 8, moved: the walkthrough only when asked and through the runner, toolchains shared across checkouts by ODRIG_TOOLS, the APK and the firmware built alongside the suites with --builds, and the documents with the times measured."
+}

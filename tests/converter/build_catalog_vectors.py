@@ -7,7 +7,8 @@ Each folder holds the files of one storage's catalog; `cases.json` says what a r
 find in it: the state, what is wrong with a damaged or incompatible one, and the entries of
 one that is ok, as `[name, bytes, crc32, width, height, total_ms, type]`. The outcomes are
 written here by hand, never by a reader. The core's tests and the PC library's read the
-same folders.
+same folders. tests/vectors/index holds the same for a drive's catalog of version 2 with
+its index; an `ok` case gives its files in the walk's order too, as `[id, name]`.
 """
 
 import json
@@ -132,18 +133,81 @@ def cases():
     return made
 
 
-def build():
-    if VECTORS.exists():
-        shutil.rmtree(VECTORS)
-    VECTORS.mkdir(parents=True)
+def drive_files_of(entries, generation=1):
+    """The files of a drive's catalog of these entries, of version 2, with its index: the
+    pages, the folders' files, the table and the map, and the marker."""
+    made = files_of(entries, generation)
+    pages = catalog.parse_marker(made.pop(catalog.MARKER))
+    index = catalog.build_index(sorted(entries, key=lambda entry: catalog.listing_key(entry.name)))
+    for ordinal, folder in enumerate(index.folders):
+        text = index.folder_text(ordinal)
+        if text:
+            made[catalog.folder_file(folder.id)] = text
+    made[catalog.FOLDERS] = index.table_text()
+    if index.map_text():
+        made[catalog.IDS] = index.map_text()
+    folders, ids = index.counts()
+    made[catalog.MARKER] = catalog.Marker(generation, pages.counts, pages.crcs, folders, ids).text()
+    return made
+
+
+def remade(files, name, data):
+    """A drive's files with one folder's file replaced, its CRC-32 put into the table and
+    the table's into the marker, so that only what the rows say is wrong."""
+    files = dict(files)
+    old = files[name]
+    files[name] = data
+    files[catalog.FOLDERS] = files[catalog.FOLDERS].replace(f"{catalog.crc(old):08x}".encode(), f"{catalog.crc(data):08x}".encode())
+    marker = catalog.parse_marker(files[catalog.MARKER], drive=True)
+    folders = (marker.folders[0], catalog.crc(files[catalog.FOLDERS]))
+    files[catalog.MARKER] = catalog.Marker(marker.generation, marker.counts, marker.crcs, folders, marker.ids).text()
+    return files
+
+
+def walked(entries):
+    """The files of a drive's index in the walk's order, each `[id, name]`."""
+    index = catalog.build_index(sorted(entries, key=lambda entry: catalog.listing_key(entry.name)))
+    return [[file_id, entry.name] for folder in index.folders for file_id, entry in folder.rows]
+
+
+def index_cases():
+    """The cases of a drive's catalog with its index, read by a drive's readers."""
+    valid = drive_files_of(FOLDERS, generation=3)
+    made = {}
+    made["ok-index"] = (valid, {"state": "ok", "generation": 3, "entries": listed(FOLDERS), "walk": walked(FOLDERS)})
+    made["ok-index-empty"] = (drive_files_of([]), {"state": "ok", "generation": 1, "entries": [], "walk": []})
+    made["incompatible-version-1"] = (files_of(FOLDERS, generation=3), {"state": "incompatible"})
+    without = dict(valid)
+    del without[catalog.FOLDERS]
+    made["damaged-index-table-missing"] = (without, {"state": "damaged", "detail": "page"})
+    night = catalog.folder_file(catalog.build_index(sorted(FOLDERS, key=lambda entry: catalog.listing_key(entry.name))).folders[3].id)
+    made["damaged-index-folder-crc"] = ({**valid, night: valid[night].replace(b"night/comet", b"night/comex")}, {"state": "damaged", "detail": "page"})
+    made["damaged-index-map-crc"] = ({**valid, catalog.IDS: valid[catalog.IDS].replace(b"60001 f 0 0", b"60001 f 0 1")}, {"state": "damaged", "detail": "page"})
+    made["damaged-index-row-form"] = (remade(valid, night, valid[night].replace(b" f ", b" g ", 1)), {"state": "damaged", "detail": "line"})
+    made["damaged-index-row-disagrees"] = (remade(valid, night, valid[night].replace(b"night/comet.odrg", b"night/comex.odrg")), {"state": "damaged", "detail": "line"})
+    return made
+
+
+def write_cases(folder_of_cases, made):
+    if folder_of_cases.exists():
+        shutil.rmtree(folder_of_cases)
+    folder_of_cases.mkdir(parents=True)
     expected = {}
-    for name, (files, outcome) in cases().items():
-        folder = VECTORS / name
+    for name, (files, outcome) in made.items():
+        folder = folder_of_cases / name
         folder.mkdir()
         for file, data in files.items():
             (folder / file).write_bytes(data)
         expected[name] = outcome
-    (VECTORS / "cases.json").write_text(json.dumps(expected, indent=1, sort_keys=True) + "\n", encoding="ascii")
+    (folder_of_cases / "cases.json").write_bytes((json.dumps(expected, indent=1, sort_keys=True) + "\n").encode("ascii"))
+
+
+INDEX_VECTORS = VECTORS.parent / "index"
+
+
+def build():
+    write_cases(VECTORS, cases())
+    write_cases(INDEX_VECTORS, index_cases())
 
 
 if __name__ == "__main__":

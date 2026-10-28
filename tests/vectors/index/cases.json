@@ -1,0 +1,117 @@
+{
+ "damaged-index-folder-crc": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "damaged-index-map-crc": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "damaged-index-row-disagrees": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-index-row-form": {
+  "detail": "line",
+  "state": "damaged"
+ },
+ "damaged-index-table-missing": {
+  "detail": "page",
+  "state": "damaged"
+ },
+ "incompatible-version-1": {
+  "state": "incompatible"
+ },
+ "ok-index": {
+  "entries": [
+   [
+    "night/comet.odrg",
+    4096,
+    12648430,
+    60,
+    60,
+    8000,
+    "frames"
+   ],
+   [
+    "loose.odrg",
+    2048,
+    48879,
+    60,
+    60,
+    3000,
+    "frames"
+   ],
+   [
+    "2026/day.odrg",
+    3333,
+    51966,
+    60,
+    60,
+    6000,
+    "frames"
+   ],
+   [
+    "night/deep/x.odrg",
+    512,
+    233495534,
+    60,
+    60,
+    1500,
+    "frames"
+   ],
+   [
+    "night/deep/deeper/y.odrgx",
+    777,
+    180150000,
+    60,
+    60,
+    2000,
+    "text"
+   ],
+   [
+    "a b/c.odrg",
+    1024,
+    4660,
+    60,
+    60,
+    4000,
+    "frames"
+   ]
+  ],
+  "generation": 3,
+  "state": "ok",
+  "walk": [
+   [
+    60001,
+    "loose.odrg"
+   ],
+   [
+    60002,
+    "2026/day.odrg"
+   ],
+   [
+    60003,
+    "a b/c.odrg"
+   ],
+   [
+    60004,
+    "night/comet.odrg"
+   ],
+   [
+    60005,
+    "night/deep/x.odrg"
+   ],
+   [
+    60006,
+    "night/deep/deeper/y.odrgx"
+   ]
+  ]
+ },
+ "ok-index-empty": {
+  "entries": [],
+  "generation": 1,
+  "state": "ok",
+  "walk": []
+ }
+}

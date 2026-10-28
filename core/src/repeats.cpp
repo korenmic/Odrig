@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "drive.h"
 #include "order.h"
 #include "player.h"
 #include "show.h"
@@ -99,7 +100,7 @@ void clear_items(Core &core) {
 
 void clear_drive(Core &core) {
     for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
-        core.repeats_drive[at].place = 0;
+        core.repeats_drive[at].position = 0;
         core.repeats_drive[at].loops = 0;
     }
 }
@@ -109,10 +110,10 @@ void clear_all(Core &core) {
     clear_drive(core);
 }
 
-// The entry of the drive's table for a place, or kRepeatsDriveMost.
-uint32_t entry_of(const Core &core, uint32_t place) {
+// The entry of the drive's table for a position of its walk, or kRepeatsDriveMost.
+uint32_t entry_of(const Core &core, uint32_t position) {
     for (uint32_t at = 0; core.repeats_drive != nullptr && at < kRepeatsDriveMost; ++at) {
-        if (core.repeats_drive[at].loops != 0 && core.repeats_drive[at].place == place) {
+        if (core.repeats_drive[at].loops != 0 && core.repeats_drive[at].position == position) {
             return at;
         }
     }
@@ -129,21 +130,21 @@ bool drive_full(const Core &core) {
     return core.repeats_drive != nullptr;
 }
 
-// Gives a line `x` to the place of the drive whose file has its name, when that place has
-// no saved repeat yet: a new entry, or with every entry taken none; at the take-up of a
-// drive, `taking_up`, the log says `repeats over` once then.
+// Gives a line `x` to the file of the drive that has its name, when that file has no saved
+// repeat yet: a new entry, or with every entry taken none; at the take-up of a drive,
+// `taking_up`, the log says `repeats over` once then.
 void apply_drive(Core &core, const Line &line, bool taking_up) {
     if (line.kind != 'x' || core.repeats_drive == nullptr) {
         return;
     }
-    const uint32_t place = order_place_named(core, line.name, line.length);
-    if (place == kDriveMost || entry_of(core, place) != kRepeatsDriveMost) {
+    const uint32_t position = drive_position_named(core, line.name, line.length);
+    if (position == kNothing || entry_of(core, position) != kRepeatsDriveMost) {
         return;
     }
     for (uint32_t at = 0; at < kRepeatsDriveMost; ++at) {
         if (core.repeats_drive[at].loops == 0) {
-            core.repeats_drive[at].place = static_cast<uint16_t>(place);
-            core.repeats_drive[at].loops = static_cast<uint16_t>(line.loops);
+            core.repeats_drive[at].position = position;
+            core.repeats_drive[at].loops = line.loops;
             return;
         }
     }
@@ -284,14 +285,15 @@ uint32_t animation_with(const Core &core, uint32_t id, bool *in_use) {
             return *in_use ? kNothing : position;
         }
     }
-    const uint32_t place = core.drive != nullptr ? drive_place_holding(core, id) : kDriveMost;
-    if (place < kDriveMost) {
-        const uint8_t state = core.drive[place].state;
-        if (state == kDriveInPlaylist || state == kDriveLeftOut) {
-            return kDriveBase + place;
+    uint32_t value = 0;
+    const uint8_t kind = drive_find(core, id, &value);
+    if (kind == 'f') {
+        const DriveRow *row = drive_row(core, value);
+        if (row != nullptr && row->listed) {
+            return kDriveBase + value;
         }
     }
-    *in_use = tree_folder_with_id(core, id) != kFolderMost;
+    *in_use = kind == 'd';
     return kNothing;
 }
 
@@ -328,8 +330,8 @@ struct Writer {
 };
 
 // The animation's own line, `<n> <kind> <name>`, written at kOwnLine in the chunk with `n`
-// as its loops; the kind and the name at `*name` and `*length`. False when the host gives
-// no name for a drive's file.
+// as its loops; the kind and the name at `*name` and `*length`. False when the drive's file
+// cannot be read.
 bool own_line(Core &core, uint32_t position, uint32_t loops, uint32_t *size, const char **name, uint32_t *length) {
     char *line = reinterpret_cast<char *>(core.chunk + kOwnLine);
     char figures[5];
@@ -347,9 +349,11 @@ bool own_line(Core &core, uint32_t position, uint32_t loops, uint32_t *size, con
     line[at++] = ' ';
     *name = line + at;
     if (is_drive(position)) {
-        if (core.host.drive_name(core.host.ctx, core.drive_number, position - kDriveBase, line + at, kNameMost + 1) != 1) {
+        const DriveRow *row = drive_row(core, position - kDriveBase);
+        if (row == nullptr || text_length(row->name) > kNameMost) {
             return false;
         }
+        memcpy(line + at, row->name, text_length(row->name) + 1);
     } else {
         const char *file = core.files[core.items[position].first].name;
         memcpy(line + at, file, text_length(file) + 1);
@@ -500,34 +504,14 @@ void repeats_drive_found(Core &core) {
     clear_drive(core);
 }
 
-void repeats_drive_step(Core &core) {
-    FileSource &source = core.checker->file;
-    OrderReader &reader = core.order_reader;
-    if (!core.order_reading) {
-        clear_drive(core);
-        source.open_at(core.host, kRepeatsFile);
-        reader_clear(core);
-        core.order_reading = 1;
+void repeats_drive_taken(Core &core) {
+    if (core.checker == nullptr || core.order_items == nullptr || core.repeats_drive == nullptr) {
+        return;
     }
-    Taken taken = kTakenOn;
-    int got = source.get();
-    while (got >= 0) {
-        taken = take_byte(core, static_cast<uint8_t>(got), [&core](const Line &line, uint32_t) { apply_drive(core, line, true); });
-        if (taken == kTakenBad) {
-            break;
-        }
-        if (source.position >= source.length) {
-            // The rest at the next step.
-            return;
-        }
-        got = source.get();
-    }
-    const uint32_t read = source.taken;
-    source.close();
-    core.order_reading = 0;
-    core.order_due = 0;
-    const bool missing = taken == kTakenOn && got == -kReadError && read == 0;
-    if (!missing && (taken == kTakenBad || got == -kReadError || reader.header == 0 || reader.length != 0)) {
+    drive_check_yields(core);
+    clear_drive(core);
+    const Ending ending = read_through(core, [&core](const Line &line, uint32_t) { apply_drive(core, line, true); });
+    if (ending == kEndBad || ending == kEndFailed) {
         unreadable(core);
     }
 }

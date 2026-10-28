@@ -11,7 +11,7 @@ from . import support
 from .test_catalog_drive import card, polls
 from .test_catalog_writes import a_card, folder_of, upload_external
 from .test_drive import DONE, SHOW, a_drive, asked, logged, refusal, replies, statuses, with_drive
-from .test_order import HEADER, ordered
+from .test_order import ordered
 from .test_playback import T0
 from .test_playlist import CANVAS, loop_of, show_of
 
@@ -39,10 +39,32 @@ def on_cataloged_card(card_files, script, options=()):
         return support.start(SHOW, polls(0, 400) + script, ["--drive", top, *options], check_first=False)
 
 
-def listing(time):
-    """A refresh and `list` from every position of 0 to 79 on, so that the replies hold the
-    chain of pages of `list` from the first on: `paged` follows it."""
-    return asked(time, *(f"list {start}" for start in range(80)))
+def listing(time, level=""):
+    """A refresh and `list` from every position of 0 to 79 on, or `list in <id>` of a level,
+    so that the replies hold the chain of pages of the level from the first on: `paged`
+    follows it."""
+    return asked(time, *(f"list {level}{start}" for start in range(80)))
+
+
+# The levels of NESTED: the root's, with the show's item, and each folder's.
+LEVELS = ("list", "list in 60007", "list in 60008", "list in 60009", "list in 60010")
+
+
+def whole(answers):
+    """The items of the replies of every level, the root's first."""
+    return [item for reply in answers for item in reply["items"]]
+
+
+def every_level(card_files):
+    """The items of every level of a cataloged card, found level by level: the root's, then
+    those of the folders each level names."""
+    found = []
+    pending = ["list"]
+    while pending:
+        answers = replies(on_cataloged_card(card_files, asked(8100, *pending)))
+        pending = [f"list in {item['id']}" for reply in answers for item in reply["items"] if "playlist" in item]
+        found += whole(answers)
+    return found
 
 
 def paged(answers):
@@ -56,91 +78,131 @@ def paged(answers):
 
 
 class TheTree(unittest.TestCase):
-    def test_a_legacy_card_lists_its_folders_after_the_shows_items_with_ids_after_the_files(self):
+    def test_list_gives_the_shows_items_and_the_roots_level_its_folders_with_ids_after_the_files(self):
         reply = replies(with_drive(SHOW, NESTED, asked(0, "list")))[0]
-        self.assertEqual([item["id"] for item in reply["items"]], [1, 60007, 60008, 60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
-        self.assertEqual(folders(reply), list(zip(range(60007, 60011), TREE)))
-        self.assertEqual(files(reply), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg"), (60003, "a b/c.odrg"), (60004, "night/comet.odrg"),
-                                        (60005, "night/deep/x.odrg"), (60006, "night/deep/deeper/y.odrg")])
-        self.assertEqual(reply["items"][1], {"id": 60007, "playlist": "a b", "external": True})
+        self.assertEqual([item["id"] for item in reply["items"]], [1, 60007, 60008, 60001, 60002])
+        self.assertEqual(folders(reply), [(60007, "a b"), (60008, "night")])
+        self.assertEqual(files(reply), [(1, "four.odrg"), (60001, "A.ODRG"), (60002, "b.odrg")])
+        self.assertEqual(reply["items"][1], {"id": 60007, "playlist": "a b", "external": True, "files": 1})
 
-    def test_a_cataloged_card_lists_the_same_tree_whatever_the_order_of_its_pages(self):
-        reply = replies(on_cataloged_card(card(NESTED), asked(8100, "list")))[0]
-        self.assertEqual(folders(reply), list(zip(range(60007, 60011), TREE)))
-        self.assertEqual(sorted(name for _, name in files(reply)), sorted(["four.odrg", *NESTED]))
-        self.assertEqual([item["id"] for item in reply["items"]][:5], [1, 60007, 60008, 60009, 60010])
-        self.assertEqual(sorted(id for id, _ in files(reply)), [1, *range(60001, 60007)])
+    def test_list_in_gives_a_folders_level_its_sub_folders_then_its_own_files(self):
+        answers = replies(with_drive(SHOW, NESTED, asked(0, *LEVELS[1:])))
+        self.assertEqual([[(item["id"], item.get("playlist", item.get("file")), item.get("files")) for item in reply["items"]] for reply in answers], [
+            [(60003, "a b/c.odrg", None)],
+            [(60009, "night/deep", 1), (60004, "night/comet.odrg", None)],
+            [(60010, "night/deep/deeper", 1), (60005, "night/deep/x.odrg", None)],
+            [(60006, "night/deep/deeper/y.odrg", None)],
+        ])
+        self.assertEqual({reply["next"] for reply in answers}, {None})
 
-    def test_the_positions_of_list_count_the_folders(self):
-        run = with_drive(SHOW, NESTED, asked(0, "list 1", "list 3", "list 5", "list 11"))
-        first, third, fifth, beyond = replies(run)
-        self.assertEqual([item["id"] for item in first["items"]], [60007, 60008, 60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
-        self.assertEqual([item["id"] for item in third["items"]], [60009, 60010, 60001, 60002, 60003, 60004, 60005, 60006])
-        self.assertEqual(files(fifth), files(first))
+    def test_a_cataloged_card_lists_the_same_levels_whatever_the_order_of_its_pages(self):
+        items = whole(replies(on_cataloged_card(card(NESTED), asked(8100, *LEVELS))))
+        self.assertEqual([(item["id"], item["playlist"]) for item in items if "playlist" in item], list(zip(range(60007, 60011), TREE)))
+        self.assertEqual(sorted(item["file"] for item in items if "file" in item), sorted(["four.odrg", *NESTED]))
+        self.assertEqual(sorted(item["id"] for item in items if "file" in item), [1, *range(60001, 60007)])
+
+    def test_the_positions_of_a_level_count_its_folders_and_its_files(self):
+        run = with_drive(SHOW, NESTED, asked(0, "list 1", "list 3", "list 5", "list in 60008 1", "list in 60008 2", "list in 60008 4294967295"))
+        first, third, beyond, night, after, far = replies(run)
+        self.assertEqual([item["id"] for item in first["items"]], [60007, 60008, 60001, 60002])
+        self.assertEqual([item["id"] for item in third["items"]], [60001, 60002])
         self.assertEqual(beyond, {"ok": True, "items": [], "next": None})
+        self.assertEqual([item["id"] for item in night["items"]], [60004])
+        self.assertEqual((after, far), ({"ok": True, "items": [], "next": None}, {"ok": True, "items": [], "next": None}))
+
+    def test_list_in_of_an_id_that_is_no_folder_is_unknown_and_its_words_are_in_their_form(self):
+        known = ("list in 1", "list in 60001", "list in 99999", "list in 4294967295")
+        bad = ("list in", "list in x", "list in 0", "list in 4294967296", "list 1 2", "list in 60008 1 2", "list 4294967296", "list into 60008")
+        run = with_drive(SHOW, NESTED, asked(0, *known, *bad))
+        self.assertEqual(replies(run), [refusal("unknown-id")] * len(known) + [refusal("bad-argument")] * len(bad))
 
     def test_a_page_holds_folder_items_of_the_longest_paths(self):
         # Ten files whose paths are 100 bytes, in three folders each, thirty folders in all.
         drive = {}
         for number in range(10):
             drive[f"{number:02d}{'a' * 28}/{'b' * 30}/{'c' * 31}/x.odrg"] = loop_of(2, number)
-        run = with_drive(SHOW, drive, listing(0))
+        run = with_drive(SHOW, drive, listing(0) + listing(0, "in 60012 ") + listing(0, "in 60013 "))
         answers = replies(run)
         lines = [line[len("reply "):] for line in run.lines if line.startswith("reply ")]
         self.assertTrue(all(len(line.encode()) + 1 <= 1024 for line in lines))
-        self.assertGreater(answers[0]["next"], 1)
-        whole = paged(answers)
-        self.assertEqual(len([item for item in whole if "playlist" in item]), 30)
-        self.assertEqual(len(whole), 1 + 30 + 10)
-        self.assertEqual([item["playlist"] for item in whole[1:4]], [f"00{'a' * 28}", f"00{'a' * 28}/{'b' * 30}", f"00{'a' * 28}/{'b' * 30}/{'c' * 31}"])
-        self.assertEqual([item["id"] for item in whole], [1, *range(60011, 60041), *range(60001, 60011)])
+        root = paged(answers[:80])
+        self.assertEqual(len(root), 1 + 10)
+        self.assertEqual([item["id"] for item in root], [1, *range(60011, 60041, 3)])
+        self.assertEqual([(item["playlist"], item["files"]) for item in root[1:3]], [(f"00{'a' * 28}", 0), (f"01{'a' * 28}", 0)])
+        self.assertEqual([(item["id"], item["playlist"], item["files"]) for item in paged(answers[80:160])], [(60013, f"00{'a' * 28}/{'b' * 30}/{'c' * 31}", 1)])
+        self.assertEqual([(item["id"], item["file"]) for item in paged(answers[160:])], [(60001, f"00{'a' * 28}/{'b' * 30}/{'c' * 31}/x.odrg")])
 
-    def test_a_33rd_sub_folder_named_by_a_catalog_is_left_out_with_too_many_folders(self):
+    def test_a_33rd_sub_folder_of_an_index_is_a_playlist_as_the_others(self):
         names = [f"f{number:02d}/x.odrg" for number in range(33)]
-        storage = catalog.MemoryStorage({name: loop_of(2, number) for number, name in enumerate(names)})
-        made, refused = catalog.rebuild(storage, names=names, canvas=CANVAS)
-        self.assertEqual((refused, made.marker.counts and sum(made.marker.counts)), ([], 33))
-        run = on_cataloged_card(storage.files, listing(8100))
-        items = paged(replies(run))
-        self.assertEqual(len([item for item in items if "playlist" in item]), 32)
-        left_out = [item for item in items if item.get("fault") == "too-many-folders"]
-        self.assertEqual(len(left_out), 1)
-        self.assertEqual([line for line in logged(run) if "too-many-folders" in line], [f"drive file {left_out[0]['file']} left out: too-many-folders"])
-        self.assertEqual(len([item for item in items if "file" in item and "fault" not in item]), 1 + 32)
+        run = on_cataloged_card(card({name: loop_of(2, number) for number, name in enumerate(names)}), listing(8100) + asked(8200, "list in 60066"))
+        items = paged(replies(run)[:-1])
+        self.assertEqual([(item["id"], item["playlist"], item["files"]) for item in items if "playlist" in item],
+                         [(60034 + number, f"f{number:02d}", 1) for number in range(33)])
+        self.assertEqual([(item["id"], item["file"]) for item in replies(run)[-1]["items"]], [(60033, "f32/x.odrg")])
+        self.assertFalse([line for line in logged(run) if "too-many-folders" in line])
 
     def test_a_folder_without_a_file_is_no_folder_of_the_tree(self):
         with a_drive(NESTED) as top:
             support.pathlib.Path(top, "odrig", "empty", "deeper").mkdir(parents=True)
-            run = support.start(SHOW, asked(0, "list"), ["--drive", top])
-        self.assertEqual(folders(replies(run)[0]), list(zip(range(60007, 60011), TREE)))
+            run = support.start(SHOW, asked(0, *LEVELS), ["--drive", top])
+        self.assertEqual(folders({"items": whole(replies(run))}), list(zip(range(60007, 60011), TREE)))
+
+
+class WhatPlaysAndTheOrderOfALevel(unittest.TestCase):
+    def test_status_names_the_file_on_the_leds_and_the_current_folders_path(self):
+        script = asked(0, "status", "play 60008") + asked(20, "status", "play 60002") + asked(40, "status", "play all") + asked(60, "status")
+        run = with_drive(SHOW, NESTED, script)
+        named = [(reply["playing"], reply["animation"], reply["file"], reply["playlist"]) for reply in replies(run) if "on" in reply]
+        self.assertEqual(named, [("all", 1, "four.odrg", None), (60008, 60004, "night/comet.odrg", "night"), (60008, 60002, "b.odrg", "night"),
+                                 ("all", 1, "four.odrg", None)])
+        nothing = replies(support.start(show_of([], {}), asked(0, "status")))[0]
+        self.assertEqual((nothing["file"], nothing["playlist"]), (None, None))
+        self.assertEqual(list(nothing)[-3:], ["file", "playlist", "left"])
+
+    def test_order_get_gives_the_root_level_and_order_get_in_a_folders(self):
+        lines = ("order get", "order get in 60007", "order get in 60008", "order get in 60010", "order get in 60008 1", "order get in 1", "order get in 60001",
+                 "order get in", "order get in 60008 x", "order get in 60008 1 2")
+        answers = replies(with_drive(SHOW, NESTED, asked(0, *lines)))
+        self.assertEqual([(reply["ids"], reply["next"]) for reply in answers[:5]], [([1, 60001, 60002], None), ([60003], None), ([60004], None), ([60006], None), ([], None)])
+        self.assertEqual(answers[5:], [refusal("unknown-id")] * 2 + [refusal("bad-argument")] * 3)
+        self.assertEqual(len({reply["revision"] for reply in answers[:4]}), 4)
+
+    def test_a_move_is_compared_with_the_revision_of_the_level_of_its_animation(self):
+        with a_drive(NESTED) as top:
+            first = support.start(SHOW, asked(0, "order get", "order get in 60009"), ["--drive", top])
+            root, deep = (reply["revision"] for reply in replies(first))
+            run = support.start(SHOW, asked(0, f"order move {deep} 1 end", f"order move {root} 1 end"), ["--drive", top])
+        self.assertEqual(replies(run), [refusal("order-conflict"), DONE])
 
 
 class ThePathsInTheSavedOrderAndTheCatalog(unittest.TestCase):
-    def test_order_move_of_a_file_in_a_folder_writes_its_path(self):
+    def test_a_file_of_a_drive_without_a_catalog_is_not_moved(self):
         with a_drive(NESTED) as top:
-            first = support.start(SHOW, asked(0, "order get"), ["--drive", top])
-            revision = replies(first)[0]["revision"]
-            self.assertEqual(replies(first)[0]["ids"], [1, 60001, 60002, 60003, 60004, 60005, 60006])
-            run, kept = support.start_and_keep(SHOW, asked(0, f"order move {revision} 60004 60001", "order get"), ["--drive", top])
-        self.assertEqual(replies(run), [{"ok": True}, {"ok": True, "ids": [1, 60004, 60001, 60002, 60003, 60005, 60006], "next": None, "revision": replies(run)[1]["revision"]}])
-        self.assertEqual(kept["order.txt"], (HEADER + "i 1\nx night/comet.odrg\nx A.ODRG\nx b.odrg\nx a b/c.odrg\nx night/deep/x.odrg\nx night/deep/deeper/y.odrg\n").encode())
+            first = support.start(SHOW, asked(0, "order get", "order get in 60008"), ["--drive", top])
+            root, night = (reply["revision"] for reply in replies(first))
+            self.assertEqual([reply["ids"] for reply in replies(first)], [[1, 60001, 60002], [60004]])
+            run, kept = support.start_and_keep(SHOW, asked(0, f"order move {night} 60004 end", f"order move {root} 1 end", "order get"), ["--drive", top])
+        self.assertEqual(replies(run)[:2], [refusal("read-only"), DONE])
+        self.assertEqual(replies(run)[2]["ids"], [1, 60001, 60002])
+        self.assertNotIn("order.txt", kept)
 
     def test_remove_of_a_file_in_a_folder_removes_that_file_and_an_emptied_folder_leaves_the_tree(self):
         card_files = card(NESTED)
-        ids = {name: id for id, name in files(replies(on_cataloged_card(card_files, asked(8100, "list")))[0])}
+        ids = {item["file"]: item["id"] for item in every_level(card_files) if "file" in item}
         with a_card(card_files) as top:
-            script = polls(0, 400) + asked(8100, f"remove {ids['night/comet.odrg']}", "list", f"remove {ids['a b/c.odrg']}", "list")
+            script = polls(0, 400) + asked(8100, f"remove {ids['night/comet.odrg']}", *LEVELS, f"remove {ids['a b/c.odrg']}", "list", "list in 60007")
             run = support.start(SHOW, script, ["--drive", top], check_first=False)
             left = folder_of(top)
-        done, after_first, done_again, after_second = replies(run)
+        answers = replies(run)
+        done, after_first, done_again, after_second, gone = answers[0], answers[1:6], answers[6], answers[7], answers[8]
         self.assertEqual((done, done_again), ({"ok": True}, {"ok": True}))
-        self.assertEqual(folders(after_first), list(zip(range(60007, 60011), TREE)))
-        self.assertNotIn("night/comet.odrg", [name for _, name in files(after_first)])
-        self.assertEqual(folders(after_second), [(60008, "night"), (60009, "night/deep"), (60010, "night/deep/deeper")])
+        self.assertEqual(folders({"items": whole(after_first)}), list(zip(range(60007, 60011), TREE)))
+        self.assertNotIn("night/comet.odrg", [name for _, name in files({"items": whole(after_first)})])
+        self.assertEqual((folders(after_second), gone), ([(60008, "night")], refusal("unknown-id")))
         self.assertNotIn("night/comet.odrg", left)
         self.assertNotIn("a b/c.odrg", left)
         self.assertEqual(sorted(name for name in left if name.lower().endswith(".odrg")), ["A.ODRG", "b.odrg", "night/deep/deeper/y.odrg", "night/deep/x.odrg"])
-        found = catalog.read(catalog.MemoryStorage(left))
+        found = catalog.read(catalog.MemoryStorage(left, drive=True))
         self.assertEqual(sorted(entry.name for entry in found.entries), ["A.ODRG", "b.odrg", "night/deep/deeper/y.odrg", "night/deep/x.odrg"])
 
     def test_upload_begin_external_takes_a_bare_file_name(self):
@@ -179,10 +241,10 @@ class PlayOfAFolder(unittest.TestCase):
 
     def test_a_folder_with_nothing_to_play_plays_the_root_in_its_place(self):
         drive = {**NESTED, "solo/bad.odrg": b"not an animation"}
-        run = with_drive(SHOW, drive, asked(0, "list", "play 60012") + asked(20, "status"))
+        run = with_drive(SHOW, drive, asked(0, "list", "play 60012") + asked(20, "status", "list in 60012"))
         reply, done = replies(run)[:2]
         self.assertEqual(folders(reply)[-1], (60012, "solo"))
-        self.assertEqual([item.get("fault") for item in reply["items"] if item.get("file") == "solo/bad.odrg"], ["bad-magic"])
+        self.assertEqual([item.get("fault") for item in replies(run)[-1]["items"] if item.get("file") == "solo/bad.odrg"], ["bad-magic"])
         # The folder is current and named, and the root's first animation plays in its place.
         self.assertEqual((done, statuses(run)), (DONE, [(60012, 1)]))
 
@@ -200,7 +262,7 @@ class PlayOfAFolder(unittest.TestCase):
         self.assertEqual(replies(run), [refusal("in-use")] * len(commands))
         on_card = on_cataloged_card(card(NESTED), asked(8100, "remove 60008", "list"))
         self.assertEqual(replies(on_card)[0], refusal("in-use"))
-        self.assertEqual(folders(replies(on_card)[1]), list(zip(range(60007, 60011), TREE)))
+        self.assertEqual(folders(replies(on_card)[1]), [(60007, "a b"), (60008, "night")])
 
 
 class TheExhaustingOrder(unittest.TestCase):
@@ -209,30 +271,28 @@ class TheExhaustingOrder(unittest.TestCase):
         self.assertEqual(replies(run)[0], DONE)
         self.assertEqual(set(animation for _, animation in statuses(run)), {60002})
 
-    def test_the_root_plays_its_own_animations_in_the_saved_order_then_each_folder_once_then_again(self):
-        # The saved order puts `night/comet.odrg` first and `b.odrg` second. The root begins
-        # with the show's first animation at power-on, as always, goes on with its own
-        # animations by their keys, then each folder's once in the tree's order, and comes
-        # back to its own, `b.odrg` first by the saved order; `night/comet.odrg` plays in
-        # its folder's turn, not first.
+    def test_the_root_plays_the_shows_animations_then_the_drives_walk_whatever_the_saved_order_says(self):
+        # The saved order names `night/comet.odrg` and `b.odrg`, lines that are passed over:
+        # the root plays the show's animation, then the root's files, then each folder's in
+        # the tree's order, and again.
         installed = ordered(SHOW, "x night/comet.odrg", "x b.odrg")
         with a_drive(NESTED) as top:
             run = support.start(installed, every(100, 45000, "status"), ["--drive", top])
-        self.assertEqual(played(run)[:9], [1, 60001, 60003, 60004, 60005, 60006, 60002, 1, 60001])
+        self.assertEqual(played(run)[:9], [1, 60001, 60002, 60003, 60004, 60005, 60006, 1, 60001])
 
     def test_a_folder_exhausts_its_own_animations_then_its_nested_folders_then_again(self):
         run = with_drive(SHOW, NESTED, asked(0, "play 60008") + every(100, 20000, "status"))
         self.assertEqual(played(run)[:5], [60004, 60005, 60006, 60004, 60005])
 
-    def test_the_order_within_a_folder_follows_the_saved_order(self):
+    def test_a_folders_files_play_in_the_walk_whatever_the_saved_order_says(self):
         drive = {**NESTED, "night/zeta.odrg": loop_of(2, 11)}
         installed = ordered(SHOW, "x night/zeta.odrg")
         with a_drive(drive) as top:
-            run = support.start(installed, asked(0, "list", "play 60009") + every(100, 25000, "status"), ["--drive", top])
+            run = support.start(installed, asked(0, "list", "list in 60009", "play 60009") + every(100, 25000, "status"), ["--drive", top])
         reply = replies(run)[0]
         self.assertEqual(folders(reply)[1], (60009, "night"))
-        self.assertEqual([id for id, name in files(reply) if name in ("night/comet.odrg", "night/zeta.odrg")], [60004, 60005])
-        self.assertEqual(played(run)[:5], [60005, 60004, 60006, 60007, 60005])
+        self.assertEqual([id for id, name in files(replies(run)[1]) if name in ("night/comet.odrg", "night/zeta.odrg")], [60004, 60005])
+        self.assertEqual(played(run)[:5], [60004, 60005, 60006, 60007, 60004])
 
     def test_a_jump_inside_the_current_playlist_goes_on_from_the_jumped_animation(self):
         script = asked(0, "play 60008") + asked(20, "status") + asked(100, "play 60006") + [line for time in range(200, 15000, 100) for line in asked(time, "status")]
@@ -408,8 +468,9 @@ class TheSavedFile(unittest.TestCase):
 
     def test_the_removal_of_the_current_folders_last_file_makes_the_root_current_and_saves_it(self):
         card_files = card({**NESTED, "solo/only.odrg": loop_of(2, 11)})
-        ids = {name: id for id, name in files(replies(on_cataloged_card(card_files, asked(8100, "list")))[0])}
-        solo = [id for id, path in folders(replies(on_cataloged_card(card_files, asked(8100, "list")))[0]) if path == "solo"][0]
+        items = every_level(card_files)
+        ids = {item["file"]: item["id"] for item in items if "file" in item}
+        solo = [item["id"] for item in items if item.get("playlist") == "solo"][0]
         with a_card(card_files) as top:
             script = polls(0, 400) + asked(8100, f"play {solo}", "status") + asked(8120, f"remove {ids['solo/only.odrg']}", "status", "list") + asked(8140)
             run, left = support.start_and_keep(SHOW, script, ["--drive", top, "--trace-store"], check_first=False)
@@ -434,7 +495,7 @@ class TheSavedFile(unittest.TestCase):
 
     def test_the_start_of_a_show_without_a_drive_makes_no_call_for_the_file(self):
         run = support.start(SHOW, asked(0, "status"), ["--trace-store", "--trace-read-at"])
-        self.assertFalse(any("playlist" in line for line in run.lines))
+        self.assertFalse(any("playlist" in line for line in run.lines if not line.startswith("reply ")))
 
 
 if __name__ == "__main__":

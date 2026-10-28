@@ -5,6 +5,7 @@ import tempfile
 import time
 import unittest
 
+from odrig import catalog
 from tests.emulator import support as emulator_support
 
 from . import support
@@ -12,8 +13,20 @@ from .test_target import entered
 
 # The capacity of a medium, as the core reports it, in its words on the screen.
 CAPACITY = r"free [0-9]+\.[0-9] (MB|GB) of [0-9]+\.[0-9] (MB|GB) \(read-only\)\."
+# The same of a drive with a catalog, which the installation may write.
+WRITABLE = r"free [0-9]+\.[0-9] (MB|GB) of [0-9]+\.[0-9] (MB|GB)\."
 INTERNAL = r"free [0-9]+\.[0-9] MB of [0-9]+\.[0-9] MB"
 BUSY = (200, '{"ok":false,"error":"busy"}\n')
+
+
+def cataloged(top, files):
+    """Puts these files into the folder `odrig` of a drive, with the catalog and the index
+    the PC library makes of them for the example show's canvas: written beside it and moved
+    into place at once, so that the drive is never plugged in half written."""
+    storage = catalog.MemoryStorage(dict(files), drive=True)
+    catalog.rebuild(storage, canvas=(60, 6))
+    emulator_support.installed(top / "odrig.part", storage.files)
+    (top / "odrig.part").rename(top / "odrig")
 
 
 def space(animations, present, free=None, total=None):
@@ -42,6 +55,13 @@ class Counts(unittest.TestCase):
 
 
 class OnTheShowScreen(Counts):
+    def test_a_drive_without_a_catalog_has_no_number(self):
+        emulator, address, folder = self.emulator("--drive", top := self.drive())
+        emulator_support.installed(top / "odrig", {"a.odrg": (folder / "hello.odrg").read_bytes()})
+        self.read(emulator, 4)
+        seen = self.lines(address, 3, [rf"External storage: {CAPACITY}$"], ms=20000)
+        self.assertRegex(seen[0]["external"], rf"\AExternal storage: {CAPACITY}\Z")
+
     def test_without_a_drive_the_board_s_own_animations_are_counted_and_the_drive_is_absent(self):
         emulator, address, _ = self.emulator()
         seen = self.lines(address, 2, [rf"^Internal storage: 2 animations, {INTERNAL} \| External storage: absent \(read-only\)\.$"])
@@ -49,22 +69,22 @@ class OnTheShowScreen(Counts):
 
     def test_a_drive_s_animations_are_counted_on_its_line(self):
         emulator, address, folder = self.emulator("--drive", top := self.drive())
-        emulator_support.installed(top / "odrig", {"a.odrg": (folder / "hello.odrg").read_bytes(), "b.odrg": (folder / "dvd.odrg").read_bytes()})
+        cataloged(top, {"a.odrg": (folder / "hello.odrg").read_bytes(), "b.odrg": (folder / "dvd.odrg").read_bytes()})
         self.read(emulator, 5)
-        seen = self.lines(address, 4, [rf"^Internal storage: 2 animations, {INTERNAL} \| External storage: 2 animations, {CAPACITY}$"], ms=20000)
-        self.assertRegex(seen[0]["external"], rf"\AExternal storage: 2 animations, {CAPACITY}\Z")
+        seen = self.lines(address, 4, [rf"^Internal storage: 2 animations, {INTERNAL} \| External storage: 2 animations, {WRITABLE}$"], ms=20000)
+        self.assertRegex(seen[0]["external"], rf"\AExternal storage: 2 animations, {WRITABLE}\Z")
 
     def test_a_drive_without_animations_says_0(self):
         emulator, address, _ = self.emulator("--drive", top := self.drive())
-        emulator_support.installed(top / "odrig", {})
-        seen = self.lines(address, 2, [rf"External storage: 0 animations, {CAPACITY}$"], ms=20000)
-        self.assertRegex(seen[0]["external"], rf"\AExternal storage: 0 animations, {CAPACITY}\Z")
+        cataloged(top, {})
+        seen = self.lines(address, 2, [rf"External storage: 0 animations, {WRITABLE}$"], ms=20000)
+        self.assertRegex(seen[0]["external"], rf"\AExternal storage: 0 animations, {WRITABLE}\Z")
 
     def test_a_drive_plugged_in_and_pulled_out_while_the_app_runs_is_followed(self):
         emulator, address, folder = self.emulator("--drive", top := self.drive())
-        plug = lambda: emulator_support.installed(top / "odrig", {"a.odrg": (folder / "hello.odrg").read_bytes()})
+        plug = lambda: cataloged(top, {"a.odrg": (folder / "hello.odrg").read_bytes()})
         pull = lambda: shutil.rmtree(top / "odrig")
-        untils = [r"External storage: absent \(read-only\)\.$", rf"External storage: 1 animation, {CAPACITY}$", r"External storage: absent \(read-only\)\.$"]
+        untils = [r"External storage: absent \(read-only\)\.$", rf"External storage: 1 animation, {WRITABLE}$", r"External storage: absent \(read-only\)\.$"]
         seen = self.lines(address, 2, untils, steps=[plug, pull], ms=25000)
         self.assertEqual([line["internal"] for line in seen], [seen[0]["internal"]] * 3)
         self.assertRegex(seen[0]["internal"], rf"\AInternal storage: 2 animations, {INTERNAL}\Z")

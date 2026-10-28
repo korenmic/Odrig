@@ -153,12 +153,16 @@ class EditingAnInstalledOne(unittest.TestCase):
     """A show on the two-leg mapping, 60 x 6: frames, a text the playlist ignores, frames, a
     clock."""
 
-    def emulator(self):
+    def emulator(self, more=None):
         hello = encoded({**TEXT, "text": "Hello", "motion": "up", "width": 60, "height": 6})
         clock = encoded({**CLOCK, "width": 60, "height": 6})
         items = [{"id": 1, "file": "one.odrg"}, {"id": 5, "file": "hello.odrgx", "ignored": True}, {"id": 2, "file": "two.odrg"}, {"id": 7, "file": "clock-analog.odrgx"}]
         files = {"mapping.json": core_support.mapping_texts()["legs-2"], "show.json": json.dumps({"version": 1, "brightness": 128, "items": items}),
                  "one.odrg": core_support.clip(1, 60, 6), "two.odrg": core_support.clip(2, 60, 6), "hello.odrgx": hello, "clock-analog.odrgx": clock}
+        for number, name, data in more or ():
+            items.append({"id": number, "file": name})
+            files[name] = data
+        files["show.json"] = json.dumps({"version": 1, "brightness": 128, "items": items})
         folder = emulator_support.installed(pathlib.Path(entered(self, tempfile.TemporaryDirectory()), "show"), files)
         return entered(self, emulator_support.Emulator(folder)), folder
 
@@ -183,6 +187,19 @@ class EditingAnInstalledOne(unittest.TestCase):
         saved = encoded({**CLOCK, "seconds": 20, "width": 60, "height": 6})
         self.assertEqual((folder / "clock-analog.odrgx").read_bytes(), saved)
         self.assertEqual([item["id"] for item in json.loads(emulator.command("list"))["items"]], [1, 5, 2, 7])
+
+    def test_a_picture_clock_opens_no_form_and_the_app_says_why(self):
+        rows = ["".join("1" if x in (0, 59) else "0" for x in range(60)) for _ in range(6)]
+        picture = encoded({"version": 1, "type": "widget", "width": 60, "height": 6, "widget": "picture-display", "seconds": 30, "speed_min": 60,
+                           "speed_max": 600, "direction": "random", "turns": 30, "palette": [0, 0xFFD040], "picture": rows,
+                           "fields": [{"left": 20, "top": 0, "width": 20, "height": 6, "font": "tiny", "pattern": "Ih:Mm", "digits": 1, "colons": 1,
+                                       "blink": True, "offset": 0}]})
+        emulator, folder = self.emulator([(8, "picture.odrgx", picture)])
+        found = support.run("author-edit", address=f"127.0.0.1:{emulator.port}", settings={"rows": 5, "edit": 8, "refused": True}).seen
+        self.assertEqual(found["message"], "This clock is made from a picture: it cannot be edited here.")
+        self.assertFalse(found["formShown"])
+        self.assertEqual((folder / "picture.odrgx").read_bytes(), picture)
+        self.assertNotIn("upload.part", [path.name for path in folder.iterdir()])
 
     def test_a_change_by_another_controller_is_said_and_nothing_is_overwritten(self):
         emulator, folder = self.emulator()

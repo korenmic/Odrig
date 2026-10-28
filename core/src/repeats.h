@@ -17,23 +17,24 @@ const char kRepeatsPart[] = "repeats.part";
 const uint32_t kRepeatsLines = 512;
 
 // The loops of the saved repeat of the animation at a position of the playlist, an item of
-// the item table or kDriveBase and a place of the drive; 0 when it has none.
+// the item table or kDriveBase and a position of the drive's walk; 0 when it has none.
 uint32_t repeats_of(const Core &core, uint32_t position);
 
 // The start, once the order is read: the saved repeats of the show's items from the file.
 void repeats_start(Core &core);
 
 // Reads the whole file again at once and sets every saved repeat, of the items and of the
-// drive's places.
+// drive's files.
 void repeats_reload(Core &core);
 
-// A drive's places were counted, or it left: its saved repeats are dropped until its lines
+// A drive's files were counted, or it left: its saved repeats are dropped until its lines
 // are read.
 void repeats_drive_found(Core &core);
 
-// One step of the drive's part of the file: the bytes of one read at most. At its end the
-// drive's check goes on with the drive's files.
-void repeats_drive_step(Core &core);
+// A drive is taken up: the file is read whole at once and its lines `x` give their loops to
+// the files of the drive of their names, the first kRepeatsDriveMost of them, before any of
+// its files plays. The log says `repeats over` once when more would.
+void repeats_drive_taken(Core &core);
 
 // The reply to `repeat <id> <n> save`: the listed animation with the id keeps `n` loops for
 // every later turn, and its reported turn plays them. The whole file is saved before the

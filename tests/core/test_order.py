@@ -120,43 +120,32 @@ class CardEntries(unittest.TestCase):
         with a_drive(self.DRIVE) as top:
             return support.start(files, script, ["--drive", top, *options])
 
-    def test_card_animations_are_named_by_their_file_names_in_one_mixed_order(self):
+    def test_the_drives_files_follow_the_shows_animations_in_the_order_of_their_names(self):
+        # The lines that name a file of the card are passed over.
         files = ordered(self.SHOW, "x b.odrg", "i 2", "x c d.odrg", "i 1", "x A.ODRG")
         run = self.run_with_drive(files, asked(0, "list", "order get"))
         ids = {item["file"]: item["id"] for item in replies(run)[0]["items"]}
-        self.assertEqual(order_ids(run)[0], [ids["b.odrg"], 2, ids["c d.odrg"], 1, ids["A.ODRG"]])
+        self.assertEqual(order_ids(run)[0], [2, 1, ids["A.ODRG"], ids["b.odrg"], ids["c d.odrg"]])
+        self.assertEqual([ids["A.ODRG"], ids["b.odrg"], ids["c d.odrg"]], [60001, 60002, 60003])
 
-    def test_the_playlist_plays_card_and_internal_animations_in_the_saved_order(self):
+    def test_the_playlist_plays_the_shows_animations_in_the_saved_order_then_the_drives(self):
         files = ordered(self.SHOW, "x b.odrg", "i 2", "x A.ODRG", "i 1")
         run = self.run_with_drive(files, asked(0, "list", "play all") + every_turn(6))
-        ids = {item["file"]: item["id"] for item in replies(run)[0]["items"]}
-        self.assertEqual(turns(run)[:5], [ids["b.odrg"], 2, ids["A.ODRG"], 1, ids["c d.odrg"]])
-
-    def test_a_card_entry_whose_file_is_absent_keeps_its_place_and_is_skipped(self):
-        files = ordered(self.SHOW, "x gone.odrg", "i 2", "x b.odrg", "i 1")
-        run = self.run_with_drive(files, asked(0, "list", "order get"))
-        ids = {item["file"]: item["id"] for item in replies(run)[0]["items"]}
-        self.assertEqual(order_ids(run)[0], [2, ids["b.odrg"], 1, ids["A.ODRG"], ids["c d.odrg"]])
+        self.assertEqual(turns(run)[:6], [2, 1, 60001, 60002, 60003, 2])
 
     def test_a_card_pulled_out_and_plugged_in_again_takes_its_places_again(self):
         files = ordered(self.SHOW, "x c d.odrg", "i 2", "x b.odrg", "i 1")
         script = asked(0, "list", "order get") + ["drive pull"] + asked(20, "order get") + ["drive plug"] + ticks(40, 120)
         script += asked(2440, "list", "order get")
         run = self.run_with_drive(files, script)
-        lists = [reply for reply in replies(run) if "items" in reply]
         orders = [reply["ids"] for reply in replies(run) if "ids" in reply]
-        before = {item["file"]: item["id"] for item in lists[0]["items"]}
-        self.assertEqual(orders[0], [before["c d.odrg"], 2, before["b.odrg"], 1, before["A.ODRG"]])
-        self.assertEqual(orders[1], [2, 1])
-        after = {item["file"]: item["id"] for item in lists[1]["items"]}
-        self.assertEqual(orders[2], [after["c d.odrg"], 2, after["b.odrg"], 1, after["A.ODRG"]])
+        self.assertEqual(orders, [[2, 1, 60001, 60002, 60003], [2, 1], [2, 1, 60001, 60002, 60003]])
 
-    def test_the_playlist_goes_on_after_a_card_animation_that_left_in_the_saved_order(self):
-        files = ordered(self.SHOW, "i 1", "x b.odrg", "i 2", "x A.ODRG")
-        script = asked(0, "list", "play all") + asked(120) + asked(4220, "status") + ["drive pull"] + asked(4240, "status")
+    def test_the_playlist_goes_on_after_a_card_animation_that_left(self):
+        files = ordered(self.SHOW, "i 1", "i 2")
+        script = asked(0, "play 60002") + asked(120) + asked(2220, "status") + ["drive pull"] + asked(2240, "status")
         run = self.run_with_drive(files, script)
-        ids = {item["file"]: item["id"] for item in replies(run)[0]["items"]}
-        self.assertEqual(turns(run), [ids["b.odrg"], 2])
+        self.assertEqual(turns(run), [60002, 1])
 
     def test_every_animation_item_of_list_says_whether_it_is_external(self):
         files = ordered(dict(self.SHOW, **{"show.json": json.dumps({**json.loads(self.SHOW["show.json"]), "items": json.loads(self.SHOW["show.json"])["items"] + [{"id": 9, "cycle": [1, 2], "seconds": 3}]})}), "i 2")
@@ -200,7 +189,7 @@ class OrderGet(unittest.TestCase):
 
     def test_it_is_refused_as_list_is(self):
         # While the player reads the installed animations after a start, both answer.
-        run = support.start(animations(2), asked(0, "list", "order get", "order get x", "order get 65536", "order get 1 2", "order", "order put"), check_first=False)
+        run = support.start(animations(2), asked(0, "list", "order get", "order get x", "order get 4294967296", "order get 1 2", "order", "order put"), check_first=False)
         listed, order = replies(run)[:2]
         self.assertIn(None, [item["bytes"] for item in listed["items"]])
         self.assertEqual((order["ids"], order["next"]), ([1, 2], None))
@@ -277,21 +266,18 @@ class OrderMove(unittest.TestCase):
         self.assertEqual(order_ids(runs[0])[0], [1, 3, 2])
         self.assertEqual(kept["order.txt"], (HEADER + "i 1\ni 3\ni 2\n").encode())
 
-    def test_moves_of_external_animations_keep_absent_entries_in_their_places(self):
+    def test_a_drives_file_is_not_moved_and_a_move_drops_the_lines_of_files(self):
         drive = {"b.odrg": loop_of(4, 5), "A.ODRG": loop_of(4, 6), "c d.odrg": loop_of(4, 7)}
         files = ordered(animations(2), "x gone.odrg", "i 2", "x b.odrg", "i 1")
         with a_drive(drive) as top:
             options = ["--drive", top]
-            first = support.start(files, asked(0, "list"), options)
-            ids = {item["file"]: item["id"] for item in replies(first)[0]["items"]}
-            runs, kept = moved(files, (ids["A.ODRG"], 2), (1, ids["b.odrg"]), options=options)
-            self.assertEqual(order_ids(runs[0])[0], [ids["A.ODRG"], 2, ids["b.odrg"], 1, ids["c d.odrg"]])
-            self.assertEqual(order_ids(runs[1])[0], [ids["A.ODRG"], 2, 1, ids["b.odrg"], ids["c d.odrg"]])
-        self.assertEqual(kept["order.txt"], (HEADER + "x gone.odrg\nx A.ODRG\ni 2\ni 1\nx b.odrg\nx c d.odrg\n").encode())
-        # Without the card its entries keep their places, and a move keeps them.
-        runs, kept = moved(kept, (1, 2))
-        self.assertEqual(order_ids(runs[0])[0], [1, 2])
-        self.assertEqual(kept["order.txt"], (HEADER + "x gone.odrg\nx A.ODRG\ni 1\ni 2\nx b.odrg\nx c d.odrg\n").encode())
+            current = revision(files, options)
+            refused = support.start(files, asked(0, f"order move {current} 60001 2"), options)
+            self.assertEqual(replies(refused), [refusal("read-only")])
+            # A show's animation put before a file of the drive goes last among the show's.
+            runs, kept = moved(files, (2, 60002), options=options)
+            self.assertEqual(order_ids(runs[0])[0], [1, 2, 60001, 60002, 60003])
+        self.assertEqual(kept["order.txt"], (HEADER + "i 1\ni 2\n").encode())
 
     def test_entries_of_ids_no_item_has_are_dropped_when_the_file_is_written(self):
         runs, kept = moved(ordered(animations(2), "i 7", "i 2", "i 1"), (1, 2))
@@ -317,7 +303,7 @@ class OrderMove(unittest.TestCase):
             f"order move {current} 1": "bad-argument",
             f"order move x 1 2": "bad-argument",
             f"order move {current} 0 2": "bad-argument",
-            f"order move {current} 70000 2": "bad-argument",
+            f"order move {current} 4294967296 2": "bad-argument",
             f"order move {current} 1 x": "bad-argument",
             f"order move {current} 1 0": "bad-argument",
             f"order move 4294967296 1 2": "bad-argument",
@@ -432,20 +418,14 @@ class UnavailableAnimations(unittest.TestCase):
         self.assertEqual(order_ids(runs[0])[0], [3, 1, 2])
         self.assertEqual(kept["order.txt"], (HEADER + "i 3\ni 1\ni 2\n").encode())
 
-    def test_a_file_of_the_card_left_out_for_a_fault_is_in_the_order_and_can_be_moved(self):
+    def test_a_file_of_the_card_left_out_for_a_fault_is_in_the_order_in_its_place(self):
         drive = {"b.odrg": loop_of(4, 5), "zz.odrg": loop_of(4, 6)[:-3]}
-        files = ordered(animations(2), "x zz.odrg", "i 2", "x b.odrg", "i 1")
+        files = ordered(animations(2), "i 2", "i 1")
         with a_drive(drive) as top:
-            options = ["--drive", top]
-            run = support.start(files, asked(0, "list", "order get"), options)
-            listed = replies(run)[0]["items"]
-            ids = {item["file"]: item["id"] for item in listed}
-            self.assertEqual([item["file"] for item in listed if "fault" in item], ["zz.odrg"])
-            self.assertEqual(order_ids(run)[0], [ids["zz.odrg"], 2, ids["b.odrg"], 1])
-            runs, kept = moved(files, (ids["zz.odrg"], "end"), options=options)
-            self.assertEqual(replies(runs[0])[0], {"ok": True})
-            self.assertEqual(order_ids(runs[0])[0], [2, ids["b.odrg"], 1, ids["zz.odrg"]])
-        self.assertEqual(kept["order.txt"], (HEADER + "i 2\nx b.odrg\ni 1\nx zz.odrg\n").encode())
+            run = support.start(files, asked(0, "list", "order get"), ["--drive", top])
+        listed = replies(run)[0]["items"]
+        self.assertEqual([(item["id"], item["file"]) for item in listed if "fault" in item], [(60002, "zz.odrg")])
+        self.assertEqual(order_ids(run)[0], [2, 1, 60001, 60002])
 
 
 if __name__ == "__main__":

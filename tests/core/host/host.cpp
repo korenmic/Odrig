@@ -320,8 +320,7 @@ public:
     }
 
     // Lists the folder `odrig` of the drive as it is now: the paths of its animation files
-    // and of its sub-folders' to three levels, depth first, at most 256 files and 32
-    // sub-folders, a folder counted with its uncounted ancestors when its first file is kept.
+    // and of its sub-folders' to three levels, depth first, every one of them.
     void list_drive() {
         drive_names_.clear();
         const std::string root = options_.drive + "/odrig";
@@ -347,21 +346,7 @@ public:
             }
         }
         std::sort(found.begin(), found.end(), before);
-        std::vector<std::string> counted;
-        for (const std::string &path : found) {
-            std::vector<std::string> added;
-            for (size_t slash = path.find('/'); slash != std::string::npos; slash = path.find('/', slash + 1)) {
-                const std::string folder = path.substr(0, slash);
-                if (std::find(counted.begin(), counted.end(), folder) == counted.end()) {
-                    added.push_back(folder);
-                }
-            }
-            if (drive_names_.size() >= 256 || counted.size() + added.size() > 32) {
-                break;
-            }
-            counted.insert(counted.end(), added.begin(), added.end());
-            drive_names_.push_back(path);
-        }
+        drive_names_ = found;
     }
 
     void pull() {
@@ -766,10 +751,12 @@ private:
         Host &host = *static_cast<Host *>(ctx);
         host.check_name(name);
         // A file is read from its start, each call where the last for that file ended; only
-        // `read`, a command, begins where it is asked to.
+        // a command, and the files of a drive's index and of its rebuild, begin where they
+        // are asked to.
         const auto ended = host.read_at_ends_.find(name);
         const bool goes_on = ended != host.read_at_ends_.end() && offset == ended->second;
-        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_)) {
+        const bool anywhere = std::strncmp(name, "drive/index-", 12) == 0 || std::strncmp(name, "drive/rebuild", 13) == 0;
+        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
         }
         std::string content;
@@ -1161,7 +1148,9 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
         // A text or a widget is read and checked whole, as the core reads it.
         std::vector<uint8_t> payload(odrig::kLargestTextPayload);
-        reason = odrig::drawn_read(&file, content, payload.data());
+        std::vector<uint8_t> pixels(3u * content.width * content.height);
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), pixels.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -1244,8 +1233,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         reason = odrig::kUnknownType;
     }
     std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    // A picture clock's picture: its palette indices, as the player's pixel buffer holds them.
+    std::vector<uint8_t> indices(3u * content.width * content.height);
     if (reason == odrig::kNone) {
-        reason = odrig::drawn_read(&file, content, payload.data());
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), indices.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     }
     file.close();
     if (reason != odrig::kNone) {
@@ -1253,9 +1245,17 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         return 0;
     }
     std::vector<uint8_t> pixels(3u * content.width * content.height);
+    std::vector<uint8_t> layer(static_cast<size_t>(content.width) * content.height);
     for (const std::string &time : times) {
         const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
-        if (content.type == odrig::kTypeText) {
+        if (content.type == odrig::kTypeWidget && odrig::clock_is_picture(payload.data())) {
+            // The picture through its palette, and the layer over it, as the LEDs show it.
+            odrig::clock_overlay(payload.data(), seed, content.width, content.height, ms, layer.data());
+            for (size_t at = 0; at < layer.size(); ++at) {
+                const uint8_t index = layer[at] != 0 ? static_cast<uint8_t>(layer[at] - 1) : indices[at];
+                std::memcpy(&pixels[3 * at], decoder.palette + 3u * index, 3);
+            }
+        } else if (content.type == odrig::kTypeText) {
             odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
         } else {
             odrig::clock_draw(payload.data(), seed, content.width, content.height, ms, pixels.data());

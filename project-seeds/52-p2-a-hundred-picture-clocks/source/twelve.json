@@ -1,0 +1,175 @@
+[
+ {
+  "name": "time-original-1-two-times",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 13869,
+  "palette": [
+   "#000000",
+   "#d6e3e8",
+   "#51e6df",
+   "#354953"
+  ]
+ },
+ {
+  "name": "time-original-2-never-zero",
+  "seconds": 16,
+  "frame_ms": 50,
+  "bytes": 1443,
+  "palette": [
+   "#000000",
+   "#d6e3e8",
+   "#ffc577",
+   "#51e6df",
+   "#354953"
+  ]
+ },
+ {
+  "name": "time-original-3-sand-goes-back-up",
+  "seconds": 16,
+  "frame_ms": 50,
+  "bytes": 9695,
+  "palette": [
+   "#000000",
+   "#51e6df",
+   "#354953",
+   "#d6e3e8",
+   "#ffc577"
+  ]
+ },
+ {
+  "name": "time-original-4-we-were-here",
+  "seconds": 10,
+  "frame_ms": 50,
+  "bytes": 4472,
+  "palette": [
+   "#000000",
+   "#354953",
+   "#51e6df",
+   "#d6e3e8",
+   "#ef80bd",
+   "#ffc577"
+  ]
+ },
+ {
+  "name": "time-original-5-every-row-another-time",
+  "seconds": 720,
+  "frame_ms": 50,
+  "bytes": 471095,
+  "palette": [
+   "#000000",
+   "#d6e3e8",
+   "#51e6df",
+   "#354953",
+   "#ef80bd"
+  ]
+ },
+ {
+  "name": "time-original-6-the-clock-melts",
+  "seconds": 90,
+  "frame_ms": 50,
+  "bytes": 23875,
+  "palette": [
+   "#000000",
+   "#51e6df",
+   "#d6e3e8",
+   "#ffc577"
+  ]
+ },
+ {
+  "name": "time-standalone-1-two-times",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 22349,
+  "palette": [
+   "#000000",
+   "#567999",
+   "#16263b",
+   "#42e9ff",
+   "#f1f5ff",
+   "#a5bad6",
+   "#44617f",
+   "#899eb3"
+  ]
+ },
+ {
+  "name": "time-standalone-2-never-zero",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 7295,
+  "palette": [
+   "#000000",
+   "#ff4667",
+   "#16263b",
+   "#253047",
+   "#42e9ff",
+   "#899eb3",
+   "#f1f5ff",
+   "#ff5dbd"
+  ]
+ },
+ {
+  "name": "time-standalone-3-reverse-hourglass",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 5111,
+  "palette": [
+   "#000000",
+   "#ffc95a",
+   "#16263b",
+   "#42e9ff",
+   "#ff8654",
+   "#f1f5ff",
+   "#899eb3",
+   "#65ffd4"
+  ]
+ },
+ {
+  "name": "time-standalone-4-we-were-here",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 19248,
+  "palette": [
+   "#000000",
+   "#16263b",
+   "#2d3867",
+   "#42e9ff",
+   "#30437d",
+   "#f1f5ff",
+   "#253047",
+   "#a68dff"
+  ]
+ },
+ {
+  "name": "time-standalone-5-time-bands",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 10263,
+  "palette": [
+   "#000000",
+   "#ffc95a",
+   "#42e9ff",
+   "#ff5dbd",
+   "#16263b",
+   "#f1f5ff",
+   "#a5bad6",
+   "#b1caff"
+  ]
+ },
+ {
+  "name": "time-standalone-6-melting-clock",
+  "seconds": 18,
+  "frame_ms": 50,
+  "bytes": 25491,
+  "palette": [
+   "#000000",
+   "#a68dff",
+   "#16263b",
+   "#ffc95a",
+   "#f1f5ff",
+   "#42e9ff",
+   "#594b83",
+   "#253047"
+  ]
+ }
+]

@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"left":86400}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"left":86400}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
@@ -81,7 +81,7 @@ class EveryErrorCode(Commands):
     def test_bad_argument(self):
         lines = [
             "play", "play ", "play  1", "play 1 ", "play 1 2", "play a", "play 1a", "play a1", "play -1", "play +1", "play 1.0", "play 1e0",
-            "play 0x1", "play 0", "play 00", "play 65536", "play 99999", "play 4294967297", "play " + "9" * 30,
+            "play 0x1", "play 0", "play 00", "play 4294967296", "play 99999999999", "play 4294967297", "play " + "9" * 30,
             "brightness", "brightness ", "brightness 256", "brightness -1", "brightness 1 1", "brightness  1", "brightness 12.5", "brightness " + "1" * 30,
             "on 1", "on ", "off 0", "off  ", "status 1", "status ", "status  ", "status status",
             "play 1 2 3 4", "play 1 2 3 4 5", "play 1 2 3 4 5 6 7 8 9", "status 1 2 3 4 5", "on" + " " * 5, "off" + " x" * 1000,
@@ -140,7 +140,7 @@ class EveryErrorCode(Commands):
             "play 1 2 3 4 5 6": "bad-argument",
             "play x": "bad-argument",
             "play 0": "bad-argument",
-            "play 65536": "bad-argument",
+            "play 4294967296": "bad-argument",
             "play 1 ": "bad-argument",
             "play 99": "show-invalid",
             "play 1": "show-invalid",

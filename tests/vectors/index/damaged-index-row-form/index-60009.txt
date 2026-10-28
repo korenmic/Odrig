@@ -1,0 +1,2 @@
+60004 g 00c0ffee 4096 60 60 8000 frames night/comet.odrg                                                                                                                           
+60010 d 1 night/deep                                                                                                                                                               

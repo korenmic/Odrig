@@ -19,11 +19,16 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // `link` is "checking" until the first request has ended, then "answers" or "no-answer",
 // with the Failure in `failure`. `status` is the newest reply to `status`, `heardAt` the
 // time of the newest reply of any kind, `since` the time the app began with this address,
-// and `answered` whether the target of this address has answered at least once.
-// `animations` is the animation items of the newest complete list, in the order of the
-// show, each as `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the ids of
-// its cycles, and `folders` its folders of the card, each `{id, playlist}` with its path,
-// in the order they play. `space` holds internal and external capacity from the newest reply, or null.
+// and `answered` whether the target of this address has answered at least once. `level` is
+// the level of the card's folders the list is of, `{path, id}`, "" and null for the root,
+// which holds the show's items too; nothing of another level is kept. `animations` is the
+// animation items of the level's newest complete list, in its order, each as
+// `{id, file, bytes}` with optional `ignored`, or null while there is none; `cycles` is the
+// ids of its cycles, and `folders` its folders of the card, each `{id, playlist, files}` with
+// its path and the number of its own files, in the order they play. `rootNames` holds what
+// the root's newest list named, `{ids, files}`, the ids and the file names of the show's
+// items and of the root's files, which an upload chooses its id and its name against, or
+// null while none is known. `space` holds internal and external capacity from the newest reply, or null.
 // `listBusy` says whether the newest `list` request was answered `busy`. `order` is the
 // saved playlist order that goes with the newest list, `{ids, revision}`, or null while
 // there is none; `orderKnown` is false when the target has no saved order, an older one.
@@ -33,7 +38,8 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
 // from before either. `statusCount` counts the replies to `status`, so that a screen can wait
 // for the first one after a command.
-export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], folders: [], space: null,
+export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, level: {path: "", id: null}, rootNames: null,
+  animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
   catalogNone: false, pagesRefused: false, statusCount: 0};
 
@@ -51,6 +57,13 @@ let listTimer = null;
 // The list that is being asked for in parts: the items so far and the position to ask
 // for next. Null when none is.
 let listing = null;
+// The folders entered from the root down to the level shown, each `{path, id}`.
+const trail = [];
+// Whether the root's names are due while another level is shown, and the root's list that
+// is being asked for in parts for them: the ids and the files so far and the position to
+// ask for next.
+let rootDue = false;
+let rooting = null;
 // The animation a status named that the list did not have, for which the list was asked.
 let askedFor = null;
 // Whether the saved order is due after a complete list, and the order that is being asked
@@ -147,15 +160,17 @@ async function askStatus() {
     state.status = reply;
     state.statusCount += 1;
     const named = reply.animation;
-    if (named !== null && state.animations !== null && named !== askedFor && !state.animations.some((animation) => animation.id === named)) {
-      // The target plays an animation the list does not have.
+    const here = typeof reply.file === "string" && parentOf(reply.file) === state.level.path && (state.level.id === null || reply.file.includes("/"));
+    if (named !== null && state.animations !== null && named !== askedFor && here && !state.animations.some((animation) => animation.id === named)) {
+      // The target plays an animation of the level shown that its list does not have.
       askedFor = named;
       listDue = true;
     }
     const playing = reply.playing;
-    if (typeof playing === "number" && state.animations !== null && playing !== askedFor && !state.cycles.includes(playing) &&
-      !state.folders.some((folder) => folder.id === playing)) {
-      // The target plays a playlist the list does not have: a folder of a card just put in.
+    if (typeof playing === "number" && typeof reply.playlist === "string" && parentOf(reply.playlist) === state.level.path && state.animations !== null &&
+      playing !== askedFor && !state.folders.some((folder) => folder.id === playing)) {
+      // The target plays a playlist of this level that its list does not have: a folder of a
+      // card just put in.
       askedFor = playing;
       listDue = true;
     }
@@ -216,15 +231,28 @@ async function askSpace() {
   changed();
 }
 
-// Asks for one part of the list. The new list takes the place of the old one only when
-// its last part has come; when a part fails, the old list stays.
+// The parent of a path of the card: the part before its last `/`, "" for the root.
+function parentOf(path) {
+  return path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+}
+
+// What an upload chooses its id and its name against, from the items of the root's list.
+function namesOf(items) {
+  const named = items.filter((item) => typeof item.playlist !== "string");
+  return {ids: named.map((item) => item.id), files: named.filter((item) => typeof item.file === "string").map((item) => item.file)};
+}
+
+// Asks for one part of the list of the level shown. The new list takes the place of the
+// old one only when its last part has come; when a part fails, the old list stays. A
+// folder that is no more brings the list to the root.
 async function askListPart() {
   const asked = target;
+  const level = state.level;
   const part = listing === null ? {items: [], from: 0} : listing;
   listing = null;
   try {
-    const reply = await commands.list(part.from);
-    if (asked !== target) {
+    const reply = await commands.list(part.from, level.id);
+    if (asked !== target || level !== state.level) {
       return;
     }
     heard();
@@ -237,6 +265,9 @@ async function askListPart() {
       state.animations = items.filter((item) => typeof item.file === "string");
       state.folders = items.filter((item) => typeof item.playlist === "string");
       state.cycles = items.filter((item) => item.cycle === true).map((item) => item.id);
+      if (level.id === null) {
+        state.rootNames = namesOf(items);
+      }
       orderDue = state.orderKnown;
       ordering = null;
       if (!state.orderKnown) state.order = null;
@@ -244,10 +275,16 @@ async function askListPart() {
       listAgainLater();
     }
   } catch (error) {
-    if (asked !== target) {
+    if (asked !== target || level !== state.level) {
       return;
     }
-    if (error instanceof commands.Refusal && error.code === "busy") {
+    if (error instanceof commands.Refusal && error.code === "unknown-id" && level.id !== null) {
+      // The folder is no more, with its card or after a removal: the root is shown.
+      heard();
+      trail.length = 0;
+      toLevel();
+      return;
+    } else if (error instanceof commands.Refusal && error.code === "busy") {
       // The target has just started and still reads what it has installed. What is
       // known of its list stays, and the list is asked for again soon.
       heard();
@@ -274,11 +311,12 @@ async function askListPart() {
 // list is asked for again.
 async function askOrderPart() {
   const asked = target;
+  const level = state.level;
   const part = ordering === null ? {ids: [], from: 0, revision: null} : ordering;
   ordering = null;
   try {
-    const reply = await commands.orderGet(part.from);
-    if (asked !== target) {
+    const reply = await commands.orderGet(part.from, level.id);
+    if (asked !== target || level !== state.level) {
       return;
     }
     heard();
@@ -300,7 +338,7 @@ async function askOrderPart() {
       }
     }
   } catch (error) {
-    if (asked !== target) {
+    if (asked !== target || level !== state.level) {
       return;
     }
     if (error instanceof commands.Refusal) {
@@ -629,6 +667,10 @@ function due() {
     listWaited = false;
     return askListPart;
   }
+  if (rootDue || rooting !== null) {
+    rootDue = false;
+    return askRootPart;
+  }
   if (orderDue || ordering !== null) {
     orderDue = false;
     return askOrderPart;
@@ -681,6 +723,11 @@ export function begin() {
   state.heardAt = null;
   state.since = Date.now();
   state.answered = false;
+  trail.length = 0;
+  state.level = {path: "", id: null};
+  state.rootNames = null;
+  rootDue = false;
+  rooting = null;
   state.animations = null;
   state.cycles = [];
   state.folders = [];
@@ -723,7 +770,72 @@ export function showing(name) {
   if ((showScreen || storageScreen) && (!was || storageScreen !== wasStorage)) {
     spaceDue = true;
   }
+  if (storageScreen && !wasStorage && state.answered && state.level.id !== null) {
+    // An upload chooses its id and its name against the root's, which another level lacks.
+    rootDue = true;
+  }
   next();
+}
+
+// Shows another level of the card's folders: `folder`, `{id, playlist}`, a folder of the
+// level shown, entered; or with `back` the level above. Its list is read at once, and
+// nothing of the level left is kept.
+export function enter(folder) {
+  trail.push({path: folder.playlist, id: folder.id});
+  toLevel();
+}
+
+export function back() {
+  trail.pop();
+  toLevel();
+}
+
+function toLevel() {
+  const top = trail[trail.length - 1];
+  state.level = top === undefined ? {path: "", id: null} : {path: top.path, id: top.id};
+  state.animations = null;
+  state.folders = [];
+  state.cycles = [];
+  state.order = null;
+  state.orderVersion += 1;
+  listing = null;
+  ordering = null;
+  orderDue = false;
+  listDue = true;
+  askedFor = null;
+  changed();
+  next();
+}
+
+// Asks for one part of the root's list for the names an upload chooses against, while
+// another level is shown; the list shown stays as it is.
+async function askRootPart() {
+  const asked = target;
+  const part = rooting === null ? {items: [], from: 0} : rooting;
+  rooting = null;
+  try {
+    const reply = await commands.list(part.from, null);
+    if (asked !== target) {
+      return;
+    }
+    heard();
+    const items = part.items.concat(reply.items);
+    if (reply.next !== null) {
+      rooting = {items, from: reply.next};
+    } else {
+      state.rootNames = namesOf(items);
+    }
+  } catch (error) {
+    if (asked !== target) {
+      return;
+    }
+    if (error instanceof commands.Refusal) {
+      heard();
+    } else {
+      failed(error);
+    }
+  }
+  changed();
 }
 
 // Takes something the operator asked for. A brightness that still waits is replaced by a
