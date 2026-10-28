@@ -14,7 +14,7 @@ function rgba(colour) {
 
 // The colour behind an element: the backgrounds up the tree, each laid over the one
 // below it by its opacity, down to the first that is not see-through.
-function behind(view, element) {
+export function behind(view, element) {
   const layers = [];
   for (let at = element; at !== null; at = at.parentElement) {
     const colour = rgba(view.getComputedStyle(at).backgroundColor);
