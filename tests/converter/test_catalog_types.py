@@ -1,6 +1,7 @@
 """The type and the loop of each file in a catalog: ODRG files, and ODRGX containers of
 frames, of text and of a widget."""
 
+import os
 import pathlib
 import tempfile
 import unittest
@@ -84,6 +85,9 @@ class Names(unittest.TestCase):
                                          "bad./h.odrg", "a/.hid.odrg", "zz/only/sub/k.odrg")}
         wanted = ["C.ODRGX", "a.odrg", "b.odrgx", "a/z.odrg", "a/deep/w.odrg", "a/deep/deeper/v.odrg", "a b/x.odrg", "a-b/y.odrg", "zz/only/sub/k.odrg"]
         self.assertEqual(catalog.MemoryStorage(files).names(), wanted)
+        if os.name == "nt":
+            # Windows drops a trailing dot from a folder's name, so a folder bad. cannot be made there.
+            del files["bad./h.odrg"]
         with tempfile.TemporaryDirectory() as folder:
             for name in files:
                 path = pathlib.Path(folder, *name.split("/"))

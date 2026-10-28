@@ -16,6 +16,7 @@ It needs only Python's own library and runs on macOS, Linux and Windows.
 """
 
 import argparse
+import ctypes
 import json
 import os
 import pathlib
@@ -147,6 +148,9 @@ def end(pids, seconds=2.0):
 
 
 def alive(pid):
+    if WINDOWS:
+        listed = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"], capture_output=True, text=True)
+        return f'"{pid}"' in listed.stdout
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -154,6 +158,43 @@ def alive(pid):
     except PermissionError:
         return True
     return True
+
+
+class Job:
+    """A job object of Windows, whose system shows no process's environment: each worker is
+    put in it, every process a worker starts joins it, and what is still in it once the
+    workers have ended is what the run's tests left running."""
+
+    def __init__(self):
+        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.kernel.CreateJobObjectW.restype = ctypes.c_void_p
+        self.kernel.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self.kernel.QueryInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
+        self.handle = self.kernel.CreateJobObjectW(None, None)
+
+    def add(self, process):
+        self.kernel.AssignProcessToJobObject(self.handle, int(process._handle))
+
+    def members(self):
+        class Listed(ctypes.Structure):
+            _fields_ = [("assigned", ctypes.c_uint32), ("listed", ctypes.c_uint32), ("ids", ctypes.c_size_t * 4096)]
+
+        found = Listed()
+        if not self.kernel.QueryInformationJobObject(self.handle, 3, ctypes.byref(found), ctypes.sizeof(found), None):
+            return []
+        return [found.ids[index] for index in range(found.listed)]
+
+    def left(self):
+        """The members whose parent is not one, such as a Python that a launcher started:
+        ending one with its tree ends what it started."""
+        members = self.members()
+        if not members:
+            return []
+        query = " OR ".join(f"ProcessId={pid}" for pid in members)
+        done = subprocess.run(["powershell", "-NoProfile", "-Command", f"Get-CimInstance Win32_Process -Filter '{query}' | ForEach-Object {{ \"$($_.ProcessId) $($_.ParentProcessId)\" }}"],
+                              capture_output=True, text=True)
+        parents = dict(tuple(map(int, line.split())) for line in done.stdout.splitlines() if len(line.split()) == 2)
+        return [pid for pid in members if parents.get(pid) not in members]
 
 
 def sweep(out):
@@ -176,6 +217,7 @@ class Runner:
         self.summary = {}
         self.failed = False
         self.env = dict(os.environ, ODRIG_RUN=self.run_id, PYTHONUNBUFFERED="1")
+        self.job = Job() if WINDOWS else None
 
     def say(self, line=""):
         print(line, file=self.out, flush=True)
@@ -385,7 +427,7 @@ class Runner:
         if not serial:
             queue.sort(key=lambda job: -job["expected"])
         self.execute(queue, 1 if serial else self.arguments.workers)
-        left = strays(self.run_id)
+        left = [(pid, "", "") for pid in self.job.left()] if WINDOWS else strays(self.run_id)
         if left:
             end([pid for pid, _, _ in left])
             self.say(f"swept {len(left)} processes this run's tests left running")
@@ -407,6 +449,8 @@ class Runner:
                 job["handle"] = open(log, "w", encoding="utf-8")
                 job["began"] = time.monotonic()
                 job["process"] = subprocess.Popen(job["command"], cwd=self.root, env=self.env_of(job["suite"]), stdout=job["handle"], stderr=subprocess.STDOUT)
+                if self.job:
+                    self.job.add(job["process"])
                 self.summary.setdefault(name, {"began": job["began"], "jobs": []})
                 running.append(job)
             time.sleep(0.1)
@@ -495,7 +539,10 @@ class Runner:
         self.say(f"{'FAILED' if self.failed else 'OK'}: wall time {wall:.0f} s ({wall / 60:.1f} min)")
 
 
-def main(argv=None, root=ROOT, suites=SUITES, out=sys.stdout):
+def main(argv=None, root=ROOT, suites=SUITES, out=None):
+    if out is None:
+        out = sys.stdout
+        out.reconfigure(encoding="utf-8")
     arguments = parser().parse_args(argv)
     if arguments.workers < 1:
         raise SystemExit("error: --workers takes 1 or more")

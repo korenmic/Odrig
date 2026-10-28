@@ -58,7 +58,8 @@ class Stream(unittest.TestCase):
         position = json.loads(events[kinds.index("position")].data)
         self.assertEqual(sorted(position), ["animation", "length", "start", "turn"])
         self.assertEqual(position["animation"], 1)
-        self.assertEqual(position["start"] % 20, 0)
+        hello = json.loads(events[0].data)
+        self.assertEqual((position["start"] - hello["t0"]) % 20, 0, (position, hello["t0"]))
         self.assertEqual(position["turn"], position["start"])
 
     def test_100_refreshes_in_a_row_each_equal_the_reference_for_their_timestamp(self):

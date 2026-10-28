@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import shutil
 import tempfile
@@ -42,8 +43,12 @@ class TheOption(unittest.TestCase):
 
     def test_the_list_walks_the_sub_folders_depth_first_to_three_levels(self):
         folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b""})
-        for name in ("night/comet.odrg", "night/deep/x.odrg", "night/deep/deeper/y.odrg", "night/deep/deeper/more/z.odrg", "a b/q.odrg", "a-b/r.odrg",
-                     ".h/s.odrg", "System Volume Information/t.odrg", "bad./u.odrg", "night/.hidden.odrg", "only/sub/k.odrg"):
+        names = ["night/comet.odrg", "night/deep/x.odrg", "night/deep/deeper/y.odrg", "night/deep/deeper/more/z.odrg", "a b/q.odrg", "a-b/r.odrg",
+                 ".h/s.odrg", "System Volume Information/t.odrg", "bad./u.odrg", "night/.hidden.odrg", "only/sub/k.odrg"]
+        if os.name == "nt":
+            # Windows drops a trailing dot from a folder's name, so a folder bad. cannot be made there.
+            names.remove("bad./u.odrg")
+        for name in names:
             support.installed(folder.joinpath(*name.split("/")[:-1]), {name.split("/")[-1]: b""})
         (folder / "empty").mkdir()
         self.assertEqual(host.drive_list(folder), ["A.ODRG", "b.odrg", "a b/q.odrg", "a-b/r.odrg", "night/comet.odrg", "night/deep/x.odrg",

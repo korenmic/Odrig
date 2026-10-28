@@ -2,9 +2,11 @@ import io
 import json
 import pathlib
 import shutil
+import sys
 import tempfile
 import textwrap
 import unittest
+from unittest import mock
 
 from tests import run
 
@@ -183,6 +185,28 @@ class Leaves(unittest.TestCase):
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
         pathlib.Path("left.pid").write_text(str(child.pid))
 """
+
+
+NAMED = r"""
+import unittest
+
+
+class Named(unittest.TestCase):
+    def test_named(self):
+        self.fail("\u00e9t\u00e9 \u05e9")
+"""
+
+
+class Writing(unittest.TestCase):
+    def test_the_output_is_utf_8_whatever_the_encoding_of_the_console(self):
+        root = standin_root(self, {"tests/beta/test_named.py": NAMED})
+        written = io.BytesIO()
+        console = io.TextIOWrapper(written, encoding="cp1252")
+        with mock.patch.object(sys, "stdout", console):
+            status = run.main(["--suites", "beta"], root=root, suites=STANDIN)
+            console.flush()
+        self.assertEqual(status, 1)
+        self.assertIn("\u00e9t\u00e9 \u05e9".encode("utf-8"), written.getvalue())
 
 
 class Sweeping(unittest.TestCase):

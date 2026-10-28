@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 
 from . import support
@@ -97,17 +98,19 @@ class TheLastFault(unittest.TestCase):
 
     def test_a_drives_file_is_named_while_it_is_checked_and_in_the_fault(self):
         from .test_drive import a_drive
+        # Windows forbids a quote in a file name, so there the name has an apostrophe.
+        name = "z'z.odrg" if os.name == "nt" else 'z"z.odrg'
         files = show_of([{"id": 1, "file": "a.odrg"}], {"a.odrg": good(1)})
         # The installed file takes 7 steps and the refreshes 0, 1, 2, 3 and 4 in a row: the
         # check is in the drive's file at the fifth refresh.
         script = [f"poll {T0 + 20 * step}" for step in range(5)] + [support.line(T0 + 80, "status")]
         script += [f"poll {T0 + 100 + 20 * step}" for step in range(10)] + [support.line(T0 + 300, "status"), support.line(T0 + 300, "fault")]
-        with a_drive({"z\"z.odrg": cut_clip(10, 3)}) as top:
+        with a_drive({name: cut_clip(10, 3)}) as top:
             run = support.start(files, script, ["--drive", top], check_first=False)
         during, after, fault = replies(run)
-        self.assertEqual((during["readiness"], during["checking"]), ("checking", 'z"z.odrg'))
+        self.assertEqual((during["readiness"], during["checking"]), ("checking", name))
         self.assertEqual((after["readiness"], after["checked"], after["unavailable"]), ("degraded", 2, 1))
-        self.assertEqual((fault["fault"]["work"], fault["fault"]["file"]), ("drive", 'z"z.odrg'))
+        self.assertEqual((fault["fault"]["work"], fault["fault"]["file"]), ("drive", name))
 
 
 
