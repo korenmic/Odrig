@@ -11997,3 +11997,17 @@ programs, and each of them is still the one the commands start: the generators t
 names are exactly `hello_world`, `dvd_bounce` and `dense`, however many lines run them.
 
 **Resolution.** `converter/tests/docs.test.js`.
+
+## The internal catalog's rebuild through the emulator, answered busy
+
+**Question.** On Windows the emulator's test of `catalog rebuild internal` was answered
+`busy` most times, alone too. Is the core's refusal wrong there?
+
+**Answer.** No. The test starts the emulator with a card and sends the rebuild at once;
+the core reads the drive's catalog for the first frames after the start, and
+`docs/commands.md` has `catalog rebuild` answer `busy` while it does. Where the suite passed,
+the tool's line came after that reading; on Windows it often came during it, with the drive's state
+`loading`. The test now waits until `status` names nothing it checks, the drive's catalog
+included, as an operator's tool would, and the core is as it was.
+
+**Resolution.** `tests/emulator/test_catalog.py`.

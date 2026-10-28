@@ -52,6 +52,14 @@ class WithACard(unittest.TestCase):
                 return reply
             time.sleep(0.1)
 
+    def checked(self, emulator):
+        """Waits until the start's check is over, the drive's catalog read with it, during
+        which `catalog rebuild` answers `busy`."""
+        deadline = time.monotonic() + WAIT_SECONDS
+        while json.loads(emulator.command("status"))["checking"] is not None:
+            self.assertLess(time.monotonic(), deadline, "the start's check did not end")
+            time.sleep(0.05)
+
     def card_files(self):
         return {name: path.read_bytes() for name, path in ((path.name, path) for path in (self.top / "odrig").iterdir())}
 
@@ -203,6 +211,7 @@ class Commands(WithACard):
 
     def test_the_internal_catalog_is_rebuilt_through_the_emulator_as_the_pc_library_rebuilds_it(self):
         emulator = self.start()
+        self.checked(emulator)
         result = support.run_tool(*support.line_target(emulator), "catalog", "rebuild", "internal")
         self.assertEqual((result.status, json.loads(result.out)), (0, {"ok": True}))
         self.catalog_when(emulator, lambda reply: reply["internal"]["state"] == "ok" and reply["rebuild"] is None)
