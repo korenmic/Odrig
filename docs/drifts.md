@@ -11257,3 +11257,27 @@ the same day?
 **Resolution.** `app/www/style.css`; `tests/app/page/reading.js`,
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
+
+## Seed 52: the inventory, its motions and the subcommand `clocks`
+
+**Question.** The seed asks for one inventory that the converter reads, and for the motions
+of the tiles that show no time, of the kinds it names, and leaves their form, the reading
+and the place of the code to the spec. What are they?
+
+**Answer.** A subcommand of the converter, `clocks INVENTORY.json --out DIR`, so that the
+files can be made again from a clone, with `converter/lib/inventory.js` and
+`converter/lib/motion.js` beside the other modules. The inventory holds each tile's
+palette and picture as a picture clock's source does, rows of palette digits, so it needs
+no reader of images; a tile's base picture is that picture. A motion is up to 8 parts,
+each working on what the ones before it made: a level that falls and rises again in a
+triangle over the loop, so that it loops without a jump; a flicker of 2 or 3 recolourings;
+a pulse through up to 8 recolourings and back; a turn and a swing of the pixels of some
+colours about a point. Turns and swings are made in whole numbers with the sine table of
+the clocks, so the same inventory gives the same bytes on every computer, and they keep
+the palette's colours, as a recolouring does: no motion makes a colour. Every file is made
+before one is written. The design's `from` and `to` of a level are named `start` and
+`half`, its share at the start of the loop and at its half: the library's test of its own
+imports reads a quoted `from` as one.
+
+**Resolution.** `converter/lib/motion.js`, `converter/lib/inventory.js`,
+`converter/cli/clocks.js`; `docs/converter.md`, "clocks".

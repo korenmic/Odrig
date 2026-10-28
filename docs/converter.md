@@ -15,6 +15,7 @@ It is written in JavaScript, lives in the folder `converter/`, and has two parts
 | [`check`](#check) | Says whether a JSON frames or ODRG file is valid and what it holds. |
 | [`pack`](#pack) | Builds the folder that is installed for a show. |
 | [`thumbnail`](#thumbnail) | Makes the preview of an animation, a short GIF that loops, or adds previews to a preview catalog. |
+| [`clocks`](#clocks) | Makes the animations of an inventory of pictures: picture clocks and the frames of motions. |
 
 This is the one converter of the project. The Python package `odrig/` converted before it;
 what that package answered to the same inputs is stored with the [tests](#tests) of this
@@ -25,8 +26,8 @@ other ODRG readers. All of that is on its own page,
 
 ## Setup
 
-The tool needs Node.js 20 or later. `encode`, `decode`, `check`, `pack` and `thumbnail`
-need Node.js alone: there is nothing to install and nothing to build. `import` needs two
+The tool needs Node.js 20 or later. `encode`, `decode`, `check`, `pack`, `thumbnail` and
+`clocks` need Node.js alone: there is nothing to install and nothing to build. `import` needs two
 packages, which one command puts into the project folder:
 
 ```
@@ -405,6 +406,57 @@ subcommand only:
 node converter/odrig.js thumbnail test-animations/*.odrg --catalog thumbnails
 ```
 
+## clocks
+
+```
+node converter/odrig.js clocks INVENTORY.json --out DIR
+```
+
+Makes the animations of an inventory of pictures: for each tile of a picture, the picture
+clock of a tile with a dial or a display, or the frames of a tile that shows no time. The
+files are written into the folder `DIR`, which is made when it is missing, one for each
+tile: `NAME.odrgx` for a picture clock and `NAME.odrg` for frames, and a line is printed
+for each, `<file> <kind> <bytes>`. An existing file of the same name is replaced. The
+inventory is read whole and every file made before any is written: an inventory that is
+refused ends with status 1 and its reason, the detail naming the tile, and nothing is
+written. The same inventory gives the same bytes on every computer.
+
+```
+node converter/odrig.js clocks build/clocks/inventory.json --out build/clocks
+```
+
+**The inventory** is a UTF-8 JSON object, read as strictly as JSON frames, with exactly the
+members `version` (1), `width`, `height` and `tiles`, 1 to 256 of them. A tile is an
+object with exactly `name` (letters, digits and dashes, unique), `tile` (its number in the
+picture), `kind` (`"dial"`, `"display"` or `"motion"`), `about` (a few words of what it
+shows), `palette` and `picture` as in the source of a picture clock
+([format.md](format.md), "The JSON source of a picture clock"), and `clock` for a dial or a
+display, `motion` for a motion. `clock` has the members of a picture clock's source but
+`version`, `type`, `width`, `height`, `widget`, `palette` and `picture`: a dial becomes a
+`picture-dial`, a display a `picture-display`.
+
+**A motion** has exactly `seconds` (10 to 600), `frame_ms` (20 to 1,000, a multiple of 10
+that divides the loop) and `parts`, 1 to 8 of them, each applied to the picture the parts
+before it made, the first to the tile's picture. A part has `kind` and `box`,
+`[left, top, width, height]` in pixels from the top left, within the canvas. At a time t
+of the loop L:
+
+| Kind | Members | At t |
+|---|---|---|
+| `level` | `inside` (palette indices), `fill`, `empty`, `rests` (`"bottom"`, `"top"`, `"left"` or `"right"`), `start` and `half` (percent) | The box's pixels of an index of `inside` are a vessel. A share of the box from its `rests` side, `start` percent of it at 0, `half` percent at L / 2 and `start` again at L, is filled: there the vessel's pixels become `fill`, elsewhere `empty`. The share is `floor(S * (start * L + (half - start) * (L - abs(2 t - L))) / (100 L))` of the box's S rows or columns. |
+| `flicker` | `variants`, 2 or 3 lists of `[from, to]` index pairs, and `step_ms` | The variant `floor(t / step_ms)` modulo their number recolours the box: a pixel of the index `from` takes `to`. The loop is a whole number of rounds of the variants. |
+| `pulse` | `variants`, 2 to 8 lists of pairs | The variants are gone through and back once over the loop, evenly: with n of them, the step `floor(t * (2n - 2) / L)` shows the variant of its number, or 2n - 2 less it once it reaches n. |
+| `turn` | `moving` (indices), `behind` (an index), `centre` (`[x, y]` in half pixels from the top left) and `degrees` (per loop, negative counter-clockwise) | The box's pixels of a `moving` index turn about the centre by `degrees * t / L` clockwise; a pixel they left takes `behind`. |
+| `swing` | as a turn, with `degrees` (1 to 180) and `swings` (1 to 60) | As a turn, by `degrees * sin(2 pi * swings * t / L)`. |
+
+A turn and a swing are made in whole numbers with the sine table of the clocks: the angle
+`a` in 2^26ths of a turn, each pixel of the box takes the pixel of the picture before the
+part at `floor((cx + floor((du * c(a) + dv * s(a)) / 16,384)) / 2)`,
+`floor((cy + floor((-du * s(a) + dv * c(a)) / 16,384)) / 2)`, where du and dv are its
+centre's place from the centre `cx`, `cy` in half pixels, when that pixel is in the box and
+of a `moving` index. The frames are taken at 0, `frame_ms`, ... before L, each
+`frame_ms` long, and written as `encode` writes JSON frames, compressed.
+
 ## The library
 
 `converter/lib/` is the converter without files and without a command line: it is given
@@ -424,6 +476,8 @@ a web page load the same files.
 | `inflate.js` | The DEFLATE decoder. |
 | `deflate.js` | The DEFLATE compressor. |
 | `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `decode` and `encode`. |
+| `motion.js` | The motions of a still picture: `loadsMotion`, `pictureAt`, the picture of palette indices at a time, and `framesOf`, its frames over the loop. |
+| `inventory.js` | Inventories of pictures: `loads`, read strictly, and `filesOf`, the file of each tile. |
 | `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; picture clocks: `loadsPicture`, `loadsPictureSettings`, `pictureRows` and `pictureFile`; and `pictureAt`, the picture of a text or a clock at a time. |
 | `bidi.js` | The Unicode Bidirectional Algorithm for the characters of a text: `paragraphLevel`, `levels` and `visualOrder`. |
 | `textlayout.js` | The layout of a text: `checkCharacters`, `visualLines` and `layout`, with the fonts by name. |

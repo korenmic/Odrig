@@ -87,7 +87,7 @@ Rules for every task:
   - Suites: the app's, the onboarding suite.
   - Requirements: 11.2
 
-- [ ] 4. Motions and the subcommand `clocks`
+- [x] 4. Motions and the subcommand `clocks`
   - `converter/lib/motion.js`: `level`, `flicker`, `pulse`, `turn` and `swing`, and the
     frames of a motion. `converter/lib/inventory.js`: the inventory read strictly, the
     files of its tiles. `converter/cli/`: `clocks INVENTORY.json --out DIR`.

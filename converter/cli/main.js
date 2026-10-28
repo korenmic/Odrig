@@ -7,6 +7,7 @@ import fs from "node:fs";
 
 import {errors, jsonframes, mapping, odrg, odrgx, timeline, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
+import {clocks} from "./clocks.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
 import * as gif from "./gif.js";
@@ -216,6 +217,7 @@ export const SUBCOMMANDS = new Map([
   ["check", check],
   ["pack", folder.pack],
   ["thumbnail", thumbnails.thumbnail],
+  ["clocks", clocks],
 ]);
 
 // White space as Python's `str.split` knows it.

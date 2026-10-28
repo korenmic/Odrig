@@ -1,4 +1,4 @@
-// The arguments of the command line: the six subcommands, their options and their usage
+// The arguments of the command line: the seven subcommands, their options and their usage
 // texts.
 //
 // An option is given as `--name value` or `--name=value`, before, between or after the
@@ -6,7 +6,7 @@
 
 export const TOOL = "node converter/odrig.js";
 
-export const NAMES = ["import", "encode", "decode", "check", "pack", "thumbnail"];
+export const NAMES = ["import", "encode", "decode", "check", "pack", "thumbnail", "clocks"];
 
 // A command line that was not understood. `subcommand` is the subcommand it was for, or
 // null when none was recognised.
@@ -31,6 +31,7 @@ subcommands:
   pack     Builds the folder of files that is installed for a show.
   thumbnail Makes the preview of an animation, or adds previews to a preview
            catalog.
+  clocks   Makes the animations of an inventory of pictures.
 
 ${TOOL} <subcommand> --help shows the arguments of a subcommand.
 `;
@@ -142,6 +143,22 @@ Builds the folder of files that is installed for a show.
       "--out": {name: "out", required: true},
     },
     flags: {"--uncompressed": "uncompressed"},
+  },
+  clocks: {
+    usage: `usage: ${TOOL} clocks INVENTORY.json --out DIR
+
+Makes the animations of an inventory of pictures: a picture clock for each tile with a
+dial or a display, the frames of its motion for each other tile.
+
+  INVENTORY.json  the inventory
+  --out DIR       the folder to write the files into, made when it is missing
+  --help          shows this text
+`,
+    positionals: [["inventory", "INVENTORY.json"]],
+    options: {
+      "--out": {name: "out", required: true},
+    },
+    flags: {},
   },
   thumbnail: {
     usage: `usage: ${TOOL} thumbnail FILE... (--catalog DIR [--card ODRIG] | --out OUT.gif)
