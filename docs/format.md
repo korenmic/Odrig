@@ -365,7 +365,10 @@ are of frames; the converter writes it with two spaces of indent.
 
 ### The widget payload
 
-The payload of the type 3 is a widget: a clock that the player draws, of 20 bytes.
+The payload of the type 3 is a widget: a clock that the player draws. Its first byte names
+the widget: 1 `analog`, 2 `digital` and 3 `melting` have the 20 bytes of this table; 4
+`picture-dial` and 5 `picture-display` carry a picture of their own, as
+["Picture clocks"](#picture-clocks) says. A widget's payload has at most 32,768 bytes.
 
 | Offset | Size | Field | Values |
 |---:|---:|---|---|
@@ -463,6 +466,163 @@ in JSON frames), `speed_min` (1 to 3,600) and `speed_max` (`speed_min` to 3,600)
   "background": 0,
   "speed_min": 60,
   "speed_max": 600
+}
+```
+
+### Picture clocks
+
+A picture dial and a picture display are clocks drawn over a picture of their own: the
+picture is still, and the player draws over it, at every refresh, the hands of a dial or
+the time of a display, of the virtual time of the turn. Their payload is a head, its
+parts, and the picture:
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Widget | 4 `picture-dial`, 5 `picture-display` |
+| 1 | 1 | Reserved | 0 |
+| 2 | 2 | Seconds | the loop, 1 to 3,600 |
+| 4 | 2 | Least speed | times real time, 1 to 3,600 |
+| 6 | 2 | Greatest speed | the least to 3,600 |
+| 8 | 1 | Direction | 0 `forward`, 1 `backward`, 2 `random`: chosen by the seed of the turn |
+| 9 | 1 | Turns | 0 to 100: the greatest chance of a turn at a slowest point, in percent; 0 unless the direction is `random` |
+| 10 | 1 | Parts | a dial's hands, 1 to 8; a display's fields, 1 to 4 |
+| 11 | 1 | Caps | a dial's caps, 0 to 4; a display's 0 |
+| 12 | | Parts | a dial's hands, 10 bytes each, then its caps, 6 bytes each; a display's fields, 22 bytes each |
+| | | Picture | an ODRG file, to the end of the payload |
+
+A hand:
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 1 | Unit | 0 the hour, a turn in 12 hours; 1 the minute, a turn in an hour; 2 the second, a turn in a minute |
+| 1 | 1 | Colour | an index into the picture's palette |
+| 2 | 2 | Pivot x | half pixels from the canvas's left edge, 0 to 2 W |
+| 4 | 2 | Pivot y | half pixels from the canvas's top edge, 0 to 2 H |
+| 6 | 1 | Length | half pixels from the pivot to the tip, 1 to 255 |
+| 7 | 1 | Tail | half pixels behind the pivot, 0 to 255 |
+| 8 | 1 | Half width | half pixels to either side of the hand's line, 1 to 15 |
+| 9 | 1 | Offset | whole hours added to the time, a signed byte, -12 to 12 |
+
+A cap is a disc: x and y, 2 bytes each, as a pivot's; its radius in half pixels, 1 to 255;
+its colour, an index into the palette.
+
+A field:
+
+| Offset | Size | Field | Values |
+|---:|---:|---|---|
+| 0 | 2 | Left | pixels from the canvas's left edge |
+| 2 | 2 | Top | pixels from the canvas's top edge |
+| 4 | 2 | Width | at least 1; the box lies within the canvas |
+| 6 | 2 | Height | at least 1 |
+| 8 | 1 | Font | 1 `small`, 2 `medium`, 3 `large`, 4 `tiny` |
+| 9 | 1 | Digits | the colour of the digits, an index into the palette |
+| 10 | 1 | Colons | the colour of the colons, an index into the palette |
+| 11 | 1 | Blink | 0, or 1: the colons are shown in the first half of each real second only |
+| 12 | 1 | Offset | whole hours added to the time, a signed byte, -12 to 12 |
+| 13 | 1 | Reserved | 0 |
+| 14 | 8 | Pattern | 1 to 8 characters of the pattern, then zero bytes |
+
+The characters of a pattern: `H` the tens of the hour of a 12-hour clock, 1 to 12, so `0`
+or `1`; `I` the same, but nothing at all, no glyph and no advance, when it is 0; `h` the
+ones of the hour; `M` and `m` the tens and ones of the minutes; `S` and `s` those of the
+seconds; `:` a colon; and the space. So `Ih:Mm` is `h:mm`, `Hh:Mm` is `hh:mm`, `Ih:Mm:Ss`
+is `h:mm:ss`, and `Mm:Ss` is a timer's minutes and seconds.
+
+**The picture** is an ODRG file of the container's canvas, of exactly one frame and a
+palette of 1 to 8 colours; the duration of its frame is not used. Every colour of a hand, a
+cap or a field is one of the palette's. The loop in the header is 1,000 times the seconds,
+and the canvas's picture, 3 * W * H bytes, is at most 65,534, as for every clock.
+
+**The font `tiny`** is the ten digits, the colon and the space, 5 rows high with nothing
+below the baseline: the digits 3 pixels wide, the colon and the space 1. Its glyphs are
+those of `fonts/tiny.txt`. A text cannot name it.
+
+**The time a picture clock shows.** Its seed gives, by xorshift32, the eleven values of the
+table of "The widget payload", start to wave, in their order, and then:
+
+| Name | From r | What it is |
+|---|---|---|
+| back | r % 2 | with `random`, 1 when the turn starts backward |
+| chance | r % (turns + 1) | with `random`, the chance of a turn at each slowest point, in percent |
+
+With Φ = phi * 65,536, the way forward `t` milliseconds into the turn is
+
+```
+u(t) = b * t + floor(A * P * (c(Φ) - c(Φ + floor(2^26 * (t % P) / P))) / 102,944)
+```
+
+so that the time of the other clocks is `start + u(t)`. The speed is least where the
+angle `Φ + floor(2^26 * (t % P) / P)` is three quarters of a turn: first at
+`t0 = floor(P * ((3 * 2^24 - Φ) mod 2^26) / 2^26)`, and then every P after it, so that the
+k-th slowest point, k from 1, is at `t0 + (k - 1) * P`. The way after k slowest points,
+D(k), is +1 or -1: D(0) is +1 for `forward`, -1 for `backward`, and for `random` -1 when
+back is 1 and +1 otherwise. With `random`, D(k) is -D(k - 1) when `mix(seed ^ k) % 100`
+is below chance, and D(k - 1) otherwise; `mix` is MurmurHash3's finalizer of
+[core.md](core.md), "Clocks". With n the number of slowest points at or before t:
+
+```
+n = 0:  v(t) = start + D(0) * u(t)
+n > 0:  v(t) = start + D(0) * u(t0) + b * P * (D(1) + ... + D(n - 1)) + D(n) * (u(t) - u(t0) - (n - 1) * b * P)
+```
+
+Over a whole period u grows by exactly b * P, so the hands turn back the way they came,
+and nothing jumps. A part shows `(v(t) + offset * 3,600,000) mod 12 hours`, taken at or
+above 0. Every division rounds down.
+
+**Drawing a picture clock** at a time t of its turn, with its seed. A pixel x, y, counted
+from the top left from 0, has its centre at `2x + 1`, `2y + 1` half pixels from the
+canvas's top left corner. The picture is drawn through its palette, and over it:
+
+- **picture-dial**: each hand in its order, then each cap; a later one covers an earlier
+  one. A hand of the hour, the minute or the second points at the angle
+  `a = floor(2^26 * (T mod U) / U)`, with T the part's time and U 12 hours, an hour or a
+  minute. With `u = 2x + 1 - pivot x` and `w = 2y + 1 - pivot y`, a pixel is the hand's
+  when `-tail * 16,384 <= u * s(a) - w * c(a) <= length * 16,384` and
+  `|u * c(a) + w * s(a)| <= half * 16,384`; it is a cap's when `u * u + w * w` is at most
+  the square of its radius, u and w taken from the cap's place.
+- **picture-display**: each field in its order. The pattern becomes glyphs of its font,
+  `large` being `small` at twice the size; the line is as wide as its advances less the
+  spacing after the last, as the digital clock's. Its left is
+  `left + floor((width - line) / 2)` and its top `top + floor((height - ascent * scale) /
+  2)`, where the ascent is the font's rows above its baseline, which the digits fill.
+  Every lit pixel of a glyph inside the box takes the colour of the digits, or of the
+  colons for a colon; with blink, a colon is drawn only while `t % 1,000` is below 500.
+  Nothing is drawn outside the box.
+
+### The JSON source of a picture clock
+
+A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `version`
+(1), `type` (`"widget"`), `width`, `height`, `widget` (`"picture-dial"` or
+`"picture-display"`), `seconds` (1 to 3,600), `speed_min` and `speed_max` as a clock's,
+`direction` (`"forward"`, `"backward"` or `"random"`), `turns` (0 to 100, and 0 unless
+`random`), `palette` (1 to 8 colours as in JSON frames, no two the same), `picture` (H
+strings of W characters, the top row first, each character the digit of an index into the
+palette), and for a dial `hands` (1 to 8) and `caps` (0 to 4), for a display `fields` (1
+to 4). A hand is an object with exactly `unit` (`"hour"`, `"minute"` or `"second"`),
+`color`, `x`, `y`, `length`, `tail`, `half` and `offset`; a cap `x`, `y`, `radius` and
+`color`; a field `left`, `top`, `width`, `height`, `font` (`"small"`, `"medium"`,
+`"large"` or `"tiny"`), `pattern`, `digits`, `colons`, `blink` (`true` or `false`) and
+`offset`, each with the values of its bytes above. The converter writes the picture as an
+ODRG file with the palette in the source's order, compressed.
+
+```json
+{
+  "version": 1,
+  "type": "widget",
+  "width": 60,
+  "height": 60,
+  "widget": "picture-display",
+  "seconds": 30,
+  "speed_min": 60,
+  "speed_max": 600,
+  "direction": "random",
+  "turns": 30,
+  "palette": [0, 16777215],
+  "picture": ["000 ... 60 characters", "... 60 rows"],
+  "fields": [
+    {"left": 10, "top": 25, "width": 40, "height": 9, "font": "small", "pattern": "Ih:Mm",
+     "digits": 1, "colons": 1, "blink": true, "offset": 0}
+  ]
 }
 ```
 

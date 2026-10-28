@@ -96,10 +96,12 @@ export function header(data) {
 //
 // The header is read, the body inflated and the palette read at once, each refused as
 // `decode` refuses it. The result has the header's `width`, `height`, `paletteSize`,
-// `frameCount` and `compressed`, and two functions:
+// `frameCount` and `compressed`, the `palette` as three bytes for each colour, and two
+// functions:
 //
-// - `next()` reads the next frame record and gives `{ms, picture, mode}`: its duration, the
-//   picture the pixel buffer holds after it and its mode byte. After the last record it
+// - `next()` reads the next frame record and gives `{ms, picture, mode, buffer}`: its
+//   duration, the picture the pixel buffer holds after it, its mode byte and the pixel
+//   buffer itself, the palette indices of a file with a palette. After the last record it
 //   refuses bytes that follow it and gives null. Every refusal is the one `decode` gives,
 //   at the same record.
 // - `loopMs()` is the sum of the durations of the records, read from their starts alone.
@@ -175,7 +177,7 @@ export function reader(data) {
         picture[3 * pixel + 2] = palette[3 * index + 2];
       }
     }
-    return {ms: duration, picture, mode};
+    return {ms: duration, picture, mode, buffer};
   };
 
   const loopMs = () => {
@@ -195,7 +197,7 @@ export function reader(data) {
     return total;
   };
 
-  return {width, height, paletteSize, frameCount, compressed, next, loopMs};
+  return {width, height, paletteSize, frameCount, compressed, palette, next, loopMs};
 }
 
 // Reads an ODRG file given as bytes.

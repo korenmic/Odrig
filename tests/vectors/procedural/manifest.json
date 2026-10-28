@@ -189,5 +189,125 @@
     "file": "widgets/valid/small.analog.odrgx",
     "ms": 980,
     "seed": 9
+  },
+  {
+    "picture": "dial.1.0.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 0,
+    "seed": 1
+  },
+  {
+    "picture": "dial.1.15000.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 15000,
+    "seed": 1
+  },
+  {
+    "picture": "dial.1.29980.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 29980,
+    "seed": 1
+  },
+  {
+    "picture": "dial.2864038069.0.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 0,
+    "seed": 2864038069
+  },
+  {
+    "picture": "dial.2864038069.7777.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 7777,
+    "seed": 2864038069
+  },
+  {
+    "picture": "dial.2864038069.29000.png",
+    "file": "pictures/valid/dial.odrgx",
+    "ms": 29000,
+    "seed": 2864038069
+  },
+  {
+    "picture": "dial.backward.5.0.png",
+    "file": "pictures/valid/dial.backward.odrgx",
+    "ms": 0,
+    "seed": 5
+  },
+  {
+    "picture": "dial.backward.5.20000.png",
+    "file": "pictures/valid/dial.backward.odrgx",
+    "ms": 20000,
+    "seed": 5
+  },
+  {
+    "picture": "dial.small.9.0.png",
+    "file": "pictures/valid/dial.small.odrgx",
+    "ms": 0,
+    "seed": 9
+  },
+  {
+    "picture": "dial.small.9.980.png",
+    "file": "pictures/valid/dial.small.odrgx",
+    "ms": 980,
+    "seed": 9
+  },
+  {
+    "picture": "display.1.0.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 0,
+    "seed": 1
+  },
+  {
+    "picture": "display.1.500.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 500,
+    "seed": 1
+  },
+  {
+    "picture": "display.1.12000.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 12000,
+    "seed": 1
+  },
+  {
+    "picture": "display.1.19980.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 19980,
+    "seed": 1
+  },
+  {
+    "picture": "display.77.250.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 250,
+    "seed": 77
+  },
+  {
+    "picture": "display.77.750.png",
+    "file": "pictures/valid/display.odrgx",
+    "ms": 750,
+    "seed": 77
+  },
+  {
+    "picture": "display.large.424242.0.png",
+    "file": "pictures/valid/display.large.odrgx",
+    "ms": 0,
+    "seed": 424242
+  },
+  {
+    "picture": "display.large.424242.19000.png",
+    "file": "pictures/valid/display.large.odrgx",
+    "ms": 19000,
+    "seed": 424242
+  },
+  {
+    "picture": "display.medium.31.0.png",
+    "file": "pictures/valid/display.medium.odrgx",
+    "ms": 0,
+    "seed": 31
+  },
+  {
+    "picture": "display.medium.31.3000.png",
+    "file": "pictures/valid/display.medium.odrgx",
+    "ms": 3000,
+    "seed": 31
   }
 ]

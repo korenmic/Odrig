@@ -1,0 +1,74 @@
+[
+ {
+  "name": "time-original-1-two-times",
+  "frames": 180,
+  "largest": 0,
+  "mean": 0
+ },
+ {
+  "name": "time-original-2-never-zero",
+  "frames": 160,
+  "largest": 792,
+  "mean": 23.7
+ },
+ {
+  "name": "time-original-3-sand-goes-back-up",
+  "frames": 160,
+  "largest": 93,
+  "mean": 0.78
+ },
+ {
+  "name": "time-original-4-we-were-here",
+  "frames": 100,
+  "largest": 58,
+  "mean": 1.18
+ },
+ {
+  "name": "time-original-5-every-row-another-time",
+  "frames": 1440,
+  "largest": 0,
+  "mean": 0
+ },
+ {
+  "name": "time-original-6-the-clock-melts",
+  "frames": 900,
+  "largest": 4,
+  "mean": 0.28
+ },
+ {
+  "name": "time-standalone-1-two-times",
+  "frames": 180,
+  "largest": 45,
+  "mean": 23.53
+ },
+ {
+  "name": "time-standalone-2-never-zero",
+  "frames": 98,
+  "largest": 63,
+  "mean": 35.55
+ },
+ {
+  "name": "time-standalone-3-reverse-hourglass",
+  "frames": 180,
+  "largest": 49,
+  "mean": 24.87
+ },
+ {
+  "name": "time-standalone-4-we-were-here",
+  "frames": 169,
+  "largest": 53,
+  "mean": 36.47
+ },
+ {
+  "name": "time-standalone-5-time-bands",
+  "frames": 180,
+  "largest": 109,
+  "mean": 72.61
+ },
+ {
+  "name": "time-standalone-6-melting-clock",
+  "frames": 180,
+  "largest": 67,
+  "mean": 35.89
+ }
+]

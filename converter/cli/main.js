@@ -7,6 +7,7 @@ import fs from "node:fs";
 
 import {errors, jsonframes, mapping, odrg, odrgx, timeline, whole} from "../lib/index.js";
 import {TOOL, UsageError, parse, usage} from "./arguments.js";
+import {clocks} from "./clocks.js";
 import * as files from "./files.js";
 import * as folder from "./folder.js";
 import * as gif from "./gif.js";
@@ -183,8 +184,11 @@ function widgetSummary(decoded, data) {
     `loop_ms: ${decoded.header.loopMs}`,
     `widget: ${decoded.settings.widget}`,
     `speed: ${decoded.settings.speedMin} to ${decoded.settings.speedMax}`,
-    `file_bytes: ${data.length}`,
   ];
+  if ("palette" in decoded.settings) {
+    lines.push(`direction: ${decoded.settings.direction}`, `palette: ${decoded.settings.palette.length}`);
+  }
+  lines.push(`file_bytes: ${data.length}`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -213,6 +217,7 @@ export const SUBCOMMANDS = new Map([
   ["check", check],
   ["pack", folder.pack],
   ["thumbnail", thumbnails.thumbnail],
+  ["clocks", clocks],
 ]);
 
 // White space as Python's `str.split` knows it.

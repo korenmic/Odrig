@@ -9,11 +9,10 @@
 import {mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
-import {deflateSync} from "node:zlib";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VECTORS = join(HERE, "..");
-const {odrgx} = await import(new URL("../../../converter/lib/index.js", import.meta.url).href);
+const {deflate, odrgx} = await import(new URL("../../../converter/lib/index.js", import.meta.url).href);
 
 // Each case: the container, relative to tests/vectors/, the times to draw it at, and for a
 // clock the seed of its turn.
@@ -32,6 +31,14 @@ export const CASES = [
   ["widgets/valid/melting.odrgx", [0, 3500, 44980], 1],
   ["widgets/valid/melting.odrgx", [0, 20000], 424242],
   ["widgets/valid/small.analog.odrgx", [0, 980], 9],
+  ["pictures/valid/dial.odrgx", [0, 15000, 29980], 1],
+  ["pictures/valid/dial.odrgx", [0, 7777, 29000], 2864038069],
+  ["pictures/valid/dial.backward.odrgx", [0, 20000], 5],
+  ["pictures/valid/dial.small.odrgx", [0, 980], 9],
+  ["pictures/valid/display.odrgx", [0, 500, 12000, 19980], 1],
+  ["pictures/valid/display.odrgx", [250, 750], 77],
+  ["pictures/valid/display.large.odrgx", [0, 19000], 424242],
+  ["pictures/valid/display.medium.odrgx", [0, 3000], 31],
 ];
 
 // The picture of a case: three bytes for each pixel in the pixel order of docs/format.md.
@@ -50,6 +57,20 @@ function crc32(bytes) {
   let c = 0xffffffff;
   for (const byte of bytes) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
+}
+
+// A zlib stream of the bytes, with the library's DEFLATE, which writes the same bytes on
+// every computer.
+function zlibOf(bytes) {
+  let a = 1;
+  let b = 0;
+  for (const byte of bytes) {
+    a = (a + byte) % 65521;
+    b = (b + a) % 65521;
+  }
+  const tail = Buffer.alloc(4);
+  tail.writeUInt32BE(((b << 16) | a) >>> 0);
+  return Buffer.concat([Buffer.from([0x78, 0x9c]), Buffer.from(deflate.deflateRaw(bytes)), tail]);
 }
 
 function chunk(type, data) {
@@ -76,7 +97,7 @@ export function png({width, height, pixels}) {
   header.writeUInt32BE(height, 4);
   header[8] = 8;
   header[9] = 2;
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows, {level: 9})), chunk("IEND", Buffer.alloc(0))]);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", zlibOf(rows)), chunk("IEND", Buffer.alloc(0))]);
 }
 
 // The manifest and the pixels of every picture, by the name of its PNG file.

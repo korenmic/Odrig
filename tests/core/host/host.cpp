@@ -1148,7 +1148,9 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
         // A text or a widget is read and checked whole, as the core reads it.
         std::vector<uint8_t> payload(odrig::kLargestTextPayload);
-        reason = odrig::drawn_read(&file, content, payload.data());
+        std::vector<uint8_t> pixels(3u * content.width * content.height);
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), pixels.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -1231,8 +1233,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         reason = odrig::kUnknownType;
     }
     std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    // A picture clock's picture: its palette indices, as the player's pixel buffer holds them.
+    std::vector<uint8_t> indices(3u * content.width * content.height);
     if (reason == odrig::kNone) {
-        reason = odrig::drawn_read(&file, content, payload.data());
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), indices.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     }
     file.close();
     if (reason != odrig::kNone) {
@@ -1240,9 +1245,17 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         return 0;
     }
     std::vector<uint8_t> pixels(3u * content.width * content.height);
+    std::vector<uint8_t> layer(static_cast<size_t>(content.width) * content.height);
     for (const std::string &time : times) {
         const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
-        if (content.type == odrig::kTypeText) {
+        if (content.type == odrig::kTypeWidget && odrig::clock_is_picture(payload.data())) {
+            // The picture through its palette, and the layer over it, as the LEDs show it.
+            odrig::clock_overlay(payload.data(), seed, content.width, content.height, ms, layer.data());
+            for (size_t at = 0; at < layer.size(); ++at) {
+                const uint8_t index = layer[at] != 0 ? static_cast<uint8_t>(layer[at] - 1) : indices[at];
+                std::memcpy(&pixels[3 * at], decoder.palette + 3u * index, 3);
+            }
+        } else if (content.type == odrig::kTypeText) {
             odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
         } else {
             odrig::clock_draw(payload.data(), seed, content.width, content.height, ms, pixels.data());

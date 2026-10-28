@@ -50,6 +50,7 @@ BAD_GLYPH = "bad-glyph"
 DOES_NOT_FIT = "does-not-fit"
 UNSUPPORTED_CHARACTER = "unsupported-character"
 UNKNOWN_WIDGET = "unknown-widget"
+BAD_PICTURE = "bad-picture"
 
 PREVIEW_TOO_LARGE = "preview-too-large"
 

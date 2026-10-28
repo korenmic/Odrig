@@ -1,6 +1,6 @@
 // Reads the fonts of this folder and writes the tables the core and the converter draw
-// with: core/src/font_tables.cpp and converter/lib/fonttables.js, the two fonts and the
-// sine table of the clocks. Run from the repository root: node fonts/generate.mjs
+// with: core/src/font_tables.cpp and converter/lib/fonttables.js, the fonts and the sine
+// table of the clocks. Run from the repository root: node fonts/generate.mjs
 // With --check it writes nothing and fails when either file is not what it would write.
 
 import {readFileSync, writeFileSync} from "node:fs";
@@ -9,20 +9,29 @@ import {fileURLToPath} from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
-export const SOURCES = ["small.txt", "medium.txt"];
+export const SOURCES = ["small.txt", "medium.txt", "tiny.txt"];
 export const CORE_FILE = join(ROOT, "core", "src", "font_tables.cpp");
 export const CONVERTER_FILE = join(ROOT, "converter", "lib", "fonttables.js");
 
-// The characters every font has: the printable ASCII characters and the Hebrew letters,
-// the final forms among them.
+// The characters a font of texts has: the printable ASCII characters and the Hebrew
+// letters, the final forms among them.
 export const REPERTOIRE = [];
 for (let code = 0x20; code <= 0x7e; code += 1) REPERTOIRE.push(code);
 for (let code = 0x5d0; code <= 0x5ea; code += 1) REPERTOIRE.push(code);
+
+// The characters of a font of digits, for the time of a picture display: the space, the
+// ten digits and the colon.
+export const DIGITS = [0x20];
+for (let code = 0x30; code <= 0x3a; code += 1) DIGITS.push(code);
+
+// The repertoires a font's header may name; a font that names none has REPERTOIRE.
+export const REPERTOIRES = {text: REPERTOIRE, digits: DIGITS};
 
 // The entries of the sine table, a whole turn, in units of 1/16,384.
 export const SINE_ENTRIES = 1024;
 export const SINE_ONE = 16384;
 const HEADER = ["name", "id", "version", "ascent", "descent"];
+const OPTIONAL = ["repertoire"];
 const WIDEST = 8;
 
 // A font of its source text: the header's numbers, and each glyph's code point, width and
@@ -42,9 +51,9 @@ export function readFont(text, file) {
       return;
     }
     const words = line.split(" ");
-    if (HEADER.includes(words[0]) && glyphs.length === 0 && glyph === null) {
+    if ((HEADER.includes(words[0]) || OPTIONAL.includes(words[0])) && glyphs.length === 0 && glyph === null) {
       if (words.length !== 2 || words[0] in header) fail(at, `a bad header line: ${line}`);
-      header[words[0]] = words[0] === "name" ? words[1] : Number(words[1]);
+      header[words[0]] = words[0] === "name" || words[0] === "repertoire" ? words[1] : Number(words[1]);
       return;
     }
     if (words[0] === "glyph") {
@@ -71,9 +80,12 @@ export function readFont(text, file) {
     if (one.rows.length !== height) fail(one.line, `U+${one.code.toString(16)} has ${one.rows.length} rows, not ${height}`);
     if (one.width < 1 || one.width > WIDEST) fail(one.line, `U+${one.code.toString(16)} is ${one.width} wide`);
   }
+  const repertoire = REPERTOIRES[header.repertoire ?? "text"];
+  if (repertoire === undefined) throw new Error(`${file}: no repertoire ${header.repertoire}`);
+  delete header.repertoire;
   const codes = glyphs.map((one) => one.code);
-  if (codes.join() !== REPERTOIRE.join()) {
-    const missing = REPERTOIRE.filter((code) => !codes.includes(code)).map((code) => `U+${code.toString(16)}`);
+  if (codes.join() !== repertoire.join()) {
+    const missing = repertoire.filter((code) => !codes.includes(code)).map((code) => `U+${code.toString(16)}`);
     throw new Error(`${file}: the glyphs are not the repertoire in order; missing: ${missing.join(" ") || "none"}`);
   }
   return {...header, glyphs};

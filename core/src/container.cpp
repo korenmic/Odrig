@@ -22,7 +22,7 @@ uint32_t largest_payload(uint8_t type) {
     if (type == kTypeText) {
         return kLargestTextPayload;
     }
-    return type == kTypeWidget ? kWidgetSize : 0xFFFFFFFFu;
+    return type == kTypeWidget ? kLargestWidget : 0xFFFFFFFFu;
 }
 
 // The next byte of the header, or the reason the file ends.
@@ -107,8 +107,8 @@ Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeade
     return total_ms == header.loop_ms ? kNone : kLoopMismatch;
 }
 
-Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into) {
-    return header.type == kTypeText ? text_read(file, header, into) : clock_read(file, header, into);
+Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into, const Picture &picture) {
+    return header.type == kTypeText ? text_read(file, header, into) : clock_read(file, header, into, picture);
 }
 
 const char *type_name(uint8_t type) {
