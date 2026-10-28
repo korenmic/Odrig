@@ -126,7 +126,6 @@ window.addEventListener("popstate", (event) => {
 for (const name of SCREENS) {
   byId(`to-${name}`).addEventListener("click", () => go(name));
 }
-byId("add-animation").addEventListener("click", () => go("upload"));
 
 window.history.replaceState({screen: "target", depth: 0}, "");
 show("target");
