@@ -141,7 +141,7 @@ Rules for every task:
   - Suites: the converter's, the app's, the onboarding suite.
   - Requirements: 8.1, 10.1 to 10.3, 13.2, 13.3
 
-- [ ] 10. The twelve: the original six
+- [x] 10. The twelve: the original six
   - `render12.mjs` with the tools: the six scenes of `references/original/animation.js`
     rendered over their periods, 8 colours, 50 ms or 100 ms; compared with their
     reference GIFs. Their previews in `thumbnails/`; the files, previews and readmes in

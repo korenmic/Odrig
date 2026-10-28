@@ -11395,3 +11395,31 @@ backward at about 7.5 minutes a second, then forward at 2.5; the alarm clock bac
 1.4, then backward at 3; 7 to 59 LEDs changed in each second.
 
 **Resolution.** `thumbnails/`; the collection's `clocks/`.
+
+## Seed 52: the original six of the twelve
+
+**Question.** The original six are to be rendered from `references/original/animation.js`
+"by calling the script's drawing at each frame's time", 8 colours each: "black, then the
+colours its script draws with, most used first". The script draws only on its own timer
+and keeps its drawings inside its closure; and on its 60 x 60 canvas almost no pixel has a
+named colour exactly, every dot and line being soft at its edges. How are the frames taken,
+which colours count as used, and how near are the files to the reference GIFs?
+
+**Answer.** The page that renders adds one name after the script's own list of its six
+drawing functions, which are pure functions of the time, and calls them at 0, 50, 100 ms
+and so on, on the script's own canvas after its own background: so each frame is the
+script's picture at that time exactly. The colours the script names are `#d6e3e8`,
+`#51e6df`, `#ef80bd`, `#ffc577` and `#354953` and its background `#040609`, which is black;
+each pixel counts for the named colour whose blend with the background comes nearest it,
+and the colours that a scene uses come after black, the most used first: 4 to 6 colours.
+Every other pixel takes the nearest of them. At 50 ms a frame every file is far below
+2 MB, so none is taken at 100 ms: the largest, every row 720 s, has 471,095 bytes, the
+others 1,443 to 23,875. Compared with the reference GIFs at their 100 ms frames, mapped to
+the same colours, two times and every row differ in no pixel, the clock that melts in at
+most 4 of 3,600, sand in at most 93 and we were here in 58, both at single frames; never
+zero differs at each whole second, up to 792 pixels, a digit: the GIFs were rendered by
+adding steps of 0.1 s, which lands just before the second, where the file shows the
+script's time exactly. Every row is compared over the GIF's 144 seconds of its 720.
+
+**Resolution.** The collection's `clocks/time-original-*.odrg` with their readmes;
+`clocks/source/tools/render12.mjs`, `make12.mjs` and `compare12.mjs`.
