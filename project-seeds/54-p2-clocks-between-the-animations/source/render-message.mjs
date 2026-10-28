@@ -89,9 +89,13 @@ async function render(page) {
         callback(t);
         const d = document.getElementById('screen').getContext('2d').getImageData(0, 0, 60, 60).data;
         const out = [];
-        for (let p = 0; p < 3600; p++) {
-          if (d[p * 4 + 3] !== 255) throw new Error('a pixel that is not opaque at ' + t + ' ms');
-          out.push(d[p * 4] * 65536 + d[p * 4 + 1] * 256 + d[p * 4 + 2]);
+        // The canvas gives its top row first; pixel order begins with the bottom row.
+        for (let y = 59; y >= 0; y--) {
+          for (let x = 0; x < 60; x++) {
+            const p = y * 60 + x;
+            if (d[p * 4 + 3] !== 255) throw new Error('a pixel that is not opaque at ' + t + ' ms');
+            out.push(d[p * 4] * 65536 + d[p * 4 + 1] * 256 + d[p * 4 + 2]);
+          }
         }
         return out;
       })()`);
