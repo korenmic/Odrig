@@ -38,7 +38,7 @@ class TheOption(unittest.TestCase):
         (folder / "inner.odrg").mkdir()
         self.assertEqual(host.drive_list(folder), ["A.ODRG", "C.ODRGX", "b.odrg", "d.odrgx"])
         support.installed(folder, {f"{index:03d}.odrg": b"" for index in range(300)})
-        self.assertEqual(len(host.drive_list(folder)), 256)
+        self.assertEqual(len(host.drive_list(folder)), 304)
 
     def test_the_list_walks_the_sub_folders_depth_first_to_three_levels(self):
         folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b""})
@@ -49,17 +49,17 @@ class TheOption(unittest.TestCase):
         self.assertEqual(host.drive_list(folder), ["A.ODRG", "b.odrg", "a b/q.odrg", "a-b/r.odrg", "night/comet.odrg", "night/deep/x.odrg",
                                                    "night/deep/deeper/y.odrg", "only/sub/k.odrg"])
 
-    def test_the_list_takes_at_most_32_sub_folders_counted_when_their_first_file_is_kept(self):
+    def test_the_list_takes_every_sub_folder(self):
         folder = support.installed(self.work / "odrig", {f"r{index:03d}.odrg": b"" for index in range(5)})
         for index in range(40):
             support.installed(folder / f"f{index:02d}", {"x.odrg": b""})
         names = host.drive_list(folder)
-        self.assertEqual((len(names), names[-1]), (37, "f31/x.odrg"))
+        self.assertEqual((len(names), names[-1]), (45, "f39/x.odrg"))
         nested = support.installed(self.work / "nested" / "odrig", {})
         for index in range(40):
             support.installed(nested / "a" / f"b{index:02d}", {"x.odrg": b""})
         names = host.drive_list(nested)
-        self.assertEqual((len(names), names[-1]), (31, "a/b30/x.odrg"))
+        self.assertEqual((len(names), names[-1]), (40, "a/b39/x.odrg"))
 
     def test_the_folder_is_looked_for_once_a_second_and_listed_when_the_core_asks(self):
         now = [0.0]

@@ -339,7 +339,7 @@ succeeds.
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
-| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive, or the drive has 256 animations. |
+| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
 | `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
@@ -519,12 +519,13 @@ read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
 can be written and the drive's catalog is `ok`. `<file>` follows the naming rule of the
 show's files. The rest of the upload is as for the board's own storage: `upload data`, the
 check, `upload end`. On success one commit of the drive's catalog moves the file onto its
-name with its entry, and the reply gives the animation's id: `{"ok":true,"id":60003}`. A file
-of that name on the drive is replaced and keeps its id, and where it plays it plays anew
-from its start, as an item's file replaced under its name does; a new one gets the lowest free id
-from 60,001, and its place in the saved order by its name. `busy` while an upload is open or
-the drive's catalog is read, `read-only` when the core may not write the drive, `no-space`
-when `drive_space` says the file does not fit or 256 animations are on the drive.
+name with its entry and its row in the root's file of the index, and the reply gives the
+animation's id: `{"ok":true,"id":60003}`. A file of that name in the drive's folder is
+replaced and keeps its id and its row, and where it plays it plays anew from its start, as
+an item's file replaced under its name does; a new one goes last among the root's files,
+with the lowest id from 60,001 that the index's map does not hold. `busy` while an upload is
+open or the drive's catalog is read, `read-only` when the core may not write the drive,
+`no-space` when `drive_space` says the file does not fit.
 
 `remove <id>` of an animation of a drive the core may write removes its file and its entry
 in one commit; its id is free again. Of any other drive it is `in-use`, as before. `space`

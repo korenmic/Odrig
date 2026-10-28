@@ -10894,3 +10894,101 @@ compares the revision of the level of `<id>`, the root's for a show's item.
 
 **Resolution.** `core/src/order.cpp` (`revision_of`, `order_get`, `order_move`);
 docs/commands.md, "The saved playlist order".
+
+## Seed 50: what the core checks of a drive's index
+
+**Question.** The PC tool reads a drive's index whole and checks every file's CRC-32 and
+every line against the pages. The core may not read the whole index: it publishes the drive
+from its marker and reads lines as it needs them. What does it check, and what does it say
+of a damage it meets?
+
+**Answer.** The core checks the marker, of version 2, at the plug-in and at each look. It
+reads neither the pages nor the CRC-32s of the index's files. A line it reads that is not
+in its form, or a file shorter than the lines the marker or the table gives it, makes the
+catalog `damaged` with `line` at the next refresh, and the drive's animations go; the PC
+tool says `page` for a file of the wrong length. A damage the core does not read is found
+by the PC tool's `check`.
+
+**Resolution.** `core/src/drive.cpp` (`index_line`, `drive_row`), `core/src/catalog.cpp`
+(`catalog_drive_look`); docs/catalog.md, "The index of a drive"; docs/core.md, "A drive".
+
+## Seed 50: the files a rebuild of a drive's catalog writes for itself
+
+**Question.** The design names `rebuild.tmp` and `rebuild-folders.tmp` and the phases that
+write them, but not every field of their lines, nor what the draft of the table holds when
+a folder's end and counts are known only after its subtree.
+
+**Answer.** Both have lines of 180 bytes, padded as the index's. A line of `rebuild.tmp` is
+`1 <crc> <bytes> <width> <height> <length> <type> <path>` for a file that passed, so that
+what follows `1 ` is its page line, and `0 00000000 0 0 0 0 frames <path>` for one that did
+not. A line of `rebuild-folders.tmp` is `<ordinal> <depth> <first> <path>`, the root's
+`0 0 0`: a folder's own files are the next line's first position less its own, and its end
+and its sub-folders are found by reading on until a line of its depth or less, so that no
+line is written before it is known. Each phase takes at most eight lines at a step. A
+plug-in of a drive that can be written removes both files, as it removes `upload.part`.
+
+**Resolution.** `core/src/catalog.cpp` (`scan_step`, `draft_step`, `folders_step`,
+`map_step`, `table_step`, `commit_drive`, `catalog_drive_step`).
+
+## Seed 50: a drive after its rebuild
+
+**Question.** A rebuild used to leave the drive listed, its refused files in `list` with
+their faults until the next plug-in. The design reads the drive again from its new index at
+the end. What of the files the rebuild refused, and of a drive that is pulled out while it
+runs?
+
+**Answer.** At the commit the drive's animations are dropped and its catalog read again at
+once, as after another marker: the playlist plays from its first animation, and only the
+files of the index are listed. A refused file is logged when the scan meets it, `drive file
+<name> left out: <reason>`, for a drive without a catalog as before. While the rebuild
+runs, an indexed drive plays from its old index and its catalog stays `ok`; a listed drive
+is listed again and its catalog is `none`, as before. A drive pulled out ends the rebuild
+without removing anything, since another drive may be in by then; its files are never read
+without a record, and the next plug-in of it removes the two files of the rebuild.
+
+**Resolution.** `core/src/catalog.cpp` (`drive_rebuild_step`, `catalog_drive_went`).
+
+## Seed 50: the hosts list every file
+
+**Question.** The core takes a listed drive's first 256 files and 32 sub-folders. Should the
+hosts still cut their listings?
+
+**Answer.** The test host and the emulator list every animation file of the drive's folder
+to three levels, so that a rebuild reads every file and the core's own cut is tested; the
+firmware still stops at 256 files and 32 sub-folders, which the host interface allows. The
+emulator's `drive_cut` goes, and the interface's comment says a host may stop there.
+
+**Resolution.** `tests/core/host/host.cpp` (`list_drive`), `emulator/host.py`
+(`drive_list`), `core/include/odrig_core.h` (`drive_name`).
+
+## Seed 50: reads of a drive's index at any offset
+
+**Question.** The host interface says the core reads a file with `read_at` from offset 0
+on, each call where the last ended, but for the commands `read` and `catalog page`. The
+design reads the index's lines by their numbers and finds ids and folders by binary search.
+May the core begin a read anywhere in those files?
+
+**Answer.** Yes, in the files of a drive's index, `drive/index-...`, and in the two files a
+rebuild writes for itself, `drive/rebuild...`: every host with a drive seeks there already,
+the firmware's `readPart` with `fseek` and the emulator's with `seek`. Every other file is
+read as before, and the test host still stops on a read of another file that does not go on
+where the last ended. The emulator opens and closes a file of the drive's catalog or
+index at each read, so that the PC tool may replace it on Windows while the emulator has
+the card: the core no longer reads `order.txt` after the marker, which used to let go of
+the last file of the catalog it read.
+
+**Resolution.** `core/include/odrig_core.h` (`read_at`), `tests/core/host/host.cpp`
+(`read_at`), `emulator/host.py` (`read_at`); docs/core.md, "Rules of use".
+
+## Seed 50: where the cursor's code lives
+
+**Question.** The tasks name `core/src/index.h` and `index.cpp` for the index's rows. The
+same calls answer for a drive without a catalog, from its table and its tree. Where do they
+go?
+
+**Answer.** Into `core/src/drive.h` and `drive.cpp`, the drive as the rest of the core reads
+it, whatever keeps it; the reading and writing of the fields of a catalog's and an index's
+lines into `core/src/fields.h`, which the catalog shares. The writers of the index's files
+stay in `core/src/catalog.cpp` beside the commit they belong to.
+
+**Resolution.** `core/src/drive.h`, `core/src/drive.cpp`, `core/src/fields.h`.

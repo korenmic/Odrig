@@ -320,8 +320,7 @@ public:
     }
 
     // Lists the folder `odrig` of the drive as it is now: the paths of its animation files
-    // and of its sub-folders' to three levels, depth first, at most 256 files and 32
-    // sub-folders, a folder counted with its uncounted ancestors when its first file is kept.
+    // and of its sub-folders' to three levels, depth first, every one of them.
     void list_drive() {
         drive_names_.clear();
         const std::string root = options_.drive + "/odrig";
@@ -347,21 +346,7 @@ public:
             }
         }
         std::sort(found.begin(), found.end(), before);
-        std::vector<std::string> counted;
-        for (const std::string &path : found) {
-            std::vector<std::string> added;
-            for (size_t slash = path.find('/'); slash != std::string::npos; slash = path.find('/', slash + 1)) {
-                const std::string folder = path.substr(0, slash);
-                if (std::find(counted.begin(), counted.end(), folder) == counted.end()) {
-                    added.push_back(folder);
-                }
-            }
-            if (drive_names_.size() >= 256 || counted.size() + added.size() > 32) {
-                break;
-            }
-            counted.insert(counted.end(), added.begin(), added.end());
-            drive_names_.push_back(path);
-        }
+        drive_names_ = found;
     }
 
     void pull() {
@@ -766,10 +751,12 @@ private:
         Host &host = *static_cast<Host *>(ctx);
         host.check_name(name);
         // A file is read from its start, each call where the last for that file ended; only
-        // `read`, a command, begins where it is asked to.
+        // a command, and the files of a drive's index and of its rebuild, begin where they
+        // are asked to.
         const auto ended = host.read_at_ends_.find(name);
         const bool goes_on = ended != host.read_at_ends_.end() && offset == ended->second;
-        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_)) {
+        const bool anywhere = std::strncmp(name, "drive/index-", 12) == 0 || std::strncmp(name, "drive/rebuild", 13) == 0;
+        if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
         }
         std::string content;

@@ -3,6 +3,7 @@
 #include "catalog.h"
 
 #include "content.h"
+#include "drive.h"
 #include "mapping_control.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -67,6 +68,12 @@ Readiness readiness_of(const Core &core) {
             counts.unavailable += state == kDriveLeftOut ? 1 : 0;
         }
     }
+    if (core.indexed && core.drive_number != 0) {
+        // A drive read from its index: its files are known from it, and those left out
+        // since it was taken up are unavailable.
+        counts.checked += core.index->files;
+        counts.unavailable += core.index->left_out;
+    }
     return counts;
 }
 
@@ -82,8 +89,8 @@ void checking_of(const Core &core, Reply &reply) {
             reply.text("\"");
             return;
         }
-        if (core.rebuild == 1 + kExternal && at < core.drive_count) {
-            drive_given_name(core, at, name, sizeof name);
+        if (core.rebuild == 1 + kExternal && at < core.rebuild_total &&
+            core.host.drive_name(core.host.ctx, core.drive_number, at, name, sizeof name) == 1) {
             reply.text("\"");
             reply.escaped(name);
             reply.text("\"");
@@ -149,7 +156,7 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"playing\":");
     if (core.playing == kPlaylist && core.tree_known && core.current != 0) {
         // The playlist of a folder of the drive, while the drive is in and holds it.
-        reply.number(core.folders[core.current].id);
+        reply.number(core.current_folder.id);
     } else {
         reply.id_or_null(core, core.playing);
     }
@@ -213,15 +220,15 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
         reply.text("\"");
         reply.text(core.files[core.items[shown].first].name);
         reply.text("\"");
-    } else if (shown != kNothing && is_drive(shown) && core.host.drive_name(core.host.ctx, core.drive_number, shown - kDriveBase, name, sizeof name) == 1) {
+    } else if (shown != kNothing && is_drive(shown) && drive_row(core, shown - kDriveBase) != nullptr) {
         reply.text("\"");
-        reply.escaped(name);
+        reply.escaped(drive_row(core, shown - kDriveBase)->name);
         reply.text("\"");
     } else {
         reply.text("null");
     }
     reply.text(",\"playlist\":");
-    if (core.playing == kPlaylist && core.tree_known && core.current != 0 && tree_folder_path(core, core.current, name, sizeof name) != 0) {
+    if (core.playing == kPlaylist && core.tree_known && core.current != 0 && drive_folder_path(core, core.current, name, sizeof name) != 0) {
         reply.text("\"");
         reply.escaped(name);
         reply.text("\"");
@@ -318,7 +325,7 @@ bool crc_word(const Words &words, uint32_t word, uint32_t *value) {
 
 // The words of a level from the word `first` on: none or `<from>` for the root, `in
 // <folder-id>` or `in <folder-id> <from>` for a folder of the drive's tree. False when they
-// are not in their form; the level is kFolderMost for an id that is no folder's.
+// are not in their form; the level is kNoFolder for an id that is no folder's.
 bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t *level, uint32_t *from) {
     *level = 0;
     *from = 0;
@@ -328,7 +335,8 @@ bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t 
         if (words.count < at + 2 || !number_word(words, at + 1, 1, 0xFFFFFFFFu, &id)) {
             return false;
         }
-        *level = tree_folder_with_id(core, id);
+        uint32_t value = 0;
+        *level = drive_find(core, id, &value) == 'd' ? value : kNoFolder;
         at += 2;
     }
     if (words.count == at) {
@@ -526,7 +534,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         // The root for `play all`; else an item of the show, an animation of the drive or
         // a folder of the drive's tree.
-        uint32_t folder = all ? 0 : kFolderMost;
+        uint32_t folder = all ? 0 : kNoFolder;
         uint32_t item = kNothing;
         if (all) {
             tree_choose(core, 0);
@@ -539,26 +547,28 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
                 item = position;
             }
         }
-        if (!all && item == kNothing && core.drive != nullptr && drive_has_id(core, id)) {
-            item = kDriveBase + drive_place_of(core, id);
-        }
-        if (!all && item == kNothing && drive_place_holding(core, id) != kDriveMost &&
-            core.drive[drive_place_holding(core, id)].state == kDriveLeftOut) {
-            // A file of the drive that was left out for a fault.
-            return refuse(reply, "unavailable");
+        uint32_t value = 0;
+        const uint8_t kind = !all && item == kNothing ? drive_find(core, id, &value) : 0;
+        if (kind == 'f') {
+            const DriveRow *row = drive_row(core, value);
+            if (row != nullptr && row->listed && row->fault != kNone) {
+                // A file of the drive that was left out for a fault.
+                return refuse(reply, "unavailable");
+            }
+            if (row != nullptr && row->listed) {
+                item = kDriveBase + value;
+            }
         }
         // A folder of the drive's tree: its playlist becomes current, and it plays from
         // its first animation, or the root does in its place.
-        if (!all && item == kNothing) {
-            folder = tree_folder_with_id(core, id);
-            if (folder != kFolderMost) {
-                tree_choose(core, folder);
-                player_playlist_chosen(core, core.latest);
-                playlist_changed(core);
-                item = player_first_in_playlist(core);
-            }
+        if (kind == 'd') {
+            folder = value;
+            tree_choose(core, folder);
+            player_playlist_chosen(core, core.latest);
+            playlist_changed(core);
+            item = player_first_in_playlist(core);
         }
-        if (item == kNothing && (all || folder == kFolderMost)) {
+        if (item == kNothing && (all || folder == kNoFolder)) {
             // `play all` while the playlist has no animation, or an id that nothing has.
             return refuse(reply, "unknown-id");
         }
@@ -575,7 +585,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         // jump, unless a playlist was chosen and plays from its first.
         if (!is_drive(item) && core.items[item].is_cycle) {
             player_play_cycle(core, item);
-        } else if (folder != kFolderMost) {
+        } else if (folder != kNoFolder) {
             player_play_all(core, item);
         } else {
             player_jump(core, item);
@@ -597,7 +607,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (level == kFolderMost) {
+        if (level == kNoFolder) {
             return refuse(reply, "unknown-id");
         }
         return content_list(core, level, from, reply);
@@ -608,7 +618,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         if (words.count >= 2 && words.is(1, "get")) {
             if (!level_words(core, words, 2, &level, &from)) return refuse(reply, "bad-argument");
             if (core.invalid) return refuse(reply, "show-invalid");
-            if (level == kFolderMost) return refuse(reply, "unknown-id");
+            if (level == kNoFolder) return refuse(reply, "unknown-id");
             return order_get(core, level, from, reply);
         }
         uint32_t revision, id, before = 0;

@@ -89,7 +89,7 @@ Every function receives `ctx` as its first argument.
 | `drive_name` | `int drive_name(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity)`: the name of the file at this place, counted from 0, of the list of that drive, as the drive has it, into `buffer` with a zero after it, cut to `capacity - 1` bytes; for a file in a sub-folder of the drive's folder, its path from that folder, the parts joined by `/`. Returns 1, or 0 when that drive has no file at that place or is not plugged in any more. `NULL` when `drive` is. |
 | `drive_space` | `int drive_space(void *ctx, uint32_t drive, uint64_t *free_bytes, uint64_t *total_bytes)`: optional mounted-volume capacity; returns 1, or -1 if unavailable or its generation changed. The shared core reports null counters on failure. It performs no writes. |
 | `about` | `int about(void *ctx, char *buffer, size_t capacity)`: optional; a text that names the host, its build, its storage and the reason of its last start, into `buffer` with a zero after it, cut to `capacity - 1` bytes. Returns 1, or 0 when it has none. The core asks it at each `status`, with room for 96 bytes, and reports it as `host`. `NULL` for a host without it. |
-| `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, at most 256 files and 32 sub-folders, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog. |
+| `drive_list` | `int32_t drive_list(void *ctx, uint32_t drive)`: optional; lists the drive's folder `odrig` and its sub-folders to three levels now, depth first, a folder's animation files by the bytes of their names and then its sub-folders by the bytes of their names, every file or, as the firmware does, up to the 256th file and the 32nd sub-folder, and returns the number of files listed, or -1 when that drive is not plugged in any more. A host that has it lists the folder only when it is called: the core calls it for a drive without a catalog and for a rebuild of a drive's catalog. |
 | `drive_bind` | `int drive_bind(void *ctx, uint32_t drive, uint32_t place, const char *name)`: optional; gives the place to the file of the drive's folder with this name, so that `drive_name` gives the name and `drive/<place>` opens it. Returns 1, or 0 when that drive is not plugged in any more or the name is not one of the drive. Without it every drive is listed. |
 | `drive_writable` | `int drive_writable(void *ctx, uint32_t drive)`: optional; 1 when the core may change the files of that drive with the storage functions, by the names `drive/<name>`, 0 otherwise. Without it the drive is read only. |
 
@@ -108,8 +108,9 @@ The last seven members are the storage functions: three that write a file, `rena
   `order.txt` and `order.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
-  that file ended; only the commands `read` and `catalog page` begin at the offset they are
-  given. Between two
+  that file ended; only the commands `read` and `catalog page`, and the reads of the files
+  of a drive's index and of a rebuild of it, `drive/index-...` and `drive/rebuild...`, begin
+  at the offset they are given. Between two
   calls for one file there may be calls for another.
   It renames and removes no file that `open` holds or that is being written.
 - A host without storage that can be changed sets `write_open` to `NULL`. The core then
@@ -551,60 +552,70 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
 ## A drive
 
 A host with a drive gives the core animations that are not in the show: the files of the
-folder `odrig` of a USB flash drive. The host makes the drive's list, as its member
-`drive_name` says; the core keeps for each place of the list its state, its size, its
-length and its id, and asks the host for a name only when `list` writes it or a log line
-needs it.
+folder `odrig` of a USB flash drive or a microSD card. A drive with a catalog is read from
+its index, [catalog.md](catalog.md#the-index-of-a-drive), as it is needed, whatever the
+number of its files; a drive without one is listed by the host, as its member `drive_name`
+says, and the core keeps for each place of the list its state, its size, its length and
+its id, and asks the host for a name only when `list` writes it or a log line needs it.
 
 - At each refresh, before the LED data is made, the core asks `drive`. When the number
   differs from the one it holds, it drops what it knew of the old drive. For a number
   other than 0 and a host with `drive_bind`, it reads the drive's catalog first, as the
   next item says; a drive without one, and every drive of a host without `drive_bind`, is
-  listed (`drive_list`, when the host has it), its files counted with `drive_name`, at
-  most 256, each given its id and marked to be checked.
+  listed (`drive_list`, when the host has it), its files counted with `drive_name`, each
+  given its id and marked to be checked. The core takes the listing's files up to the
+  256th, and up to the first whose folder would be the 33rd sub-folder.
 - A drive's catalog is read by the check after the start once the installed files are
-  read, one step at a time at its pace, each step one read of at most 512 bytes: a commit
-  record that is whole is finished when `drive_writable` says 1 and makes the catalog
-  damaged otherwise; then the marker; then each page, whose entries become places with
-  `drive_bind`, `order_drive_named` and the lowest free id, not yet in the playlist;
-  then `order.txt`; then every place joins the playlist at once, or is left out for an
-  entry of another canvas or a fault remembered by its name and CRC-32. A page that does
-  not agree with the marker drops every place: the catalog is damaged. While the catalog
-  is read, the second source taken by an upload makes the page be read again. Once read,
-  the marker is read again at the first refresh 10,000 ms later, and each 10,000 ms; when
-  it differs, the drive's places are dropped and the catalog is read again. A file the
-  player leaves out is remembered with its entry's CRC-32, read from its page.
-- The check after the start goes on with the drive once the installed files are read.
-  It first reads `order.txt`, to know the place of each of the drive's files in the saved
-  order, see [the saved order](#the-saved-order), and then the drive's files, in the order
-  of their places, at the same pace and through the same second decoders. Its first step
+  read, one step at a time at its pace: a commit record that is whole is finished when
+  `drive_writable` says 1 and makes the catalog damaged otherwise; then the marker, of
+  version 2. A whole marker makes the drive read from its index at once: every file the
+  index names is in the playlist and in `list`, and neither a page, nor a row, nor an
+  animation is read for that. A marker of version 1 is `incompatible`. Once read, the
+  marker is read again at the first refresh 10,000 ms later, and each 10,000 ms; when it
+  differs, the drive's animations are dropped and the catalog is read again.
+- The drive's cursor, a block the core takes at the start for a host with a drive, reads
+  the index as the core needs it: a line of the table for a folder, a row of a folder's
+  file for a file, a line of the map for an id, each by its number, the map and the table
+  by binary search. It holds a room of 512 bytes, which takes as many whole lines of a file
+  as fit in one read, with the name of the file and the offset they are from; the counts of
+  the table's and the map's lines, from the marker; the last two rows read, each with its
+  position, id, CRC-32, size, canvas, length, type, fault and path; the folder of the last
+  file found; and the files left out since the drive was taken up. A row of another canvas
+  is left out with `size-mismatch`, and one whose path and CRC-32 are among the files
+  remembered as left out with that fault. A line out of its form, or a file of the index
+  shorter than its lines, makes the catalog `damaged`, `line`, at the next refresh, and
+  the drive's animations go. The CRC-32s of the index's files, and the pages, are not read:
+  the PC tool checks them.
+- The check after the start goes on with a listed drive once the installed files are
+  read: the drive's files, in the order of their places, at the same pace and through the
+  same second decoders. Its first step
   on a file reads the file's first 512 bytes. A file that is whole and made for the canvas
   joins the playlist as soon as its check has ended. One that is not, or one for which no
   id is left, is left out, and the host's log gets
   `drive file <name> left out: <reason>`. The drive's check does not make
   any command answer `busy`. While an upload is open it waits, and the file it was in is
   read again from its start afterwards.
-- A drive's file gets its id when the drive is taken up, before it is checked: the lowest
-  from 60001 up that no item of the show and no file of the drive before it has. The same
-  files with the same show get the same ids, and a file left out keeps its id.
-- The drive's sub-folders make a tree, built from the names of the places once every file
-  has its id: a table of at most 32 folders beside the root, in the listing's order, each
-  with a place at or below it, its depth and the index after its last descendant, so that
-  a folder's subtree is one range of the table; and for each place the index of its
-  folder. A listed drive's tree is built at once; a cataloged drive's when its places are
-  published, since its pages name a folder's files in any order: a folder is put before
-  the folders below it and among its siblings by the bytes of its name, one part of the
-  path at a time, not by the bytes of the whole paths. A place whose folder would be the
-  33rd sub-folder, which only a catalog can name, is left out with `too-many-folders`. The
-  folders get ids after the files', from the same pool, in the order of the table, and
-  `list` gives each as `{"id":<id>,"playlist":"<path>","external":true}` after the show's
-  items and before the files. The tree is dropped with the places; a removal takes the
-  folders left without a file out of it, the others keeping their ids and their order; a
-  file uploaded to the drive lies in the drive's folder itself, the root's.
-- The playlist is walked by the exhausting key of each animation: the index of its folder
-  in the table, 0 for an item of the show, then its key in the saved order. The range
-  walked is the current playlist's, the folders of its subtree, or the root's, the whole
-  table, while the current one has nothing to play; which it is is judged where a turn
+- A listed drive's file gets its id when the drive is taken up, before it is checked: the
+  lowest from 60001 up that no item of the show and no file of the drive before it has. The
+  same files with the same show get the same ids, and a file left out keeps its id. An
+  indexed drive's files and folders have the ids of its map.
+- The drive's files are positions of its walk: the root's files, then each folder's in the
+  table's order; a drive's file is the position kDriveBase and its position in the walk. A
+  listed drive's sub-folders make a tree, built from the names of the places once every
+  file has its id: a table of at most 32 folders beside the root, in the listing's order,
+  each with the place of the first file at or below it, its own files, its depth and the
+  index after its last descendant, so that a folder's subtree is one range of the table
+  and its files one range of places, which are the walk. Its folders get ids after the
+  files', from the same pool, in the order of the table. An indexed drive's tree is the
+  index's table. `list` gives a folder as `{"id":<id>,"playlist":"<path>","external":true,"files":<n>}`
+  after the show's items and before the files of its level. The tree is dropped with the
+  drive; a removal takes the folders left without a file out of it, the others keeping
+  their ids and their order; a file uploaded to the drive lies in the drive's folder
+  itself, the root's.
+- The playlist is walked in its range: the show's animations by their keys in the saved
+  order, then the drive's files in the walk. The range is the current playlist's, the
+  files of its folder's subtree, or the root's, the show's animations and every file,
+  while the current one has nothing to play; which it is is judged where a turn
   ends, so that the current playlist takes over at the end of the turn in progress, from
   its first animation. The current playlist is kept as its path and its index in the
   table, found again from the path whenever the tree is built, and the root stands for a
@@ -619,34 +630,54 @@ needs it.
   next folder of the table current, the root after the last and while the tree is not
   known, and the new playlist plays from its first animation, or a cycle goes on. The
   whole rounds that a long time without a refresh takes off at once end before the
-  window's end, and a rotation sums the new playlist's round anew; the root alone,
+  window's end, and a rotation sums the new playlist's round anew; with an indexed drive
+  no round is taken off at once, since summing one would read every row: the turns are
+  walked one at each refresh. The root alone,
   current again at its window's end, goes on as it was with a fresh window. `status`
   writes the seconds left as `left`, its last member.
-- A drive whose host says it can be written, with a catalog that is `ok`, is changed by
-  the core: an upload to it is written as `drive/upload.part`, checked, and moved onto its
-  name with its entry in one commit of the drive's catalog; a removal takes the entry out
-  and removes the file in one commit. A replacement keeps its place and its id, and what
-  plays the file plays the new one from its start; a new file takes the first place a
-  removal freed, or the next one, and the lowest free id. The core's own commit gives the
-  marker's CRC-32 to the look, which does not read the drive again for it.
-- `catalog rebuild external` drops the drive's places, lists the folder once and reads each
-  file with the check's steps: a file joins as it is read, or is left out, and at the end
-  the drive's catalog is committed anew. A drive pulled out ends the rebuild.
+- A drive whose host says it can be written, read from its index, is changed by the core:
+  an upload to it is written as `drive/upload.part`, checked, and moved onto its name in
+  the root with its entry and its row in one commit of the drive's catalog and index; a
+  removal takes the entry and the row out, with the folders left without a file, and
+  removes the file in one commit. Each file of the index the change writes is streamed
+  from the old one through the chunk buffer, a line at a time, as `.new`. A replacement
+  keeps its row and its id, and what plays the file plays the new one from its start; a
+  new file goes last among the root's files with the lowest id the map does not hold,
+  found by binary search, and the positions the core holds at or after it move on by one;
+  a removal moves those after it back by one. The core's own commit gives the marker's
+  CRC-32 to the look, which does not read the drive again for it.
+- `catalog rebuild external` lists the drive's folder once and reads every listed file
+  with the check's steps, without a limit, then writes the drive's catalog and index anew,
+  a few lines at each step, through two files of its own that no reader reads,
+  `rebuild.tmp` and `rebuild-folders.tmp`: the scan, a line for each listed file; the
+  pages, one pass over the scan for each; the draft of the table, a line for each folder
+  that begins at a file that passed; the folders' files, the files' rows in the order of
+  their names with the walk's ids and then the sub-folders' rows; the map; the table, each
+  line with the CRC-32 of its folder's file, read again whole; and the commit, whose record
+  also removes the files of the old table's folders whose ids the new one has not. An
+  indexed drive plays from its old index meanwhile; a listed drive's places are dropped,
+  and each joins as it is read. At the end the drive is read again from its new index, as
+  after another marker. `catalog cancel`, a failed call and a drive pulled out end the
+  rebuild, and what it wrote is removed, but from a drive that is gone.
 - The core remembers the last 16 files of drives it left out for a fault in this boot: the
   name the drive gave each, cut to 32 characters, the number and the CRC-32 of its first
-  bytes, at most 512, and the reason. A file of a drive taken up later with the same name
-  and the same first bytes is left out again with that reason after its first step, and
-  its body is not read. Another file of the same name is checked as any other.
-- The playlist is the show's animations and the drive's in the saved order; without
-  one, the show's and then the drive's, in the order of their places. A drive's animation has the turn of an animation without `repeat` and
+  bytes, at most 512, and the reason; a file of an indexed drive with its row's CRC-32 in
+  place of its first bytes. A file of a drive taken up later with the same name and the
+  same first bytes is left out again with that reason after its first step, and its body
+  is not read; a row of an index with the same path and CRC-32 at once. Another file of
+  the same name is checked as any other.
+- The playlist is the show's animations in the saved order, then the drive's in its walk.
+  A drive's animation has the turn of an animation without `repeat` and
   `max_seconds`. When nothing plays and a drive's animation joins, the playlist plays
   from it: a show without an animation of its own plays the drive's.
-- `play <id>` finds an id among the show's items and then among the drive's animations;
-  `status` names a drive's animation by its id. `list` lists the drive's animations
-  after the show's items, with the file's name on the drive written as a JSON string,
-  and in their places the files left out with a fault, with `"bytes":null` and `fault`.
-  `play` of a file left out is refused with `unavailable`. `remove`, `remove many`,
-  `ignore` and `upload begin` of a drive's id are answered with `in-use`.
+- `play <id>` finds an id among the show's items and then among the drive's files and
+  folders; `status` names a drive's animation by its id, with its path as `file`. `list`
+  lists the root's level after the show's items, and `list in <id>` a folder's, with the
+  file's name on the drive written as a JSON string, and in their places the files left
+  out with a fault, with `"bytes":null` and `fault`. `play` of a file left out is refused
+  with `unavailable`. `remove` of an indexed drive's file removes it when the core may
+  write the drive; `remove` of another drive's id, `remove many`, `ignore` and `upload
+  begin` of a drive's id are answered with `in-use`.
 - When the drive is pulled out, or another one is plugged in, its animations leave the
   playlist and `list`. When one of them was playing, the playlist goes on with the next
   animation that is left, from its first frame, or nothing plays.
@@ -836,7 +867,7 @@ come through `odrig_core_command` and `odrig_core_feed` in any mixture.
 ## Memory
 
 The core asks the host for memory only inside `odrig_core_begin`, in up to seventeen
-blocks, nineteen with a drive, in the order of the table: two of a fixed size for the byte
+blocks, twenty with a drive, in the order of the table: two of a fixed size for the byte
 entry, five for a host whose storage can be changed, and the others sized from the mapping
 and the show. No
 command, no upload and no check asks for memory. The figures are for the target file,
@@ -845,7 +876,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,872 |
+| The core object | fixed | 3,912 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -862,19 +893,21 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,405** |
+| **Total** | | **125,445** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,922 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,609 bytes for the target file. A host with a drive
-is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
-for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
-out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
-each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
-8 bytes and 104 bytes of room for the current playlist's path, 368.
-With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
+of the check and the saved order: 77,649 bytes for the target file. A host with a drive
+is asked for three blocks more, after the three of the check: the table of a drive
+without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
+files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
+964 bytes: the room of 512 for one read with the name of its file, the two rows read of
+160 bytes each, the counts of the index, the folder of the last row and a rebuild's
+state. The block of the saved order holds after the keys the tree of the drive's folders,
+a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
+368. With it the target file takes 130,489 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 

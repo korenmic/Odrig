@@ -38,10 +38,13 @@ card is missing, and plays the rest from the card.
   in its sub-folders, to three levels down. Names ending in `.odrg` or `.odrgx`, in any
   case, and not beginning with a dot are taken; other files are passed over. The files
   are listed depth first: a folder's files in the order of their names, then each of its
-  sub-folders in the order of their names, the same way. At most 256 files and 32
-  sub-folders are taken, the first in that order; a sub-folder counts when its first
-  file is taken, with the folders above it that were not counted yet. What is beyond
-  the limits is passed over, as is a sub-folder deeper than three levels, one whose name
+  sub-folders in the order of their names, the same way. A card with a catalog has every
+  file of its index, which the PC tool's `import` writes for a card of any size. Of a
+  card without one at most 256 files and 32 sub-folders are taken, the first in that
+  order; a sub-folder counts when its first file is taken, with the folders above it that
+  were not counted yet, and the board's listing, which a rebuild reads too, stops at the
+  same limits. What is beyond the limits is passed over, as is a sub-folder deeper than
+  three levels, one whose name
   begins with a dot or is not sound, and `System Volume Information`. The log line of
   the listing counts what was passed over. Each file is known by its path from `odrig`,
   `night/comet.odrg` for one, and [catalog.md](catalog.md) has the rule of the names.

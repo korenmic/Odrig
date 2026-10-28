@@ -1,5 +1,7 @@
 #include "mapping_control.h"
 
+#include "drive.h"
+
 #include <string.h>
 
 #include "crc32.h"
@@ -178,8 +180,7 @@ bool decode_diagonal(Core &core) {
 
 bool available(const Core &core, uint32_t item) {
     if (is_drive(item)) {
-        const uint32_t place = item - kDriveBase;
-        return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
+        return drive_plays(core, item - kDriveBase);
     }
     return item < core.item_count && !core.items[item].is_cycle && item_usable(core, item);
 }

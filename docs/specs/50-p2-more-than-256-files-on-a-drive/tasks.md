@@ -106,7 +106,7 @@ Rules for every task:
   - Suites: app, onboarding.
   - Requirements: 9.1, 9.2
 
-- [ ] 4. The core keeps a drive's index
+- [x] 4. The core keeps a drive's index
   - `core/src/index.h`, `core/src/index.cpp`, new: the index's rows, read through the
     cursor's room, and written: a folder's file, the table, the map, streamed from the
     old ones with a change; the binary search of the map; the lowest free id.

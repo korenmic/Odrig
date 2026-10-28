@@ -1,6 +1,6 @@
 """`catalog rebuild` and `catalog cancel`: a storage read whole by the check's steps and its
-catalog committed at the end, as the PC library makes it; progress, refusals, a cancel and a
-cut at every step."""
+catalog committed at the end, as the PC library makes it, a drive's with its index; progress,
+refusals, a cancel and a cut at every step."""
 
 import json
 import unittest
@@ -11,7 +11,7 @@ from . import support
 from .test_catalog_drive import card
 from .test_catalog_start import ANIMATIONS, SHOW, with_catalog
 from .test_catalog_writes import a_card, folder_of
-from .test_drive import asked, replies
+from .test_drive import asked, logged, replies
 from .test_playback import T0
 from .test_playlist import CANVAS, loop_of
 
@@ -23,7 +23,9 @@ def polls(begin, count):
 
 
 def catalog_files(files):
-    return {name: data for name, data in files.items() if name.startswith("catalog")}
+    """The files of a catalog, of a drive's index, and those a drive's rebuild writes for
+    itself."""
+    return {name: data for name, data in files.items() if name.startswith(("catalog", "index-", "rebuild"))}
 
 
 def catalog_replies(run):
@@ -133,30 +135,30 @@ class External(unittest.TestCase):
             run = support.start(SHOW, asked(0, "catalog rebuild external") + polls(20, 400) + asked(8100, "catalog", "list"), ["--drive", top])
             left = folder_of(top)
         self.assertEqual(catalog_replies(run)[-1]["external"], {"state": "ok", "generation": 1, "entries": 2, "writable": True})
-        storage = catalog.MemoryStorage(drive)
+        storage = catalog.MemoryStorage(drive, drive=True)
         _, refused = catalog.rebuild(storage, canvas=CANVAS)
         self.assertEqual(sorted(name for name, _ in refused), sorted(["bad.odrg", "x" * 96 + ".odrg"]))
         self.assertEqual(catalog_files(left), catalog_files(storage.files))
+        # The drive is read from its new index: the files it refused are not in it.
         listed = {item["file"]: item.get("fault") for item in replies(run)[-1]["items"] if item.get("external")}
-        self.assertEqual(listed["bad.odrg"], "truncated")
-        self.assertIn("x" * 96 + ".odrg", listed)
+        self.assertEqual(listed, {"Moon Rise.ODRG": None, "sun.odrg": None})
+        self.assertIn("drive file bad.odrg left out: truncated", logged(run))
 
     def test_a_card_with_sub_folders_is_imported_as_the_pc_library_imports_it(self):
         drive = {"sun.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(3, 6), "night/deep/x.odrg": loop_of(2, 7), "a b/c.odrg": loop_of(3, 8), "a-b/d.odrg": loop_of(2, 9),
                  "night/bad.odrg": loop_of(2, 10)[:-4]}
         with a_card(drive) as top:
-            levels = ("list", "list in 60007", "list in 60008", "list in 60009", "list in 60010")
+            levels = ("list", "list in 60006", "list in 60007", "list in 60008", "list in 60009")
             run = support.start(SHOW, asked(0, "catalog rebuild external") + polls(20, 500) + asked(10100, "catalog", *levels), ["--drive", top])
             left = folder_of(top)
         self.assertEqual(catalog_replies(run)[-1]["external"], {"state": "ok", "generation": 1, "entries": 5, "writable": True})
-        storage = catalog.MemoryStorage(drive)
+        storage = catalog.MemoryStorage(drive, drive=True)
         _, refused = catalog.rebuild(storage, canvas=CANVAS)
         self.assertEqual([name for name, _ in refused], ["night/bad.odrg"])
         self.assertEqual(catalog_files(left), catalog_files(storage.files))
         items = [item for reply in replies(run)[-5:] for item in reply["items"]]
         listed = [(item["file"], item.get("fault")) for item in items if "file" in item and item.get("external")]
-        self.assertEqual(listed, [("sun.odrg", None), ("a b/c.odrg", None), ("a-b/d.odrg", None), ("night/bad.odrg", "truncated"), ("night/comet.odrg", None),
-                                  ("night/deep/x.odrg", None)])
+        self.assertEqual(listed, [("sun.odrg", None), ("a b/c.odrg", None), ("a-b/d.odrg", None), ("night/comet.odrg", None), ("night/deep/x.odrg", None)])
         self.assertEqual([item["playlist"] for item in items if "playlist" in item], ["a b", "a-b", "night", "night/deep"])
 
     def test_a_file_copied_onto_a_card_with_a_catalog_joins_after_a_rebuild(self):
@@ -184,7 +186,7 @@ class External(unittest.TestCase):
 
     def test_a_failure_at_every_storage_call_leaves_no_catalog_or_the_one_of_the_pc_library(self):
         drive = {"sun.odrg": loop_of(2, 5), "moon.odrg": loop_of(3, 6)}
-        storage = catalog.MemoryStorage(dict(drive))
+        storage = catalog.MemoryStorage(dict(drive), drive=True)
         catalog.rebuild(storage, canvas=CANVAS)
         whole = catalog_files(storage.files)
         script = asked(0, "catalog rebuild external") + polls(20, 300)

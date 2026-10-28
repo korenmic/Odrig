@@ -4,6 +4,7 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "core_state.h"
+#include "drive.h"
 #include "mapping.h"
 #include "odrig_core.h"
 #include "order.h"
@@ -223,6 +224,10 @@ bool same_name(const char *one, const char *other) {
 }  // namespace
 
 bool drive_id_taken(const Core &core, uint32_t id) {
+    if (core.indexed) {
+        uint32_t value = 0;
+        return drive_find(core, id, &value) != 0;
+    }
     for (uint32_t place = 0; place < core.drive_count; ++place) {
         if (core.drive[place].id == id) {
             return true;
@@ -236,14 +241,14 @@ bool drive_id_taken(const Core &core, uint32_t id) {
     return false;
 }
 
-uint16_t free_drive_id(const Core &core) {
+uint32_t free_drive_id(const Core &core) {
     for (uint32_t id = kDriveFirstId; id <= 65535; ++id) {
         bool taken = drive_id_taken(core, id);
         for (uint32_t item = 0; item < core.item_count && !taken; ++item) {
             taken = core.items[item].id == id;
         }
         if (!taken) {
-            return static_cast<uint16_t>(id);
+            return id;
         }
     }
     return 0;
@@ -285,11 +290,6 @@ void remember_file(Core &core, const char *name, Reason reason) {
 void drive_step(Core &core) {
     if (catalog_drive_loading(core)) {
         catalog_drive_step(core);
-        return;
-    }
-    if (order_drive_due(core)) {
-        // The saved order of the drive's files is known before any of them joins the playlist.
-        order_drive_step(core);
         return;
     }
     while (core.drive_check_at < core.drive_count && core.drive[core.drive_check_at].state != kDriveToCheck) {
@@ -395,14 +395,17 @@ void start(Core &core) {
             core_fail(core, kOutOfMemory, nullptr, kNone);
             return;
         }
-        // A host with a drive: an entry for each place of the drive's list.
+        // A host with a drive: an entry for each place of the list of a drive without a
+        // catalog, the boot's memory of files left out, and the cursor over a drive's index.
         if (core.host.drive != nullptr && core.host.drive_name != nullptr) {
             core.drive = static_cast<DriveEntry *>(arena_take(core, kDriveMost * sizeof(DriveEntry)));
             core.remembered = static_cast<Remembered *>(arena_take(core, kRememberedMost * sizeof(Remembered)));
-            if (core.drive == nullptr || core.remembered == nullptr) {
+            core.index = static_cast<DriveIndex *>(arena_take(core, sizeof(DriveIndex)));
+            if (core.drive == nullptr || core.remembered == nullptr || core.index == nullptr) {
                 core_fail(core, kOutOfMemory, nullptr, kNone);
                 return;
             }
+            index_forget(core);
         }
     }
 
@@ -496,31 +499,36 @@ void drive_touch(Core &core) {
     core.drive_number = number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    core.indexed = 0;
+    index_forget(core);
     tree_clear(core);
     catalog_drive_went(core);
     catalog_drive_plugged(core);
     if (catalog_drive_loading(core)) {
-        // A host that is given the names: the drive's catalog is read first.
+        // A host that can read the drive's files by their names: the drive's catalog is read
+        // first.
         player_drive_changed(core);
-        order_drive_found(core);
         return;
     }
     drive_take_listed(core);
 }
 
-void drive_take_listed(Core &core) {
+void drive_take_listed(Core &core, int32_t *listed) {
     const uint32_t number = core.drive_number;
     core.drive_count = 0;
     core.drive_check_at = 0;
+    core.indexed = 0;
+    index_forget(core);
     tree_clear(core);
-    if (number != 0 && core.host.drive_list != nullptr) {
-        // A host that lists the folder only when asked.
-        core.host.drive_list(core.host.ctx, number);
+    const int32_t count = number != 0 && core.host.drive_list != nullptr ? core.host.drive_list(core.host.ctx, number) : -1;
+    if (listed != nullptr) {
+        *listed = count;
     }
+    // The first 256 files of the listing; the tree drops those from the first whose folder
+    // would be past the 32nd on.
     char name[kDriveListedName];
     while (number != 0 && core.drive_count < kDriveMost &&
            core.host.drive_name(core.host.ctx, number, core.drive_count, name, sizeof name) == 1) {
-        order_drive_named(core, core.drive_count, name);
         DriveEntry &entry = core.drive[core.drive_count++];
         entry.bytes = 0;
         entry.total_ms = 0;
@@ -528,15 +536,82 @@ void drive_take_listed(Core &core) {
         entry.state = kDriveToCheck;
         entry.fault = kNone;
     }
+    tree_build(core);
     // Every file has its id at once, in the order of the list, before it is checked; the
     // folders come after them.
     for (uint32_t place = 0; place < core.drive_count; ++place) {
-        core.drive[place].id = free_drive_id(core);
+        core.drive[place].id = static_cast<uint16_t>(free_drive_id(core));
     }
-    tree_build(core);
-    // The playlist goes on after an animation that left by the keys it had.
+    for (uint32_t folder = 1; core.folders != nullptr && folder <= core.folder_count; ++folder) {
+        core.folders[folder].id = static_cast<uint16_t>(free_drive_id(core));
+    }
+    // The current playlist's folder is found again by its path.
+    if (core.tree_known) {
+        tree_find_current(core);
+    }
+    // The playlist goes on after an animation that left.
     player_drive_changed(core);
-    order_drive_found(core);
+}
+
+void drive_log_left_out(Core &core, const char *name, Reason reason) {
+    if (core.host.log == nullptr) {
+        return;
+    }
+    char text[256];
+    const char head[] = "drive file ";
+    const char middle[] = " left out: ";
+    const char *why = reason_name(reason);
+    uint32_t length = 0;
+    for (uint32_t at = 0; head[at] != '\0'; ++at) {
+        text[length++] = head[at];
+    }
+    for (uint32_t at = 0; name[at] != '\0' && length < 160; ++at) {
+        text[length++] = name[at];
+    }
+    for (uint32_t at = 0; middle[at] != '\0'; ++at) {
+        text[length++] = middle[at];
+    }
+    for (uint32_t at = 0; why[at] != '\0' && length + 1 < sizeof text; ++at) {
+        text[length++] = why[at];
+    }
+    text[length] = '\0';
+    core.host.log(core.host.ctx, text);
+}
+
+void drive_faulted(Core &core, uint32_t position, Reason reason) {
+    if (!core.indexed) {
+        core.drive[position].state = kDriveLeftOut;
+        drive_left_out(core, position, reason);
+        return;
+    }
+    const DriveRow *row = drive_row(core, position);
+    if (row == nullptr) {
+        return;
+    }
+    // Remembered by its name and its entry's CRC-32, so that the row is left out from now on,
+    // in this index and in one read again.
+    if (core.remembered != nullptr && is_file_fault(reason)) {
+        Remembered &one = core.remembered[core.remembered_next];
+        core.remembered_next = (core.remembered_next + 1) % kRememberedMost;
+        uint32_t at = 0;
+        for (; row->name[at] != '\0' && at + 1 < kFaultNameSize; ++at) {
+            one.name[at] = row->name[at];
+        }
+        one.name[at] = '\0';
+        one.reason = static_cast<uint8_t>(reason);
+        one.first_read = kRememberedWhole;
+        one.crc = row->crc;
+    }
+    ++core.index->left_out;
+    for (uint32_t slot = 0; slot < 2; ++slot) {
+        if (core.index->rows[slot].position == position) {
+            core.index->rows[slot].fault = static_cast<uint8_t>(reason);
+        }
+    }
+    char name[kDrivePathRoom];
+    memcpy(name, row->name, sizeof name);
+    name[sizeof name - 1] = '\0';
+    drive_log_left_out(core, name, reason);
 }
 
 void drive_left_out(Core &core, uint32_t place, Reason reason) {
@@ -579,35 +654,11 @@ void drive_left_out(Core &core, uint32_t place, Reason reason) {
     core.host.log(core.host.ctx, text);
 }
 
-uint32_t drive_place_of(const Core &core, uint32_t id) {
-    for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (core.drive[place].state == kDriveInPlaylist && core.drive[place].id == id) {
-            return place;
-        }
-    }
-    return kDriveMost;
-}
-
-bool drive_has_id(const Core &core, uint32_t id) {
-    return drive_place_of(core, id) != kDriveMost;
-}
-
-uint32_t drive_place_holding(const Core &core, uint32_t id) {
-    for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
-        if (core.drive[place].id == id && id != 0) {
-            return place;
-        }
-    }
-    return kDriveMost;
-}
-
 void drive_check_yields(Core &core) {
     if (core.checker != nullptr && core.check_header_read) {
         core.checker->file.close();
         core.check_header_read = 0;
     }
-    catalog_drive_yields(core);
-    order_drive_yields(core);
 }
 
 void check_file_left(Core &core, uint32_t file) {
@@ -654,6 +705,15 @@ void check_after_start(Core &core, bool in_step, bool on_time) {
 }
 
 void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t room) {
+    if (core.indexed) {
+        const DriveRow *row = drive_row(core, place);
+        uint32_t at = 0;
+        for (; row != nullptr && row->name[at] != '\0' && at + 1 < room; ++at) {
+            name[at] = row->name[at];
+        }
+        name[at] = '\0';
+        return;
+    }
     if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, room) != 1) {
         drive_file_name(place, name);
     }

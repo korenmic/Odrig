@@ -167,8 +167,9 @@ On the board the drive is a USB stick or a microSD card, as
   sub-folders to three levels down: those whose names end in `.odrg` or `.odrgx`, in any
   case, and do not begin with a dot; other files are passed over. They are listed depth
   first, a folder's files in the order of their names and then its sub-folders in the
-  order of their names, at most 256 files and 32 sub-folders, as
-  [microsd.md](microsd.md#preparing-a-card) says; a file in a sub-folder is known by its
+  order of their names, every file of the index of a drive with a catalog, and at most 256
+  files and 32 sub-folders of one without, as [microsd.md](microsd.md#preparing-a-card)
+  says; a file in a sub-folder is known by its
   path from `odrig`, `night/comet.odrg`, in `list`, in the saved order and in the catalog.
 - The sub-folders make a tree, the folder `odrig` its root: a sub-folder with an animation
   file at any depth below it is a playlist of its own, with its path and an id from the

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "core_state.h"
+#include "drive.h"
 
 namespace odrig {
 
@@ -136,7 +137,12 @@ struct Reply {
         } else if (item == kPlaylist) {
             text("\"all\"");
         } else if (is_drive(item)) {
-            number(core.drive[item - kDriveBase].id);
+            const DriveRow *row = drive_row(core, item - kDriveBase);
+            if (row != nullptr) {
+                number(row->id);
+            } else {
+                text("null");
+            }
         } else {
             number(core.items[item].id);
         }

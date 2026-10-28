@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "catalog.h"
+#include "drive.h"
 #include "odrig_core.h"
 #include "clock.h"
 #include "mapping_control.h"
@@ -25,7 +26,8 @@ void close_stream(Core &core) {
 // drive's animation is in the playlist only once its length is known.
 uint64_t length_of(const Core &core, uint32_t animation) {
     if (is_drive(animation)) {
-        return core.drive[animation - kDriveBase].total_ms;
+        const DriveRow *row = drive_row(core, animation - kDriveBase);
+        return row != nullptr ? row->total_ms : 0;
     }
     return core.files[core.items[animation].first].total_ms;
 }
@@ -42,13 +44,18 @@ uint32_t seconds_of(const Core &core, uint32_t animation) {
 
 // The id `list` and `status` give the animation at a position of the playlist.
 uint32_t id_of(const Core &core, uint32_t animation) {
-    return is_drive(animation) ? core.drive[animation - kDriveBase].id : core.items[animation].id;
+    if (is_drive(animation)) {
+        const DriveRow *row = drive_row(core, animation - kDriveBase);
+        return row != nullptr ? row->id : 0;
+    }
+    return core.items[animation].id;
 }
 
 // What the animation at a position of the playlist holds, as its header says.
 uint8_t type_of(const Core &core, uint32_t animation) {
     if (is_drive(animation)) {
-        return core.drive[animation - kDriveBase].type;
+        const DriveRow *row = drive_row(core, animation - kDriveBase);
+        return row != nullptr ? row->type : kTypeFrames;
     }
     return core.files[core.items[animation].first].type;
 }
@@ -68,8 +75,7 @@ uint64_t whole_passes(const Core &core, uint32_t animation, uint64_t turn) {
 // playlist.
 bool plays(const Core &core, uint32_t position) {
     if (is_drive(position)) {
-        const uint32_t place = position - kDriveBase;
-        return place < core.drive_count && core.drive[place].state == kDriveInPlaylist;
+        return drive_plays(core, position - kDriveBase);
     }
     return position < core.item_count && !core.items[position].is_cycle && !core.items[position].ignored &&
            item_usable(core, position);
@@ -91,10 +97,12 @@ uint32_t cycle_animation(const Core &core, const ItemInfo &cycle, uint64_t turn)
 // zero and no frame decoded.
 Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop) {
     close_stream(core);
-    char drive_name[kDriveNameSize];
+    char drive_name[kDriveOpenRoom];
     const char *name = drive_name;
     if (is_drive(animation)) {
-        drive_file_name(animation - kDriveBase, drive_name);
+        if (!drive_open_name(core, animation - kDriveBase, drive_name)) {
+            return kFileMissing;
+        }
     } else {
         name = core.files[core.items[animation].first].name;
     }
@@ -242,14 +250,12 @@ uint64_t turn_ms(const Core &core, uint32_t position) {
     return longest != 0 && turn > longest ? whole_passes(core, position, longest) : turn;
 }
 
-// The animation that plays with the smallest key, among the show's items alone or among
-// them and the drive's, whose key is above `above` unless `any` is set; kNothing when none.
-uint32_t lowest_playing(const Core &core, bool with_drive, uint32_t above, bool any) {
+// The show's animation that plays with the smallest key above `above` unless `any` is
+// set; kNothing when none.
+uint32_t lowest_playing(const Core &core, uint32_t above, bool any) {
     uint32_t best = kNothing;
     uint32_t best_key = 0;
-    const uint32_t places = with_drive ? core.drive_count : 0;
-    for (uint32_t at = 0; at < core.item_count + places; ++at) {
-        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
+    for (uint32_t position = 0; position < core.item_count; ++position) {
         if (!plays(core, position)) {
             continue;
         }
@@ -262,42 +268,29 @@ uint32_t lowest_playing(const Core &core, bool with_drive, uint32_t above, bool 
     return best;
 }
 
-// The folder of a position in the drive's tree: 0 for an item of the show and for a place
-// of no folder.
-uint32_t folder_of(const Core &core, uint32_t position) {
-    if (!is_drive(position) || core.drive_folder == nullptr || !core.tree_known) {
-        return 0;
-    }
-    const uint8_t byte = core.drive_folder[position - kDriveBase];
-    return byte == kNoFolder ? 0 : byte;
-}
-
-// The exhausting key of a position: its folder's index in the table, then its key in the
-// saved order. A playlist walked by it plays its own animations in the saved order, then
-// each of its sub-folders' once, depth first, since the table is in that order.
-uint64_t exhausting_key(const Core &core, uint32_t position) {
-    return static_cast<uint64_t>(folder_of(core, position)) << 32 | order_key(core, position);
-}
-
-// A range of the tree's table: the folders from `first` to `end`.
+// A range of the playlist: the show's items with `show`, and the drive's files at the
+// positions of its walk from `first` to `last`. A playlist walked through its range plays
+// the show's animations in the saved order, then the drive's files in the walk's order,
+// which holds a folder's own files and then each of its sub-folders' once, depth first.
 struct Range {
+    bool show;
     uint32_t first;
-    uint32_t end;
+    uint32_t last;
 };
 
-// The root's range: the whole table, and everything while the tree is not known.
+// The root's range: the show's items and every file of the drive.
 Range root_range(const Core &core) {
-    const Range range = {0, core.tree_known ? core.folder_count + 1u : 1u};
+    const Range range = {true, 0, drive_files(core)};
     return range;
 }
 
 // The current playlist's range: its folder's subtree, the root's while the tree is not
 // known.
 Range current_range(const Core &core) {
-    if (!core.tree_known || core.current == 0 || core.folders == nullptr) {
+    if (!core.tree_known || core.current == 0) {
         return root_range(core);
     }
-    const Range range = {core.current, core.folders[core.current].end};
+    const Range range = {false, core.current_folder.first, core.current_folder.last};
     return range;
 }
 
@@ -306,38 +299,48 @@ Range range_in_use(const Core &core) {
     return core.in_place ? root_range(core) : current_range(core);
 }
 
-bool in_range(const Core &core, Range range, uint32_t position) {
-    const uint32_t folder = folder_of(core, position);
-    return folder >= range.first && folder < range.end;
+bool in_range(Range range, uint32_t position) {
+    if (!is_drive(position)) {
+        return range.show;
+    }
+    const uint32_t at = position - kDriveBase;
+    return at >= range.first && at < range.last;
 }
 
-// The animation that plays with the smallest exhausting key within a range, above `above`
-// unless `any` is set; kNothing when none. Not inlined: the refresh's frame stays small.
-__attribute__((noinline)) uint32_t lowest_in(const Core &core, Range range, uint64_t above, bool any) {
-    uint32_t best = kNothing;
-    uint64_t best_key = 0;
-    for (uint32_t at = 0; at < core.item_count + core.drive_count; ++at) {
-        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
-        if (!plays(core, position) || !in_range(core, range, position)) {
-            continue;
-        }
-        const uint64_t key = exhausting_key(core, position);
-        if ((any || key > above) && (best == kNothing || key < best_key)) {
-            best = position;
-            best_key = key;
+// The first file of the drive at or after a position of the walk within a range that
+// plays, or kNothing. Each file passed over is read. Not inlined: the refresh's frame stays
+// small.
+__attribute__((noinline)) uint32_t drive_playing_from(const Core &core, Range range, uint32_t from) {
+    for (uint32_t at = from > range.first ? from : range.first; at < range.last; ++at) {
+        if (drive_plays(core, at)) {
+            return kDriveBase + at;
         }
     }
-    return best;
+    return kNothing;
 }
 
 uint32_t first_in(const Core &core, Range range) {
-    return lowest_in(core, range, 0, true);
+    if (range.show) {
+        const uint32_t item = lowest_playing(core, 0, true);
+        if (item != kNothing) {
+            return item;
+        }
+    }
+    return drive_playing_from(core, range, range.first);
 }
 
-// The animation after a position within a range: the lowest key above its key, else the
-// lowest in the range.
+// The animation after a position within a range: the next show's animation by its key, or
+// the next file of the walk, else the range's first.
 uint32_t next_in(const Core &core, Range range, uint32_t position) {
-    const uint32_t after = lowest_in(core, range, exhausting_key(core, position), false);
+    uint32_t after = kNothing;
+    if (!is_drive(position)) {
+        after = range.show ? lowest_playing(core, order_key(core, position), false) : kNothing;
+        if (after == kNothing) {
+            after = drive_playing_from(core, range, range.first);
+        }
+    } else {
+        after = drive_playing_from(core, range, position - kDriveBase + 1);
+    }
     return after != kNothing ? after : first_in(core, range);
 }
 
@@ -357,15 +360,14 @@ void judge_in_place(Core &core) {
 // The window has passed at a moment: the next playlist of the tree is current from then,
 // with a window of its own, the root after the last and while the tree is not known.
 void rotate(Core &core, uint64_t at) {
-    const uint32_t next = core.tree_known && core.current < core.folder_count ? core.current + 1u : 0;
+    const uint32_t next = core.tree_known && core.current + 1u < drive_folder_count(core) ? core.current + 1u : 0;
     tree_choose(core, next);
     player_playlist_chosen(core, at);
     playlist_changed(core);
 }
 
-// The position of the animation after this one in the playlist: the next in the
-// exhausting order of the range in use, the first after the last; this one again when no
-// other plays. The current playlist takes over from its first animation as soon as it has
+// The position of the animation after this one in the playlist: the next in the order of
+// the range in use, the first after the last; this one again when no other plays. The current playlist takes over from its first animation as soon as it has
 // something to play again.
 __attribute__((noinline)) uint32_t next_animation(Core &core, uint32_t position) {
     const bool was_in_place = core.in_place != 0;
@@ -412,17 +414,19 @@ __attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_
             }
             turn = longest;
         }
-        if (!rounds_taken && plays(core, core.turn_item) && core.resume_item == kNothing) {
+        if (!rounds_taken && !core.indexed && plays(core, core.turn_item) && core.resume_item == kNothing) {
             // Whole rounds of the playlist in use are taken off at once when the length of
             // every animation of it is known, so that a long time without a refresh costs
-            // one walk over the items.
+            // one walk over the items. Not with a drive read from its index: that would
+            // read every row of it, and its turns are walked one by one.
             rounds_taken = true;
             uint64_t round = 0;
             bool all_known = true;
             const Range range = range_in_use(core);
-            for (uint32_t at = 0; at < core.item_count + core.drive_count && all_known; ++at) {
+            const uint32_t files = drive_files(core);
+            for (uint32_t at = 0; at < core.item_count + files && all_known; ++at) {
                 const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
-                if (!plays(core, position) || !in_range(core, range, position)) {
+                if (!in_range(range, position) || !plays(core, position)) {
                     continue;
                 }
                 if (!is_drive(position)) {
@@ -544,11 +548,8 @@ Shown advance(Core &core, uint64_t now) {
     }
     if (reason != kNone && is_drive(animation)) {
         // A drive's file that cannot be played leaves the playlist, and the show stays valid.
-        const uint32_t place = animation - kDriveBase;
         close_stream(core);
-        core.drive[place].state = kDriveLeftOut;
-        drive_left_out(core, place, reason);
-        catalog_drive_left_out(core, place, reason);
+        drive_faulted(core, animation - kDriveBase, reason);
         player_drive_changed(core);
         return kShowsBefore;
     }
@@ -618,7 +619,7 @@ void player_set_brightness(Core &core, uint8_t value) {
 }
 
 uint32_t player_first_animation(const Core &core) {
-    const uint32_t first = lowest_playing(core, false, 0, true);
+    const uint32_t first = lowest_playing(core, 0, true);
     return first != kNothing ? first : core.item_count;
 }
 
@@ -651,13 +652,65 @@ uint32_t player_window_left(const Core &core) {
 
 void player_jump(Core &core, uint32_t item) {
     const uint32_t cut = core.playing == kPlaylist ? core.turn_item : kNothing;
-    core.resume_item = cut != kNothing && cut != item && plays(core, cut) && !in_range(core, range_in_use(core), item) ? cut : kNothing;
+    core.resume_item = cut != kNothing && cut != item && plays(core, cut) && !in_range(range_in_use(core), item) ? cut : kNothing;
     player_play_all(core, item);
 }
 
 void player_drive_joined(Core &core, uint32_t place) {
     if (core.playing == kNothing && !core.invalid && !core.mapping_test) {
         player_play_all(core, kDriveBase + place);
+    }
+}
+
+namespace {
+
+// A position the player holds, after the drive's walk changed at `at` by `delta`: a file's
+// at or after the change moves with it, the one that went is kNothing.
+uint32_t shifted(uint32_t held, uint32_t at, int32_t delta) {
+    if (held == kNothing || !is_drive(held) || held - kDriveBase < at) {
+        return held;
+    }
+    if (delta < 0 && held - kDriveBase == at) {
+        return kNothing;
+    }
+    return delta < 0 ? held - 1 : held + 1;
+}
+
+}  // namespace
+
+void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
+    const bool turn_went = core.playing == kPlaylist && delta < 0 && core.turn_item == kDriveBase + position;
+    if (core.playing == kPlaylist) {
+        core.turn_item = shifted(core.turn_item, position, delta);
+    }
+    core.resume_item = shifted(core.resume_item, position, delta);
+    core.shown = shifted(core.shown, position, delta);
+    core.mapping_saved_shown = shifted(core.mapping_saved_shown, position, delta);
+    if (core.stream_open && is_drive(core.stream_item)) {
+        const uint32_t moved = shifted(core.stream_item, position, delta);
+        if (moved == kNothing) {
+            close_stream(core);
+        } else {
+            core.stream_item = moved;
+        }
+    }
+    if (turn_went) {
+        // The file whose turn it was went: the playlist goes on with the one after it, now at
+        // its position, from its first frame.
+        const Range range = range_in_use(core);
+        uint32_t next = drive_playing_from(core, range, position);
+        if (next == kNothing) {
+            next = first_in(core, range);
+        }
+        if (next == kNothing) {
+            next = player_first_in_playlist(core);
+        }
+        if (next == kNothing) {
+            core.playing = kNothing;
+            core.shown = kNothing;
+        } else {
+            player_play_all(core, next);
+        }
     }
 }
 

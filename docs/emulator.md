@@ -182,8 +182,9 @@ python -m emulator build/demo-20/show --drive build/stick
 - The folder is listed when the core asks, for a drive without a catalog: the files whose
   names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, of `odrig`
   and of its sub-folders to three levels, depth first, a folder's files by the bytes of
-  their names and then its sub-folders by the bytes of their names, at most 256 files and
-  32 sub-folders; a file in a sub-folder is named by its path, as `night/comet.odrg`. A
+  their names and then its sub-folders by the bytes of their names, every one of them,
+  and the core takes the first 256 files and 32 sub-folders; a file in a sub-folder is
+  named by its path, as `night/comet.odrg`. A
   folder whose name begins with a dot, ends with a space or a dot, holds a character a
   name may not, or is `System Volume Information` is passed over. The folder is not listed
   again while it stays. To take up files added to it, move the folder `odrig` away for two

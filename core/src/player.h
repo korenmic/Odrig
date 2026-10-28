@@ -70,9 +70,14 @@ uint32_t player_window_left(const Core &core);
 // the jump cut plays again after it, from its first frame.
 void player_jump(Core &core, uint32_t item);
 
-// A file of the drive has joined the playlist. When nothing plays, the playlist starts
-// with it.
-void player_drive_joined(Core &core, uint32_t place);
+// A file of the drive has joined the playlist, at a position of the drive's walk. When
+// nothing plays, the playlist starts with it.
+void player_drive_joined(Core &core, uint32_t position);
+
+// The drive's walk changed under the positions the player holds: a file came in at a
+// position, `delta` 1, or the one at a position went, `delta` -1, and the positions after
+// it follow. A held position of a file that went is let go.
+void player_drive_shifted(Core &core, uint32_t position, int32_t delta);
 
 // The drive's animations changed: a drive was plugged in or pulled out, or a file of it
 // left the playlist. When the animation whose turn it is has gone, the playlist goes on

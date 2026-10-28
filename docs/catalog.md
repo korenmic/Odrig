@@ -159,7 +159,11 @@ of the show has a drive's id, the commands mean the item.
 The index agrees with the pages: the same files, with the same fields, and no file twice.
 A reader that finds an index file shorter than its lines or with another CRC-32 than the
 marker or the table gives it finds the catalog `damaged` with `page`, and one whose lines
-are not those its folders make, or that do not agree with the pages, with `line`.
+are not those its folders make, or that do not agree with the pages, with `line`. The
+board's core reads a drive's marker when the drive is plugged in, and the index's lines
+only as it needs them: a line out of its form, or a file shorter than its lines, makes the
+catalog `damaged` with `line` once it is read there; it does not read the pages or the
+CRC-32s of the index's files, which the PC tool checks.
 
 ### What a reader finds
 
@@ -265,11 +269,11 @@ touches (N / 16 on average, at most N), S the size of an animation.
 | Operation | Animation bytes | Catalog |
 |---|---|---|
 | A start | none of a cataloged file | the marker once, and the pages twice: checked, then taken |
-| A drive with a catalog plugged in | none | the marker and the pages, in steps of at most 512 bytes, and the marker again before each page |
-| An unchanged drive | none | one read of the marker, 409 bytes, in 10 seconds |
-| An addition or a replacement | S written and S read back by the check | one page of P lines read and written, the marker, the commit record |
-| A removal | the file removed | one page, the marker, the commit record |
-| A rebuild or an import | every file read whole | every page and the marker written |
+| A drive with a catalog plugged in | none | the commit record and the marker, 461 bytes; no page; the index's lines later, as the core needs them, at most 512 bytes at a read |
+| An unchanged drive | none | one read of the marker, 461 bytes, in 10 seconds |
+| An addition or a replacement | S written and S read back by the check | one page of P lines read and written, the marker, the commit record; on a drive also the root's file of the index and the table, and for a new file the map, each read and written a line at a time |
+| A removal | the file removed | one page, the marker, the commit record; on a drive also the file of its folder and of the parent, the table and the map |
+| A rebuild or an import | every file read whole | every page, a drive's index and the marker written |
 
 No change lists the storage, reads another animation or writes another page; a rebuild is
 the one operation that reads the whole library, and it is a command.

@@ -166,8 +166,8 @@ const uint8_t kDriveLeftOut = 2;
 const uint8_t kDriveStaged = 3;
 const uint8_t kDriveGone = 4;
 
-// The most files of a drive, the position in the playlist of the file at place 0, and the
-// first id a drive's animation can get.
+// The most files of a drive without a catalog, the position in the playlist of the first
+// file of the drive's walk, and the first id a drive's animation can get.
 const uint32_t kDriveMost = 256;
 const uint32_t kDriveBase = 0x10000u;
 const uint32_t kDriveFirstId = 60001;
@@ -217,33 +217,135 @@ const uint32_t kExternal = 1;
 // that is read its generation and its number of entries.
 struct CatalogState {
     uint32_t generation;
-    uint16_t entries;
+    uint32_t entries;
     uint8_t state;
     uint8_t detail;
 };
 
-// Whether a position of the playlist is a drive's file.
+// Whether a position of the playlist is a file of the drive: kDriveBase and the file's
+// position in the drive's walk, the root's files first and then each folder's in the
+// tree's order.
 inline bool is_drive(uint32_t position) {
-    return position >= kDriveBase && position < kDriveBase + kDriveMost;
+    return position >= kDriveBase && position < kPlaylist;
 }
 
-// One folder of the drive's tree: its id, a place whose path is at or below it, its depth
-// below the drive's folder, 1 to 3, and the index after its last descendant in the table.
-// The table is in the listing's order, depth first, so the subtree of a folder is the
-// index range from it to `end`.
+// One folder of the tree of a drive without a catalog: its id, the place of the first file
+// at or below it, which is the first of its own files when it has any, its number of own
+// files, its depth below the drive's folder, 1 to 3, and the index after its last
+// descendant in the table. The places and the table are in the listing's order, depth
+// first, so a folder's subtree is the index range from it to `end`, and its files a range
+// of places from `first`.
 struct Folder {
     uint16_t id;
-    uint16_t place;
+    uint16_t first;
+    uint16_t files;
     uint8_t depth;
     uint8_t end;
-    uint8_t spare[2];
 };
 
-// The most folders of the table, the root among them; what a place's folder byte holds for
-// a place of no folder; and the room for the current playlist's path, with its 0.
+// The most folders of the table of a drive without a catalog, the root among them; a
+// folder that is none; and the room for the current playlist's path, with its 0.
 const uint32_t kFolderMost = 33;
-const uint8_t kNoFolder = 255;
+const uint32_t kNoFolder = 0xFFFFFFFFu;
 const uint32_t kPlaylistPathRoom = 104;
+
+// Room for a path of the drive, at most 100 bytes, with its 0.
+const uint32_t kDrivePathRoom = 101;
+
+// A file of the drive at a position of its walk, or a sub-folder of a level, as the core
+// reads it: from the table of a drive without a catalog, or from a line of the index of
+// one with a catalog. `kind` is 'f' for a file and 'd' for a folder, whose `files` are its
+// own files; `fault` is kNone for a file that plays, else the reason it is left out;
+// `listed` says whether `list` lists the file, which a file still to be checked is not;
+// its length is as the drive's table keeps it, and its name has the room of a listed
+// drive's, whose host may give a name longer than an index holds.
+struct DriveRow {
+    uint32_t position;
+    uint32_t id;
+    uint32_t crc;
+    uint32_t bytes;
+    uint32_t total_ms;
+    uint32_t files;
+    uint16_t width;
+    uint16_t height;
+    uint8_t kind;
+    uint8_t type;
+    uint8_t fault;
+    uint8_t listed;
+    char name[kDriveListedName];
+};
+
+// A folder of the drive's tree: its ordinal in the table, its id, 0 for the root, the
+// ordinal after its last descendant, the position in the walk of its first file and the
+// one after its subtree's files, its own files and sub-folders, the CRC-32 of its file of
+// the index, and its depth.
+struct IndexFolder {
+    uint32_t ordinal;
+    uint32_t id;
+    uint32_t end;
+    uint32_t first;
+    uint32_t last;
+    uint32_t files;
+    uint32_t folders;
+    uint32_t crc;
+    uint8_t depth;
+};
+
+// Room for the host's name of a file of the index, `drive/index-<id>.txt`, with its 0.
+const uint32_t kIndexNameRoom = 28;
+
+// The folder of the index whose own files the last row read was of: its ordinal, its id,
+// the position of its first file in the walk and its number of own files, 0 for none.
+struct WalkedFolder {
+    uint32_t ordinal;
+    uint32_t id;
+    uint32_t first;
+    uint32_t files;
+};
+
+// The cursor over the drive, a block of its own for a host with a drive: the room for one
+// read of a file of the index, with the host's name of that file and the bytes it holds;
+// the lines of the table and of the map and the drive's files, as the marker gives them;
+// two rows read, and which of them was read the latest; the folder of the last file row
+// read; the files of the drive left out since it was taken up; whether a line of the index
+// could not be read, which makes the catalog damaged at the next refresh; and a rebuild's
+// state.
+struct DriveIndex {
+    uint8_t room[kFileBufferSize];
+    char room_name[kIndexNameRoom];
+    uint32_t room_offset;
+    uint32_t room_length;
+    uint32_t folders;
+    uint32_t ids;
+    uint32_t files;
+    uint32_t left_out;
+    DriveRow rows[2];
+    uint8_t latest;
+    uint8_t broken;
+    WalkedFolder walking;
+    // A rebuild of the drive's catalog: its phase and the step of the folder it is at; the
+    // line of the scan's file a pass is at, and the scan's lines; the files that passed,
+    // which are the walk's, and the folders of the draft; the folder a phase is at, and its
+    // row, sub-folder, offset or count; of the folder whose line of the table is made, its
+    // end, sub-folders, own files and the running CRC-32 of its file; the lines and CRC-32s
+    // of the table and of the map once written.
+    uint8_t rebuild_phase;
+    uint8_t rebuild_step;
+    uint32_t rebuild_at;
+    uint32_t scan_lines;
+    uint32_t rebuild_passed;
+    uint32_t rebuild_kept;
+    uint32_t rebuild_ordinal;
+    uint32_t rebuild_row;
+    uint32_t rebuild_end;
+    uint32_t rebuild_folders;
+    uint32_t rebuild_files;
+    uint32_t rebuild_sum;
+    uint32_t table_lines;
+    uint32_t table_crc;
+    uint32_t map_lines;
+    uint32_t map_crc;
+};
 
 // Everything the core knows. The host holds the one object; no part of the core keeps
 // anything outside it.
@@ -317,14 +419,18 @@ struct Core {
     uint8_t check_row;
     uint8_t check_idle;
 
-    // The drive, for a host that has one: an entry for each place of its list, the number
-    // of the drive the entries are of, 0 for none, how many places it has, and the place
-    // the check is at, with the name of its file, which the check reads by.
+    // The drive, for a host that has one: an entry for each place of the list of a drive
+    // without a catalog, the number of the drive the entries are of, 0 for none, how many
+    // places it has, and the place the check is at, with the name of its file, which the
+    // check reads by; the cursor over a drive with a catalog, and whether the drive is read
+    // from its index.
     DriveEntry *drive;
     uint32_t drive_number;
     uint32_t drive_count;
     uint32_t drive_check_at;
     char drive_check_name[kDriveNameSize];
+    DriveIndex *index;
+    uint8_t indexed;
     // The files of drives left out in this boot, the place the next one is written to, and
     // of the drive's file the check is at, the bytes and the CRC-32 of its first read.
     Remembered *remembered;
@@ -333,29 +439,23 @@ struct Core {
     uint16_t drive_first_read;
 
     // The saved playlist order, for a host whose storage can be changed: for each item of
-    // the item table, and for each place of a drive, the number of the entry of `order.txt`
-    // that names it, or kOrderUnnamed; for each place the low byte of its name's hash. While
-    // `order_due` is set the drive's check reads the file before the drive's files, and
-    // `order_reading` while it is in the middle of it.
+    // the item table the number of the entry of `order.txt` that names it, or
+    // kOrderUnnamed.
     uint16_t *order_items;
-    uint16_t *order_drive;
-    uint8_t *order_hash;
-    uint8_t order_due;
-    uint8_t order_reading;
     OrderReader order_reader;
 
     // The tree of the drive's folders, for a host with a drive, in the block of the saved
-    // order: for each place the index of its folder in the table, kNoFolder for a place of
-    // none; the table, the root at index 0 and the sub-folders after it in the listing's
-    // order, `folder_count` of them; whether the table is built for the drive's places;
-    // the index of the current playlist's folder, 0 for the root; and the room for the
-    // current playlist's path, empty for the root.
-    uint8_t *drive_folder;
+    // order: the table of a drive without a catalog, the root at index 0 and the
+    // sub-folders after it in the listing's order, `folder_count` of them; whether the
+    // drive's tree is known, the table built or the index read; the current playlist's
+    // folder, its index in the table or its ordinal in the index, 0 for the root, and its
+    // record; and the room for the current playlist's path, empty for the root.
     Folder *folders;
     char *playlist_path;
-    uint8_t folder_count;
+    uint32_t folder_count;
     uint8_t tree_known;
-    uint8_t current;
+    uint32_t current;
+    IndexFolder current_folder;
     // Whether the root plays in the current playlist's place, since that has nothing to
     // play: judged where a turn ends. And the animation whose turn a jump outside the
     // current playlist cut, which plays again after the jumped turn; kNothing for none.
@@ -444,33 +544,24 @@ struct Core {
     // The catalogs of the internal storage and of the drive.
     CatalogState catalogs[2];
 
-    // The reading of a drive's catalog in steps: its phase, the page it is at, the place the
-    // page's entries begin at, the page's lines so far and the count the marker gives it,
-    // whether a line of it was not sound, the running CRC-32 of the page and the one the
-    // marker gives, the CRC-32 of the whole marker, and when it was last looked at.
+    // The reading of a drive's catalog in steps: its phase, the CRC-32 of the whole marker,
+    // and when it was last looked at.
     uint8_t catalog_phase;
-    uint8_t catalog_page;
-    uint8_t catalog_bad_line;
-    uint8_t catalog_open;
-    uint16_t catalog_first_place;
-    uint16_t catalog_lines;
-    uint16_t catalog_expected_lines;
-    uint32_t catalog_page_crc;
-    uint32_t catalog_expected_crc;
     uint32_t catalog_marker_crc;
     uint64_t catalog_looked;
 
     // A rebuild of a catalog: 0 for none, 1 + the storage's catalog it makes; the page it
     // writes, whether that page's new file is open, the file or the place it is at, the files
     // read and those to read, and the page's lines and running CRC-32. Each page's count and
-    // CRC-32 wait at the end of the chunk buffer, from kRebuildPages on.
+    // CRC-32 wait at the end of the chunk buffer, from kRebuildPages on. A drive's rebuild
+    // keeps the rest of its state in the cursor.
     uint8_t rebuild;
     uint8_t rebuild_page;
     uint8_t rebuild_open;
-    uint16_t rebuild_at;
-    uint16_t rebuild_read;
-    uint16_t rebuild_total;
-    uint16_t rebuild_lines;
+    uint32_t rebuild_at;
+    uint32_t rebuild_read;
+    uint32_t rebuild_total;
+    uint32_t rebuild_lines;
     uint32_t rebuild_crc;
 };
 
@@ -531,18 +622,24 @@ void drive_given_name(const Core &core, uint32_t place, char *name, uint32_t roo
 // Takes up a drive that was plugged in and drops one that was pulled out, at a refresh.
 void drive_touch(Core &core);
 
-// A drive without a catalog: listed, each file given its id and its key, to be checked.
-void drive_take_listed(Core &core);
+// A drive without a catalog: listed, its first 256 files taken and 32 sub-folders, each
+// file given its id, to be checked. `listed`, when given, gets the number of files the
+// host's listing holds, or -1 when the drive is gone.
+void drive_take_listed(Core &core, int32_t *listed = nullptr);
 
-// The lowest id from kDriveFirstId up that no item of the show, no file of the drive and
-// no folder of its tree has, or 0 when there is none.
-uint16_t free_drive_id(const Core &core);
+// The lowest id from kDriveFirstId up that no item of the show, no file of a drive without
+// a catalog and no folder of its tree has, or 0 when there is none below 65,536.
+uint32_t free_drive_id(const Core &core);
 
 // Whether a file of the drive, whatever its state, or a folder of its tree has this id.
 bool drive_id_taken(const Core &core, uint32_t id);
 
-// A file of the drive is left out: its state says so, and the host's log says why.
+// A file of a drive without a catalog is left out: its state says so, and the host's log
+// says why.
 void drive_left_out(Core &core, uint32_t place, Reason reason);
+
+// The host's log says that a file of the drive, by its name, is left out, and why.
+void drive_log_left_out(Core &core, const char *name, Reason reason);
 
 // An upload, or a change that reads with the second source, takes the second decoders:
 // the check after the start, or the check of a drive's file, begins the file it was in
@@ -552,15 +649,6 @@ void drive_check_yields(Core &core);
 // A file left the file table at this place: the check after the start stays at the file
 // it was at, and begins it again when it was the one that left.
 void check_file_left(Core &core, uint32_t file);
-
-// Whether an animation of the drive has this id.
-bool drive_has_id(const Core &core, uint32_t id);
-
-// The place of the drive's animation that has this id, or kDriveMost when none has.
-uint32_t drive_place_of(const Core &core, uint32_t id);
-
-// The place of the drive's file that has this id, whatever its state, or kDriveMost.
-uint32_t drive_place_holding(const Core &core, uint32_t id);
 
 // The check after the start at one refresh, after the LED data was made. `in_step` says
 // whether the refresh followed the one before it without a grid time left out, and

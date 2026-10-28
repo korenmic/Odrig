@@ -21,8 +21,12 @@ ARRAY_IN_A_BLOCK = re.compile(r"(?m)^[ \t]+(?:const[ \t]+)?([A-Za-z_]\w*)[ \t]+(
 CONSTANT = re.compile(r"(?m)^const[ \t]+\w+[ \t]+(k\w+)[ \t]*=[ \t]*([^;\n]+);")
 ELEMENT_BYTES = {"char": 1, "uint8_t": 1, "int8_t": 1, "uint16_t": 2, "int16_t": 2, "uint32_t": 4, "int32_t": 4, "uint64_t": 8, "int64_t": 8}
 # The structures of the core that a function holds an array of, by their size: a stroke of
-# a clock's dial is five 16-bit numbers.
+# a clock's dial is five 16-bit numbers; a folder of a drive's index eight 32-bit numbers and
+# its depth, and the change of a folder's file nine 32-bit numbers; a flag one byte.
 ELEMENT_BYTES["Stroke"] = 10
+ELEMENT_BYTES["IndexFolder"] = 36
+ELEMENT_BYTES["FolderEdit"] = 36
+ELEMENT_BYTES["bool"] = 1
 NO_TYPES = ("return", "else", "case", "goto", "delete", "throw", "sizeof")
 # The most bytes an array inside a function of the core may have.
 LARGEST_LOCAL_ARRAY = 256
