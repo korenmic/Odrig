@@ -116,7 +116,7 @@ Rules for every task:
   - `docs/drifts.md`: the sundials, the numerals kept, the speeds.
   - Requirements: 7.1, 8.2, 8.3
 
-- [ ] 7. The inventory: the displays
+- [x] 7. The inventory: the displays
   - For each display: its fields, their boxes, fonts, patterns and colours; the time
     erased from its base picture; a sheet of each at two times, looked at.
   - `docs/drifts.md`: the tiles with several fields, the fonts chosen.

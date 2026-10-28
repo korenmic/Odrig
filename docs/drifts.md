@@ -11329,3 +11329,24 @@ Every dial runs 30 seconds a loop in a random direction, turns 30.
 
 **Resolution.** The collection's `clocks/source/inventory.json`; the scripts of each tile
 in `clocks/source/tools/helpers-dials/`.
+
+## Seed 52: the displays of the inventory
+
+**Question.** For each of the 28 displays: the box of its time, the font that fits it,
+what it shows, and its colours; and the tiles whose time is not one line.
+
+**Answer.** The time is erased by painting its box with the display's background, labels
+that are not the time kept (GPS, NTP, the date of tile 64, the cities of tile 60, the
+battery's charge bar of 89). The font is the largest whose widest time fits the box whole,
+checked over every time of a day: `medium` for most clocks of 10 rows, `small` for
+watches, the holograms and the lines of seconds, `large` only for the LED matrix 26,
+`tiny` for the parking meter 86. The flip clock 24 and the band 29 have a field for the
+hours and one for the minutes; the nixie tubes 25 a field for each tube; the three cities
+of 60 three fields at offsets 0, -7 and -2 hours. The time sources 51 to 53 show
+`hh:mm:ss`, the timers 66, 67, 75 and 83 minutes and seconds (`m:ss` on 83, as its picture
+shows `5:00`), the traffic light 84 its seconds; those run 2 to 30 times real time, the
+others 60 to 600. The colons of the digital clocks blink; those of the flaps, tubes and
+lights do not.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of the
+displays in `clocks/source/tools/helpers-displays/`.
