@@ -33,6 +33,11 @@ bool clock_is_picture(const uint8_t *payload);
 uint32_t clock_stir(uint32_t noise, uint64_t timestamp);
 uint32_t clock_seed(uint32_t noise, uint32_t id, uint64_t start);
 
+// The place of `index` in a permutation of 0 to count - 1 drawn from a key: a balanced
+// Feistel network of four rounds over the fewest even bits that hold `count`, walked
+// again on its own output while that is `count` or more.
+uint32_t clock_shuffle(uint32_t key, uint32_t count, uint32_t index);
+
 // The virtual time of a clock of this payload and seed `t` milliseconds into its turn, in
 // milliseconds, not taken modulo 12 hours; a picture clock's with its direction.
 int64_t clock_virtual_time(const uint8_t *payload, uint32_t seed, uint64_t t);

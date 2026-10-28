@@ -47,6 +47,7 @@ SESSION = (
     ("status",),
     ("read", "1", "0"),
     ("catalog",),
+    ("clocks", "off"),
     ("repeat", "99", "2"),
     ("play", "99"),
     ("play", "abc"),
@@ -296,6 +297,11 @@ class Usage(unittest.TestCase):
             ["--port", "a", "--timeout", "inf", "status"],
             ["--port", "a", "--emulator", "status"],
             ["--port", "a", "--board", "status"],
+            ["--port", "a", "clocks"],
+            ["--port", "a", "clocks", "message"],
+            ["--port", "a", "clocks", "yes"],
+            ["--port", "a", "clocks", "on", "now"],
+            ["--port", "a", "clocks", "message", "on\n"],
         ):
             result = support.run_tool(*argv)
             self.assertEqual(result.status, 2, argv)
@@ -307,16 +313,16 @@ class Usage(unittest.TestCase):
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
         self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
-                                      "repeat <id> default", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
+                                      "repeat <id> default", "clocks on", "clocks off", "clocks message on", "clocks message off", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ", "clocks ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat", "clocks")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
                          {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
-                          "upload": ("ID", "FILE")})
+                          "clocks": ("OPERATION",), "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -326,6 +332,7 @@ class Usage(unittest.TestCase):
                            (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["repeat", "1"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8", "keep"], "repeat takes ID N, ID N save, or ID default"),
                            (["repeat", "1", "8", "save", "x"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8\n"], "a command is one line"),
+                           (["clocks"], "clocks takes on, off, message on, or message off"), (["clocks", "message", "yes"], "clocks takes on, off, message on, or message off"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -360,6 +367,10 @@ class Usage(unittest.TestCase):
             (["repeat", "1", "8"], b"repeat 1 8\n"),
             (["repeat", "1", "8", "save"], b"repeat 1 8 save\n"),
             (["repeat", "60001", "default"], b"repeat 60001 default\n"),
+            (["clocks", "on"], b"clocks on\n"),
+            (["clocks", "off"], b"clocks off\n"),
+            (["clocks", "message", "on"], b"clocks message on\n"),
+            (["clocks", "message", "off"], b"clocks message off\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 

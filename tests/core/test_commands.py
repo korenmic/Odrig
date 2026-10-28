@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"left":86400}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86400}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):
@@ -189,13 +189,16 @@ class LineEndings(Commands):
         files[longest_name] = bad_index
         printed = self.assert_as_the_reference(files, [support.line(T0, "off"), support.line(T0, "status")])
         reply = printed[-1][len("reply "):]
-        # A bad file is quarantined and the show has no error. With the longest reason text
-        # the core can hold, 65 characters, the largest numbers, a file of 32 characters
-        # being checked, the longest name of a host, every byte of it escaped, and a seed of
-        # ten digits, the reply still fits into 1,024 bytes.
+        # A bad file is quarantined and the show has no error. With the largest numbers and
+        # the longest name of a host, every byte of it escaped, the reply still fits into
+        # 1,024 bytes: of a valid show with a file of 32 characters being checked and a seed
+        # of ten digits, and of an invalid one with the longest reason text the core can
+        # hold, 65 characters, which has neither.
         self.assertIsNone(json.loads(reply)["error"])
-        longest = len(reply) - 2 * len("null") + len('""') + 65 + 1 + 2 * len("4294967295") + 3 * 10 + len('"' + "a" * 32 + '"') + len(',"host":""') + 6 * 95
-        self.assertLess(longest, 1024)
+        common = len(reply) - len("null") + 1 + 2 * len("4294967295") + len(',"host":""') + 6 * 95
+        valid = common + 3 * 10 + len('"' + "a" * 32 + '"')
+        invalid = common + len('""') + 65
+        self.assertLess(max(valid, invalid), 1024)
 
 
 class BytesOfATransport(Commands):

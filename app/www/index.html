@@ -194,6 +194,12 @@
 <div class="panel">
 <label class="check" for="show-tests"><input id="show-tests" type="checkbox"><span><span class="title">Show test animations</span><span class="small">20 snake tests + diagonal</span></span></label>
 </div>
+<div id="clocks-panel" class="panel" hidden>
+<h2>Clocks</h2>
+<label class="check" for="clocks"><input id="clocks" type="checkbox"><span><span class="title">Clocks between animations</span><span class="small">After every 5 animations, and at least every 5 minutes, a clock of the card's folder clocks plays; an animation cut for it goes on where it was.</span></span></label>
+<label class="check" for="clock-message"><input id="clock-message" type="checkbox"><span><span class="title">The message after each clock</span><span class="small">The animation of clocks/message flashes once after every clock, while clocks between animations is on.</span></span></label>
+<p id="clocks-said" role="status" aria-live="polite" hidden></p>
+</div>
 <div id="catalogs" class="panel">
 <h2>Catalogs</h2>
 <p class="small">A catalog says what a storage holds, so that the installation need not read every animation at its start or when the card goes in. A rebuild reads every animation of the storage whole and writes its catalog anew.</p>

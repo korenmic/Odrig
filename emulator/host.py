@@ -120,11 +120,12 @@ class Drive:
     last, and its going is the drive pulled out. The folder is looked for at most once in
     DRIVE_LOOK_SECONDS of the clock. It is listed when the core asks, and not otherwise; the
     core may give the names of places instead. The core may change its files unless it is
-    read only."""
+    read only. With `itself`, the folder given is the drive's folder `odrig` itself and
+    not the top of the drive: its appearing and going plug the drive in and pull it out."""
 
-    def __init__(self, top, clock=time.monotonic, writable=True):
+    def __init__(self, top, clock=time.monotonic, writable=True, itself=False):
         self.top = os.fspath(top)
-        self.folder = os.path.join(self.top, "odrig")
+        self.folder = self.top if itself else os.path.join(self.top, "odrig")
         self.clock = clock
         self.writable = writable
         self.number = 0

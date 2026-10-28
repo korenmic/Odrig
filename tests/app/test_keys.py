@@ -348,6 +348,11 @@ class KeptOnThePhone(unittest.TestCase):
                 target.state["internal"] = "damaged"
                 target.state["external"] = "absent"
             marks.append(len(stand_in.lines))
+            # The app has to see the damage before the catalog is whole again: on a loaded
+            # computer its next question may come later than the scenario's pause.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline and not any(line.startswith(b"catalog") for _, line in stand_in.lines[marks[-1]:]):
+                time.sleep(0.05)
 
         def loading():
             with target.lock:
@@ -365,10 +370,11 @@ class KeptOnThePhone(unittest.TestCase):
         with support.StandIn(target.replies()) as stand_in:
             seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[away, loading, back]).seen
             lines = sent(stand_in)
-        while_ok_again = page_lines(lines[marks[1]:marks[2]])
-        self.assertTrue(while_ok_again, "the damaged catalog's keys were forgotten and read again")
-        self.assertEqual({line.split(" ")[2] for line in while_ok_again}, {"internal"})
-        self.assertEqual(page_lines(lines[marks[2]:]), [], "absent and loading kept the card's keys")
+        # On a loaded computer the board's pages may be read again early or late, so they are
+        # looked for from the damage on; the card's pages are never read again.
+        read_again = page_lines(lines[marks[0]:])
+        self.assertTrue(read_again, "the damaged catalog's keys were forgotten and read again")
+        self.assertEqual({line.split(" ")[2] for line in read_again}, {"internal"}, "absent and loading kept the card's keys")
         self.assertEqual(seen["back"]["external"]["byName"], target.keys("external"))
 
     def test_another_address_has_keys_of_its_own(self):

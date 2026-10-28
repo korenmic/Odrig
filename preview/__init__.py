@@ -15,7 +15,7 @@ import subprocess
 import sys
 import webbrowser
 
-from emulator import app
+from emulator import app, parent
 from odrigctl import client, content
 
 ROOT = app.ROOT
@@ -89,7 +89,7 @@ def packed(node, mapping, work):
 def started(folder, work, core, port):
     """The emulator on a folder, as a child, and the address of its page. None when the
     port of the page is taken."""
-    command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--core", str(core)]
+    command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--core", str(core), "--parent", str(os.getpid())]
     command += ["--tcp-port", "0"] if WINDOWS else ["--serial-link", str(work / "serial")]
     child = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=OWN_GROUP,
                              start_new_session=not WINDOWS)
@@ -152,6 +152,11 @@ def run(arguments):
         raise Refused("Node.js is not there; see \"What you need\" in agent/getting-started.md")
     canvas = checked(node, file)
     data = file.read_bytes()
+    # The work folders of earlier previews that are no longer running go first: a preview
+    # killed without warning leaves its folder behind.
+    for left in WORK.glob("*") if WORK.is_dir() else ():
+        if left.is_dir() and left.name.isdigit() and int(left.name) != os.getpid() and not parent.alive(int(left.name)):
+            shutil.rmtree(left, ignore_errors=True)
     work = WORK / str(os.getpid())
     if work.exists():
         shutil.rmtree(work)

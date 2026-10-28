@@ -23,7 +23,7 @@ a top bar with the app's name and whether the installation answers.
   slider for it under them: the field and the slider follow each other both ways. The
   panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
   and `Off`. Under the name of the animation on the LEDs stands its bar while a
-  playlist turn plays it, the root's or a folder's, and the list holds it: its row menu's
+  playlist turn plays it, the root's or a folder's, and the level shown holds it: its row menu's
   actions but the moves, in short words, `Ignore` or `Restore`, `Select`, `Delete` and,
   for a text or a clock, `Edit`, or a line that says why it has none; `Repeat this` with a
   field that holds the loops of the turn in progress; and `Save` and `Restore default`,
@@ -94,7 +94,8 @@ a top bar with the app's name and whether the installation answers.
   clock, and uploads it, with the free internal storage above it. While the installation
   can write its card, an animation of a video or a GIF goes to the card unless
   `This board` is chosen, and the card's free storage is there too.
-- **Settings** has the checkbox `Show test animations`, the catalogs of the board's own
+- **Settings** has the checkbox `Show test animations`, the panel `Clocks` with its two
+  checkboxes, the catalogs of the board's own
   storage and of the card with a rebuild of each, and the mapping editor: the twenty
   saved snake-to-pin assignments. It has no copy of the power or brightness controls.
 - **Target** has the address of the installation, says whether it answers, names the
@@ -102,7 +103,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-eight command lines and no other, each as `POST /odrig` to the address that is set:
+forty-two command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -131,6 +132,7 @@ thirty-eight command lines and no other, each as `POST /odrig` to the address th
 | Presses `Repeat this` on the bar of the animation playing now, or Done or Enter in its field | `repeat <id> <n>` |
 | Presses `Save` on that bar | `repeat <id> <n> save` |
 | Presses `Restore default` on that bar | `repeat <id> default` |
+| Ticks or clears `Clocks between animations`, or `The message after each clock` | `clocks on`, `clocks off`, `clocks message on`, `clocks message off` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -312,9 +314,9 @@ Store. It asks for no permission that the phone shows a question for.
    stands. A number above 255 is not sent, and the line under the slider says `The
    brightness is 0 to 255.`; an emptied field sends nothing and shows the brightness again.
 4. The bar under the name of the animation on the LEDs acts on that animation as its row's
-   menu does, whichever folder the list shows: `Ignore` ends its turn at once, `Delete`
-   asks first, `Select` shows the selection with its row ticked, at the root and with the
-   filters showing it. Its field shows how many loops the turn in progress plays; type
+   menu does, on the level that holds it: `Ignore` ends its turn at once, `Delete`
+   asks first, `Select` shows the selection with its row ticked, with the filters showing
+   it. Its field shows how many loops the turn in progress plays; type
    another number and press `Repeat this`, or Done, and the turn plays that many loops from
    its first frame, or ends with the loop in progress when that is already the last, for
    this turn alone; the app then says how many loops it plays and which is playing. `Save`
@@ -717,6 +719,24 @@ leaves that snake with the position that shows it whole, gives position 10 no sn
 then the snake no other position shows, its own, and says `Position 10 shows no snake`;
 apply the reading, then tick the box.
 
+**Clocks.** After the first panel of Settings, the panel `Clocks` has two checkboxes in the
+form of `Snake 10 is cross-wired`. `Clocks between animations`: after every 5 animations,
+and at least every 5 minutes, a clock of the card's folder `clocks` plays, and an animation
+cut for it goes on where it was. `The message after each clock`: the animation of
+`clocks/message` flashes once after every clock, while the first is on. Each box shows what
+the installation reports, `clocks` and `clock_message` of `status`, and a tap sends at once
+`clocks on` or `clocks off`, `clocks message on` or `clocks message off`. Both boxes cannot be
+used while a line of the panel is out and while the installation does not answer. The line
+under them says `Saved: a clock plays between the animations.`, `Saved: no clock plays
+between the animations.`, `Saved: the message flashes after each clock.` or `Saved: no
+message after the clocks.`; a refusal is said there instead: `The target is busy checking or
+uploading files. Try again after it finishes.`, `The target has an invalid show. Fix its
+show before changing the clocks.` or `The target could not save the setting. The setting in
+force is shown.`, and the box shows the setting in force again. After each reply both boxes
+follow `status`, also when another controller changed them. The panel is hidden while the
+installation's `status` has no `clocks`: its software has no clocks between the animations.
+The emulator's Controller view shows the same panel.
+
 **The test animations.** `Show test animations` in Settings, off at first and
 remembered on the phone, shows the pinned Tests group above the list of Animations: `Tests
 · 21`, which can be folded, with `Diagonal` and `Snake 1` to `Snake 20`. The diagonal
@@ -955,7 +975,13 @@ installed; the phone with mobile data on.
     too, also after a restart of the board; `Restore default` brings its own count back;
     `Ignore` moves on at once; the panel stays at the top while the list scrolls under it,
     and with the phone held sideways the whole screen scrolls.
-23. **Note** the phone's model, its Android version, the web view's version from the
+23. **The clocks.** With firmware that has the command `clocks`, and the card's folder
+    `clocks` filled, in Settings. *Seen:* the panel `Clocks` with its two boxes off; tick
+    `Clocks between animations`: the line says `Saved: a clock plays between the
+    animations.`, and after five animations a clock plays on the LEDs before the next;
+    tick `The message after each clock`: the message flashes after the next clock; after a
+    restart of the board both boxes are still ticked; clear both, and no clock plays.
+24. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -1097,7 +1123,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the thirty-eight lines above and no other, and names no address
+- That the web code sends the forty-two lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -1115,6 +1141,9 @@ By programs, on a Mac:
   seen the Aurora Glass look on a phone, or seen the snake tests and the saved order on
   the LEDs: steps 16 to 18 above, and seed 36's board session, which also removes the 21
   hand-uploaded line-test files from the board.
+
+- **Seed 54 on a phone and on the board.** No program has seen the panel `Clocks` on a
+  phone, nor a clock between the animations on the LEDs: step 23 above.
 
 - **Seed 33 on a phone and on the board.** Nobody has seen the line of the reading, the
   name of the board and its last fault on a phone; that belongs to the seed's board

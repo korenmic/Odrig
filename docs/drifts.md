@@ -11491,6 +11491,74 @@ the same day?
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
 
+## Seed 53: isolation under load, and the slowest tests
+
+**Question.** Task 2 of seed 53 mends every failure that comes from two workers or two
+suites sharing a file, a port or a build. What did the first loaded run show, and where
+does the work go that brings the slowest tests within requirement 8.1?
+
+**Answer.** The first run of `tests/run.py` with its default eight workers, on db81baa with
+the runner of task 1, failed in nothing shared: every failure of the emulator's, the
+app's, the core's and the converter's suites was absent, and the one failure, of
+`tests.firmware.test_paths`, came from the firmware tool's Python environment linked into
+the checkout from another one, which task 6's `ODRIG_TOOLS` settles. The suites already
+take their ports from the system, their folders from temporary directories and their
+Chrome profiles from temporary folders, and the firmware suite compiles its host program
+into a temporary folder; the emulator's package no longer builds the core under the
+runner (task 1). Its wall time was 631 s, against 1,954 s for the same suites one after
+another; the core's suite, 598 s, was bound by one test of 492 s,
+`test_the_memory_does_not_depend_on_the_length_of_a_clip`, whose time is the test host's
+`read_at` reading the whole of a 10.8 MB file again for every call of at most 512 bytes.
+That and the other tests that keep a suite above a third of its time alone are task 3's,
+with the timing: requirement 8.1 is met there.
+
+**Resolution.** No code changes for task 2; task 3 takes the slowest tests with the timing.
+
+## Seed 53: the slowest tests, a module split by its classes, and timing under load
+
+**Question.** Task 3 makes the tests that fail under load robust and brings the core's,
+the emulator's and the app's suites within a third of their time alone (requirement 8.1).
+What did that take?
+
+**Answer.** Three things. The core's test host read a whole file from storage again for
+every `read_at` of at most 512 bytes; a 10.8 MB clip took 193 s to play. It now keeps the
+content it read while the next call goes on where the last ended, with no storage call
+and no change of the drive in between, and reads anew otherwise; the clip plays in 0.6 s
+and the core's suite alone takes 368 s instead of 564. The runner gives a module that took
+more than a worker's share in the previous report by its test classes, and the report
+keeps the times of the suites a run did not run. And under load the app asked an
+installation that keeps no catalogs twice: the client asks once the target answers, and
+Settings' question, queued behind that answer, was sent after it; a queued question is now
+not sent once the installation is known to keep none (`client.catalog`), with a test whose
+stand-in answers in three seconds. Three passes in a row with eight workers then took 435,
+377 and 399 s, against 1,954 s one after another, with no failure but the linked Python
+environment of task 2's entry. Alone through the runner: core 95 s (564), emulator 58 s
+(387), app 271 s (854, its four workers kept).
+
+**Resolution.** `tests/core/host/host.cpp`'s `read_at`; `tests/run.py`'s `split` and report;
+`app/www/client.js`'s `catalog`; `tests/runner/test_runner.py`; `tests/app/test_catalog.py`.
+
+## Seed 53: no process left behind, without a helper of its own
+
+**Question.** Task 4 names `tests/children.py`, a marker set to `manual` outside the runner,
+and process groups for every starter. What was needed?
+
+**Answer.** The emulators found running for days were left by starters killed without a
+chance to clean up, which no cleanup can mend; the emulator now takes `--parent PID` and
+ends within two seconds after that process ends, and the preview and the emulator suite's
+starter give their own id. The starters already put their children in a group of their
+own. The runner sets `ODRIG_RUN` for its children, which every child inherits, ends at a
+run's end what still carries its id, and `--sweep` ends every process that carries any id
+and every emulator of a temporary or a preview's folder; outside the runner no id is set,
+and the sweep's second rule finds those emulators. So no helper module and no `manual` id.
+A preview also removes, at its start, the work folders of previews no longer running, and
+the preview's tests look at their own folder only. Under load, a test of the app's kept
+keys found the board's pages read again after the card was back rather than before; it now
+looks for them from the moment the board's catalog is whole.
+
+**Resolution.** `emulator/parent.py`, `emulator/app.py`'s `--parent`, `preview/__init__.py`,
+`tests/run.py`'s `strays`, `end` and `--sweep`, `tests/emulator/test_parent.py`,
+`tests/app/test_keys.py`.
 ## Seed 52: the inventory, its motions and the subcommand `clocks`
 
 **Question.** The seed asks for one inventory that the converter reads, and for the motions
@@ -11758,6 +11826,34 @@ The walk-through, which clones the repository, took 1,418 seconds.
 docs/specs/46-p2-every-animation-file-tracked-with-its-preview-and-source/tasks.md, task
 6.
 
+## Seed 50: the memory with a drive, after seed 48
+
+**Question.** Requirement 8 asks the core's memory with a drive to stay below 130,509 bytes,
+the figure before seed 48. Seed 48's saved repeats came in on the way, with 4 bytes for each
+of 32 entries, and an indexed drive's positions do not fit in their 16 bits. Is the
+requirement kept?
+
+**Answer.** Against the same core without the index, it is: the cursor of 972 bytes and 40
+bytes more of the core object take the place of the saved order's 4 bytes for each of 256
+places, 1,024. The saved repeats' entries grow to 8 bytes, a position of 32 bits and the loops,
+128 bytes more, so the target file with a drive takes 130,761 bytes, 116 more than master's
+130,645 and within the 131,072 the core may use. Nothing else is cut to win the 116 back.
+
+**Resolution.** docs/core.md, "Memory"; docs/decisions.md, the change log of 2026-10-28.
+
+## Seed 50 and seed 48: the bar of the animation playing now, one level at a time
+
+**Question.** Seed 48's bar names the animation playing now from the whole list, and its
+`Select` went back to the root to select it there. Seed 50's app holds only the level
+shown. Where does the bar show, and what does its `Select` do?
+
+**Answer.** The bar shows while the level shown holds the animation that plays, the root
+playlist or a folder's playing, as `status` names it; on another level it is hidden. Its
+`Select` selects the animation in the level shown, the filters showing it, as a row's menu
+does. The stand-in of the app's tests answers `list` and `list in` one level at a time.
+
+**Resolution.** `app/www/screens/show.js` (`barAnimation`, `selectFromBar`);
+`tests/app/test_now_bar.py`.
 ## Seed 52: the clocks placed as the collection says
 
 **Question.** The tasks of seed 52 kept the 112 files outside git, in the share's
@@ -11785,3 +11881,89 @@ work that lifts that limit.
 **Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
 `thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
 `design.md`.
+
+## Seed 54: the message's frames, colours and size
+
+**Question.** The requirements ask for 120 frames of 50 ms from the owner's page
+`horror-text-60x60.html`, its colours as the page draws them. The page anti-aliases its
+Hebrew text, blends a dark red edge and scanlines over it, and lays a noise that changes 12
+times a second; what does the file hold, and is it light enough for the card?
+
+**Answer.** `render-message.mjs` steps the page's clock to 0, 50, ... 5,950 ms and takes
+120 frames of 50 ms; two runs gave the same bytes. Six of them, at 50, 150, 300, 1,550, 4,650
+and 4,800 ms, are the same as the frame before: the page's noise holds for 83 ms, and the
+text then stands still while its scanline is off the canvas. The converter merges them as
+the format says, so the file has 114 frames, 6,000 ms in all.
+The page draws 855 colours, kept as they are, not reduced to 8: the file has no palette,
+3 bytes a pixel, and its body is compressed. `its-not-the-time.odrg` has 120,969 bytes,
+key `5218d8e1-120969`, far from heavy; `check` accepts it.
+
+**Resolution.** `project-seeds/54-p2-clocks-between-the-animations/source/render-message.mjs`;
+`collection/card/clocks/message/`; `thumbnails/catalog.js`.
+## Seed 54: the two members of `status` and the longest reply
+
+**Question.** `clocks` and `clock_message` add 37 bytes to every reply of `status`. The
+suite's bound of the longest reply added the longest reason text of an invalid show to a
+file being checked and a seed, and came to 1,059 bytes with them, above the 1,024 of a
+reply. Does the reply still fit?
+
+**Answer.** Yes. The core writes a reason text only while the show is invalid, and then
+`checking` and `seed` are `null`; the bound took both at once. Taken apart, a valid show
+with a file of 32 characters being checked and a seed of ten digits comes to 996 bytes,
+an invalid one with a reason text of 65 characters to 999, each with the longest name of
+a host, every byte of it escaped. The suite's bound now takes the two cases apart.
+
+**Resolution.** `tests/core/test_commands.py`, `LineEndings`.
+
+## Seed 54: the settings and the breaks in the core
+
+**Question.** The design of seed 54 names the core's code for the two settings of the
+clocks and for the breaks. What does the code do where the design leaves a point open or
+the code differs from it?
+
+**Answer.**
+
+- `clocks.txt` is read at the start only by a core whose storage can be changed, as
+  `order.txt` and `repeats.txt` are; on a host whose storage cannot be changed both
+  settings are off, and the four lines answer `storage-error`, as `repeat`'s saving forms
+  do, before a setting already in force is looked at.
+- A failed read of `clocks.txt` at offset 0 is taken as a missing file, both off without a
+  log line; one that fails later, or a file of 64 bytes or more, is out of form.
+- A `play` that cuts a turn of the playlist counts it only when the turn had its first
+  refresh; two `play`s before a refresh count one. A cut never begins a break: once 5
+  turns are counted by cuts, the break comes at the end of the next turn. A `play` of a
+  cycle cuts the turn and counts it as a `play` of an animation does.
+- "The message as it was set then": the message follows a clock when it was on as the
+  break began, or when `clocks message on` comes during the clock's turn; `clocks message
+  off` during the break takes it from no break that has begun.
+- The design calls `breaks_tree` in `player_drive_changed` too. Every path of the code that
+  changes the tree calls `tree_clear`, `tree_build` or `tree_find_current` before it, and
+  the moves of the walk call `player_drive_moved` and `player_drive_shifted`; those five
+  find the clocks' folders again, and a fault of one file draws no new order.
+- An upload that replaces the file of the paused turn's animation during a break makes it
+  play from its first frame after the break, as a turn of a replaced file begins again.
+  When the paused animation is removed, ignored, quarantined or leaves with the card, the
+  playlist goes on after the break with the animation after it.
+- The test host's `shuffle KEY COUNT` takes a count of 1 to 65,536 and prints the
+  permutation on one line.
+
+**Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`, `core/src/order.cpp`,
+`core/src/mapping_control.cpp`, `tests/core/host/host.cpp`; `docs/show.md`,
+`docs/core.md`, `docs/commands.md`.
+
+## Seed 54: the clocks on the card, and the proof on the emulator
+
+**Question.** Are the clocks of `collection/card/clocks/` those of the share, and do the
+breaks play on the collection's card as the seed says?
+
+**Answer.** The 339 files of `collection/card/clocks/`, the 112 clocks and the message with
+their GIFs and readmes, have the bytes of the share's `card/clocks/`. The demo show with
+`--drive-folder collection/card`, the clocks and the message switched on by their lines:
+the folder `clocks` was passed over by the playlist; when 5 minutes were counted, the
+frames clock `clock-013` cut the turn of `archive/vjmorph-nurave-kali_fit.odrg` after 10 s
+of it, the message played once for 6 s, and that turn went on for the 17.5 s it had left;
+five turns later the picture dial `clock-064` played between two turns. The card's folder
+has more than 256 files without a catalog, so its last files are passed over; the clocks
+come early in the walk and all 113 play.
+
+**Resolution.** `docs/microsd.md`, `agent/vocabulary.md` (`clock break`).

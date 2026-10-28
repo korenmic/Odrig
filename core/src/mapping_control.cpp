@@ -290,6 +290,9 @@ uint32_t mapping_test(Core &core, bool enabled, uint32_t snake, Reply &reply) {
     if (!check_complete(core) || core.upload.state != kUploadNone) return refuse(reply, "busy");
     // A test that follows another one resumes what played before the first.
     if (!core.mapping_test) {
+        // A break gives way to the animation it was to give way to, which the test's end
+        // plays from its first frame.
+        player_break_leave(core);
         core.mapping_saved_playing = core.playing;
         core.mapping_saved_shown = core.shown;
         player_halt(core);

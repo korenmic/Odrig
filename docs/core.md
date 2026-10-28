@@ -897,7 +897,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,920 |
+| The core object | fixed | 4,000 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -914,13 +914,13 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,453** |
+| **Total** | | **125,533** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,930 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 89,010 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,657 bytes for the target file. A host with a drive
+of the check and the saved order: 77,737 bytes for the target file. A host with a drive
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
@@ -929,7 +929,9 @@ files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive'
 state, with the lines of the old table it keeps the rows' order of. The block of the saved order holds after the keys the tree of the drive's folders,
 a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
 368, and the saved repeats of 32 of the drive's files, 8 bytes each, 256. With it
-the target file takes 130,761 bytes, 99 percent. The size and the number of frames
+the target file takes 130,841 bytes, 99 percent. The clocks between the animations add
+no block: their settings, their counts, the paused turn and the key and the place of their
+order are fields of the core object, and the order is a permutation computed from its key. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read. Picture clocks add no block either: a picture is decoded into
 the pixel buffer, its head, its parts and its layer live in the window of the DEFLATE
@@ -968,6 +970,7 @@ repeated exactly.
 | `odrig_host session --batch [options]` | Runs one session after the other from standard input, which holds a file set and a script for each, and prints `end` after each. |
 | `odrig_host decode FILE` | Reads one `.odrg` file or ODRGX container with the core's decoder. Prints `container <type> <loop> <payload>` for a container; then, for frames, `header <W> <H> <C> <F> <compressed>` and one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel; then `end`; or `rejected <reason>` where the file is refused. A text has no frame records: its payload is read and checked whole. |
 | `odrig_host render [--seed N] FILE MS...` | Reads a text or a clock and draws it as the player does at each of these milliseconds into its turn, a clock with the seed N, 1 when none is given; a picture clock as its LEDs show it, its picture through its palette with its layer over it. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
+| `odrig_host shuffle KEY COUNT` | Prints on one line the permutation of 0 to COUNT - 1, 1 to 65,536, that the 32-bit KEY draws, as the player orders the clocks of its breaks: the place of each index in turn. The suite compares it with the twin `clock_shuffle` of `tests/core/support.py`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host decode --slice BYTES FILE`, `decode --slice BYTES --batch` | The same, with the decoder settling a defect in slices of `BYTES` bytes, not of 32,768: it is called again while it gives `pending`, and `pending <calls>`, how many calls gave it, comes before the last line. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |

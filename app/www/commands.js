@@ -84,7 +84,9 @@ function progressOf(reply) {
 // target names none, and undefined from a target that does not name them; and of the
 // playlist's turn in progress the loops it plays, `repeat`, the loop in progress, `loop`,
 // and its animation's saved repeat, `saved`, each null while the target reports none, with
-// `hasRepeat` and `hasSaved` saying whether the target reports them.
+// `hasRepeat` and `hasSaved` saying whether the target reports them; and whether a clock plays
+// between the animations, `clocks`, and the message after each clock, `clockMessage`, each
+// null from a target that does not report them.
 export async function status() {
   const reply = await carriedOut("status");
   const named = (value) => value === undefined || value === null || typeof value === "string";
@@ -103,7 +105,9 @@ export async function status() {
     (reply.left === undefined || whole(reply.left, 0, MOST_BYTES)) &&
     countOrNull(reply.repeat, MOST_LOOPS) &&
     countOrNull(reply.loop, MOST_LOOPS) &&
-    countOrNull(reply.saved, MOST_SAVED);
+    countOrNull(reply.saved, MOST_SAVED) &&
+    (reply.clocks === undefined || typeof reply.clocks === "boolean") &&
+    (reply.clock_message === undefined || typeof reply.clock_message === "boolean");
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
@@ -126,6 +130,8 @@ export async function status() {
     loop: reply.loop ?? null,
     hasSaved: reply.saved !== undefined,
     saved: reply.saved ?? null,
+    clocks: reply.clocks ?? null,
+    clockMessage: reply.clock_message ?? null,
   };
 }
 
@@ -312,6 +318,16 @@ export async function repeat(id, loops) {
 // turn in progress.
 export async function repeatSave(id, loops) {
   await carriedOut(`repeat ${id} ${loops} save`);
+}
+
+// Switches the clocks between the animations on or off.
+export async function clocks(on) {
+  await carriedOut(`clocks ${on ? "on" : "off"}`);
+}
+
+// Switches the message after each clock on or off.
+export async function clockMessage(on) {
+  await carriedOut(`clocks message ${on ? "on" : "off"}`);
 }
 
 // Removes an animation's saved repeat: its turns play its own count again.

@@ -234,7 +234,14 @@ are in [format.md](format.md), "Measured sizes".
   of an animation in the board's `repeats.txt` by its file name with `repeat <id> <n>
   save`, and brings its own count back with `repeat <id> default`; `status` reports the
   turn's `repeat`, `loop` and `saved`, and `show.json` is never changed for a repeat (the
-  owner, 2026-10-27, seed 48).
+  owner, 2026-10-27, seed 48). While an operator has switched them on with `clocks on`, a
+  clock of the card's folder `clocks` plays between the animations, after every 5 turns of
+  the playlist and at least every 5 minutes of it, a turn cut for it going on where it was,
+  and the folder `clocks` plays only so; with `clocks message on` the first animation of
+  `clocks/message` plays once after each clock. `clocks off` and `clocks message off` switch
+  them off, both are off until switched on, the board keeps them in `clocks.txt` across a
+  restart, and `status` reports them as `clocks` and `clock_message` (the owner,
+  2026-10-28, seed 54).
 - Commands are plain text lines and every reply is one JSON line. A line has up to 2,048
   characters and a reply up to 1,024 bytes. See [commands.md](commands.md).
 - An animation is uploaded as an ODRG file in pieces of up to 1,500 bytes, written in
@@ -815,6 +822,24 @@ are in [format.md](format.md), "Measured sizes".
   previews and readmes tracked; no JSON of them is committed. `env.template`, tracked, and
   `env`, ignored, name the share's collection. The remote is public, and the tracked
   collection is published with it. The sources of the earlier set are unknown for now.
+- 2026-10-28: Seed 50: a drive's catalog is of version 2 and keeps an index of its files
+  beside its pages, one file of rows for each folder in the playlist's order, a table of
+  the folders and a map of the ids, written by the PC tool's `import` and by the board's
+  `catalog rebuild external`, which keeps the order the rows were moved into. The core
+  keeps no entry for each file of an indexed drive: a cursor of 972 bytes reads a row when
+  it needs it, so the card alone bounds the number of its files and folders; a drive
+  without a catalog is taken as before, at most 256 files and 32 folders. The target file
+  with a drive takes 130,761 bytes, 116 more than before, because a saved repeat keeps the
+  file's position in 32 bits. New: `list in <folder-id> [<from>]` and `order get in
+  <folder-id> [<from>]`, `order move` of a drive's file, approved through the seed; `list`
+  gives the root's level only. The app reads one level at a time. The board session and
+  the owner's check on a phone are open.
+- 2026-10-28: Seed 54, by the owner's ruling of 2026-10-28: the commands `clocks on`,
+  `clocks off`, `clocks message on` and `clocks message off`, their replies and refusals,
+  the `status` members `clocks` and `clock_message`, and the board's file `clocks.txt`; a
+  clock of the card's folder `clocks` plays after every 5 turns of the playlist and at least
+  every 5 minutes, and the message after it, while they are switched on. The firmware tool
+  keeps the board's `clocks.txt` as it keeps `repeats.txt`.
 - 2026-10-28: Seed 52, the owner's request with the picture of a hundred timekeepers: the
   widget payload gains a picture dial and a picture display, of their own picture of at
   most 8 colours, a direction forward, backward or random that may turn at the swing's

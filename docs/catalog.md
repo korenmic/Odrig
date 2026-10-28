@@ -291,5 +291,13 @@ Measured through the core's test host, with refreshes 20 ms apart:
 | An addition among 16, 64 and 256 animations | the file and the show file | 623, 707 and 1,169 bytes of the catalog written: the page (123, 207 and 669 bytes), the marker (409) and the record; 12 files opened, renamed or removed at each size |
 | A rebuild of the target file | | done in the first second; 3,849 bytes of the catalog written, the same as the PC tool's |
 
+Measured on the emulator on Windows, with a drive of 1,000 animations of 1,469 bytes in 50
+folders of 20, indexed by the PC tool's `import` in 9.2 seconds: a catalog and index of 70
+files, 281,441 bytes. Over HTTP the root's level, 50 folders, came in 4 replies, 5 ms in
+all, and the 50 folders' levels in 100 replies, the slowest 24 ms; `play 60300` played
+`f14/c19.odrg`, the 300th file, and `status` named it; after `play 60255` the playlist went
+on to the 256th file and the four after it. `catalog rebuild external` took 7.6 seconds, and
+its files were byte for byte those of the PC tool's rebuild of the same card.
+
 The board's own figures are measured in its session: the first reply, the first list with
 sizes, the first picture and the card's catalog published.

@@ -779,6 +779,30 @@ uint32_t clock_seed(uint32_t noise, uint32_t id, uint64_t start) {
     return seed == 0 ? 1 : seed;
 }
 
+uint32_t clock_shuffle(uint32_t key, uint32_t count, uint32_t index) {
+    if (count <= 1) {
+        return 0;
+    }
+    uint32_t bits = 2;
+    while (bits < 32 && (1ull << bits) < count) {
+        bits += 2;
+    }
+    const uint32_t half = bits / 2;
+    const uint32_t mask = (1u << half) - 1u;
+    uint32_t value = index;
+    do {
+        uint32_t left = value >> half;
+        uint32_t right = value & mask;
+        for (uint32_t round = 0; round < 4; ++round) {
+            const uint32_t next = left ^ (mix(key ^ (round * 0x9E3779B9u) ^ right) & mask);
+            left = right;
+            right = next;
+        }
+        value = (left << half) | right;
+    } while (value >= count);
+    return value;
+}
+
 bool clock_is_picture(const uint8_t *payload) {
     return is_picture(payload[0]);
 }

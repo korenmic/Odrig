@@ -178,7 +178,7 @@ Rules for every task:
   - Suites: library, core, onboarding.
   - Requirements: 3.2, 3.4, 7.1
 
-- [ ] 7. The pages, the proof on the emulator, every suite, and the seed done
+- [x] 7. The pages, the proof on the emulator, every suite, and the seed done
   - `docs/catalog.md`, `docs/core.md`, `docs/show.md`, `docs/commands.md`,
     `docs/android-app.md`, `docs/microsd.md`, `docs/emulator.md`: what exists, the figures
     as measured; `docs/decisions.md`: the change log entry of the seed and the memory

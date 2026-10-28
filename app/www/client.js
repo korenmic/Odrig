@@ -903,6 +903,14 @@ export function repeatDefault(id) {
   return requestOperation("repeat", () => commands.repeatDefault(id));
 }
 
+export function clocks(on) {
+  return requestOperation("clocks", () => commands.clocks(on));
+}
+
+export function clockMessage(on) {
+  return requestOperation("clocks", () => commands.clockMessage(on));
+}
+
 // Names the function that is told of every refusal of what the operator asked for.
 export function onRefusal(handler) {
   refused = handler;
@@ -1025,7 +1033,9 @@ export function removeMany(ids) {
 
 // The catalogs of the target, the rebuild of one of them and its cancel.
 export function catalog() {
-  return requestOperation("catalog", () => commands.catalog());
+  // A question that waited its turn behind the answer that the installation keeps no
+  // catalogs is not sent: that answer is its answer.
+  return requestOperation("catalog", () => (state.catalogNone ? Promise.reject(new commands.Refusal("unknown-command", "catalog")) : commands.catalog()));
 }
 
 export function catalogRebuild(storage) {

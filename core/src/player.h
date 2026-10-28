@@ -149,6 +149,14 @@ void player_hold_turn(Core &core, uint32_t loops);
 // progress before its count changed: a turn whose own count has passed ends with that loop.
 void player_default_again(Core &core, uint64_t now, uint64_t loop);
 
+// Both counts of the clocks between the animations start again at a moment: the turns of
+// the playlist from 0, and its time, held with its 5 minutes until the playlist plays.
+void player_counts_start(Core &core, uint64_t at);
+
+// A break in progress ends at once, its paused turn not resumed: the playlist's turn is the
+// animation the break was to give way to, which opens anew.
+void player_break_leave(Core &core);
+
 // Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.
 int player_poll(Core &core, uint64_t now_ms);
 

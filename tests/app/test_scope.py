@@ -11,7 +11,7 @@ LINES = {"status", "list", "list <n>", "play <n>", "play all", "on", "off", "bri
          "upload begin <n> <n> <n>", "upload data <n> <n>", "upload end <n>", "upload cancel", "mapping get", "mapping set <n> <n>", "mapping test <n>", "mapping cross <n>",
          "order get", "order get <n>", "list in <n> <n>", "order get in <n>", "order get in <n> <n>", "order move <n> <n> <n>", "mapping test snake <n>", "read <n> <n>", "upload expect <n>", "fault",
          "upload begin external <n> <n>", "catalog", "catalog page <n> <n> <n>", "catalog rebuild <n>", "catalog cancel", "repeat <n> <n>", "repeat <n> <n> save",
-         "repeat <n> default"}
+         "repeat <n> default", "clocks <n>", "clocks message <n>"}
 
 
 def files():

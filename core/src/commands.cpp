@@ -1,5 +1,6 @@
 #include "commands.h"
 
+#include "breaks.h"
 #include "catalog.h"
 
 #include "content.h"
@@ -258,6 +259,9 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The settings of the clocks between the animations.
+    reply.text(core.clocks_on != 0 ? ",\"clocks\":true" : ",\"clocks\":false");
+    reply.text(core.clock_message_on != 0 ? ",\"clock_message\":true" : ",\"clock_message\":false");
     // The seconds left in the current playlist's window, the last member.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
@@ -537,6 +541,15 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         core.on = switch_on ? 1 : 0;
         return succeed(reply);
+    }
+    if (words.is(0, "clocks")) {
+        // `clocks on`, `clocks off`, `clocks message on` and `clocks message off`.
+        const bool message = words.count == 3 && words.is(1, "message");
+        const uint32_t last = message ? 2 : 1;
+        if ((words.count != 2 && !message) || !(words.is(last, "on") || words.is(last, "off"))) {
+            return refuse(reply, "bad-argument");
+        }
+        return breaks_command(core, message, words.is(last, "on"), reply);
     }
     if (words.is(0, "brightness")) {
         uint32_t value;

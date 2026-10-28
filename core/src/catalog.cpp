@@ -340,6 +340,54 @@ void take_name(char *into, const char *line, uint32_t length) {
     into[length] = '\0';
 }
 
+// Reads one action line of a commit record, the word `move` or `remove` first, of `length`
+// characters. Returns whether it is valid. With `give` the action is given in `action`;
+// with `acting` it is done, and the return is also false when that failed. Kept apart from
+// the reading of the record, whose frame has the line, as it needs room for the action.
+ODRIG_NOINLINE bool take_action(Core &core, const Place &place, const char *line, uint32_t length, bool give, Action *action, bool acting) {
+    const bool drive = place.storage == kExternal;
+    Action found;
+    found.moves = false;
+    found.from[0] = '\0';
+    uint32_t at = 0;
+    bool whole;
+    if (word(line, &at, "move ")) {
+        // `move <from> <to>`: the upload's part onto a name of the catalog, or a new file
+        // of a drive's index onto a file of it.
+        uint32_t space = at;
+        while (space < length && line[space] != ' ') {
+            ++space;
+        }
+        const uint32_t from_length = space - at;
+        const uint32_t to_length = space < length ? length - space - 1 : 0;
+        const char *to = line + space + 1;
+        if (space < length && is_part(line + at, from_length)) {
+            whole = catalog_name_allowed(to, to_length);
+        } else {
+            whole = space < length && drive && is_index_name(line + at, from_length, true) && is_index_name(to, to_length, false);
+        }
+        if (whole) {
+            found.moves = true;
+            take_name(found.from, line + at, from_length);
+            take_name(found.name, to, to_length);
+        }
+    } else if (word(line, &at, "remove ")) {
+        const char *name = line + at;
+        const uint32_t name_length = length - at;
+        whole = catalog_name_allowed(name, name_length) || is_part(name, name_length) ||
+                (drive && (is_index_name(name, name_length, false) || is_index_name(name, name_length, true)));
+        if (whole) {
+            take_name(found.name, name, name_length);
+        }
+    } else {
+        whole = false;
+    }
+    if (whole && give) {
+        *action = found;
+    }
+    return whole && (!acting || act(core, place.storage, found));
+}
+
 // Reads the commit record of a place whole. Returns whether it is whole; `mask` is its pages
 // and `actions` the number of its actions. With `wanted` below kNothing the action at that
 // position is given in `action`. With `acting` each action is done as soon as it is read,
@@ -352,7 +400,6 @@ ODRIG_NOINLINE bool read_record(Core &core, const Place &place, uint32_t *mask, 
     if (open_for(core, place, kRecordNames[place.storage]) != kNone) {
         return false;
     }
-    const bool drive = place.storage == kExternal;
     LineReader reader;
     char line[kCatalogLineRoom];
     uint32_t at = 0;
@@ -363,7 +410,6 @@ ODRIG_NOINLINE bool read_record(Core &core, const Place &place, uint32_t *mask, 
     whole = whole && reader.next(source, line, sizeof line) == kLineGot && !reader.over && !reader.unended && word(line, &at, "pages ") &&
             hexadecimal(line, &at, 4, mask) && line[at] == '\0';
     bool ended = false;
-    Action found;
     while (whole && !ended) {
         const uint32_t before = crc_value(reader.crc);
         if (reader.next(source, line, sizeof line) != kLineGot || reader.over || reader.unended) {
@@ -372,49 +418,12 @@ ODRIG_NOINLINE bool read_record(Core &core, const Place &place, uint32_t *mask, 
         }
         at = 0;
         uint32_t sealed;
-        found.moves = false;
-        found.from[0] = '\0';
         if (word(line, &at, "crc ")) {
             whole = hexadecimal(line, &at, 8, &sealed) && line[at] == '\0' && sealed == before && reader.next(source, line, sizeof line) == kLineEnd;
             ended = true;
             continue;
-        } else if (word(line, &at, "move ")) {
-            // `move <from> <to>`: the upload's part onto a name of the catalog, or a new file
-            // of a drive's index onto a file of it.
-            uint32_t space = at;
-            while (space < reader.length && line[space] != ' ') {
-                ++space;
-            }
-            const uint32_t from_length = space - at;
-            const uint32_t to_length = space < reader.length ? reader.length - space - 1 : 0;
-            const char *to = line + space + 1;
-            if (space < reader.length && is_part(line + at, from_length)) {
-                whole = catalog_name_allowed(to, to_length);
-            } else {
-                whole = space < reader.length && drive && is_index_name(line + at, from_length, true) && is_index_name(to, to_length, false);
-            }
-            if (whole) {
-                found.moves = true;
-                take_name(found.from, line + at, from_length);
-                take_name(found.name, to, to_length);
-            }
-        } else if (word(line, &at, "remove ")) {
-            const char *name = line + at;
-            const uint32_t length = reader.length - at;
-            whole = catalog_name_allowed(name, length) || is_part(name, length) ||
-                    (drive && (is_index_name(name, length, false) || is_index_name(name, length, true)));
-            if (whole) {
-                take_name(found.name, name, length);
-            }
-        } else {
-            whole = false;
         }
-        if (whole && *actions == wanted && action != nullptr) {
-            *action = found;
-        }
-        if (whole && acting && !act(core, place.storage, found)) {
-            whole = false;
-        }
+        whole = take_action(core, place, line, reader.length, *actions == wanted && action != nullptr, action, acting);
         ++*actions;
     }
     source.close();
@@ -2374,7 +2383,7 @@ ODRIG_NOINLINE void sound_step(Core &core) {
         } else {
             uint32_t length = 0;
             const char *text = index_line(core, kIndexTable, kIndexRow, ordinal, &length);
-            IndexFolder folder;
+            IndexFolder folder = {};
             uint32_t path_at = 0;
             uint32_t path_length = 0;
             sound = text != nullptr && index_parse_folder(text, length, ordinal, folder, &path_at, &path_length);
@@ -2693,7 +2702,7 @@ ODRIG_NOINLINE bool folder_rows(Core &core, const DraftLine &folder, uint32_t fi
     memcpy(path, folder.path, folder.path_length);
     if (cursor.rebuild_step == 0) {
         // The old folder of its path: its ordinal, own files and the next row to read.
-        IndexFolder old;
+        IndexFolder old = {};
         cursor.rebuild_end = cursor.old_folders != 0 ? old_folder_of(core, path, folder.path_length, old) : kNothing;
         cursor.rebuild_folders = cursor.rebuild_end != kNothing ? old.files : 0;
         cursor.rebuild_files = cursor.rebuild_end != kNothing ? old.id : 0;
@@ -2802,7 +2811,7 @@ ODRIG_NOINLINE void folders_step(Core &core) {
             continue;
         } else {
             const uint32_t child = cursor.rebuild_row;
-            DraftLine below;
+            DraftLine below = {};
             if (child < cursor.rebuild_kept && !draft_line(core, child, below)) {
                 rebuild_failed(core);
                 return;

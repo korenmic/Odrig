@@ -399,8 +399,8 @@ def _install_show(arguments):
         present = storage.show_of(before)
         for name in storage.KEPT_NAMES:
             if name in present and name not in files:
-                # The saved order, the saved playlist and the saved repeats are the
-                # operator's choices: a folder without them keeps the board's.
+                # The saved order, the saved playlist, the saved repeats and the clocks'
+                # settings are the operator's choices: a folder without them keeps the board's.
                 files = dict(files, **{name: present[name]})
         files = storage.with_board_generation(files, present)
         for line in show_lines(present, files):
