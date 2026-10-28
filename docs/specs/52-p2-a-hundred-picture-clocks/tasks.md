@@ -128,7 +128,7 @@ Rules for every task:
   - `docs/drifts.md`: the motion of each tile.
   - Requirements: 6.1, 6.2, 7.1, 8.2
 
-- [ ] 9. The hundred made and kept
+- [x] 9. The hundred made and kept
   - `clocks` writes the 100 files into `build/clocks/`; `check` accepts each; each has
     at most 8 colours, counted from its pictures. The previews:
     `thumbnail --catalog thumbnails` of the 100, committed. The collection's `clocks/`:

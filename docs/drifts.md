@@ -11372,3 +11372,26 @@ runs 12 to 16 seconds, its frames 50 ms apart, the spinner's 150 ms, one dot a f
 
 **Resolution.** The collection's `clocks/source/inventory.json`; the script of each tile in
 `clocks/source/tools/helpers-motions/`.
+
+## Seed 52: the hundred made and kept
+
+**Question.** Where do the 100 files go, with what, and how are they known to work?
+
+**Answer.** `clocks` made them from the inventory in one run: 38 picture dials and 28
+picture displays of 393 to 1,218 bytes each, and 34 frames files of up to 45,633, 153,655
+bytes in all.
+`check` accepts each, and each has at most 8 colours, counted over the pictures of a
+frames file and over a clock's pictures every 250 ms of its loop with three seeds: 97 of
+them 8, the others 5 to 7. Their previews, made by `thumbnail --catalog thumbnails`, are
+100 GIFs in `thumbnails/`, 1,775,742 bytes, committed; the collection's folder `clocks/` on the share holds
+each file with its preview `X.gif`, the copy of its GIF in `thumbnails/`, and its readme
+`X.md` in the shape of seed 46, which names the owner's picture, the tile and its place;
+and `source/` with the owner's picture, the 100 cut tiles, the inventory, each base picture
+as a PNG and the tools. Nothing of it is committed. The emulator, given a drive whose
+folder `odrig` held the 100, listed all of them and played each with `play <id>`, `status`
+naming it with a seed. A recording of 16 seconds played the wall clock, tile 15, and the
+red alarm clock, tile 21, twice each, each turn begun by `play`: the wall clock went
+backward at about 7.5 minutes a second, then forward at 2.5; the alarm clock backward at
+1.4, then backward at 3; 7 to 59 LEDs changed in each second.
+
+**Resolution.** `thumbnails/`; the collection's `clocks/`.
