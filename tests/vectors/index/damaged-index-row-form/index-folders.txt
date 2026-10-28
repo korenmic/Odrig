@@ -1,0 +1,6 @@
+0 0 0 6 0 1 3 afdf37ac                                                                                                                                                             
+1 60007 1 2 1 1 0 99a1f4ee 2026                                                                                                                                                    
+2 60008 1 3 2 1 0 ffbefe8a a b                                                                                                                                                     
+3 60009 1 6 3 1 1 9afceaaf night                                                                                                                                                   
+4 60010 2 6 4 1 1 f756e1ec night/deep                                                                                                                                              
+5 60011 3 6 5 1 0 d184460f night/deep/deeper                                                                                                                                       

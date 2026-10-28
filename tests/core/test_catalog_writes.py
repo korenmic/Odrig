@@ -13,7 +13,7 @@ from odrig import catalog
 
 from . import support
 from .test_catalog_changes import commit_point, script_bytes
-from .test_catalog_drive import card
+from .test_catalog_drive import card, drive_ids
 from .test_drive import SHOW, asked, replies
 from .test_playback import T0, refreshes
 from .test_playlist import CANVAS, loop_of
@@ -62,7 +62,7 @@ class Uploads(unittest.TestCase):
         ended = [reply for reply in replies(run) if "id" in reply and len(reply) == 2]
         self.assertEqual(ended, [{"ok": True, "id": 60003}])
         self.assertEqual(left["new.odrg"], data)
-        found = catalog.read(catalog.MemoryStorage(left))
+        found = catalog.read(catalog.MemoryStorage(left, drive=True))
         self.assertEqual(found.entry("new.odrg"), catalog.entry_of("new.odrg", data, canvas=CANVAS))
         self.assertEqual(found.marker.generation, 2)
         items = {item["file"]: item for item in replies(run)[-2]["items"] if item.get("external")}
@@ -75,8 +75,7 @@ class Uploads(unittest.TestCase):
         script += upload_external("new.odrg", second, T0 + 1100) + asked(2000, "list")
         run, left = run_on_card(card(CARD), script)
         lists = [{item["file"]: item["id"] for item in reply["items"] if item.get("external")} for reply in replies(run) if "items" in reply]
-        before = card(CARD)
-        ids = {name: 60001 + at for at, name in enumerate(entry.name for entry in catalog.read(catalog.MemoryStorage(before)).entries)}
+        ids = drive_ids(card(CARD))
         self.assertEqual(lists[0], ids)
         sun_id = ids["sun.odrg"]
         self.assertEqual(lists[0]["sun.odrg"], sun_id)
@@ -89,8 +88,7 @@ class Uploads(unittest.TestCase):
         script = upload_external("new.odrg", data, T0) + asked(1000, "remove 60001", "list")
         script += [f"poll {T0 + 1020 + 20 * step}" for step in range(1300)] + asked(27100, "list", "catalog")
         run, _ = run_on_card(card(CARD), script, ["--trace-drive"])
-        binds = [line for line in run.lines if line.startswith("drive bind")]
-        self.assertEqual(len(binds), len(CARD) + 1, binds)
+        self.assertFalse([line for line in run.lines if line.startswith(("drive bind", "drive list"))])
         lists = [reply["items"] for reply in replies(run) if "items" in reply]
         self.assertEqual(lists[0], lists[1])
         self.assertEqual(replies(run)[-1]["external"]["generation"], 3)
@@ -98,9 +96,10 @@ class Uploads(unittest.TestCase):
     def test_a_replacement_of_the_file_that_plays_plays_the_new_one_from_its_start(self):
         new = loop_of(5, 10)
         after = [f"poll {T0 + 920 + 20 * step}" for step in range(150)]
-        script = asked(0, "play 60001") + [f"poll {T0 + 20 * step}" for step in range(1, 15)] + upload_external("sun.odrg", new, T0 + 300) + after
+        sun = drive_ids(card(CARD))["sun.odrg"]
+        script = asked(0, f"play {sun}") + [f"poll {T0 + 20 * step}" for step in range(1, 15)] + upload_external("sun.odrg", new, T0 + 300) + after
         replaced, _ = run_on_card(card(CARD), script)
-        anew = [f"poll {T0 + 20 * step}" for step in range(1, 45)] + asked(900, "play 60001") + after
+        anew = [f"poll {T0 + 20 * step}" for step in range(1, 45)] + asked(900, f"play {sun}") + after
         played, _ = run_on_card(card({**CARD, "sun.odrg": new}), anew)
 
         def pictures(run):
@@ -145,11 +144,10 @@ class SameAsThePcLibrary(unittest.TestCase):
     def test_uploads_replacements_and_removals_leave_the_same_files(self):
         start = card(CARD)
         new, again = loop_of(4, 9), loop_of(6, 11)
-        names = [entry.name for entry in catalog.read(catalog.MemoryStorage(start)).entries]
-        removed = names[0]
+        removed = next(name for name, file_id in drive_ids(start).items() if file_id == 60001)
         script = upload_external("new.odrg", new, T0) + upload_external("sun.odrg", again, T0 + 700) + asked(1500, f"remove {60001}")
         _, left = run_on_card(start, script)
-        storage = catalog.MemoryStorage(start)
+        storage = catalog.MemoryStorage(start, drive=True)
         catalog.add(storage, "new.odrg", new, canvas=CANVAS)
         catalog.add(storage, "sun.odrg", again, canvas=CANVAS)
         catalog.remove(storage, removed)
@@ -158,11 +156,10 @@ class SameAsThePcLibrary(unittest.TestCase):
     def test_a_card_with_sub_folders_leaves_the_same_files_too(self):
         start = card({"sun.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(3, 6), "night/deep/x.odrg": loop_of(2, 7), "a b/c.odrg": loop_of(3, 8)})
         new = loop_of(4, 9)
-        names = [entry.name for entry in catalog.read(catalog.MemoryStorage(start)).entries]
-        removed = 60001 + names.index("night/comet.odrg")
+        removed = drive_ids(start)["night/comet.odrg"]
         script = upload_external("new.odrg", new, T0) + asked(1500, f"remove {removed}")
         _, left = run_on_card(start, script)
-        storage = catalog.MemoryStorage(start)
+        storage = catalog.MemoryStorage(start, drive=True)
         catalog.add(storage, "new.odrg", new, canvas=CANVAS)
         catalog.remove(storage, "night/comet.odrg")
         self.assertEqual(left, storage.files)
@@ -178,7 +175,7 @@ def card_calls(script, options=()):
 
 
 def entries_agree(test, files, what):
-    found = catalog.read(catalog.MemoryStorage(files))
+    found = catalog.read(catalog.MemoryStorage(files, drive=True))
     test.assertEqual(found.state, "ok", what)
     for entry in found.entries:
         test.assertIn(entry.name, files, what)
@@ -249,7 +246,7 @@ class Cuts(unittest.TestCase):
                     return number, outcomes
                 support.session(show, asked(0, "status"), ["--drive", top])
                 after = folder_of(top)
-            found = catalog.read(catalog.MemoryStorage(after))
+            found = catalog.read(catalog.MemoryStorage(after, drive=True))
             self.assertEqual(found.state, "ok", number)
             for entry in found.entries:
                 self.assertEqual((len(after[entry.name]), zlib.crc32(after[entry.name])), (entry.bytes, entry.crc), (number, entry.name))

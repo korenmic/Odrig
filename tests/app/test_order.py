@@ -3,6 +3,7 @@ import pathlib
 import tempfile
 import unittest
 
+from odrig import catalog
 from tests.core import support as core_support
 from tests.emulator import support as emulator_support
 
@@ -39,10 +40,12 @@ class TheSavedOrder(unittest.TestCase):
     def order_of(self, emulator):
         return json.loads(emulator.command("order get"))["ids"]
 
-    def test_the_rows_stand_in_the_saved_order_with_card_animations_among_them(self):
+    def test_the_rows_stand_in_the_saved_order_and_the_cards_after_them(self):
+        # The line that names a file of the card is passed over: the card's files follow the
+        # show's animations in the order of their names.
         emulator, _ = self.emulator(3, ["x b.odrg", "i 3", "i 1"], drive=["a.odrg", "b.odrg"])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 5}).seen
-        self.assertEqual(found["first"], [60002, 3, 1, 2, 60001])
+        self.assertEqual(found["first"], [3, 1, 2, 60001, 60002])
         self.assertEqual(found["first"], self.order_of(emulator))
         self.assertEqual(found["note"], HINT)
 
@@ -94,11 +97,29 @@ class TheSavedOrder(unittest.TestCase):
         self.assertEqual(found["after"], [3, 1, 4, 2])
         self.assertEqual(self.order_of(emulator), [3, 1, 4, 2])
 
-    def test_the_first_row_cannot_move_up_nor_the_last_down_and_a_card_row_moves(self):
+    def test_a_row_of_a_folder_of_a_card_with_a_catalog_moves_within_its_folder(self):
+        folder, _ = self.folder(2)
+        top = folder.parent / "card"
+        storage = catalog.MemoryStorage({"night/a.odrg": core_support.clip(7, 60, 6), "night/b.odrg": core_support.clip(8, 60, 6)}, drive=True)
+        catalog.rebuild(storage, canvas=(60, 6))
+        for name, data in storage.files.items():
+            path = top.joinpath("odrig", *name.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        emulator = entered(self, emulator_support.Emulator(folder, "--drive", str(top)))
+        # `night/a.odrg` is 60001 and `night/b.odrg` 60002; the folder `night` is 60003.
+        steps = [{"enter": "night", "level": "night", "rows": 2}, {"menu": [60001, "Move down", [60002, 60001]], "rows": 2}]
+        support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 2, "folders": 1, "steps": steps})
+        self.assertEqual(json.loads(emulator.command("order get in 60003"))["ids"], [60002, 60001])
+        moved = catalog.read(catalog.Storage(top / "odrig", drive=True))
+        self.assertEqual([entry.name for _, entry in moved.index.folders[1].rows], ["night/b.odrg", "night/a.odrg"])
+
+    def test_the_first_row_cannot_move_up_nor_the_last_down(self):
         emulator, _ = self.emulator(2, drive=["c.odrg"])
-        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "menu": [60001, "Move up", [1, 60001, 2]]}).seen
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "look": 60001}).seen
         self.assertEqual(found["menu"], ["Move up", "Move down (disabled)", "External storage is read-only: this animation cannot be ignored or deleted from the app."])
-        self.assertEqual(self.order_of(emulator), [1, 60001, 2])
+        found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "menu": [2, "Move up", [2, 1, 60001]]}).seen
+        self.assertEqual(self.order_of(emulator), [2, 1, 60001])
         found = support.run("order", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "older": True}).seen
         self.assertEqual(found["menu"][1:3], ["Move up (disabled)", "Move down"])
 

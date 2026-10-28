@@ -10759,6 +10759,239 @@ in the commit that records it; a file whose key the folder holds only adds its n
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
 
+## Seed 50: which catalogs are of version 2
+
+**Question.** The seed takes the marker's format to version 2 and says a reader of version
+1 finds it incompatible. The board's own storage has a catalog too, with no folder and no
+index. Does its marker go to version 2 as well, which would make every board's catalog
+incompatible after the update?
+
+**Answer.** No. Version 2 is the marker of a catalog with an index, a drive's: the marker
+of version 1 with the lines `folders` and `ids` before its `crc` line, 461 bytes. The board's
+own catalog stays of version 1, 409 bytes, as it has no index. Each reader takes only its
+storage's version: a drive's catalog of version 1, the cards made before the index, is
+`incompatible` until `import` or `catalog rebuild external` writes it anew, and a catalog of
+version 2 in the board's own storage is `incompatible` too.
+
+**Resolution.** `odrig/catalog.py` (`parse_marker(data, drive)`, `Storage(folder, drive)`);
+docs/catalog.md, "The marker"; docs/specs/50-p2-more-than-256-files-on-a-drive/design.md.
+
+## Seed 50: the index's files and lines
+
+**Question.** The seed asks for fixed-width lines and three kinds of file, but names
+neither the files, the widths nor the fields beyond a list, and does not say where a
+folder's file's CRC-32 stands, since the marker cannot name a number of files that grows
+with the folders.
+
+**Answer.** `index-<id>.txt` for each folder, the root's `index-0.txt`, `index-folders.txt`
+for the table and `index-ids.txt` for the map. Lines of 180 bytes in a folder's file and
+in the table, 36 in the map, padded with spaces before the line feed; a line's last field
+is what follows its fixed fields with the padding cut off, which a name never ends in. A
+file's line has the fields of its catalog line after its id and `f`, its canvas among
+them, so that the core leaves out a file of another canvas without a page; a folder's line
+has its id, `d`, its number of own files, which the app shows on a folder's row, and its
+path. The table's line has, besides the seed's fields, the ordinal after the folder's last
+descendant, the number of files of the folders before it, and the CRC-32 of its file; the
+marker names the table and the map with their lines and CRC-32s, so any change of a
+folder's file changes the table's CRC-32 and the marker.
+
+**Resolution.** `odrig/catalog.py` (`Index`, `parse_index`); docs/catalog.md, "The index of
+a drive".
+
+## Seed 50: the ids the writers give, and the show's
+
+**Question.** The seed keeps the ids stable "as today": the lowest free id when a file is
+added, the same files with the same show the same ids. Today the core skips the ids of the
+show's items. The PC tool, which writes the index on a computer, does not know the show,
+and the two writers must leave the same bytes. And what does a rebuild give, which sorts
+nothing in memory?
+
+**Answer.** Neither writer looks at the show. A rebuild and an import give the files the
+ids from 60001 in the walk's order and the folders the ids after them in the table's order,
+as a listed drive's files and folders get theirs today with an empty show; an upload of a
+new file takes the lowest id the map does not hold, a replacement keeps its file's, a
+removal frees its own and those of the folders it empties. Where an item of the show has a
+drive's id, every command means the item, as `play` finds the show's items first today;
+an upload to the show of an id the drive's index holds stays `in-use`. A rebuild that
+gives the ids anew in the walk's order keeps the same files in the same order on the same
+ids, and writes the map in one pass, without a sort.
+
+**Resolution.** `odrig/catalog.py` (`build_index`, `lowest_free_id`); docs/catalog.md, "The
+index of a drive".
+
+## Seed 50: the order a rebuild keeps, and the old index it trusts
+
+**Question.** A rebuild and an import keep the order of the rows they find for the files
+still there and put new files after them. Which old index is trusted, and how is a "new"
+file told apart in the core, which cannot hold the old rows of a big folder?
+
+**Answer.** The old index is taken when its marker is of version 2 and every page, the
+table, the map and each folder's file agree with their CRC-32s and each line is in its
+form, the check the core can make by reading each once; otherwise every folder's files are
+by the bytes of their names. A folder's old rows are those of the first line of the old
+table with its path. A new file is one the old pages have no line for, which the core
+finds by reading one page; both writers ask the pages, not the old rows, so that they
+agree on every card.
+
+**Resolution.** `odrig/catalog.py` (`_sound_old`, `build_index`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: the record's actions of an index
+
+**Question.** The commit record of version 1 knows `move upload.part <name>` and `remove
+<name>`. How does it put a change's index files in place, and in what order?
+
+**Answer.** `move <from> <to>` takes any file of the catalog as `<from>`, and `remove` an
+index file too; the record's first line stays `odrig-catalog-do 1`. A change writes each
+index file it changes as `.new` before the marker, and the record names them in a fixed
+order, so that both writers write the same record: the removals of the files of the folders
+that left, the animation's own action, each folder's file in the table's order, the table,
+then the map. A file of the index left without a line, the root's or the map, is removed.
+
+**Resolution.** `odrig/catalog.py` (`_index_actions`, `commit`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: where the PC tool adds a file to a drive
+
+**Question.** `add` puts a file into the folder under the last part of its path, so always
+into the root. The library's `add` takes any name a catalog may hold. Where does a file
+with a folder in its name go in a drive's index, whose folder may not be in the table?
+
+**Answer.** Into the root only, as the board's uploads: the library refuses a name with a
+`/` for a drive with `file-malformed`. A file put into a folder on a computer joins the
+index with `import`.
+
+**Resolution.** `odrig/catalog.py` (`add`).
+
+## Seed 50: what `status` names, and a folder's count in `list`
+
+**Question.** The seed approves that `status` names the playing animation's path, so that
+the app need not hold the whole list. The app also marks the levels that lead to the
+current playlist and shows on a folder's row the count of its own files, both of which it
+took from the whole list. Which members carry them, and where do they stand?
+
+**Answer.** `status` gains two members before `left`, which stays its last: `file`, the
+file of the animation `animation` names, an item's file or a drive's by its path, and
+`playlist`, the path of the card's folder whose playlist is current while `playing` is its
+id; each `null` otherwise. A folder's item of `list` and `list in` gains `files`, the number
+of its own files that `list in` of it gives. All three are parts of the forms the owner
+approved, the playing animation named and one level given with its folder rows, and add
+no command.
+
+**Resolution.** `core/src/commands.cpp` (`status`), `core/src/content.cpp`
+(`content_list`); docs/commands.md, "Status reply" and "Storage and the installed items".
+
+## Seed 50: the revision of a level's order
+
+**Question.** `order get` now gives one level, and `order get in <folder-id>` another. The
+revision was the CRC-32 of every listed animation's id and key. Of what is a level's
+revision made, and which revision does `order move` compare?
+
+**Answer.** A level's revision is the CRC-32 of the ids of its animations in the saved
+order, each as four bytes, low byte first: it changes whenever the level's order or its
+animations change, and is the same after a restart for the same files. `order move`
+compares the revision of the level of `<id>`, the root's for a show's item.
+
+**Resolution.** `core/src/order.cpp` (`revision_of`, `order_get`, `order_move`);
+docs/commands.md, "The saved playlist order".
+
+## Seed 50: what the core checks of a drive's index
+
+**Question.** The PC tool reads a drive's index whole and checks every file's CRC-32 and
+every line against the pages. The core may not read the whole index: it publishes the drive
+from its marker and reads lines as it needs them. What does it check, and what does it say
+of a damage it meets?
+
+**Answer.** The core checks the marker, of version 2, at the plug-in and at each look. It
+reads neither the pages nor the CRC-32s of the index's files. A line it reads that is not
+in its form, or a file shorter than the lines the marker or the table gives it, makes the
+catalog `damaged` with `line` at the next refresh, and the drive's animations go; the PC
+tool says `page` for a file of the wrong length. A damage the core does not read is found
+by the PC tool's `check`.
+
+**Resolution.** `core/src/drive.cpp` (`index_line`, `drive_row`), `core/src/catalog.cpp`
+(`catalog_drive_look`); docs/catalog.md, "The index of a drive"; docs/core.md, "A drive".
+
+## Seed 50: the files a rebuild of a drive's catalog writes for itself
+
+**Question.** The design names `rebuild.tmp` and `rebuild-folders.tmp` and the phases that
+write them, but not every field of their lines, nor what the draft of the table holds when
+a folder's end and counts are known only after its subtree.
+
+**Answer.** Both have lines of 180 bytes, padded as the index's. A line of `rebuild.tmp` is
+`1 <crc> <bytes> <width> <height> <length> <type> <path>` for a file that passed, so that
+what follows `1 ` is its page line, and `0 00000000 0 0 0 0 frames <path>` for one that did
+not. A line of `rebuild-folders.tmp` is `<ordinal> <depth> <first> <path>`, the root's
+`0 0 0`: a folder's own files are the next line's first position less its own, and its end
+and its sub-folders are found by reading on until a line of its depth or less, so that no
+line is written before it is known. Each phase takes at most eight lines at a step. A
+plug-in of a drive that can be written removes both files, as it removes `upload.part`.
+
+**Resolution.** `core/src/catalog.cpp` (`scan_step`, `draft_step`, `folders_step`,
+`map_step`, `table_step`, `commit_drive`, `catalog_drive_step`).
+
+## Seed 50: a drive after its rebuild
+
+**Question.** A rebuild used to leave the drive listed, its refused files in `list` with
+their faults until the next plug-in. The design reads the drive again from its new index at
+the end. What of the files the rebuild refused, and of a drive that is pulled out while it
+runs?
+
+**Answer.** At the commit the drive's animations are dropped and its catalog read again at
+once, as after another marker: the playlist plays from its first animation, and only the
+files of the index are listed. A refused file is logged when the scan meets it, `drive file
+<name> left out: <reason>`, for a drive without a catalog as before. While the rebuild
+runs, an indexed drive plays from its old index and its catalog stays `ok`; a listed drive
+is listed again and its catalog is `none`, as before. A drive pulled out ends the rebuild
+without removing anything, since another drive may be in by then; its files are never read
+without a record, and the next plug-in of it removes the two files of the rebuild.
+
+**Resolution.** `core/src/catalog.cpp` (`drive_rebuild_step`, `catalog_drive_went`).
+
+## Seed 50: the hosts list every file
+
+**Question.** The core takes a listed drive's first 256 files and 32 sub-folders. Should the
+hosts still cut their listings?
+
+**Answer.** The test host and the emulator list every animation file of the drive's folder
+to three levels, so that a rebuild reads every file and the core's own cut is tested; the
+firmware still stops at 256 files and 32 sub-folders, which the host interface allows. The
+emulator's `drive_cut` goes, and the interface's comment says a host may stop there.
+
+**Resolution.** `tests/core/host/host.cpp` (`list_drive`), `emulator/host.py`
+(`drive_list`), `core/include/odrig_core.h` (`drive_name`).
+
+## Seed 50: reads of a drive's index at any offset
+
+**Question.** The host interface says the core reads a file with `read_at` from offset 0
+on, each call where the last ended, but for the commands `read` and `catalog page`. The
+design reads the index's lines by their numbers and finds ids and folders by binary search.
+May the core begin a read anywhere in those files?
+
+**Answer.** Yes, in the files of a drive's index, `drive/index-...`, and in the two files a
+rebuild writes for itself, `drive/rebuild...`: every host with a drive seeks there already,
+the firmware's `readPart` with `fseek` and the emulator's with `seek`. Every other file is
+read as before, and the test host still stops on a read of another file that does not go on
+where the last ended. The emulator opens and closes a file of the drive's catalog or
+index at each read, so that the PC tool may replace it on Windows while the emulator has
+the card: the core no longer reads `order.txt` after the marker, which used to let go of
+the last file of the catalog it read.
+
+**Resolution.** `core/include/odrig_core.h` (`read_at`), `tests/core/host/host.cpp`
+(`read_at`), `emulator/host.py` (`read_at`); docs/core.md, "Rules of use".
+
+## Seed 50: where the cursor's code lives
+
+**Question.** The tasks name `core/src/index.h` and `index.cpp` for the index's rows. The
+same calls answer for a drive without a catalog, from its table and its tree. Where do they
+go?
+
+**Answer.** Into `core/src/drive.h` and `drive.cpp`, the drive as the rest of the core reads
+it, whatever keeps it; the reading and writing of the fields of a catalog's and an index's
+lines into `core/src/fields.h`, which the catalog shares. The writers of the index's files
+stay in `core/src/catalog.cpp` beside the commit they belong to.
+
+**Resolution.** `core/src/drive.h`, `core/src/drive.cpp`, `core/src/fields.h`.
 ## Seed 51: the core builds on Windows again
 
 **Question.** Microsoft's compiler does not know `__attribute__((noinline))` and doubts the
@@ -11133,6 +11366,26 @@ the same day?
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
 
+## Seed 50 and seed 48: the saved repeats of a drive's files
+
+**Question.** Seed 48 keeps the saved repeats of 32 of the drive's files by their places,
+found by the hash of `order.txt`'s entries, and reads the drive's lines of `repeats.txt` in
+steps after the drive's part of `order.txt`. Seed 50 takes the places, the hashes and the
+drive's part of `order.txt` away: an indexed drive has positions in its walk and no listing.
+How do the two meet?
+
+**Answer.** An entry holds the position of the drive's file in its walk and its loops, 8
+bytes. A line `x <name>` finds its file by its path: a listed drive's by the host's names of
+its places, an indexed drive's in the rows of the folder of its path. The file is read whole
+at once when the drive is taken up: a listed drive's at its first step, before its files are
+checked; an indexed drive's when it is published, before any of its files plays. An upload
+to the drive and a removal from it read the file again, since the positions after them
+move; a rebuild reads it with the drive read anew. The limits stay: 32 entries, `repeats
+over` once, `no-space` for a 33rd.
+
+**Resolution.** `core/src/repeats.cpp` (`apply_drive`, `repeats_drive_taken`),
+`core/src/drive.cpp` (`drive_position_named`), `core/src/core.cpp` (`drive_step`),
+`core/src/catalog.cpp` (`publish`); docs/core.md, "The saved repeats".
 ## Seed 46: the installation's animations in git, the heavy ones on the share
 
 **Question.** The decision committed the JSON source of every animation; seed 10's answer

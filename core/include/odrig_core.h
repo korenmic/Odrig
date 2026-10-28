@@ -67,7 +67,10 @@ typedef struct odrig_host {
     /* Reads a file apart from the one that open, read and close hold: up to capacity
        bytes from this offset. Returns the number read, 0 at or after the end of the
        file, -1 on failure and when there is no such file. capacity is at most 512.
-       The core reads a file with it from offset 0 on, each call where the last ended. */
+       The core reads a file with it from offset 0 on, each call where the last ended, but
+       for the commands `read` and `catalog page` and for the files of a drive's index and
+       of its rebuild, `drive/index-...` and `drive/rebuild...`, which it reads at any
+       offset. */
     int32_t (*read_at)(void *ctx, const char *name, uint32_t offset,
                        uint8_t *buffer, size_t capacity);
 
@@ -89,8 +92,9 @@ typedef struct odrig_host {
        drive's folder `odrig` and of its sub-folders to three levels whose names end in
        `.odrg` or `.odrgx`, in any case, and do not begin with a dot: depth first, a folder's
        files by the bytes of their names and then its sub-folders by the bytes of their
-       names, at most 256 files and 32 sub-folders; a file in a sub-folder is named by its
-       path from odrig. Returns 1, or 0 when that drive has no file at that place or is not
+       names; a file in a sub-folder is named by its path from odrig. A host may end the
+       list at its 256th file, or before the first file whose folder would be the 33rd
+       sub-folder in it. Returns 1, or 0 when that drive has no file at that place or is not
        plugged in any more. */
     int (*drive_name)(void *ctx, uint32_t drive, uint32_t place, char *buffer, size_t capacity);
     /* Optional capacity of this mounted drive, in bytes. Returns 1, or -1 when

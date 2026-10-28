@@ -182,8 +182,9 @@ python -m emulator build/demo-20/show --drive build/stick
 - The folder is listed when the core asks, for a drive without a catalog: the files whose
   names end in `.odrg` or `.odrgx`, in any case, and do not begin with a dot, of `odrig`
   and of its sub-folders to three levels, depth first, a folder's files by the bytes of
-  their names and then its sub-folders by the bytes of their names, at most 256 files and
-  32 sub-folders; a file in a sub-folder is named by its path, as `night/comet.odrg`. A
+  their names and then its sub-folders by the bytes of their names, every one of them,
+  and the core takes the first 256 files and 32 sub-folders; a file in a sub-folder is
+  named by its path, as `night/comet.odrg`. A
   folder whose name begins with a dot, ends with a space or a dot, holds a character a
   name may not, or is `System Volume Information` is passed over. The folder is not listed
   again while it stays. To take up files added to it, move the folder `odrig` away for two
@@ -897,7 +898,10 @@ The tool prints the reply line to standard output:
   command front-end's.
 - `list` prints the reply, and for as long as the reply names a `next` position it sends
   `list <next>` and prints that reply too: a line of output for each part of a long show.
-  It stops at a reply that is not ok.
+  It stops at a reply that is not ok. `list in ID` does the same for the level of the
+  card's folder with that id, and `order get` and `order get in ID` for the saved order of
+  a level; with a position after them, `list in ID FROM` and `order get in ID FROM` send
+  that one line.
 - `--timeout SECONDS` is how long the tool waits for a reply; 2 seconds without it.
 - `--port NAME`: the tool opens the port without resetting the board. It sets 115200 baud,
   8 data bits and no parity, lowers RTS before it lowers DTR, waits 0.2 seconds, discards

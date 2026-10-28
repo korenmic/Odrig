@@ -42,12 +42,14 @@ a top bar with the app's name and whether the installation answers.
   `Internal storage: 84 animations, free 6.7 MB of 13.5 MB` and
   `External storage: 12 animations, free 3.1 GB of 31.9 GB (read-only).`, without
   `(read-only)` while the installation can write its card: the board's
-  own from `space`, the external storage's by `external` of `list`. A medium that is
+  own from `space`, the external storage's from the entries of the card's catalog that
+  `catalog` gives, since the list holds one level of the card only. A medium that is
   present without animations says `0 animations`; an absent one says `absent` with no
-  number. While the board still reads its animations after a start, the external number
-  is `animations not known yet`, and while the show is invalid the internal one is
-  `animations not known`. Below them, when Settings says so, stands the pinned Tests
-  group; then two filters and the one list of
+  number; a card whose catalog is not `ok` has no count, and its line says only what is
+  free, as `External storage: free 3.1 GB of 31.9 GB`. While the
+  card's catalog is still read, the external number is `animations not known yet`, and
+  while the show is invalid the internal one is `animations not known`. Below them, when
+  Settings says so, stands the pinned Tests group; then two filters and the one list of
   animations, one level of the card's folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as
   `night/deep`, with `Back` inside a folder and the button `Play this folder`, which
@@ -56,10 +58,17 @@ a top bar with the app's name and whether the installation answers.
   one row for each folder of the card, with the folder's name, how many animations it
   holds itself and a chevron; a tap on a folder row enters it, and the list then holds
   that folder's own files and the rows of its sub-folders. A folder with no file of its
-  own keeps its row, `0 animations` and its way in. The heading is marked while the
-  level's playlist is current, and so is the folder row that leads to the current
-  playlist at every level above it. The list comes back to the root when the target
-  changes, when the card goes out and when the folder shown is gone from the list. Each row
+  own keeps its row, `0 animations` and its way in. The app reads the level it shows and
+  no other, in parts, with `list` and `order get` at the root and `list in` and `order get
+  in` inside a folder; entering a folder or going Back reads that level anew, and nothing
+  of the level left is kept, so that a card of any size takes one level's rows on the
+  phone. The heading is marked while the level's playlist is current, and so is the
+  folder row that leads to the current playlist at every level above it, from the path
+  that `status` names as `playlist`; the line of what plays names the file from `status`
+  as well. The list comes back to the root when the target changes, when the card goes
+  out and when the folder shown is gone from the card. An upload chooses its id and its
+  name against the root's level, which the app reads for it when another level is
+  shown. Each row
   begins its Play button with a square of 44 by 44 pixels: the preview of its animation, a
   short GIF that loops, its pixels kept square and whole, a 60-by-6 strip as a band across
   the middle, or an empty dark square when the animation has no preview or a fault; a tap
@@ -892,7 +901,7 @@ installed; the phone with mobile data on.
 15. **The numbers of animations.** On the board's network, with the microSD card in,
     once the list has come. *Seen:* `Internal storage:` begins with the number of the
     board's own animations and `External storage:` with the number of the card's, and
-    both match what `python3 -m odrigctl --port … space` and `list` say. Take the card
+    both match what `python3 -m odrigctl --port … space` and `catalog` say. Take the card
     out: within twenty seconds the external line says `absent (read-only).` with no
     number; put it back: the number comes back.
 16. **The look and the menus.** On each tab, upright and sideways. *Seen:* the midnight

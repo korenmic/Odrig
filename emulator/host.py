@@ -18,17 +18,19 @@ MOST_STORAGE = 4294967295
 LONGEST_NAME = 32
 NAME_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_.")
 
-# The most files of a drive, how often the folder of a drive is looked for, and the
-# beginning of the name the core gives a file of the drive.
+# The most places of a drive's list that a name is bound to, how often the folder of a
+# drive is looked for, and the beginning of the name the core gives a file of the drive.
 DRIVE_MOST = 256
 DRIVE_LOOK_SECONDS = 1.0
 DRIVE_PREFIX = "drive/"
+# The names of the files of a drive's catalog and index and of a rebuild of it, which the
+# core reads a few lines at a time.
+DRIVE_CATALOG_PREFIXES = ("drive/catalog", "drive/index-", "drive/rebuild")
 # What a part of a name of a file of a drive may not hold, the longest length of a whole
-# name, how many sub-folders of the drive's folder are taken, how deep below it a folder
-# may lie, and the folder of the file system that is never one of them.
+# name, how deep below the drive's folder a folder may lie, and the folder of the file
+# system that is never one of them.
 DRIVE_FORBIDDEN = frozenset('/\\:*?"<>|')
 DRIVE_LONGEST_NAME = 100
-DRIVE_MOST_FOLDERS = 32
 DRIVE_DEEPEST = 3
 DRIVE_SYSTEM_FOLDER = "System Volume Information"
 
@@ -65,21 +67,6 @@ def drive_listing_key(path):
     return tuple(os.fsencode(folder) for folder in folders), os.fsencode(file)
 
 
-def drive_cut(paths):
-    """The paths of a sorted listing within the limits: at most 256 files and at most 32
-    sub-folders, a folder counted with its uncounted ancestors when the first file at or
-    below it is kept; from the file whose folder would be counted past the 32nd, and from
-    the 257th, the rest is passed over."""
-    kept, counted = [], set()
-    for path in paths:
-        folders = path.split("/")[:-1]
-        new = {"/".join(folders[:depth]) for depth in range(1, len(folders) + 1)} - counted
-        if len(kept) >= DRIVE_MOST or len(counted) + len(new) > DRIVE_MOST_FOLDERS:
-            break
-        counted |= new
-        kept.append(path)
-    return kept
-
 # Windows refuses to remove a file that a program holds open, and its folder, unless the
 # program let others do so when it opened the file. The host lets them, as macOS does: a
 # drive is pulled out by moving its folder away while one of its files plays.
@@ -106,8 +93,8 @@ def reading(path):
 def drive_list(folder):
     """The paths of the animation files of a drive's folder `odrig` and of its sub-folders
     to three levels, depth first: a folder's files by the bytes of their names, then its
-    sub-folders by the bytes of their names, each listed the same way, at most 256 files
-    and 32 sub-folders. Empty when the folder cannot be listed."""
+    sub-folders by the bytes of their names, each listed the same way, every one of them.
+    Empty when the folder cannot be listed."""
     found = []
     pending = [("", 0)]
     while pending:
@@ -124,7 +111,7 @@ def drive_list(folder):
         except OSError:
             if not prefix:
                 return []
-    return drive_cut(sorted(found, key=drive_listing_key))
+    return sorted(found, key=drive_listing_key)
 
 
 class Drive:
@@ -459,6 +446,16 @@ class FolderHost:
         path = self.drive.path(name) if self._of_the_drive(name) else self._path(name)
         if path is None:
             return None
+        if name.startswith(DRIVE_CATALOG_PREFIXES):
+            # Each read of a file of a drive's catalog opens the file and closes it, so that
+            # the program that changes the card on a computer may replace the file between
+            # two reads.
+            try:
+                with reading(path) as opened:
+                    opened.seek(offset)
+                    return opened.read(capacity)
+            except OSError:
+                return None
         try:
             if self._second_name != name:
                 self._drop_second()
