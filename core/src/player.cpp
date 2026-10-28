@@ -8,6 +8,7 @@
 #include "mapping_control.h"
 #include "order.h"
 #include "playlist.h"
+#include "repeats.h"
 #include "text.h"
 #include "upload.h"
 
@@ -33,7 +34,7 @@ uint64_t length_of(const Core &core, uint32_t animation) {
 // The loops and the longest time of an animation's turn, as its item gives them, 0 when
 // it gives none. A drive's animation has neither.
 uint32_t loops_of(const Core &core, uint32_t animation) {
-    return is_drive(animation) ? 0 : core.items[animation].count;
+    return is_drive(animation) ? 0 : core.items[animation].count & 0xFFFFu;
 }
 
 uint32_t seconds_of(const Core &core, uint32_t animation) {
@@ -230,9 +231,14 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
 }
 
 // How long the turn of the animation at this position lasts in the playlist, in
-// milliseconds. The length of the animation is known.
+// milliseconds: the loops of its saved repeat, not cut by its longest time, or else the
+// loops the show gives it. The length of the animation is known.
 uint64_t turn_ms(const Core &core, uint32_t position) {
     const uint64_t loop = length_of(core, position);
+    const uint64_t saved = repeats_of(core, position);
+    if (saved != 0) {
+        return saved * loop;
+    }
     uint64_t loops = loops_of(core, position);
     if (loops == 0) {
         loops = (1000ull * core.min_seconds + loop - 1) / loop;
@@ -407,9 +413,10 @@ __attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_
                 return kNone;
             }
         } else {
-            // A turn whose loops a `repeat` gave is not cut by the longest time.
+            // A turn whose loops a `repeat` gave, or a saved repeat, is not cut by the longest
+            // time.
             const uint64_t longest = 1000ull * seconds;
-            const bool beyond = seconds != 0 && core.turn_repeat == 0 && elapsed >= longest;
+            const bool beyond = seconds != 0 && core.turn_repeat == 0 && repeats_of(core, core.turn_item) == 0 && elapsed >= longest;
             const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, beyond ? longest : elapsed);
             if (reason != kNone) {
                 return reason;
@@ -930,8 +937,10 @@ bool player_counts(const Core &core, uint64_t now, TurnCounts *counts) {
     if (!player_reported(core)) {
         return false;
     }
+    // The turn's own value, else its saved repeat, else its loops by the show's numbers,
+    // which need the length of its loop.
     const uint64_t loop = length_of(core, core.turn_item);
-    uint64_t repeat = core.turn_repeat;
+    uint64_t repeat = core.turn_repeat != 0 ? core.turn_repeat : repeats_of(core, core.turn_item);
     if (repeat == 0 && loop != 0) {
         repeat = (turn_ms(core, core.turn_item) + loop - 1) / loop;
     }
@@ -939,19 +948,32 @@ bool player_counts(const Core &core, uint64_t now, TurnCounts *counts) {
     if (repeat != 0 && at > repeat) {
         at = repeat;
     }
+    counts->id = id_of(core, core.turn_item);
+    counts->saved = repeats_of(core, core.turn_item);
     counts->repeat = repeat;
     counts->loop = at;
-    counts->saved = 0;
     return true;
 }
 
 bool player_set_repeat(Core &core, uint32_t id, uint32_t loops, uint64_t now) {
     TurnCounts counts;
-    if (!player_counts(core, now, &counts) || id_of(core, core.turn_item) != id) {
+    if (!player_counts(core, now, &counts) || counts.id != id) {
         return false;
     }
     core.turn_repeat = counts.loop > loops ? static_cast<uint32_t>(counts.loop) : loops;
     return true;
+}
+
+void player_hold_turn(Core &core, uint32_t loops) {
+    core.turn_repeat = loops;
+}
+
+void player_default_again(Core &core, uint64_t now, uint64_t loop) {
+    core.turn_repeat = 0;
+    if (length_of(core, core.turn_item) != 0 && now - core.zero >= turn_ms(core, core.turn_item)) {
+        // Its own count has passed: the turn ends with the loop in progress.
+        core.turn_repeat = static_cast<uint32_t>(loop);
+    }
 }
 
 bool player_seed(const Core &core, uint32_t *seed) {

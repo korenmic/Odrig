@@ -5,6 +5,7 @@
 #include "arena.h"
 #include "catalog.h"
 #include "crc32.h"
+#include "repeats.h"
 #include "storage.h"
 
 namespace odrig {
@@ -528,6 +529,7 @@ void order_start(Core &core) {
     }
     clear_items(core);
     read_whole(core, kReadItems);
+    repeats_start(core);
 }
 
 void order_drive_named(Core &core, uint32_t place, const char *name) {
@@ -591,6 +593,7 @@ void order_reload(Core &core) {
     clear_drive(core);
     read_whole(core, kReadItems | kReadDrive);
     core.order_due = 0;
+    repeats_reload(core);
 }
 
 void order_item_leaves(Core &core, uint32_t position) {

@@ -107,13 +107,14 @@ void player_inclusion_changed(Core &core, uint32_t item);
 // it was.
 void player_item_leaves(Core &core, uint32_t item);
 
-// The counts of the playlist's turn in progress: the loops it plays, 0 while they are not
-// known, the loop in progress, from 1, and the loops of its animation's saved repeat, 0
-// for none.
+// The counts of the playlist's turn in progress: the id of its animation, the loops it
+// plays, 0 while they are not known, the loop in progress, from 1, and the loops of its
+// animation's saved repeat, 0 for none.
 struct TurnCounts {
+    uint32_t id;
+    uint32_t saved;
     uint64_t repeat;
     uint64_t loop;
-    uint32_t saved;
 };
 
 // Whether the playlist's turn in progress is reported: the show is valid, no test shows,
@@ -131,6 +132,13 @@ bool player_counts(const Core &core, uint64_t now, TurnCounts *counts);
 // frame, or as long as the loop in progress when that is the later end. False when no turn
 // of that animation is reported.
 bool player_set_repeat(Core &core, uint32_t id, uint32_t loops, uint64_t now);
+
+// Makes the reported turn so many loops long from its first frame.
+void player_hold_turn(Core &core, uint32_t loops);
+
+// Gives the reported turn its own count again at a moment, with the loop that was in
+// progress before its count changed: a turn whose own count has passed ends with that loop.
+void player_default_again(Core &core, uint64_t now, uint64_t loop);
 
 // Produces a refresh when a grid time is due: 1 when it did, 0 when none was due.
 int player_poll(Core &core, uint64_t now_ms);

@@ -22,7 +22,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the core's (after `make -C core build/odrig_host all shared`), the emulator's,
     onboarding.
 
-- [ ] 2. The saved repeats of the board's own files
+- [x] 2. The saved repeats of the board's own files
   - `core/src/repeats.cpp` and `repeats.h`, `core/src/order.cpp` (the calls),
     `core/src/storage.cpp` (`repeats.part`, the reload after a renaming upload),
     `core/src/content.cpp` (the masked `repeat`), `core/src/commands.cpp` (the saving

@@ -8,6 +8,7 @@
 #include "order.h"
 #include "player.h"
 #include "playlist.h"
+#include "repeats.h"
 #include "show.h"
 #include "upload.h"
 
@@ -639,18 +640,24 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return content_remove(core, id, reply);
     }
     if (words.is(0, "repeat")) {
-        uint32_t id;
-        uint32_t loops;
-        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 1, 65535, &loops)) {
+        // `repeat <id> <n>`, `repeat <id> <n> save` and `repeat <id> default`.
+        uint32_t id = 0;
+        uint32_t loops = 0;
+        const bool restore = words.count == 3 && words.is(2, "default");
+        const bool save = words.count == 4 && words.is(3, "save");
+        if ((words.count != 3 && !save) || !number_word(words, 1, 1, 65535, &id) || (!restore && !number_word(words, 2, 1, 65535, &loops))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        if (!player_set_repeat(core, id, loops, now)) {
-            return refuse(reply, "stale");
+        if (!save && !restore) {
+            return player_set_repeat(core, id, loops, now) ? succeed(reply) : refuse(reply, "stale");
         }
-        return succeed(reply);
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) {
+            return refuse(reply, "busy");
+        }
+        return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
     }
     if (words.is(0, "upload")) {
         if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");

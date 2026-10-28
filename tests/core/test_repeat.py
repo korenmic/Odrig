@@ -200,5 +200,265 @@ class ItsLifetime(Playback):
         self.assert_as_the_reference(three(), script)
 
 
+HEADER = "odrig-repeats 1\n"
+
+
+def repeats(files, *lines, header=HEADER):
+    """The files with a `repeats.txt` of these lines."""
+    return {**files, "repeats.txt": header + "".join(f"{line}\n" for line in lines)}
+
+
+def saved_of(run_or_lines):
+    """The animation and `saved` of each `status` of a session."""
+    lines = run_or_lines if isinstance(run_or_lines, list) else run_or_lines.lines
+    states = [json.loads(line[len("reply "):]) for line in lines if line.startswith('reply {"ok":true,"on"')]
+    return [(state["animation"], state["saved"]) for state in states]
+
+
+def logs_of(run):
+    return list(run.logs) + [line[len("log "):] for line in run.lines if line.startswith("log ")]
+
+
+class TheSavingForms(Playback):
+    def test_their_refusals_come_in_the_order_of_the_table(self):
+        files = with_a_cycle(three(), {"id": 4, "cycle": [1, 2], "seconds": 5})
+        lines = {
+            "repeat 1 0 save": "bad-argument",
+            "repeat 1 5 saved": "bad-argument",
+            "repeat 1 defaults": "bad-argument",
+            "repeat 0 default": "bad-argument",
+            "repeat 1 65536 save": "bad-argument",
+            "repeat 1 default 5": "bad-argument",
+            "repeat 99 5 save": "unknown-id",
+            "repeat 99 default": "unknown-id",
+            "repeat 4 5 save": "in-use",
+            "repeat 4 default": "in-use",
+        }
+        run, kept = support.start_and_keep(files, first_poll() + asked(100, *lines))
+        self.assertEqual(replies(run), [refusal(code) for code in lines.values()])
+        self.assertNotIn("repeats.txt", kept)
+        invalid = support.with_show_fault(three())
+        run = support.start(invalid, first_poll() + asked(100, "repeat 1 0 save", "repeat 1 5 save", "repeat 1 default"))
+        self.assertEqual(replies(run), [refusal("bad-argument"), refusal("show-invalid"), refusal("show-invalid")])
+
+    def test_they_are_busy_until_the_check_after_the_start_has_ended_and_while_an_upload_is_open_or_a_rebuild_runs(self):
+        run = support.start(three(), first_poll() + asked(0, "repeat 1 5 save", "repeat 1 default"), check_first=False)
+        self.assertEqual(replies(run), [refusal("busy")] * 2)
+        data = support.clip(9, *CANVAS, (4000,))
+        run = support.start(three(), first_poll() + asked(100, support.upload_lines(9, "nine.odrg", data)[0], "repeat 1 5 save"))
+        self.assertEqual(replies(run)[1], refusal("busy"))
+        run = support.start(three(), first_poll() + asked(100, "catalog rebuild internal", "repeat 1 5 save", "repeat 1 default"))
+        self.assertEqual(replies(run), [DONE, refusal("busy"), refusal("busy")])
+
+    def test_a_host_whose_storage_cannot_be_changed_cannot_save_one(self):
+        run = support.start(three(), first_poll() + asked(100, "repeat 1 5 save"), ["--only-space"])
+        self.assertEqual(replies(run), [refusal("storage-error")])
+
+    def test_a_save_writes_the_line_reports_it_and_acts_on_the_turn(self):
+        script = first_poll() + asked(1000, "repeat 1 2 save", "status") + asked(7980, "status") + asked(8000, "status")
+        run, kept = support.start_and_keep(three(), script)
+        self.assertEqual(replies(run)[0], DONE)
+        self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n2 f four.odrg\n")
+        self.assertEqual(counts(run), [(1, 2, 1), (1, 2, 2), (2, 3, 1)])
+        self.assertEqual(saved_of(run), [(1, 2), (1, 2), (2, None)])
+
+    def test_it_holds_for_every_later_turn_and_across_a_restart(self):
+        files = three()
+        with support.installed(files) as folder:
+            support.session(folder, first_poll() + asked(1000, "repeat 1 2 save"))
+            # The first turn of 1 is 2 loops, 8 seconds; then 2 for 30 and 3 for 45.
+            again = support.session(folder, first_poll() + asked(1000, "status") + asked(8000, "status") + asked(83_000, "status") + asked(91_000, "status"))
+        self.assertEqual(counts(again), [(1, 2, 1), (2, 3, 1), (1, 2, 1), (2, 3, 1)])
+        self.assertEqual(saved_of(again), [(1, 2), (2, None), (1, 2), (2, None)])
+
+    def test_the_value_already_saved_writes_nothing_and_still_acts_on_the_turn(self):
+        files = repeats(three(), "2 f four.odrg")
+        run, kept = support.start_and_keep(files, first_poll() + asked(1000, "repeat 1 2 save", "status") + asked(5000, "repeat 1 2 save", "status"), ["--trace-store"])
+        self.assertFalse(any(line.startswith("store ") for line in run.lines))
+        self.assertEqual(kept["repeats.txt"], files["repeats.txt"].encode())
+        self.assertEqual(counts(run), [(1, 2, 1), (1, 2, 2)])
+
+    def test_a_restore_removes_the_line_and_the_turn_plays_its_own_count_again(self):
+        files = repeats(three(), "3 f long.odrg", "2 f four.odrg", "5 f ten.odrg")
+        script = first_poll() + asked(1000, "status", "repeat 1 default", "status") + asked(31_980, "status") + asked(32_000, "status")
+        run, kept = support.start_and_keep(files, script)
+        self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n3 f long.odrg\n5 f ten.odrg\n")
+        self.assertEqual(counts(run), [(1, 2, 1), (1, 8, 1), (1, 8, 8), (2, 5, 1)])
+        self.assertEqual(saved_of(run), [(1, 2), (1, None), (1, None), (2, 5)])
+
+    def test_a_restore_after_the_own_count_has_passed_ends_the_turn_with_the_loop_in_progress(self):
+        # Saved 10 loops; at 33 seconds the own count, 8 loops, has passed: the turn ends with
+        # its ninth loop, at 36 seconds.
+        files = repeats(three(), "10 f four.odrg")
+        script = first_poll() + asked(33_000, "repeat 1 default", "status") + asked(35_980, "status") + asked(36_000, "status")
+        printed = self.assert_as_the_reference(files, script)
+        self.assertEqual(counts(printed), [(1, 9, 9), (1, 9, 9), (2, 3, 1)])
+
+    def test_a_restore_with_nothing_saved_writes_nothing_and_drops_the_turns_own_value(self):
+        script = first_poll() + asked(1000, "repeat 1 2", "status", "repeat 1 default", "status")
+        run, kept = support.start_and_keep(three(), script, ["--trace-store"])
+        self.assertEqual(replies(run)[2], DONE)
+        self.assertFalse(any(line.startswith("store ") for line in run.lines))
+        self.assertNotIn("repeats.txt", kept)
+        self.assertEqual(counts(run), [(1, 2, 1), (1, 8, 1)])
+
+    def test_a_save_replaces_the_animations_first_line_in_its_place_and_keeps_the_others(self):
+        files = repeats(three(), "3 f long.odrg", "2 f four.odrg", "7 x night/a.odrg", "9 f four.odrg", "5 f gone.odrg")
+        run, kept = support.start_and_keep(files, first_poll() + asked(1000, "repeat 1 4 save"))
+        self.assertEqual(replies(run), [DONE])
+        self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n3 f long.odrg\n4 f four.odrg\n7 x night/a.odrg\n5 f gone.odrg\n")
+
+    def test_the_order_of_the_counts(self):
+        # Animation 1 has `repeat` 3 in the show and `max_seconds` 6: 2 loops, the cut one
+        # counted; a saved repeat of 4 is not cut; a turn's own value goes before both.
+        files = repeats(three(first={"repeat": 3, "max_seconds": 6}), "4 f four.odrg")
+        script = first_poll() + asked(1000, "status") + asked(15_980, "status") + asked(16_000, "status", "play 1") + asked(16_020, "repeat 1 1", "status")
+        printed = self.assert_as_the_reference(files, script)
+        self.assertEqual(counts(printed), [(1, 4, 1), (1, 4, 4), (2, 3, 1), (1, 1, 1)])
+        plain = three(first={"repeat": 3, "max_seconds": 6})
+        self.assertEqual(counts(self.assert_as_the_reference(plain, first_poll() + asked(1000, "status"))), [(1, 2, 1)])
+
+    def test_two_items_that_name_one_file_share_it(self):
+        files = show_of([{"id": 1, "file": "four.odrg"}, {"id": 5, "file": "four.odrg"}, {"id": 2, "file": "ten.odrg"}], {"four.odrg": three()["four.odrg"], "ten.odrg": three()["ten.odrg"]})
+        script = first_poll() + asked(1000, "repeat 5 2 save", "status") + asked(10_000, "status")
+        run = support.start(files, script)
+        self.assertEqual(saved_of(run), [(1, 2), (5, 2)])
+
+    def test_it_follows_the_file_name_through_a_removal_and_uploads(self):
+        files = repeats(three(), "2 f four.odrg")
+        data = three()["four.odrg"]
+        other = support.clip(9, *CANVAS, (4000,))
+        script = Script().polls(1).line("remove 1").polls(2).upload(7, "four.odrg", data).polls(2).line("play 7").polls(1).line("status")
+        script.upload(7, "seven.odrg", other).polls(2).line("play 7").polls(1).line("status")
+        run, kept = support.start_and_keep(files, script.lines)
+        self.assertEqual(saved_of(run), [(7, 2), (7, None)])
+        # The line stays with its name, which no item names now.
+        self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n2 f four.odrg\n")
+
+
+class TheFile(Playback):
+    def test_a_file_out_of_form_holds_no_saved_repeat_and_the_log_says_so_once(self):
+        bad = (
+            repeats(three(), "2 f four.odrg", header="odrig-repeats 2\n"),
+            repeats(three(), "2 f four.odrg", header=""),
+            repeats(three(), "02 f four.odrg"),
+            repeats(three(), "0 f four.odrg"),
+            repeats(three(), "65536 f four.odrg"),
+            repeats(three(), "2 F four.odrg"),
+            repeats(three(), "2 f Four.odrg"),
+            repeats(three(), "2 f four.txt"),
+            repeats(three(), "2  f four.odrg"),
+            repeats(three(), "2 x "),
+            repeats(three(), "2 x " + "a" * 128),
+            repeats(three(), "2 f four.odrg", "x"),
+            {**three(), "repeats.txt": HEADER + "2 f four.odrg"},
+            {**three(), "repeats.txt": ""},
+            {**three(), "repeats.txt": "2 f four.odrg\n"},
+            repeats(three(), *(["2 f four.odrg"] * 513)),
+            {**three(), "repeats.txt": (HEADER + "2 x a\0b\n").encode()},
+        )
+        for files in bad:
+            with self.subTest(repeats=bytes(files["repeats.txt"] if isinstance(files["repeats.txt"], bytes) else files["repeats.txt"].encode())[:40]):
+                run = support.start(files, first_poll() + asked(1000, "status"))
+                self.assertEqual(saved_of(run), [(1, None)])
+                self.assertEqual(logs_of(run).count("repeats unreadable"), 1)
+
+    def test_a_sound_file_gives_its_values_the_first_line_of_a_file_counting(self):
+        files = repeats(three(), "2 f four.odrg", "5 f four.odrg", "4 x " + "a" * 127, "6 f absent.odrg", "9 f ten.odrg", *(["7 x b"] * 507))
+        run = support.start(files, first_poll() + asked(1000, "status") + asked(8000, "status"))
+        self.assertEqual(saved_of(run), [(1, 2), (2, 9)])
+        self.assertNotIn("repeats unreadable", logs_of(run))
+
+    def test_a_missing_file_holds_none_and_logs_nothing(self):
+        run = support.start(three(), first_poll() + asked(1000, "status"))
+        self.assertEqual(saved_of(run), [(1, None)])
+        self.assertEqual(logs_of(run), [])
+
+    def test_a_save_writes_an_unreadable_file_anew(self):
+        files = repeats(three(), "2 f four.odrg", "bad")
+        run, kept = support.start_and_keep(files, first_poll() + asked(1000, "repeat 2 4 save", "status"))
+        self.assertEqual(replies(run)[0], DONE)
+        self.assertEqual(kept["repeats.txt"], b"odrig-repeats 1\n4 f ten.odrg\n")
+
+    def test_a_part_left_by_an_interrupted_save_is_removed_at_the_start(self):
+        files = {**repeats(three(), "2 f four.odrg"), "repeats.part": HEADER + "5 f four.odrg\n"}
+        run, kept = support.start_and_keep(files, first_poll() + asked(1000, "status"))
+        self.assertNotIn("repeats.part", kept)
+        self.assertEqual(saved_of(run), [(1, 2)])
+
+    def test_a_folder_without_the_file_gets_no_storage_call_more(self):
+        run = support.start(three(), options=["--trace-store"])
+        self.assertFalse(any("repeats" in call for call in run.stored))
+
+    def test_512_lines_are_kept_and_one_more_is_no_space_once_the_lines_of_files_no_item_names_are_dropped(self):
+        full = repeats(three(), *(f"3 x card-{number}.odrg" for number in range(511)), "4 f gone.odrg")
+        run, kept = support.start_and_keep(full, first_poll() + asked(1000, "repeat 1 2 save"))
+        self.assertEqual(replies(run), [DONE])
+        lines = kept["repeats.txt"].decode().splitlines()
+        self.assertEqual((len(lines), lines[-1]), (513, "2 f four.odrg"))
+        self.assertNotIn("4 f gone.odrg", lines)
+        fuller = repeats(three(), *(f"3 x card-{number}.odrg" for number in range(511)), "4 f long.odrg")
+        run, kept = support.start_and_keep(fuller, first_poll() + asked(1000, "repeat 1 2 save", "repeat 3 5 save", "repeat 3 default"))
+        self.assertEqual(replies(run), [refusal("no-space"), DONE, DONE])
+        self.assertEqual(kept["repeats.txt"].decode().splitlines()[-1], "3 x card-510.odrg")
+
+    def test_a_power_cut_at_any_call_of_a_save_or_a_restore_leaves_the_old_file_or_the_new_one(self):
+        files = repeats(three(), "3 f long.odrg", "2 f four.odrg")
+        for command, new in ((asked(1000, "repeat 1 6 save"), (6, b"odrig-repeats 1\n3 f long.odrg\n6 f four.odrg\n")),
+                             (asked(1000, "repeat 1 default"), (None, b"odrig-repeats 1\n3 f long.odrg\n"))):
+            observed, whole = support.start_and_keep(files, first_poll() + command, ["--trace-store"])
+            self.assertEqual(whole["repeats.txt"], new[1])
+            first = len(observed.stored) + 1
+            calls = sum(line.startswith("store ") for line in observed.lines)
+            self.assertEqual(calls, 4)
+            for at in range(first, first + calls):
+                for keeps in (0, 1):
+                    with self.subTest(command=command[-1], at=at, keeps=keeps):
+                        _, left = support.start_and_keep(files, first_poll() + command, ["--cut-at", str(at), "--cut-keeps", str(keeps)], status=75)
+                        recovered, settled = support.start_and_keep(left, first_poll() + asked(1000, "status"))
+                        self.assertEqual(saved_of(recovered), [(1, 2)])
+                        self.assertNotIn("repeats.part", settled)
+                        self.assertEqual(settled["repeats.txt"], files["repeats.txt"].encode())
+            recovered = support.start(whole, first_poll() + asked(1000, "status"))
+            self.assertEqual(saved_of(recovered), [(1, new[0])])
+
+    def test_a_failed_call_says_storage_error_and_changes_nothing(self):
+        files = repeats(three(), "3 f long.odrg", "2 f four.odrg")
+        for command in (asked(1000, "repeat 1 6 save", "status"), asked(1000, "repeat 1 default", "status")):
+            observed = support.start(files, first_poll() + command, ["--trace-store"])
+            first = len(observed.stored) + 1
+            calls = sum(line.startswith("store ") for line in observed.lines)
+            for at in range(first, first + calls):
+                with self.subTest(command=command[-2], at=at):
+                    run, kept = support.start_and_keep(files, first_poll() + command, ["--store-fails-at", str(at)])
+                    answer = replies(run)[0]
+                    if answer == DONE:
+                        continue
+                    self.assertEqual(answer, refusal("storage-error"))
+                    self.assertEqual(saved_of(run), [(1, 2)])
+                    self.assertEqual(kept["repeats.txt"], files["repeats.txt"].encode())
+                    self.assertNotIn("repeats.part", kept)
+
+    def test_a_read_that_fails_says_storage_error_and_changes_nothing(self):
+        files = repeats(three(), "3 f long.odrg", "2 f four.odrg")
+        for offset in ("0", "20"):
+            with self.subTest(offset=offset):
+                run, kept = support.start_and_keep(files, first_poll() + asked(1000, "repeat 1 6 save", "status"), ["--command-read-fails", "repeats.txt", offset])
+                self.assertEqual(replies(run)[0], refusal("storage-error"))
+                self.assertEqual(saved_of(run), [(1, 2)])
+                self.assertEqual(kept["repeats.txt"], files["repeats.txt"].encode())
+
+    def test_the_rounds_after_a_long_gap_count_the_saved_repeats(self):
+        files = repeats(three(), "2 f four.odrg", "1 f ten.odrg", "3 f long.odrg")
+        script = first_poll() + asked(1000, "repeat 1 3", "status") + asked(10 * 3_600_000, "status") + asked(10 * 3_600_000 + 50_000, "status")
+        self.assert_as_the_reference(files, script)
+
+    def test_a_save_and_a_restore_as_the_reference_states_them(self):
+        files = repeats(three(), "3 f long.odrg")
+        script = first_poll() + asked(1000, "repeat 1 5 save", "status") + asked(25_000, "status", "repeat 2 2 save", "repeat 1 default", "status")
+        script += asked(40_000, "status") + asked(130_000, "status", "repeat 3 default", "status") + asked(200_000, "status")
+        self.assert_as_the_reference(files, script)
+
+
 if __name__ == "__main__":
     unittest.main()
