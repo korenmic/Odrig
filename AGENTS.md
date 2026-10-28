@@ -127,7 +127,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **The app's count of animations, and app mapping with a diagonal check**, seeds 28 and 30: merged; the owner's LED check is open.
 - **Toggles and filters in the playlist**, seeds 29 and 39: merged; the owner's phone checks are open.
 - **Bounded decoding and boot-local quarantine**, seeds 31 and 32: no bad file freezes the board; bad files grayed.
-- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open. A hundred picture clocks, seed 52: 8-colour widgets that tick at random, from the owner's picture.
+- **Managed catalogs, and ODRGX text and clock animations in them**, seeds 35 and 37: built; the board session and the owner's checks are open.
 - **Aurora Glass UI and playlist revamp**, seed 36: built; the board and phone checks are open.
 - **A microSD card as the external storage**, seed 38: `build` makes it; the board session is open.
 - **The mapping from a photo of the diagonal**, seed 40: the app reads the snakes' order from a photo.

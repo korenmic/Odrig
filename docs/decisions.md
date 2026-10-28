@@ -166,6 +166,15 @@ text's layout and stores it, and the core checks its bounds and draws it. A cloc
 randomness comes from the timing of the refreshes, mixed with the turn. See
 [format.md](format.md), "ODRGX".
 
+The widget payload was extended on purpose with seed 52: two picture clocks, a picture
+dial and a picture display, which carry a picture of their own, an ODRG file of one frame
+and at most 8 colours, and draw over it the hands or the digits of the virtual time; the
+time may run backward, or turn at the swing's slowest points as the seed of the turn says.
+The core decodes the picture once a turn into the pixel buffer it has and draws the hands
+and digits into the DEFLATE window as the LED data is made, so it asks for no more memory.
+The files of the owner's picture of a hundred clocks are made from one inventory by the
+converter's `clocks`. See [format.md](format.md), "Picture clocks".
+
 ### Measurements behind the choice
 
 Sizes in bytes of the same animations in each format. Every lossless file was decoded back
@@ -831,3 +840,12 @@ are in [format.md](format.md), "Measured sizes".
   clock of the card's folder `clocks` plays after every 5 turns of the playlist and at least
   every 5 minutes, and the message after it, while they are switched on. The firmware tool
   keeps the board's `clocks.txt` as it keeps `repeats.txt`.
+- 2026-10-28: Seed 52, the owner's request with the picture of a hundred timekeepers: the
+  widget payload gains a picture dial and a picture display, of their own picture of at
+  most 8 colours, a direction forward, backward or random that may turn at the swing's
+  slowest points, and a font `tiny` of digits; a reason `bad-picture`; a widget's payload
+  may have 32,768 bytes. The owner approved the two widgets by asking for the seed. The
+  converter gains `clocks`, which makes the files of an inventory. The 100 tiles and the
+  twelve time animations of the owner's ideas are 112 files of 60 x 60 and at most 8
+  colours in `collection/card/clocks/`, their sources beside the seed. The core's memory,
+  the command list and every reply are unchanged. The owner's look at the LEDs is open.

@@ -155,7 +155,7 @@ Rules for every task:
   - Suites: the converter's, the onboarding suite.
   - Requirements: 9.1 to 9.6, 10.1, 10.2
 
-- [ ] 12. The pages, the decisions and every suite
+- [x] 12. The pages, the decisions and every suite
   - `docs/decisions.md`: the format's extension and a line in the change log;
     `AGENTS.md`: the seed's line in "What is coming". The contact sheet of the 112 in
     `build/clocks/`. Every suite that runs on Windows, after bringing the branch up to
