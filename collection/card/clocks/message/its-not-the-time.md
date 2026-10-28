@@ -1,7 +1,7 @@
 # It's not the time
 
 - File: `its-not-the-time.odrg`
-- Key: `5218d8e1-120969`
+- Key: `55c9771a-121161`
 - Animation: 60 x 60, frames, 6 s, 114 frames, 120 of 50 ms before the same ones are merged
 - Source: the owner's page `references/horror-text-60x60.html` of seed 54, made by another tool from the owner's conversation of 2026-10-28
 - Platform: unknown
