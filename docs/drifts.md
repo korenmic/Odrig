@@ -11281,3 +11281,26 @@ imports reads a quoted `from` as one.
 
 **Resolution.** `converter/lib/motion.js`, `converter/lib/inventory.js`,
 `converter/cli/clocks.js`; `docs/converter.md`, "clocks".
+
+## Seed 52: the tiles reduced to 8 colours
+
+**Question.** Each tile is to be "scaled to 60 x 60 and reduced to" at most 8 colours,
+"black among them when the clock has black". The cut tiles are not square: those of the
+lower rows of the owner's picture are 103 to 114 pixels high and about 122 wide, because
+the picture's rows are. How is a tile scaled, how are its colours chosen, and where is the
+tool?
+
+**Answer.** Each cut tile is scaled to 60 x 60 as it is, with Pillow's box filter: the
+lower rows' tiles are stretched up to 17 percent in height, which pixel art bears, rather
+than given bands that are not in the picture. Its colours are a median cut of the scaled
+tile, refined by k-means, 8 or fewer; when the tile has a pixel darker than 24 in each
+channel, the colour nearest black becomes black. Each pixel takes the nearest colour,
+without dithering, and the colours are ordered from dark to light. The tool, `prep.py`,
+and every other tool of the inventory are kept with the collection in
+`clocks/source/tools/`, as the inventory is, and were run from `scratch/clocks52/` of the
+first checkout on the Windows computer; the kinds came from a look at the picture: 38
+dials, 28 displays and 34 motions, the list of
+`docs/specs/52-p2-a-hundred-picture-clocks/design.md`.
+
+**Resolution.** The collection's `clocks/source/tools/prep.py` and
+`clocks/source/inventory.json`.

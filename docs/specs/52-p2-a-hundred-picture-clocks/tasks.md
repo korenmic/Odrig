@@ -101,7 +101,7 @@ Rules for every task:
   - Suites: the converter's, the onboarding suite.
   - Requirements: 6.1 to 6.3, 7.1, 7.2
 
-- [ ] 5. The tiles prepared
+- [x] 5. The tiles prepared
   - The tools in the collection's `clocks/source/tools/`, run from `scratch/`: each tile
     scaled to 60 x 60 and reduced to 8 colours, black among them when it has black; the
     skeleton of `inventory.json` with each tile's palette, picture, kind and `about`; a
