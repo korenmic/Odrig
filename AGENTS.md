@@ -137,6 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
 - **Fast and parallel tests and builds**, seed 53: one runner for every suite and both builds at once; no process left behind.
+- **Clocks between the animations**, seed 54: a clock of the card's folder `clocks` after every 5 animations or 5 minutes, and the installation's name after it; two checkboxes in Settings.
 
 The state of every seed is in the `state.json` of its folder.
 
