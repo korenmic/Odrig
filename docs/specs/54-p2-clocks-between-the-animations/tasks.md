@@ -25,7 +25,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the core's, the emulator's, onboarding.
   - Requirements: 2.1 to 2.5
 
-- [ ] 3. The breaks in the core
+- [x] 3. The breaks in the core
   - `core/src/breaks.cpp` (the folders, the order, the message), `core/src/clock.cpp`
     (`clock_shuffle`), `core/src/player.cpp` and `player.h`, `core/src/mapping_control.cpp`,
     `core/src/order.cpp` and `drive.cpp` where the tree changes, `core/src/core_state.h`;

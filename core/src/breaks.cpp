@@ -1,6 +1,9 @@
 #include "breaks.h"
 
 #include "catalog.h"
+#include "clock.h"
+#include "drive.h"
+#include "player.h"
 #include "storage.h"
 
 namespace odrig {
@@ -54,6 +57,9 @@ bool write_file(Core &core, bool clocks, bool message) {
 void breaks_start(Core &core) {
     core.clocks_on = 0;
     core.clock_message_on = 0;
+    core.clocks_first = core.clocks_last = core.clocks_files = 0;
+    core.message_first = core.message_files = 0;
+    core.order_key = core.order_next = core.order_count = 0;
     if (!storage_changes(core) || core.host.read_at == nullptr) {
         return;
     }
@@ -124,9 +130,65 @@ uint32_t breaks_command(Core &core, bool message, bool on, Reply &reply) {
         core.host.remove(core.host.ctx, kClocksPart);
         return refuse(reply, "storage-error");
     }
+    if (clocks && core.clocks_on == 0) {
+        player_counts_start(core, core.latest);
+    }
+    if (message && on && core.break_phase == kBreakClock) {
+        core.break_message = 1;
+    }
     core.clocks_on = clocks ? 1 : 0;
     core.clock_message_on = after ? 1 : 0;
     return succeed(reply);
+}
+
+void breaks_tree(Core &core) {
+    core.clocks_first = core.clocks_last = core.clocks_files = 0;
+    core.message_first = core.message_files = 0;
+    core.order_next = core.order_count = 0;
+    if (!core.tree_known) {
+        return;
+    }
+    IndexFolder folder;
+    uint32_t ordinal = drive_folder_with_path(core, "clocks");
+    if (ordinal != kNoFolder && ordinal != 0 && drive_folder(core, ordinal, folder)) {
+        core.clocks_first = folder.first;
+        core.clocks_last = folder.last;
+        core.clocks_files = folder.files;
+    }
+    ordinal = drive_folder_with_path(core, "clocks/message");
+    if (ordinal != kNoFolder && ordinal != 0 && drive_folder(core, ordinal, folder)) {
+        core.message_first = folder.first;
+        core.message_files = folder.files;
+    }
+}
+
+bool breaks_passes_over(const Core &core, uint32_t at) {
+    return core.clocks_on != 0 && at >= core.clocks_first && at < core.clocks_last;
+}
+
+uint32_t breaks_pick(Core &core, uint64_t at) {
+    // At most two whole orders are tried: what is left of this one, and a new one.
+    for (uint32_t tried = 0; core.clocks_files != 0 && tried < 2 * core.clocks_files; ++tried) {
+        if (core.order_next >= core.order_count || core.order_count != core.clocks_files) {
+            core.order_key = clock_seed(core.noise, core.clocks_files, at);
+            core.order_count = core.clocks_files;
+            core.order_next = 0;
+        }
+        const uint32_t position = core.clocks_first + clock_shuffle(core.order_key, core.order_count, core.order_next++);
+        if (drive_plays(core, position)) {
+            return kDriveBase + position;
+        }
+    }
+    return kNothing;
+}
+
+uint32_t breaks_message(const Core &core) {
+    for (uint32_t position = core.message_first; position < core.message_first + core.message_files; ++position) {
+        if (drive_plays(core, position)) {
+            return kDriveBase + position;
+        }
+    }
+    return kNothing;
 }
 
 }  // namespace odrig

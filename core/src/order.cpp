@@ -6,6 +6,7 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "drive.h"
+#include "breaks.h"
 #include "repeats.h"
 #include "storage.h"
 
@@ -181,6 +182,7 @@ void tree_clear(Core &core) {
     core.current = 0;
     core.current_folder.ordinal = 0;
     core.current_folder.id = 0;
+    breaks_tree(core);
     if (core.folders == nullptr) {
         return;
     }
@@ -239,6 +241,7 @@ void tree_build(Core &core) {
     }
     set_ends(core);
     core.tree_known = 1;
+    breaks_tree(core);
 }
 
 void tree_find_current(Core &core) {
@@ -257,6 +260,7 @@ void tree_find_current(Core &core) {
         }
     }
     drive_folder(core, core.current, core.current_folder);
+    breaks_tree(core);
 }
 
 void tree_choose(Core &core, uint32_t folder) {

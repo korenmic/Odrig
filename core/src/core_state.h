@@ -501,6 +501,41 @@ struct Core {
     // after each clock.
     uint8_t clocks_on;
     uint8_t clock_message_on;
+    // The clocks' folders of the drive's tree, as positions of its walk: the folder
+    // `clocks`, its subtree from `clocks_first` to before `clocks_last` and its own files,
+    // `clocks_files` from `clocks_first` on; the folder `clocks/message`, its own files,
+    // `message_files` from `message_first` on. All 0 for a folder there is none of.
+    uint32_t clocks_first;
+    uint32_t clocks_last;
+    uint32_t clocks_files;
+    uint32_t message_first;
+    uint32_t message_files;
+    // The order of the clocks: the key of its permutation, the place of the next clock in
+    // it, and the number of clocks it was drawn for; a new one is drawn once it is used up.
+    uint32_t order_key;
+    uint32_t order_next;
+    uint32_t order_count;
+    // A break: its phase, kBreakNone, kBreakClock or kBreakMessage; whether it paused a
+    // turn of the playlist; whether the message follows its clock; the turns of the
+    // playlist counted, at most 255; whether the count of the playlist's time is held, as
+    // the playlist does not play, with the time left of it then.
+    uint8_t break_phase;
+    uint8_t break_paused;
+    uint8_t break_message;
+    uint8_t break_turns;
+    uint8_t break_held;
+    // The position the playlist goes back to after the break; the paused turn's loops a
+    // `repeat` gave it, its clock's seed, 0 for none, and its time when it was paused. The
+    // seed a resumed turn of a clock takes in place of a new one, 0 for none.
+    uint32_t break_back;
+    uint32_t break_repeat;
+    uint32_t break_seed;
+    uint32_t resume_seed;
+    uint64_t break_offset;
+    // The timestamp at which 5 minutes of the playlist's time are counted, and while the
+    // count is held, the time left of the 5 minutes.
+    uint64_t break_due;
+    uint64_t break_rest;
 
     uint8_t *pixels;        // the pixel buffer of the decoder
     uint8_t *window;        // the window of the DEFLATE decoder

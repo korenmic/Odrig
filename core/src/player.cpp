@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "breaks.h"
 #include "catalog.h"
 #include "drive.h"
 #include "odrig_core.h"
@@ -205,7 +206,8 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
             }
             // A clock's turn gets its seed when it begins: its file is opened once in a turn.
             if (type == kTypeWidget) {
-                core.seed = clock_seed(core.noise, id_of(core, animation), start);
+                core.seed = core.resume_seed != 0 ? core.resume_seed : clock_seed(core.noise, id_of(core, animation), start);
+                core.resume_seed = 0;
             }
         }
         if (type == kTypeWidget && clock_is_picture(core.window)) {
@@ -336,6 +338,10 @@ bool in_range(Range range, uint32_t position) {
 // small.
 ODRIG_NOINLINE uint32_t drive_playing_from(const Core &core, Range range, uint32_t from) {
     for (uint32_t at = from > range.first ? from : range.first; at < range.last; ++at) {
+        if (breaks_passes_over(core, at)) {
+            at = core.clocks_last - 1;
+            continue;
+        }
         if (drive_plays(core, at)) {
             return kDriveBase + at;
         }
@@ -402,6 +408,99 @@ ODRIG_NOINLINE uint32_t next_animation(Core &core, uint32_t position) {
     return next_in(core, range_in_use(core), position);
 }
 
+// The count of the playlist's time is held while the playlist does not play, with the time
+// left of its 5 minutes.
+void counts_hold(Core &core) {
+    if (!core.break_held) {
+        core.break_rest = core.break_due > core.latest ? core.break_due - core.latest : 0;
+        core.break_held = 1;
+    }
+}
+
+// Both counts start again at a moment of the playlist.
+void counts_from(Core &core, uint64_t at) {
+    core.break_turns = 0;
+    core.break_held = 0;
+    core.break_due = at + kBreakMs;
+}
+
+// A break is cut: the turn it paused is not resumed, and both counts start again, the
+// time's held until the playlist's next turn begins.
+void cut_break(Core &core) {
+    core.break_phase = kBreakNone;
+    core.break_paused = 0;
+    core.resume_seed = 0;
+    core.break_turns = 0;
+    core.break_held = 1;
+    core.break_rest = kBreakMs;
+}
+
+// The position the playlist goes on with after a break that resumes nothing: the animation
+// whose turn was to begin, else the one after it, else the playlist's first.
+uint32_t back_after_break(Core &core) {
+    uint32_t back = core.break_back;
+    if (back != kNothing && !plays(core, back)) {
+        back = next_animation(core, back);
+    }
+    return back != kNothing ? back : player_first_in_playlist(core);
+}
+
+// A break begins at a moment with the next clock that plays, after which the playlist goes
+// back to `back`. False when no clock plays: nothing is paused, and the counts start again
+// at that moment.
+bool break_begins(Core &core, uint64_t at, uint32_t back) {
+    const uint32_t clock = breaks_pick(core, at);
+    if (clock == kNothing) {
+        core.break_paused = 0;
+        counts_from(core, at);
+        return false;
+    }
+    core.break_back = back;
+    core.break_phase = kBreakClock;
+    core.break_message = core.clock_message_on;
+    core.turn_item = clock;
+    core.turn_repeat = 0;
+    core.zero = at;
+    ++core.turn_number;
+    return true;
+}
+
+// A break ends at the playlist's zero: the counts start again there. A window that passed
+// during it is taken, and the next playlist plays from its first animation; else the
+// paused turn goes on from where it was paused, or the playlist goes on where the break
+// began.
+void break_ends(Core &core) {
+    const bool paused = core.break_paused != 0;
+    core.break_phase = kBreakNone;
+    core.break_paused = 0;
+    counts_from(core, core.zero);
+    if (core.zero >= window_end(core)) {
+        rotate(core, core.zero);
+        core.turn_item = player_first_in_playlist(core);
+    } else if (paused && core.break_back != kNothing && plays(core, core.break_back)) {
+        core.turn_item = core.break_back;
+        core.zero -= core.break_offset;
+        core.turn_repeat = core.break_repeat;
+        core.resume_seed = core.break_seed;
+    } else {
+        core.turn_item = back_after_break(core);
+    }
+}
+
+// Pauses the playlist's turn in progress where 5 minutes of the playlist's time are
+// counted, a moment in it, and begins a break there.
+void pause_for_break(Core &core) {
+    const uint64_t at = core.break_due > core.zero ? core.break_due : core.zero;
+    const uint32_t paused = core.turn_item;
+    core.break_offset = at - core.zero;
+    core.break_repeat = core.turn_repeat;
+    const bool seeded = core.stream_open && core.stream_drawn && core.stream_item == paused && core.stream_turn == core.turn_number &&
+                        type_of(core, paused) == kTypeWidget;
+    core.break_seed = seeded ? core.seed : 0;
+    core.break_paused = 1;
+    break_begins(core, at, paused);
+}
+
 // Moves the playlist on to the turn that a moment falls into, and gives the time since
 // that turn began. A turn begins where the one before it ended, however late the moment is.
 //
@@ -410,18 +509,19 @@ ODRIG_NOINLINE uint32_t next_animation(Core &core, uint32_t position) {
 // may last when the moment lies beyond it. When the loop ends on the way, the length is
 // known. When it does not, the animation is in its first loop and its turn goes on; or
 // the loop is longer than the longest time, and the turn ended there.
+//
+// While the clocks are on, a break's turns come between the playlist's: at the end of a
+// turn once 5 turns are counted, or within one where 5 minutes of the playlist's time are.
 ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
-    uint64_t elapsed = now - core.zero;
     bool rounds_taken = false;
     for (;;) {
+        const uint64_t elapsed = now - core.zero;
         const uint32_t seconds = seconds_of(core, core.turn_item);
-        uint64_t turn;
+        uint64_t turn = 0;
+        bool ended = true;
         if (length_of(core, core.turn_item) != 0) {
             turn = current_turn_ms(core);
-            if (elapsed < turn) {
-                *in_turn = elapsed;
-                return kNone;
-            }
+            ended = elapsed >= turn;
         } else {
             // A turn whose loops a `repeat` gave, or a saved repeat, is not cut by the longest
             // time.
@@ -434,17 +534,25 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
             if (length_of(core, core.turn_item) != 0) {
                 continue;
             }
-            if (!beyond) {
-                *in_turn = elapsed;
-                return kNone;
-            }
+            ended = beyond;
             turn = longest;
         }
-        if (!rounds_taken && !core.indexed && core.turn_repeat == 0 && plays(core, core.turn_item) && core.resume_item == kNothing) {
+        if (core.clocks_on && core.break_phase == kBreakNone && !core.break_held && core.break_due <= now &&
+            (!ended || core.break_due < core.zero + turn)) {
+            pause_for_break(core);
+            continue;
+        }
+        if (!ended) {
+            *in_turn = elapsed;
+            return kNone;
+        }
+        if (!rounds_taken && !core.indexed && !core.clocks_on && core.break_phase == kBreakNone && core.turn_repeat == 0 &&
+            plays(core, core.turn_item) && core.resume_item == kNothing) {
             // Whole rounds of the playlist in use are taken off at once when the length of
             // every animation of it is known, so that a long time without a refresh costs
             // one walk over the items. Not with a drive read from its index: that would
-            // read every row of it, and its turns are walked one by one. A turn whose loops a
+            // read every row of it, and its turns are walked one by one; nor while the
+            // clocks are on, whose breaks make the rounds unequal. A turn whose loops a
             // `repeat` gave ends first.
             rounds_taken = true;
             uint64_t round = 0;
@@ -470,34 +578,56 @@ ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn)
                 rounds = rounds < before_end ? rounds : before_end;
                 if (rounds != 0) {
                     core.zero += rounds * round;
-                    elapsed -= rounds * round;
                     ++core.turn_number;
                     continue;
                 }
             }
         }
         core.zero += turn;
-        elapsed -= turn;
         core.turn_repeat = 0;
-        if (core.zero >= window_end(core)) {
-            // The window passed during the turn: the next playlist is current from the
-            // turn's end, and plays from its first animation; its round is summed anew.
-            // The root alone, current again, goes on as it was.
-            const uint32_t before = core.current;
-            rotate(core, core.zero);
-            rounds_taken = false;
-            core.turn_item = core.current != before ? player_first_in_playlist(core) : next_animation(core, core.turn_item);
-        } else if (core.resume_item != kNothing && plays(core, core.resume_item)) {
-            // The turn a jump cut plays again, from its first frame.
-            core.turn_item = core.resume_item;
-            core.resume_item = kNothing;
+        if (core.break_phase == kBreakClock) {
+            // The clock's turn ended: the message plays once after it, else the break ends.
+            const uint32_t message = core.break_message || core.clock_message_on ? breaks_message(core) : kNothing;
+            if (message != kNothing) {
+                core.break_phase = kBreakMessage;
+                core.turn_item = message;
+                core.turn_repeat = 1;
+            } else {
+                break_ends(core);
+            }
+        } else if (core.break_phase == kBreakMessage) {
+            break_ends(core);
         } else {
-            core.resume_item = kNothing;
-            core.turn_item = next_animation(core, core.turn_item);
+            if (core.clocks_on && core.break_turns < 255) {
+                ++core.break_turns;
+            }
+            if (core.zero >= window_end(core)) {
+                // The window passed during the turn: the next playlist is current from the
+                // turn's end, and plays from its first animation; its round is summed anew.
+                // The root alone, current again, goes on as it was.
+                const uint32_t before = core.current;
+                rotate(core, core.zero);
+                rounds_taken = false;
+                core.turn_item = core.current != before ? player_first_in_playlist(core) : next_animation(core, core.turn_item);
+            } else if (core.resume_item != kNothing && plays(core, core.resume_item)) {
+                // The turn a jump cut plays again, from its first frame.
+                core.turn_item = core.resume_item;
+                core.resume_item = kNothing;
+            } else {
+                core.resume_item = kNothing;
+                core.turn_item = next_animation(core, core.turn_item);
+            }
+            if (core.turn_item != kNothing && core.clocks_on &&
+                (core.break_turns >= kBreakTurns || (!core.break_held && core.zero >= core.break_due))) {
+                break_begins(core, core.zero, core.turn_item);
+            }
         }
         if (core.turn_item == kNothing) {
             close_stream(core);
             core.playing = core.shown = kNothing;
+            core.break_phase = kBreakNone;
+            core.break_paused = 0;
+            counts_hold(core);
             *in_turn = 0;
             return kNone;
         }
@@ -747,11 +877,13 @@ void player_drive_moved(Core &core, uint32_t from, uint32_t to) {
         core.turn_item = moved(core.turn_item, from, to);
     }
     core.resume_item = moved(core.resume_item, from, to);
+    core.break_back = moved(core.break_back, from, to);
     core.shown = moved(core.shown, from, to);
     core.mapping_saved_shown = moved(core.mapping_saved_shown, from, to);
     if (core.stream_open && is_drive(core.stream_item)) {
         core.stream_item = moved(core.stream_item, from, to);
     }
+    breaks_tree(core);
 }
 
 void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
@@ -760,6 +892,8 @@ void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
         core.turn_item = shifted(core.turn_item, position, delta);
     }
     core.resume_item = shifted(core.resume_item, position, delta);
+    const bool back_went = core.break_phase != kBreakNone && delta < 0 && core.break_back == kDriveBase + position;
+    core.break_back = shifted(core.break_back, position, delta);
     core.shown = shifted(core.shown, position, delta);
     core.mapping_saved_shown = shifted(core.mapping_saved_shown, position, delta);
     if (core.stream_open && is_drive(core.stream_item)) {
@@ -769,6 +903,13 @@ void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
         } else {
             core.stream_item = moved;
         }
+    }
+    breaks_tree(core);
+    if (back_went) {
+        // The file the playlist goes back to after the break went: it goes on with the one
+        // after it, from its first frame.
+        core.break_paused = 0;
+        core.break_back = drive_playing_from(core, range_in_use(core), position);
     }
     if (turn_went) {
         // The file whose turn it was went: the playlist goes on with the one after it, now at
@@ -815,6 +956,14 @@ void player_start(Core &core) {
     core.shown = kNothing;
     core.resume_item = kNothing;
     core.in_place = 0;
+    core.break_phase = kBreakNone;
+    core.break_paused = 0;
+    core.break_message = 0;
+    core.break_back = kNothing;
+    core.resume_seed = 0;
+    core.break_turns = 0;
+    core.break_held = 1;
+    core.break_rest = kBreakMs;
     player_set_brightness(core, core.brightness);
     if (core.invalid) {
         return;
@@ -839,6 +988,42 @@ void player_start(Core &core) {
     }
 }
 
+namespace {
+
+// What plays leaves the playlist's turn in progress: a break is cut, and a turn of the
+// playlist that had begun counts one.
+void turn_cut(Core &core) {
+    if (core.playing == kPlaylist && core.break_phase != kBreakNone) {
+        cut_break(core);
+    } else if (core.playing == kPlaylist && core.clocks_on && !core.zero_pending && core.break_turns < 255) {
+        ++core.break_turns;
+    }
+    core.resume_seed = 0;
+}
+
+}  // namespace
+
+void player_counts_start(Core &core, uint64_t at) {
+    if (core.playing == kPlaylist && !core.zero_pending && !core.mapping_test) {
+        counts_from(core, at);
+    } else {
+        core.break_turns = 0;
+        core.break_held = 1;
+        core.break_rest = kBreakMs;
+    }
+}
+
+void player_break_leave(Core &core) {
+    if (core.playing != kPlaylist || core.break_phase == kBreakNone) {
+        return;
+    }
+    const uint32_t back = back_after_break(core);
+    cut_break(core);
+    close_stream(core);
+    core.turn_item = back;
+    core.shown = back;
+}
+
 void player_file_failed(Core &core, uint32_t file) {
     if (core.stream_open && !is_drive(core.stream_item) && core.items[core.stream_item].first == file) {
         close_stream(core);
@@ -861,6 +1046,11 @@ void player_file_failed(Core &core, uint32_t file) {
 }
 
 void player_halt(Core &core) {
+    if (core.break_phase != kBreakNone) {
+        cut_break(core);
+    }
+    counts_hold(core);
+    core.resume_seed = 0;
     close_stream(core);
     core.playing = kNothing;
     core.shown = kNothing;
@@ -868,6 +1058,8 @@ void player_halt(Core &core) {
 }
 
 void player_play_cycle(Core &core, uint32_t item) {
+    turn_cut(core);
+    counts_hold(core);
     core.cycle_start_entry = 0;
     core.turn_repeat = 0;
     close_stream(core);
@@ -877,6 +1069,7 @@ void player_play_cycle(Core &core, uint32_t item) {
 }
 
 void player_play_all(Core &core, uint32_t from) {
+    turn_cut(core);
     close_stream(core);
     core.turn_repeat = 0;
     core.playing = kPlaylist;
@@ -900,6 +1093,9 @@ void player_file_replaced(Core &core, uint32_t item) {
     if (core.playing == kPlaylist) {
         if (core.turn_item == item) {
             player_play_all(core, item);
+        } else if (core.break_phase != kBreakNone && core.break_back == item) {
+            // The paused turn's animation is another now: it plays from its first frame.
+            core.break_paused = 0;
         }
         return;
     }
@@ -955,6 +1151,16 @@ void player_item_leaves(Core &core, uint32_t item) {
         }
     } else if (core.playing != kNothing && core.playing > item) {
         --core.playing;
+    }
+    if (core.break_phase != kBreakNone && core.break_back == item) {
+        // The animation the playlist goes back to after the break leaves: it goes on with
+        // the one after it, from its first frame.
+        const uint32_t next = next_animation(core, item);
+        core.break_back = next == item ? kNothing : next;
+        core.break_paused = 0;
+    }
+    if (core.break_back != kNothing && !is_drive(core.break_back) && core.break_back > item) {
+        --core.break_back;
     }
     if (core.resume_item != kNothing && !is_drive(core.resume_item)) {
         if (core.resume_item == item) {
@@ -1013,6 +1219,11 @@ int player_poll(Core &core, uint64_t now_ms) {
         if (core.zero_pending) {
             core.zero = grid;
             core.zero_pending = 0;
+            if (core.playing == kPlaylist && core.break_held) {
+                // The playlist plays again: its time is counted on from here.
+                core.break_due = grid + core.break_rest;
+                core.break_held = 0;
+            }
         }
         shows = advance(core, now);
     }
