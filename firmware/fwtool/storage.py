@@ -333,7 +333,8 @@ def folder_files(folder, check=True):
     """The files of a show folder: the content of each by its name.
 
     The folder must be flat. With `check` it must also be a valid installed file set, as
-    the readers of the converter judge it, and hold no file the show does not name.
+    the readers of the converter judge it, and hold no file the show does not name besides
+    the saved playlist order and the saved playlist.
     """
     folder = pathlib.Path(folder)
     if not folder.is_dir():
@@ -365,7 +366,7 @@ def folder_files(folder, check=True):
         except show_errors.Rejection as rejection:
             raise _rejected(rejection) from None
         for name in files:
-            if name not in (MAPPING_NAME, SHOW_NAME, ORDER_NAME, REPEATS_NAME, *named):
+            if name not in (MAPPING_NAME, SHOW_NAME, *KEPT_NAMES, *named):
                 raise Failure("not-a-show-folder", f"{folder / name} is not a file of the show")
         files.update(made)
     return files
