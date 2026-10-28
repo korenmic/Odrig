@@ -133,6 +133,28 @@ class Look(unittest.TestCase):
             nav = {control["what"] for control in screen["controls"] if control["group"] == "nav"}
             self.assertEqual(len(nav), 4, where)
 
+    def test_the_brightness_field_stands_on_one_line_with_its_label_and_the_slider_under_it(self):
+        for size in SIZES:
+            where = f"{size[0]} wide"
+            level = self.measured[size]["animations"]["level"]
+            label, field, slider = level["label"], level["field"], level["slider"]
+            # One line: the label's middle within the field's height, 8 pixels before it, and
+            # the field at the panel's right edge.
+            self.assertLessEqual(field["top"], (label["top"] + label["bottom"]) / 2, where)
+            self.assertGreaterEqual(field["bottom"], (label["top"] + label["bottom"]) / 2, where)
+            self.assertAlmostEqual(field["left"] - label["right"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(field["right"], level["right"], delta=0.5, msg=where)
+            # About 5.5 em of the field's letters, 44 pixels wide and 48 high or more, with
+            # digits of one width.
+            self.assertAlmostEqual(field["right"] - field["left"], 5.5 * level["letters"], delta=1, msg=where)
+            self.assertGreaterEqual(field["right"] - field["left"], 44, where)
+            self.assertGreaterEqual(field["bottom"] - field["top"], 48 - 0.01, where)
+            self.assertEqual(level["digits"], "tabular-nums", where)
+            # The slider 8 pixels under it, across the panel.
+            self.assertAlmostEqual(slider["top"] - field["bottom"], 8, delta=0.5, msg=where)
+            self.assertAlmostEqual(slider["left"], level["left"], delta=0.5, msg=where)
+            self.assertAlmostEqual(slider["right"], level["right"], delta=0.5, msg=where)
+
     def test_nothing_scrolls_sideways(self):
         for where, size, screen in self.each():
             self.assertLessEqual(screen["scrollWidth"], screen["width"], where)
@@ -191,12 +213,13 @@ class Back(unittest.TestCase):
         for look in found["toggled"]:
             self.assertEqual((look["shown"], look["state"], look["entries"]), ("animations", {"screen": "animations", "depth": 0}, entries + 1))
         # Upload and Settings lie on top of Animations as the target screen does, and one
-        # takes the other's place there: back goes to Animations. So does `Add animation`.
+        # takes the other's place there: back goes to Animations, also after a back from the
+        # target screen.
         self.assertEqual((found["upload"]["shown"], found["upload"]["state"], found["upload"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
         self.assertEqual((found["settings"]["shown"], found["settings"]["state"], found["settings"]["entries"]), ("settings", {"screen": "settings", "depth": 1}, entries + 1))
         self.assertEqual((found["across"]["shown"], found["across"]["state"], found["across"]["entries"]), ("target", {"screen": "target", "depth": 1}, entries + 1))
         self.assertEqual((found["home"]["shown"], found["home"]["state"]), ("animations", {"screen": "animations", "depth": 0}))
-        self.assertEqual((found["added"]["shown"], found["added"]["state"], found["added"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
+        self.assertEqual((found["uploadAgain"]["shown"], found["uploadAgain"]["state"], found["uploadAgain"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
 
     def test_while_the_target_has_not_answered_the_target_screen_is_the_apps_first_entry(self):
         found = support.run("back", address=f"127.0.0.1:{support.free_port()}", settings={"answers": False}).seen

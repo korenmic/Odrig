@@ -1,8 +1,7 @@
-import {shown} from "../reading.js";
+import {shown, startSelection} from "../reading.js";
 export default async function(app) {
   await shown(app, 2);
-  await app.until(() => !app.byId("select-mode").disabled, "selection available");
-  app.press("Select");
+  await app.until(() => startSelection(app) !== null, "selection available");
   app.press("Select all");
   app.press("Delete selected");
   const confirmed = app.text("confirm-text");

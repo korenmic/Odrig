@@ -2,7 +2,7 @@
 // way at a time. The state holds only what a reply said.
 
 import * as commands from "./commands.js";
-import {Failure} from "./target.js";
+import {Failure, address} from "./target.js";
 
 const STATUS_EVERY_MS = 1000;
 const LIST_EVERY_MS = 10000;
@@ -31,10 +31,11 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // keys of its files learnt from its catalog's pages, `{generation, entries, byName}`, or
 // null while none is known; `keysVersion` grows when they change. `catalogNone` says that
 // the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
-// from before either.
+// from before either. `statusCount` counts the replies to `status`, so that a screen can wait
+// for the first one after a command.
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false};
+  catalogNone: false, pagesRefused: false, statusCount: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -73,6 +74,12 @@ let job = null;
 let catalogDue = false;
 const reads = [];
 let pageWait = null;
+// Where the keys of the catalogs are kept between two starts of the app, the address they are
+// kept under, and whether those of earlier starts have been taken: no page of a catalog is
+// asked before.
+let keeper = {kept: () => null, keep: () => {}, forget: () => {}};
+let keptUnder = null;
+let keptTaken = false;
 // Counts the targets: a reply that belongs to an earlier address is dropped.
 let target = 0;
 let contentLocked = false;
@@ -138,6 +145,7 @@ async function askStatus() {
     }
     heard();
     state.status = reply;
+    state.statusCount += 1;
     const named = reply.animation;
     if (named !== null && state.animations !== null && named !== askedFor && !state.animations.some((animation) => animation.id === named)) {
       // The target plays an animation the list does not have.
@@ -319,6 +327,9 @@ export function noteCatalog(reply) {
     const part = reply[storage];
     const at = reads.findIndex((read) => read.storage === storage);
     if (part.state !== "ok") {
+      if (["damaged", "incompatible", "none"].includes(part.state)) {
+        keeper.forget(keptUnder, storage);
+      }
       if (at !== -1) {
         reads.splice(at, 1);
       }
@@ -330,6 +341,17 @@ export function noteCatalog(reply) {
     }
     const kept = state.keys[storage];
     const same = (read) => read.generation === part.generation && read.entries === part.entries;
+    // Keys kept on the phone of this generation and number of entries are the storage's at
+    // once, and its pages are not read.
+    const record = state.pagesRefused || (kept !== null && same(kept)) ? null : keeper.kept(keptUnder, storage);
+    if (record !== null && same(record)) {
+      if (at !== -1) {
+        reads.splice(at, 1);
+      }
+      state.keys[storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      state.keysVersion += 1;
+      continue;
+    }
     if (state.pagesRefused || (at !== -1 && same(reads[at])) || (at === -1 && kept !== null && same(kept))) {
       continue;
     }
@@ -341,6 +363,32 @@ export function noteCatalog(reply) {
       reads.sort((a, b) => STORAGES.indexOf(a.storage) - STORAGES.indexOf(b.storage));
     }
   }
+}
+
+// Takes where the keys of the catalogs are kept between two starts of the app.
+export function keepKeysIn(given) {
+  keeper = given;
+}
+
+// Says that the keys kept at earlier starts have been taken, or found missing: pages may be
+// asked from now on. A read under way of the generation and number of entries of kept keys
+// ends, and those keys are the storage's.
+export function keptKeysReady() {
+  keptTaken = true;
+  let took = false;
+  for (const read of [...reads]) {
+    const record = keeper.kept(keptUnder, read.storage);
+    if (record !== null && record.generation === read.generation && record.entries === read.entries) {
+      reads.splice(reads.indexOf(read), 1);
+      state.keys[read.storage] = {generation: record.generation, entries: record.entries, byName: record.byName};
+      state.keysVersion += 1;
+      took = true;
+    }
+  }
+  if (took) {
+    changed();
+  }
+  next();
 }
 
 // Says that the target keeps no catalogs: it is asked for none again until it changes.
@@ -401,11 +449,17 @@ async function askPage() {
       read.pageGeneration = reply.generation;
       const parts = (read.tail + reply.text).split("\n");
       read.tail = reply.next === null ? "" : parts.pop();
+      let taken = 0;
       for (const line of parts) {
         const found = CATALOG_LINE.exec(line);
         if (found !== null) {
           read.byName.set(found[3], `${found[1]}-${found[2]}`);
+          taken += 1;
         }
+      }
+      // The rows these lines name have their keys from now on, before the read ends.
+      if (taken > 0) {
+        state.keysVersion += 1;
       }
       if (reply.next !== null) {
         read.offset = reply.next;
@@ -416,6 +470,7 @@ async function askPage() {
         reads.shift();
         state.keys[read.storage] = {generation: read.pageGeneration, entries: read.entries, byName: read.byName};
         state.keysVersion += 1;
+        keeper.keep(keptUnder, read.storage, state.keys[read.storage]);
       }
     }
   } catch (error) {
@@ -452,15 +507,18 @@ async function askPage() {
   changed();
 }
 
-// The key of an animation, `<crc32>-<bytes>`, as the catalog of its storage names its file,
-// when that key's size is the animation's; otherwise null.
+// The key of an animation, `<crc32>-<bytes>`, as the catalog of its storage names its file:
+// the read of that catalog under way first, as far as it has come, then the keys of its last
+// read; only when that key's size is the animation's, otherwise null.
 export function keyOf(animation) {
   const external = typeof animation.external === "boolean" ? animation.external : typeof animation.ignored !== "boolean";
-  const kept = state.keys[external ? "external" : "internal"];
-  if (kept === null || typeof animation.bytes !== "number") {
+  const storage = external ? "external" : "internal";
+  if (typeof animation.bytes !== "number") {
     return null;
   }
-  const key = kept.byName.get(animation.file);
+  const read = reads.find((one) => one.storage === storage);
+  const kept = state.keys[storage];
+  const key = (read === undefined ? undefined : read.byName.get(animation.file)) ?? (kept === null ? undefined : kept.byName.get(animation.file));
   return key !== undefined && key.endsWith(`-${animation.bytes}`) ? key : null;
 }
 
@@ -583,7 +641,7 @@ function due() {
     catalogDue = false;
     return askCatalog;
   }
-  if (reads.length > 0 && pageWait === null) {
+  if (reads.length > 0 && pageWait === null && keptTaken) {
     return askPage;
   }
   return null;
@@ -610,6 +668,7 @@ async function next() {
 // upload to the earlier target ends.
 export function begin() {
   target += 1;
+  keptUnder = address();
   contentLocked = false;
   state.listVersion = 0;
   if (job !== null) {
@@ -715,6 +774,21 @@ export function switchOff() {
 
 export function setBrightness(value) {
   want("brightness", () => commands.brightness(value));
+}
+
+// The loops of an animation's turn in progress, for that turn alone; the loops kept for
+// its every turn; and its own count again. Each gives the reply, or a refusal or a
+// failure, and a status follows it at once.
+export function repeat(id, loops) {
+  return requestOperation("repeat", () => commands.repeat(id, loops));
+}
+
+export function repeatSave(id, loops) {
+  return requestOperation("repeat", () => commands.repeatSave(id, loops));
+}
+
+export function repeatDefault(id) {
+  return requestOperation("repeat", () => commands.repeatDefault(id));
 }
 
 // Names the function that is told of every refusal of what the operator asked for.

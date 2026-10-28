@@ -59,7 +59,7 @@ export default async function (app) {
     // Animations while the rebuild runs: the line of the reading, and controls that work.
     app.press("Animations");
     await app.until(() => app.shown() === "animations" && app.text("readiness") !== null, "the reading on Animations");
-    seen.animations = {readiness: app.text("readiness"), pressable: ["on", "off", "play-all", "level"].every((id) => !app.byId(id).disabled)};
+    seen.animations = {readiness: app.text("readiness"), pressable: ["power-toggle", "play-all", "level"].every((id) => !app.byId(id).disabled)};
     app.press("Settings");
     await app.until(() => app.shown() === "settings" && follow() !== null, "the progress again");
   }

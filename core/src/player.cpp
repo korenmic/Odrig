@@ -8,6 +8,7 @@
 #include "mapping_control.h"
 #include "order.h"
 #include "playlist.h"
+#include "repeats.h"
 #include "text.h"
 #include "upload.h"
 
@@ -33,7 +34,7 @@ uint64_t length_of(const Core &core, uint32_t animation) {
 // The loops and the longest time of an animation's turn, as its item gives them, 0 when
 // it gives none. A drive's animation has neither.
 uint32_t loops_of(const Core &core, uint32_t animation) {
-    return is_drive(animation) ? 0 : core.items[animation].count;
+    return is_drive(animation) ? 0 : core.items[animation].count & 0xFFFFu;
 }
 
 uint32_t seconds_of(const Core &core, uint32_t animation) {
@@ -238,9 +239,14 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
 }
 
 // How long the turn of the animation at this position lasts in the playlist, in
-// milliseconds. The length of the animation is known.
+// milliseconds: the loops of its saved repeat, not cut by its longest time, or else the
+// loops the show gives it. The length of the animation is known.
 uint64_t turn_ms(const Core &core, uint32_t position) {
     const uint64_t loop = length_of(core, position);
+    const uint64_t saved = repeats_of(core, position);
+    if (saved != 0) {
+        return saved * loop;
+    }
     uint64_t loops = loops_of(core, position);
     if (loops == 0) {
         loops = (1000ull * core.min_seconds + loop - 1) / loop;
@@ -248,6 +254,16 @@ uint64_t turn_ms(const Core &core, uint32_t position) {
     const uint64_t turn = loops * loop;
     const uint64_t longest = 1000ull * seconds_of(core, position);
     return longest != 0 && turn > longest ? whole_passes(core, position, longest) : turn;
+}
+
+// How long the turn in progress of the playlist lasts: the loops a `repeat` gave it, from
+// its first frame and not cut by the longest time, or else as its animation's turn lasts.
+// The length of its animation is known.
+uint64_t current_turn_ms(const Core &core) {
+    if (core.turn_repeat != 0) {
+        return core.turn_repeat * length_of(core, core.turn_item);
+    }
+    return turn_ms(core, core.turn_item);
 }
 
 // The animation that plays with the smallest key, among the show's items alone or among
@@ -321,7 +337,7 @@ bool in_range(const Core &core, Range range, uint32_t position) {
 
 // The animation that plays with the smallest exhausting key within a range, above `above`
 // unless `any` is set; kNothing when none. Not inlined: the refresh's frame stays small.
-__attribute__((noinline)) uint32_t lowest_in(const Core &core, Range range, uint64_t above, bool any) {
+ODRIG_NOINLINE uint32_t lowest_in(const Core &core, Range range, uint64_t above, bool any) {
     uint32_t best = kNothing;
     uint64_t best_key = 0;
     for (uint32_t at = 0; at < core.item_count + core.drive_count; ++at) {
@@ -375,7 +391,7 @@ void rotate(Core &core, uint64_t at) {
 // exhausting order of the range in use, the first after the last; this one again when no
 // other plays. The current playlist takes over from its first animation as soon as it has
 // something to play again.
-__attribute__((noinline)) uint32_t next_animation(Core &core, uint32_t position) {
+ODRIG_NOINLINE uint32_t next_animation(Core &core, uint32_t position) {
     const bool was_in_place = core.in_place != 0;
     judge_in_place(core);
     if (was_in_place && !core.in_place) {
@@ -392,21 +408,23 @@ __attribute__((noinline)) uint32_t next_animation(Core &core, uint32_t position)
 // may last when the moment lies beyond it. When the loop ends on the way, the length is
 // known. When it does not, the animation is in its first loop and its turn goes on; or
 // the loop is longer than the longest time, and the turn ended there.
-__attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
+ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     uint64_t elapsed = now - core.zero;
     bool rounds_taken = false;
     for (;;) {
         const uint32_t seconds = seconds_of(core, core.turn_item);
         uint64_t turn;
         if (length_of(core, core.turn_item) != 0) {
-            turn = turn_ms(core, core.turn_item);
+            turn = current_turn_ms(core);
             if (elapsed < turn) {
                 *in_turn = elapsed;
                 return kNone;
             }
         } else {
+            // A turn whose loops a `repeat` gave, or a saved repeat, is not cut by the longest
+            // time.
             const uint64_t longest = 1000ull * seconds;
-            const bool beyond = seconds != 0 && elapsed >= longest;
+            const bool beyond = seconds != 0 && core.turn_repeat == 0 && repeats_of(core, core.turn_item) == 0 && elapsed >= longest;
             const Reason reason = first_loop_to(core, core.turn_item, core.turn_number, beyond ? longest : elapsed);
             if (reason != kNone) {
                 return reason;
@@ -420,10 +438,10 @@ __attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_
             }
             turn = longest;
         }
-        if (!rounds_taken && plays(core, core.turn_item) && core.resume_item == kNothing) {
+        if (!rounds_taken && core.turn_repeat == 0 && plays(core, core.turn_item) && core.resume_item == kNothing) {
             // Whole rounds of the playlist in use are taken off at once when the length of
             // every animation of it is known, so that a long time without a refresh costs
-            // one walk over the items.
+            // one walk over the items. A turn whose loops a `repeat` gave ends first.
             rounds_taken = true;
             uint64_t round = 0;
             bool all_known = true;
@@ -455,6 +473,7 @@ __attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_
         }
         core.zero += turn;
         elapsed -= turn;
+        core.turn_repeat = 0;
         if (core.zero >= window_end(core)) {
             // The window passed during the turn: the next playlist is current from the
             // turn's end, and plays from its first animation; its round is summed anew.
@@ -756,10 +775,12 @@ void player_halt(Core &core) {
     close_stream(core);
     core.playing = kNothing;
     core.shown = kNothing;
+    core.turn_repeat = 0;
 }
 
 void player_play_cycle(Core &core, uint32_t item) {
     core.cycle_start_entry = 0;
+    core.turn_repeat = 0;
     close_stream(core);
     core.playing = item;
     core.zero_pending = 1;
@@ -768,6 +789,7 @@ void player_play_cycle(Core &core, uint32_t item) {
 
 void player_play_all(Core &core, uint32_t from) {
     close_stream(core);
+    core.turn_repeat = 0;
     core.playing = kPlaylist;
     core.zero_pending = 1;
     core.turn_item = from;
@@ -925,6 +947,54 @@ int player_poll(Core &core, uint64_t now_ms) {
         memset(core.led_data, 0, 3u * core.led_total);
     }
     return 1;
+}
+
+bool player_reported(const Core &core) {
+    return !core.invalid && !core.mapping_test && core.playing == kPlaylist && core.turn_item != kNothing && core.shown == core.turn_item &&
+           !core.zero_pending;
+}
+
+bool player_counts(const Core &core, uint64_t now, TurnCounts *counts) {
+    if (!player_reported(core)) {
+        return false;
+    }
+    // The turn's own value, else its saved repeat, else its loops by the show's numbers,
+    // which need the length of its loop.
+    const uint64_t loop = length_of(core, core.turn_item);
+    uint64_t repeat = core.turn_repeat != 0 ? core.turn_repeat : repeats_of(core, core.turn_item);
+    if (repeat == 0 && loop != 0) {
+        repeat = (turn_ms(core, core.turn_item) + loop - 1) / loop;
+    }
+    uint64_t at = loop == 0 || now <= core.zero ? 1 : (now - core.zero) / loop + 1;
+    if (repeat != 0 && at > repeat) {
+        at = repeat;
+    }
+    counts->id = id_of(core, core.turn_item);
+    counts->saved = repeats_of(core, core.turn_item);
+    counts->repeat = repeat;
+    counts->loop = at;
+    return true;
+}
+
+bool player_set_repeat(Core &core, uint32_t id, uint32_t loops, uint64_t now) {
+    TurnCounts counts;
+    if (!player_counts(core, now, &counts) || counts.id != id) {
+        return false;
+    }
+    core.turn_repeat = counts.loop > loops ? static_cast<uint32_t>(counts.loop) : loops;
+    return true;
+}
+
+void player_hold_turn(Core &core, uint32_t loops) {
+    core.turn_repeat = loops;
+}
+
+void player_default_again(Core &core, uint64_t now, uint64_t loop) {
+    core.turn_repeat = 0;
+    if (length_of(core, core.turn_item) != 0 && now - core.zero >= turn_ms(core, core.turn_item)) {
+        // Its own count has passed: the turn ends with the loop in progress.
+        core.turn_repeat = static_cast<uint32_t>(loop);
+    }
 }
 
 bool player_seed(const Core &core, uint32_t *seed) {

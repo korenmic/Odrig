@@ -837,7 +837,7 @@ private:
                           (given.compare(10, 4, ".txt") == 0 || given.compare(10, 4, ".new") == 0);
         const bool fixed = given == "mapping.json" || given == "show.json" || given == "upload.part" ||
                            given == "show.part" || given == "pending.txt" || given == "mapping.part" ||
-                           given == "order.txt" || given == "order.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
+                           given == "order.txt" || given == "order.part" || given == "repeats.txt" || given == "repeats.part" || given == "playlist.txt" || given == "playlist.part" || given == "catalog.txt" ||
                            given == "catalog.new" || given == "catalog.do" || page;
         if (!sound || !(animation || fixed)) {
             stop("file misuse", kFileMisuse);

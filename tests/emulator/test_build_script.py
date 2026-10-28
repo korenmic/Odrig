@@ -1,3 +1,4 @@
+import concurrent.futures
 import contextlib
 import ctypes
 import importlib.util
@@ -6,6 +7,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -463,6 +465,33 @@ class TheLibraryOfTheSystem(unittest.TestCase):
         self.assertEqual(sorted(written), ["ar", "cc", "cxx", "kind", "nm"])
         self.assertIn(written["kind"], ("gnu", "msvc"))
         self.assertEqual(written["kind"], build.kind_of(written["cxx"]))
+
+
+class MicrosoftsCompiler(unittest.TestCase):
+    """The core compiles with Microsoft's compiler wherever the build script finds it, also
+    where the library is built with another."""
+
+    def test_every_source_of_the_core_compiles_with_it_and_the_flags_of_the_script(self):
+        toolchain = build.microsoft(build.MICROSOFT[0], os.environ, shutil.which, build.microsoft_environment)
+        if toolchain is None:
+            self.skipTest("the build script finds no Microsoft compiler here")
+        sources = build.sources()
+        self.assertGreaterEqual(len(sources), 10)
+        with tempfile.TemporaryDirectory() as folder:
+
+            def compiled(source):
+                made = pathlib.Path(folder, source[: -len(".cpp")] + ".obj")
+                done = subprocess.run(
+                    [toolchain.cxx, *build.MICROSOFT_FLAGS, "/c", f"src/{source}", f"/Fo{made}"],
+                    cwd=build.CORE, env=toolchain.env, capture_output=True, text=True, errors="replace",
+                )
+                said = [line for line in done.stdout.splitlines() if "error" in line or "warning" in line]
+                return source, done.returncode, said
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 2) as pool:
+                results = list(pool.map(compiled, sources))
+        failed = [f"{source}: status {status}\n" + "\n".join(said) for source, status, said in results if status != 0]
+        self.assertEqual(failed, [], "\n".join(failed))
 
 
 class TheRepository(unittest.TestCase):

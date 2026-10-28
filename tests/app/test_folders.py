@@ -72,7 +72,9 @@ class TheLevels(unittest.TestCase):
         self.assertEqual([folder["name"] for folder in found["folders"]], ["night", "only"])
         self.assertEqual(marked(found), {"level": False, "folders": ["night"], "rows": []})
         self.assertEqual(found["playing"], "Playlist night \u00b7 23 h 12 min left")
-        self.assertEqual(found["buttons"][:4], ["On", "Off", "Add animation", "Select"])
+        self.assertEqual(found["buttons"][:2], ["LEDs on or off", "Collapse the panel"])
+        for gone in ("On", "Off", "Add animation", "Select"):
+            self.assertNotIn(gone, found["buttons"])
         self.assertEqual([name for name in found["buttons"] if name.startswith(("Play", "Open", "Back"))],
                          ["Play this folder", "Play 1 one.odrg", "Play 2 two.odrg", "Play 60001 a.odrg", "Play 60002 b.odrg", "Open folder night", "Open folder only"])
 
@@ -185,10 +187,10 @@ class AgainstTheEmulator(WithACard, unittest.TestCase):
         night = folders_["night"]
         steps = [
             {"enter": "night", "level": "night", "rows": 1},
-            {"top": True, "until": "Playlist night \u00b7 2[34] h [0-9]+ min left"},
+            {"top": True, "line": "^Playlist night \u00b7 2[34] h [0-9]+ min left$"},
             {"back": True, "level": "Root", "rows": 3},
-            {"row": 1, "until": "Playlist night, the root plays for now \u00b7 2[34] h [0-9]+ min left"},
-            {"top": True, "until": "Now 1 hello\\.odrg Playlist \u00b7 2[34] h [0-9]+ min left"},
+            {"row": 1, "line": "^Playlist night, the root plays for now \u00b7 2[34] h [0-9]+ min left$"},
+            {"top": True, "until": "Now 1 hello\\.odrg", "line": "^Playlist \u00b7 2[34] h [0-9]+ min left$"},
         ]
         found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "steps": steps}).seen
         # The example show begins with its cycle of 1 and 2, 15 s each: no playlist is
@@ -216,8 +218,8 @@ class AgainstTheEmulator(WithACard, unittest.TestCase):
 
         def plug():
             shutil.move(str(top / "away"), str(top / "odrig"))
-        steps = [{"enter": "night", "level": "night", "rows": 1}, {"step": True, "level": "Root", "rows": 2, "wait": 500}, {"step": True, "until": "Playlist night", "rows": 3, "wait": 500}]
-        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "until": "Playlist night", "steps": steps}, steps=[pull, plug]).seen
+        steps = [{"enter": "night", "level": "night", "rows": 1}, {"step": True, "level": "Root", "rows": 2, "wait": 500}, {"step": True, "line": "^Playlist night", "rows": 3, "wait": 500}]
+        found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "line": "^Playlist night", "steps": steps}, steps=[pull, plug]).seen
         inside, out, back = found["steps"]
         self.assertEqual((inside["level"]["title"], marked(inside)["level"]), ("night", True))
         self.assertEqual((out["level"]["title"], out["level"]["back"], ids(out), folders(out), out["playing"]), ("Root", False, [1, 2], [], "Playlist"))
