@@ -6,6 +6,7 @@
 #include "catalog.h"
 #include "crc32.h"
 #include "drive.h"
+#include "repeats.h"
 #include "storage.h"
 
 namespace odrig {
@@ -153,10 +154,11 @@ bool order_begin(Core &core) {
     if (!storage_changes(core) || core.checker == nullptr) {
         return true;
     }
-    // The block: a key for each item, and with a drive the table of the folders and the room
-    // for the current playlist's path.
+    // The block: a key for each item, and with a drive the table of the folders, the room
+    // for the current playlist's path and the saved repeats of the drive's files.
     const uint32_t tree = core.drive != nullptr ? kFolderMost * sizeof(Folder) + kPlaylistPathRoom : 0;
-    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree));
+    const uint32_t repeats = core.drive != nullptr ? kRepeatsDriveMost * sizeof(RepeatOf) : 0;
+    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + tree + repeats));
     if (block == nullptr) {
         return false;
     }
@@ -166,7 +168,9 @@ bool order_begin(Core &core) {
         core.folders = reinterpret_cast<Folder *>(block + core.item_capacity * 2);
         core.playlist_path = reinterpret_cast<char *>(block + core.item_capacity * 2 + kFolderMost * sizeof(Folder));
         core.playlist_path[0] = '\0';
+        core.repeats_drive = reinterpret_cast<RepeatOf *>(block + core.item_capacity * 2 + tree);
         tree_clear(core);
+        repeats_drive_found(core);
     }
     return true;
 }
@@ -282,6 +286,7 @@ void order_start(Core &core) {
     }
     clear_items(core);
     read_whole(core);
+    repeats_start(core);
 }
 
 void order_reload(Core &core) {
@@ -291,6 +296,7 @@ void order_reload(Core &core) {
     drive_check_yields(core);
     clear_items(core);
     read_whole(core);
+    repeats_reload(core);
 }
 
 void order_item_leaves(Core &core, uint32_t position) {

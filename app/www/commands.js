@@ -45,6 +45,15 @@ const READINESS = ["checking", "ready", "degraded", "recovery"];
 // The most files a count of `status` names.
 const MOST_FILES = 1000000;
 
+// The most loops a turn of the playlist has, and the most a saved repeat has.
+const MOST_LOOPS = 65535000;
+const MOST_SAVED = 65535;
+
+// A count of `status` that may be null, or missing from an older target's reply.
+function countOrNull(value, most) {
+  return value === undefined || value === null || whole(value, 1, most);
+}
+
 // How far a target has read its files after its start, as `status` reports it, or null
 // when the target does not report it.
 function progressOf(reply) {
@@ -72,7 +81,10 @@ function progressOf(reply) {
 // seconds left in the window of the current playlist, each null when the target gives
 // none; in `file`, the file of the animation on the LEDs, a card's by its path, and in
 // `playlist`, the path of the card's folder whose playlist is current, each null when the
-// target names none, and undefined from a target that does not name them.
+// target names none, and undefined from a target that does not name them; and of the
+// playlist's turn in progress the loops it plays, `repeat`, the loop in progress, `loop`,
+// and its animation's saved repeat, `saved`, each null while the target reports none, with
+// `hasRepeat` and `hasSaved` saying whether the target reports them.
 export async function status() {
   const reply = await carriedOut("status");
   const named = (value) => value === undefined || value === null || typeof value === "string";
@@ -88,7 +100,10 @@ export async function status() {
     (side(reply.width) === null || whole(reply.width, 1, 65535)) &&
     (side(reply.height) === null || whole(reply.height, 1, 65535)) &&
     (reply.host === undefined || reply.host === null || typeof reply.host === "string") &&
-    (reply.left === undefined || whole(reply.left, 0, MOST_BYTES));
+    (reply.left === undefined || whole(reply.left, 0, MOST_BYTES)) &&
+    countOrNull(reply.repeat, MOST_LOOPS) &&
+    countOrNull(reply.loop, MOST_LOOPS) &&
+    countOrNull(reply.saved, MOST_SAVED);
   if (!sound) {
     throw new Failure("bad-reply", address());
   }
@@ -106,6 +121,11 @@ export async function status() {
     left: reply.left === undefined ? null : reply.left,
     file: reply.file,
     playlist: reply.playlist,
+    hasRepeat: reply.repeat !== undefined,
+    repeat: reply.repeat ?? null,
+    loop: reply.loop ?? null,
+    hasSaved: reply.saved !== undefined,
+    saved: reply.saved ?? null,
   };
 }
 
@@ -281,6 +301,22 @@ export async function off() {
 // Sets the brightness, 0 to 255.
 export async function brightness(value) {
   await carriedOut(`brightness ${value}`);
+}
+
+// Gives the playlist's turn in progress of an animation so many loops, for that turn alone.
+export async function repeat(id, loops) {
+  await carriedOut(`repeat ${id} ${loops}`);
+}
+
+// Keeps so many loops as an animation's repeat for every later turn, and gives them to its
+// turn in progress.
+export async function repeatSave(id, loops) {
+  await carriedOut(`repeat ${id} ${loops} save`);
+}
+
+// Removes an animation's saved repeat: its turns play its own count again.
+export async function repeatDefault(id) {
+  await carriedOut(`repeat ${id} default`);
 }
 
 

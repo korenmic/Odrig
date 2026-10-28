@@ -8,6 +8,7 @@
 #include "json_reader.h"
 #include "order.h"
 #include "player.h"
+#include "repeats.h"
 #include "storage.h"
 
 namespace odrig {
@@ -322,7 +323,7 @@ void host_name_of(uint32_t storage, const char *name, char *into) {
 // Does an action of a commit record on a storage. False when the call failed. Kept apart
 // from the reading of the record, whose frame has the line, as it needs room for the host's
 // names of the files.
-__attribute__((noinline)) bool act(Core &core, uint32_t storage, const Action &action) {
+ODRIG_NOINLINE bool act(Core &core, uint32_t storage, const Action &action) {
     char to[6 + kCatalogNameMost + 1];
     host_name_of(storage, action.name, to);
     if (!action.moves) {
@@ -345,7 +346,7 @@ void take_name(char *into, const char *line, uint32_t length) {
 // which the second source allows, as `read_at` does not mind the files that change: then
 // the return is also false when an action failed. Without it nothing is done while the
 // record is read: the first source reads one file at a time.
-__attribute__((noinline)) bool read_record(Core &core, const Place &place, uint32_t *mask, uint32_t *actions, uint32_t wanted, Action *action, bool acting) {
+ODRIG_NOINLINE bool read_record(Core &core, const Place &place, uint32_t *mask, uint32_t *actions, uint32_t wanted, Action *action, bool acting) {
     FileSource &source = source_of(core, place);
     *actions = 0;
     if (open_for(core, place, kRecordNames[place.storage]) != kNone) {
@@ -436,7 +437,7 @@ uint8_t read_marker_of(Core &core, const Place &place, const char *name, Marker 
 // written: its actions, its pages, its marker, and the record removed, each step once the
 // one before it is done. Returns whether no whole record is left: false when a call failed,
 // and the record stays for the next attempt, which goes on where this one stopped.
-__attribute__((noinline)) bool finish(Core &core, const Place &place) {
+ODRIG_NOINLINE bool finish(Core &core, const Place &place) {
     uint32_t mask = 0;
     uint32_t actions = 0;
     if (!read_record(core, place, &mask, &actions, kNothing, nullptr, false)) {
@@ -460,7 +461,7 @@ __attribute__((noinline)) bool finish(Core &core, const Place &place) {
     // The counts of the new marker, or of the marker when it was renamed already; a page
     // whose count is not known counts as one, so that it is not removed.
     const uint32_t storage = place.storage;
-    Marker marker;
+    Marker marker = {};
     uint8_t found = read_marker_of(core, place, kNewMarkerNames[storage], marker);
     if (found == kCatalogNone) {
         found = read_marker_of(core, place, kMarkerNames[storage], marker);
@@ -618,7 +619,7 @@ const uint32_t kPageFlush = 1200;
 
 // Writes the new page of a change from the old one: every line but the dropped ones, the
 // added entry in the place of the line of its name, or last. Gives its count and CRC-32.
-__attribute__((noinline)) bool write_page(Core &core, uint32_t storage, uint32_t page, const Marker &old, const CatalogChange &change, uint16_t *count, uint32_t *crc) {
+ODRIG_NOINLINE bool write_page(Core &core, uint32_t storage, uint32_t page, const Marker &old, const CatalogChange &change, uint16_t *count, uint32_t *crc) {
     const odrig_host &host = core.host;
     const char *fresh = kNewPageNames[storage][page];
     const Place place = {storage, true};
@@ -866,7 +867,7 @@ void put_row(Core &core, uint32_t *length, uint32_t id, const CatalogChange &cha
 // Writes the new file of a folder of the index from its old one, as the edit says, and
 // gives whether it has a line and its CRC-32. False on a failed call or a line that cannot
 // be read, the new file then removed.
-__attribute__((noinline)) bool write_folder(Core &core, const FolderEdit &edit, const CatalogChange &change, bool *has_lines, uint32_t *crc) {
+ODRIG_NOINLINE bool write_folder(Core &core, const FolderEdit &edit, const CatalogChange &change, bool *has_lines, uint32_t *crc) {
     char old_name[kIndexNameRoom];
     char fresh[kIndexNameRoom];
     index_folder_name(edit.id, false, old_name);
@@ -933,7 +934,7 @@ uint32_t moved(uint32_t value, int32_t delta) {
 
 // Writes the new table from the old one, as the change says, with the CRC-32s of the
 // folders' files it wrote. Gives its lines and CRC-32.
-__attribute__((noinline)) bool write_table(Core &core, const IndexChange &change, uint32_t *lines, uint32_t *crc) {
+ODRIG_NOINLINE bool write_table(Core &core, const IndexChange &change, uint32_t *lines, uint32_t *crc) {
     const TableEdit &edit = change.table;
     const uint32_t past = edit.gone_from + edit.gone_count;
     Writer writer = writer_for(kIndexTableNew);
@@ -997,7 +998,7 @@ void put_id_line(Core &core, uint32_t *length, uint32_t id, uint8_t kind, uint32
 }
 
 // Writes the new map from the old one, as the change says. Gives its lines and CRC-32.
-__attribute__((noinline)) bool write_map(Core &core, const IndexChange &change, uint32_t *lines, uint32_t *crc) {
+ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *lines, uint32_t *crc) {
     const MapEdit &edit = change.map;
     const uint32_t past = edit.gone_from + edit.gone_count;
     const uint32_t count = core.index->ids;
@@ -1044,7 +1045,7 @@ __attribute__((noinline)) bool write_map(Core &core, const IndexChange &change, 
 
 // Writes the new files of the index that a change of the drive's catalog makes, and puts the
 // lines and CRC-32s of the new table and map into the marker.
-__attribute__((noinline)) bool write_index(Core &core, IndexChange &index, const CatalogChange &change, Marker &marker) {
+ODRIG_NOINLINE bool write_index(Core &core, IndexChange &index, const CatalogChange &change, Marker &marker) {
     for (uint32_t at = 0; at < index.folder_count; ++at) {
         if (!write_folder(core, index.folders[at], change, &index.has_lines[at], &index.crcs[at])) {
             return false;
@@ -1109,7 +1110,7 @@ bool record_close(Core &core, Writer &writer) {
 
 // Writes the commit record of a change: the removals of the files of the folders that went,
 // the animation's action, then the moves of the index's new files.
-__attribute__((noinline)) bool write_record(Core &core, uint32_t storage, uint32_t generation, uint32_t mask, const CatalogChange &change, const IndexChange *index) {
+ODRIG_NOINLINE bool write_record(Core &core, uint32_t storage, uint32_t generation, uint32_t mask, const CatalogChange &change, const IndexChange *index) {
     Writer writer = writer_for(kRecordNames[storage]);
     record_head(core, writer, generation, mask);
     for (uint32_t at = 0; index != nullptr && at < index->gone_count; ++at) {
@@ -1144,7 +1145,7 @@ __attribute__((noinline)) bool write_record(Core &core, uint32_t storage, uint32
 // Commits a change of a storage's catalog and finishes it, as catalog_commit does; a change
 // of a drive's catalog with the change of its index, after which the cursor reads the new
 // index.
-__attribute__((noinline)) bool commit_change(Core &core, uint32_t storage, const CatalogChange &change, IndexChange *index) {
+ODRIG_NOINLINE bool commit_change(Core &core, uint32_t storage, const CatalogChange &change, IndexChange *index) {
     if (!catalog_settle(core, storage)) {
         return false;
     }
@@ -1153,7 +1154,7 @@ __attribute__((noinline)) bool commit_change(Core &core, uint32_t storage, const
         return true;
     }
     const Place place = {storage, true};
-    Marker marker;
+    Marker marker = {};
     if (read_marker_of(core, place, kMarkerNames[storage], marker) != kCatalogOk) {
         return false;
     }
@@ -1284,7 +1285,9 @@ void drive_dropped(Core &core) {
     index_forget(core);
     core.drive_count = 0;
     core.drive_check_at = 0;
+    core.repeats_due = 0;
     tree_clear(core);
+    repeats_drive_found(core);
     player_drive_changed(core);
 }
 
@@ -1325,6 +1328,8 @@ void publish(Core &core, const Marker &marker) {
     catalog.generation = marker.generation;
     catalog.entries = entries_of(marker);
     core.catalog_looked = core.latest;
+    // The drive's saved repeats, before any of its files plays.
+    repeats_drive_taken(core);
     if (core.playing == kNothing) {
         const uint32_t first = player_first_in_playlist(core);
         if (first != kNothing && is_drive(first)) {
@@ -1420,7 +1425,7 @@ bool catalog_settle(Core &core, uint32_t storage) {
     if (!finish(core, place)) {
         return false;
     }
-    Marker marker;
+    Marker marker = {};
     if (catalog_left(core, storage) && read_marker_of(core, place, kMarkerNames[storage], marker) == kCatalogOk) {
         // The change the start could not finish is finished: the catalog is kept from here on.
         catalog.state = kCatalogOk;
@@ -1455,7 +1460,7 @@ void catalog_read_internal(Core &core) {
     if (catalog.state == kCatalogNone && opened == kFileMissing) {
         return;
     }
-    Marker marker;
+    Marker marker = {};
     if (catalog.state == kCatalogNone) {
         catalog.state = opened == kNone ? read_marker(source, marker, false) : kCatalogDamaged;
         catalog.detail = catalog.state == kCatalogDamaged ? kDamagedMarker : 0;
@@ -1529,7 +1534,7 @@ void catalog_drive_step(Core &core) {
         core.catalog_phase = kLoadMarker;
         return;
     }
-    Marker marker;
+    Marker marker = {};
     const uint8_t found = read_marker_of(core, place, kMarkerNames[kExternal], marker, &core.catalog_marker_crc);
     if (found == kCatalogNone) {
         // A drive without a catalog is listed and checked as before.
@@ -1560,7 +1565,7 @@ void catalog_drive_look(Core &core) {
     }
     core.catalog_looked = core.latest;
     const Place place = {kExternal, true};
-    Marker marker;
+    Marker marker = {};
     uint32_t crc = 0;
     if (read_marker_of(core, place, kMarkerNames[kExternal], marker, &crc) == kCatalogOk && crc == core.catalog_marker_crc) {
         return;
@@ -1678,6 +1683,9 @@ bool catalog_install_external(Core &core, uint32_t *id) {
         return false;
     }
     current_again(core);
+    // The positions of the walk after the new file moved: the saved repeats find their files
+    // again.
+    repeats_reload(core);
     if (replaced != kNothing) {
         // What plays it plays the new file from its start.
         player_file_replaced(core, kDriveBase + replaced);
@@ -1697,7 +1705,7 @@ namespace {
 // folder, the folder and each ancestor left without a file out of the table, their files
 // removed and the row of the topmost in its parent's file. Gives the row of the file in its
 // folder. False when the table cannot be read.
-__attribute__((noinline)) bool plan_removal(const Core &core, uint32_t position, uint32_t ordinal, uint32_t file_id, IndexChange &index) {
+ODRIG_NOINLINE bool plan_removal(const Core &core, uint32_t position, uint32_t ordinal, uint32_t file_id, IndexChange &index) {
     // The folder of the file and each of its ancestors, by depth, the root at 0.
     IndexFolder chain[kCatalogDeepest + 1];
     IndexFolder folder;
@@ -1796,6 +1804,7 @@ bool catalog_remove_external(Core &core, uint32_t position) {
     current_again(core);
     player_drive_shifted(core, position, -1);
     player_drive_changed(core);
+    repeats_reload(core);
     return true;
 }
 
@@ -1997,7 +2006,7 @@ bool rebuild_close_page(Core &core, uint32_t storage) {
 // page, and the finishing.
 bool rebuild_commit(Core &core) {
     const Place place = {kInternal, true};
-    Marker marker;
+    Marker marker = {};
     const uint8_t old = read_marker_of(core, place, kMarkerNames[kInternal], marker);
     // The page summaries are taken from the chunk before the marker's text overwrites it.
     for (uint32_t page = 0; page < kCatalogPages; ++page) {
@@ -2098,7 +2107,7 @@ bool draft_files(Core &core, uint32_t ordinal, uint32_t first, uint32_t *files) 
 // The scan: each listed file is checked with the check's steps and gets its line in the
 // scan's file, `1` and its entry for a file that passed, `0` and zeros for another. A file
 // of the table of a drive without a catalog joins the playlist, or is left out, at once.
-__attribute__((noinline)) void scan_step(Core &core) {
+ODRIG_NOINLINE void scan_step(Core &core) {
     DriveIndex &cursor = *core.index;
     if (core.rebuild_at >= core.rebuild_total) {
         uint32_t crc = 0;
@@ -2171,7 +2180,7 @@ __attribute__((noinline)) void scan_step(Core &core) {
 }
 
 // The pages: for each page one pass over the scan's file writes the entries of its names.
-__attribute__((noinline)) void pages_step(Core &core) {
+ODRIG_NOINLINE void pages_step(Core &core) {
     DriveIndex &cursor = *core.index;
     if (core.rebuild_page >= kCatalogPages) {
         cursor.rebuild_phase = kDraftPhase;
@@ -2249,7 +2258,7 @@ bool draft_before(Core &core, char *before) {
 // The draft: the root's line, then, as one pass over the scan's file meets the files that
 // passed in the listing's order, which is depth first, a line for each folder that begins
 // at a file, the folders it does not share with the file passed before it.
-__attribute__((noinline)) void draft_step(Core &core) {
+ODRIG_NOINLINE void draft_step(Core &core) {
     DriveIndex &cursor = *core.index;
     char before[kDrivePathRoom];
     if (cursor.rebuild_kept == 0) {
@@ -2333,7 +2342,7 @@ __attribute__((noinline)) void draft_step(Core &core) {
 
 // The folders' files: for each folder of the draft, its files' rows, the next of the scan's
 // files that passed with the next ids of the walk, then a row for each of its sub-folders.
-__attribute__((noinline)) void folders_step(Core &core) {
+ODRIG_NOINLINE void folders_step(Core &core) {
     DriveIndex &cursor = *core.index;
     const uint32_t ordinal = cursor.rebuild_ordinal;
     if (ordinal >= cursor.rebuild_kept) {
@@ -2418,7 +2427,7 @@ __attribute__((noinline)) void folders_step(Core &core) {
 
 // The map: the files' ids in the walk's order, each with its folder and row, then the
 // folders' ids in the table's order.
-__attribute__((noinline)) void map_step(Core &core) {
+ODRIG_NOINLINE void map_step(Core &core) {
     DriveIndex &cursor = *core.index;
     for (uint32_t step = 0; step < kPassLines; ++step) {
         uint32_t length = 0;
@@ -2466,7 +2475,7 @@ __attribute__((noinline)) void map_step(Core &core) {
 
 // The table: for each folder of the draft its end, its own files and its sub-folders, then
 // the CRC-32 of its file, read again whole, and its line.
-__attribute__((noinline)) void table_step(Core &core) {
+ODRIG_NOINLINE void table_step(Core &core) {
     DriveIndex &cursor = *core.index;
     const uint32_t ordinal = cursor.rebuild_ordinal;
     if (ordinal >= cursor.rebuild_kept) {
@@ -2562,10 +2571,10 @@ __attribute__((noinline)) void table_step(Core &core) {
 // The commit: the marker of version 2 and the record with every page, the removals of the
 // old index's folder files whose ids the new table has not, and the moves of the new files;
 // the finishing, and the rebuild's own files removed.
-__attribute__((noinline)) bool commit_drive(Core &core) {
+ODRIG_NOINLINE bool commit_drive(Core &core) {
     const DriveIndex &cursor = *core.index;
     const Place place = {kExternal, true};
-    Marker marker;
+    Marker marker = {};
     const uint8_t old = read_marker_of(core, place, kMarkerNames[kExternal], marker);
     const uint32_t old_folders = old == kCatalogOk ? marker.folders : 0;
     marker.generation = old == kCatalogOk ? next_generation(marker.generation) : 1;

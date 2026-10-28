@@ -45,6 +45,9 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `order get`, `order get <from>` | Reports the ids of the root level's animations in the saved playlist order. |
 | `order get in <folder-id>`, `order get in <folder-id> <from>` | Reports the ids of a folder's animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
+| `repeat <id> <n>` | Makes the playlist's turn in progress of that animation `n` loops long, for that turn alone. |
+| `repeat <id> <n> save` | Keeps `n` loops as the animation's saved repeat, for every later turn, and gives them to its turn in progress. |
+| `repeat <id> default` | Removes the animation's saved repeat: its turns play its own count again, the one in progress too. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
 | `upload data <offset> <base64>` | Adds a piece of the file to the open upload. |
@@ -67,7 +70,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"file":"hello.odrg","playlist":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"left":86399}
 ```
 
 | Member | Meaning |
@@ -86,6 +89,9 @@ A number in a command is written in decimal digits.
 | `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
 | `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
+| `repeat` | The loops of the playlist's turn in progress, while it is reported: the `n` of `repeat <id> <n>`, else the count the show gives the animation, a loop cut by its `max_seconds` counting as one; at most 65,535,000. `null` while no turn is reported, and while the length of its loop is not known yet and no `repeat` gave it a count. A turn is reported while the show is valid, no test of the mapping shows, the playlist plays, `animation` names the animation whose turn it is, and the turn's first refresh was made. |
+| `loop` | The loop in progress of that turn, from 1, at most `repeat`; 1 while the length of its loop is not known yet; `null` while no turn is reported. A loop is a file's frames once, a text's pass, or a clock's `seconds`. |
+| `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
 | `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
 | `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
@@ -327,19 +333,19 @@ succeeds.
 | `line-too-long` | The line is longer than 2,048 characters. |
 | `unknown-command` | The first word is not a command. |
 | `bad-argument` | An argument is missing, extra, not a number, out of range, or not in its form: a file name outside the naming rule, base64 that is not as described or stands for more bytes than `chunk`, a CRC-32 that is not eight hexadecimal digits, or a word after `upload` that is not `begin`, `data`, `end` or `cancel`. |
-| `show-invalid` | `play`, `list`, `read`, `remove` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
+| `show-invalid` | `play`, `list`, `read`, `remove`, `repeat` or an `upload` command was sent while the show is invalid: its mapping file or show file cannot be used, or its ids are wrong. A fault of one animation file does not make it invalid. |
 | `no-upload` | `upload data`, `upload expect`, `upload end` or `upload cancel` was sent while no upload is open. |
 | `incomplete` | `upload end` came before all bytes. |
 | `bad-checksum` | `upload end` names another CRC-32 than the bytes received have. |
-| `busy` | `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
-| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
+| `busy` | `repeat <id> <n> save` and `repeat <id> default` until the player has read every installed animation after a start, while an upload is open and while a rebuild runs; `read` of a file the player has not read whole since the start; `upload begin` or `remove` while an upload is open; `upload end` while the file is being checked; `upload begin`, `remove`, `remove many`, `ignore`, `order move`, `mapping set` and `catalog rebuild` while a rebuild runs; `catalog rebuild` while an upload is open, a test shows or the drive's catalog is read. |
+| `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
-| `in-use` | `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
+| `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
 | `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
-| `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. |
+| `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
-| `no-space` | `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |
+| `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
 | `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
@@ -604,3 +610,68 @@ itself, writes nothing.
 A move does not change the animation whose turn it is, its time, the brightness or
 whether the LEDs are on; the next turn follows the new order. It works while a test of
 the mapping shows. Every route carries it to the one command parser of the core.
+
+## Repeating the turn in progress
+
+```
+repeat 1 8
+{"ok":true}
+```
+
+`repeat <id> <n>` makes the playlist's turn in progress of the animation `<id>` `<n>` loops
+long, counted from the turn's first frame, as `repeat` of [show.md](show.md) counts them.
+`<id>` is the id `status` names as `animation`, 1 to 65,535; `<n>` is 1 to 65,535. Nothing
+restarts: the frame on the LEDs, the turn's time and a clock's seed go on. When `<n>` is at
+or below the loop in progress, the turn ends at the end of that loop, never in the middle
+of one: the core keeps the larger of the two, which `status` then reports as `repeat` and
+which may be above 65,535. The animation's `max_seconds` does not cut a turn so set. A text
+counts its passes and a clock the loops of its `seconds`; an animation of a drive or a card
+is taken as an item is; after `play <id>` it acts on the turn that `play` began. While the
+length of the loop is not known yet, the turn is in its first loop.
+
+The count holds for that turn alone and is kept in memory only: it is dropped at the
+turn's end and by every new turn, whether by `play`, `play all`, a folder's `play`, an
+upload that changes or adds the animation of the turn, the quarantine of its file, its
+removal, `ignore`, a drive or a card pulled out, a test of the mapping or a restart. `order
+move`, `on`, `off` and `brightness` keep it; while the LEDs are off or dark the loops run on.
+A folder's window that ends during such a turn waits for the turn's end, with `left` at 0.
+
+- `bad-argument`: the words are not in their form.
+- `show-invalid`: the show is invalid.
+- `stale`: no turn of `<id>` is reported, as `status` says it: a cycle plays, nothing
+  plays, a test of the mapping shows, the turn has not had its first refresh, or it has
+  moved on to another animation.
+
+```
+repeat 1 5 save
+{"ok":true}
+repeat 1 default
+{"ok":true}
+```
+
+`repeat <id> <n> save` keeps `<n>` loops as the saved repeat of the animation `<id>`, for
+every later turn of it, across a restart, and gives them to its turn in progress, when one
+is reported, as `repeat <id> <n>` does. `repeat <id> default` removes the saved repeat: the
+animation's turns play its own count again, and its turn in progress, when one is reported,
+drops its own value and plays its own count, or ends with the loop in progress when that
+count has already passed; while the length of its loop is not known the turn's own value is
+merely dropped. Both are about the animation and not the turn: they work for every
+animation `list` lists, an unavailable one and one of a drive or a card included, while a
+test of the mapping shows too, and are never `stale`. A saved repeat is kept by the file's
+name in `repeats.txt` of the board's own storage, see
+[show.md](show.md#the-saved-repeats); the reply comes once the whole file is saved, and a
+power cut leaves the file before the change or the one after it. Saving the value already
+saved, and restoring an animation that has none, write nothing and still act on its turn.
+
+- `bad-argument`: the words are not one of the three forms, or a number is out of range.
+- `show-invalid`: the show is invalid.
+- `busy`: while a rebuild of a catalog runs, until the player has read every installed
+  animation after a start, and while an upload is open.
+- `unknown-id`: `<id>` is the id of no animation `list` lists, of no cycle and of no folder
+  of the card.
+- `in-use`: `<id>` is the id of a cycle or of a folder of the card, which keep no repeat.
+- `no-space`, for a save only: the drive's files would have more than 32 saved repeats, or
+  the file holds 512 lines of other animations once the lines of files `show.json` no
+  longer names are dropped, which a save does whenever it finds the file full.
+- `storage-error`: the file could not be read or written, or the board's storage cannot be
+  changed. Nothing changes. A file out of form is no failure: a save writes it anew.

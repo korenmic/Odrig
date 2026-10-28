@@ -84,6 +84,11 @@ uint8_t drive_find(const Core &core, uint32_t id, uint32_t *value);
 // kNoFolder.
 uint32_t drive_folder_with_path(const Core &core, const char *path);
 
+// The position in the walk of the drive's file with this path, of so many bytes, or
+// kNothing: a place of a drive without a catalog by the host's name of it, a row of the
+// index in the folder of its path.
+uint32_t drive_position_named(const Core &core, const char *name, uint32_t length);
+
 // Room for the host's name of a file of the drive, `drive/<place>` or `drive/<path>`.
 const uint32_t kDriveOpenRoom = 6 + kDrivePathRoom;
 

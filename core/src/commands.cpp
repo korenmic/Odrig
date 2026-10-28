@@ -9,6 +9,7 @@
 #include "order.h"
 #include "player.h"
 #include "playlist.h"
+#include "repeats.h"
 #include "show.h"
 #include "upload.h"
 
@@ -208,6 +209,28 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     reply.text(",\"seed\":");
     if (player_seed(core, &seed)) {
         reply.number(seed);
+    } else {
+        reply.text("null");
+    }
+    // The loops of the playlist's turn in progress, its loop in progress and its saved
+    // repeat, while the turn is reported.
+    TurnCounts turn;
+    const bool reported = player_counts(core, now, &turn);
+    reply.text(",\"repeat\":");
+    if (reported && turn.repeat != 0) {
+        reply.number(turn.repeat);
+    } else {
+        reply.text("null");
+    }
+    reply.text(",\"loop\":");
+    if (reported) {
+        reply.number(turn.loop);
+    } else {
+        reply.text("null");
+    }
+    reply.text(",\"saved\":");
+    if (reported && turn.saved != 0) {
+        reply.number(turn.saved);
     } else {
         reply.text("null");
     }
@@ -677,6 +700,26 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         }
         if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_remove(core, id, reply);
+    }
+    if (words.is(0, "repeat")) {
+        // `repeat <id> <n>`, `repeat <id> <n> save` and `repeat <id> default`.
+        uint32_t id = 0;
+        uint32_t loops = 0;
+        const bool restore = words.count == 3 && words.is(2, "default");
+        const bool save = words.count == 4 && words.is(3, "save");
+        if ((words.count != 3 && !save) || !number_word(words, 1, 1, 65535, &id) || (!restore && !number_word(words, 2, 1, 65535, &loops))) {
+            return refuse(reply, "bad-argument");
+        }
+        if (core.invalid) {
+            return refuse(reply, "show-invalid");
+        }
+        if (!save && !restore) {
+            return player_set_repeat(core, id, loops, now) ? succeed(reply) : refuse(reply, "stale");
+        }
+        if (catalog_rebuilding(core) || !check_complete(core) || core.upload.state != kUploadNone) {
+            return refuse(reply, "busy");
+        }
+        return save ? repeats_save(core, id, loops, now, reply) : repeats_restore(core, id, now, reply);
     }
     if (words.is(0, "upload")) {
         if (core.mapping_test || (catalog_rebuilding(core) && words.count >= 2 && words.is(1, "begin"))) return refuse(reply, "busy");

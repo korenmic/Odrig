@@ -67,6 +67,10 @@ class OwnPreviews(unittest.TestCase):
         seen = support.run("ownpreviews", address=self.address, settings={"mode": "refused", "refusedKey": f"{zlib.crc32(data):08x}-{len(data)}"}).seen
         self.assertEqual((seen["source"], seen["stored"], seen["message"]), (None, [], None))
 
+    def test_a_start_that_a_later_one_overtakes_leaves_the_database_it_opens(self):
+        seen = support.run("ownpreviews", address=self.address, settings={"mode": "overtaken"}).seen
+        self.assertNotIn("overtaken internal", seen["kept"])
+
     def test_without_indexeddb_the_preview_is_kept_for_the_run_alone(self):
         seen = support.run("ownpreviews", address=self.address, settings={"mode": "no-database", "file": "clip.gif", "name": "clip.odrg"}, media=self.media).seen
         self.assertTrue(seen["uploaded"]["loaded"])

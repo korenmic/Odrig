@@ -11,6 +11,7 @@
 #include "player.h"
 #include "playlist.h"
 #include "reasons.h"
+#include "repeats.h"
 #include "show.h"
 #include "storage.h"
 #include "upload.h"
@@ -292,6 +293,12 @@ void drive_step(Core &core) {
         catalog_drive_step(core);
         return;
     }
+    if (core.repeats_due) {
+        // The drive's saved repeats are read before any of its files is checked.
+        core.repeats_due = 0;
+        repeats_drive_taken(core);
+        return;
+    }
     while (core.drive_check_at < core.drive_count && core.drive[core.drive_check_at].state != kDriveToCheck) {
         ++core.drive_check_at;
     }
@@ -461,7 +468,7 @@ bool check_complete(const Core &core) {
 }
 
 bool drive_waits(const Core &core) {
-    return core.drive != nullptr && core.upload.state == kUploadNone && (core.drive_check_at < core.drive_count || catalog_drive_loading(core));
+    return core.drive != nullptr && core.upload.state == kUploadNone && (core.drive_check_at < core.drive_count || catalog_drive_loading(core) || core.repeats_due);
 }
 
 void drive_file_name(uint32_t place, char *name) {
@@ -549,6 +556,9 @@ void drive_take_listed(Core &core, int32_t *listed) {
     if (core.tree_known) {
         tree_find_current(core);
     }
+    // The drive's saved repeats are read again, before its files are checked.
+    repeats_drive_found(core);
+    core.repeats_due = core.drive_count != 0 && core.repeats_drive != nullptr ? 1 : 0;
     // The playlist goes on after an animation that left.
     player_drive_changed(core);
 }

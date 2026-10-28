@@ -1,0 +1,4 @@
+
+  #ntt-preview .ntt-stage {max-width:420px; margin:16px auto 0; background:#040609; aspect-ratio:1;}
+  #ntt-preview canvas {display:block;width:100%;height:auto;}
+  #ntt-preview p {margin:12px 0 0;}

@@ -715,7 +715,9 @@ position, the emulator first restarts the animation with a `play <id>` of its ow
 the log shows with the transport `seek`, moves its clock one grid step so that the core
 takes the refresh that begins the turn, and then moves to the point. A move of the clock
 is running time for the core: the turn and whatever else the core counts in time advance
-by it, and the clock never goes back. The answer to a seek is refused with
+by it, and the clock never goes back. A seek backward begins a new turn with its `play
+<id>`, and so drops the count that `repeat <id> <n>` gave the turn; a saved repeat stays.
+The answer to a seek is refused with
 `nothing-plays` while no animation is on the LEDs, `cycle` while a cycle plays,
 `length-unknown` while the length is unknown, `beyond-length` for a point out of reach,
 and `bad-argument` for a body that is not `{"ms": <whole number>}`.
@@ -785,6 +787,7 @@ python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SEC
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] ignore ID VALUE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] mapping OPERATION
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] order OPERATION
+python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] repeat ID N [save]
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload ID FILE
 python -m odrigctl (--port NAME | --tcp ADDRESS | --http ADDRESS) [--timeout SECONDS] upload --external FILE
 ```
@@ -812,6 +815,9 @@ python -m odrigctl --port build/emulator/serial remove many 9,10
 python -m odrigctl --port build/emulator/serial ignore 9 1
 python -m odrigctl --port build/emulator/serial order get
 python -m odrigctl --port build/emulator/serial order move 2805384113 9 1
+python -m odrigctl --port build/emulator/serial repeat 1 8
+python -m odrigctl --port build/emulator/serial repeat 1 8 save
+python -m odrigctl --port build/emulator/serial repeat 1 default
 ```
 
 Over TCP, to the emulator's [line port](#the-line-port), which is how the emulator takes
@@ -837,6 +843,9 @@ python -m odrigctl --tcp 127.0.0.1:8601 remove many 9,10
 python -m odrigctl --tcp 127.0.0.1:8601 ignore 9 1
 python -m odrigctl --tcp 127.0.0.1:8601 order get
 python -m odrigctl --tcp 127.0.0.1:8601 order move 2805384113 9 1
+python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8
+python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 8 save
+python -m odrigctl --tcp 127.0.0.1:8601 repeat 1 default
 ```
 
 Over HTTP, here to the emulator's address; for the board the address is the one it has on
@@ -862,6 +871,9 @@ python -m odrigctl --http 127.0.0.1:8600 remove many 9,10
 python -m odrigctl --http 127.0.0.1:8600 ignore 9 1
 python -m odrigctl --http 127.0.0.1:8600 order get
 python -m odrigctl --http 127.0.0.1:8600 order move 2805384113 9 1
+python -m odrigctl --http 127.0.0.1:8600 repeat 1 8
+python -m odrigctl --http 127.0.0.1:8600 repeat 1 8 save
+python -m odrigctl --http 127.0.0.1:8600 repeat 1 default
 ```
 
 `status` names the emulator as its host: `"host":"odrig emulator on Darwin arm64"`, with the
@@ -1454,5 +1466,11 @@ pin list, `mapping test on` or `mapping test off` for the packaged diagonal, and
 `order move REV ID BEFORE` moves one animation, with `BEFORE` an id or `end`; the tool
 sends the words as they are typed. The emulator keeps the order in `order.txt` of its show
 folder, as the board does in its storage, and plays its playlist in that order.
+
+`repeat ID N` gives the turn in progress of an animation `N` loops, `repeat ID N save`
+keeps them for every later turn and `repeat ID default` brings its own count back; the
+tool sends the words as they are typed. The emulator keeps the saved repeats in
+`repeats.txt` of its show folder through its host, as the board does in its storage: it
+has no code of its own for them.
 
 The shared core handles `ignore ID 0|1` and `remove many IDS` unchanged on HTTP, serial and TCP; odrigctl accepts both. Space reports internal quota and optional external capacity from the mounted folder filesystem. External files are changed only on a drive with a catalog that the emulator may write (`--drive` without `--drive-read-only`).

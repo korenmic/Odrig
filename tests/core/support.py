@@ -455,14 +455,16 @@ def demo_show():
 
 
 # The members of a reply of `status` that say how far the check is, with the seconds left
-# in the current playlist's window, which runs with the time, and the names of the file and
-# the folder that play, which the tests of what plays look at.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "file", "playlist", "left")
+# in the current playlist's window, which runs with the time, the counts of the turn in
+# progress, and the names of the file and the folder that play, which the tests of what
+# plays look at.
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "repeat", "loop", "saved", "file", "playlist", "left")
 
 
 def without_readiness(state):
     """A reply of `status`, as a value, without the members that say how far the check is,
-    the window's seconds left and the names of what plays, for tests of the others."""
+    the counts of the turn in progress, the window's seconds left and the names of what
+    plays, for tests of the others."""
     return {name: value for name, value in state.items() if name not in READINESS}
 
 
@@ -751,6 +753,10 @@ class ReferencePlayer:
         self.playing = None     # the id of the cycle being played, ALL for the playlist, or None
         self.turn = None        # while the playlist plays, the id of the animation whose turn it is
         self.zero = None        # the time zero of that item, once a refresh has set it
+        self.adhoc = None       # the loops `repeat` gave that turn, or None
+        self.seen_whole = set()  # the files whose first loop was played through or passed over
+        self.saved = {}         # the loops of each file's saved repeat, by its name
+        self.repeat_lines = []  # the lines of `repeats.txt` as (loops, kind, name), None when out of form
         self.shown = None       # the id of the animation item the latest refresh chose
         self.t0 = None          # the power-on moment
         self.window_started = None  # when the current playlist, the root, became current
@@ -773,6 +779,7 @@ class ReferencePlayer:
             self.error = str(invalid)
             self.start_logs.append(self.error)
         else:
+            self._read_repeats()
             # A cycle named as the start plays while it lists a usable animation.
             # Otherwise the playlist plays, from the animation the start names or the next
             # usable one after it, or from its first, when the show has one.
@@ -793,6 +800,45 @@ class ReferencePlayer:
                 self.checks = []
             self.start_logs += self.logged
             self.logged = []
+
+    REPEATS = "repeats.txt"
+    REPEATS_HEADER = b"odrig-repeats 1"
+    REPEATS_LINES = 512
+
+    def _read_repeats(self):
+        """Reads `repeats.txt` whole and strictly: its lines in form give each file its saved
+        repeat, the first line of a file counting; a file out of form gives none, and the
+        log says so."""
+        self.saved = {}
+        self.repeat_lines = []
+        data = self.files.get(self.REPEATS) if self.changeable else None
+        if data is None:
+            return
+        lines = data.split(b"\n")
+        body = lines[1:-1]
+        read = []
+        sound = len(lines) >= 2 and lines[0] == self.REPEATS_HEADER and lines[-1] == b"" and len(body) <= self.REPEATS_LINES
+        for line in body if sound else ():
+            found = re.fullmatch(rb"([1-9][0-9]{0,4}) ([fx]) (.+)", line, re.S)
+            if found is None or int(found.group(1)) > 65535:
+                sound = False
+                break
+            loops, kind, name = int(found.group(1)), found.group(2).decode(), found.group(3)
+            if kind == "f" and not (show.FILE_NAME.fullmatch(name.decode("latin-1")) and name.decode("latin-1").endswith(show.ENDINGS)):
+                sound = False
+                break
+            if kind == "x" and (len(name) > 127 or b"\0" in name):
+                sound = False
+                break
+            read.append((loops, kind, name.decode("latin-1")))
+        if not sound:
+            self.repeat_lines = None
+            self.logged.append("repeats unreadable")
+            return
+        self.repeat_lines = read
+        for loops, kind, name in read:
+            if kind == "f":
+                self.saved.setdefault(name, loops)
 
     def _check(self, files):
         """Reads the installed file set in the order of the checks. Returns the `start` id."""
@@ -893,7 +939,7 @@ class ReferencePlayer:
         if self.playing == self.ALL and self.turn is not None and not self._usable(self.turn):
             following = self._after(self.turn)
             if following is None:
-                self.playing = self.shown = self.zero = self.turn = None
+                self.playing = self.shown = self.zero = self.turn = self.adhoc = None
             else:
                 self._play_all(following)
         elif self.playing not in (None, self.ALL) and not self._usable(self.playing):
@@ -901,7 +947,7 @@ class ReferencePlayer:
             if order:
                 self._play_all(order[0])
             else:
-                self.playing = self.shown = self.zero = self.turn = None
+                self.playing = self.shown = self.zero = self.turn = self.adhoc = None
 
     KEEP = object()
 
@@ -909,7 +955,7 @@ class ReferencePlayer:
         """Makes the show invalid while it runs: nothing plays from here on."""
         self.error = reason
         self.seed_shown = False
-        self.playing = self.shown = self.zero = self.turn = None
+        self.playing = self.shown = self.zero = self.turn = self.adhoc = None
         if self.upload is not None:
             self._discard()
 
@@ -919,7 +965,7 @@ class ReferencePlayer:
         """Starts a cycle. An animation is not played by itself: it has its turn."""
         self.seed_shown = False
         self.playing = number
-        self.zero = None
+        self.zero = self.adhoc = None
         self.shown = next(member for member in self.items[number].cycle if self._usable(member))
 
     def _animations(self):
@@ -930,7 +976,7 @@ class ReferencePlayer:
         """Starts the playlist with the turn of an animation, or of its first one."""
         self.seed_shown = False
         self.playing = self.ALL
-        self.zero = None
+        self.zero = self.adhoc = None
         self.turn = self.shown = self._animations()[0] if number is None else number
 
     def _whole_passes(self, number, turn):
@@ -946,6 +992,9 @@ class ReferencePlayer:
         text, at the whole pass in which that ends."""
         item = self.items[number]
         loop = self.clips[item.file].total
+        if item.file in self.saved:
+            # A saved repeat is so many loops, which the longest time does not cut.
+            return self.saved[item.file] * loop
         loops = item.repeat if item.repeat is not None else -(-1000 * self.min_seconds // loop)
         turn = loops * loop
         if item.max_seconds is None or turn <= 1000 * item.max_seconds:
@@ -980,7 +1029,7 @@ class ReferencePlayer:
                     # The frames before the fault are played as a first loop. The fault
                     # is met when the time comes to their end; a longest time of the
                     # turn that lies before it ends the turn first.
-                    longest = None if item.max_seconds is None else 1000 * item.max_seconds
+                    longest = None if item.max_seconds is None or self.adhoc is not None or item.file in self.saved else 1000 * item.max_seconds
                     if clip.total <= (elapsed if longest is None else min(elapsed, longest)):
                         self._quarantine(item.file, clip.broken)
                         return self.KEEP
@@ -988,11 +1037,17 @@ class ReferencePlayer:
                         break
                     turn = longest
                 else:
-                    turn = self._turn_ms(self.turn)
+                    # The core knows the length of a loop once a refresh came at or after
+                    # its end, or a turn passed over it as far as its longest time lets it.
+                    reach = elapsed if item.max_seconds is None or self.adhoc is not None or item.file in self.saved or elapsed < 1000 * item.max_seconds else 1000 * item.max_seconds
+                    if reach >= clip.total:
+                        self.seen_whole.add(item.file)
+                    turn = self._turn_ms(self.turn) if self.adhoc is None else self.adhoc * clip.total
                     if elapsed < turn:
                         break
                 elapsed -= turn
                 self.zero += turn
+                self.adhoc = None
                 if self.zero >= self.window_started + self.WINDOW:
                     # The window passed during the turn: the root is current again from
                     # the turn's end, with a fresh window, and nothing else changes.
@@ -1017,6 +1072,8 @@ class ReferencePlayer:
                 place += 1
             item = self.items[shown_in(place)]
             clip = self.clips[item.file]
+            if not clip.broken and elapsed >= clip.total:
+                self.seen_whole.add(item.file)
             if clip.broken and clip.total <= elapsed:
                 self._quarantine(item.file, clip.broken)
                 return self.KEEP
@@ -1095,7 +1152,7 @@ class ReferencePlayer:
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
+    COMMANDS = {b"repeat": (2, 3), b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
     READ_MOST = 600
     EXPECT_LARGEST = 16384
     RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
@@ -1139,6 +1196,8 @@ class ReferencePlayer:
             return self._upload(arguments)
         if name == b"read":
             return self._read(arguments)
+        if name == b"repeat":
+            return self._repeat(arguments)
         if name == b"play" and arguments == [b"all"]:
             if self.error is not None:
                 return "show-invalid"
@@ -1196,6 +1255,90 @@ class ReferencePlayer:
             self._remove(value)
         elif name not in (b"status", b"fault"):
             self.on = name == b"on"
+        return None
+
+    def _counts(self):
+        """The loops of the playlist's turn in progress, its loop in progress, and the
+        loops of its saved repeat, while the turn is reported: the playlist plays, the
+        animation whose turn it is is the one on the LEDs, and its first refresh was made.
+        None otherwise."""
+        if self.error is not None or self.playing != self.ALL or self.turn is None or self.shown != self.turn or self.zero is None:
+            return None
+        file = self.items[self.turn].file
+        loop = self.clips[file].total
+        if not self._known(file):
+            # In its first loop: the loops are not known unless a count was given.
+            return self.adhoc if self.adhoc is not None else self.saved.get(file), 1, self.saved.get(file)
+        repeat = self.adhoc if self.adhoc is not None else -(-self._turn_ms(self.turn) // loop)
+        return repeat, min(repeat, (self.latest - self.zero) // loop + 1), self.saved.get(file)
+
+    def _known(self, name):
+        """Whether the core knows the length of a file's loop: a text's or a clock's from its
+        header, and a file of frames once the check after the start has read it whole or
+        its first loop was played through or passed over."""
+        clip = self.clips.get(name)
+        if clip is None or clip.broken:
+            return False
+        return isinstance(clip, _Drawn) or name in self.seen_whole or not any(check[0] == name for check in self.checks)
+
+    def _repeat(self, arguments):
+        """`repeat <id> <n>`: the reported turn of that animation plays `n` loops from its
+        first frame, or ends at the end of the loop in progress when that is later. With
+        `save` the animation's file keeps `n` for every later turn, and `repeat <id>
+        default` removes what it keeps; both act on its reported turn."""
+        number = self._number(arguments[0], 1, 65535)
+        restore = len(arguments) == 2 and arguments[1] == b"default"
+        save = len(arguments) == 3 and arguments[2] == b"save"
+        loops = None if restore else self._number(arguments[1], 1, 65535)
+        if number is None or (len(arguments) == 3 and not save) or (loops is None and not restore):
+            return "bad-argument"
+        if self.error is not None:
+            return "show-invalid"
+        counts = self._counts()
+        reported = counts is not None and self.turn == number
+        if not save and not restore:
+            if not reported:
+                return "stale"
+            self.adhoc = max(loops, counts[1])
+            return None
+        if self.checks or self.upload is not None:
+            return "busy"
+        if number not in self.items:
+            return "unknown-id"
+        if self.items[number].cycle is not None:
+            return "in-use"
+        if not self.changeable:
+            return "storage-error"
+        file = self.items[number].file
+        if self.saved.get(file) != loops:
+            lines = list(self.repeat_lines or [])
+            others = [line for line in lines if (line[1], line[2]) != ("f", file)]
+            named = {item.file for item in self.items.values() if item.cycle is None}
+            full = save and self.repeat_lines is not None and len(others) >= self.REPEATS_LINES
+            if full and len([line for line in others if line[1] == "x" or line[2] in named]) >= self.REPEATS_LINES:
+                return "no-space"
+            written, placed = [], False
+            for line in lines:
+                if (line[1], line[2]) == ("f", file):
+                    if save and not placed:
+                        written.append((loops, "f", file))
+                    placed = True
+                elif not (full and line[1] == "f" and line[2] not in named):
+                    written.append(line)
+            if save and not placed:
+                written.append((loops, "f", file))
+            text = self.REPEATS_HEADER + b"\n" + b"".join(f"{n} {kind} {name}\n".encode("latin-1") for n, kind, name in written)
+            self.files[self.REPEATS] = text
+            self._read_repeats()
+        # The turn acts with the loop that was in progress before the count changed.
+        if not reported:
+            return None
+        if save:
+            self.adhoc = max(loops, counts[1])
+        else:
+            self.adhoc = None
+            if self.latest - self.zero >= self._turn_ms(self.turn):
+                self.adhoc = counts[1]
         return None
 
     @staticmethod
@@ -1393,7 +1536,7 @@ class ReferencePlayer:
                 self.clips.pop(old.file, None)
             if self.playing == self.ALL and self.turn == number:
                 # The animation whose turn it is has another file: its turn begins again.
-                self.zero = None
+                self.zero = self.adhoc = None
                 self.seed_shown = False
             played = None if self.playing == self.ALL else self.items.get(self.playing)
             if played is not None and number in played.cycle:
@@ -1475,7 +1618,7 @@ class ReferencePlayer:
             self.start = None
         if goes_on == number:
             # It was the only animation of the show.
-            self.playing = self.shown = self.zero = self.turn = None
+            self.playing = self.shown = self.zero = self.turn = self.adhoc = None
         elif goes_on is not None:
             self._play_all(goes_on)
         if item.file is not None and all(other.file != item.file for other in self.items.values()):
@@ -1515,6 +1658,8 @@ class ReferencePlayer:
         # The seed of the clock on the LEDs, then the seconds left in the window of the
         # current playlist, the root, the last member.
         state["seed"] = self.seed if self.seed_shown and self.error is None and self.playing is not None else None
+        counts = self._counts()
+        state["repeat"], state["loop"], state["saved"] = counts if counts is not None else (None, None, None)
         # The file of the animation on the LEDs, and the path of a card's folder whose
         # playlist is current, which the reference has none of.
         state["file"] = self.items[self.shown].file if self.playing is not None and self.shown in self.items else None

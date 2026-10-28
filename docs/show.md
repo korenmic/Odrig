@@ -136,6 +136,12 @@ clock's time runs on from the turn's start, not from the start of a loop.
 A turn begins with the first frame of its animation, and at the moment the turn before
 it ended. The time of the playlist goes on while the LEDs are switched off.
 
+The numbers above are an animation's own count. Two more come before it, see
+[commands.md](commands.md#repeating-the-turn-in-progress): the count `repeat <id> <n>` gives
+one turn, for the rest of that turn, and then the saved repeat of the animation in
+`repeats.txt`, for every turn. Each is that many loops from the turn's first frame, and
+`max_seconds` cuts neither. A cycle has no turn, and so neither.
+
 ## Playing an item by command
 
 - `play <id>` of an animation item plays the playlist from that animation: its turn
@@ -348,3 +354,38 @@ entries for one animation the first.
   the first animation of the order. Cycles do not follow the order.
 - A turn in progress, the brightness and whether the LEDs are on do not change when the
   order does; the next turn follows the new order.
+
+## The saved repeats
+
+The saved repeats are kept in `repeats.txt` beside `order.txt`. The player writes it when a
+command saves a repeat or restores an animation's own count, see
+[commands.md](commands.md#repeating-the-turn-in-progress), and nothing else changes it; it
+may be missing. It is not JSON, because a drive's names may hold bytes JSON does not take.
+
+```
+odrig-repeats 1
+5 f hello.odrg
+3 x night/comet.odrg
+```
+
+The first line is `odrig-repeats 1`. Every further line ends in a line feed: the loops, in
+decimal from 1 to 65,535 without a leading zero, a space, `f` and the name a file of the
+board's own storage has in `show.json`, or `x` and the name of a file of a drive or a card as
+the drive gives it, 1 to 127 bytes without NUL, as `order.txt` names it. The file holds at
+most 512 lines. It is read strictly, as a whole: a first line that is not the header, a line
+in another form, more than 512 lines or bytes after the last line feed make it unreadable,
+which the log says once, `repeats unreadable`; no saved repeat is in force then, and the
+next save writes the file anew. Of two lines for one file the first counts; the player
+never writes two.
+
+- A saved repeat belongs to the file name, not to the id. A removal keeps its line, and an
+  item or a file that has that name again has it again; an upload under another name, or a
+  new name, starts from the animation's own count. Two items that name one file share it.
+- A drive's lines are matched to its files by name when it is read, before any of them
+  plays: of its files, 32 at most have a saved repeat, the first 32 the file names; a drive
+  that would have more gives the others none, and the log says `repeats over`.
+- The player writes the file whole as `repeats.part` and renames it, as it writes
+  `order.txt`: a power cut leaves the old file or the new one, and a `repeats.part` left by
+  one is removed at the next start.
+- `ignore`, a move of the order and the brightness leave the saved repeats alone, and
+  `show.json` is never changed for a repeat.

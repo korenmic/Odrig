@@ -574,6 +574,49 @@ bool drive_open_name(const Core &core, uint32_t position, char *into) {
     return true;
 }
 
+uint32_t drive_position_named(const Core &core, const char *name, uint32_t length) {
+    if (core.drive == nullptr || core.drive_number == 0 || length == 0 || length >= kDriveListedName) {
+        return kNothing;
+    }
+    if (!indexed(core)) {
+        char given[kDriveListedName];
+        for (uint32_t place = 0; place < core.drive_count; ++place) {
+            if (core.host.drive_name(core.host.ctx, core.drive_number, place, given, sizeof given) == 1 && text_length(given) == length &&
+                memcmp(given, name, length) == 0) {
+                return place;
+            }
+        }
+        return kNothing;
+    }
+    // The folder of the path, then its rows.
+    uint32_t slash = length;
+    while (slash > 0 && name[slash - 1] != '/') {
+        --slash;
+    }
+    char path[kDrivePathRoom];
+    if (length >= kDrivePathRoom) {
+        return kNothing;
+    }
+    const uint32_t path_length = slash == 0 ? 0 : slash - 1;
+    memcpy(path, name, path_length);
+    path[path_length] = '\0';
+    const uint32_t ordinal = drive_folder_with_path(core, path);
+    IndexFolder folder;
+    if (ordinal == kNoFolder || !drive_folder(core, ordinal, folder)) {
+        return kNothing;
+    }
+    for (uint32_t position = folder.first; position < folder.first + folder.files; ++position) {
+        const DriveRow *row = drive_row(core, position);
+        if (row == nullptr) {
+            return kNothing;
+        }
+        if (text_length(row->name) == length && memcmp(row->name, name, length) == 0) {
+            return position;
+        }
+    }
+    return kNothing;
+}
+
 uint32_t drive_folder_with_path(const Core &core, const char *path) {
     if (path[0] == '\0') {
         return 0;

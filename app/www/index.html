@@ -14,17 +14,21 @@
 <main>
 <section id="animations" hidden>
 <div id="now-panel" class="panel">
+<div class="now-top">
+<div id="power-switch" class="power" role="group" aria-label="LEDs">
+<button id="power-toggle" type="button" aria-label="LEDs on or off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+<button id="on" type="button" aria-pressed="false" hidden>On</button>
+<button id="off" type="button" aria-pressed="false" hidden>Off</button>
+</div>
+<button id="now-collapse" type="button" aria-label="Collapse the panel" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="now-collapse-mark" d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
 <div class="now-row">
 <div class="now-words">
 <p class="label">Now playing</p>
 <p id="now" hidden><span id="now-thumb" class="thumb" aria-hidden="true" hidden></span><span id="now-text"></span></p>
+<div id="now-bar" role="group" aria-label="The animation playing now" hidden></div>
 <p id="playing">-</p>
 </div>
-</div>
-<div id="power-switch" class="power" role="group" aria-label="LEDs">
-<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-<button id="on" type="button" aria-pressed="false">On</button>
-<button id="off" type="button" aria-pressed="false">Off</button>
 </div>
 <div id="state" class="facts">
 <p id="power">-</p>
@@ -32,8 +36,12 @@
 <p id="fps">-</p>
 </div>
 <p id="readiness" class="small" role="status" aria-live="polite" hidden></p>
-<label for="level" class="slider-label">Set the brightness to <span id="level-number">-</span></label>
-<input id="level" type="range" min="0" max="255" step="1" value="0">
+<div id="level-line">
+<label for="level-number" class="slider-label">Set the brightness to</label>
+<input id="level-number" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="-">
+</div>
+<input id="level" type="range" min="0" max="255" step="1" value="0" aria-label="Brightness">
+<p id="level-range" class="small" role="status" aria-live="polite" hidden></p>
 <div id="test-now" hidden>
 <p id="test-now-text" role="status"></p>
 <button id="stop-test" type="button">Stop test</button>
@@ -44,9 +52,6 @@
 <div id="space-panel" class="panel compact">
 <p id="show-space">-</p>
 <p id="show-external-space">-</p>
-</div>
-<div class="pair">
-<button id="add-animation" type="button" class="primary">Add animation</button>
 </div>
 <div id="tests" class="panel" hidden>
 <div class="group-head">
@@ -60,7 +65,6 @@
 </div>
 <div id="list-head">
 <h1 id="list-title">Animations</h1>
-<button id="select-mode" type="button">Select</button>
 </div>
 <div id="selection-bar" hidden>
 <div class="pair">

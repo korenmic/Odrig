@@ -26,7 +26,7 @@ uint32_t order_key(const Core &core, uint32_t position);
 // The start, once the show is read: the keys of the show's animations from the file.
 void order_start(Core &core);
 
-// Reads the whole file again at once and sets every key.
+// Reads the whole file again at once and sets every key, and the saved repeats again.
 void order_reload(Core &core);
 
 // The item at a position is about to leave the item table; the keys follow the items.
