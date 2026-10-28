@@ -25,7 +25,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show, the playlists of the card's folders, and the animations of a USB drive or a card. |
+| `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
+| `list in <folder-id>`, `list in <folder-id> <from>` | Lists one level of the card: the playlists of a folder's sub-folders and its own animations. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog page <storage> <page> <offset>` | Reads up to 512 bytes of a page of the catalog of the board's own storage, `internal`, or of the drive, `external`. |
@@ -41,7 +42,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
 | `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
-| `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
+| `order get`, `order get <from>` | Reports the ids of the root level's animations in the saved playlist order. |
+| `order get in <folder-id>`, `order get in <folder-id> <from>` | Reports the ids of a folder's animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `upload begin <id> <file> <bytes>` | Opens an upload of an animation; with the file's CRC-32 after `<bytes>`, answers `unchanged` when the last upload installed that file. |
 | `upload begin external <file> <bytes>` | Opens an upload of an animation to the drive, when the core may write it. |
@@ -65,7 +67,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"file":"hello.odrg","playlist":null,"left":86399}
 ```
 
 | Member | Meaning |
@@ -84,6 +86,8 @@ A number in a command is written in decimal digits.
 | `checking` | The name of the file the player reads now, or that a rebuild reads; `catalog` while a drive's catalog is read; or `null`. |
 | `host` | The name the board or the emulator gives itself: on the board its build, its storage and the reason of its last start, at most 95 characters; `null` when it gives none. |
 | `seed` | The seed of the clock on the LEDs, 1 to 4,294,967,295: the number its turn chose when it began, from which [format.md](format.md), "The widget payload", draws every picture of the turn. `null` while the animation whose turn it is is no clock, while nothing plays, and from a `play` until the next refresh. A reply without `seed` comes from a player before it. |
+| `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
+| `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -123,7 +127,7 @@ list
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
-from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
+from 0, which is 0 when it is left out. `<from>` is 0 to 4,294,967,295. An animation item has its
 `id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
 animation of the board's own storage, `true` for one of the external storage; then its
 `type`, what the file holds as its header says ([format.md](format.md)): `"frames"` for an
@@ -142,23 +146,32 @@ gives no items and `null`, and so does a show without items:
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
-The files of a USB drive or of the card come after the items of the show, in the order of
-the drive's listing, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
-A file in a sub-folder of the card's folder `odrig` has its path from `odrig` as its
-`file`: `{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}`.
-The sub-folders themselves come between the items of the show and the files, in the
-order of the listing, depth first, each as a playlist item with its path:
-`{"id":60007,"playlist":"night","external":true}`, then
-`{"id":60008,"playlist":"night/deep","external":true}`. Their ids come after the files',
-from the same pool, in the order of the items. [show.md](show.md#animations-from-a-usb-drive)
-says what a folder of the card is to the player.
+The drive is listed one level at a time. `list` gives the root's level after the items of
+the show: the playlists of the folders right in the card's folder `odrig`, then the files of
+`odrig` itself, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+`list in <folder-id>` and `list in <folder-id> <from>` give the level of the card's folder
+with that id: the playlists of its sub-folders, then its own files, from the position
+`<from>` of that level, with `next` as `list` has it. A file in a sub-folder has its path
+from `odrig` as its `file`, and a folder's playlist item its path and `files`, the number
+of its own files that `list in` of it gives:
+
+```
+list in 60007
+{"ok":true,"items":[{"id":60008,"playlist":"night/deep","external":true,"files":1},{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}],"next":null}
+```
+
+A folder's id comes after the files', from the same pool, in the tree's order, depth
+first. `list in` is refused with `bad-argument` for another form, `show-invalid` while the
+show is invalid, and `unknown-id` for an id that is no folder of the card, the card out
+too. [show.md](show.md#animations-from-a-usb-drive) says what a folder of the card is to
+the player.
 A file left out for a fault is listed in its place as
 `{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits, and so is
-`playlist`. The positions of `<from>` and `next` count the three kinds. An animation of the drive is listed once the player
+`playlist`. The positions of `<from>` and `next` count the kinds of the level. An animation of the drive is listed once the player
 has read it whole; while the drive is read, `list` answers without the ones still to be
 read, and is not refused with `busy` for them. [show.md](show.md#animations-from-a-usb-drive)
 says what the board does with a drive.
@@ -550,8 +563,10 @@ order get
 ```
 
 `ids` are the ids of the animations `list` lists, the ignored ones, the unavailable ones
-and the external storage's among them, in the saved order, beginning at the position `<from>`, counted
-from 0, which is 0 when it is left out; `<from>` is 0 to 65,535. The reply holds as many
+and the external storage's among them, of one level, in the saved order, beginning at the position `<from>`, counted
+from 0, which is 0 when it is left out; `<from>` is 0 to 4,294,967,295. `order get` gives the
+root level, the show's animations and the root's files of the card, and `order get in
+<folder-id>` the files of that folder of the card, refused as `list in` is. The reply holds as many
 as fit into it, and `next` is the position of the first one left out, or `null`, as for
 `list`. `revision` is a number that changes whenever the order or the listed animations
 change, and is the same after a restart for the same files. `order get` is refused as
@@ -567,8 +582,8 @@ order move 2805384113 1 3
 `order move <revision> <id> <before>` moves the listed animation with the id `<id>`, of the
 board's own storage or of the external storage, to stand right before the listed animation
 with the id `<before>`, or last when `<before>` is the word `end`. `<revision>` is the
-`revision` of `order get` the client read, 0 to 4,294,967,295; `<id>` and `<before>` are 1
-to 65,535. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
+`revision` of `order get` of the level of `<id>` the client read, 0 to 4,294,967,295;
+`<id>` and `<before>` are 1 to 4,294,967,295. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
 the order before the move or the one after it. A move that changes nothing, of an
 animation that already stands right before `<before>`, or last for `end`, or before
 itself, writes nothing.

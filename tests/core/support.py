@@ -455,13 +455,14 @@ def demo_show():
 
 
 # The members of a reply of `status` that say how far the check is, with the seconds left
-# in the current playlist's window, which runs with the time.
-READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "left")
+# in the current playlist's window, which runs with the time, and the names of the file and
+# the folder that play, which the tests of what plays look at.
+READINESS = ("readiness", "checked", "to_check", "unavailable", "checking", "host", "file", "playlist", "left")
 
 
 def without_readiness(state):
-    """A reply of `status`, as a value, without the members that say how far the check is
-    and the window's seconds left, for tests of the others."""
+    """A reply of `status`, as a value, without the members that say how far the check is,
+    the window's seconds left and the names of what plays, for tests of the others."""
     return {name: value for name, value in state.items() if name not in READINESS}
 
 
@@ -1094,10 +1095,10 @@ class ReferencePlayer:
     CHECK_ON_TIME_MS = 2
     CHECK_LEAST_RATE = 30
     LINE_MAX = 2048
-    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
+    COMMANDS = {b"play": (1,), b"on": (0,), b"off": (0,), b"brightness": (1,), b"status": (0,), b"fault": (0,), b"space": (0,), b"list": (0, 1, 2, 3), b"remove": (1,), b"upload": range(0, 2048), b"read": range(0, 2048)}
     READ_MOST = 600
     EXPECT_LARGEST = 16384
-    RANGES = {b"play": (1, 65535), b"brightness": (0, 255), b"list": (0, 65535), b"remove": (1, 65535)}
+    RANGES = {b"play": (1, 4294967295), b"brightness": (0, 255), b"list": (0, 4294967295), b"remove": (1, 4294967295)}
     REPLY_MAX = 1024
 
     def command(self, now, line):
@@ -1147,6 +1148,13 @@ class ReferencePlayer:
             self.window_started = self.latest
             self._play_all()
             return None
+        if name == b"list" and len(arguments) > 1:
+            # `list in <folder-id> [<from>]`: the reference has no drive, so no folder.
+            number = self._number(arguments[1], 1, 4294967295) if arguments[0] == b"in" and len(arguments) in (2, 3) else None
+            start = self._number(arguments[2], 0, 4294967295) if len(arguments) == 3 else 0
+            if number is None or start is None:
+                return "bad-argument"
+            return "show-invalid" if self.error is not None else "unknown-id"
         value = None
         if arguments:
             if not arguments[0] or arguments[0].strip(b"0123456789"):
@@ -1242,7 +1250,7 @@ class ReferencePlayer:
     def _read(self, arguments):
         """`read <id> <offset>`: up to 600 bytes of the file of an animation, from an offset,
         with its size. Returns an error code or the reply."""
-        number = self._number(arguments[0], 1, 65535) if len(arguments) == 2 else None
+        number = self._number(arguments[0], 1, 4294967295) if len(arguments) == 2 else None
         offset = self._number(arguments[1], 0, 4294967295) if len(arguments) == 2 else None
         if number is None or offset is None:
             return "bad-argument"
@@ -1507,6 +1515,10 @@ class ReferencePlayer:
         # The seed of the clock on the LEDs, then the seconds left in the window of the
         # current playlist, the root, the last member.
         state["seed"] = self.seed if self.seed_shown and self.error is None and self.playing is not None else None
+        # The file of the animation on the LEDs, and the path of a card's folder whose
+        # playlist is current, which the reference has none of.
+        state["file"] = self.items[self.shown].file if self.playing is not None and self.shown in self.items else None
+        state["playlist"] = None
         state["left"] = max(0, self.WINDOW - (now - self.window_started)) // 1000
         return json.dumps(state, separators=(",", ":")).encode("ascii") + b"\n"
 

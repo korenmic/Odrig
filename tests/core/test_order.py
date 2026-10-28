@@ -200,7 +200,7 @@ class OrderGet(unittest.TestCase):
 
     def test_it_is_refused_as_list_is(self):
         # While the player reads the installed animations after a start, both answer.
-        run = support.start(animations(2), asked(0, "list", "order get", "order get x", "order get 65536", "order get 1 2", "order", "order put"), check_first=False)
+        run = support.start(animations(2), asked(0, "list", "order get", "order get x", "order get 4294967296", "order get 1 2", "order", "order put"), check_first=False)
         listed, order = replies(run)[:2]
         self.assertIn(None, [item["bytes"] for item in listed["items"]])
         self.assertEqual((order["ids"], order["next"]), ([1, 2], None))
@@ -317,7 +317,7 @@ class OrderMove(unittest.TestCase):
             f"order move {current} 1": "bad-argument",
             f"order move x 1 2": "bad-argument",
             f"order move {current} 0 2": "bad-argument",
-            f"order move {current} 70000 2": "bad-argument",
+            f"order move {current} 4294967296 2": "bad-argument",
             f"order move {current} 1 x": "bad-argument",
             f"order move {current} 1 0": "bad-argument",
             f"order move 4294967296 1 2": "bad-argument",

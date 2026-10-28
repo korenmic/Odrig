@@ -176,14 +176,14 @@ uint32_t id_of(const Core &core, uint32_t position) {
     return is_drive(position) ? core.drive[position - kDriveBase].id : core.items[position].id;
 }
 
-// The listed animation with the smallest key above `after`, or kNothing.
-uint32_t listed_after(const Core &core, uint64_t after, bool any) {
+// The listed animation of a level with the smallest key above `after`, or kNothing.
+uint32_t listed_after(const Core &core, uint32_t level, uint64_t after, bool any) {
     uint32_t best = kNothing;
     uint32_t best_key = 0;
     const uint32_t places = core.drive != nullptr ? core.drive_count : 0;
     for (uint32_t at = 0; at < core.item_count + places; ++at) {
         const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
-        if (!listed(core, position)) {
+        if (!listed(core, position) || level_of(core, position) != level) {
             continue;
         }
         const uint32_t key = order_key(core, position);
@@ -512,6 +512,40 @@ uint32_t tree_folder_path(const Core &core, uint32_t folder, char *into, uint32_
     return length;
 }
 
+uint32_t level_of(const Core &core, uint32_t position) {
+    if (!is_drive(position) || core.drive_folder == nullptr || !core.tree_known) {
+        return 0;
+    }
+    const uint8_t byte = core.drive_folder[position - kDriveBase];
+    return byte == kNoFolder ? 0 : byte;
+}
+
+uint32_t level_folder_count(const Core &core, uint32_t level) {
+    uint32_t count = 0;
+    while (level_folder_at(core, level, count) != kFolderMost) {
+        ++count;
+    }
+    return count;
+}
+
+uint32_t level_folder_at(const Core &core, uint32_t level, uint32_t at) {
+    if (core.folders == nullptr || !core.tree_known || level > core.folder_count) {
+        return kFolderMost;
+    }
+    // A level's sub-folders are the folders of its subtree one deeper than it: the first
+    // one right after it, each next one after the subtree of the one before.
+    uint32_t folder = level + 1;
+    const uint32_t end = level == 0 ? core.folder_count + 1u : core.folders[level].end;
+    while (folder < end) {
+        if (at == 0) {
+            return folder;
+        }
+        --at;
+        folder = core.folders[folder].end;
+    }
+    return kFolderMost;
+}
+
 uint32_t order_key(const Core &core, uint32_t position) {
     if (is_drive(position)) {
         const uint32_t place = position - kDriveBase;
@@ -609,24 +643,18 @@ void order_item_added(Core &core, uint32_t position) {
 
 namespace {
 
-// The revision of the order: the CRC-32 of each listed animation's id, as two bytes, and
-// key, as four, low byte first, in the order of `list`; and the number of them.
-uint32_t revision_of(const Core &core, uint32_t *total) {
+// The revision of a level's order: the CRC-32 of the ids of its listed animations in the
+// saved order, each as four bytes, low byte first; and the number of them.
+uint32_t revision_of(const Core &core, uint32_t level, uint32_t *total) {
     uint32_t crc = kCrcStart;
     *total = 0;
-    const uint32_t places = core.drive != nullptr ? core.drive_count : 0;
-    for (uint32_t at = 0; at < core.item_count + places; ++at) {
-        const uint32_t position = at < core.item_count ? at : kDriveBase + (at - core.item_count);
-        if (!listed(core, position)) {
-            continue;
-        }
+    uint32_t key = 0;
+    for (uint32_t at = listed_after(core, level, 0, true); at != kNothing; at = listed_after(core, level, key, false)) {
         ++*total;
-        const uint32_t id = id_of(core, position);
-        const uint32_t key = order_key(core, position);
-        crc = crc_add(crc, static_cast<uint8_t>(id));
-        crc = crc_add(crc, static_cast<uint8_t>(id >> 8));
+        key = order_key(core, at);
+        const uint32_t id = id_of(core, at);
         for (uint32_t shift = 0; shift < 32; shift += 8) {
-            crc = crc_add(crc, static_cast<uint8_t>(key >> shift));
+            crc = crc_add(crc, static_cast<uint8_t>(id >> shift));
         }
     }
     return crc_value(crc);
@@ -841,18 +869,18 @@ bool write_part(Core &core, Move &move) {
 
 }  // namespace
 
-uint32_t order_get(const Core &core, uint32_t from, Reply &reply) {
+uint32_t order_get(const Core &core, uint32_t level, uint32_t from, Reply &reply) {
     uint32_t total = 0;
-    const uint32_t revision = revision_of(core, &total);
+    const uint32_t revision = revision_of(core, level, &total);
     reply.text("{\"ok\":true,\"ids\":[");
     // The tail: `],"next":<n>,"revision":<r>}` and a line feed, with room for any position.
-    const uint32_t tail = 9 + 5 + 12 + digits(revision) + 2;
+    const uint32_t tail = 9 + (digits(total) > 4 ? digits(total) : 4) + 12 + digits(revision) + 2;
     uint32_t position = 0;
     uint32_t at = kNothing;
     uint32_t key = 0;
     bool first = true;
     for (; position < total; ++position) {
-        at = listed_after(core, key, at == kNothing);
+        at = listed_after(core, level, key, at == kNothing);
         key = order_key(core, at);
         if (position < from) {
             continue;
@@ -898,11 +926,12 @@ uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before,
         return refuse(reply, "in-use");
     }
     uint32_t total = 0;
-    if (revision != revision_of(core, &total)) {
+    const uint32_t level = level_of(core, moved);
+    if (revision != revision_of(core, level, &total)) {
         return refuse(reply, "order-conflict");
     }
-    // Nothing changes when the animation already stands where it is to go.
-    const uint32_t next = listed_after(core, order_key(core, moved), false);
+    // Nothing changes when the animation already stands where it is to go in its level.
+    const uint32_t next = listed_after(core, level, order_key(core, moved), false);
     if (moved == target || next == target) {
         return succeed(reply);
     }

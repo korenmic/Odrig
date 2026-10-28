@@ -78,13 +78,24 @@ void tree_choose(Core &core, uint32_t folder);
 // the host gives no name.
 uint32_t tree_folder_path(const Core &core, uint32_t folder, char *into, uint32_t room);
 
-// The reply to `order get`: the ids of the listed animations in the saved order, from a
-// position on, as many as fit, the position of the first one left out, and the revision.
-uint32_t order_get(const Core &core, uint32_t from, Reply &reply);
+// A level of the drive's tree, as `list` and `order get` give it: the root, 0, which holds
+// the show's items too, or a folder of the table by its index. The level a position of the
+// playlist is at: 0 for an item of the show, the folder of a place of the drive.
+uint32_t level_of(const Core &core, uint32_t position);
+
+// The number of a level's sub-folders, and the folder of the table at a position among
+// them, in the table's order.
+uint32_t level_folder_count(const Core &core, uint32_t level);
+uint32_t level_folder_at(const Core &core, uint32_t level, uint32_t at);
+
+// The reply to `order get` and `order get in`: the ids of a level's listed animations in
+// the saved order, from a position on, as many as fit, the position of the first one left
+// out, and the revision of the level.
+uint32_t order_get(const Core &core, uint32_t level, uint32_t from, Reply &reply);
 
 // The reply to `order move`: the listed animation with the id `id` goes before the one with
 // the id `before`, or last when `before` is 0, and the whole order is saved before the
-// reply. `order-conflict` when `revision` is not the order's.
+// reply. `order-conflict` when `revision` is not that of the level of `id`.
 uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before, Reply &reply);
 
 }  // namespace odrig

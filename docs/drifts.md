@@ -10862,3 +10862,35 @@ with a folder in its name go in a drive's index, whose folder may not be in the 
 index with `import`.
 
 **Resolution.** `odrig/catalog.py` (`add`).
+
+## Seed 50: what `status` names, and a folder's count in `list`
+
+**Question.** The seed approves that `status` names the playing animation's path, so that
+the app need not hold the whole list. The app also marks the levels that lead to the
+current playlist and shows on a folder's row the count of its own files, both of which it
+took from the whole list. Which members carry them, and where do they stand?
+
+**Answer.** `status` gains two members before `left`, which stays its last: `file`, the
+file of the animation `animation` names, an item's file or a drive's by its path, and
+`playlist`, the path of the card's folder whose playlist is current while `playing` is its
+id; each `null` otherwise. A folder's item of `list` and `list in` gains `files`, the number
+of its own files that `list in` of it gives. All three are parts of the forms the owner
+approved, the playing animation named and one level given with its folder rows, and add
+no command.
+
+**Resolution.** `core/src/commands.cpp` (`status`), `core/src/content.cpp`
+(`content_list`); docs/commands.md, "Status reply" and "Storage and the installed items".
+
+## Seed 50: the revision of a level's order
+
+**Question.** `order get` now gives one level, and `order get in <folder-id>` another. The
+revision was the CRC-32 of every listed animation's id and key. Of what is a level's
+revision made, and which revision does `order move` compare?
+
+**Answer.** A level's revision is the CRC-32 of the ids of its animations in the saved
+order, each as four bytes, low byte first: it changes whenever the level's order or its
+animations change, and is the same after a restart for the same files. `order move`
+compares the revision of the level of `<id>`, the root's for a show's item.
+
+**Resolution.** `core/src/order.cpp` (`revision_of`, `order_get`, `order_move`);
+docs/commands.md, "The saved playlist order".

@@ -13,9 +13,11 @@ namespace odrig {
 // when the host cannot tell the space.
 uint32_t content_space(const Core &core, Reply &reply);
 
-// The reply to `list`: the items of a valid show in its order, from a position on, as many
-// as fit into one reply, and the position of the first one left out.
-uint32_t content_list(const Core &core, uint32_t from, Reply &reply);
+// The reply to `list` and `list in`: the items of a level of a valid show, the show's items
+// in its order and the root's folders and files for the root, 0, a folder's own folders
+// and files for a folder of the tree, from a position on, as many as fit into one reply,
+// and the position of the first one left out.
+uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &reply);
 
 // Carries out `remove` on a valid show and writes the reply: the item with this id leaves
 // the show, in storage and in the tables.

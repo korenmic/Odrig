@@ -204,6 +204,30 @@ uint32_t status(const Core &core, uint64_t now, Reply &reply) {
     } else {
         reply.text("null");
     }
+    // The file of the animation on the LEDs, a drive's by its path; and the path of the
+    // folder of the drive whose playlist is current while `playing` names it.
+    const uint32_t shown = core.playing == kNothing ? kNothing : core.shown;
+    char name[kDriveListedName];
+    reply.text(",\"file\":");
+    if (shown != kNothing && !is_drive(shown) && shown < core.item_count && !core.items[shown].is_cycle) {
+        reply.text("\"");
+        reply.text(core.files[core.items[shown].first].name);
+        reply.text("\"");
+    } else if (shown != kNothing && is_drive(shown) && core.host.drive_name(core.host.ctx, core.drive_number, shown - kDriveBase, name, sizeof name) == 1) {
+        reply.text("\"");
+        reply.escaped(name);
+        reply.text("\"");
+    } else {
+        reply.text("null");
+    }
+    reply.text(",\"playlist\":");
+    if (core.playing == kPlaylist && core.tree_known && core.current != 0 && tree_folder_path(core, core.current, name, sizeof name) != 0) {
+        reply.text("\"");
+        reply.escaped(name);
+        reply.text("\"");
+    } else {
+        reply.text("null");
+    }
     // The seconds left in the current playlist's window, the last member.
     reply.text(",\"left\":");
     reply.number(player_window_left(core));
@@ -290,6 +314,27 @@ bool crc_word(const Words &words, uint32_t word, uint32_t *value) {
     }
     *value = result;
     return true;
+}
+
+// The words of a level from the word `first` on: none or `<from>` for the root, `in
+// <folder-id>` or `in <folder-id> <from>` for a folder of the drive's tree. False when they
+// are not in their form; the level is kFolderMost for an id that is no folder's.
+bool level_words(const Core &core, const Words &words, uint32_t first, uint32_t *level, uint32_t *from) {
+    *level = 0;
+    *from = 0;
+    uint32_t at = first;
+    if (words.count > at && words.is(at, "in")) {
+        uint32_t id;
+        if (words.count < at + 2 || !number_word(words, at + 1, 1, 0xFFFFFFFFu, &id)) {
+            return false;
+        }
+        *level = tree_folder_with_id(core, id);
+        at += 2;
+    }
+    if (words.count == at) {
+        return true;
+    }
+    return words.count == at + 1 && number_word(words, at, 0, 0xFFFFFFFFu, from);
 }
 
 // The four `upload` commands. The words are read first, then the show is asked for.
@@ -473,7 +518,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "play")) {
         const bool all = words.count == 2 && words.is(1, "all");
         uint32_t id = 0;
-        if (!all && (words.count != 2 || !number_word(words, 1, 1, 65535, &id))) {
+        if (!all && (words.count != 2 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id))) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
@@ -544,24 +589,31 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
         return content_space(core, reply);
     }
     if (words.is(0, "list")) {
+        uint32_t level = 0;
         uint32_t from = 0;
-        if (words.count > 2 || (words.count == 2 && !number_word(words, 1, 0, 65535, &from))) {
+        if (!level_words(core, words, 1, &level, &from)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
             return refuse(reply, "show-invalid");
         }
-        return content_list(core, from, reply);
+        if (level == kFolderMost) {
+            return refuse(reply, "unknown-id");
+        }
+        return content_list(core, level, from, reply);
     }
     if (words.is(0, "order")) {
+        uint32_t level = 0;
         uint32_t from = 0;
-        if (words.count >= 2 && words.count <= 3 && words.is(1, "get") && (words.count == 2 || number_word(words, 2, 0, 65535, &from))) {
+        if (words.count >= 2 && words.is(1, "get")) {
+            if (!level_words(core, words, 2, &level, &from)) return refuse(reply, "bad-argument");
             if (core.invalid) return refuse(reply, "show-invalid");
-            return order_get(core, from, reply);
+            if (level == kFolderMost) return refuse(reply, "unknown-id");
+            return order_get(core, level, from, reply);
         }
         uint32_t revision, id, before = 0;
-        if (words.count == 5 && words.is(1, "move") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) && number_word(words, 3, 1, 65535, &id) &&
-            (words.is(4, "end") || number_word(words, 4, 1, 65535, &before))) {
+        if (words.count == 5 && words.is(1, "move") && number_word(words, 2, 0, 0xFFFFFFFFu, &revision) && number_word(words, 3, 1, 0xFFFFFFFFu, &id) &&
+            (words.is(4, "end") || number_word(words, 4, 1, 0xFFFFFFFFu, &before))) {
             if (!core.invalid && catalog_rebuilding(core)) return refuse(reply, "busy");
             return order_move(core, revision, id, before, reply);
         }
@@ -570,7 +622,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     if (words.is(0, "read")) {
         uint32_t id;
         uint32_t offset;
-        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
+        if (words.count != 3 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 0xFFFFFFFFu, &offset)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {
@@ -580,7 +632,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     }
     if (words.is(0, "ignore")) {
         uint32_t id, value;
-        if (words.count != 3 || !number_word(words, 1, 1, 65535, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
+        if (words.count != 3 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id) || !number_word(words, 2, 0, 1, &value)) return refuse(reply, "bad-argument");
         if (core.invalid) return refuse(reply, "show-invalid");
         if (core.mapping_test || catalog_rebuilding(core)) return refuse(reply, "busy");
         return content_ignore(core, id, value != 0, reply);
@@ -607,7 +659,7 @@ uint32_t command_answer(Core &core, uint64_t now_ms, const char *line, uint32_t 
     }
     if (words.is(0, "remove")) {
         uint32_t id;
-        if (words.count != 2 || !number_word(words, 1, 1, 65535, &id)) {
+        if (words.count != 2 || !number_word(words, 1, 1, 0xFFFFFFFFu, &id)) {
             return refuse(reply, "bad-argument");
         }
         if (core.invalid) {

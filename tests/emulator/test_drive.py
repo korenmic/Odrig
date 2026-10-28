@@ -92,11 +92,12 @@ class AnEmulatorWithADrive(unittest.TestCase):
     def start(self, *options):
         return support.entered(self, support.Emulator(self.folder, "--drive", self.top, *options))
 
-    def listed_when(self, emulator, condition):
-        """The items of `list` once they meet a condition, which the test waits for."""
+    def listed_when(self, emulator, condition, command="list"):
+        """The items of `list`, or of another level's command, once they meet a condition,
+        which the test waits for."""
         deadline = time.monotonic() + WAIT_SECONDS
         while True:
-            items = [(item["id"], item.get("file")) for item in json.loads(emulator.command("list"))["items"]]
+            items = [(item["id"], item.get("file")) for item in json.loads(emulator.command(command))["items"]]
             if condition(items) or time.monotonic() > deadline:
                 return items
             time.sleep(0.1)
@@ -118,14 +119,18 @@ class AnEmulatorWithADrive(unittest.TestCase):
         support.installed(folder / "night", {"comet.odrg": self.animation})
         support.installed(folder / "night" / "deep", {"x.odrg": self.animation})
         emulator = support.entered(self, support.Emulator(self.folder, "--drive", self.top, tcp_port=0))
-        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 5)
+        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 2)
         shows = [item for item in items if item[0] < 60001]
-        self.assertEqual(items, shows + [(60004, None), (60005, None), (60001, "b.odrg"), (60002, "night/comet.odrg"), (60003, "night/deep/x.odrg")])
+        self.assertEqual(items, shows + [(60004, None), (60001, "b.odrg")])
+        self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 2, "list in 60004"), [(60005, None), (60002, "night/comet.odrg")])
+        self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 1, "list in 60005"), [(60003, "night/deep/x.odrg")])
         reply = json.loads(emulator.command("list"))
-        self.assertEqual([item for item in reply["items"] if "playlist" in item],
-                         [{"id": 60004, "playlist": "night", "external": True}, {"id": 60005, "playlist": "night/deep", "external": True}])
+        self.assertEqual([item for item in reply["items"] if "playlist" in item], [{"id": 60004, "playlist": "night", "external": True, "files": 1}])
+        night = json.loads(emulator.command("list in 60004"))
+        self.assertEqual(night["items"][0], {"id": 60005, "playlist": "night/deep", "external": True, "files": 1})
         with support.Lines(emulator.tcp) as port:
             self.assertEqual(json.loads(port.ask("list")), reply)
+            self.assertEqual(json.loads(port.ask("list in 60004")), night)
         # The folder's playlist chosen: `playing` names it, and its first animation plays.
         self.assertEqual(json.loads(emulator.command("play 60004")), {"ok": True})
         status = emulator.status()

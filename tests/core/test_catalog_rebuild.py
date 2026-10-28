@@ -145,14 +145,15 @@ class External(unittest.TestCase):
         drive = {"sun.odrg": loop_of(2, 5), "night/comet.odrg": loop_of(3, 6), "night/deep/x.odrg": loop_of(2, 7), "a b/c.odrg": loop_of(3, 8), "a-b/d.odrg": loop_of(2, 9),
                  "night/bad.odrg": loop_of(2, 10)[:-4]}
         with a_card(drive) as top:
-            run = support.start(SHOW, asked(0, "catalog rebuild external") + polls(20, 500) + asked(10100, "catalog", "list"), ["--drive", top])
+            levels = ("list", "list in 60007", "list in 60008", "list in 60009", "list in 60010")
+            run = support.start(SHOW, asked(0, "catalog rebuild external") + polls(20, 500) + asked(10100, "catalog", *levels), ["--drive", top])
             left = folder_of(top)
         self.assertEqual(catalog_replies(run)[-1]["external"], {"state": "ok", "generation": 1, "entries": 5, "writable": True})
         storage = catalog.MemoryStorage(drive)
         _, refused = catalog.rebuild(storage, canvas=CANVAS)
         self.assertEqual([name for name, _ in refused], ["night/bad.odrg"])
         self.assertEqual(catalog_files(left), catalog_files(storage.files))
-        items = replies(run)[-1]["items"]
+        items = [item for reply in replies(run)[-5:] for item in reply["items"]]
         listed = [(item["file"], item.get("fault")) for item in items if "file" in item and item.get("external")]
         self.assertEqual(listed, [("sun.odrg", None), ("a b/c.odrg", None), ("a-b/d.odrg", None), ("night/bad.odrg", "truncated"), ("night/comet.odrg", None),
                                   ("night/deep/x.odrg", None)])

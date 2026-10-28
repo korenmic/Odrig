@@ -29,19 +29,19 @@ def hello_only(brightness=255):
 class StatusReply(Playback):
     def test_its_exact_bytes(self):
         printed = self.assert_as_the_reference(support.example_show(), [status_at(0)])
-        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86400}'])
+        self.assertEqual(printed, ['reply {"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"file":"hello.odrg","playlist":null,"left":86400}'])
 
     def test_its_exact_bytes_when_nothing_plays_and_the_show_is_invalid(self):
         files = support.with_show_fault(support.example_show())
         printed = self.assert_as_the_reference(files, [at(0, "off"), status_at(0)])
         self.assertEqual(
             printed[1],
-            'reply {"ok":true,"on":false,"brightness":0,"playing":null,"animation":null,"fps":0,"error":"undefined-id 99","width":60,"height":6,"readiness":"recovery","checked":0,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86400}',
+            'reply {"ok":true,"on":false,"brightness":0,"playing":null,"animation":null,"fps":0,"error":"undefined-id 99","width":60,"height":6,"readiness":"recovery","checked":0,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"file":null,"playlist":null,"left":86400}',
         )
 
     def test_it_is_the_reply_of_the_document(self):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
-        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86399}'
+        example = '{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"file":"hello.odrg","playlist":null,"left":86399}'
         self.assertIn(example, text)
         script = every_20_ms(50) + [status_at(1000)]
         printed = self.assert_as_the_reference(support.example_show(), script)

@@ -171,10 +171,13 @@ On the board the drive is a USB stick or a microSD card, as
   [microsd.md](microsd.md#preparing-a-card) says; a file in a sub-folder is known by its
   path from `odrig`, `night/comet.odrg`, in `list`, in the saved order and in the catalog.
 - The sub-folders make a tree, the folder `odrig` its root: a sub-folder with an animation
-  file at any depth below it is a playlist of its own, and `list` gives it after the show's
-  items and before the files, in the order of the listing, with its path and an id from the
-  same pool as the files', given after theirs:
-  `{"id":60007,"playlist":"night","external":true}`.
+  file at any depth below it is a playlist of its own, with its path and an id from the
+  same pool as the files', given after theirs. The drive is listed one level at a time:
+  `list` gives the root's level after the show's items, the folders right in `odrig` and
+  then its own files, and `list in <folder-id>` a folder's level, its sub-folders and then
+  its own files; a folder is listed as
+  `{"id":60007,"playlist":"night","external":true,"files":2}`, with the number of its own
+  files.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
   has been read, at its place in the saved order: without one, after the show's

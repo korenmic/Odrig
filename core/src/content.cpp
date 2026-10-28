@@ -79,19 +79,19 @@ bool drive_is_listed(const DriveEntry &entry) {
     return entry.state == kDriveInPlaylist || (entry.state == kDriveLeftOut && entry.id != 0);
 }
 
-// The number of the drive's listed files: they are listed after the items.
-uint32_t drive_listed(const Core &core) {
+// The number of the drive's listed files of a level: they are listed after its folders.
+uint32_t drive_listed(const Core &core, uint32_t level) {
     uint32_t count = 0;
     for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
-        count += drive_is_listed(core.drive[place]) ? 1 : 0;
+        count += drive_is_listed(core.drive[place]) && level_of(core, kDriveBase + place) == level ? 1 : 0;
     }
     return count;
 }
 
-// The place of the drive's file that is listed at this place among them.
-uint32_t drive_listed_place(const Core &core, uint32_t listed) {
+// The place of the drive's file that is listed at this place among those of a level.
+uint32_t drive_listed_place(const Core &core, uint32_t level, uint32_t listed) {
     for (uint32_t place = 0; place < core.drive_count; ++place) {
-        if (drive_is_listed(core.drive[place])) {
+        if (drive_is_listed(core.drive[place]) && level_of(core, kDriveBase + place) == level) {
             if (listed == 0) {
                 return place;
             }
@@ -100,6 +100,9 @@ uint32_t drive_listed_place(const Core &core, uint32_t listed) {
     }
     return core.drive_count;
 }
+
+// The member of a folder's item of `list` that gives its own files, before their number.
+const char kListFiles[] = ",\"files\":";
 
 // The text of a file the core writes, gathered in the chunk buffer and given to the host
 // whenever the buffer is full.
@@ -241,25 +244,27 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
     return reply.length;
 }
 
-uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
+uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &reply) {
     reply.text(kListHead);
-    // The items of the show, then the folders of the drive's tree, then the drive's
-    // animations in the playlist.
-    const uint32_t folders = core.folders != nullptr && core.tree_known ? core.folder_count : 0;
-    const uint32_t total = core.item_count + folders + drive_listed(core);
+    // A level's items: the show's at the root, then its sub-folders, then its files of the
+    // drive in the playlist or left out.
+    const uint32_t items = level == 0 ? core.item_count : 0;
+    const uint32_t folders = level_folder_count(core, level);
+    const uint32_t total = items + folders + drive_listed(core, level);
     uint32_t position = from;
     bool first = true;
     for (; position < total; ++position) {
         const uint32_t tail = list_tail_size(position + 1, total);
-        if (position >= core.item_count && position < core.item_count + folders) {
-            const uint32_t folder = 1 + position - core.item_count;
+        if (position >= items && position < items + folders) {
+            const uint32_t folder = level_folder_at(core, level, position - items);
             char path[kDriveListedName];
-            if (tree_folder_path(core, folder, path, sizeof path) == 0) {
+            if (folder == kFolderMost || tree_folder_path(core, folder, path, sizeof path) == 0) {
                 // The drive went while the list was written: it is no more.
                 continue;
             }
+            const uint32_t files = drive_listed(core, folder);
             const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(core.folders[folder].id) + text_length(kListPlaylist) +
-                                  json_escaped(path, nullptr) + 1 + text_length(kListExternal) + 1;
+                                  json_escaped(path, nullptr) + 1 + text_length(kListExternal) + text_length(kListFiles) + digits(files) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -273,11 +278,13 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             reply.escaped(path);
             reply.text("\"");
             reply.text(kListExternal);
+            reply.text(kListFiles);
+            reply.number(files);
             reply.text("}");
             continue;
         }
-        if (position >= core.item_count) {
-            const uint32_t place = drive_listed_place(core, position - core.item_count - folders);
+        if (position >= items) {
+            const uint32_t place = drive_listed_place(core, level, position - items - folders);
             const DriveEntry &entry = core.drive[place];
             char name[kDriveListedName];
             if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {

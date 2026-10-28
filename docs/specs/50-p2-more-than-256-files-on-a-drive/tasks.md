@@ -63,7 +63,7 @@ Rules for every task:
   - Suites: library, onboarding.
   - Requirements: 1.1 to 1.6, 2.1, 2.2, 3.1 to 3.5
 
-- [ ] 2. One level at a time in the replies
+- [x] 2. One level at a time in the replies
   - `core/src/commands.cpp`: ids of `play`, `read`, `remove`, `ignore`, `order move` up to
     4,294,967,295; `list in <folder-id> [<from>]` and `order get in <folder-id> [<from>]`,
     `<from>` up to 4,294,967,295. `core/src/content.cpp`: `list` gives the show's items and
