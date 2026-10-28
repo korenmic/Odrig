@@ -115,7 +115,8 @@ void upload_step(Core &core, uint64_t now) {
         }
     } else if (upload.records_left != 0) {
         if (is_drawn(core.check_content.type)) {
-            reason = drawn_read(&checker.file, core.check_content, nullptr);
+            const Picture picture = {&checker.decoder, &checker.inflate, core.check_window, core.check_pixels};
+            reason = drawn_read(&checker.file, core.check_content, nullptr, picture);
             upload.total_ms = core.check_content.loop_ms;
         } else {
             uint16_t duration = 0;

@@ -57,7 +57,7 @@ Rules for every task:
   - Suites: the converter's two, the core's, the onboarding suite.
   - Requirements: 1.1 to 1.8, 2.1 to 2.4, 3.1 to 3.5, 4.1, 4.2, 4.4
 
-- [ ] 2. The picture widgets in the core
+- [x] 2. The picture widgets in the core
   - `core/src/clock.h/.cpp`: `clock_read` with its `Picture`, `clock_overlay`,
     `clock_is_picture`, the virtual time with a direction. `core/src/container.h/.cpp`,
     `core/src/core.cpp`, `core/src/upload.cpp`, `core/src/player.cpp`: the picture decoded

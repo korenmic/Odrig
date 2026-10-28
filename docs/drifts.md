@@ -10835,3 +10835,38 @@ The folder of the clocks of 20 bytes keeps its vectors.
 **Resolution.** `tests/vectors/pictures/build.mjs`; `converter/tests/picture.test.js`,
 `converter/tests/clock.test.js`; `odrig/errors.py`; `core/src/reasons.h`,
 `core/src/reasons.cpp`.
+
+## Seed 52: where the core keeps a picture clock
+
+**Question.** Seed 52 asks that a picture clock cost the core no memory: its picture
+decoded once a turn into the pixel buffer, its hands or digits drawn over it as the LED
+data is made, the pixel buffer never written meanwhile. Where are the head, the parts and
+the hands of a refresh kept, and what decodes the picture at each check?
+
+**Answer.** The picture is decoded into the pixel buffer as palette indices by the
+player's decoder, which keeps its palette; the window of the DEFLATE decoder, which a
+drawn type leaves free, keeps the head and the parts from its first byte and, from byte
+128, a layer of a byte for each pixel, written at each refresh with the hands and caps or
+the digits; `fill_leds` takes the layer's colour where it has one. The window serves the
+picture's inflate first: the head is read onto the stack and copied there afterwards.
+Each check decodes the picture with the decoder, the window and the pixel buffer it has
+for frames, so it needs nothing more. The Python library's header reader allows a widget
+32,768 bytes, as the converter and the core do.
+
+**Resolution.** `core/src/clock.h`, `core/src/clock.cpp`, `core/src/container.h`,
+`core/src/player.cpp`; `docs/core.md`, "Clocks" and "Memory"; `odrig/odrgx.py`.
+
+## Seed 52: the reference pictures are written the same on every computer
+
+**Question.** The builder of `tests/vectors/procedural/` wrote its PNG files with the zlib
+of Node.js, and Node.js on Windows gives other bytes than on the Mac that made them: 18 of
+the 35 pictures came out different with the same pixels, and the converter's suite failed
+on Windows on one of them. Seed 52 adds pictures of picture clocks; made on Windows, they
+would fail on the Mac. How are they written?
+
+**Answer.** The builder compresses with the library's own DEFLATE, which writes the same
+bytes everywhere, in a zlib stream of its own making. All the pictures were written again:
+every one keeps its pixels, which the core's and the emulator's suites read, and the
+converter's suite finds them what their builder makes on Windows too.
+
+**Resolution.** `tests/vectors/procedural/build.mjs` and its pictures.
