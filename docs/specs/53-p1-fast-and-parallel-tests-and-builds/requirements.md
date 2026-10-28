@@ -3,7 +3,8 @@
 The seed is `project-seeds/53-p1-fast-and-parallel-tests-and-builds/`. It has no open
 questions; the owner ordered on 2026-10-28 that it be specified and built at once, and a
 point these requirements decide that the seed leaves open is recorded at the end of
-`docs/drifts.md`.
+`docs/drifts.md`. By the owner's order of 2026-10-28 the seed was split: requirements 5, 6,
+7 and 8 and tasks 5 to 8 moved to seed 55; this seed delivers requirements 1 to 4.
 
 ## 1. The runner
 

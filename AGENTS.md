@@ -137,7 +137,7 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
 - **Every animation tracked with its preview and its source, the heavy ones on the share**, seed 46: small animation files tracked with their GIFs and readmes; long videos and files over 50 MB kept on the share, only their GIFs and readmes tracked.
 - **More than 256 files on a drive**, seed 50: the drive's entries move to an index on the card.
-- **Fast and parallel tests and builds**, seed 53: one runner for every suite and both builds at once; no process left behind.
+- **Fast and parallel tests and builds**, seed 53: one runner for every suite at once, and no process left behind.
 
 The state of every seed is in the `state.json` of its folder.
 

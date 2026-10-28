@@ -24,22 +24,22 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       `--sweep`. Tests: a killed starter's emulator ends within two seconds; the runner
       ends its run's strays; `--sweep` on stand-in strays. Suites: runner, emulator, app,
       mapping, through the runner.
-- [ ] 5. The walkthrough. It runs only by `--walkthrough` or its own command; its five
+- [ ] 5. Not done here: moved to seed 55, `project-seeds/55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough/`, as its task 1, by the owner's order of 2026-10-28. The walkthrough. It runs only by `--walkthrough` or its own command; its five
       suites in the copy through the copy's runner; `npm ci` from the computer's cache;
       its emulators ended; port 8600 checked before the page's emulator. Suites: runner,
       onboarding, then `tests/run.py --walkthrough`.
-- [ ] 6. Shared toolchains. `ODRIG_TOOLS` in `app/apptool/paths.py` and
+- [ ] 6. Not done here: moved to seed 55, `project-seeds/55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough/`, as its task 2, by the owner's order of 2026-10-28. Shared toolchains. `ODRIG_TOOLS` in `app/apptool/paths.py` and
       `firmware/fwtool/paths.py`, the shared and the checkout's parts, the setup lock,
       the cloned WLED copy, Gradle without its daemon. Tests in `tests/app` and
       `tests/firmware` with stand-in folders. Then, on the first computer, a build of the
       APK and of the firmware from this checkout with `ODRIG_TOOLS` pointing at
       `scratch/combine-trial/build`. Suites: app, firmware, through the runner.
-- [ ] 7. Builds alongside. `--builds`: the APK and the firmware built while the suites
+- [ ] 7. Not done here: moved to seed 55, `project-seeds/55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough/`, as its task 3, by the owner's order of 2026-10-28. Builds alongside. `--builds`: the APK and the firmware built while the suites
       run, two slots kept for them, `tests/apk` after the APK, the builds' lines, sizes
       and SHA-256 in the output and the report; nothing flashed, uploaded or installed.
       Tests in `tests/runner` with stand-in builds. Suites: runner, then
       `tests/run.py --builds`.
-- [ ] 8. The documents, every suite, and the measurement. `agent/getting-started.md`:
+- [ ] 8. Not done here: moved to seed 55, `project-seeds/55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough/`, as its task 4, by the owner's order of 2026-10-28. The documents, every suite, and the measurement. `agent/getting-started.md`:
       the runner first, the times table measured, `ODRIG_TOOLS`, the Windows section;
       `agent/working-rules.md`: the runner before a merge, the rule of processes, the
       walkthrough's rule; `docs/emulator.md`, `docs/android-app.md`, `docs/firmware.md`;
