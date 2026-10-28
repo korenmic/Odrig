@@ -16,6 +16,7 @@ HEADINGS = (
     "If you have a board",
     "The frame rate",
     "Several contributors at once",
+    "Code that runs on every computer",
     "The owner's workflow skills",
 )
 
@@ -36,7 +37,7 @@ class WorkingRules(unittest.TestCase):
     def part(self, heading):
         return flat(support.section(self.text, heading))
 
-    def test_it_is_one_of_the_pages_and_has_its_seven_sections(self):
+    def test_it_is_one_of_the_pages_and_has_its_eight_sections(self):
         self.assertIn(PAGE, support.PAGES)
         self.assertEqual(tuple(re.findall(r"(?m)^## (.+)$", self.text)), HEADINGS)
 

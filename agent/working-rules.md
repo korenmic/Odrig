@@ -175,6 +175,17 @@ folders down it is `../../env` of the first computer's checkout, else `env.templ
 coding agent takes the path from there to copy to the share, to read it back, and in a
 one-line command for the emulator that it gives the owner; it never types it from memory.
 
+## Code that runs on every computer
+
+- **Text.** Write bytes, or text with `newline="\n"` and UTF-8 named for each file, pipe and console; never Python's plain text mode, which writes CRLF and cp1252 on Windows.
+- **File names.** In tests, use names every system allows; never `"`, `:`, `*`, `?`, `<`, `>`, `|` or a trailing dot or space, except in a case skipped on Windows that says why.
+- **Paths.** Join and split paths with `pathlib` or `path`, and write `/` only in names the project stores; never build or compare a path with a literal `/` or `\`.
+- **Open files.** Close a file, and end what loaded a library, before you replace or remove it; never count on changing a file that is open, which Windows refuses.
+- **C++.** Write what GCC, Clang and MSVC take with warnings as errors, an attribute through a macro for each; never `__attribute__` alone, a signed and unsigned comparison, or a variable read on a path that did not set it.
+- **Ports and load.** Bind to port 0 and bound the sockets and processes run at once; never SO_REUSEADDR on Windows, where a second server takes a port in use, nor as many sockets as macOS takes (WinError 10055).
+- **Processes.** Start a program without a window and end it by what each system offers, a job object on Windows; never `chrome --version` as it is, which opens a window there, nor `os.kill(pid, 0)`, which ends the process.
+- **Time.** Measure from the moment the program reports, such as the hello's `t0`; never take a first refresh or tick to come at 0 ms.
+
 ## The owner's workflow skills
 
 The owner runs this process with a set of workflow skills for coding agents: one turns a

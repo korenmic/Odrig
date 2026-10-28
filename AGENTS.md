@@ -113,6 +113,7 @@ and seed 26 for the work that came after it.
 - The firmware tool and the board stay with the first computer.
 - Nothing is installed in the system. A compiler or another program that is fetched is
   unpacked into `tools/`, and a trial goes into `scratch/`. Git ignores both.
+- Code runs on macOS, Linux and Windows alike: [the rules](agent/working-rules.md#code-that-runs-on-every-computer).
 
 [agent/getting-started.md](agent/getting-started.md#on-windows) has the setup and the
 commands of Windows.
