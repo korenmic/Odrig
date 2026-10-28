@@ -60,7 +60,7 @@ class Install(unittest.TestCase):
             self.assertEqual(done.status, 0, done.err)
             # The board's reply to `status` is the last line, after the lines of the layout,
             # of the change of the show and of the write.
-            reply = json.loads(done.out.splitlines()[-1])
+            reply = json.loads(done.out.splitlines()[-2])
             self.assertEqual((reply["ok"], reply["error"], reply["playing"], reply["brightness"]), (True, None, 3, support.DIM))
             self.assertRegex(done.out, r"\nstorage: committed: \d+ bytes written and compared; the board restarts\n")
             read = support.on_port("read-show", pathlib.Path(out, "copy"))
@@ -87,7 +87,7 @@ class Install(unittest.TestCase):
             with support.dim_show(show=one_animation(work, "hello.odrg")) as second:
                 done = support.install(second)
                 self.assertEqual(done.status, 0, done.err)
-                self.assertEqual((json.loads(done.out.splitlines()[-1])["playing"], json.loads(done.out.splitlines()[-1])["animation"]), ("all", 1))
+                self.assertEqual((json.loads(done.out.splitlines()[-2])["playing"], json.loads(done.out.splitlines()[-2])["animation"]), ("all", 1))
                 self.assertEqual(support.installed(), storage.folder_files(second))
                 self.assertEqual(sorted(support.installed()), ["hello.odrg", "mapping.json", "show.json"])
 
@@ -102,7 +102,7 @@ class Install(unittest.TestCase):
                 done = support.install(folder, "--no-check")
                 self.assertEqual(done.status, 1, done.err)
                 self.assertEqual(done.err, "")
-                self.assertEqual(json.loads(done.out.splitlines()[-1])["error"], reason)
+                self.assertEqual(json.loads(done.out.splitlines()[-2])["error"], reason)
                 self.assertEqual(support.command(PORT, "status")[1]["error"], reason)
                 self.assertEqual(support.command(PORT, "play", "1"), (1, {"ok": False, "error": "show-invalid"}))
                 self.assertEqual(support.command(PORT, "status")[1]["playing"], None)
