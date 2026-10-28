@@ -19,7 +19,9 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -69,7 +71,98 @@ def parser():
     made.add_argument("--workers", type=int, default=default_workers(), help="worker processes of a split suite (default: the processors less two)")
     made.add_argument("--slowest", type=int, default=30, help="how many of the slowest tests to print (default 30)")
     made.add_argument("--walkthrough", action="store_true", help="also run the walkthrough of the pages, in a fresh copy")
+    made.add_argument("--sweep", action="store_true", help="list and end the processes earlier runs and tests left behind, and run nothing")
     return made
+
+
+# What marks a process as left by a run or a test: the runner's id in its environment, or
+# an emulator whose show is in a temporary folder or in a preview's work folder.
+MARKER = re.compile(r"(?:^|\s)ODRIG_RUN=(\S+)")
+LEFT_EMULATOR = re.compile(r"-m emulator \S*(?:/T/|/tmp/|\\Temp\\|build/preview/\d+/show)")
+
+
+def processes():
+    """(id, age, command with its environment where the system shows it) of the processes
+    this user can see."""
+    found = []
+    if WINDOWS:
+        done = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"],
+                              capture_output=True, text=True)
+        for line in done.stdout.splitlines():
+            pid, _, command = line.partition("\t")
+            if pid.strip().isdigit():
+                found.append((int(pid), "", command))
+        return found
+    options = "-axwwE" if sys.platform == "darwin" else "-axww"
+    done = subprocess.run(["ps", options, "-o", "pid=", "-o", "etime=", "-o", "command="], capture_output=True, text=True)
+    for line in done.stdout.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit():
+            pid, age, command = int(parts[0]), parts[1], parts[2]
+            if sys.platform.startswith("linux"):
+                try:
+                    command += " " + pathlib.Path(f"/proc/{pid}/environ").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+                except OSError:
+                    pass
+            found.append((pid, age, command))
+    return found
+
+
+def strays(run_id=None, listed=None):
+    """The processes a run left: with `run_id`, those that carry it; without, every one that
+    carries a run's id and every emulator of a temporary or a preview's folder."""
+    mine = {os.getpid(), os.getppid()}
+    left = []
+    for pid, age, command in (processes() if listed is None else listed):
+        if pid in mine:
+            continue
+        marked = MARKER.search(command)
+        if run_id is not None:
+            if marked and marked.group(1) == run_id:
+                left.append((pid, age, command))
+        elif marked or LEFT_EMULATOR.search(command):
+            left.append((pid, age, command))
+    return left
+
+
+def end(pids, seconds=2.0):
+    """Ends processes: a termination signal, then a kill of those still there."""
+    for pid in pids:
+        try:
+            if WINDOWS:
+                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+            else:
+                os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.monotonic() + seconds
+    while not WINDOWS and time.monotonic() < deadline and any(alive(pid) for pid in pids):
+        time.sleep(0.1)
+    for pid in pids:
+        if not WINDOWS and alive(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def sweep(out):
+    left = strays()
+    for pid, age, command in left:
+        print(f"{pid}  {age}  {MARKER.sub('', command)[:160]}", file=out)
+    end([pid for pid, _, _ in left])
+    print(f"swept {len(left)} processes", file=out, flush=True)
+    return 0
 
 
 class Runner:
@@ -292,6 +385,10 @@ class Runner:
         if not serial:
             queue.sort(key=lambda job: -job["expected"])
         self.execute(queue, 1 if serial else self.arguments.workers)
+        left = strays(self.run_id)
+        if left:
+            end([pid for pid, _, _ in left])
+            self.say(f"swept {len(left)} processes this run's tests left running")
         wall = time.monotonic() - began
         self.finish(wall)
         return 1 if self.failed else 0
@@ -402,6 +499,8 @@ def main(argv=None, root=ROOT, suites=SUITES, out=sys.stdout):
     arguments = parser().parse_args(argv)
     if arguments.workers < 1:
         raise SystemExit("error: --workers takes 1 or more")
+    if arguments.sweep:
+        return sweep(out)
     return Runner(arguments, root=root, suites=suites, out=out).run()
 
 

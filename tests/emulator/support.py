@@ -227,7 +227,7 @@ class Emulator:
 
     def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None, checked=True):
         self._temporary = None
-        command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port)]
+        command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--parent", str(os.getpid())]
         if HAS_SERIAL:
             if serial_link is None:
                 self._temporary = tempfile.TemporaryDirectory()

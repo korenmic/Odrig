@@ -11179,3 +11179,25 @@ environment of task 2's entry. Alone through the runner: core 95 s (564), emulat
 
 **Resolution.** `tests/core/host/host.cpp`'s `read_at`; `tests/run.py`'s `split` and report;
 `app/www/client.js`'s `catalog`; `tests/runner/test_runner.py`; `tests/app/test_catalog.py`.
+
+## Seed 53: no process left behind, without a helper of its own
+
+**Question.** Task 4 names `tests/children.py`, a marker set to `manual` outside the runner,
+and process groups for every starter. What was needed?
+
+**Answer.** The emulators found running for days were left by starters killed without a
+chance to clean up, which no cleanup can mend; the emulator now takes `--parent PID` and
+ends within two seconds after that process ends, and the preview and the emulator suite's
+starter give their own id. The starters already put their children in a group of their
+own. The runner sets `ODRIG_RUN` for its children, which every child inherits, ends at a
+run's end what still carries its id, and `--sweep` ends every process that carries any id
+and every emulator of a temporary or a preview's folder; outside the runner no id is set,
+and the sweep's second rule finds those emulators. So no helper module and no `manual` id.
+A preview also removes, at its start, the work folders of previews no longer running, and
+the preview's tests look at their own folder only. Under load, a test of the app's kept
+keys found the board's pages read again after the card was back rather than before; it now
+looks for them from the moment the board's catalog is whole.
+
+**Resolution.** `emulator/parent.py`, `emulator/app.py`'s `--parent`, `preview/__init__.py`,
+`tests/run.py`'s `strays`, `end` and `--sweep`, `tests/emulator/test_parent.py`,
+`tests/app/test_keys.py`.

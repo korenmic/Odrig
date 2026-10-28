@@ -18,7 +18,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       fails for time is made to assert what holds on a loaded computer, as requirement
       3.2 says, the failure seen first and quoted. Suites: every suite through the runner,
       three passes.
-- [ ] 4. No process left behind. `tests/children.py`; `ODRIG_RUN` passed on by every
+- [x] 4. No process left behind. `tests/children.py`; `ODRIG_RUN` passed on by every
       starter; process groups; the emulator's `--parent`; the preview, the tests'
       supports and the walkthrough passing it; the runner's end-of-run sweep and
       `--sweep`. Tests: a killed starter's emulator ends within two seconds; the runner

@@ -365,10 +365,11 @@ class KeptOnThePhone(unittest.TestCase):
         with support.StandIn(target.replies()) as stand_in:
             seen = support.run("keys", address=stand_in.address, settings={"plan": plan}, steps=[away, loading, back]).seen
             lines = sent(stand_in)
-        while_ok_again = page_lines(lines[marks[1]:marks[2]])
+        # On a loaded computer the board's pages may still come after the card is back, so
+        # they are looked for from the moment the board's catalog is whole again.
+        while_ok_again = page_lines(lines[marks[1]:])
         self.assertTrue(while_ok_again, "the damaged catalog's keys were forgotten and read again")
-        self.assertEqual({line.split(" ")[2] for line in while_ok_again}, {"internal"})
-        self.assertEqual(page_lines(lines[marks[2]:]), [], "absent and loading kept the card's keys")
+        self.assertEqual({line.split(" ")[2] for line in while_ok_again}, {"internal"}, "absent and loading kept the card's keys")
         self.assertEqual(seen["back"]["external"]["byName"], target.keys("external"))
 
     def test_another_address_has_keys_of_its_own(self):

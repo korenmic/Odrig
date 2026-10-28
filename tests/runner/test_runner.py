@@ -170,6 +170,50 @@ class Running(unittest.TestCase):
         self.assertIn("ended with status 3", out)
 
 
+LEAVES = """
+import os
+import pathlib
+import subprocess
+import sys
+import unittest
+
+
+class Leaves(unittest.TestCase):
+    def test_it_leaves_a_process_running(self):
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], start_new_session=True)
+        pathlib.Path("left.pid").write_text(str(child.pid))
+"""
+
+
+class Sweeping(unittest.TestCase):
+    def test_a_run_ends_the_processes_its_tests_left_running(self):
+        root = standin_root(self, {"tests/beta/test_leaves.py": LEAVES})
+        status, out = ran(root, "--suites", "beta")
+        self.assertEqual(status, 0, out)
+        pid = int((root / "left.pid").read_text())
+        self.addCleanup(run.end, [pid])
+        self.assertIn("swept 1 processes this run's tests left running", out)
+        self.assertFalse(run.alive(pid))
+
+    def test_strays_are_those_of_a_run_s_id_or_emulators_of_temporary_and_preview_folders(self):
+        listed = [
+            (11, "1-00:00:00", "python -m emulator /var/folders/a/b/T/tmpx/show --port 0 HOME=/x"),
+            (12, "00:10", "python -m unittest discover ODRIG_RUN=run-1 HOME=/x"),
+            (13, "00:10", "python -m emulator build/demo-20/show HOME=/x"),
+            (14, "00:10", "python -m emulator /Users/x/odrig/build/preview/77/show --parent 77"),
+            (15, "00:10", "python -m emulator x ODRIG_RUN=run-2"),
+        ]
+        self.assertEqual([pid for pid, _, _ in run.strays(listed=listed)], [11, 12, 14, 15])
+        self.assertEqual([pid for pid, _, _ in run.strays("run-1", listed=listed)], [12])
+
+    def test_end_ends_a_process(self):
+        import subprocess
+        import sys
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        run.end([child.pid])
+        self.assertIsNotNone(child.wait(timeout=5))
+
+
 class Splitting(unittest.TestCase):
     def runner(self, previous, workers=2, cap=None):
         arguments = run.parser().parse_args(["--workers", str(workers)])
