@@ -11984,3 +11984,59 @@ there finds only the emulators of temporary and preview folders, as without a ru
 `tests/core/test_readiness.py`, `tests/emulator/test_drive.py`,
 `tests/emulator/test_events.py`, `tests/converter/test_catalog_types.py`,
 `converter/tests/thumbnailtool.test.js`; `agent/working-rules.md`.
+
+## Seed 55: the lock of a setup, held by the system
+
+**Question.** Seed 53's design takes `setup.lock` by an exclusive create, and a lock older
+than an hour whose owner is gone is taken over. A setup that dies leaves the file; how long
+does the next one wait, and how is "gone" known on Windows, where `os.kill(pid, 0)` ends
+the process?
+
+**Answer.** The lock is one the system holds for the open file, `flock` on macOS and Linux
+and `msvcrt.locking` on Windows: it is free as soon as its process is gone, however it
+ended, so nothing is taken over and no process is looked up. A setup that finds it held
+says that it waits, and waits at most an hour.
+
+**Resolution.** `app/apptool/setuplock.py`, `firmware/fwtool/setuplock.py`, their tests in
+`tests/app/test_shared_tools.py` and `tests/firmware/test_shared_tools.py`.
+
+## Seed 55: the shared WLED copy is the source as fetched
+
+**Question.** The design keeps a prepared WLED copy in the shared folder, "patched and once
+built". Who builds it, and when, while each checkout patches its copy with its own
+patches and builds with its own path in the override file?
+
+**Answer.** The shared copy is WLED's source as fetched, never patched or built there. A
+checkout's copy is cloned from it, copy-on-write where the system can, with whatever
+build folder it holds, and is patched and built in the checkout. PlatformIO's build cache
+is shared, so a checkout's first build reuses what any checkout compiled: a second
+checkout's first firmware build took 52 s, beside an APK build.
+
+**Resolution.** `firmware/fwtool/paths.py`, `firmware/fwtool/wled.py`,
+`firmware/fwtool/toolchain.py`; `docs/firmware.md`.
+
+## Seed 55: no port to check before the walkthrough's emulator
+
+**Question.** Seed 53's requirement 5.3 says the walkthrough fails at once when port 8600
+is held before it starts the page's emulator. Which emulator is that?
+
+**Answer.** None: the walkthrough leaves out "Run it in the emulator", which needs a
+person at the page, and its record runs open no port. It ends the process group of every
+command it runs once the command ends, so nothing it starts is left; the suites in the
+copy run through the copy's runner, which ends what is left of its run.
+
+**Resolution.** `tests/walkthrough/support.py`, `tests/walkthrough/test_fresh_copy.py`.
+
+## Seed 55: two tests of master that failed in every run
+
+**Question.** Requirement 8.5 asks every suite to pass, alone and through the runner. On
+master the converter's `docs.test.js` counted exactly three generator commands in
+`docs/emulator.md`, which has seven since the demo of the clock breaks, and
+`tests.emulator.test_preview` failed when a preview of another worker ran beside it.
+
+**Answer.** The documents test asks for three or more, which is what it says it checks:
+that the page generates with the Python programs. The preview test checks that the work
+folders of its own previews are gone, by their process ids, and no longer that no other
+folder appeared meanwhile.
+
+**Resolution.** `converter/tests/docs.test.js`, `tests/emulator/test_preview.py`.

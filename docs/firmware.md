@@ -129,6 +129,18 @@ folder. `HOME` is left as it is. For `build`, `build --probe` and `build --micro
 
 The paths are absolute.
 
+**Shared toolchains.** With the environment variable `ODRIG_TOOLS` set to a folder, its
+`firmware/` folder holds what checkouts can share: `venv/`, `pio/`, `pio-cache/`,
+`npm-cache/`, `pip-cache/`, `newer/`, and WLED's source as fetched, `WLED/`, which is never
+patched there. Each checkout keeps `build/firmware/WLED/`, `out/`, `storage/` and
+`standalone/`: its WLED copy is made from the shared one by `cp -c -R` on macOS, a
+copy-on-write clone on APFS, with whatever build folder the source holds, and is patched
+and built in the checkout. `ODRIG_TOOLS/setup.lock` makes a second setup wait for the
+first, which `setup` says, and then skip what it did; `setup` prints the folder as
+`toolchains:`. The variables above then name the shared folders. The first computer's
+toolchains are in its checkout's `build/`: `ODRIG_TOOLS` set to that folder lets another
+checkout build without fetching anything.
+
 ## Commands
 
 Run from the repository root.

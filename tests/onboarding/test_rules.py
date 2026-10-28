@@ -95,8 +95,15 @@ class WorkingRules(unittest.TestCase):
                        "Nothing is committed directly on `master`", "`git fetch origin`", "`git merge origin/master`", "Run every suite that works on your computer",
                        "merged only when all of them pass", "`git merge <your-branch>`", "`git push origin master`", "Never rewrite history that has been pushed",
                        "added to at the end only", "keep both by hand, those of `master` first", "A seed's number is chosen after fetching",
-                       "one folder and one commit"):
+                       "one folder and one commit", "at once by `.venv/bin/python tests/run.py`",
+                       "with `--walkthrough` when `agent/getting-started.md` or `agent/animation-guide.md` changed"):
             self.assertIn(phrase, several)
+
+    def test_what_a_test_or_a_tool_starts_it_ends(self):
+        every = flat(self.part("Code that runs on every computer"))
+        for phrase in ("**What you start, you end.**", "ends every process it starts, when it is done and when it is stopped", "`--parent` for an emulator",
+                       "the runner's `ODRIG_RUN`", "by which the runner ends what is left"):
+            self.assertIn(phrase, every)
 
     def test_the_drift_log_keeps_the_additions_of_both_sides_of_a_merge(self):
         self.assertIn("`.gitattributes` has git keep the additions of both sides of a merge", self.part("Several contributors at once"))

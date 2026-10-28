@@ -133,8 +133,6 @@ These are planned as seeds and are not in the repository yet. Do not describe th
 - **Previews at once, each as soon as it is known**, seed 49: by name and size from the default catalog, and keys kept on the phone.
 - **A brightness field beside the slider, and a bar for the animation playing now**, seed 47 and seed 48: built; the phone checks are open, and seed 48's `repeat` needs its firmware on the board.
 - **Current limits for the wall and each snake**, seed 45: budgets in mA set in Settings, limited in the core.
-- **Fast and parallel tests and builds**, seed 53: one runner for every suite at once, and no process left behind.
-- **Shared toolchains, builds alongside, and a narrower walkthrough**, seed 55: seed 53's last four tasks, moved.
 
 The state of every seed is in the `state.json` of its folder.
 

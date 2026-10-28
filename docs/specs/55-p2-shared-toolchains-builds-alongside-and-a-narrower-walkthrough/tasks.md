@@ -16,7 +16,7 @@ Each task is seed 53's task of the same subject, moved here unchanged.
 - [x] 3. Builds alongside (seed 53's task 7). `--builds`: both built while the suites run,
       two slots kept, `tests/apk` after the APK, sizes and SHA-256 printed and reported.
       Tests in `tests/runner` with stand-in builds. Suites: runner, then `--builds`.
-- [ ] 4. The documents, every suite, and the measurement (seed 53's task 8).
+- [x] 4. The documents, every suite, and the measurement (seed 53's task 8).
       `agent/getting-started.md`, `agent/working-rules.md`, `docs/android-app.md`,
       `docs/firmware.md`, `docs/decisions.md`'s line, `docs/drifts.md`'s entries, the
       onboarding pins; every suite alone and through the runner; the full pass with

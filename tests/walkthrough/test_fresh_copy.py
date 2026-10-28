@@ -48,6 +48,12 @@ TESTS = "Run the tests"
 SUITES = 5
 
 
+def is_the_runner(command):
+    """Whether a command of the page is the runner's, which the walk-through runs itself for
+    the page's suites."""
+    return command.split()[1:2] == ["tests/run.py"]
+
+
 def passed(suite):
     return re.compile(rf"(?m)^{re.escape(suite)}: [1-9][0-9]* tests, [0-9]+ s, OK( \(skipped=[0-9]+\))?$")
 
@@ -93,7 +99,7 @@ class Plan(unittest.TestCase):
         self.assertIn(f" import {CLIP} ", imports[0])
 
     def test_every_suite_the_page_runs_is_one_of_the_runner(self):
-        commands = [command for heading, command in pages.page_commands(pages.read(START.page)) if heading == TESTS]
+        commands = [command for heading, command in pages.page_commands(pages.read(START.page)) if heading == TESTS and not is_the_runner(command)]
         self.assertEqual(len(commands), SUITES)
         names = [support.runner_suite(command, runner.SUITES) for command in commands]
         self.assertNotIn(None, names, commands)
@@ -142,6 +148,8 @@ class FreshCopy(unittest.TestCase):
         return printed
 
     def run_the_suites(self, commands, page):
+        self.assertEqual(sum(map(is_the_runner, commands)), 1, f"{page} gives the runner's command once under \"{TESTS}\"")
+        commands = [command for command in commands if not is_the_runner(command)]
         names = [support.runner_suite(command, runner.SUITES) for command in commands]
         for command, name in zip(commands, names):
             self.assertIsNotNone(name, f"{page}: the command\n    {command}\nis not one of a suite the runner knows")

@@ -219,6 +219,14 @@ so a second run takes a second.
 - After a build the work folder `build/app/` has about 2.2 GB. Removing it removes
   everything a setup and a build made, the debug key among it; see [Installing on a
   phone](#installing-on-a-phone).
+- **Shared toolchains.** With the environment variable `ODRIG_TOOLS` set to a folder, the
+  JDK, the SDK, the downloads, Gradle's user home with its caches, the Android user folder
+  with the debug key and npm's cache are in its `app/` folder, and every checkout that
+  sets it uses them; `app/node_modules/`, the staged web code, the Android project's build
+  folder and the APK stay the checkout's. `ODRIG_TOOLS/setup.lock` makes a second setup
+  wait for the first and then skip what it did; Gradle runs without its daemon and locks
+  its caches itself, so two builds at once from two checkouts both succeed. Without the
+  variable, everything is in `build/app/` as above.
 
 ### build
 

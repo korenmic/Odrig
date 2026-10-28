@@ -41,6 +41,8 @@ NEED_THE_BOARD = ("board", "air")
 # The suite of the converter, which lives beside the tool and not in tests/: its folder and
 # the command that runs it. The page gives it first among the suites to run after the setup.
 CONVERTER_SUITE = ("converter/tests", "npm test --prefix converter")
+# The runner, which the page gives first among the tests: every suite at once.
+RUNNER = ".venv/bin/python tests/run.py"
 CONVERTER = "node converter/odrig.js"
 
 
@@ -93,6 +95,7 @@ class GettingStarted(unittest.TestCase):
             "cd Odrig",
             "python -m venv .venv",
             "npm ci --prefix converter",
+            f"{python} tests/run.py",
             CONVERTER_SUITE[1],
             f"{python} core/build.py shared",
             f"{python} -m unittest discover -s tests/converter -t .",
@@ -159,7 +162,7 @@ class GettingStarted(unittest.TestCase):
         beside, of_the_converter = CONVERTER_SUITE
         self.assertTrue(any((support.ROOT / beside).glob("*.test.js")))
         after_setup = self.commands("Run the tests")
-        self.assertEqual(after_setup, [of_the_converter] + [command for command, at_once in SUITES.values() if at_once])
+        self.assertEqual(after_setup, [RUNNER, of_the_converter] + [command for command, at_once in SUITES.values() if at_once])
         given = flat(self.text)
         self.assertIn(f"| `{beside}` |", given)
         for suite, (command, _) in SUITES.items():
@@ -170,12 +173,25 @@ class GettingStarted(unittest.TestCase):
         for suite in NEED_THE_BOARD:
             self.assertIn(f"`tests/{suite}`", more)
         self.assertIn("need the board on USB and write to it", more)
-        self.assertEqual(len(after_setup), 5)
-        self.assertIn("runs the five suites above", more)
+        self.assertEqual(len(after_setup), 6)
+        self.assertIn("runs the five suites above through its runner", more)
+        self.assertIn("Run it, or `tests/run.py --walkthrough`, when either page changed", more)
+        for phrase in ("set the environment variable `ODRIG_TOOLS` to the full path of a folder of its own, outside the checkout", "(../docs/firmware.md#the-work-folder)"):
+            self.assertIn(phrase, more)
         after = flat(self.part("Run the tests"))
-        for phrase in ("The first ends with a list of counts, in which `fail 0` says that every test passed", "Each of the others ends with the line `OK`", "leaves out the tests that are for the other system and says how many, as in `OK (skipped=9)`",
-                       "None needs the board or the network"):
+        for phrase in ("The first, the runner, runs at once every suite that works on this computer, these and those of the next heading", "`--suites core,app` picks some",
+                       "Each of the others runs one suite alone", "The second ends with a list of counts, in which `fail 0` says that every test passed", "Each of the others ends with the line `OK`",
+                       "leaves out the tests that are for the other system and says how many, as in `OK (skipped=9)`", "None needs the board or the network"):
             self.assertIn(phrase, after)
+
+    def test_the_times_table_gives_each_suite_alone_and_in_the_runner(self):
+        rows = re.findall(r"(?m)^\| (.+?) \| (.+?) \| (.+?) \| (.+?) \|$", self.part("Run the tests"))
+        self.assertEqual(rows[0], ("Suite", "What it checks", "Alone", "In the runner"))
+        named = [row[0] for row in rows[1:]]
+        self.assertEqual(named, [f"`{CONVERTER_SUITE[0]}`", "`tests/converter`", "`tests/core`", "`tests/emulator`", "`tests/onboarding`", "Every suite"])
+        for row in rows[1:]:
+            for time in row[2:]:
+                self.assertRegex(time, r"^[0-9.]+ (seconds|minutes?)$", row[0])
 
     def test_it_packs_the_demo_show_from_what_the_generators_write_and_calls_it_test_content(self):
         commands = self.commands("Pack the demo show")
