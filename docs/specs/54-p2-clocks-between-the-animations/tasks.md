@@ -35,7 +35,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the core's, the emulator's, onboarding.
   - Requirements: 3.1 to 7.2
 
-- [ ] 4. The emulator's `--drive-folder` and the demo show
+- [x] 4. The emulator's `--drive-folder` and the demo show
   - `emulator/app.py`, `emulator/host.py`, their tests; `shows/clock-breaks/show.json`;
     `docs/emulator.md`.
   - Suites: the emulator's, onboarding.

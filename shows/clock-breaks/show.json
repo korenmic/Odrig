@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "brightness": 128,
+  "min_seconds": 6,
+  "items": [
+    {"id": 1, "file": "hello.odrg"},
+    {"id": 2, "file": "dvd.odrg"}
+  ]
+}
