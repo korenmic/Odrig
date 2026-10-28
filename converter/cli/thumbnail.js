@@ -84,12 +84,23 @@ export function nameOf(file, card) {
   return path.basename(file);
 }
 
+// The path of the preview beside a file: in its folder, its name without the ending of an
+// ODRG file or an ODRGX container, in any case, and `.gif`; a name with neither ending
+// keeps it whole.
+function besideOf(file) {
+  const name = path.basename(file);
+  const bare = /\.odrgx?$/i.test(name) ? name.replace(/\.odrgx?$/i, "") : name;
+  return path.join(path.dirname(file), `${bare}.gif`);
+}
+
 function oneSpaced(text) {
   return text.split(/\s+/).filter((word) => word !== "").join(" ");
 }
 
 // Adds the previews of the files to the preview catalog of a folder, and writes the mapping
-// anew. A file that is refused is passed over, with one line on standard error.
+// anew. A file that is refused is passed over, with one line on standard error. With
+// `beside`, each file not passed over then gets a copy of its preview beside it, in the
+// order the files are given.
 function intoCatalog(values, streams) {
   const folder = values.catalog;
   try {
@@ -102,6 +113,7 @@ function intoCatalog(values, streams) {
   }
   const where = path.join(folder, CATALOG);
   const mapping = fs.existsSync(where) ? parseCatalog(fs.readFileSync(where, "utf8"), where) : new Map();
+  const taken = [];
   for (const file of values.files) {
     try {
       const data = files.read(file);
@@ -114,6 +126,7 @@ function intoCatalog(values, streams) {
         mapping.set(key, entry);
       }
       entry.names.add(nameOf(file, values.card));
+      taken.push([file, key]);
     } catch (error) {
       if (!(error instanceof errors.Rejection) || error.reason === errors.CANNOT_WRITE) {
         throw error;
@@ -122,6 +135,11 @@ function intoCatalog(values, streams) {
     }
   }
   files.write(where, bytesOf(formatCatalog(mapping)));
+  if (values.beside) {
+    for (const [file, key] of taken) {
+      files.write(besideOf(file), fs.readFileSync(path.join(folder, mapping.get(key).gif)));
+    }
+  }
 }
 
 export function thumbnail(values, streams) {

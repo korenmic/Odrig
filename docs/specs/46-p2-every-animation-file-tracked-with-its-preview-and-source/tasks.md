@@ -37,7 +37,7 @@ Rules for every task:
   - Suites: onboarding.
   - Requirements: 1.1, 1.2, 8.4 (the records)
 
-- [ ] 2. The converter's `--beside`
+- [x] 2. The converter's `--beside`
   - `converter/cli/arguments.js` and `converter/cli/thumbnail.js` as the design says;
     `docs/converter.md`: the usage line, the paragraph and an example.
   - `converter/tests/thumbnailtool.test.js`: `--beside` writes `X.gif` equal to the
