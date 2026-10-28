@@ -1907,16 +1907,17 @@ void kept_page(const Core &core, uint32_t page, uint16_t *count, uint32_t *crc) 
     }
 }
 
-// The phases of a rebuild of the drive's catalog, docs/catalog.md, "The rebuild of a drive's
-// catalog": the scan of the listed files, the pages, the draft of the table, the folders'
-// files, the map, the table and the commit.
+// The phases of a rebuild of the drive's catalog, docs/catalog.md, "A drive's index in a
+// change": the scan of the listed files, the check of the old index, the pages, the draft of
+// the table, the folders' files, the map, the table and the commit.
 const uint8_t kScanPhase = 0;
-const uint8_t kPagesPhase = 1;
-const uint8_t kDraftPhase = 2;
-const uint8_t kFoldersPhase = 3;
-const uint8_t kMapPhase = 4;
-const uint8_t kTablePhase = 5;
-const uint8_t kCommitPhase = 6;
+const uint8_t kSoundPhase = 1;
+const uint8_t kPagesPhase = 2;
+const uint8_t kDraftPhase = 3;
+const uint8_t kFoldersPhase = 4;
+const uint8_t kMapPhase = 5;
+const uint8_t kTablePhase = 6;
+const uint8_t kCommitPhase = 7;
 
 // The most lines of its files a phase of a drive's rebuild takes in one step.
 const uint32_t kPassLines = 8;
@@ -2180,6 +2181,264 @@ bool draft_files(Core &core, uint32_t ordinal, uint32_t first, uint32_t *files) 
     return true;
 }
 
+// The path of line `number` of the scan's file, in the cursor's room, its length and whether
+// its file passed. False when the line is not in its form.
+bool scan_path(Core &core, uint32_t number, const char **path, uint32_t *length, bool *passed) {
+    ScanLine line;
+    if (!scan_line(core, number, line)) {
+        return false;
+    }
+    *passed = line.passed;
+    if (line.passed) {
+        *path = line.entry.name;
+        *length = line.entry.name_length;
+        return true;
+    }
+    // `00000000 0 0 0 0 frames <path>`.
+    uint32_t spaces = 0;
+    uint32_t at = 0;
+    while (at < line.length && spaces < 6) {
+        spaces += line.text[at++] == ' ' ? 1 : 0;
+    }
+    *path = line.text + at;
+    *length = line.length - at;
+    return spaces == 6 && *length != 0;
+}
+
+// Whether a path comes before another in the listing's order: a folder's files by the bytes
+// of their names, then its sub-folders by the bytes of their names, each the same way.
+bool listed_before(const char *a, uint32_t a_length, const char *b, uint32_t b_length) {
+    uint32_t at = 0;
+    while (at < a_length && at < b_length && a[at] == b[at]) {
+        ++at;
+    }
+    bool a_file = true;
+    for (uint32_t look = at; look < a_length; ++look) {
+        a_file = a_file && a[look] != '/';
+    }
+    bool b_file = true;
+    for (uint32_t look = at; look < b_length; ++look) {
+        b_file = b_file && b[look] != '/';
+    }
+    if (a_file != b_file) {
+        return a_file;
+    }
+    const uint32_t byte_a = at < a_length && a[at] != '/' ? static_cast<uint8_t>(a[at]) + 1u : 0;
+    const uint32_t byte_b = at < b_length && b[at] != '/' ? static_cast<uint8_t>(b[at]) + 1u : 0;
+    return byte_a < byte_b;
+}
+
+// The line of the scan's file of a path, found by binary search in the listing's order, and
+// whether its file passed; kNothing when no line has it.
+ODRIG_NOINLINE uint32_t scan_find(Core &core, const char *name, uint32_t length, bool *passed) {
+    char wanted[kDrivePathRoom];
+    if (length >= kDrivePathRoom) {
+        return kNothing;
+    }
+    memcpy(wanted, name, length);
+    uint32_t low = 0;
+    uint32_t high = core.index->scan_lines;
+    while (low < high) {
+        const uint32_t middle = low + (high - low) / 2;
+        const char *path = nullptr;
+        uint32_t path_length = 0;
+        bool found_passed = false;
+        if (!scan_path(core, middle, &path, &path_length, &found_passed)) {
+            return kNothing;
+        }
+        if (path_length == length && memcmp(path, wanted, length) == 0) {
+            *passed = found_passed;
+            return middle;
+        }
+        if (listed_before(path, path_length, wanted, length)) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+    return kNothing;
+}
+
+// Whether a name has a line on its page of the drive's old catalog, which a rebuild leaves in
+// place until its commit.
+ODRIG_NOINLINE bool on_old_page(Core &core, const char *name, uint32_t length) {
+    const uint32_t page = catalog_page_of(name, length);
+    const Place place = {kExternal, true};
+    if (open_for(core, place, kPageNames[kExternal][page]) != kNone) {
+        return false;
+    }
+    LineReader reader;
+    char line[kCatalogLineRoom];
+    bool found = false;
+    while (!found && reader.next(core.checker->file, line, sizeof line) == kLineGot) {
+        EntryLine entry;
+        found = !reader.over && parse_entry(line, reader.length, page, entry) && entry.name_length == length && memcmp(entry.name, name, length) == 0;
+    }
+    core.checker->file.close();
+    return found;
+}
+
+// Whether a page of the old catalog is sound: its lines in their form and on it, as many and
+// of the CRC-32 the marker gives.
+ODRIG_NOINLINE bool page_sound(Core &core, uint32_t page, const Marker &marker) {
+    const Place place = {kExternal, true};
+    if (open_for(core, place, kPageNames[kExternal][page]) != kNone) {
+        return false;
+    }
+    LineReader reader;
+    char line[kCatalogLineRoom];
+    uint32_t lines = 0;
+    bool sound = true;
+    LineRead read;
+    while ((read = reader.next(core.checker->file, line, sizeof line)) == kLineGot) {
+        EntryLine entry;
+        sound = sound && !reader.over && !reader.unended && parse_entry(line, reader.length, page, entry);
+        ++lines;
+    }
+    core.checker->file.close();
+    return sound && read == kLineEnd && lines == marker.counts[page] && crc_value(reader.crc) == marker.crcs[page];
+}
+
+// Whether a file of the old index of lines of `width` bytes is sound: of `lines` lines when
+// they are given, kNothing for any whole number of them, and of the CRC-32 `crc`, 0 for a file
+// without a line; each line in the form `form` takes. Gives its lines.
+template <typename Form>
+bool index_file_sound(Core &core, const char *name, uint32_t width, uint32_t lines, uint32_t crc, uint32_t *count, Form form) {
+    uint32_t sum = kCrcStart;
+    uint32_t bytes = 0;
+    for (;;) {
+        const int32_t got = core.host.read_at(core.host.ctx, name, bytes, core.chunk, kFileBufferSize);
+        if (got < 0) {
+            if (bytes != 0) {
+                return false;
+            }
+            break;
+        }
+        if (got == 0) {
+            break;
+        }
+        for (int32_t at = 0; at < got; ++at) {
+            sum = crc_add(sum, core.chunk[at]);
+        }
+        bytes += static_cast<uint32_t>(got);
+    }
+    *count = bytes / width;
+    if (bytes % width != 0 || (lines != kNothing && *count != lines) || (bytes == 0 ? 0u : crc_value(sum)) != crc) {
+        return false;
+    }
+    for (uint32_t number = 0; number < *count; ++number) {
+        uint32_t length = 0;
+        const char *text = index_line(core, name, width, number, &length);
+        if (text == nullptr || !form(text, length, number)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The check of the old index, one of its files at each step: the marker of version 2, whole;
+// each page with lines, its lines in their form, as many and of the CRC-32 the marker gives;
+// the table and the map, of the lines and the CRC-32s the marker gives, each line in its
+// form; each folder's file, of the CRC-32 its line of the table gives, each row in its form.
+// A rebuild keeps the rows' order of an old index that is sound.
+ODRIG_NOINLINE void sound_step(Core &core) {
+    DriveIndex &cursor = *core.index;
+    const uint32_t at = cursor.rebuild_ordinal;
+    const Place place = {kExternal, true};
+    Marker marker = {};
+    bool sound = read_marker_of(core, place, kMarkerNames[kExternal], marker) == kCatalogOk;
+    bool done = !sound;
+    uint32_t count = 0;
+    if (sound && at < kCatalogPages) {
+        sound = marker.counts[at] == 0 || page_sound(core, at, marker);
+    } else if (sound && at == kCatalogPages) {
+        sound = index_file_sound(core, kIndexTable, kIndexRow, marker.folders, marker.folders_crc, &count, [](const char *text, uint32_t length, uint32_t number) {
+            IndexFolder folder;
+            uint32_t path_at = 0;
+            uint32_t path_length = 0;
+            return index_parse_folder(text, length, number, folder, &path_at, &path_length);
+        });
+    } else if (sound && at == kCatalogPages + 1) {
+        sound = index_file_sound(core, kIndexMap, kIndexIdRow, marker.ids, marker.ids_crc, &count, [](const char *text, uint32_t length, uint32_t) {
+            uint32_t id = 0;
+            uint8_t kind = 0;
+            uint32_t ordinal = 0;
+            uint32_t row = 0;
+            return index_parse_id(text, length, &id, &kind, &ordinal, &row);
+        });
+    } else if (sound) {
+        const uint32_t ordinal = at - kCatalogPages - 2;
+        if (ordinal >= marker.folders) {
+            done = true;
+            cursor.old_folders = marker.folders;
+        } else {
+            uint32_t length = 0;
+            const char *text = index_line(core, kIndexTable, kIndexRow, ordinal, &length);
+            IndexFolder folder;
+            uint32_t path_at = 0;
+            uint32_t path_length = 0;
+            sound = text != nullptr && index_parse_folder(text, length, ordinal, folder, &path_at, &path_length);
+            if (sound && folder.crc != 0) {
+                char name[kIndexNameRoom];
+                index_folder_name(folder.id, false, name);
+                sound = index_file_sound(core, name, kIndexRow, kNothing, folder.crc, &count, [](const char *row_text, uint32_t row_length, uint32_t) {
+                    DriveRow row;
+                    return index_parse_row(row_text, row_length, row);
+                });
+            }
+        }
+    }
+    if (!sound || done) {
+        if (!sound) {
+            cursor.old_folders = 0;
+        }
+        cursor.rebuild_phase = kPagesPhase;
+        cursor.rebuild_at = 0;
+        core.rebuild_page = 0;
+        index_forget(core);
+        return;
+    }
+    ++cursor.rebuild_ordinal;
+}
+
+// The ordinal of the old table's folder of a path, and its line: kNothing for none. The
+// search begins where the last one found its folder, the tables being in the same order.
+ODRIG_NOINLINE uint32_t old_folder_of(Core &core, const char *path, uint32_t path_length, IndexFolder &found) {
+    DriveIndex &cursor = *core.index;
+    char wanted[kDrivePathRoom];
+    if (path_length >= kDrivePathRoom) {
+        return kNothing;
+    }
+    memcpy(wanted, path, path_length);
+    for (uint32_t step = 0; step < cursor.old_folders; ++step) {
+        const uint32_t ordinal = (cursor.old_search + step) % cursor.old_folders;
+        uint32_t length = 0;
+        const char *text = index_line(core, kIndexTable, kIndexRow, ordinal, &length);
+        uint32_t path_at = 0;
+        uint32_t found_length = 0;
+        if (text == nullptr || !index_parse_folder(text, length, ordinal, found, &path_at, &found_length)) {
+            return kNothing;
+        }
+        if (found_length == path_length && memcmp(text + path_at, wanted, path_length) == 0) {
+            cursor.old_search = ordinal + 1;
+            return ordinal;
+        }
+    }
+    return kNothing;
+}
+
+// Puts the row of a file of the scan's file, with its id, into the chunk buffer.
+bool put_scan_row(Core &core, uint32_t number, uint32_t id, uint32_t *length) {
+    ScanLine line;
+    if (!scan_line(core, number, line) || !line.passed) {
+        return false;
+    }
+    put_number(core, length, id);
+    put(core, length, " f ");
+    put_bytes(core.chunk, length, line.text, line.length);
+    return true;
+}
+
 // The scan: each listed file is checked with the check's steps and gets its line in the
 // scan's file, `1` and its entry for a file that passed, `0` and zeros for another. A file
 // of the table of a drive without a catalog joins the playlist, or is left out, at once.
@@ -2191,9 +2450,10 @@ ODRIG_NOINLINE void scan_step(Core &core) {
             rebuild_failed(core);
             return;
         }
-        cursor.rebuild_phase = kPagesPhase;
-        cursor.rebuild_at = 0;
-        core.rebuild_page = 0;
+        cursor.rebuild_phase = kSoundPhase;
+        cursor.rebuild_ordinal = 0;
+        cursor.old_folders = 0;
+        cursor.old_search = 1;
         return;
     }
     // The file is read as the place of the listing, `drive/<place>`, and named by its path.
@@ -2416,8 +2676,93 @@ ODRIG_NOINLINE void draft_step(Core &core) {
     }
 }
 
-// The folders' files: for each folder of the draft, its files' rows, the next of the scan's
-// files that passed with the next ids of the walk, then a row for each of its sub-folders.
+// The rows of the old index's file of the folder of the draft at an ordinal, of the files
+// that passed, in their order, at the next ids of the walk; then its own files that passed
+// that the old pages have no line for, in the listing's order. A folder without an old file,
+// and every folder of a drive whose old index is not sound, takes its files in the listing's
+// order. Steps 0 to 2 of the folder.
+ODRIG_NOINLINE bool folder_rows(Core &core, const DraftLine &folder, uint32_t files, const char *fresh, bool *ended) {
+    DriveIndex &cursor = *core.index;
+    *ended = false;
+    uint32_t length = 0;
+    // The folder's path, kept before the room is read again.
+    char path[kDrivePathRoom];
+    if (folder.path_length >= kDrivePathRoom) {
+        return false;
+    }
+    memcpy(path, folder.path, folder.path_length);
+    if (cursor.rebuild_step == 0) {
+        // The old folder of its path: its ordinal, own files and the next row to read.
+        IndexFolder old;
+        cursor.rebuild_end = cursor.old_folders != 0 ? old_folder_of(core, path, folder.path_length, old) : kNothing;
+        cursor.rebuild_folders = cursor.rebuild_end != kNothing ? old.files : 0;
+        cursor.rebuild_files = cursor.rebuild_end != kNothing ? old.id : 0;
+        cursor.rebuild_sum = 0;
+        cursor.rebuild_row = 0;
+        cursor.rebuild_step = 1;
+        return true;
+    }
+    if (cursor.rebuild_step == 1) {
+        if (cursor.rebuild_row >= cursor.rebuild_folders) {
+            cursor.rebuild_step = 2;
+            cursor.rebuild_row = 0;
+            return true;
+        }
+        char old_name[kIndexNameRoom];
+        index_folder_name(cursor.rebuild_files, false, old_name);
+        uint32_t line_length = 0;
+        const char *text = index_line(core, old_name, kIndexRow, cursor.rebuild_row++, &line_length);
+        DriveRow row;
+        if (text == nullptr || !index_parse_row(text, line_length, row) || row.kind != 'f') {
+            return false;
+        }
+        const uint32_t name_length = text_size(row.name);
+        uint32_t slash = name_length;
+        while (slash > 0 && row.name[slash - 1] != '/') {
+            --slash;
+        }
+        const uint32_t folder_length = slash == 0 ? 0 : slash - 1;
+        if (folder_length != folder.path_length || memcmp(row.name, path, folder_length) != 0) {
+            return true;
+        }
+        bool passed = false;
+        const uint32_t line = scan_find(core, row.name, name_length, &passed);
+        if (line == kNothing || !passed) {
+            return true;
+        }
+        if (!put_scan_row(core, line, kDriveFirstId + folder.first + cursor.rebuild_sum, &length)) {
+            return false;
+        }
+    } else {
+        // The folder's own files that passed, the next of the scan's: those without a line on
+        // the old pages are new.
+        if (cursor.rebuild_row >= files) {
+            *ended = true;
+            return cursor.rebuild_sum == files;
+        }
+        ScanLine line;
+        if (!scan_line(core, cursor.rebuild_at, line)) {
+            return false;
+        }
+        const uint32_t number = cursor.rebuild_at++;
+        if (!line.passed) {
+            return true;
+        }
+        ++cursor.rebuild_row;
+        if (cursor.rebuild_end != kNothing && on_old_page(core, line.entry.name, line.entry.name_length)) {
+            return true;
+        }
+        if (!put_scan_row(core, number, kDriveFirstId + folder.first + cursor.rebuild_sum, &length)) {
+            return false;
+        }
+    }
+    put_padding(core.chunk, &length, 0, kIndexRow);
+    ++cursor.rebuild_sum;
+    return rebuild_write(core, fresh, length);
+}
+
+// The folders' files: for each folder of the draft, its files' rows, then a row for each of
+// its sub-folders.
 ODRIG_NOINLINE void folders_step(Core &core) {
     DriveIndex &cursor = *core.index;
     const uint32_t ordinal = cursor.rebuild_ordinal;
@@ -2432,33 +2777,29 @@ ODRIG_NOINLINE void folders_step(Core &core) {
     index_folder_name(draft_id(cursor, ordinal), true, fresh);
     DraftLine folder;
     uint32_t files = 0;
-    if (!draft_line(core, ordinal, folder) || !draft_files(core, ordinal, folder.first, &files)) {
+    if (!draft_line(core, ordinal, folder) || !draft_files(core, ordinal, folder.first, &files) || !draft_line(core, ordinal, folder)) {
         rebuild_failed(core);
         return;
     }
     const uint32_t depth = folder.depth;
-    const uint32_t first = folder.first;
     for (uint32_t step = 0; step < kPassLines; ++step) {
         uint32_t length = 0;
-        if (cursor.rebuild_step == 0) {
-            if (cursor.rebuild_row >= files) {
-                cursor.rebuild_step = 1;
-                cursor.rebuild_row = ordinal + 1;
-                continue;
-            }
-            ScanLine line;
-            if (!scan_line(core, cursor.rebuild_at, line)) {
+        if (cursor.rebuild_step < 3) {
+            bool ended = false;
+            if (!folder_rows(core, folder, files, fresh, &ended)) {
                 rebuild_failed(core);
                 return;
             }
-            ++cursor.rebuild_at;
-            if (!line.passed) {
-                continue;
+            if (ended) {
+                cursor.rebuild_step = 3;
+                cursor.rebuild_row = ordinal + 1;
             }
-            put_number(core, &length, kDriveFirstId + first + cursor.rebuild_row);
-            put(core, &length, " f ");
-            put_bytes(core.chunk, &length, line.text, line.length);
-            ++cursor.rebuild_row;
+            // The draft's line is read again: the rows read the room.
+            if (!draft_line(core, ordinal, folder)) {
+                rebuild_failed(core);
+                return;
+            }
+            continue;
         } else {
             const uint32_t child = cursor.rebuild_row;
             DraftLine below;
@@ -2652,7 +2993,8 @@ ODRIG_NOINLINE bool commit_drive(Core &core) {
     const Place place = {kExternal, true};
     Marker marker = {};
     const uint8_t old = read_marker_of(core, place, kMarkerNames[kExternal], marker);
-    const uint32_t old_folders = old == kCatalogOk ? marker.folders : 0;
+    // The files of the old table's folders are removed only of an old index that is sound.
+    const uint32_t old_folders = cursor.old_folders;
     marker.generation = old == kCatalogOk ? next_generation(marker.generation) : 1;
     for (uint32_t page = 0; page < kCatalogPages; ++page) {
         kept_page(core, page, &marker.counts[page], &marker.crcs[page]);
@@ -2707,6 +3049,9 @@ void drive_rebuild_step(Core &core) {
     switch (core.index->rebuild_phase) {
     case kScanPhase:
         scan_step(core);
+        return;
+    case kSoundPhase:
+        sound_step(core);
         return;
     case kPagesPhase:
         pages_step(core);

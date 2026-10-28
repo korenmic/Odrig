@@ -164,7 +164,7 @@ Rules for every task:
   - Suites: library, core, emulator, app, onboarding.
   - Requirements: 3.2, 3.3, 5.2, 6.5
 
-- [ ] 6. A rebuild keeps the rows' order
+- [x] 6. A rebuild keeps the rows' order
   - `core/src/catalog.cpp`: the rebuild's folders' files begin with the old index's rows
     of the files still there, in their order, looked up in `rebuild.tmp`, and its new
     files are those the old pages have no line for; the removals of the old folders'

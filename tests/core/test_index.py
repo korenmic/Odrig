@@ -275,6 +275,33 @@ class TheRebuild(unittest.TestCase):
         self.assertEqual(sorted(name for name in left if name.startswith("index-6")), [f"index-{number}.txt" for number in range(60295, 60334)])
         self.assertEqual(replies(run)[-1]["items"][0]["file"], "t12/a/c0.odrg")
 
+    def test_a_rebuild_keeps_the_order_the_rows_were_moved_into(self):
+        # Rows moved in `night` and at the root; then a file of `night` removed, one added to
+        # it and one to the root, a folder added and one gone.
+        storage = catalog.MemoryStorage(card({**NIGHT, "gone/z.odrg": loop_of(2, 13)}), drive=True)
+        catalog.move(storage, "night/c.odrg", before="night/a.odrg")
+        catalog.move(storage, "sun.odrg", before="moon.odrg")
+        changed = {name: data for name, data in storage.files.items() if name not in ("night/b.odrg", "gone/z.odrg")}
+        changed.update({"night/aa.odrg": loop_of(2, 10), "new.odrg": loop_of(2, 11), "x/y.odrg": loop_of(2, 12)})
+        run, left = run_on_card(changed, until_rebuilt(20))
+        self.assertEqual(replies(run)[-1]["rebuild"], None)
+        expected = catalog.MemoryStorage(dict(changed), drive=True)
+        catalog.rebuild(expected, canvas=CANVAS)
+        self.assertEqual(left, expected.files)
+        rows = {folder.path: [entry.name for _, entry in folder.rows] for folder in index_of(left).folders}
+        self.assertEqual(rows, {"": ["sun.odrg", "moon.odrg", "new.odrg"], "night": ["night/c.odrg", "night/a.odrg", "night/aa.odrg"], "x": ["x/y.odrg"]})
+
+    def test_a_rebuild_of_a_card_whose_index_is_not_sound_takes_the_order_of_the_names(self):
+        storage = catalog.MemoryStorage(card(NIGHT), drive=True)
+        catalog.move(storage, "night/c.odrg", before="night/a.odrg")
+        changed = dict(storage.files)
+        changed["index-ids.txt"] = changed["index-ids.txt"][:-36]
+        run, left = run_on_card(changed, until_rebuilt(20))
+        expected = catalog.MemoryStorage(dict(changed), drive=True)
+        catalog.rebuild(expected, canvas=CANVAS)
+        self.assertEqual(left, expected.files)
+        self.assertEqual([entry.name for _, entry in index_of(left).folders[1].rows], ["night/a.odrg", "night/b.odrg", "night/c.odrg"])
+
     def test_a_cancelled_rebuild_leaves_nothing_of_it(self):
         for steps in (0, 5, 20, 60):
             with self.subTest(steps=steps):

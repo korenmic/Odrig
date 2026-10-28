@@ -250,7 +250,10 @@ the old pages have no line for, by the bytes of their names. They take the old i
 its marker is of version 2 and every page, the table, the map and each folder's file agree
 with their CRC-32s and each line is in its form; otherwise every folder's files are by the
 bytes of their names. The PC tool's `import` takes every animation file of the folder; the
-board's rebuild every file its host lists.
+board's rebuild every file its host lists. The board checks the old index as the PC tool
+does, a file at each step, before it writes the new one; it finds an old row's file in its
+scan by binary search in the listing's order, and looks a folder's other files up on their
+old pages, which stay in place until the commit.
 
 ## The writers
 

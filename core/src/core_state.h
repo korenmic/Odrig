@@ -345,7 +345,9 @@ struct DriveIndex {
     // which are the walk's, and the folders of the draft; the folder a phase is at, and its
     // row, sub-folder, offset or count; of the folder whose line of the table is made, its
     // end, sub-folders, own files and the running CRC-32 of its file; the lines and CRC-32s
-    // of the table and of the map once written.
+    // of the table and of the map once written; the lines of the old table when the old index
+    // is sound, so that its rows' order is kept, 0 otherwise; and where the next search of
+    // the old table begins.
     uint8_t rebuild_phase;
     uint8_t rebuild_step;
     uint32_t rebuild_at;
@@ -362,6 +364,8 @@ struct DriveIndex {
     uint32_t table_crc;
     uint32_t map_lines;
     uint32_t map_crc;
+    uint32_t old_folders;
+    uint32_t old_search;
 };
 
 // Everything the core knows. The host holds the one object; no part of the core keeps

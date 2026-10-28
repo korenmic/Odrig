@@ -656,9 +656,12 @@ its id, and asks the host for a name only when `list` writes it or a log line ne
   with the check's steps, without a limit, then writes the drive's catalog and index anew,
   a few lines at each step, through two files of its own that no reader reads,
   `rebuild.tmp` and `rebuild-folders.tmp`: the scan, a line for each listed file; the
-  pages, one pass over the scan for each; the draft of the table, a line for each folder
-  that begins at a file that passed; the folders' files, the files' rows in the order of
-  their names with the walk's ids and then the sub-folders' rows; the map; the table, each
+  check of the old index, a file at each step; the pages, one pass over the scan for each;
+  the draft of the table, a line for each folder that begins at a file that passed; the
+  folders' files, each with the rows of its old file of the files that passed, in their
+  order, then its other files that passed, those the old pages have no line for, in the
+  order of their names, with the walk's ids, and then the sub-folders' rows; the map; the
+  table, each
   line with the CRC-32 of its folder's file, read again whole; and the commit, whose record
   also removes the files of the old table's folders whose ids the new one has not. An
   indexed drive plays from its old index meanwhile; a listed drive's places are dropped,
@@ -909,12 +912,12 @@ of the check and the saved order: 77,657 bytes for the target file. A host with 
 is asked for three blocks more, after the three of the check: the table of a drive
 without a catalog, 12 bytes for each of 256 places, 3,072 bytes; the boot's memory of 16
 files of drives left out, 40 bytes each, 640 bytes; and the cursor over a drive's index,
-964 bytes: the room of 512 for one read with the name of its file, the two rows read of
+972 bytes: the room of 512 for one read with the name of its file, the two rows read of
 160 bytes each, the counts of the index, the folder of the last row and a rebuild's
-state. The block of the saved order holds after the keys the tree of the drive's folders,
+state, with the lines of the old table it keeps the rows' order of. The block of the saved order holds after the keys the tree of the drive's folders,
 a table of 33 records of 8 bytes and 104 bytes of room for the current playlist's path,
 368, and the saved repeats of 32 of the drive's files, 8 bytes each, 256. With it
-the target file takes 130,753 bytes, 99 percent. The size and the number of frames
+the target file takes 130,761 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
