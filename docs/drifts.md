@@ -11967,3 +11967,20 @@ has more than 256 files without a catalog, so its last files are passed over; th
 come early in the walk and all 113 play.
 
 **Resolution.** `docs/microsd.md`, `agent/vocabulary.md` (`clock break`).
+
+## The tests that failed on Windows only
+
+**Question.** A test needs a file or a folder whose name Windows forbids or changes; the
+sweep of a run cannot see a process's environment on Windows. What do they do there?
+
+**Answer.** A test keeps its case on every system that allows the name. On Windows it uses
+a name Windows allows when the behaviour does not hang on the forbidden character, as the
+readiness test's drive file, and leaves the one case out with its reason when it does: the
+folder `bad.` on disk, and the quoted name in the thumbnail catalog. On Windows the runner
+puts its workers in a job object and ends what is still in it after them; `--sweep`
+there finds only the emulators of temporary and preview folders, as without a runner.
+
+**Resolution.** `tests/run.py`, `tests/runner/test_runner.py`,
+`tests/core/test_readiness.py`, `tests/emulator/test_drive.py`,
+`tests/emulator/test_events.py`, `tests/converter/test_catalog_types.py`,
+`converter/tests/thumbnailtool.test.js`; `agent/working-rules.md`.
