@@ -334,19 +334,20 @@ class TheToolchain(unittest.TestCase):
         self.assertIn("toolchain.json has no jdk for plan9-mips", detail)
         self.assertRegex(toolchain.system(), r"\A[a-z0-9]+-[a-z0-9_]+\Z")
 
-    def test_the_environment_of_a_child_keeps_everything_in_the_work_folder(self):
+    def test_the_environment_of_a_child_keeps_everything_in_the_shared_toolchains(self):
         home = self.work / "jdk" / "Home"
         made = env.child(home, caller={"PATH": os.pathsep.join(("/usr/bin", "/bin")), "HOME": "/Users/somebody", "ANDROID_SDK_ROOT": "/elsewhere", "KEPT": "1"})
-        work = str(paths.WORK)
+        work = str(paths.SHARED)
         self.assertEqual(paths.WORK, support.ROOT / "build" / "app")
+        self.assertEqual(paths.SHARED, paths.tools_folder() / "app")
         for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache"):
             self.assertTrue(made[name].startswith(work + os.sep), name)
         self.assertEqual(len({made[name] for name in ("ANDROID_HOME", "ANDROID_USER_HOME", "GRADLE_USER_HOME", "npm_config_cache")}), 4)
         self.assertEqual((made["JAVA_HOME"], made["PATH"]), (str(home), os.pathsep.join((os.path.join(str(home), "bin"), "/usr/bin", "/bin"))))
         self.assertEqual((made["npm_config_update_notifier"], made["HOME"], made["KEPT"]), ("false", "/Users/somebody", "1"))
         self.assertNotIn("ANDROID_SDK_ROOT", made)
-        # Capacitor's command line gets the work folder's own folder as the user's.
-        self.assertEqual(env.child(home, home=True, caller={"HOME": "/Users/somebody"})["HOME"], str(paths.WORK / "home"))
+        # Capacitor's command line gets the toolchains' own folder as the user's.
+        self.assertEqual(env.child(home, home=True, caller={"HOME": "/Users/somebody"})["HOME"], str(paths.SHARED / "home"))
         self.assertNotIn("JAVA_HOME", env.child(caller={"PATH": "/usr/bin"}))
 
     def test_gradle_leaves_nothing_running_and_keeps_its_settings_in_the_work_folder(self):

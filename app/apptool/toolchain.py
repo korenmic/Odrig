@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 import zipfile
 
-from . import Failure, env, paths
+from . import Failure, env, paths, setuplock
 
 OLDEST_NODE = 22
 PIECE = 1 << 20
@@ -163,26 +163,43 @@ def _sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _record(path):
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
+def _write_record(path, members):
+    """Writes members into a setup record, keeping the others it has."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(dict(_record(path), **members), indent=2) + "\n", encoding="utf-8")
+
+
 def setup(out=sys.stdout):
-    """Puts everything a build needs into `app/node_modules/` and the work folder. A step
-    whose result is there is skipped."""
+    """Puts everything a build needs into `app/node_modules/`, the work folder and the shared
+    toolchains. A step whose result is there is skipped, and a setup waits for another one
+    that runs from another checkout."""
     node_version()
     listed = read()
-    wanted = {"package-lock": _sha256(paths.LOCK), "toolchain": _sha256(paths.TOOLCHAIN)}
-    recorded = json.loads(paths.SETUP_RECORD.read_text(encoding="utf-8")) if paths.SETUP_RECORD.is_file() else {}
+    with setuplock.held(paths.SETUP_LOCK, waiting=lambda: print(f"waiting for another setup, which holds {paths.SETUP_LOCK}", file=out)):
+        return _setup(listed, out)
+
+
+def _setup(listed, out):
+    lock, toolchain = _sha256(paths.LOCK), _sha256(paths.TOOLCHAIN)
     paths.WORK.mkdir(parents=True, exist_ok=True)
 
-    if recorded.get("package-lock") != wanted["package-lock"] or not paths.CAPACITOR.is_file():
+    if _record(paths.SETUP_RECORD).get("package-lock") != lock or not paths.CAPACITOR.is_file():
         _run("npm ci", ["npm", "ci", "--prefix", str(paths.APP)], env=env.child())
+    _write_record(paths.SETUP_RECORD, {"package-lock": lock})
 
+    current = _record(paths.SHARED_RECORD).get("toolchain") == toolchain
     home = java_home()
-    if recorded.get("toolchain") != wanted["toolchain"] or home is None:
+    if not current or home is None:
         home = unpacked_jdk(fetched(archive_of(listed, "jdk")))
     print(_run("java -version", [str(home / "bin" / "java"), "-version"]).stderr.splitlines()[0], file=out)
 
-    if recorded.get("toolchain") != wanted["toolchain"] or not paths.SDK_MANAGER.is_file():
+    if not current or not paths.SDK_MANAGER.is_file():
         unpacked_tools(fetched(archive_of(listed, "command-line-tools")))
     sdk_packages(listed, home)
 
-    paths.SETUP_RECORD.write_text(json.dumps(wanted, indent=2) + "\n", encoding="utf-8")
+    _write_record(paths.SHARED_RECORD, {"toolchain": toolchain})
     return home

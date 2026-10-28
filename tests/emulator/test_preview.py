@@ -100,12 +100,13 @@ def previews_left():
 class OneAnimation(unittest.TestCase):
     def setUp(self):
         self.work = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
-        self.before = previews_left()
+        self.started = []
 
     def preview(self, *arguments, **settings):
         """A preview that is stopped at the end of the test, whatever happens in it."""
         started = Preview(*arguments, **settings)
         self.addCleanup(started.close)
+        self.started.append(str(started.process.pid))
         return started
 
     def without_the_port_line(self, err):
@@ -130,9 +131,9 @@ class OneAnimation(unittest.TestCase):
     def assert_nothing_left(self, page=None):
         if page is not None:
             self.assertFalse(listening(page), "the emulator still listens")
-        # Nothing of its own is left; a folder left before by a preview that was killed may
-        # have gone meanwhile, since a preview removes those at its start.
-        self.assertLessEqual(set(previews_left()), set(self.before))
+        # The work folders of this test's previews are gone. Those of other previews, of tests
+        # that run at the same time, may come and go meanwhile.
+        self.assertEqual(set(previews_left()) & set(self.started), set())
 
     def test_a_file_plays_alone_until_the_preview_is_interrupted(self):
         data = core_support.example_show()["hello.odrg"]
