@@ -116,6 +116,10 @@ class ShowFolders(Temporary):
         (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 2\n")
         self.assertEqual(storage.folder_files(self.show)["order.txt"], b"odrig-order 1\ni 2\n")
 
+    def test_the_saved_repeats_are_a_file_of_the_show(self):
+        (self.show / "repeats.txt").write_bytes(b"odrig-repeats 1\n5 f hello.odrg\n")
+        self.assertEqual(storage.folder_files(self.show)["repeats.txt"], b"odrig-repeats 1\n5 f hello.odrg\n")
+
     def test_a_folder_without_its_mapping_is_refused_with_the_converters_reason(self):
         (self.show / "mapping.json").unlink()
         self.assertEqual(self.reason(), "mapping-missing")
@@ -251,6 +255,29 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"playlist.txt": playlist}))
         self.assertIn("show: kept 1 files\n", result.out)
+
+    def test_the_boards_saved_repeats_are_kept_for_a_folder_without_them(self):
+        repeats = b"odrig-repeats 1\n5 f hello.odrg\n3 x night/comet.odrg\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/repeats.txt": repeats}))
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"repeats.txt": repeats}))
+        self.assertIn("show: kept 1 files\n", result.out)
+        (self.show / "repeats.txt").write_bytes(b"odrig-repeats 1\n2 f hello.odrg\n")
+        esptool = self.esptool()
+        self.install(esptool)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool))["repeats.txt"], b"odrig-repeats 1\n2 f hello.odrg\n")
+
+    def test_read_show_copies_the_saved_repeats_with_the_files_of_the_show(self):
+        repeats = b"odrig-repeats 1\n5 f hello.odrg\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/repeats.txt": repeats}))
+        esptool = self.esptool()
+        self.install(esptool)
+        with support.no_board(self.esptool(self.on_the_board(esptool), failing_verifies=1)):
+            result = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(result.status, 0, result.err)
+        self.assertEqual(support.files_of(self.folder / "copy"), dict(storage.folder_files(self.show), **{"repeats.txt": repeats}))
 
     def test_a_dry_run_says_what_would_change_and_writes_nothing(self):
         esptool = self.esptool()

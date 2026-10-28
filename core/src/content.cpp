@@ -494,9 +494,9 @@ bool content_write_show(Core &core, const ShowChange &change) {
             out.text(position == change.renamed ? change.name : core.files[item.first].name);
             out.byte('"');
             // What the show says of the animation's turn: its loops, and its longest time.
-            if (item.count != 0) {
+            if ((item.count & 0xFFFFu) != 0) {
                 out.text(",\"repeat\":");
-                out.number(item.count);
+                out.number(item.count & 0xFFFFu);
             }
             if (item.seconds != 0) {
                 out.text(",\"max_seconds\":");

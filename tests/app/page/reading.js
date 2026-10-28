@@ -77,14 +77,15 @@ export function state(app) {
   };
 }
 
-// The controls as the screen shows them: which of `On` and `Off` is marked, and where
-// the slider stands.
+// The controls as the screen shows them: which of `On` and `Off` is marked, where the
+// slider stands, and the text of the brightness field, or null while it is not shown.
 export function controls(app) {
+  const field = app.byId("level-number");
   return {
     on: app.byId("on").getAttribute("aria-pressed") === "true",
     off: app.byId("off").getAttribute("aria-pressed") === "true",
     slider: Number(app.byId("level").value),
-    number: app.text("level-number"),
+    number: field.getClientRects().length > 0 ? field.value : null,
   };
 }
 

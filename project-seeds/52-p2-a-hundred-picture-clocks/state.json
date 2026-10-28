@@ -6,5 +6,5 @@
   "priority": "P2",
   "addedAt": "2026-10-28T01:34:35+02:00",
   "addedCommit": "pending-local",
-  "summary": "The owner's picture of 100 timekeepers becomes 100 files of 60 x 60 and at most 8 colours: two new widgets, a picture dial and a picture display, draw hands or digits over an erased base picture, ticking at random speeds and in random directions; the tiles that show no time become frames animations."
+  "summary": "The owner's picture of 100 timekeepers becomes 100 files of 60 x 60 and at most 8 colours: two new widgets, a picture dial and a picture display, draw hands or digits over an erased base picture, ticking at random speeds and in random directions; the tiles that show no time become frames animations. Twelve more, the six demos of the owner's conversation and six of a standalone page, become frames animations rendered from their own scripts; references beside the seed."
 }

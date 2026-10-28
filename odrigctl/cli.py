@@ -30,6 +30,7 @@ COMMANDS = {
     "ignore": ("ID", "VALUE"),
     "mapping": ("OPERATION",),
     "order": ("OPERATION",),
+    "repeat": ("ID", "N", "[save]"),
     "upload": ("ID", "FILE"),
 }
 # What an upload came to, beside its reply: a reply that does not report success leaves the
@@ -65,7 +66,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -75,7 +76,7 @@ def parser():
     made.add_argument("--log", action="store_true", help="print each line of the target's log as it arrives, until stopped, and send nothing; with --port or --tcp, and no command")
     made.add_argument("--external", action="store_true", help="with upload: send the FILE to the target's drive, which takes no ID")
     made.add_argument("command", metavar="COMMAND", nargs="?", choices=list(COMMANDS), help=", ".join(COMMANDS))
-    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, the ID and the FILE of upload, the FILE of upload --external")
+    made.add_argument("arguments", metavar="ARGUMENT", nargs="*", help="the ID of play and of remove, the word all of play, the N of brightness, the ID and the N of repeat with save after them or default in the place of N, the ID and the OFFSET of read, rebuild internal, rebuild external or cancel of catalog, the ID and the FILE of upload, the FILE of upload --external")
     return made
 
 
@@ -116,6 +117,13 @@ def checked(made, arguments):
             len(words) == 3 and words[:2] == ["test", "snake"])
         if not valid:
             made.error("mapping takes get, set REV PINS, cross on|off, test on|off, or test snake N")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
+    if arguments.command == "repeat":
+        words = arguments.arguments
+        if not (len(words) == 2 or (len(words) == 3 and words[2] == "save")):
+            made.error("repeat takes ID N, ID N save, or ID default")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]

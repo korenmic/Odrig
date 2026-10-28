@@ -181,8 +181,9 @@ class TheCheckOfTheDrive(unittest.TestCase):
             drive, drive_blocks = support.start(files, options=["--drive", top]).memory
         # The drive's table of 256 places, the boot's memory of 16 files left out, and in
         # the block of the saved order a key, a hash and a folder byte for each place, the
-        # tree's table of 33 folders of 8 bytes and the room for the current playlist's path.
-        self.assertEqual((drive - without, drive_blocks - blocks), (3072 + 640 + 256 * 4 + 33 * 8 + 104, 2))
+        # tree's table of 33 folders of 8 bytes, the room for the current playlist's path and
+        # the saved repeats of 32 of its files.
+        self.assertEqual((drive - without, drive_blocks - blocks), (3072 + 640 + 256 * 4 + 33 * 8 + 104 + 32 * 4, 2))
         self.assertLess(drive, 131072)
         self.assertIn(f"the target file takes {drive:,} bytes", (support.ROOT / "docs" / "core.md").read_text(encoding="utf-8"))
 

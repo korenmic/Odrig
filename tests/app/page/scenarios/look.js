@@ -43,7 +43,14 @@ function measure(app) {
     const rect = element.getBoundingClientRect();
     return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom};
   };
-  const controls = [...doc.querySelectorAll("button, input, select, label.button")].filter(displayed).map((element) => ({
+  // A control that the panel staying at the top covers is not seen: the list scrolls under it.
+  const top = doc.getElementById("now-panel");
+  const topBox = top.getBoundingClientRect();
+  const covered = (element) => {
+    const at = element.getBoundingClientRect();
+    return top.classList.contains("frozen") && !top.contains(element) && at.top < topBox.bottom && at.bottom > topBox.top;
+  };
+  const controls = [...doc.querySelectorAll("button, input, select, label.button")].filter((element) => displayed(element) && !covered(element)).map((element) => ({
     what: element.id || element.getAttribute("aria-label") || element.textContent.trim(),
     group: element.closest("nav") !== null ? "nav" : element.closest("#message") !== null ? "message" : element.closest("#confirm") !== null ? "question" :
       element.closest("#row-menu") !== null ? "menu" : "screen",
@@ -59,7 +66,23 @@ function measure(app) {
   const message = doc.getElementById("message");
   const question = doc.getElementById("confirm");
   const menu = doc.getElementById("row-menu");
+  // The line of the brightness: its label, its field and the slider under them, with the
+  // inside of their panel.
+  const field = doc.getElementById("level-number");
+  const panel = doc.getElementById("now-panel");
+  const panelStyle = view.getComputedStyle(panel);
+  const panelBox = panel.getBoundingClientRect();
+  const level = displayed(field) ? {
+    label: box(doc.querySelector("#level-line label")),
+    field: box(field),
+    slider: box(doc.getElementById("level")),
+    left: panelBox.left + parseFloat(panelStyle.borderLeftWidth) + parseFloat(panelStyle.paddingLeft),
+    right: panelBox.right - parseFloat(panelStyle.borderRightWidth) - parseFloat(panelStyle.paddingRight),
+    digits: view.getComputedStyle(field).fontVariantNumeric,
+    letters: parseFloat(view.getComputedStyle(field).fontSize),
+  } : null;
   return {
+    level,
     controls,
     texts,
     width: view.innerWidth,
@@ -80,7 +103,7 @@ export default async function (app) {
   await app.until(() => spaceKnown(app) && storage(app).rows.length === app.settings.rows, "the list with its rows and the space");
   const animations = measure(app);
   // Selection mode, with the note of the ignored row under its name inside Play.
-  app.press("Select");
+  app.pressIn("#list-head", "Select");
   await app.until(() => app.doc.querySelectorAll("#animations-list .pick").length > 0, "selection mode");
   const selecting = measure(app);
   app.press("Done");

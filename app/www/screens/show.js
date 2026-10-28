@@ -17,6 +17,9 @@ import * as tests from "./tests.js";
 const BRIGHTNESS_EVERY_MS = 200;
 // How long after a brightness command a status does not move the slider.
 const SLIDER_RESTS_MS = 1000;
+// The brightness the field takes, and what it says of another value.
+const MOST_BRIGHTNESS = 255;
+const BRIGHTNESS_RANGE = "The brightness is 0 to 255.";
 
 // Whether the operator holds the slider, the value and the time of the newest brightness
 // command, and the timer of one that waits for its time.
@@ -24,8 +27,28 @@ let held = false;
 let sentValue = null;
 let sentAt = -Infinity;
 let waiting = null;
+// The value in force: the brightness this phone last wrote into the field, by the slider,
+// by a value sent from the field, or by following a status; null before the first.
+let inForce = null;
 // The inclusion changes under way, by id, each with the target it was sent to.
 const pending = new Map();
+// The bar of the animation playing now: the animation it shows and what the installation
+// reported of its turn when it was drawn, or null while it is hidden; the key of what it
+// shows, which it is built anew for; its line that is out, "repeat", "save" or "default",
+// or null; when its field last lost the focus; and the sentence that waits for the first
+// status after a reply, as `{count, say}`.
+let bar = null;
+let barKey = "";
+let barOut = null;
+let fieldLeftAt = -Infinity;
+let awaiting = null;
+// How long after its field lost the focus the bar keeps what it showed.
+const FIELD_RESTS_MS = 1000;
+// The loops a repeat may have.
+const MOST_REPEAT = 65535;
+// The room a whole row of the list takes: the panel stays at the top only while it is left
+// between the panel and the tabs.
+const ROW_ROOM = 80;
 // The row whose menu is open, and the button that opened it.
 let menuFor = null;
 let menuButton = null;
@@ -228,6 +251,246 @@ function drawNow(status, state) {
   const square = byId("now-thumb");
   square.hidden = shown === undefined;
   previews.show(square, shown === undefined ? null : previewOf(shown));
+  drawBar(state);
+}
+
+// The animation the bar is for: the one `status` names while a playlist turn plays it, the
+// root's or a folder's of the list, and the whole list holds it; else null.
+function barAnimation(state) {
+  const status = state.status;
+  if (status === null || status.error !== null || status.animation === null || state.animations === null) {
+    return null;
+  }
+  if (status.playing !== "all" && !state.folders.some((folder) => folder.id === status.playing)) {
+    return null;
+  }
+  return state.animations.find((animation) => animation.id === status.animation) ?? null;
+}
+
+// The words of an action on the bar: the first word of the menu's label, and the label in
+// full with the animation after its first word as its accessible name.
+function barWords(label, animation) {
+  const [first, ...rest] = label.split(" ");
+  return {short: first, named: [first, `${animation.id} ${animation.file}`, ...rest].join(" ")};
+}
+
+// The actions of the row menu that the bar has: every one but the moves.
+function barActions(animation) {
+  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down");
+}
+
+function barButton(label, named, act) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.setAttribute("aria-label", named);
+  button.addEventListener("click", act);
+  return button;
+}
+
+// Builds the bar for an animation: on its first line the row menu's actions but `Edit`, or
+// the line that says why it has none; on its second `Edit` when the menu has it, and
+// `Repeat this` with its field while the installation reports `repeat`; on a third, while
+// it reports `saved`, `Save` and `Restore default`.
+function buildBar(place, animation) {
+  const first = document.createElement("div");
+  first.className = "bar-line";
+  const second = document.createElement("div");
+  second.className = "bar-line";
+  const lines = [first, second];
+  for (const item of barActions(animation)) {
+    if (item.note !== undefined) {
+      const note = document.createElement("p");
+      note.className = "bar-note";
+      note.textContent = isExternal(animation) ? "External storage is read-only." : "This software allows no change.";
+      first.append(note);
+      continue;
+    }
+    const words = barWords(item.label, animation);
+    const act = item.label === "Select" ? () => selectFromBar(animation) : () => item.act();
+    const button = barButton(words.short, words.named, act);
+    button.dataset.label = item.label;
+    if (item.danger) button.classList.add("danger");
+    (item.label === "Edit" ? second : first).append(button);
+  }
+  const named = `${animation.id} ${animation.file}`;
+  if (bar.hasRepeat) {
+    const repeat = barButton("Repeat this", `Repeat ${named} this turn`, () => sendRepeat("repeat"));
+    repeat.id = "repeat-this";
+    const field = document.createElement("input");
+    field.id = "repeat-count";
+    field.type = "text";
+    field.inputMode = "numeric";
+    field.setAttribute("enterkeyhint", "done");
+    field.autocomplete = "off";
+    field.placeholder = "-";
+    field.setAttribute("aria-label", `Loops of ${named} this turn`);
+    field.addEventListener("input", () => {
+      const digits = field.value.replace(/[^0-9]/g, "");
+      if (digits !== field.value) field.value = digits;
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") sendRepeat("repeat");
+    });
+    second.append(repeat, field);
+  }
+  if (bar.hasSaved) {
+    const third = document.createElement("div");
+    third.className = "bar-line";
+    const save = barButton("Save", `Save the repeat of ${named} for every turn`, () => sendRepeat("save"));
+    save.id = "repeat-save";
+    const restore = barButton("Restore default", `Restore the default repeat of ${named}`, () => sendRepeat("default"));
+    restore.id = "repeat-default";
+    third.append(save, restore);
+    lines.push(third);
+  }
+  place.replaceChildren(...lines);
+}
+
+// Whether the bar keeps what it shows: while its field has the focus, within a second after
+// it lost it, and while a line of the bar is out.
+function barHeld() {
+  const field = document.getElementById("repeat-count");
+  return bar !== null && (barOut !== null || (field !== null && document.activeElement === field) || performance.now() - fieldLeftAt < FIELD_RESTS_MS);
+}
+
+// The text the field shows for the turn's loops: none while they are not known.
+function loopsText(repeat) {
+  return repeat === null ? "" : String(repeat);
+}
+
+// An element lost the focus: the time is noted when it is the bar's field.
+export function left(element) {
+  if (element instanceof Element && element.id === "repeat-count") {
+    fieldLeftAt = performance.now();
+  }
+}
+
+// Sends a line of the bar for the animation it shows: `repeat <id> <n>` with the field's
+// text, the same with `save`, or `repeat <id> default`. Then the app says what the next
+// status reports, or the refusal, or that no reply came.
+async function sendRepeat(kind) {
+  if (bar === null || barOut !== null || !answers() || selection.locked()) return;
+  const {animation} = bar;
+  const field = byId("repeat-count");
+  let loops = null;
+  if (kind === "default") {
+    field.value = loopsText(bar.repeat);
+  } else {
+    const digits = field.value.replace(/[^0-9]/g, "");
+    loops = Number(digits);
+    if (digits === "" || loops < 1 || loops > MOST_REPEAT) {
+      field.value = loopsText(bar.repeat);
+      message(messages.REPEAT_RANGE);
+      return;
+    }
+  }
+  const version = client.targetVersion();
+  barOut = kind;
+  draw(client.state);
+  try {
+    if (kind === "repeat") await client.repeat(animation.id, loops);
+    else if (kind === "save") await client.repeatSave(animation.id, loops);
+    else await client.repeatDefault(animation.id);
+    if (version !== client.targetVersion()) return;
+    awaiting = {count: client.state.statusCount, say: (status) => messages.ofRepeat(kind, animation, loops, status)};
+  } catch (error) {
+    if (version !== client.targetVersion()) return;
+    if (error instanceof Refusal) message(messages.ofRefusal(error));
+    else message(kind === "repeat" ? messages.REPEAT_NO_REPLY : messages.SAVED_NO_REPLY);
+  } finally {
+    if (version === client.targetVersion()) {
+      barOut = null;
+      // What was typed is sent: the field follows the status once it has not the focus.
+      fieldLeftAt = -Infinity;
+      draw(client.state);
+    }
+  }
+}
+
+// Draws the bar: built anew when what it shows changes, its buttons' states at every draw.
+// While it is held it stays on what it showed, and its field is not rewritten.
+function drawBar(state) {
+  const place = byId("now-bar");
+  const held = barHeld();
+  if (!held) {
+    const animation = barAnimation(state);
+    const status = state.status;
+    bar = animation === null ? null : {animation, hasRepeat: status.hasRepeat, hasSaved: status.hasSaved, repeat: status.repeat, saved: status.saved};
+  }
+  place.hidden = bar === null;
+  if (bar === null) {
+    if (barKey !== "") place.replaceChildren();
+    barKey = "";
+    return;
+  }
+  const items = barActions(bar.animation);
+  const key = JSON.stringify([bar.animation.id, bar.animation.file, items.map((item) => [item.label, item.note]), bar.hasRepeat, bar.hasSaved]);
+  if (key !== barKey) {
+    buildBar(place, bar.animation);
+    barKey = key;
+  }
+  for (const button of place.querySelectorAll("button[data-label]")) {
+    const item = items.find((one) => one.label === button.dataset.label);
+    button.disabled = item === undefined || item.disabled === true;
+  }
+  const free = answers() && !selection.locked() && barOut === null;
+  const field = document.getElementById("repeat-count");
+  if (field !== null) {
+    byId("repeat-this").disabled = !free;
+    if (!held && field.value !== loopsText(bar.repeat)) field.value = loopsText(bar.repeat);
+  }
+  if (document.getElementById("repeat-save") !== null) {
+    byId("repeat-save").disabled = !free;
+    byId("repeat-default").disabled = !free || bar.saved === null;
+  }
+  if (awaiting !== null && state.statusCount > awaiting.count) {
+    const said = awaiting.say(state.status);
+    awaiting = null;
+    message(said);
+  }
+}
+
+// Turns the selection mode on with the bar's animation ticked, as the menu's Select does,
+// from the root, where every internal animation stands, with the filters showing it, and
+// scrolls its row to just below the panel.
+function selectFromBar(animation) {
+  opened = "";
+  filters.reveal(animation);
+  selection.enter(animation.id);
+  const row = byId("animations-list").querySelector(`:scope > .row[data-id="${animation.id}"]`);
+  if (row !== null) {
+    window.scrollTo(0, Math.max(0, row.getBoundingClientRect().top + window.scrollY - panelBottom() - 8));
+  }
+}
+
+// The height of the band that keeps the room of the phone's bar at the top.
+function bandHeight() {
+  return parseFloat(window.getComputedStyle(document.body, "::before").height) || 0;
+}
+
+// Where the screen's room for the list begins: under the panel while it stays at the top,
+// else under the band at the top of the screen.
+function panelBottom() {
+  const panel = byId("now-panel");
+  return panel.classList.contains("frozen") ? bandHeight() + panel.getBoundingClientRect().height : bandHeight();
+}
+
+// The panel stays at the top of the screen while Animations is shown, the keyboard is closed
+// and a whole row of the list fits between it and the tabs; a field brought into view stops
+// under it then.
+function freeze() {
+  const panel = byId("now-panel");
+  const nav = document.querySelector("nav");
+  const room = window.innerHeight - bandHeight() - panel.getBoundingClientRect().height - nav.getBoundingClientRect().height;
+  const frozen = visible && !document.body.classList.contains("typing") && room >= ROW_ROOM;
+  if (panel.classList.contains("frozen") !== frozen) {
+    panel.classList.toggle("frozen", frozen);
+  }
+  const padding = frozen ? `${bandHeight() + panel.getBoundingClientRect().height}px` : "";
+  if (document.documentElement.style.scrollPaddingTop !== padding) {
+    document.documentElement.style.scrollPaddingTop = padding;
+  }
 }
 
 // The animations in the order the list shows them: the saved order when another part of
@@ -423,10 +686,11 @@ function draw(state) {
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
     byId("off").setAttribute("aria-pressed", String(!status.on));
-    // A status does not move the slider while it is held, nor right after a command.
-    if (!held && performance.now() - sentAt >= SLIDER_RESTS_MS) {
+    // A status moves neither the slider nor the field while the slider is held, right
+    // after a command, while the field holds text not sent, or while it is typed into.
+    if (!held && performance.now() - sentAt >= SLIDER_RESTS_MS && !unsent() && !typingIn()) {
       byId("level").value = String(status.brightness);
-      byId("level-number").textContent = String(status.brightness);
+      writeLevel(status.brightness);
     }
   }
   const all = shownOrder(state);
@@ -462,6 +726,7 @@ function draw(state) {
   byId("animations-list").classList.toggle("stale", silent);
   say("silent", silent ? messages.ofSilence(Math.floor((Date.now() - (state.heardAt === null ? state.since : state.heardAt)) / 1000)) : null);
   say("silent-why", silent ? messages.ofFailure(state.failure) : null);
+  freeze();
 }
 
 // Sends an inclusion change and shows it as saving until the target has answered.
@@ -602,6 +867,57 @@ function sendLevel() {
   }
 }
 
+// Writes a brightness into the field, and makes it the value in force.
+function writeLevel(value) {
+  inForce = value;
+  byId("level-number").value = value === null ? "" : String(value);
+}
+
+// Whether the field holds text that differs from the value in force.
+function unsent() {
+  return byId("level-number").value !== (inForce === null ? "" : String(inForce));
+}
+
+// Whether the field is typed into: it has the focus while the phone's keyboard is open.
+function typingIn() {
+  return document.activeElement === byId("level-number") && document.body.classList.contains("typing");
+}
+
+// Shows the value in force in the field and on the slider, 0 on the slider while there is
+// none.
+function showInForce() {
+  writeLevel(inForce);
+  byId("level").value = String(inForce === null ? 0 : inForce);
+}
+
+// The field was entered or left with text not sent: a whole value from 0 to 255 that is
+// not the value in force is sent as letting go of the slider sends; anything else, and
+// anything while the app is hidden, sends nothing and shows the value in force.
+function commitLevel() {
+  const field = byId("level-number");
+  if (!unsent()) {
+    return;
+  }
+  const digits = field.value.replace(/[^0-9]/g, "");
+  const value = Number(digits);
+  if (document.hidden || digits === "" || value > MOST_BRIGHTNESS) {
+    say("level-range", !document.hidden && digits !== "" ? BRIGHTNESS_RANGE : null);
+    showInForce();
+    return;
+  }
+  say("level-range", null);
+  if (value === inForce) {
+    showInForce();
+    return;
+  }
+  byId("level").value = String(value);
+  writeLevel(value);
+  if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
+    sentValue = null;
+  }
+  sendLevel();
+}
+
 // Lets another part of the screen add actions to a row's menu, draw with the screen, or
 // give the order of the rows.
 export function extend({menu, draw: drawing, order}) {
@@ -617,6 +933,7 @@ export function redraw() {
 export function showing(shown) {
   visible = shown;
   if (!shown) closeMenu();
+  freeze();
 }
 
 export function isVisible() {
@@ -644,14 +961,23 @@ export function start(options) {
   });
   byId("level-back").addEventListener("click", () => enter(parentOf(opened)));
   const level = byId("level");
+  const field = byId("level-number");
   level.addEventListener("input", () => {
     held = true;
-    byId("level-number").textContent = level.value;
+    // The slider wins over text not sent: the text is dropped, and the field gives up the
+    // focus only after it holds the slider's value, so that leaving it sends nothing.
+    const dropped = unsent();
+    writeLevel(Number(level.value));
+    if (dropped && document.activeElement === field) {
+      field.blur();
+    }
+    say("level-range", null);
     sendLevel();
   });
   level.addEventListener("change", () => {
     held = false;
-    byId("level-number").textContent = level.value;
+    writeLevel(Number(level.value));
+    say("level-range", null);
     // The value at which the slider is let go is always sent: once more when it was
     // sent a while ago, because somebody else may have set another since.
     if (performance.now() - sentAt >= SLIDER_RESTS_MS) {
@@ -659,6 +985,24 @@ export function start(options) {
     }
     sendLevel();
   });
+  // The field takes digits only, and moves the slider to each whole value up to 255 as it
+  // is typed; it sends when it is entered or left.
+  field.addEventListener("input", () => {
+    const digits = field.value.replace(/[^0-9]/g, "");
+    if (digits !== field.value) {
+      field.value = digits;
+    }
+    say("level-range", null);
+    if (digits !== "" && Number(digits) <= MOST_BRIGHTNESS) {
+      level.value = String(Number(digits));
+    }
+  });
+  field.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      commitLevel();
+    }
+  });
+  field.addEventListener("change", commitLevel);
   // A press anywhere else closes the menu of a row, and so does Escape.
   document.addEventListener("click", (event) => {
     if (menuFor !== null && !byId("row-menu").contains(event.target)) {
@@ -673,6 +1017,7 @@ export function start(options) {
     }
   });
   window.addEventListener("resize", placeMenu);
+  window.addEventListener("resize", freeze);
   window.addEventListener("scroll", placeMenu);
   client.watch(draw);
   setInterval(() => {

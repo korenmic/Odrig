@@ -5,6 +5,7 @@
 #include "arena.h"
 #include "catalog.h"
 #include "crc32.h"
+#include "repeats.h"
 #include "storage.h"
 
 namespace odrig {
@@ -214,7 +215,8 @@ bool order_begin(Core &core) {
     // each place, the folder table and the room for the current playlist's path.
     const uint32_t places = core.drive != nullptr ? kDriveMost : 0;
     const uint32_t tree = places != 0 ? kFolderMost * sizeof(Folder) + kPlaylistPathRoom : 0;
-    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + places * 4 + tree));
+    const uint32_t repeats = places != 0 ? kRepeatsDriveMost * sizeof(RepeatOf) : 0;
+    uint8_t *block = static_cast<uint8_t *>(arena_take(core, core.item_capacity * 2 + places * 4 + tree + repeats));
     if (block == nullptr) {
         return false;
     }
@@ -227,8 +229,10 @@ bool order_begin(Core &core) {
         core.folders = reinterpret_cast<Folder *>(block + core.item_capacity * 2 + places * 4);
         core.playlist_path = reinterpret_cast<char *>(block + core.item_capacity * 2 + places * 4 + kFolderMost * sizeof(Folder));
         core.playlist_path[0] = '\0';
+        core.repeats_drive = reinterpret_cast<RepeatOf *>(block + core.item_capacity * 2 + places * 4 + tree);
         clear_drive(core);
         tree_clear(core);
+        repeats_drive_found(core);
     }
     return true;
 }
@@ -528,6 +532,7 @@ void order_start(Core &core) {
     }
     clear_items(core);
     read_whole(core, kReadItems);
+    repeats_start(core);
 }
 
 void order_drive_named(Core &core, uint32_t place, const char *name) {
@@ -546,8 +551,19 @@ void order_drive_found(Core &core) {
         return;
     }
     clear_drive(core);
+    repeats_drive_found(core);
     core.order_reading = 0;
     core.order_due = core.drive_count != 0 ? 1 : 0;
+}
+
+uint32_t order_place_named(const Core &core, const char *name, uint32_t length) {
+    const uint8_t hash = name_hash(name, length);
+    for (uint32_t place = 0; core.order_hash != nullptr && place < core.drive_count; ++place) {
+        if (core.order_hash[place] == hash && place_named(core, place, name, length)) {
+            return place;
+        }
+    }
+    return kDriveMost;
 }
 
 bool order_drive_due(const Core &core) {
@@ -555,6 +571,10 @@ bool order_drive_due(const Core &core) {
 }
 
 void order_drive_step(Core &core) {
+    if (core.order_due == 2) {
+        repeats_drive_step(core);
+        return;
+    }
     FileSource &source = core.checker->file;
     if (!core.order_reading) {
         clear_drive(core);
@@ -572,7 +592,8 @@ void order_drive_step(Core &core) {
     }
     source.close();
     core.order_reading = 0;
-    core.order_due = 0;
+    // The drive's saved repeats are read next, before any of its files joins the playlist.
+    core.order_due = core.repeats_drive != nullptr ? 2 : 0;
 }
 
 void order_drive_yields(Core &core) {
@@ -591,6 +612,7 @@ void order_reload(Core &core) {
     clear_drive(core);
     read_whole(core, kReadItems | kReadDrive);
     core.order_due = 0;
+    repeats_reload(core);
 }
 
 void order_item_leaves(Core &core, uint32_t position) {

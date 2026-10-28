@@ -7,6 +7,7 @@
 #include "order.h"
 #include "playlist.h"
 #include "player.h"
+#include "repeats.h"
 #include "show.h"
 
 namespace odrig {
@@ -128,6 +129,9 @@ void storage_clear_parts(Core &core) {
     }
     if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kOrderPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kOrderPart);
+    }
+    if (core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kRepeatsPart, 0, &probe, 1) >= 0) {
+        core.host.remove(core.host.ctx, kRepeatsPart);
     }
     if (core.host.drive != nullptr && core.host.read_at != nullptr && core.host.read_at(core.host.ctx, kPlaylistPart, 0, &probe, 1) >= 0) {
         core.host.remove(core.host.ctx, kPlaylistPart);
@@ -307,6 +311,8 @@ bool storage_install_upload(Core &core) {
     } else {
         content_change_file(core, position, upload.name, upload.size, upload.total_ms, core.check_content.type);
         entered(core, position);
+        // A saved repeat belongs to a file name: the item's new name has its own, or none.
+        repeats_reload(core);
         player_file_replaced(core, position);
     }
     core.pending_cleanup = 1;

@@ -105,7 +105,7 @@ The last seven members are the storage functions: three that write a file, `rena
 - A name the core gives any of them is 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_`
   and `.`: `mapping.json`, `show.json`, the name of an `.odrg` file, or one of the names
   the core keeps for itself, `upload.part`, `show.part`, `pending.txt`, `mapping.part`,
-  `order.txt` and `order.part`.
+  `order.txt`, `order.part`, `repeats.txt` and `repeats.part`.
 - The core has at most one file being written, gives `write` at most 1,500 bytes in one
   call, and reads a file with `read_at` from offset 0 on, each call where its last call for
   that file ended; only the commands `read` and `catalog page` begin at the offset they are
@@ -304,8 +304,8 @@ change left:
 1. Before anything is read, it finishes the change of the catalog whose commit record is
    whole; when a call of that fails, the record stays and the catalog is `damaged`,
    `interrupted`, for this boot. Then it removes `upload.part`, which stays while a record
-   is left, and `show.part`, and `mapping.part` and `order.part` when a `read_at` of one
-   byte finds them there.
+   is left, and `show.part`, and `mapping.part`, `order.part` and `repeats.part` when a
+   `read_at` of one byte finds them there.
 2. When `show.json` was read and its ids are sound, it opens `pending.txt`. Of that file
    it reads at most 1,500 bytes and takes every line that ends in a line feed and is a file
    name under the naming rule of [show.md](show.md). Each such file that no item names is
@@ -313,7 +313,8 @@ change left:
    for the next start; when it could not be read, nothing is removed.
 3. When the mapping or the show file could not be used, `pending.txt` is left alone.
 4. When the show is valid, it reads `order.txt` with `read_at`, for the order of the show's
-   items; see [the saved order](#the-saved-order).
+   items, and then `repeats.txt`, for their saved repeats; see [the saved
+   order](#the-saved-order) and [the saved repeats](#the-saved-repeats).
 
 A folder with none of the three files is asked to remove two names that are not there and
 to open three that are not there, `catalog.do`, `pending.txt` and `catalog.txt`, and for
@@ -845,7 +846,7 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 
 | Block | Size | Bytes |
 |---|---|---:|
-| The core object | fixed | 3,872 |
+| The core object | fixed | 3,880 |
 | Line of the byte entry | 2,049 | 2,049 |
 | Reply of the byte entry | 1,024 | 1,024 |
 | Legs | 12 for each leg | 240 |
@@ -862,19 +863,20 @@ with a file each and 20 cycles of 10 entries. They are measured by the suite.
 | Cycle entries | 2 for each entry of a cycle, 2 at least | 400 |
 | Files | 48 for each of 132 | 6,336 |
 | The saved order, with storage that can be changed | 2 for each of 132 | 264 |
-| **Total** | | **125,405** |
+| **Total** | | **125,413** |
 
 That is 96 percent of the 131,072 bytes the core may use for this canvas: the second
 decoders, which serve the check after the start and the check of an uploaded file, take
-46,032 of them. The example show on the two-leg mapping asks for 88,882 bytes. A host
+46,032 of them. The example show on the two-leg mapping asks for 88,890 bytes. A host
 without storage that can be changed is not asked for the chunk buffer, the three blocks
-of the check and the saved order: 77,609 bytes for the target file. A host with a drive
+of the check and the saved order: 77,617 bytes for the target file. A host with a drive
 is asked for two blocks more, after the three of the check: the drive's table, 12 bytes
 for each of 256 places, 3,072 bytes, and the boot's memory of 16 files of drives left
 out, 40 bytes each, 640 bytes; and the block of the saved order holds 4 bytes more for
 each place, 1,024, and after them the tree of the drive's folders, a table of 33 records of
-8 bytes and 104 bytes of room for the current playlist's path, 368.
-With it the target file takes 130,509 bytes, 99 percent. The size and the number of frames
+8 bytes and 104 bytes of room for the current playlist's path, 368, and the saved repeats of
+32 of the drive's files, 4 bytes each, 128.
+With it the target file takes 130,645 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
 the 512 bytes it last read.
 
@@ -1079,6 +1081,53 @@ for and a drive's name stand after them.
 Then the core reads `order.txt` again and sets every key. A call that fails before the
 arrow removes `order.part` and answers `storage-error`; the keys are as they were. The
 start removes an `order.part` that a power cut left.
+
+## The saved repeats
+
+The saved repeats of [show.md](show.md#the-saved-repeats) live in `repeats.txt`. The core
+keeps the saved repeat of an item of the show in the upper 16 bits of the item's `count`,
+which a `repeat` of `show.json` of at most 65,535 leaves free, and every reader of `count`
+masks them; it keeps no name. The turn in progress has its own value from `repeat <id> <n>`
+in one 32-bit member of the core object, 0 while none is set, which is set where a turn's
+length is made and cleared where a turn ends and wherever a new one begins: in
+`player_play_all`, `player_play_cycle` and `player_halt`.
+
+The file is read whole, with `read_at` through the second source, strictly: a line out of
+form clears every saved repeat and gives the log `repeats unreadable` once for the reading.
+It is read at startup after `order.txt`, and again wherever `order.txt` is read again as a
+whole, and after an upload gives an item another file name. A line `f <name>` gives its
+loops to every item whose file has that name and has none yet.
+
+On a host with a drive the block of the saved order holds a table of 32 entries of 4 bytes,
+the place of a drive's file and its loops, for the saved repeats of the drive's files. A
+line `x <name>` gives its loops to the place whose name it is, found as an entry of
+`order.txt` is, by the hash and `drive_name`, while that place has none yet and an entry is
+free. When a drive is counted or leaves, the table is emptied; the drive's check reads the
+drive's lines of `repeats.txt` right after its part of `order.txt`, in steps of one read of
+at most 512 bytes, before any of its files joins the playlist, and begins again when the
+second source is taken meanwhile. A take-up that would match more than 32 lines uses the
+first 32, and the log says `repeats over` once. A save that would add a 33rd is refused
+with `no-space`.
+
+`repeat <id> <n> save` and `repeat <id> default` read the file twice through the second
+source, after the drive's check has yielded it: once to count the lines of the other
+animations, and of them the lines of files no item names, which a save drops when it finds
+the file full; then to write `repeats.part` through the first 1,000 bytes of the chunk
+buffer, the header, every other line, and the animation's own line in the place of its
+first one or at the end, its own line standing after those 1,000 bytes.
+
+```
+1  write repeats.part
+2  rename repeats.part -> repeats.txt          <-
+```
+
+Then the core reads `repeats.txt` again. A call that fails before the arrow removes
+`repeats.part` and answers `storage-error`; the saved repeats are as they were. A read of
+the old file that fails after its first byte, or at its first byte while a saved repeat is
+in force, answers `storage-error` too, so that a read that failed is never taken for a
+missing file. The start removes a `repeats.part` that a power cut left. Last, the command
+acts on the reported turn of the animation with the loop that was in progress before the
+count changed.
 
 ## The saved playlist
 

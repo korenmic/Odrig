@@ -24,9 +24,10 @@ struct LegInfo {
     uint32_t count;
 };
 
-// One item of the show. An animation item: `first` is its entry of the file table, `count`
-// the number of loops of its turn and `seconds` the longest its turn lasts, each 0 when
-// the show gives none. A cycle item: its animations are `count` entries of the entry
+// One item of the show. An animation item: `first` is its entry of the file table, the low
+// 16 bits of `count` the number of loops of its turn as the show gives it and its high 16
+// bits the loops of its saved repeat, and `seconds` the longest its turn lasts, each 0
+// when there is none. A cycle item: its animations are `count` entries of the entry
 // table, from `first` on, each the position of an animation item in the item table, and
 // `seconds` is the length of each of its turns.
 struct ItemInfo {
@@ -176,6 +177,14 @@ const uint32_t kDriveNameSize = 16;
 // Room for the name of a drive's file as `list` writes it: a longer one is cut to 127 bytes.
 // Written as a JSON string it takes at most 762 bytes, so that its item fits into a reply.
 const uint32_t kDriveListedName = 128;
+
+// A saved repeat of a file of the drive: its place and its loops, 0 for a free entry. The
+// core keeps kRepeatsDriveMost of them.
+struct RepeatOf {
+    uint16_t place;
+    uint16_t loops;
+};
+const uint32_t kRepeatsDriveMost = 32;
 
 // The reading of `order.txt` line by line: the entries taken so far, whether its first line
 // was read and was the header, and the line so far without its line feed. A line longer
@@ -335,11 +344,14 @@ struct Core {
     // The saved playlist order, for a host whose storage can be changed: for each item of
     // the item table, and for each place of a drive, the number of the entry of `order.txt`
     // that names it, or kOrderUnnamed; for each place the low byte of its name's hash. While
-    // `order_due` is set the drive's check reads the file before the drive's files, and
-    // `order_reading` while it is in the middle of it.
+    // `order_due` is set the drive's check reads the file before the drive's files, 1 while
+    // it reads `order.txt` and 2 while it reads `repeats.txt`, and `order_reading` while it
+    // is in the middle of one. In the same block, for a host with a drive, the saved repeats
+    // of the drive's files.
     uint16_t *order_items;
     uint16_t *order_drive;
     uint8_t *order_hash;
+    RepeatOf *repeats_drive;
     uint8_t order_due;
     uint8_t order_reading;
     OrderReader order_reader;
@@ -416,6 +428,7 @@ struct Core {
     uint32_t noise;         // what the timestamps of the polls were mixed into
     uint64_t zero;          // the item's time zero; of the playlist, the start of the turn
     uint32_t turn_item;     // of the playlist: the position of the animation whose turn it is
+    uint32_t turn_repeat;   // of that turn: the loops a `repeat` gave it, 0 while none did
     uint64_t turn_number;   // of the playlist: counts its turns, so that each opens its file anew
 
     // The file that is open for playback: an animation item in one turn and one loop. A

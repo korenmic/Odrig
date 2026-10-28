@@ -1,0 +1,20 @@
+<div id="ntt-preview" dir="rtl">
+  <div class="viz-controls">
+    <label class="form-label" for="ntt-scene">בחרו אנימציה
+      <select id="ntt-scene" class="form-select">
+        <option value="0">אותה שנייה, שני זמנים</option>
+        <option value="1">עוד שנייה זה קורה</option>
+        <option value="2">החול חוזר למעלה</option>
+        <option value="3">כבר היינו כאן</option>
+        <option value="4">כל שורה בזמן אחר</option>
+        <option value="5">השעון נוזל</option>
+      </select>
+    </label>
+    <button type="button" id="ntt-pause" class="btn" aria-pressed="false">השהיה</button>
+  </div>
+  <div class="ntt-stage">
+    <canvas id="ntt-led" width="600" height="600" role="img" aria-label="המחוג הלבן מתקדם בקצב קבוע; התכלת מאיץ, כמעט נעצר ואז משיג אותו. מחזור הדגמה: 18 שניות.">הדמיה של אנימציות זמן על לוח לדים.</canvas>
+  </div>
+  <p id="ntt-caption" class="text-small" aria-live="polite">המחוג הלבן מתקדם בקצב קבוע; התכלת מאיץ, כמעט נעצר ואז משיג אותו. מחזור הדגמה: 18 שניות.</p>
+  <p class="text-small text-muted">הדמיית רעיון ברשת של 60×60 נקודות. רזולוציית הלוח בפועל טרם אומתה.</p>
+</div>

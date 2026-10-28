@@ -47,6 +47,7 @@ SESSION = (
     ("status",),
     ("read", "1", "0"),
     ("catalog",),
+    ("repeat", "99", "2"),
     ("play", "99"),
     ("play", "abc"),
     ("brightness", "256"),
@@ -90,6 +91,17 @@ class AgainstTheEmulator(unittest.TestCase):
             self.assertEqual(support.without_fps(result.out), {"ok": True, "on": True, "brightness": 90, "playing": 3, "animation": 1, "error": None, "width": 60, "height": 6, "seed": None})
             self.assertTrue(result.out.endswith("}\n"))
             self.assertEqual(result.out.count("\n"), 1)
+
+    def test_repeat_is_sent_in_its_three_forms(self):
+        # The example show plays its cycle, so that a turn's count is stale; a saved repeat is
+        # about the animation, and is kept.
+        for transport, target in self.targets.items():
+            for words, status, out in ((("repeat", "1", "2"), 1, '{"ok":false,"error":"stale"}\n'), (("repeat", "1", "2", "save"), 0, OK),
+                                       (("repeat", "1", "default"), 0, OK), (("repeat", "3", "default"), 1, '{"ok":false,"error":"in-use"}\n')):
+                with self.subTest(transport=transport, command=words):
+                    result = support.run_tool(*target, *words)
+                    self.assertEqual((result.status, result.out, result.err), (status, out, ""))
+        self.assertEqual((self.folder / "repeats.txt").read_bytes(), b"odrig-repeats 1\n")
 
     def test_a_refused_command_prints_the_reply_and_exits_with_1(self):
         for transport, target in self.targets.items():
@@ -291,16 +303,17 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "upload begin <id> <file> <bytes>",
-                                      "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
+                                      "repeat <id> default", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog")) and command not in ("play all", "remove many <ids>")]
-        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog")],
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ")) and command not in ("play all", "remove many <ids>")]
+        self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
         self.assertEqual(cli.COMMANDS["upload"], ("ID", "FILE"))
         self.assertEqual({name: takes for name, takes in cli.COMMANDS.items() if takes},
-                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "upload": ("ID", "FILE")})
+                         {"play": ("ID",), "brightness": ("N",), "read": ("ID", "OFFSET"), "catalog": ("[OPERATION]",), "remove": ("ID",), "ignore": ("ID", "VALUE"), "mapping": ("OPERATION",), "order": ("OPERATION",), "repeat": ("ID", "N", "[save]"),
+                          "upload": ("ID", "FILE")})
 
     def test_a_usage_error_says_what_the_command_takes(self):
         for argv, said in ((["status", "1"], "status takes no argument"), (["play"], "play takes one argument: ID"), (["remove", "1", "2"], "remove takes one argument: ID"),
@@ -308,6 +321,8 @@ class Usage(unittest.TestCase):
                            (["catalog", "rebuild"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["catalog", "page", "internal", "0"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
                            (["catalog", "check"], "catalog takes no argument, rebuild internal, rebuild external, cancel, or page internal|external PAGE OFFSET"),
+                           (["repeat", "1"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8", "keep"], "repeat takes ID N, ID N save, or ID default"),
+                           (["repeat", "1", "8", "save", "x"], "repeat takes ID N, ID N save, or ID default"), (["repeat", "1", "8\n"], "a command is one line"),
                            (["status", "--external"], "--external goes with upload"), (["--log", "--external"], "--external goes with upload"),
                            (["upload", "--external"], "upload --external takes one argument: FILE"),
                            (["upload", "--external", "9", "a.odrg"], "upload --external takes one argument: FILE")):
@@ -335,6 +350,9 @@ class Usage(unittest.TestCase):
             (["catalog", "rebuild", "internal"], b"catalog rebuild internal\n"),
             (["catalog", "rebuild", "external"], b"catalog rebuild external\n"),
             (["catalog", "cancel"], b"catalog cancel\n"),
+            (["repeat", "1", "8"], b"repeat 1 8\n"),
+            (["repeat", "1", "8", "save"], b"repeat 1 8 save\n"),
+            (["repeat", "60001", "default"], b"repeat 60001 default\n"),
         ):
             self.assertEqual(cli.command_line(made, made.parse_args(["--port", "x", *argv])), line)
 

@@ -41,7 +41,7 @@ class EveryCommand(Commands):
         lines = ["play 1", "play 2", "play 3", "on", "off", "brightness 0", "brightness 255", "status"]
         replies = self.replies(lines)
         self.assertEqual(replies[:7], [OK] * 7)
-        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"left":86400}')
+        self.assertEqual(replies[7], '{"ok":true,"on":false,"brightness":255,"playing":3,"animation":1,"fps":0,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"left":86400}')
 
     def test_play_plays_an_animation_in_the_playlist_and_a_cycle_by_itself(self):
         for number, playing, animation in ((1, "all", 1), (2, "all", 2), (3, 3, 1)):

@@ -1,0 +1,17 @@
+{
+  "source": "https://chatgpt.com/share/6ae1379a-9dc8-83ed-8fee-9aca58017cc7",
+  "extractedAt": "2026-10-28T02:00:51.624Z",
+  "method": "read-only DOM extraction from original embedded iframe",
+  "animationScriptMatchesFreshLiveDOM": true,
+  "originalHttpByteIdentityVerified": false,
+  "htmlIsDOMSerialization": true,
+  "externalScriptsDownloaded": false,
+  "externalScriptReferences": [
+    "https://cdn.tailwindcss.com",
+    "https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js",
+    "https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js",
+    "https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js"
+  ],
+  "mediaAssetCount": 0,
+  "codeRewritten": false
+}

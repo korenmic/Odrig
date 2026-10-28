@@ -188,7 +188,7 @@ class AgainstTheEmulator(WithACard, unittest.TestCase):
             {"top": True, "until": "Playlist night \u00b7 2[34] h [0-9]+ min left"},
             {"back": True, "level": "Root", "rows": 3},
             {"row": 1, "until": "Playlist night, the root plays for now \u00b7 2[34] h [0-9]+ min left"},
-            {"top": True, "until": "Now 1 hello\\.odrg Playlist \u00b7 2[34] h [0-9]+ min left"},
+            {"top": True, "until": "Now 1 hello\\.odrg .*Playlist \u00b7 2[34] h [0-9]+ min left"},
         ]
         found = support.run("folders", address=f"127.0.0.1:{emulator.port}", settings={"rows": 3, "folders": 2, "steps": steps}).seen
         # The example show begins with its cycle of 1 and 2, 15 s each: no playlist is
