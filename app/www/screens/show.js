@@ -669,6 +669,7 @@ function draw(state) {
     drawNow(null, state);
     byId("on").setAttribute("aria-pressed", "false");
     byId("off").setAttribute("aria-pressed", "false");
+    byId("power-toggle").setAttribute("aria-pressed", "false");
   } else {
     byId("power").textContent = status.on ? "ON" : "OFF";
     byId("brightness").textContent = `Brightness ${status.brightness}`;
@@ -677,6 +678,7 @@ function draw(state) {
     byId("fps").textContent = `${status.fps} refreshes a second`;
     byId("on").setAttribute("aria-pressed", String(status.on));
     byId("off").setAttribute("aria-pressed", String(!status.on));
+    byId("power-toggle").setAttribute("aria-pressed", String(status.on));
     // A status moves neither the slider nor the field while the slider is held, right
     // after a command, while the field holds text not sent, or while it is typed into.
     if (!held && performance.now() - sentAt >= SLIDER_RESTS_MS && !unsent() && !typingIn()) {
@@ -944,6 +946,25 @@ export function start(options) {
   extend({draw: tests.draw});
   byId("on").addEventListener("click", () => client.switchOn());
   byId("off").addEventListener("click", () => client.switchOff());
+  // The power icon alone switches the LEDs: off when they are on, on otherwise.
+  byId("power-toggle").addEventListener("click", () => {
+    if (byId("power-toggle").getAttribute("aria-pressed") === "true") client.switchOff();
+    else client.switchOn();
+  });
+  // The panel collapses upwards to give the list its room, and expands again.
+  const collapse = byId("now-collapse");
+  function setCollapsed(collapsed) {
+    byId("now-panel").classList.toggle("collapsed", collapsed);
+    collapse.setAttribute("aria-expanded", String(!collapsed));
+    collapse.setAttribute("aria-label", collapsed ? "Expand the panel" : "Collapse the panel");
+    byId("now-collapse-mark").setAttribute("d", collapsed ? "M6 9l6 6 6-6" : "M6 15l6-6 6 6");
+    try { localStorage.setItem("odrig.panel", collapsed ? "collapsed" : "expanded"); } catch (error) { /* storage may be off */ }
+    window.dispatchEvent(new Event("resize"));
+  }
+  collapse.addEventListener("click", () => setCollapsed(!byId("now-panel").classList.contains("collapsed")));
+  let kept = null;
+  try { kept = localStorage.getItem("odrig.panel"); } catch (error) { /* storage may be off */ }
+  if (kept === "collapsed") setCollapsed(true);
   // The level's button: the root's playlist at the root, the folder's inside one.
   byId("play-all").addEventListener("click", () => {
     const folder = opened === "" ? undefined : client.state.folders.find((item) => item.playlist === opened);
