@@ -116,6 +116,10 @@ class ShowFolders(Temporary):
         (self.show / "order.txt").write_bytes(b"odrig-order 1\ni 2\n")
         self.assertEqual(storage.folder_files(self.show)["order.txt"], b"odrig-order 1\ni 2\n")
 
+    def test_a_saved_playlist_is_a_file_of_the_show(self):
+        (self.show / "playlist.txt").write_bytes(b"odrig-playlist 1\nnight\n5400000\n")
+        self.assertEqual(storage.folder_files(self.show)["playlist.txt"], b"odrig-playlist 1\nnight\n5400000\n")
+
     def test_the_saved_repeats_are_a_file_of_the_show(self):
         (self.show / "repeats.txt").write_bytes(b"odrig-repeats 1\n5 f hello.odrg\n")
         self.assertEqual(storage.folder_files(self.show)["repeats.txt"], b"odrig-repeats 1\n5 f hello.odrg\n")
@@ -255,6 +259,27 @@ class Commands(Temporary):
         self.assertEqual(result.status, 0, result.err)
         self.assertEqual(storage.show_of(self.on_the_board(esptool)), dict(storage.folder_files(self.show), **{"playlist.txt": playlist}))
         self.assertIn("show: kept 1 files\n", result.out)
+
+    def test_a_copy_read_from_a_board_with_a_saved_playlist_is_installed_again(self):
+        playlist = b"odrig-playlist 1\nnight\n5400000\n"
+        self.old = support.storage_image(dict(support.WLED_FILES, **{"/odrig/playlist.txt": playlist}))
+        first = self.esptool()
+        self.assertEqual(self.install(first).status, 0)
+        self.old = self.on_the_board(first)
+        with support.no_board(self.esptool(failing_verifies=1)):
+            read = support.run_main("read-show", self.folder / "copy")
+        self.assertEqual(read.status, 0, read.err)
+        self.assertEqual(support.files_of(self.folder / "copy")["playlist.txt"], playlist)
+        self.show = self.folder / "copy"
+        result = self.install(self.esptool())
+        self.assertEqual(result.status, 0, result.err)
+        self.assertIn(f"show: kept {len(storage.show_of(self.old))} files; nothing added, replaced or removed\n", result.out)
+        (self.show / "playlist.txt").write_bytes(b"odrig-playlist 1\n\n0\n")
+        esptool = self.esptool()
+        result = self.install(esptool)
+        self.assertEqual(result.status, 0, result.err)
+        self.assertIn("show: replaced playlist.txt, 20 bytes, was 31\n", result.out)
+        self.assertEqual(storage.show_of(self.on_the_board(esptool))["playlist.txt"], b"odrig-playlist 1\n\n0\n")
 
     def test_the_boards_saved_repeats_are_kept_for_a_folder_without_them(self):
         repeats = b"odrig-repeats 1\n5 f hello.odrg\n3 x night/comet.odrg\n"
