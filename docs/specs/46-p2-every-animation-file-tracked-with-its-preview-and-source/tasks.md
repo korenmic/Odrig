@@ -92,7 +92,7 @@ Rules for every task:
   - The numbers into `docs/drifts.md` under "Seed 46".
   - Requirements: 8.2, 8.4, 8.5
 
-- [ ] 7. Completion, after the owner's merge
+- [x] 7. Completion, after the owner's merge
   - On `master`: `state.json` `completed` with `completedAt`, and the seed's line out of
     "What is coming" in `AGENTS.md`; the owner told in words what the seed's Definition
     Of Done lists.
