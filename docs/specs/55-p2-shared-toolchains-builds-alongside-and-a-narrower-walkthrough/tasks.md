@@ -13,7 +13,7 @@ Each task is seed 53's task of the same subject, moved here unchanged.
       the shared Python. Tests in `tests/app` and `tests/firmware` with stand-in folders;
       then a build of the APK and of the firmware from a second checkout. Suites: app,
       firmware, through the runner.
-- [ ] 3. Builds alongside (seed 53's task 7). `--builds`: both built while the suites run,
+- [x] 3. Builds alongside (seed 53's task 7). `--builds`: both built while the suites run,
       two slots kept, `tests/apk` after the APK, sizes and SHA-256 printed and reported.
       Tests in `tests/runner` with stand-in builds. Suites: runner, then `--builds`.
 - [ ] 4. The documents, every suite, and the measurement (seed 53's task 8).

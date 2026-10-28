@@ -1,7 +1,7 @@
 """Runs every suite that works on this computer, at the same time.
 
     .venv/bin/python tests/run.py [--suites A,B] [--serial] [--workers N] [--slowest N]
-                                  [--walkthrough]
+                                  [--walkthrough] [--builds]
 
 The suites of `tests/core`, `tests/emulator`, `tests/app`, `tests/converter` and
 `tests/firmware` are split by test module across worker processes; the others run whole,
@@ -12,11 +12,17 @@ that needs it. The runner prints a line for each suite as it ends, the output of
 failing test, the slowest tests and the wall time, writes `build/tests/report.json`, and
 ends with status 0 only when every suite passed.
 
+With `--builds` it also builds the APK and the firmware, by the tools' own `build`
+commands, while the suites run on the processors less two, prints each build's size, time
+and SHA-256, and runs `tests/apk` once the APK is built. It never flashes, uploads or
+installs anything.
+
 It needs only Python's own library and runs on macOS, Linux and Windows.
 """
 
 import argparse
 import ctypes
+import hashlib
 import json
 import os
 import pathlib
@@ -61,6 +67,23 @@ SUITES = (
 )
 
 
+class Build:
+    """A build the runner makes with `--builds`: its name, the tool's command after Python,
+    the file it makes, and the suite that waits for it."""
+
+    def __init__(self, name, command, output, then=None):
+        self.name, self.command, self.output, self.then = name, command, output, then
+
+
+BUILDS = (
+    Build("apk", ["app/app.py", "build"], "build/app/odrig-debug.apk", then="apk"),
+    Build("firmware", ["firmware/fw.py", "build"], "build/firmware/out/odrig-firmware.bin"),
+)
+
+# The processors a run keeps for its builds; the suites have the others.
+BUILD_SLOTS = 2
+
+
 def default_workers():
     return max(2, (os.cpu_count() or 4) - 2)
 
@@ -72,6 +95,7 @@ def parser():
     made.add_argument("--workers", type=int, default=default_workers(), help="worker processes of a split suite (default: the processors less two)")
     made.add_argument("--slowest", type=int, default=30, help="how many of the slowest tests to print (default 30)")
     made.add_argument("--walkthrough", action="store_true", help="also run the walkthrough of the pages, in a fresh copy")
+    made.add_argument("--builds", action="store_true", help="also build the APK and the firmware while the suites run, then check the APK")
     made.add_argument("--sweep", action="store_true", help="list and end the processes earlier runs and tests left behind, and run nothing")
     return made
 
@@ -207,9 +231,11 @@ def sweep(out):
 
 
 class Runner:
-    def __init__(self, arguments, root=ROOT, suites=SUITES, out=sys.stdout):
+    def __init__(self, arguments, root=ROOT, suites=SUITES, out=sys.stdout, builds=BUILDS):
         self.arguments, self.root, self.out = arguments, pathlib.Path(root), out
         self.suites = list(suites)
+        self.builds = list(builds) if getattr(arguments, "builds", False) else []
+        self.built = {}
         self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
         self.logs = self.root / LOGS / self.run_id
         self.previous = self.read_report()
@@ -273,7 +299,8 @@ class Runner:
     def firmware_python(self):
         name = "python.exe" if WINDOWS else "python"
         folder = "Scripts" if WINDOWS else "bin"
-        path = self.root / "build" / "firmware" / "venv" / folder / name
+        tools = pathlib.Path(os.environ["ODRIG_TOOLS"]).expanduser().resolve() if os.environ.get("ODRIG_TOOLS") else self.root / "build"
+        path = tools / "firmware" / "venv" / folder / name
         return path if path.exists() else None
 
     def python_of(self, suite):
@@ -420,13 +447,18 @@ class Runner:
         if any("core" in suite.needs for suite in runnable) and not self.build_core():
             self.failed = True
             runnable = [suite for suite in runnable if "core" not in suite.needs]
+        self.start_builds()
+        waiting = {build.then: build.name for build in self.builds if build.then}
         queue = []
         for suite in runnable:
             for command, results, expected in self.jobs_of(suite, serial):
-                queue.append({"suite": suite, "command": command, "results": results, "expected": expected})
+                queue.append({"suite": suite, "command": command, "results": results, "expected": expected, "after": waiting.get(suite.name)})
         if not serial:
             queue.sort(key=lambda job: -job["expected"])
-        self.execute(queue, 1 if serial else self.arguments.workers)
+        slots = 1 if serial else self.arguments.workers
+        if self.builds:
+            slots = max(1, slots - BUILD_SLOTS)
+        self.execute(queue, slots)
         left = [(pid, "", "") for pid in self.job.left()] if WINDOWS else strays(self.run_id)
         if left:
             end([pid for pid, _, _ in left])
@@ -435,14 +467,67 @@ class Runner:
         self.finish(wall)
         return 1 if self.failed else 0
 
+    # The builds, beside the suites.
+
+    def start_builds(self):
+        for build in self.builds:
+            self.logs.mkdir(parents=True, exist_ok=True)
+            log = self.logs / f"build-{build.name}.log"
+            handle = open(log, "w", encoding="utf-8")
+            (self.root / build.output).unlink(missing_ok=True)
+            process = subprocess.Popen([sys.executable, *build.command], cwd=self.root, env=self.env, stdout=handle, stderr=subprocess.STDOUT)
+            if self.job:
+                self.job.add(process)
+            self.built[build.name] = {"build": build, "process": process, "handle": handle, "log": log, "began": time.monotonic()}
+
+    def builds_running(self):
+        return any("outcome" not in state for state in self.built.values())
+
+    def poll_builds(self):
+        for name, state in self.built.items():
+            if "outcome" in state or state["process"].poll() is None:
+                continue
+            state["handle"].close()
+            seconds = time.monotonic() - state["began"]
+            output = self.root / state["build"].output
+            status = state["process"].returncode
+            if status == 0 and output.is_file():
+                data = output.read_bytes()
+                state.update(outcome="OK", seconds=seconds, bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+                self.say(f"{name}: {len(data):,} bytes, {seconds:.0f} s, SHA-256 {state['sha256'][:8]}...")
+                continue
+            self.failed = True
+            reason = f"FAILED with status {status}" if status else f"FAILED: it left no {state['build'].output}"
+            state.update(outcome=reason, seconds=seconds)
+            self.say(f"{name}: {reason}")
+            for line in state["log"].read_text(encoding="utf-8", errors="replace").splitlines()[-20:]:
+                self.say(f"    {line}")
+
+    def ready(self, job):
+        """Whether a job may start: one that waits for a build, once it was built."""
+        state = self.built.get(job["after"]) if job.get("after") else None
+        return state is None or state.get("outcome") == "OK"
+
+    def dropped(self, job):
+        """Whether a job waits for a build that failed."""
+        state = self.built.get(job["after"]) if job.get("after") else None
+        return state is not None and "outcome" in state and state["outcome"] != "OK"
+
     def execute(self, queue, slots):
         running = []
         left = {}
         for job in queue:
             left[job["suite"].name] = left.get(job["suite"].name, 0) + 1
-        while queue or running:
-            while queue and len(running) < slots:
-                job = queue.pop(0)
+        while queue or running or self.builds_running():
+            self.poll_builds()
+            for job in [job for job in queue if self.dropped(job)]:
+                queue.remove(job)
+                left[job["suite"].name] -= 1
+                if left[job["suite"].name] == 0:
+                    self.say(f"{job['suite'].name}: not run: {job['after']} was not built")
+            while len(running) < slots and any(self.ready(job) for job in queue):
+                job = next(job for job in queue if self.ready(job))
+                queue.remove(job)
                 name = job["suite"].name
                 log = self.logs / f"{name}-{len([1 for record in running if record['suite'].name == name]) + 1}-{id(job)}.log"
                 job["log"] = log
@@ -528,6 +613,7 @@ class Runner:
             "run": self.run_id,
             "wall": round(wall, 1),
             "suites": dict(kept_suites, **{name: {"tests": state.get("tests"), "seconds": round(state.get("seconds", 0.0), 1), "outcome": state.get("outcome")} for name, state in self.summary.items()}),
+            "builds": {name: {key: (round(value, 1) if key == "seconds" else value) for key, value in state.items() if key in ("outcome", "seconds", "bytes", "sha256")} for name, state in self.built.items()} or self.previous.get("builds", {}),
             "tests": kept_tests + [{"suite": record["suite"], "id": record["id"], "seconds": record["seconds"], "outcome": record["outcome"]} for record in self.records],
         }
         path = self.root / REPORT
@@ -539,7 +625,7 @@ class Runner:
         self.say(f"{'FAILED' if self.failed else 'OK'}: wall time {wall:.0f} s ({wall / 60:.1f} min)")
 
 
-def main(argv=None, root=ROOT, suites=SUITES, out=None):
+def main(argv=None, root=ROOT, suites=SUITES, out=None, builds=BUILDS):
     if out is None:
         out = sys.stdout
         out.reconfigure(encoding="utf-8")
@@ -548,7 +634,7 @@ def main(argv=None, root=ROOT, suites=SUITES, out=None):
         raise SystemExit("error: --workers takes 1 or more")
     if arguments.sweep:
         return sweep(out)
-    return Runner(arguments, root=root, suites=suites, out=out).run()
+    return Runner(arguments, root=root, suites=suites, out=out, builds=builds).run()
 
 
 if __name__ == "__main__":

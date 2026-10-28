@@ -1,10 +1,12 @@
 """Checks of a built APK.
 
-They need `build/app/odrig-debug.apk` and the SDK of the work folder, both of which
+They need `build/app/odrig-debug.apk` and the SDK of the shared toolchains, under
+`ODRIG_TOOLS` when it is set, else in the work folder, both of which
 `python3 app/app.py build` makes, and no phone.
 """
 
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -17,6 +19,7 @@ LIBRARY = ROOT / "converter" / "lib"
 THUMBNAILS = ROOT / "thumbnails"
 WORK = ROOT / "build" / "app"
 APK = WORK / "odrig-debug.apk"
+TOOLS = pathlib.Path(os.environ["ODRIG_TOOLS"]).expanduser().resolve() / "app" if os.environ.get("ODRIG_TOOLS") else WORK
 IDENTIFIER = "app.odrig.operators"
 PUBLIC = "assets/public/"
 # What Capacitor puts beside the web code, and the note of the build.
@@ -27,7 +30,7 @@ def build_tool(name):
     """A program of the SDK's build tools, of the version `app/toolchain.json` names."""
     listed = json.loads((ROOT / "app" / "toolchain.json").read_text(encoding="utf-8"))
     version = next(package.split(";")[1] for package in listed["sdk-packages"] if package.startswith("build-tools;"))
-    return WORK / "android-sdk" / "build-tools" / version / name
+    return TOOLS / "android-sdk" / "build-tools" / version / name
 
 
 class TheApk(unittest.TestCase):
