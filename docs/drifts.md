@@ -11087,6 +11087,52 @@ lines with a line feed alone now, and hold no other change.
 **Resolution.** converter/tests/library.test.js; the two files of
 project-seeds/52-p2-a-hundred-picture-clocks/references/; docs/decisions.md.
 
+## The owner's order of 2026-10-28: one Select, the power icon and a collapsing panel
+
+**Question.** On 2026-10-28 the owner ordered five changes of the operators' app and had
+them committed on `master` before their tests and documents, by the owner's exception to
+the rule of one's own branch (269e50a and 4dc1c22): the list's own `Select` and `Add
+animation` go, the line of what plays and the words `On` and `Off` are hidden, the power
+icon alone switches the LEDs, and a chevron collapses the panel of what plays to its top
+row. Which points did the order leave open, for the tests and the documents that followed
+the same day?
+
+**Answer.**
+
+- Where the selection starts. With the list's `Select` gone, the selection mode starts
+  only from `Select` in an internal row's menu or on the bar, each with its row ticked.
+  While nothing plays, or a cycle, a test or an animation the list lacks plays, the bar is
+  hidden and a row's menu is the one way. A level where no row's menu offers `Select`, a
+  folder of the card or an installation that does not report inclusion, offers no
+  selection, as the list's `Select` was off there before. The suite starts a selection from
+  the first row of the level whose menu offers it, `startSelection` of
+  `tests/app/page/reading.js`.
+- The line of what plays is hidden by the style sheet alone and keeps its words, which
+  the app writes as before. The suite reads its words, `playing` of `reading.js`, waits on
+  them with a pattern, `line`, where it waited on the screen's text, and pins that the line
+  is not shown. So Animations no longer shows the time left in a playlist's window, a
+  cycle's id, or why the installed show is invalid; the target screen still says why a show
+  is invalid, and so does the message of a refused play. The hand-over of this work says
+  so to the owner.
+- The buttons `On` and `Off` stay in the page, hidden, with their `aria-pressed`. The
+  suite presses the power icon by its id, `tap` of `tests/app/page/driver.js`, and the
+  lists of controls that must stay pressable name `power-toggle`.
+- The power icon follows the status alone: a press sends `off` while the icon is pressed
+  and `on` otherwise, and the icon changes when a status says the LEDs changed, not at the
+  press. A second press before that status sends the same line again.
+- The collapse button is 48 pixels, as the message of 4dc1c22 says, where its style had
+  44: the look wants the main controls 48 high. The icons of both buttons are held to the
+  contrast of the texts, 7:1, lit and dark, the panel whole and collapsed.
+- The panel's `position: relative`, left from 269e50a's collapse button placed against
+  it, went: nothing is placed against the panel any more, and the frozen top's test wants
+  the panel static while it is not frozen.
+- The choice to collapse is kept per phone, under `odrig.panel` in the web view's local
+  storage, as the filters' choices are.
+
+**Resolution.** `app/www/style.css`; `tests/app/page/reading.js`,
+`tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
+`tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
+
 ## Seed 46: the installation's animations in git, the heavy ones on the share
 
 **Question.** The decision committed the JSON source of every animation; seed 10's answer
