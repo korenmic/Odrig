@@ -81,15 +81,23 @@ test("a key the catalog holds keeps its GIF and gains the name, the names in the
   assert.deepEqual(bytes(gif), thumbnail.make(bytes(LINES)));
 });
 
-test("a name outside printable ASCII is written with \\u, and one with a quote as JSON writes it", (t) => {
+test("a name outside printable ASCII is written with \\u", (t) => {
   const work = temporary(t);
   const folder = path.join(work, "thumbnails");
   const accented = copy(LINES, path.join(work, "été ש.odrg"));
-  const quoted = copy(LINES, path.join(work, 'a"b.odrg'));
-  assert.equal(runJs(["thumbnail", accented, quoted, "--catalog", folder]).status, 0);
+  assert.equal(runJs(["thumbnail", accented, "--catalog", folder]).status, 0);
   const text = fs.readFileSync(path.join(folder, "catalog.js"), "utf8");
-  assert.equal(text, catalog(`  "${keyOf(LINES)}": {"gif": "${keyOf(LINES)}.gif", "names": ["a\\"b.odrg", "\\u00e9t\\u00e9 \\u05e9.odrg"]},`));
+  assert.equal(text, catalog(`  "${keyOf(LINES)}": {"gif": "${keyOf(LINES)}.gif", "names": ["\\u00e9t\\u00e9 \\u05e9.odrg"]},`));
   assert.ok([...text].every((character) => character.charCodeAt(0) < 128));
+});
+
+test("a name with a quote is written as JSON writes it", {skip: process.platform === "win32" && "Windows forbids a quote in a file name"}, (t) => {
+  const work = temporary(t);
+  const folder = path.join(work, "thumbnails");
+  const quoted = copy(LINES, path.join(work, 'a"b.odrg'));
+  assert.equal(runJs(["thumbnail", quoted, "--catalog", folder]).status, 0);
+  const text = fs.readFileSync(path.join(folder, "catalog.js"), "utf8");
+  assert.equal(text, catalog(`  "${keyOf(LINES)}": {"gif": "${keyOf(LINES)}.gif", "names": ["a\\"b.odrg"]},`));
 });
 
 test("a file inside the folder --card names is named by its path from it, any other by its own name", (t) => {
