@@ -92,16 +92,18 @@ class Names(unittest.TestCase):
             pathlib.Path(folder, "empty").mkdir()
             self.assertEqual(catalog.Storage(folder).names(), wanted)
 
-    def test_a_listing_takes_at_most_32_sub_folders_and_256_files(self):
+    def test_a_storage_lists_every_file_and_the_limits_of_a_listed_drive_take_256_files_and_32_sub_folders(self):
         many = {f"f{number:02d}/x.odrg": b"" for number in range(40)}
         many.update({f"r{number:03d}.odrg": b"" for number in range(5)})
-        names = catalog.MemoryStorage(many).names()
+        self.assertEqual(len(catalog.MemoryStorage(many).names()), 45)
+        names = catalog.cut_listing(catalog.MemoryStorage(many).names())
         self.assertEqual((len(names), names[:5], names[-1]), (37, [f"r{number:03d}.odrg" for number in range(5)], "f31/x.odrg"))
         # A folder counts with its ancestors when its first file is kept: the 33rd stops the walk.
         nested = {f"a/b{number:02d}/x.odrg": b"" for number in range(40)}
-        names = catalog.MemoryStorage(nested).names()
+        names = catalog.cut_listing(catalog.MemoryStorage(nested).names())
         self.assertEqual((len(names), names[-1]), (31, "a/b30/x.odrg"))
-        self.assertEqual(len(catalog.MemoryStorage({f"{number:03d}.odrg": b"" for number in range(300)}).names()), 256)
+        flat = catalog.MemoryStorage({f"{number:03d}.odrg": b"" for number in range(300)}).names()
+        self.assertEqual((len(flat), len(catalog.cut_listing(flat))), (300, 256))
 
 
 class Catalogs(unittest.TestCase):

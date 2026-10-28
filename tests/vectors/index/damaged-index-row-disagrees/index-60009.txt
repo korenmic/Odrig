@@ -1,0 +1,2 @@
+60004 f 00c0ffee 4096 60 60 8000 frames night/comex.odrg                                                                                                                           
+60010 d 1 night/deep                                                                                                                                                               

@@ -73,7 +73,7 @@ catalog: ok, generation 1, 2 entries; 3 animation files, 1 without an entry
 | Command | What it does |
 |---|---|
 | `status` | Says what the catalog is, `none`, `ok` with its generation and its entries, `damaged` or `incompatible` with what, and how many animation files the folder holds and how many of them have no entry. |
-| `import` | Checks every animation file of the folder, as the board lists them, and writes the catalog anew: `refused: NAME: REASON` for each file the check refuses, then `imported: N animations, generation G`. |
+| `import` | Checks every animation file of the folder and its sub-folders, depth first as the board lists them and without a limit of files or folders, and writes the catalog and its index anew, keeping the order its files were moved into: `refused: NAME: REASON` for each file the check refuses, then `imported: N animations, generation G`. |
 | `add FILE...` | Puts each file into the folder under the last part of its path, in place of a file of that name, checked and with its entry in the same change: `added: NAME, BYTES bytes`, `replaced: NAME, BYTES bytes` or `refused: NAME: REASON`. |
 | `remove NAME...` | Takes each animation out of the folder with its entry: `removed: NAME` or `refused: NAME: file-missing`. |
 | `check` | Compares each file's size and CRC-32 with its entry: `differs: NAME: missing`, `size` or `crc` for each file that does, then `checked: N entries, M differ`. |

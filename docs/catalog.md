@@ -3,8 +3,10 @@
 Each storage of animations keeps a catalog of what it holds: the board's own storage, and
 the folder `odrig` of the card or USB drive in it. A catalog says, for each animation file,
 its size, CRC-32, canvas, length and type, so that the board does not read the animations
-to learn them again at every start. This page states the format, how a change is made and
-finished, who writes catalogs, and what each operation costs.
+to learn them again at every start. A drive's catalog also keeps an index of its files,
+folder by folder in the order they play, with their ids, so that the board keeps none of
+them in memory and a drive holds as many files as its card. This page states the format,
+how a change is made and finished, who writes catalogs, and what each operation costs.
 
 `show.json` stays the authority of the playlist ([show.md](show.md)), `order.txt` of its
 saved order, and `mapping.json` of the LEDs ([mapping.md](mapping.md)). A catalog is the
@@ -38,6 +40,28 @@ crc 0a1b2c3d
   CRC-32 of its file, or `0000 00000000` for a page without entries, which has no file.
 - Line 18: the CRC-32 of the 396 bytes before it.
 
+That is the marker of the board's own storage. A drive's is of version 2: always 461 bytes,
+20 lines, with two lines more before its `crc` line, which names the index:
+
+```
+odrig-catalog 2 check 1 generation 0000002a
+page 00 0003 1a2b3c4d
+...
+page 15 0001 9f00e1aa
+folders 0000000004 0a1b2c3d
+ids 0000000008 5e6f7a8b
+crc 0a1b2c3d
+```
+
+- Line 18: `folders`, the number of lines of the table of the folders in ten digits and the
+  CRC-32 of its file; the table has a line for the root always.
+- Line 19: `ids`, the same of the map of the ids, `0000000000 00000000` when the drive has
+  no file.
+- Line 20: the CRC-32 of the 448 bytes before it.
+
+Each reader takes only its storage's version: a drive's catalog of version 1, and a
+catalog of version 2 in the board's own storage, are `incompatible`.
+
 ### The pages: `catalog-00.txt` to `catalog-15.txt`
 
 One line for each animation:
@@ -67,11 +91,75 @@ ASCII other than `/ \ : * ? " < > |`, neither beginning nor ending with a space 
 folder's name may be digits alone; the file's name is not, and ends in `.odrg` or `.odrgx`
 in any case. A card's folder `odrig` is listed as a drive is: a folder's animation files by
 the bytes of their names, then its sub-folders by the bytes of their names, each the same
-way, at most 256 files and 32 sub-folders, a folder counted with its uncounted ancestors
-when the first file at or below it is kept. A name of the board's own storage follows the
+way, every file of it; only a drive without a catalog is taken as at most 256 files and 32
+sub-folders, a folder counted with its uncounted ancestors when the first file at or below
+it is kept. A name of the board's own storage follows the
 show's rule too: 1 to 32 characters of `a`-`z`, `0`-`9`, `-`, `_` and `.`, so it holds no
 folder. A reader from before paths were names finds a catalog that names a file in a
 folder `damaged`, with `line` saying where.
+
+### The index of a drive
+
+A drive's catalog keeps its files a second way, beside the pages: in the order they play,
+folder by folder, each with its id. The index is three kinds of file in the folder `odrig`.
+Every line of a kind has one length, padded with spaces before its line feed, so that line
+N of a file is at N times that length and a read of 512 bytes gives whole lines; a line's
+last field is everything after its fixed fields with the padding cut off, which a name
+never ends in.
+
+**A folder's file, `index-<id>.txt`**, the root's `index-0.txt`: lines of 180 bytes. First
+the folder's own animation files, in the saved order, each with its id and the fields of
+its entry, then its sub-folders in the table's order, each with its id, its number of own
+files and its path:
+
+```
+60001 f 1a2b3c4d 52340 60 60 12000 frames sunrise.odrg
+60002 f 5e6f7a8b 1882 60 60 20000 text moon.odrgx
+60006 d 1 night
+60008 d 0 only
+```
+
+A folder without a line has no file.
+
+**The table of the folders, `index-folders.txt`**: lines of 180 bytes, one for each folder
+that has an animation file at or below it, the root first and always, in the listing's
+order, depth first:
+
+```
+0 0 0 4 0 2 2 9f00e1aa
+1 60006 1 3 2 1 1 0a1b2c3d night
+2 60007 2 3 3 1 0 4c1e00a7 night/deep
+3 60008 1 4 4 0 1 5e6f7a8b only
+```
+
+Its ordinal, the line's number; its id, 0 for the root; its depth, 0 for the root and 1 to
+3 below it; the ordinal after its last descendant, so that its subtree is the lines from it
+to there; the number of files of the folders before it, so that its files are the
+positions of the walk from there, the walk being the root's files and then each folder's
+in the table's order; its numbers of own files and of sub-folders; the CRC-32 of its file,
+`00000000` without one; and its path, empty for the root. A folder with no file at or
+below it is in no line of the table.
+
+**The map of the ids, `index-ids.txt`**: lines of 36 bytes, one for each id of the drive,
+sorted by id, so that an id is found by binary search: a file's to its folder's ordinal
+and its line there, a folder's to its own ordinal and 0:
+
+```
+60001 f 0 0
+60006 d 1 0
+```
+
+**The ids** are numbers from 60001 up to 4,294,967,295. A rebuild and an import give the
+files theirs in the walk's order, a file's being 60001 and its position, and then the
+folders theirs in the table's order; an upload of a new file takes the lowest id the map
+does not hold, a replacement keeps its file's, and a removal frees its file's and those of
+the folders it leaves without a file. No writer looks at the board's show: where an item
+of the show has a drive's id, the commands mean the item.
+
+The index agrees with the pages: the same files, with the same fields, and no file twice.
+A reader that finds an index file shorter than its lines or with another CRC-32 than the
+marker or the table gives it finds the catalog `damaged` with `page`, and one whose lines
+are not those its folders make, or that do not agree with the pages, with `line`.
 
 ### What a reader finds
 
@@ -122,6 +210,43 @@ are never read.
 An upload adds or replaces with the action `move upload.part <name>`: the file is checked
 as `upload.part` and becomes the animation in the same commit as its entry. A removal takes
 the entry out with `remove <name>`.
+
+### A drive's index in a change
+
+A change of a drive's catalog writes each index file it changes whole as `.new` beside its
+pages, before its marker, and its record names each one: `move index-0.new index-0.txt`,
+or `remove index-60008.txt` for the file of a folder that leaves the table. The actions
+stand in this order: the removals of the files of the folders that left, the animation's
+own action, then each folder's file in the table's order, the table and the map:
+
+```
+odrig-catalog-do 1 generation 0000002b
+pages 0008
+move upload.part sunrise.odrg
+move index-0.new index-0.txt
+move index-folders.new index-folders.txt
+move index-ids.new index-ids.txt
+crc 4c1e00a7
+```
+
+What each change writes, besides its page and the marker:
+
+| Change | The index files written |
+|---|---|
+| An upload of a new file, into the root: its line after the root's last file line, the lowest free id | the root's file, the table (the root's files one more, every other folder's first position one more), the map |
+| A replacement: its line anew, its id and place kept | the root's file, the table |
+| A removal of a file of folder k | k's file, and its parent's, whose line for k says one file less; when nothing is left at or below k, k and each ancestor left so leave the table, their files are removed and the parent of the topmost loses its line for it; the table; the map |
+| A move of a file among its folder's files, before another or last | the folder's file, the table, the map; no page, the mask `0000` |
+| A rebuild or an import | everything: every page, every folder's file, the table and the map, and the removal of the files of the old table's folders whose ids the new one does not have |
+
+A rebuild and an import keep the order the drive's files were moved into. For each folder of
+the new table they put first the files of the old index's file of its path, in their
+order, that are still there and pass; then the folder's other files that pass and that
+the old pages have no line for, by the bytes of their names. They take the old index when
+its marker is of version 2 and every page, the table, the map and each folder's file agree
+with their CRC-32s and each line is in its form; otherwise every folder's files are by the
+bytes of their names. The PC tool's `import` takes every animation file of the folder; the
+board's rebuild every file its host lists.
 
 ## The writers
 

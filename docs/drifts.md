@@ -10758,3 +10758,107 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 50: which catalogs are of version 2
+
+**Question.** The seed takes the marker's format to version 2 and says a reader of version
+1 finds it incompatible. The board's own storage has a catalog too, with no folder and no
+index. Does its marker go to version 2 as well, which would make every board's catalog
+incompatible after the update?
+
+**Answer.** No. Version 2 is the marker of a catalog with an index, a drive's: the marker
+of version 1 with the lines `folders` and `ids` before its `crc` line, 461 bytes. The board's
+own catalog stays of version 1, 409 bytes, as it has no index. Each reader takes only its
+storage's version: a drive's catalog of version 1, the cards made before the index, is
+`incompatible` until `import` or `catalog rebuild external` writes it anew, and a catalog of
+version 2 in the board's own storage is `incompatible` too.
+
+**Resolution.** `odrig/catalog.py` (`parse_marker(data, drive)`, `Storage(folder, drive)`);
+docs/catalog.md, "The marker"; docs/specs/50-p2-more-than-256-files-on-a-drive/design.md.
+
+## Seed 50: the index's files and lines
+
+**Question.** The seed asks for fixed-width lines and three kinds of file, but names
+neither the files, the widths nor the fields beyond a list, and does not say where a
+folder's file's CRC-32 stands, since the marker cannot name a number of files that grows
+with the folders.
+
+**Answer.** `index-<id>.txt` for each folder, the root's `index-0.txt`, `index-folders.txt`
+for the table and `index-ids.txt` for the map. Lines of 180 bytes in a folder's file and
+in the table, 36 in the map, padded with spaces before the line feed; a line's last field
+is what follows its fixed fields with the padding cut off, which a name never ends in. A
+file's line has the fields of its catalog line after its id and `f`, its canvas among
+them, so that the core leaves out a file of another canvas without a page; a folder's line
+has its id, `d`, its number of own files, which the app shows on a folder's row, and its
+path. The table's line has, besides the seed's fields, the ordinal after the folder's last
+descendant, the number of files of the folders before it, and the CRC-32 of its file; the
+marker names the table and the map with their lines and CRC-32s, so any change of a
+folder's file changes the table's CRC-32 and the marker.
+
+**Resolution.** `odrig/catalog.py` (`Index`, `parse_index`); docs/catalog.md, "The index of
+a drive".
+
+## Seed 50: the ids the writers give, and the show's
+
+**Question.** The seed keeps the ids stable "as today": the lowest free id when a file is
+added, the same files with the same show the same ids. Today the core skips the ids of the
+show's items. The PC tool, which writes the index on a computer, does not know the show,
+and the two writers must leave the same bytes. And what does a rebuild give, which sorts
+nothing in memory?
+
+**Answer.** Neither writer looks at the show. A rebuild and an import give the files the
+ids from 60001 in the walk's order and the folders the ids after them in the table's order,
+as a listed drive's files and folders get theirs today with an empty show; an upload of a
+new file takes the lowest id the map does not hold, a replacement keeps its file's, a
+removal frees its own and those of the folders it empties. Where an item of the show has a
+drive's id, every command means the item, as `play` finds the show's items first today;
+an upload to the show of an id the drive's index holds stays `in-use`. A rebuild that
+gives the ids anew in the walk's order keeps the same files in the same order on the same
+ids, and writes the map in one pass, without a sort.
+
+**Resolution.** `odrig/catalog.py` (`build_index`, `lowest_free_id`); docs/catalog.md, "The
+index of a drive".
+
+## Seed 50: the order a rebuild keeps, and the old index it trusts
+
+**Question.** A rebuild and an import keep the order of the rows they find for the files
+still there and put new files after them. Which old index is trusted, and how is a "new"
+file told apart in the core, which cannot hold the old rows of a big folder?
+
+**Answer.** The old index is taken when its marker is of version 2 and every page, the
+table, the map and each folder's file agree with their CRC-32s and each line is in its
+form, the check the core can make by reading each once; otherwise every folder's files are
+by the bytes of their names. A folder's old rows are those of the first line of the old
+table with its path. A new file is one the old pages have no line for, which the core
+finds by reading one page; both writers ask the pages, not the old rows, so that they
+agree on every card.
+
+**Resolution.** `odrig/catalog.py` (`_sound_old`, `build_index`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: the record's actions of an index
+
+**Question.** The commit record of version 1 knows `move upload.part <name>` and `remove
+<name>`. How does it put a change's index files in place, and in what order?
+
+**Answer.** `move <from> <to>` takes any file of the catalog as `<from>`, and `remove` an
+index file too; the record's first line stays `odrig-catalog-do 1`. A change writes each
+index file it changes as `.new` before the marker, and the record names them in a fixed
+order, so that both writers write the same record: the removals of the files of the folders
+that left, the animation's own action, each folder's file in the table's order, the table,
+then the map. A file of the index left without a line, the root's or the map, is removed.
+
+**Resolution.** `odrig/catalog.py` (`_index_actions`, `commit`); docs/catalog.md, "A
+drive's index in a change".
+
+## Seed 50: where the PC tool adds a file to a drive
+
+**Question.** `add` puts a file into the folder under the last part of its path, so always
+into the root. The library's `add` takes any name a catalog may hold. Where does a file
+with a folder in its name go in a drive's index, whose folder may not be in the table?
+
+**Answer.** Into the root only, as the board's uploads: the library refuses a name with a
+`/` for a drive with `file-malformed`. A file put into a folder on a computer joins the
+index with `import`.
+
+**Resolution.** `odrig/catalog.py` (`add`).

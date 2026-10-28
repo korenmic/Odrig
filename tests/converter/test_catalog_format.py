@@ -44,6 +44,28 @@ class TheVectors(unittest.TestCase):
             self.assertEqual({path.name: path.read_bytes() for path in folder.iterdir()}, files, name)
 
 
+class TheIndexVectors(unittest.TestCase):
+    def test_every_vector_of_a_drive_reads_as_its_case_says(self):
+        cases = json.loads((VECTORS / "index" / "cases.json").read_text(encoding="ascii"))
+        self.assertEqual(len(cases), 8)
+        self.assertEqual({path.name for path in (VECTORS / "index").iterdir() if path.is_dir()}, set(cases))
+        for name, wanted in sorted(cases.items()):
+            with self.subTest(vector=name):
+                found = catalog.read(catalog.Storage(VECTORS / "index" / name, drive=True))
+                self.assertEqual((found.state, found.detail), (wanted["state"], wanted.get("detail", "format 1, check 1" if wanted["state"] == "incompatible" else "")))
+                if wanted["state"] == "ok":
+                    self.assertEqual(found.marker.generation, wanted["generation"])
+                    self.assertEqual([[entry.name, entry.bytes, entry.crc, entry.width, entry.height, entry.total_ms, entry.type] for entry in found.entries], wanted["entries"])
+                    self.assertEqual([[file_id, entry.name] for folder in found.index.folders for file_id, entry in folder.rows], wanted["walk"])
+
+    def test_the_builder_writes_the_same_bytes_again(self):
+        from .build_catalog_vectors import index_cases
+
+        for name, (files, _) in index_cases().items():
+            folder = VECTORS / "index" / name
+            self.assertEqual({path.name: path.read_bytes() for path in folder.iterdir()}, files, name)
+
+
 class TheMarker(unittest.TestCase):
     def test_it_is_409_bytes_of_18_lines_at_every_generation(self):
         for generation in (1, 0x2A, 0xFFFFFFFF):

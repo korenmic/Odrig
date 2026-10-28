@@ -35,7 +35,7 @@ Rules for every task:
   decisions a task takes beyond the seed go into `docs/drifts.md` under "Seed 50" in the
   task's commit.
 
-- [ ] 1. The PC tool keeps a drive's index
+- [x] 1. The PC tool keeps a drive's index
   - Set the seed's `state.json` to `in_progress`.
   - `odrig/catalog.py`: a storage knows whether it is a drive (`Storage(folder,
     drive=True)`, `MemoryStorage(files, drive=True)`); a drive's catalog is of version 2,
