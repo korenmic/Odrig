@@ -11,24 +11,31 @@ The app has four screens, and a tab for each at the bottom: `Animations`, `Uploa
 teal and violet aurora, translucent rounded panels with a restrained glow, light text, and
 a top bar with the app's name and whether the installation answers.
 
-- **Animations** says what the installation does and holds its animations. A panel says
-  what plays, the animation on the LEDs with its id and its file name, before them the
-  square of its preview as a row has it, hidden while nothing plays, while a test shows
-  and while the list does not hold the animation yet, `ON` or `OFF`, the
-  brightness and the refreshes a second, with `On` and `Off` together in one pill, the line
-  `Set the brightness to` with a field that holds the brightness as a number, and the big
-  slider for it under them: the field and the slider follow each other both ways. Between
-  the name of the animation on the LEDs and the line of what plays stands its bar while a
+- **Animations** says what the installation does and holds its animations. A panel begins
+  with a row of two round buttons of 48 pixels: at its left the power icon, which switches
+  the LEDs off while they are on and on while they are off, and is lit teal while the
+  installation says they are on; at its right a chevron that collapses the panel to that
+  row and expands it again. Under them the panel says what plays, the animation on the
+  LEDs with its id and its file name, before them the square of its preview as a row has
+  it, hidden while nothing plays, while a test shows and while the list does not hold the
+  animation yet, `ON` or `OFF`, the brightness and the refreshes a second, the line `Set
+  the brightness to` with a field that holds the brightness as a number, and the big
+  slider for it under them: the field and the slider follow each other both ways. The
+  panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
+  and `Off`. Under the name of the animation on the LEDs stands its bar while a
   playlist turn plays it, the root's or a folder's, and the list holds it: its row menu's
   actions but the moves, in short words, `Ignore` or `Restore`, `Select`, `Delete` and,
   for a text or a clock, `Edit`, or a line that says why it has none; `Repeat this` with a
   field that holds the loops of the turn in progress; and `Save` and `Restore default`,
   which keep a count for every later turn of that animation on the installation or remove
   it. The bar has three lines of 48 pixels on an installation that reports the counts of
-  the turn, two on one that does not, whatever the animation. The panel, from `Now playing`
+  the turn, two on one that does not, whatever the animation. The panel, from its top row
   down to the slider, stays at the top of the screen while the rest scrolls under it,
   whenever a whole row of the list, 80 pixels, still fits between it and the tabs; held
-  sideways, on a short phone or with the keyboard open, the whole screen scrolls. Under the refreshes, while the installation reads its
+  sideways, on a short phone or with the keyboard open, the whole screen scrolls.
+  Collapsed, the panel is its top row alone, the list has the room, and the row stays at
+  the top whenever a row of the list fits under it; the phone keeps the choice across a
+  restart of the app. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
   read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
@@ -39,8 +46,8 @@ a top bar with the app's name and whether the installation answers.
   present without animations says `0 animations`; an absent one says `absent` with no
   number. While the board still reads its animations after a start, the external number
   is `animations not known yet`, and while the show is invalid the internal one is
-  `animations not known`. Below them is `Add animation`, which opens Upload; then, when
-  Settings says so, the pinned Tests group; then two filters and the one list of
+  `animations not known`. Below them, when Settings says so, stands the pinned Tests
+  group; then two filters and the one list of
   animations, one level of the card's folders at a time, as a file explorer shows them.
   Above the list stands the level's heading, `Root` or the folder's whole path, as
   `night/deep`, with `Back` inside a folder and the button `Play this folder`, which
@@ -94,7 +101,7 @@ thirty-eight command lines and no other, each as `POST /odrig` to the address th
 | Nothing: when the target first answers, every ten seconds, when the list is out of date, and every second while the target answers `busy` | `list 0`, and `list <next>` for a long show |
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
-| Presses `On` or `Off` | `on`, `off` |
+| Presses the power icon while the LEDs are off, or while they are on | `on`, `off` |
 | Moves the slider, or enters a brightness in its field | `brightness <n>` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
@@ -286,9 +293,11 @@ Store. It asks for no permission that the phone shows a question for.
    animation after it. `Play this folder` at the root goes back to the first animation
    of the root playlist; a tap on a folder's row enters it, and `Play this folder` there
    makes that folder's playlist current, from its first animation; the installation
-   keeps the choice across a restart. `Back` goes up one level. `Off`
-   makes every LED dark and `On` lights them again; the playlist's time goes on while
-   they are off. The slider sets the brightness from 0 to 255, and so does a number typed
+   keeps the choice across a restart. `Back` goes up one level. The power icon at the
+   panel's top left makes every LED dark while they are on, and lights them again while
+   they are off; the playlist's time goes on while they are off. It is lit teal while the
+   installation says the LEDs are on, so a press shows its effect with the next status.
+   The slider sets the brightness from 0 to 255, and so does a number typed
    into the field above it, sent when Done or Enter is pressed or the field is left: the
    slider stands at each number as it is typed, and the field shows where the slider
    stands. A number above 255 is not sent, and the line under the slider says `The
@@ -302,6 +311,9 @@ Store. It asks for no permission that the phone shows a question for.
    this turn alone; the app then says how many loops it plays and which is playing. `Save`
    keeps the field's number for every later turn of the animation, also after a restart,
    and `Restore default` brings the show's own count back. Leaving the field sends nothing.
+5. The chevron at the panel's top right collapses the panel to its top row, the power icon
+   and the chevron, and gives the list the room; pressed again it expands the panel. The
+   phone keeps the choice across a restart of the app; another phone has its own.
 
 What the screens show comes from the installation's replies, about once a second: when
 another phone changes something, this one shows it within two seconds. While the
@@ -310,8 +322,8 @@ the app goes on asking and recovers by itself. While the app is not on the scree
 phone it sends nothing, and the phone's screen stays on while the app is in front.
 
 Right after the installation was switched on, Animations has the state and the rows
-at once, in the saved order: the installation plays from its first moment, and `On`,
-`Off`, the slider and `Play this folder` work. The installation reads what it has
+at once, in the saved order: the installation plays from its first moment, and the power
+icon, the slider and `Play this folder` work. The installation reads what it has
 installed while it plays; until it has read a file whole, its row says `size not read
 yet`, and a file in which it finds a fault turns unavailable. Moving an animation waits
 until it has read them all: the installation refuses a move with `busy` until then, and
@@ -343,7 +355,8 @@ names nothing, or met no fault, or whose software does not know `fault`, shows n
 line.
 
 A cycle of the show is not in the list and cannot be started from the app. While one
-plays, Animations says `Cycle` with its id, and `Play this folder` leaves it.
+plays, no level's heading and no folder row is marked, the bar is hidden, and `Play this
+folder` leaves it.
 
 The filters count the rows of the level shown and hide only rows: a folder row stays
 whatever the filters, and `No animation matches the filters.` speaks of the level's rows.
@@ -352,14 +365,17 @@ the file in the card's folder `odrig` itself, the root level; a folder row is no
 animation, so it is not counted in the storage lines, not offered by the filters and not
 taken by `Select all`.
 
-The line that says what plays names the current playlist and the time left in its window
-of 24 hours of running time, from `status`: `Playlist · 23 h 12 min left` for the root
-while the card has folders, `Playlist night · 23 h 12 min left` for a folder by its
-path, and `Playlist night, the root plays for now · 23 h 12 min left` while the root
-plays in a folder's place, because the folder has nothing to play yet or an animation
-outside it was tapped. With no folder on the card, or none in, the line is `Playlist`
-without a time, as before. A folder the list does not hold yet, right after a card is put
-in, is named by its id until the list has come.
+The panel shows no line of what plays. The current playlist is the marked heading of its
+level and the marked folder rows that lead to it; the time left in its window of 24 hours
+of running time, which `status` reports, is not on the screen. The page keeps the line's
+words, hidden: `Playlist · 23 h 12 min left` for the root while the card has folders,
+`Playlist night · 23 h 12 min left` for a folder by its path, `Playlist night, the root
+plays for now · 23 h 12 min left` while the root plays in a folder's place, because the
+folder has nothing to play yet or an animation outside it was tapped, `Playlist` with no
+folder on the card or none in, `Cycle 3` for a cycle, `Nothing plays`, and the reason of
+an invalid show, `The installed show is invalid: <reason>.`; a folder the list does not
+hold yet, right after a card is put in, is named by its id until the list has come. Why a
+show is invalid is said on the target screen, and in the message of a refused play.
 
 A tap on a row plays its animation. Its `...` button opens the row's menu and plays
 nothing. The menu of an internal animation has `Ignore in playlist`, or `Restore to
@@ -376,9 +392,11 @@ removes it, and `Keep it` sends nothing. Afterwards the app says `Removed animat
 plays, or that a USB stick or a card the installation cannot write holds, cannot be
 removed: the installation refuses it, and the app says why. A file of a card the
 installation can write that has a fault is deleted from its menu, or uploaded again under
-its name, which keeps its id. `Select`, in the menu or above the list, starts the selection mode: a checkbox on
-each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The
-question names the count and the files before anything is sent; the deletion goes in
+its name, which keeps its id. `Select`, in an internal row's menu or on the bar of the
+animation playing now, starts the selection mode with that row ticked: a checkbox on
+each internal row, `Select all`, `Clear selection`, `Delete selected` and `Done`. The list
+has no `Select` of its own, so while nothing plays the selection starts from a row's menu.
+The question names the count and the files before anything is sent; the deletion goes in
 batches of at most 32, and a refusal or a lost reply says how many were deleted. The back
 gesture goes from Upload, Settings or the target screen to Animations.
 
@@ -415,9 +433,9 @@ controller moved something meanwhile, the installation refuses the move with
 `order-conflict`, the app says so and reads the order again; it never moves again by
 itself.
 
-To make an animation, open Upload, or press `Add animation`, press `Choose a video or a
-GIF` and pick a file; the phone shows its own picker. The app shows the file's name, and for a video its
-length. Then:
+To make an animation, open Upload, press `Choose a video or a GIF` and pick a file; the
+phone shows its own picker. The app shows the file's name, and for a video its length.
+Then:
 
 1. Choose how the picture fits the canvas: `Fill`, at first, covers the whole canvas and
    cuts off what does not fit at two sides; `Fit` shows all of the picture, with the rest
@@ -819,15 +837,20 @@ installed; the phone with mobile data on.
    incoming connections if macOS asks. Phone and Mac on the same Wi-Fi network. Give the
    app the address of the emulator's `lan:` line. *Seen:* `Answers`, `Sent over Wi-Fi.`,
    and then the show screen.
-3. **Status.** *Seen:* the show screen has what the emulator's page has: on, the
-   brightness, `Playlist`, the animation with its file name, about 50 refreshes a second.
+3. **Status.** *Seen:* the show screen has what the emulator's page has: on, with the
+   power icon lit teal, the brightness, the animation with its file name, about 50
+   refreshes a second; no line `Playlist`.
    Send `python -m odrigctl --http 127.0.0.1:8600 brightness 40` on the Mac: the phone
    shows 40 within two seconds.
-4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root;
-   then type 8 into the brightness field and press Done on the keyboard, and move the
-   slider. *Seen:* the emulator's page follows each, and its log has each line as `http`;
-   after Done the brightness is 8 and the slider stands at 8, and while the slider moves the
-   field shows its number.
+4. **Controls.** The power icon twice, the slider, each animation, `Play this folder` at
+   the root; then type 8 into the brightness field and press Done on the keyboard, and move
+   the slider; then the chevron at the panel's top right, a restart of the app, and the
+   chevron again. *Seen:* the emulator's page follows each, and its log has each line as
+   `http`, `off` and then `on` for the power icon, which is dark while the LEDs are off and
+   lit while they are on; after Done the brightness is 8 and the slider stands at 8, and
+   while the slider moves the field shows its number; the chevron leaves the panel its top
+   row alone and the list moves up, the panel is still collapsed after the restart, and the
+   chevron brings it back whole.
 5. **No answer.** Stop the emulator. *Seen:* within five seconds the app says that
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
@@ -852,8 +875,8 @@ installed; the phone with mobile data on.
     network and then to the board on its own network. *Seen:* the progress with its speed,
     then `Uploaded as animation ...`; the animation is last in the list of Animations and
     plays on the emulator's page and on the LEDs when its row is tapped.
-13. **A long press.** Hold a finger for a second on a line of Animations, on the button
-    `On`, on the `...` of a row, on an empty part of the screen, and then on the address of
+13. **A long press.** Hold a finger for a second on a line of Animations, on the power
+    icon, on the `...` of a row, on an empty part of the screen, and then on the address of
     the target screen. *Seen:* outside the address no text is marked and no menu opens; in
     the address a word is marked and the menu of copying and pasting opens. The buttons
     still work by a tap. Note whether a long press on a button pressed it too.
@@ -952,12 +975,22 @@ By programs, on a Mac:
   sent as 80, and nothing sent for the brightness in force, an emptied field, 256 or a
   commit while the app is away, the free
   storage, a removal from a row's menu confirmed and one kept, each message, the back
-  gesture across the four tabs and `Add animation`.
+  gesture across the four tabs.
 - The Aurora Glass look, in Chrome at 360 and 320 pixels upright and 740 sideways:
   every text at a contrast of 7:1 or more against what lies behind it, the translucent
   panels composited onto the midnight background, every control at least 44 pixels and
   the main ones 48, 8 pixels apart, the four tabs at equal width along the bottom, a
-  row's menu, a message and a question above the tabs, nothing scrolling sideways.
+  row's menu, a message and a question above the tabs, nothing scrolling sideways; the
+  power icon and the collapse button 48 pixels round at the two ends of the panel's top
+  row, their icons at 7:1 or more, lit and dark, with the panel whole and collapsed.
+- The panel's top row, in Chrome against the emulator and against stand-in targets: the
+  power icon sending `off` while the status says the LEDs are on and `on` while it says
+  they are off, and pressed as the status says, not as the press would have it; the line
+  of what plays and the `On` and `Off` buttons not shown, the line's words kept; no
+  `Select` of the list's own and no `Add animation`, the bar's `Select` kept; the collapse
+  button leaving the panel its top row, the list's room growing and the frozen top measured
+  again at once, at 320 by 568 and at 412 by 915, expanding the panel again, and the choice
+  kept across a reload.
 - The bar of the animation playing now, in Chrome against the emulator and against stand-in
   targets: its place and when it shows, its actions for each kind of animation, `Ignore`
   moving on, `Delete` asking first, `Select` from another folder and through a filter with
@@ -990,9 +1023,9 @@ By programs, on a Mac:
   nested folders and against stand-in targets with a fixed time left: the root's rows
   and folder rows with their names and counts, a folder without a file of its own,
   entering a folder and `Back` up to the root, the heading of a level, the marks of the
-  current playlist's level and of the folder rows that lead to it, the forms of the line
-  that says what plays, `Play this folder` inside a folder and at the root, the Tests
-  group left alone, the card out and in bringing the list to the root, a drag and `Move
+  current playlist's level and of the folder rows that lead to it, the forms of the words
+  of the hidden line that says what plays, `Play this folder` inside a folder and at the
+  root, the Tests group left alone, the card out and in bringing the list to the root, a drag and `Move
   up` and `Move down` within the level only and nothing sent for a drop in place, the
   filter counts of the level, a folder row under every filter, `Select all` and the
   counts on rows only.
@@ -1096,6 +1129,9 @@ By programs, on a Mac:
   `repeat`, so its app shows the bar without `Repeat this`, `Save` and `Restore default`;
   those need a firmware with seed 48. Nobody has seen the bar or the frozen panel on a
   phone: step 22 above.
+- **The owner's changes of 2026-10-28 on a phone.** Nobody has pressed the power icon or the
+  collapse button on a phone, or seen the panel there without `Playlist`, `Add animation`
+  and the list's `Select`: steps 3, 4 and 13 above, with an APK built after these changes.
 - **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
   owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
   and to see the field show the slider's number while it moves.

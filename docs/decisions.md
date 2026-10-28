@@ -785,3 +785,11 @@ are in [format.md](format.md), "Measured sizes".
 - 2026-10-28: The owner's ruling: GIFs may be tracked beside a seed, in its folder, as its
   references, besides the previews of `thumbnails/`; MP4 and MOV files are tracked nowhere.
   Seed 52's two text files of references end their lines with a line feed alone.
+- 2026-10-28: The owner's orders for the operators' app, made directly on `master` by the
+  owner's exception to the rule of one's own branch: the list's own `Select` and `Add
+  animation` go, so a selection starts from a row's menu or the bar and Upload is reached
+  by its tab; the line of what plays and the words `On` and `Off` are hidden, and the power
+  icon alone switches the LEDs, `off` while they are on and `on` otherwise, lit while the
+  status says they are on; a chevron at the right of the panel's top row, with the power
+  icon at its left, both 48 pixels round, collapses the panel to that row and expands it,
+  and each phone keeps the choice. No command and no reply changed.
