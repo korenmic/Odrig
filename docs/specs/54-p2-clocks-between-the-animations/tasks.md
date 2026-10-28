@@ -53,7 +53,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the app's.
   - Requirements: 9.1 to 9.4
 
-- [ ] 7. The clocks on the card, the pages and every suite
+- [x] 7. The clocks on the card, the pages and every suite
   - The 112 in `collection/card/clocks/` checked against the share; the emulator with the
     demo show and `--drive-folder collection/card`: a break after 5 turns, the message, a
     turn cut and resumed; `docs/microsd.md` (the 256), `agent/vocabulary.md` (`clock

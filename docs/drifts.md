@@ -11922,3 +11922,20 @@ the code differs from it?
 **Resolution.** `core/src/breaks.cpp`, `core/src/player.cpp`, `core/src/order.cpp`,
 `core/src/mapping_control.cpp`, `tests/core/host/host.cpp`; `docs/show.md`,
 `docs/core.md`, `docs/commands.md`.
+
+## Seed 54: the clocks on the card, and the proof on the emulator
+
+**Question.** Are the clocks of `collection/card/clocks/` those of the share, and do the
+breaks play on the collection's card as the seed says?
+
+**Answer.** The 339 files of `collection/card/clocks/`, the 112 clocks and the message with
+their GIFs and readmes, have the bytes of the share's `card/clocks/`. The demo show with
+`--drive-folder collection/card`, the clocks and the message switched on by their lines:
+the folder `clocks` was passed over by the playlist; when 5 minutes were counted, the
+frames clock `clock-013` cut the turn of `archive/vjmorph-nurave-kali_fit.odrg` after 10 s
+of it, the message played once for 6 s, and that turn went on for the 17.5 s it had left;
+five turns later the picture dial `clock-064` played between two turns. The card's folder
+has more than 256 files without a catalog, so its last files are passed over; the clocks
+come early in the walk and all 113 play.
+
+**Resolution.** `docs/microsd.md`, `agent/vocabulary.md` (`clock break`).
