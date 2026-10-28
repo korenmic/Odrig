@@ -11984,3 +11984,16 @@ there finds only the emulators of temporary and preview folders, as without a ru
 `tests/core/test_readiness.py`, `tests/emulator/test_drive.py`,
 `tests/emulator/test_events.py`, `tests/converter/test_catalog_types.py`,
 `converter/tests/thumbnailtool.test.js`; `agent/working-rules.md`.
+
+## The generators that docs/emulator.md shows
+
+**Question.** The converter's test of the documents counted three generator lines in
+`docs/emulator.md`, those of the demo show and of the dense show; the demo show of the clock
+breaks shows the demo's generators again, on macOS and Linux and in PowerShell. Is the count
+or the page wrong?
+
+**Answer.** The count. What the test means is that the page generates with the Python
+programs, and each of them is still the one the commands start: the generators the page
+names are exactly `hello_world`, `dvd_bounce` and `dense`, however many lines run them.
+
+**Resolution.** `converter/tests/docs.test.js`.
