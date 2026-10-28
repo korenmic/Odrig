@@ -47,7 +47,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - Suites: the emulator's, the firmware tool's, onboarding.
   - Requirements: 8.4, 10.1
 
-- [ ] 6. The app's panel
+- [x] 6. The app's panel
   - `app/www/index.html`, `screens/clocks.js`, `commands.js`, `client.js`, `main.js`,
     `style.css`; `tests/app/test_clocks.py`; `docs/android-app.md`.
   - Suites: the app's.
