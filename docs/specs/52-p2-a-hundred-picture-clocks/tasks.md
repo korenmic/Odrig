@@ -167,3 +167,28 @@ Rules for every task:
   - The owner plays a selection of the clocks on the installation and says whether they
     read. Not done by an agent.
   - Requirements: 13.4
+
+- [ ] 14. The clocks placed as the collection says
+  - The branch brought up to date with `origin/master`, which holds the collection's
+    standard, `collection/README.md`.
+  - The 112 files in `collection/card/clocks/`, their path on the card being `clocks/`,
+    none heavy (each under 50,000,000 bytes; the task checks it). Beside each: `X.gif`
+    written by `node converter/odrig.js thumbnail collection/card/clocks/X --catalog
+    thumbnails --card collection/card --beside`, so its line in `thumbnails/catalog.js`
+    carries its card path; and `X.md` in the 16-line shape of `collection/README.md`.
+    Tracked: each file, its GIF and readme, `thumbnails/catalog.js` and each new
+    `thumbnails/<key>.gif`.
+  - The clocks' sources, the owner's picture, `tiles/`, `inventory.json`, `base/` and
+    `tools/`, are kept beside the seed in
+    `project-seeds/52-p2-a-hundred-picture-clocks/source/`, tracked, and no longer in the
+    collection. Each document that names their old place names the new one.
+  - The share: the same files at the same paths in the share's collection,
+    `card/clocks/`. The share's earlier `clocks/` folder of the collection is moved, not
+    deleted, into the share's folder artifacts/odrig/archived, with its relative path, as
+    seed 46 moved the old paths. Every file is read back. On the Windows computer the
+    share's collection is `E:\artifacts\odrig\collection`.
+  - Seed 52's requirements, design and readmes say `collection/card/clocks/`.
+    `docs/drifts.md` gets an entry at its end: the move and why.
+  - Suites: the converter's, the onboarding suite (it checks the collection in git), the
+    app's.
+  - Requirements: 10.1 to 10.3
