@@ -60,7 +60,7 @@ Rules for every task:
   - Commit the ticked checkbox alone: the moves are outside git.
   - Requirements: 3.1 to 3.4
 
-- [ ] 4. The tracked collection
+- [x] 4. The tracked collection
   - `.gitignore`: the two lines.
   - `collection/`: the 1,001 files copied from the share by
     `scratch/collection-46/copy_to_worktree.py`, compared with the share and the archive;
