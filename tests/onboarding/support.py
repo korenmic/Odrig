@@ -211,8 +211,11 @@ def _python(words):
         return understood(firmware.parser().parse_args, words[1:])
     if words[:1] == [BUILD_SCRIPT]:
         return understood(build_script().parser().parse_args, words[1:])
+    if words[:1] == ["tests/run.py"]:
+        from tests import run
+        return understood(run.parser().parse_args, words[1:])
     if words[:1] != ["-m"] or len(words) < 2:
-        return "it starts neither a module nor the firmware tool"
+        return "it starts neither a module, the firmware tool nor the runner of the suites"
     module, rest = words[1], words[2:]
     if module == "odrig":
         return "the Python package is a library and no program: the converter is node converter/odrig.js"
