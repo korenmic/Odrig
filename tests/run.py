@@ -184,50 +184,68 @@ class Runner:
         that runs the same discovery as `-m unittest discover -s FOLDER -t .`."""
         code = (
             "import json, sys, unittest\n"
-            "found = []\n"
+            "found = {}\n"
             "def walk(tests):\n"
             "    for test in tests:\n"
             "        if isinstance(test, unittest.TestSuite):\n"
             "            walk(test)\n"
             "            continue\n"
-            "        name = type(test).__module__\n"
+            "        name, kind = type(test).__module__, type(test).__name__\n"
             "        if name == 'unittest.loader':\n"
-            "            name = test.id().split('.', 3)[-1] if test.id().startswith('unittest.loader._FailedTest.') else name\n"
-            "        if name not in found:\n"
-            "            found.append(name)\n"
+            "            name, kind = (test.id().split('.', 3)[-1] if test.id().startswith('unittest.loader._FailedTest.') else name), None\n"
+            "        classes = found.setdefault(name, [])\n"
+            "        if kind is not None and kind not in classes:\n"
+            "            classes.append(kind)\n"
             f"walk(unittest.defaultTestLoader.discover({suite.folder!r}, top_level_dir='.'))\n"
-            "print(json.dumps(found))\n"
+            "print(json.dumps(list(found.items())))\n"
         )
         done = subprocess.run([self.python_of(suite), "-c", code], cwd=self.root, env=self.env_of(suite), capture_output=True, text=True)
         if done.returncode != 0:
             raise RuntimeError(f"the discovery of {suite.folder} failed:\n{done.stdout}{done.stderr}")
-        return json.loads(done.stdout.strip().splitlines()[-1])
+        found = json.loads(done.stdout.strip().splitlines()[-1])
+        return [module for module, _ in found], {module: classes for module, classes in found}
 
-    def seconds_by_module(self, suite):
+    def seconds_by(self, suite, depth):
+        """The seconds of the previous run's tests of a suite, summed by module (depth 2) or
+        by class (depth 1)."""
         seconds = {}
         for test in self.previous.get("tests", ()):
             if test.get("suite") == suite.name:
-                module = test["id"].rsplit(".", 2)[0]
-                seconds[module] = seconds.get(module, 0.0) + float(test.get("seconds", 0.0))
+                unit = test["id"].rsplit(".", depth)[0]
+                seconds[unit] = seconds.get(unit, 0.0) + float(test.get("seconds", 0.0))
         return seconds
 
-    def split(self, suite, modules):
+    def split(self, suite, modules, classes=None):
         """The modules of a suite given to its workers: the slowest first, each to the worker
-        with the least seconds so far; round the order of discovery without a report. Each
-        worker keeps its modules in the order of discovery."""
+        with the least seconds so far; round the order of discovery without a report. A
+        module that took more than a worker's share in the previous run is given by its test
+        classes instead. Each worker keeps its parts in the order of discovery."""
         count = max(1, min(self.arguments.workers, suite.cap or self.arguments.workers, len(modules)))
-        known = self.seconds_by_module(suite)
+        known = self.seconds_by(suite, 2)
         if not known:
             parts = [modules[index::count] for index in range(count)]
             return [(part, None) for part in parts if part]
         typical = statistics.mean(known.values())
         expected = {module: known.get(module, typical) for module in modules}
-        loads = [[0.0, []] for _ in range(count)]
-        for module in sorted(modules, key=lambda name: -expected[name]):
+        share = sum(expected.values()) / count
+        by_class = self.seconds_by(suite, 1)
+        units, order = [], {}
+        for module in modules:
+            kinds = (classes or {}).get(module) or []
+            if expected[module] > share and len(kinds) > 1:
+                for kind in kinds:
+                    unit = f"{module}.{kind}"
+                    order[unit] = len(order)
+                    units.append(unit)
+                    expected[unit] = by_class.get(unit, expected[module] / len(kinds))
+            else:
+                order[module] = len(order)
+                units.append(module)
+        loads = [[0.0, []] for _ in range(min(count, len(units)))]
+        for unit in sorted(units, key=lambda name: -expected[name]):
             least = min(loads, key=lambda load: load[0])
-            least[0] += expected[module]
-            least[1].append(module)
-        order = {module: index for index, module in enumerate(modules)}
+            least[0] += expected[unit]
+            least[1].append(unit)
         return [(sorted(names, key=order.get), seconds) for seconds, names in loads if names]
 
     def expected_of(self, suite):
@@ -246,7 +264,8 @@ class Runner:
             results = self.logs / f"{suite.name}.jsonl"
             return [([*worker, "--results", str(results), "--discover", suite.folder], results, self.expected_of(suite))]
         jobs = []
-        for index, (modules, seconds) in enumerate(self.split(suite, self.modules_of(suite))):
+        modules, classes = self.modules_of(suite)
+        for index, (modules, seconds) in enumerate(self.split(suite, modules, classes)):
             results = self.logs / f"{suite.name}-{index + 1}.jsonl"
             jobs.append(([*worker, "--results", str(results), "--modules", ",".join(modules)], results, seconds or 0.0))
         return jobs
@@ -359,11 +378,16 @@ class Runner:
             self.say(f"slowest {min(self.arguments.slowest, len(self.records))} tests:")
             for record in sorted(self.records, key=lambda record: -record["seconds"])[: self.arguments.slowest]:
                 self.say(f"  {record['seconds']:7.1f} s  {record['suite']}: {record['id']}")
+        # The suites this run did not run keep what the previous report holds of them, so
+        # that the next split of every suite has its times.
+        ran = set(self.summary)
+        kept_suites = {name: state for name, state in self.previous.get("suites", {}).items() if name not in ran}
+        kept_tests = [test for test in self.previous.get("tests", ()) if test.get("suite") not in ran]
         report = {
             "run": self.run_id,
             "wall": round(wall, 1),
-            "suites": {name: {"tests": state.get("tests"), "seconds": round(state.get("seconds", 0.0), 1), "outcome": state.get("outcome")} for name, state in self.summary.items()},
-            "tests": [{"suite": record["suite"], "id": record["id"], "seconds": record["seconds"], "outcome": record["outcome"]} for record in self.records],
+            "suites": dict(kept_suites, **{name: {"tests": state.get("tests"), "seconds": round(state.get("seconds", 0.0), 1), "outcome": state.get("outcome")} for name, state in self.summary.items()}),
+            "tests": kept_tests + [{"suite": record["suite"], "id": record["id"], "seconds": record["seconds"], "outcome": record["outcome"]} for record in self.records],
         }
         path = self.root / REPORT
         path.parent.mkdir(parents=True, exist_ok=True)

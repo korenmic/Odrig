@@ -127,6 +127,14 @@ class Running(unittest.TestCase):
         self.assertGreaterEqual(tests["tests.alpha.test_a.Passing.test_slower"]["seconds"], 0.2)
         self.assertGreater(report["wall"], 0)
 
+    def test_a_run_of_some_suites_keeps_the_previous_times_of_the_others(self):
+        root = standin_root(self, ALL)
+        ran(root, "--workers", "2")
+        ran(root, "--suites", "beta")
+        report = json.loads((root / "build" / "tests" / "report.json").read_text())
+        self.assertEqual(set(report["suites"]), {"alpha", "beta", "gamma"})
+        self.assertIn("tests.alpha.test_c.Failing.test_wrong", {test["id"] for test in report["tests"]})
+
     def test_passing_suites_end_with_status_0_and_an_option_adds_its_suite(self):
         root = standin_root(self, {name: text for name, text in ALL.items() if "test_c" not in name})
         status, out = ran(root, "--walkthrough")
@@ -186,6 +194,20 @@ class Splitting(unittest.TestCase):
         self.assertEqual(len(parts), 2)
         self.assertEqual(sorted(sum((names for names, _ in parts), [])), ["a", "b", "new"])
         self.assertEqual(sorted(seconds for _, seconds in parts), [4.0, 5.0])
+
+
+    def test_a_module_heavier_than_a_worker_s_share_is_given_by_its_classes(self):
+        tests = [{"suite": "alpha", "id": test_id, "seconds": seconds} for test_id, seconds in (
+            ("big.A.test_one", 7), ("big.A.test_two", 5), ("big.B.test", 8), ("small.C.test", 2))]
+        runner, suite = self.runner({"tests": tests})
+        # The share is 11 s: big, 20 s, goes by its classes A (12 s) and B (8 s).
+        parts = runner.split(suite, ["big", "small"], {"big": ["A", "B"], "small": ["C"]})
+        self.assertEqual(parts, [(["big.A"], 12.0), (["big.B", "small"], 10.0)])
+
+    def test_a_heavy_module_of_one_class_stays_whole(self):
+        tests = [{"suite": "alpha", "id": "big.A.test", "seconds": 20}, {"suite": "alpha", "id": "small.C.test", "seconds": 2}]
+        runner, suite = self.runner({"tests": tests})
+        self.assertEqual(runner.split(suite, ["big", "small"], {"big": ["A"], "small": ["C"]}), [(["big"], 20.0), (["small"], 2.0)])
 
 
 class TheTable(unittest.TestCase):

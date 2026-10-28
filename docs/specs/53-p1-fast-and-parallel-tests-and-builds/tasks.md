@@ -14,7 +14,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
       every failure that comes from two workers or two suites sharing a file, a port or
       a build: each test made to take its own, the failure seen first in the loaded run
       and quoted in the commit. Suites: runner, then every suite through the runner.
-- [ ] 3. Timing under load. Run `tests/run.py` three times in a row; every test that
+- [x] 3. Timing under load. Run `tests/run.py` three times in a row; every test that
       fails for time is made to assert what holds on a loaded computer, as requirement
       3.2 says, the failure seen first and quoted. Suites: every suite through the runner,
       three passes.

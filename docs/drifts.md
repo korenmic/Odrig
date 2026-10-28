@@ -11155,3 +11155,27 @@ That and the other tests that keep a suite above a third of its time alone are t
 with the timing: requirement 8.1 is met there.
 
 **Resolution.** No code changes for task 2; task 3 takes the slowest tests with the timing.
+
+## Seed 53: the slowest tests, a module split by its classes, and timing under load
+
+**Question.** Task 3 makes the tests that fail under load robust and brings the core's,
+the emulator's and the app's suites within a third of their time alone (requirement 8.1).
+What did that take?
+
+**Answer.** Three things. The core's test host read a whole file from storage again for
+every `read_at` of at most 512 bytes; a 10.8 MB clip took 193 s to play. It now keeps the
+content it read while the next call goes on where the last ended, with no storage call
+and no change of the drive in between, and reads anew otherwise; the clip plays in 0.6 s
+and the core's suite alone takes 368 s instead of 564. The runner gives a module that took
+more than a worker's share in the previous report by its test classes, and the report
+keeps the times of the suites a run did not run. And under load the app asked an
+installation that keeps no catalogs twice: the client asks once the target answers, and
+Settings' question, queued behind that answer, was sent after it; a queued question is now
+not sent once the installation is known to keep none (`client.catalog`), with a test whose
+stand-in answers in three seconds. Three passes in a row with eight workers then took 435,
+377 and 399 s, against 1,954 s one after another, with no failure but the linked Python
+environment of task 2's entry. Alone through the runner: core 95 s (564), emulator 58 s
+(387), app 271 s (854, its four workers kept).
+
+**Resolution.** `tests/core/host/host.cpp`'s `read_at`; `tests/run.py`'s `split` and report;
+`app/www/client.js`'s `catalog`; `tests/runner/test_runner.py`; `tests/app/test_catalog.py`.
