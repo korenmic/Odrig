@@ -439,10 +439,15 @@ input[type="range"] {
   position: relative;
 }
 
+.now-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 6px;
+}
+
 #now-collapse {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
   min-height: 0;
@@ -457,17 +462,16 @@ input[type="range"] {
 }
 
 #now-panel.collapsed {
-  display: flex;
-  justify-content: flex-end;
   padding: 6px;
 }
 
-#now-panel.collapsed > :not(#now-collapse) {
+#now-panel.collapsed > :not(.now-top) {
   display: none;
 }
 
-#now-panel.collapsed #now-collapse {
-  position: static;
+#now-panel.collapsed .now-top {
+  width: 100%;
+  margin: 0;
 }
 
 #playing {
@@ -475,6 +479,7 @@ input[type="range"] {
 }
 
 #power-toggle {
+  flex: 0 0 48px;
   width: 48px;
   height: 48px;
   min-height: 0;
@@ -499,10 +504,12 @@ input[type="range"] {
 }
 
 .power {
+  margin: 0;
   padding: 0;
   border: none;
   background: transparent;
   width: auto;
+  flex: 0 0 auto;
 }
 
 #now-panel.frozen {

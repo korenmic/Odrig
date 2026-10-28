@@ -14,7 +14,14 @@
 <main>
 <section id="animations" hidden>
 <div id="now-panel" class="panel">
+<div class="now-top">
+<div id="power-switch" class="power" role="group" aria-label="LEDs">
+<button id="power-toggle" type="button" aria-label="LEDs on or off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+<button id="on" type="button" aria-pressed="false" hidden>On</button>
+<button id="off" type="button" aria-pressed="false" hidden>Off</button>
+</div>
 <button id="now-collapse" type="button" aria-label="Collapse the panel" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="now-collapse-mark" d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
 <div class="now-row">
 <div class="now-words">
 <p class="label">Now playing</p>
@@ -22,11 +29,6 @@
 <div id="now-bar" role="group" aria-label="The animation playing now" hidden></div>
 <p id="playing">-</p>
 </div>
-</div>
-<div id="power-switch" class="power" role="group" aria-label="LEDs">
-<button id="power-toggle" type="button" aria-label="LEDs on or off" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a7.5 7.5 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
-<button id="on" type="button" aria-pressed="false" hidden>On</button>
-<button id="off" type="button" aria-pressed="false" hidden>Off</button>
 </div>
 <div id="state" class="facts">
 <p id="power">-</p>
