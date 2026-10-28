@@ -329,7 +329,7 @@ bool in_range(const Core &core, Range range, uint32_t position) {
 
 // The animation that plays with the smallest exhausting key within a range, above `above`
 // unless `any` is set; kNothing when none. Not inlined: the refresh's frame stays small.
-__attribute__((noinline)) uint32_t lowest_in(const Core &core, Range range, uint64_t above, bool any) {
+ODRIG_NOINLINE uint32_t lowest_in(const Core &core, Range range, uint64_t above, bool any) {
     uint32_t best = kNothing;
     uint64_t best_key = 0;
     for (uint32_t at = 0; at < core.item_count + core.drive_count; ++at) {
@@ -383,7 +383,7 @@ void rotate(Core &core, uint64_t at) {
 // exhausting order of the range in use, the first after the last; this one again when no
 // other plays. The current playlist takes over from its first animation as soon as it has
 // something to play again.
-__attribute__((noinline)) uint32_t next_animation(Core &core, uint32_t position) {
+ODRIG_NOINLINE uint32_t next_animation(Core &core, uint32_t position) {
     const bool was_in_place = core.in_place != 0;
     judge_in_place(core);
     if (was_in_place && !core.in_place) {
@@ -400,7 +400,7 @@ __attribute__((noinline)) uint32_t next_animation(Core &core, uint32_t position)
 // may last when the moment lies beyond it. When the loop ends on the way, the length is
 // known. When it does not, the animation is in its first loop and its turn goes on; or
 // the loop is longer than the longest time, and the turn ended there.
-__attribute__((noinline)) Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
+ODRIG_NOINLINE Reason playlist_turn(Core &core, uint64_t now, uint64_t *in_turn) {
     uint64_t elapsed = now - core.zero;
     bool rounds_taken = false;
     for (;;) {

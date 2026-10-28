@@ -10,6 +10,14 @@
 #include "odrig_core.h"
 #include "reasons.h"
 
+// Marks a function as never inlined, so that its frame stays apart from its caller's: in
+// the words of Microsoft's compiler, or in those of GCC and Clang.
+#if defined(_MSC_VER)
+#define ODRIG_NOINLINE __declspec(noinline)
+#else
+#define ODRIG_NOINLINE __attribute__((noinline))
+#endif
+
 namespace odrig {
 
 // Room for the reason text of an invalid show: the longest, `duplicate-id` and an id of 11
