@@ -32,6 +32,7 @@ SUITES = {
     "mapping": ("python3 -m unittest discover -s tests/mapping -t .", False),
     "apk": ("python3 -m unittest discover -s tests/apk -t .", False),
     "walkthrough": (".venv/bin/python -m unittest discover -s tests/walkthrough -t .", False),
+    "runner": (".venv/bin/python -m unittest discover -s tests/runner -t .", False),
     "board": ("python3 firmware/fw.py test-board", False),
     "air": ("python3 firmware/fw.py test-air", False),
 }

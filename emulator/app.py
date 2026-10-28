@@ -13,7 +13,7 @@ import signal
 import sys
 import threading
 
-from . import binding, engine, failure, host, httpd, hub, lineport, record
+from . import binding, engine, failure, host, httpd, hub, lineport, parent, record
 
 # The virtual serial port is a pseudo-terminal. A system without one has the line port.
 HAS_SERIAL = hasattr(os, "openpty")
@@ -68,6 +68,7 @@ def parser():
     made.add_argument("--lan", action="store_true", help="let other devices of the local network open the page and send commands over HTTP")
     made.add_argument("--drive", metavar="DIR", help="a folder that stands for the top of a drive, the card: its folder odrig appearing and going is the drive plugged in and pulled out")
     made.add_argument("--drive-read-only", action="store_true", help="the drive cannot be written, as a USB stick")
+    made.add_argument("--parent", metavar="PID", type=int, help="end when the process with this id ends: what the preview and the tests give, so that no emulator outlives its starter")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
     made.add_argument("--script", metavar="FILE", help="record mode: timed command lines to give the core")
@@ -138,6 +139,8 @@ def serve(arguments, out):
         for name in ("SIGINT", "SIGTERM", "SIGBREAK"):
             if hasattr(signal, name):
                 signal.signal(getattr(signal, name), lambda *_: stopped.set())
+        if arguments.parent is not None:
+            parent.watch(arguments.parent, stopped)
 
         print(f"page: {server.url}", file=out)
         if port is not None:
