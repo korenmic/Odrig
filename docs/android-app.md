@@ -15,8 +15,20 @@ a top bar with the app's name and whether the installation answers.
   what plays, the animation on the LEDs with its id and its file name, before them the
   square of its preview as a row has it, hidden while nothing plays, while a test shows
   and while the list does not hold the animation yet, `ON` or `OFF`, the
-  brightness and the refreshes a second, with `On` and `Off` together in one pill and a
-  slider for the brightness. Under the refreshes, while the installation reads its
+  brightness and the refreshes a second, with `On` and `Off` together in one pill, the line
+  `Set the brightness to` with a field that holds the brightness as a number, and the big
+  slider for it under them: the field and the slider follow each other both ways. Between
+  the name of the animation on the LEDs and the line of what plays stands its bar while a
+  playlist turn plays it, the root's or a folder's, and the list holds it: its row menu's
+  actions but the moves, in short words, `Ignore` or `Restore`, `Select`, `Delete` and,
+  for a text or a clock, `Edit`, or a line that says why it has none; `Repeat this` with a
+  field that holds the loops of the turn in progress; and `Save` and `Restore default`,
+  which keep a count for every later turn of that animation on the installation or remove
+  it. The bar has three lines of 48 pixels on an installation that reports the counts of
+  the turn, two on one that does not, whatever the animation. The panel, from `Now playing`
+  down to the slider, stays at the top of the screen while the rest scrolls under it,
+  whenever a whole row of the list, 80 pixels, still fits between it and the tabs; held
+  sideways, on a short phone or with the keyboard open, the whole screen scrolls. Under the refreshes, while the installation reads its
   animations after a start, a line says how far it is, as `Reading the animations: 12
   read, 72 to read.`; see [Using it](#using-it). A compact panel has the two storage lines: each begins with
   the number of animations of that storage, as
@@ -71,7 +83,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-five command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-eight command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -80,7 +92,7 @@ thirty-five command lines and no other, each as `POST /odrig` to the address tha
 | Taps a row of the list, or presses `Play this folder` inside a folder | `play <id>` |
 | Presses `Play this folder` at the root | `play all` |
 | Presses `On` or `Off` | `on`, `off` |
-| Moves the slider | `brightness <n>` |
+| Moves the slider, or enters a brightness in its field | `brightness <n>` |
 | Nothing: at boot, reconnect, return to the app, entering Animations or Upload, every ten seconds while either is visible, and after upload or deletion | `space` |
 | Chooses Delete in a row's menu and then `Remove it` | `remove <id>` |
 | Chooses Ignore in playlist or Restore to playlist in a row's menu | `ignore <id> <0-or-1>` |
@@ -97,6 +109,9 @@ thirty-five command lines and no other, each as `POST /odrig` to the address tha
 | Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
+| Presses `Repeat this` on the bar of the animation playing now, or Done or Enter in its field | `repeat <id> <n>` |
+| Presses `Save` on that bar | `repeat <id> <n> save` |
+| Presses `Restore default` on that bar | `repeat <id> default` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -270,7 +285,20 @@ Store. It asks for no permission that the phone shows a question for.
    makes that folder's playlist current, from its first animation; the installation
    keeps the choice across a restart. `Back` goes up one level. `Off`
    makes every LED dark and `On` lights them again; the playlist's time goes on while
-   they are off. The slider sets the brightness from 0 to 255.
+   they are off. The slider sets the brightness from 0 to 255, and so does a number typed
+   into the field above it, sent when Done or Enter is pressed or the field is left: the
+   slider stands at each number as it is typed, and the field shows where the slider
+   stands. A number above 255 is not sent, and the line under the slider says `The
+   brightness is 0 to 255.`; an emptied field sends nothing and shows the brightness again.
+4. The bar under the name of the animation on the LEDs acts on that animation as its row's
+   menu does, whichever folder the list shows: `Ignore` ends its turn at once, `Delete`
+   asks first, `Select` shows the selection with its row ticked, at the root and with the
+   filters showing it. Its field shows how many loops the turn in progress plays; type
+   another number and press `Repeat this`, or Done, and the turn plays that many loops from
+   its first frame, or ends with the loop in progress when that is already the last, for
+   this turn alone; the app then says how many loops it plays and which is playing. `Save`
+   keeps the field's number for every later turn of the animation, also after a restart,
+   and `Restore default` brings the show's own count back. Leaving the field sends nothing.
 
 What the screens show comes from the installation's replies, about once a second: when
 another phone changes something, this one shows it within two seconds. While the
@@ -488,12 +516,12 @@ alone or with a port, as in `192.168.1.23:8600`. For a phone to reach an emulato
 it with `--lan`; see [emulator.md](emulator.md#from-a-phone).
 
 A long press marks text, and opens the phone's menu of copying and pasting, only in a
-field one types into: the address on the target screen, and `Start at` and `Length` on
-Upload. Anywhere else, on a word, a button, a list or an empty part of the screen, a long
+field one types into: the brightness on Animations, the address on the target screen, and
+`Start at` and `Length` on Upload. Anywhere else, on a word, a button, a list or an empty part of the screen, a long
 press marks nothing and opens nothing, and a tap works as before; on a row of the list a
 long press lifts the row to be moved, and nothing else. In a
 browser a right click does the same: the browser's menu opens only in a field. A field
-that the app gets later is the same as these three.
+that the app gets later is the same as these four.
 
 The app keeps clear of the phone's bars: its heading begins below the bar at the top,
 with the clock and the icons, and its tabs end above the bar at the bottom, with
@@ -684,14 +712,17 @@ it is dismissed with `OK` or another takes its place.
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
+| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
 | `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
+| `no-space` | `Save` of the bar when the installation keeps no more saved repeats. | The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all. |
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
 | `order-conflict` | A move used an order that another controller, an upload or the card changed. | The order changed on the installation since the app read it. The list is read again; move the animation again. |
 | `stale` | A text or a clock that was edited was changed or removed by another controller since it was read. | Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one. |
+| `stale` | `Repeat this` of the bar after the animation's turn ended. | That animation's turn had already ended. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -718,6 +749,17 @@ A removal and an upload that succeeded are said in the same place, without a cod
 `Removed animation <id> <file>.`, `Uploaded as animation <id> <file>. It plays in the
 playlist.`, `Uploaded to the card as animation <id> <file>. It plays in the playlist.` and
 `Saved animation <id> <file>.`
+
+The bar of the animation playing now says the same way what its lines did, from the first
+`status` after the reply: `Animation 1 hello.odrg plays 8 loops this turn; loop 3 is
+playing.`, or `Animation 1 hello.odrg's turn has ended.` once its turn has ended; `Saved:
+animation 1 hello.odrg plays 5 loops every turn.` and `Default restored: animation 1
+hello.odrg plays its own count again.`, each followed by `It plays 8 loops this turn; loop 3
+is playing.` while the turn goes on; a count of one is `1 loop`. A number that is not 1 to
+65,535 is not sent: `A repeat is 1 to 65,535.` Without a reply: `No confirmed reply. The
+turn's count is read again before another change.` for `Repeat this`, and `No confirmed
+reply. The saved repeat is read again before another change.` for `Save` and `Restore
+default`.
 
 ## The phone and the installation's network
 
@@ -764,8 +806,11 @@ installed; the phone with mobile data on.
    brightness, `Playlist`, the animation with its file name, about 50 refreshes a second.
    Send `python -m odrigctl --http 127.0.0.1:8600 brightness 40` on the Mac: the phone
    shows 40 within two seconds.
-4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root.
-   *Seen:* the emulator's page follows each, and its log has each line as `http`.
+4. **Controls.** `Off`, `On`, the slider, each animation, `Play this folder` at the root;
+   then type 8 into the brightness field and press Done on the keyboard, and move the
+   slider. *Seen:* the emulator's page follows each, and its log has each line as `http`;
+   after Done the brightness is 8 and the slider stands at 8, and while the slider moves the
+   field shows its number.
 5. **No answer.** Stop the emulator. *Seen:* within five seconds the app says that
    nothing answers, in words. Start it again: the app recovers by itself.
 6. **The installation's network.** Power the board. In the phone's Wi-Fi settings join
@@ -848,7 +893,14 @@ installed; the phone with mobile data on.
     LEDs play on; `Cancel the rebuild` ends it, and a second rebuild that runs to its end
     leaves `Card: <n> animations, cataloged.` Keep the brightness at 40 or less while one
     strip is fed from the board itself.
-22. **Note** the phone's model, its Android version, the web view's version from the
+22. **The bar of the animation playing now.** With firmware that has the command
+    `repeat`, on Animations while the playlist plays. *Seen:* the bar under the name of the
+    animation on the LEDs, with its field holding the turn's loops; `Repeat this` with 3
+    plays it three loops and then the next; `Save` with 3 makes its next turn three loops
+    too, also after a restart of the board; `Restore default` brings its own count back;
+    `Ignore` moves on at once; the panel stays at the top while the list scrolls under it,
+    and with the phone held sideways the whole screen scrolls.
+23. **Note** the phone's model, its Android version, the web view's version from the
     target screen, and anything that was not as written.
 
 ## The suites
@@ -877,7 +929,11 @@ By programs, on a Mac:
 
 - The four tabs and every action of the web code, in Chrome against the emulator:
   the address, the status, the list for shows of up to 40 animations, `play`,
-  `play all`, `on`, `off`, the brightness with at most five commands a second, the free
+  `play all`, `on`, `off`, the brightness with at most five commands a second, by the slider
+  and by its field: the field following the slider and a typed number moving the slider,
+  Enter and leaving the field sending once, a slider move dropping text not sent, `080`
+  sent as 80, and nothing sent for the brightness in force, an emptied field, 256 or a
+  commit while the app is away, the free
   storage, a removal from a row's menu confirmed and one kept, each message, the back
   gesture across the four tabs and `Add animation`.
 - The Aurora Glass look, in Chrome at 360 and 320 pixels upright and 740 sideways:
@@ -885,6 +941,19 @@ By programs, on a Mac:
   panels composited onto the midnight background, every control at least 44 pixels and
   the main ones 48, 8 pixels apart, the four tabs at equal width along the bottom, a
   row's menu, a message and a question above the tabs, nothing scrolling sideways.
+- The bar of the animation playing now, in Chrome against the emulator and against stand-in
+  targets: its place and when it shows, its actions for each kind of animation, `Ignore`
+  moving on, `Delete` asking first, `Select` from another folder and through a filter with
+  the row just below the panel, `Repeat this` by its button and by Done, `Save` with a typed
+  number and with the one in force, `Restore default`, numbers out of range and an empty
+  field sending nothing, the field kept while it has the focus and its text dropped a
+  second after it is left, every sentence and refusal, a missing reply, the buttons
+  disabled while the installation does not answer, while the selection is locked and while
+  a line is out, an installation without the counts, and the bar's one height for every
+  kind of animation at 320, 360 and 740 pixels. The panel staying at the top at 412 by 915
+  and at 360 by 740 with and without the room of the phone's bars, exactly while 80 pixels
+  are left under it, and not sideways, on a short phone or with the keyboard open; a row
+  lifted under it stopping below it.
 - The rows and their menus, in Chrome against the emulator: `in` and `ex` badges by
   `external` of `list`, Ignore in playlist and Restore to playlist shown as saving until
   confirmed, a refused change read again, the selection mode with more than 32
@@ -963,7 +1032,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the thirty-four lines above and no other, and names no address
+- That the web code sends the thirty-eight lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted
@@ -1006,6 +1075,13 @@ By programs, on a Mac:
 - **Seed 41 on a phone and on the board.** Nobody has walked the card's folders on a
   phone, chosen a folder there and seen the board play it, restart and play it again, or
   seen the time left count down on a phone: the seed's board session.
+- **Seed 48 on a phone and on the board.** The board runs a firmware without the command
+  `repeat`, so its app shows the bar without `Repeat this`, `Save` and `Restore default`;
+  those need a firmware with seed 48. Nobody has seen the bar or the frozen panel on a
+  phone: step 22 above.
+- **Seed 47 on a phone.** Nobody has typed a brightness into the field on a phone: the
+  owner's check is to type 8, press Done, and see the installation at 8 and the slider at 8,
+  and to see the field show the slider's number while it moves.
 - **Converting and uploading on a phone.** No phone has converted or uploaded an
   animation yet: whether its web view has `ImageDecoder`, how long a video of the phone
   takes to convert, and how fast an upload goes over the board's network are open.

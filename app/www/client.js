@@ -31,10 +31,11 @@ const CATALOG_LINE = /^([0-9a-f]{8}) ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [a-z]+ (.+)$/
 // keys of its files learnt from its catalog's pages, `{generation, entries, byName}`, or
 // null while none is known; `keysVersion` grows when they change. `catalogNone` says that
 // the target keeps no catalogs, and `pagesRefused` that it reads no page of one: a target
-// from before either.
+// from before either. `statusCount` counts the replies to `status`, so that a screen can wait
+// for the first one after a command.
 export const state = {link: "checking", failure: null, status: null, heardAt: null, since: Date.now(), answered: false, animations: null, cycles: [], folders: [], space: null,
   listVersion: 0, listBusy: false, order: null, orderVersion: 0, orderKnown: true, catalog: null, keys: {internal: null, external: null}, keysVersion: 0,
-  catalogNone: false, pagesRefused: false};
+  catalogNone: false, pagesRefused: false, statusCount: 0};
 
 const watchers = new Set();
 // What the operator asked for and was not sent yet, in its order: each a kind and the
@@ -138,6 +139,7 @@ async function askStatus() {
     }
     heard();
     state.status = reply;
+    state.statusCount += 1;
     const named = reply.animation;
     if (named !== null && state.animations !== null && named !== askedFor && !state.animations.some((animation) => animation.id === named)) {
       // The target plays an animation the list does not have.
@@ -715,6 +717,21 @@ export function switchOff() {
 
 export function setBrightness(value) {
   want("brightness", () => commands.brightness(value));
+}
+
+// The loops of an animation's turn in progress, for that turn alone; the loops kept for
+// its every turn; and its own count again. Each gives the reply, or a refusal or a
+// failure, and a status follows it at once.
+export function repeat(id, loops) {
+  return requestOperation("repeat", () => commands.repeat(id, loops));
+}
+
+export function repeatSave(id, loops) {
+  return requestOperation("repeat", () => commands.repeatSave(id, loops));
+}
+
+export function repeatDefault(id) {
+  return requestOperation("repeat", () => commands.repeatDefault(id));
 }
 
 // Names the function that is told of every refusal of what the operator asked for.

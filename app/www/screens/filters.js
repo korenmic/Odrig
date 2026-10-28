@@ -51,6 +51,16 @@ export function matches(animation) {
   return storageIs(animation, chosen.storage) && typeIs(animation, chosen.type);
 }
 
+// Sets back to All each filter that hides an animation, so that its row is shown.
+export function reveal(animation) {
+  for (const [filter, shows] of [["storage", storageIs], ["type", typeIs]]) {
+    if (!shows(animation, chosen[filter])) {
+      chosen[filter] = "all";
+      keep(filter, "all");
+    }
+  }
+}
+
 // Whether a filter hides anything: a choice is not All.
 export function filtering() {
   return chosen.storage !== "all" || chosen.type !== "all";

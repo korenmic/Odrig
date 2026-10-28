@@ -18,6 +18,7 @@
 <div class="now-words">
 <p class="label">Now playing</p>
 <p id="now" hidden><span id="now-thumb" class="thumb" aria-hidden="true" hidden></span><span id="now-text"></span></p>
+<div id="now-bar" role="group" aria-label="The animation playing now" hidden></div>
 <p id="playing">-</p>
 </div>
 </div>
@@ -32,8 +33,12 @@
 <p id="fps">-</p>
 </div>
 <p id="readiness" class="small" role="status" aria-live="polite" hidden></p>
-<label for="level" class="slider-label">Set the brightness to <span id="level-number">-</span></label>
-<input id="level" type="range" min="0" max="255" step="1" value="0">
+<div id="level-line">
+<label for="level-number" class="slider-label">Set the brightness to</label>
+<input id="level-number" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" placeholder="-">
+</div>
+<input id="level" type="range" min="0" max="255" step="1" value="0" aria-label="Brightness">
+<p id="level-range" class="small" role="status" aria-live="polite" hidden></p>
 <div id="test-now" hidden>
 <p id="test-now-text" role="status"></p>
 <button id="stop-test" type="button">Stop test</button>

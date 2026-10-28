@@ -268,7 +268,54 @@ button[aria-pressed="true"] {
 }
 
 .now-words {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* The bar of the animation playing now: lines of 48 pixels, 8 apart, its buttons as wide as
+   their words. */
+#now-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.bar-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.bar-line button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.bar-line button.danger {
+  color: var(--danger);
+}
+
+.bar-line button.danger:disabled {
+  color: var(--lesser);
+}
+
+#repeat-count {
+  flex: 0 0 auto;
+  width: 5em;
+  margin: 0;
+  padding: 8px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.now-words .bar-note {
+  margin: 0;
+  font-size: 15px;
+  color: var(--lesser);
 }
 
 .now-words p {
@@ -340,6 +387,28 @@ button[aria-pressed="true"] {
   color: var(--lesser);
 }
 
+/* The brightness as a number: its label and its field on one line, the slider under it. */
+#level-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+#level-line .slider-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+#level-number {
+  flex: 0 0 auto;
+  width: 5.5em;
+  min-width: 44px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 input[type="range"] {
   padding: 0;
   border: 0;
@@ -361,6 +430,16 @@ input[type="range"] {
 
 .stale {
   opacity: 0.45;
+}
+
+/* The panel of what plays stays at the top of the screen, under the band of the phone's bar,
+   while the list scrolls under it: opaque, the panel's colour over the midnight, and under
+   the band, the tabs, the menus, a lifted row and the messages. */
+#now-panel.frozen {
+  position: sticky;
+  top: var(--bar-top);
+  z-index: 2;
+  background: #0f1630;
 }
 
 #silent {

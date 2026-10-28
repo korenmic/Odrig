@@ -10758,3 +10758,191 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 47: the slider taken while the field holds text not sent
+
+**Question.** The seed has the slider's move win over text typed and not sent, "whatever
+the browser does with the focus", by the slider's own `input` handler. A browser that moves
+the focus to the slider when a finger lands on it fires the field's `change` before the
+slider's first `input`. What is sent then?
+
+**Answer.** The field's `change` is a commit, and it sends the typed value by the slider's
+path; the slider's first `input` then writes its own value into the field and sends it
+through the same `sendLevel`, which spaces the two by 200 ms and replaces a brightness that
+still waits. The slider's value is the one that stands, on the installation and in the
+field. Where the browser keeps the focus in the field, as Chrome does for a programmatic
+move, the handler drops the text first, so that nothing typed is sent; the field gives up
+the focus only after it holds the slider's value, so that leaving it finds nothing to send.
+
+**Resolution.** `app/www/screens/show.js`;
+`docs/specs/47-p2-a-brightness-field-beside-the-slider/design.md`.
+
+## Seed 47: the field and the slider with no value in force
+
+**Question.** The field and the slider "show the value in force" after a commit that sends
+nothing. Before the first `status` there is none. What do they show then, and where does
+the range line stand?
+
+**Answer.** The field is emptied, with its placeholder `-`, and the slider stands at 0, as
+before the first `status` today. The line `The brightness is 0 to 255.` is the paragraph
+`#level-range`, in the small lettering of the app's notes, hidden while it says nothing;
+it is said for a value above 255 whether the field was entered or left, and goes at the next
+keystroke in the field, at a move of the slider and at the next value sent.
+
+**Resolution.** `app/www/index.html`, `app/www/screens/show.js`;
+`docs/specs/47-p2-a-brightness-field-beside-the-slider/requirements.md`.
+
+## Seed 47: the APK and the seed's state
+
+**Question.** Seed 47 asks for a new APK with the artifacts, and the working rules have the
+last task of a spec make the seed `completed`. Seed 48 is built on the same branch right
+after it, and the owner's check on a phone is open. When is the APK built, and what is the
+seed's state?
+
+**Answer.** One APK is built from the branch's tip once seed 48 is built too, and put with
+the artifacts on the share and on Drive; it holds both seeds. The seed stays `in_progress`
+while the owner's check on a phone is open, as seed 43 does; the owner's check closes it.
+
+**Resolution.** `docs/specs/47-p2-a-brightness-field-beside-the-slider/tasks.md`,
+`project-seeds/47-p2-a-brightness-field-beside-the-slider/state.json`.
+
+## Seed 48: when the turn in progress is reported
+
+**Question.** The seed has `status` give `repeat`, `loop` and `saved` only while a playlist
+turn plays and `animation` names that turn's animation, null at a turn's change until the
+new animation's first picture, and has `repeat <id> <n>` refused with `stale` "while they
+are null"; but `repeat` alone is also null while the loop's length is not known. When is a
+turn reported, which nulls make `stale`, and what does `repeat <id> <n>` do while the length
+is not known?
+
+**Answer.** A turn is reported while the show is valid, no test of the mapping shows, the
+playlist plays, the animation the latest refresh chose is the one whose turn it is, and the
+turn's first refresh has been made. `stale` comes exactly when `loop` would be null: no turn
+of that id is reported. While the length of the loop is not known the turn is in its first
+loop, `loop` is 1, and `repeat <id> <n>` gives the turn `n` loops, which `repeat` then
+reports. Between the end of a turn's time and the refresh that moves on, `loop` is at most
+`repeat`, and a `repeat` then keeps that count, so that the turn ends at that refresh.
+
+**Resolution.** `core/src/player.cpp` (`player_reported`, `player_counts`),
+`docs/commands.md`; `docs/specs/48-p2-a-bar-for-the-animation-playing-now/requirements.md`.
+
+## Seed 48: Restore default after the turn's own count has passed
+
+**Question.** `repeat <id> default` drops the turn's own value and gives it "the larger of
+the default count and the loop now playing". When the default's end lies at or before the
+moment, as when 10 loops were saved and the turn is in its ninth of a default of eight, the
+turn would end at once in the middle of a loop. And a save or a restore reads the count
+after it has changed it. What counts?
+
+**Answer.** Both saving forms act on the turn with the loop that was in progress before the
+count changed. A restore whose default turn ends at or before the moment ends the turn at
+the end of the loop in progress, never in the middle of one and never in the past; one whose
+default ends later plays the default, `max_seconds` cutting as for any default. A save gives
+the turn the larger of its `n` and that loop.
+
+**Resolution.** `core/src/player.cpp` (`player_hold_turn`, `player_default_again`),
+`core/src/repeats.cpp`, `tests/core/support.py`; `docs/commands.md`.
+
+## Seed 48: the old file of saved repeats cannot be read
+
+**Question.** The host's `read_at` answers -1 both for a missing file and for a failure. A
+save reads `repeats.txt` before it writes the next one; a failure taken for a missing file
+would write a file with one line and lose every other saved repeat. And how does a host
+whose storage cannot be changed answer?
+
+**Answer.** A read that fails after the first byte is `storage-error`, as for `order.txt`;
+one that fails at the first byte is `storage-error` too while a saved repeat is in force,
+and a missing file otherwise. A host whose storage cannot be changed keeps no saved repeat
+and answers the saving forms `storage-error`, after `unknown-id` and `in-use`, as `order
+move` does.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/core.md`, `docs/commands.md`.
+
+## Seed 48: the 512 lines of the file
+
+**Question.** A save is `no-space` when the file "already holds 512 lines once a save has
+dropped the lines of the board's own files that `show.json` no longer names, which it does
+whenever it finds the file full". Which lines count, and which are dropped?
+
+**Answer.** The lines of other animations count; the animation's own line, or lines, are
+replaced, so a save of an animation the file names is never `no-space` for the file. When
+the other lines number 512, the save drops those `f` lines whose names no item of the show
+names, and is `no-space` when 512 remain. `x` lines are never dropped: a card that is out
+keeps its lines. A file out of form is written anew with the new line alone.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/commands.md`, `docs/show.md`.
+
+## Seed 48: `repeats over` at a take-up only
+
+**Question.** A drive's lines are matched to its files at its take-up, and the file is read
+whole again after every save, upload and rebuild of the drive's catalog. The log is to say
+`repeats over` when more than 32 lines match. Does every reading say it?
+
+**Answer.** Only the take-up of a drive, the drive's check reading its part of the file in
+steps, says it, once; the whole readings after a save, an upload or a rebuild match the same
+first 32 lines and say nothing. `repeats unreadable` is said by every reading that finds the
+file out of form.
+
+**Resolution.** `core/src/repeats.cpp`, `docs/core.md`.
+
+## Seed 48: the firmware is built and not put with the artifacts
+
+**Question.** The seed's definition of done has a new firmware put with the artifacts on the
+share and on Drive. The owner ordered this run on 2026-10-27 not to upload a firmware: the
+board runs seed 45's firmware with the owner's saved budgets, and a firmware without seed 45
+would drop them.
+
+**Answer.** The firmware is built, `python3 firmware/fw.py build`, only to prove that it
+compiles, and is neither flashed nor uploaded; the APK is put with the artifacts. The commands
+`repeat` and the members of `status` need a firmware with this seed on the board, which waits
+for seed 45 and this seed to be merged; the app hides `Repeat this`, `Save` and `Restore
+default` on a board whose `status` has no `repeat` or `saved`. The seed stays `in_progress`
+until the owner's checks on a phone are made.
+
+**Resolution.** `docs/specs/48-p2-a-bar-for-the-animation-playing-now/requirements.md`,
+`project-seeds/48-p2-a-bar-for-the-animation-playing-now/state.json`.
+
+## Seed 48: the words of the bar that the seed leaves open
+
+**Question.** The seed names the accessible names of the row actions on the bar, of `Save`
+and of `Restore default`, and the sentence said without a reply to `Save` or `Restore
+default`. What are the names of `Repeat this` and of its field, and what is said when
+`Repeat this` gets no reply?
+
+**Answer.** `Repeat this` is named `Repeat 1 hello.odrg this turn` and its field `Loops of 1
+hello.odrg this turn`; the bar is a group named `The animation playing now`. A `Repeat this`
+without a reply says `No confirmed reply. The turn's count is read again before another
+change.`, as `Save` and `Restore default` say theirs of the saved repeat. The row actions
+take the first word of the menu's label, and their names the label in full with the
+animation after its first word.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/messages.js`, `docs/android-app.md`.
+
+## Seed 48: when the bar keeps what it shows
+
+**Question.** The bar stays on its animation while its field has the focus, while a line of
+it is out, and until its field has been without the focus for a second. Does the field
+follow `status` after a reply while it still has the focus, as after Done?
+
+**Answer.** The text sent is no text not sent: after a reply the bar no longer waits out the
+second after the field lost the focus, and the field follows `status` once it has not the
+focus; while it keeps the focus, after Done, it keeps the text it was sent with. The second
+is counted from the document's `focusout`, which `main.js` passes to the screen, and the bar
+is drawn again with each `status`, about once a second.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/main.js`.
+
+## Seed 48: how the frozen top is measured
+
+**Question.** The panel sticks while at least 80 px stay between it and the tabs, opaque,
+and a field brought into view stops under it. What is measured, when, and with which colour?
+
+**Answer.** The room is the height of the view less the band of the phone's bar, the panel
+and the tabs, measured at every draw of Animations, about once a second, and at every
+`resize`, which also follows the keyboard; the panel sticks while Animations is shown, the
+keyboard is closed and the room is 80 px or more. While it sticks its colour is `#0f1630`,
+the panel's own over the midnight, made opaque, and the page's `scroll-padding-top` is the
+band and the panel, so that a field scrolled into view stops under it. `Select` on the bar
+scrolls the row to 8 px under the panel, or under the band while the panel does not stick.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/style.css`, `app/www/screens/reorder.js`.
