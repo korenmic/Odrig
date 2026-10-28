@@ -473,6 +473,12 @@ when another controller changed or removed the animation meanwhile, it refuses w
 `stale`, the app says so, nothing is overwritten, and the form keeps the edits. An
 animation of the card or of a USB drive has no `Edit`: that storage is read-only here.
 
+A picture clock, a picture dial or a picture display that the converter makes of a picture
+([format.md](format.md), "Picture clocks"), is a clock to the app: its row says `widget`,
+shows its preview and plays it. The app does not make one, and does not change one: its
+`Edit` reads the file and, in place of the form, says `This clock is made from a picture:
+it cannot be edited here.`
+
 The animations of a microSD card or a USB drive plugged into the installation are rows
 too, with the badge `ex`, each with its id from 60001 up and its file's name on the
 medium, and a tap plays one as it plays an installed animation; see
@@ -954,7 +960,7 @@ By programs, on a Mac:
   their type and holding the converter's bytes; a cancelled upload; an edit of a text and
   of a clock saved in its place with its inclusion; another controller's change between
   reading and saving said and not overwritten; `Edit` only for the board's own texts and
-  clocks.
+  clocks; a picture clock's `Edit` said in words, with no form and nothing sent.
 - The catalogs and the card, in Chrome against stand-in targets and against the
   emulator: each state of each catalog in words; a rebuild asked about, answered `Not now`,
   refused, cancelled and run to its end, with its progress and Animations working

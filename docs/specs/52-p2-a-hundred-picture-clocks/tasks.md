@@ -78,7 +78,7 @@ Rules for every task:
   - Suites: the converter's two, the core's, the emulator's, the onboarding suite.
   - Requirements: 2.1 to 2.3, 3.4, 3.5, 4.3, 5.1, 5.2, 11.1
 
-- [ ] 3. The app shows a picture clock and does not edit it
+- [x] 3. The app shows a picture clock and does not edit it
   - `app/www/screens/author.js`: "Edit" of a picture widget says "This clock is made
     from a picture: it cannot be edited here." and fills no form.
     `docs/android-app.md`.

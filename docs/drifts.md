@@ -10870,3 +10870,17 @@ every one keeps its pixels, which the core's and the emulator's suites read, and
 converter's suite finds them what their builder makes on Windows too.
 
 **Resolution.** `tests/vectors/procedural/build.mjs` and its pictures.
+
+## Seed 52: what the app does with a picture clock
+
+**Question.** The app lists a picture clock as a `widget`, as `list` says, and so offers
+its `Edit`; the form of a clock has no fields for a picture, hands or fields. What does
+`Edit` do with it?
+
+**Answer.** `list` says only the type, so the menu keeps `Edit`; the app reads the file as
+for any clock, and when it holds a picture, says "This clock is made from a picture: it
+cannot be edited here." in place of the form, and sends nothing. The app does not make
+one either: the converter's `clocks` does, from an inventory.
+
+**Resolution.** `app/www/screens/author.js`, `app/www/messages.js`;
+`docs/android-app.md`; `tests/app/test_authoring.py`.
