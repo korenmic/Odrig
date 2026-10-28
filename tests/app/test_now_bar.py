@@ -22,8 +22,19 @@ ITEMS = [
     {"id": 60001, "file": "card.odrg", "bytes": 1000, "external": True, "type": "frames"},
     {"id": 60002, "file": "night/deep.odrg", "bytes": 1000, "external": True, "type": "frames"},
     {"id": 9, "cycle": [1, 3]},
-    {"id": 60003, "playlist": "night", "external": True},
+    {"id": 60003, "playlist": "night", "external": True, "files": 1},
 ]
+
+
+def level_of(items, line):
+    """The reply to `list` or `list in <folder-id>`: the items of the root, or of the folder."""
+    words = line.decode().split()
+    if words[1:2] == ["in"]:
+        path = next(item["playlist"] for item in items if item["id"] == int(words[2]) and "playlist" in item) + "/"
+        shown = [item for item in items if item.get("file", "").startswith(path) and "/" not in item["file"][len(path):]]
+    else:
+        shown = [item for item in items if "/" not in item.get("file", "") and "/" not in item.get("playlist", "")]
+    return json.dumps({"ok": True, "items": shown, "next": None}) + "\n"
 
 
 def status_of(animation, playing="all", on=True, error=None, **more):
@@ -41,8 +52,7 @@ class Target:
     def __init__(self, test, items=ITEMS, writable=True, **replies):
         self.status = status_of(1)
         self.items = items
-        listed = json.dumps({"ok": True, "items": items, "next": None}) + "\n"
-        self.stand_in = entered(test, support.StandIn({"status": lambda line: (200, self.status), "list": (200, listed), "space": (200, space_of(writable)),
+        self.stand_in = entered(test, support.StandIn({"status": lambda line: (200, self.status), "list": lambda line: (200, level_of(items, line)), "space": (200, space_of(writable)),
                                                         "ignore": OK, "remove": OK, **replies}))
 
     def lines(self):
@@ -72,12 +82,18 @@ class ThePlaceAndTheStates(unittest.TestCase):
     def test_it_is_hidden_while_nothing_a_cycle_a_test_or_an_invalid_show_plays_and_while_the_list_has_not_the_animation(self):
         target = Target(self)
         states = [("all", 1, None, True), (None, None, None, False), (9, 1, None, False), (None, None, "undefined-id 99", False), ("all", 77, None, False),
-                  (60003, 60002, None, True), ("all", 1, None, True)]
+                  (60003, 60002, None, False), ("all", 1, None, True)]
         steps = [lambda playing=playing, animation=animation, error=error: setattr(target, "status", status_of(animation, playing, error=error))
                  for playing, animation, error, _ in states]
         acts = [act for number in range(len(states)) for act in ({"step": True}, {"wait": 1300, "look": str(number)})]
         seen = run(target, acts, steps=steps)
         self.assertEqual([seen[str(number)]["bar"] is not None for number in range(len(states))], [shows for *_, shows in states])
+
+    def test_it_names_a_folders_file_while_the_folder_is_shown_and_its_playlist_plays(self):
+        target = Target(self)
+        target.status = status_of(60002, playing=60003, playlist="night", file="night/deep.odrg")
+        seen = run(target, [{"open": "night"}, {"untilBar": "Delete 60002 night/deep.odrg", "look": "night"}])
+        self.assertEqual(seen["night"]["level"], "night")
 
     def test_it_shows_while_the_leds_are_off(self):
         target = Target(self)
@@ -90,7 +106,7 @@ class ItsActions(unittest.TestCase):
     def lines_for(self, animation, **target):
         stand_in = Target(self, **target)
         stand_in.status = status_of(animation)
-        rows = 5 if target.get("items") is None else len([item for item in target["items"] if "file" in item])
+        rows = 5 if target.get("items") is None else len([item for item in target["items"] if "/" not in item.get("file", "/")])
         seen = run(stand_in, [{"wait": 1500, "look": "bar"}], rows=rows)
         return seen["bar"]["bar"]
 
@@ -131,9 +147,9 @@ class ItsActions(unittest.TestCase):
         items += [{"id": 60001, "file": "night/deep.odrg", "bytes": 1000, "external": True, "type": "frames"}, {"id": 60003, "playlist": "night", "external": True}]
         target = Target(self, items=items)
         target.status = status_of(25)
-        acts = [{"untilBar": "Select 25 animation-25.odrg"}, {"open": "night"}, {"filter": ["type", "Text"], "look": "before"}, {"bar": "Select 25 animation-25.odrg", "wait": 300, "look": "after"}]
+        acts = [{"untilBar": "Select 25 animation-25.odrg"}, {"filter": ["type", "Text"], "look": "before"}, {"bar": "Select 25 animation-25.odrg", "wait": 300, "look": "after"}]
         seen = run(target, acts, rows=30)
-        self.assertEqual((seen["before"]["level"], seen["before"]["filters"]), ("night", ["All", "Text"]))
+        self.assertEqual((seen["before"]["level"], seen["before"]["filters"]), ("Root", ["All", "Text"]))
         after = seen["after"]
         self.assertEqual((after["level"], after["filters"], after["selecting"], after["checked"]), ("Root", ["All", "All"], True, [25]))
         self.assertGreater(after["scrolled"], 0)

@@ -2374,7 +2374,7 @@ ODRIG_NOINLINE void sound_step(Core &core) {
         } else {
             uint32_t length = 0;
             const char *text = index_line(core, kIndexTable, kIndexRow, ordinal, &length);
-            IndexFolder folder;
+            IndexFolder folder = {};
             uint32_t path_at = 0;
             uint32_t path_length = 0;
             sound = text != nullptr && index_parse_folder(text, length, ordinal, folder, &path_at, &path_length);
@@ -2693,7 +2693,7 @@ ODRIG_NOINLINE bool folder_rows(Core &core, const DraftLine &folder, uint32_t fi
     memcpy(path, folder.path, folder.path_length);
     if (cursor.rebuild_step == 0) {
         // The old folder of its path: its ordinal, own files and the next row to read.
-        IndexFolder old;
+        IndexFolder old = {};
         cursor.rebuild_end = cursor.old_folders != 0 ? old_folder_of(core, path, folder.path_length, old) : kNothing;
         cursor.rebuild_folders = cursor.rebuild_end != kNothing ? old.files : 0;
         cursor.rebuild_files = cursor.rebuild_end != kNothing ? old.id : 0;
@@ -2802,7 +2802,7 @@ ODRIG_NOINLINE void folders_step(Core &core) {
             continue;
         } else {
             const uint32_t child = cursor.rebuild_row;
-            DraftLine below;
+            DraftLine below = {};
             if (child < cursor.rebuild_kept && !draft_line(core, child, below)) {
                 rebuild_failed(core);
                 return;
