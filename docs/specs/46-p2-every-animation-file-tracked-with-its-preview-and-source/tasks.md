@@ -84,7 +84,7 @@ Rules for every task:
   - Suites: onboarding, converter (npm).
   - Requirements: 5.1, 5.2, 6.1 to 6.3, 7.1 to 7.5
 
-- [ ] 6. The measurement and every suite
+- [x] 6. The measurement and every suite
   - `git count-objects -vH` after the collection's commit, and a clone of the branch into
     `build/clone/` with the sizes of its `.git` and its files.
   - `scratch/collection-46/available.py` ends with `AVAILABLE 359`.
