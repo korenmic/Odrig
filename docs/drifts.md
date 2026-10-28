@@ -11086,3 +11086,42 @@ lines with a line feed alone now, and hold no other change.
 
 **Resolution.** converter/tests/library.test.js; the two files of
 project-seeds/52-p2-a-hundred-picture-clocks/references/; docs/decisions.md.
+
+## Seed 46: the installation's animations in git, the heavy ones on the share
+
+**Question.** The decision committed the JSON source of every animation; seed 10's answer
+committed an imported source in `animations/` up to 50 MB; the pages called the remote
+private; and "Seed 44: the tracked previews are the media the repository holds" let no GIF
+be tracked but the previews, and since 2026-10-28 GIFs beside a seed. Where is an
+animation the installation is given kept now, and what does git track of it?
+
+**Answer.** By the owner's answers of 2026-10-27 and 2026-10-28: git tracks `collection/`,
+each small animation file of `card/`, `earlier/` and `others/` with its `X.gif`, a copy of
+its preview, and its readme `X.md`; of a heavy file, a group of a long video or a file
+over 50,000,000 bytes, only its GIF and readme in `long/`, its key and its path on the
+card being in `thumbnails/catalog.js`. The share's collection, at `ODRIG_ANIMATIONS` of
+`env`, holds every file. No JSON of these animations is committed. The remote is public,
+and the tracked collection is published with it. The decisions this work took beyond the
+seed:
+
+- The collection built by hand in the owner's checkout was moved whole to
+  `scratch/collection-built-2026-10-27/`, and its line of `.git/info/exclude` removed, in
+  the first task: that line held for every worktree and hid every path of `collection/`
+  from `.gitignore`, so the files could only have been staged with `-f`. The archive is
+  only read since; the share holds every file.
+- The moves on the share were made and checked by a script of the agent's in
+  `scratch/collection-46/`, reading every file back against the archive; the share's path
+  came from `env`.
+- `collection/README.md` is a tracked file now; the share's copy has its bytes.
+- The test of the collection is in the onboarding suite, which checks what a clone holds;
+  it asks a git of its own about the lines of `.gitignore`, so that no exclude of one
+  computer counts.
+- The converter's test of tracked media lets the collection's GIFs be tracked, besides
+  those of `thumbnails/` and of a seed's folder.
+- `env` and `../../env` are names a page may give although no clone holds them, matched as
+  whole words, so that `env.template` is still looked for.
+
+**Resolution.** `.gitignore`, `collection/`, `converter/cli/`, docs/converter.md,
+docs/decisions.md, agent/animation-guide.md, agent/vocabulary.md,
+agent/getting-started.md, agent/working-rules.md, agent/README.md, docs/format.md;
+tests/onboarding/, converter/tests/library.test.js, converter/tests/thumbnailtool.test.js.

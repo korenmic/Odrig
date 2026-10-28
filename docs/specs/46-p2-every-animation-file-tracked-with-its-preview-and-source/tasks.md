@@ -74,7 +74,7 @@ Rules for every task:
   - Suites: converter (npm), onboarding, emulator.
   - Requirements: 4.1 to 4.8, 5.1, 5.2 (in `collection/README.md`), 8.1
 
-- [ ] 5. `env`, the decision and the pages
+- [x] 5. `env`, the decision and the pages
   - `tests/onboarding/support.py` and `tests/onboarding/test_pages.py`: `env` and
     `../../env` passed over by the whole word.
   - `agent/getting-started.md`, `agent/working-rules.md`, `agent/animation-guide.md`,

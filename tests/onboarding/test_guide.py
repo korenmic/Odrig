@@ -108,9 +108,10 @@ class Guide(unittest.TestCase):
     def test_it_says_where_things_go_and_what_is_committed(self):
         table = self.part("Where things go")
         rows = re.findall(r"(?m)^\| (.+?) \| (.+?) \| (Yes|No)\b.*\|$", table)
-        self.assertEqual(len(rows), 7)
+        self.assertEqual(len(rows), 8)
         committed = {where: answer for _, where, answer in rows}
         self.assertEqual([answer for where, answer in committed.items() if where.startswith("`thumbnails/")], ["Yes"])
+        self.assertEqual([answer for where, answer in committed.items() if where.startswith("`collection/")], ["Yes"])
         self.assertEqual(committed["`animations/NAME.json`"], "Yes")
         self.assertEqual(committed["`shows/NAME/show.json`"], "Yes")
         self.assertEqual(committed["`mapping/`"], "Yes")

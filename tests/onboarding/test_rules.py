@@ -121,7 +121,7 @@ class Decisions(unittest.TestCase):
         self.assertNotIn("There is no remote yet", process)
         for phrase in ("Several contributors work at once", "Each works on a branch of their own", "nothing is committed directly on `master`",
                        "brought up to date with `master` before it is merged", "only with every test suite that needs no board passing",
-                       "only ever added to at the end", f"The remote is `{REMOTE}`, a private repository", "is never rewritten",
+                       "only ever added to at the end", f"The remote is `{REMOTE}`, a public repository", "is never rewritten",
                        "[working-rules.md](../agent/working-rules.md)"):
             self.assertIn(phrase, process)
 

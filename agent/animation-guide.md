@@ -146,11 +146,12 @@ play in turn, and `"animation":1` that item 1 is the one playing now.
 | What | Where | Committed |
 |---|---|---|
 | A generator | `odrig/generators/`, its tests in `tests/converter/` | Yes. |
-| A source made by an import | `animations/NAME.json` | Yes, always. Keep it to 50 MB or less; see the next section. |
+| A source made by an import for the bench or a test | `animations/NAME.json` | Yes, always. Keep it to 50 MB or less; see the next section. |
 | A source a generator writes for the target | `build/`, written again whenever a show is packed | No. The generator is. |
 | A show file | `shows/NAME/show.json` | Yes. |
 | A mapping file | `mapping/` | Yes. It changes only when the LEDs are wired another way, which is the owner's to say. |
-| The preview of an animation | `thumbnails/<key>.gif` and its line in `thumbnails/catalog.js`, written by `node converter/odrig.js thumbnail FILE --catalog thumbnails` | Yes, in the commit of the animation's source, or of the conversion that made it. |
+| The preview of an animation | `thumbnails/<key>.gif` and its line in `thumbnails/catalog.js`, written by `node converter/odrig.js thumbnail FILE --catalog thumbnails` | Yes, in the commit of the animation's source, or of the conversion that made it, with its files of `collection/`. |
+| An animation the installation is given | `collection/card/` at its path on the card, `collection/others/`, or, a group of a long video or a file over 50,000,000 bytes, `collection/long/`; `NAME.gif` and `NAME.md` beside it; a copy on the share | Yes, the three files, but an animation file of `collection/long/`, which git ignores and the share keeps. Run `node converter/odrig.js thumbnail collection/card/<folder>/NAME.odrg --catalog thumbnails --card collection/card --beside`, write `NAME.md`, copy the three to the share: [collection/README.md](../collection/README.md). |
 | The video or GIF you imported, installed file sets, ODRG files, record files, everything you try | `build/` | No. Git ignores the folder. |
 
 `pack` makes `NAME.odrg` from `NAME.json`, so name a source in lower-case letters, digits,
@@ -182,7 +183,7 @@ demo show is 1,210 bytes, and the dense clip 1.4 MB.
 The large hosting services for git refuse a single file above 100 MB and warn above 50 MB.
 Keep every source at 50 MB or less, a minute of video at 25 pictures a second, and cut a
 longer piece into several animations with `--start` and `--duration`. By the owner's ruling
-the JSON source is what is committed for every animation, whatever its size.
+the JSON source is what is committed for every animation of the bench or of a test.
 
 ## Dense animations on the board
 
