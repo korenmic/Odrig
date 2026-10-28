@@ -75,7 +75,7 @@ export default async function (app) {
   if (settings.selecting) {
     choose(app, "type", "Normal");
     choose(app, "storage", "Internal");
-    app.press("Select");
+    app.pressIn("#list-head", "Select");
     app.press("Select all");
     const checked = () => [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));
     seen.selectedInternal = checked();

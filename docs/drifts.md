@@ -10901,3 +10901,48 @@ until the owner's checks on a phone are made.
 
 **Resolution.** `docs/specs/48-p2-a-bar-for-the-animation-playing-now/requirements.md`,
 `project-seeds/48-p2-a-bar-for-the-animation-playing-now/state.json`.
+
+## Seed 48: the words of the bar that the seed leaves open
+
+**Question.** The seed names the accessible names of the row actions on the bar, of `Save`
+and of `Restore default`, and the sentence said without a reply to `Save` or `Restore
+default`. What are the names of `Repeat this` and of its field, and what is said when
+`Repeat this` gets no reply?
+
+**Answer.** `Repeat this` is named `Repeat 1 hello.odrg this turn` and its field `Loops of 1
+hello.odrg this turn`; the bar is a group named `The animation playing now`. A `Repeat this`
+without a reply says `No confirmed reply. The turn's count is read again before another
+change.`, as `Save` and `Restore default` say theirs of the saved repeat. The row actions
+take the first word of the menu's label, and their names the label in full with the
+animation after its first word.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/messages.js`, `docs/android-app.md`.
+
+## Seed 48: when the bar keeps what it shows
+
+**Question.** The bar stays on its animation while its field has the focus, while a line of
+it is out, and until its field has been without the focus for a second. Does the field
+follow `status` after a reply while it still has the focus, as after Done?
+
+**Answer.** The text sent is no text not sent: after a reply the bar no longer waits out the
+second after the field lost the focus, and the field follows `status` once it has not the
+focus; while it keeps the focus, after Done, it keeps the text it was sent with. The second
+is counted from the document's `focusout`, which `main.js` passes to the screen, and the bar
+is drawn again with each `status`, about once a second.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/main.js`.
+
+## Seed 48: how the frozen top is measured
+
+**Question.** The panel sticks while at least 80 px stay between it and the tabs, opaque,
+and a field brought into view stops under it. What is measured, when, and with which colour?
+
+**Answer.** The room is the height of the view less the band of the phone's bar, the panel
+and the tabs, measured at every draw of Animations, about once a second, and at every
+`resize`, which also follows the keyboard; the panel sticks while Animations is shown, the
+keyboard is closed and the room is 80 px or more. While it sticks its colour is `#0f1630`,
+the panel's own over the midnight, made opaque, and the page's `scroll-padding-top` is the
+band and the panel, so that a field scrolled into view stops under it. `Select` on the bar
+scrolls the row to 8 px under the panel, or under the band while the panel does not stick.
+
+**Resolution.** `app/www/screens/show.js`, `app/www/style.css`, `app/www/screens/reorder.js`.

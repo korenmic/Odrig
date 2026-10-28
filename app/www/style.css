@@ -268,7 +268,46 @@ button[aria-pressed="true"] {
 }
 
 .now-words {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* The bar of the animation playing now: lines of 48 pixels, 8 apart, its buttons as wide as
+   their words. */
+#now-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.bar-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.bar-line button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.bar-line button.danger {
+  color: var(--danger);
+}
+
+.bar-line button.danger:disabled {
+  color: var(--lesser);
+}
+
+.now-words .bar-note {
+  margin: 0;
+  font-size: 15px;
+  color: var(--lesser);
 }
 
 .now-words p {

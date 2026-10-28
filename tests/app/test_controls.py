@@ -52,11 +52,11 @@ class Buttons(Controls):
     def test_from_a_cycle_the_playlist_button_goes_to_the_playlist_and_no_button_plays_a_cycle(self):
         emulator, address = self.emulator(emulator_support.example_show)
         self.assertEqual(emulator.status()["playing"], 3)
-        presses = [{"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg Playlist"}]
+        presses = [{"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg .*Playlist"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play all", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play all"])
         self.assertEqual(emulator.status()["playing"], "all")
-        self.assertEqual(seen[0]["buttons"], ["On", "Off", "Add animation", "Select", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
+        self.assertEqual(seen[0]["buttons"], ["Ignore 1 hello.odrg in playlist", "Select 1 hello.odrg", "Delete 1 hello.odrg", "On", "Off", "Add animation", "Select", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
                                               "Widget, 0", "Play this folder", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
 
 

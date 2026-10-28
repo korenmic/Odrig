@@ -42,7 +42,7 @@ export default async function(app) {
   const checks = () => [...app.doc.querySelectorAll('#animations-list .row .pick input[type="checkbox"]')];
   const shownChecks = () => checks().filter((input) => input.getClientRects().length > 0);
   seen.hiddenBefore = shownChecks().length;
-  app.press("Select");
+  app.pressIn("#list-head", "Select");
   await app.until(() => shownChecks().length === app.settings.selectable, "selection checkboxes");
   seen.checkboxes = shownChecks().length;
   seen.external = app.text("show-external-space");

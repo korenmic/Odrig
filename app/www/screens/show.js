@@ -32,6 +32,10 @@ let waiting = null;
 let inForce = null;
 // The inclusion changes under way, by id, each with the target it was sent to.
 const pending = new Map();
+// The bar of the animation playing now: the animation it shows, or null while it is hidden;
+// and the key of what it shows, which it is built anew for.
+let bar = null;
+let barKey = "";
 // The row whose menu is open, and the button that opened it.
 let menuFor = null;
 let menuButton = null;
@@ -225,6 +229,110 @@ function drawNow(status, state) {
   const square = byId("now-thumb");
   square.hidden = shown === undefined;
   previews.show(square, shown === undefined || typeof shown.fault === "string" ? null : previews.sourceOf(client.keyOf(shown)));
+  drawBar(state);
+}
+
+// The animation the bar is for: the one `status` names while a playlist turn plays it, the
+// root's or a folder's of the list, and the whole list holds it; else null.
+function barAnimation(state) {
+  const status = state.status;
+  if (status === null || status.error !== null || status.animation === null || state.animations === null) {
+    return null;
+  }
+  if (status.playing !== "all" && !state.folders.some((folder) => folder.id === status.playing)) {
+    return null;
+  }
+  return state.animations.find((animation) => animation.id === status.animation) ?? null;
+}
+
+// The words of an action on the bar: the first word of the menu's label, and the label in
+// full with the animation after its first word as its accessible name.
+function barWords(label, animation) {
+  const [first, ...rest] = label.split(" ");
+  return {short: first, named: [first, `${animation.id} ${animation.file}`, ...rest].join(" ")};
+}
+
+// The actions of the row menu that the bar has: every one but the moves.
+function barActions(animation) {
+  return actions(animation).filter((item) => item.label !== "Move up" && item.label !== "Move down");
+}
+
+function barButton(label, named, act) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.setAttribute("aria-label", named);
+  button.addEventListener("click", act);
+  return button;
+}
+
+// Builds the bar for an animation: on its first line the row menu's actions but `Edit`, or
+// the line that says why it has none; on its second `Edit` when the menu has it.
+function buildBar(place, animation) {
+  const first = document.createElement("div");
+  first.className = "bar-line";
+  const second = document.createElement("div");
+  second.className = "bar-line";
+  for (const item of barActions(animation)) {
+    if (item.note !== undefined) {
+      const note = document.createElement("p");
+      note.className = "bar-note";
+      note.textContent = isExternal(animation) ? "External storage is read-only." : "This software allows no change.";
+      first.append(note);
+      continue;
+    }
+    const words = barWords(item.label, animation);
+    const act = item.label === "Select" ? () => selectFromBar(animation) : () => item.act();
+    const button = barButton(words.short, words.named, act);
+    button.dataset.label = item.label;
+    if (item.danger) button.classList.add("danger");
+    (item.label === "Edit" ? second : first).append(button);
+  }
+  place.replaceChildren(first, second);
+}
+
+// Draws the bar: built anew when what it shows changes, its buttons' states at every draw.
+function drawBar(state) {
+  const place = byId("now-bar");
+  const animation = barAnimation(state);
+  bar = animation === null ? null : {animation};
+  place.hidden = bar === null;
+  if (bar === null) {
+    if (barKey !== "") place.replaceChildren();
+    barKey = "";
+    return;
+  }
+  const items = barActions(bar.animation);
+  const key = JSON.stringify([bar.animation.id, bar.animation.file, items.map((item) => [item.label, item.note])]);
+  if (key !== barKey) {
+    buildBar(place, bar.animation);
+    barKey = key;
+  }
+  for (const button of place.querySelectorAll("button[data-label]")) {
+    const item = items.find((one) => one.label === button.dataset.label);
+    button.disabled = item === undefined || item.disabled === true;
+  }
+}
+
+// Turns the selection mode on with the bar's animation ticked, as the menu's Select does,
+// from the root, where every internal animation stands, with the filters showing it, and
+// scrolls its row to just below the panel.
+function selectFromBar(animation) {
+  opened = "";
+  filters.reveal(animation);
+  selection.enter(animation.id);
+  const row = byId("animations-list").querySelector(`:scope > .row[data-id="${animation.id}"]`);
+  if (row !== null) {
+    window.scrollTo(0, Math.max(0, row.getBoundingClientRect().top + window.scrollY - panelBottom() - 8));
+  }
+}
+
+// Where the screen's room for the list begins: under the panel while it stays at the top,
+// else under the band at the top of the screen.
+function panelBottom() {
+  const band = parseFloat(window.getComputedStyle(document.body, "::before").height) || 0;
+  const panel = byId("now-panel");
+  return panel.classList.contains("frozen") ? band + panel.getBoundingClientRect().height : band;
 }
 
 // The animations in the order the list shows them: the saved order when another part of

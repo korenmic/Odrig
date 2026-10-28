@@ -55,7 +55,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
     the change log with the owner's approval of the forms, the members and the file.
   - Suites: the emulator's, the firmware tool's, onboarding.
 
-- [ ] 5. The bar and its row actions
+- [x] 5. The bar and its row actions
   - `app/www/commands.js` and `client.js` (the members, the three forms, `statusCount`),
     `app/www/index.html` (`#now-bar`), `app/www/screens/show.js` (`drawBar`, the actions
     without the moves, `Select` from the bar), `app/www/screens/filters.js` (`reveal`),
