@@ -100,7 +100,7 @@ of the Python library of [python-library.md](python-library.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only] | --drive-folder DIR]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -129,6 +129,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 | `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
+| `--drive-folder DIR` | The folder `DIR` stands for the card's folder `odrig` itself, and the drive is read-only. Not with `--drive`. See [A folder as the card](#a-folder-as-the-card). | No drive |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or
@@ -199,6 +200,45 @@ python -m emulator build/demo-20/show --drive build/stick
 - The page's header names the folder `DIR` after `drive`.
 
 `--drive` does not go with `--record`: record mode has no drive.
+
+### A folder as the card
+
+With `--drive-folder DIR` the folder `DIR` stands for the drive's folder `odrig` itself,
+not for the top of the drive, so that `collection/card`, or the share's `card/`, is a card
+as it is, with nothing copied. Everything of [A drive](#a-drive) holds for it, with
+`DIR` in place of `DIR/odrig`: the same code looks for it, lists it and reads it, with the
+same limits, 256 files, 32 sub-folders and three levels. Such a drive is always
+read-only, as with `--drive-read-only`, so the emulator never writes into the
+collection. `--drive-folder` cannot be given with `--drive`, nor with `--record`; the
+parser refuses either with status 2.
+
+**The demo show of the clock breaks**, `shows/clock-breaks/show.json`, is the demo show's
+two animations, `hello.odrg` and `dvd.odrg`, with `min_seconds` 6, which the card's
+files follow too, so that the first clock break comes after about half a minute. It is
+packed as the demo show is, from the same generators, and run on the collection's card:
+
+```
+mkdir -p build/clock-breaks/sources
+python -m odrig.generators.hello_world build/clock-breaks/sources/hello.json --mapping mapping/legs-20.json
+python -m odrig.generators.dvd_bounce  build/clock-breaks/sources/dvd.json   --mapping mapping/legs-20.json
+node converter/odrig.js pack --show shows/clock-breaks/show.json --mapping mapping/legs-20.json     --sources build/clock-breaks/sources --out build/clock-breaks/show
+python -m emulator build/clock-breaks/show --drive-folder collection/card
+```
+
+On Windows, in PowerShell, with `python` the virtual environment's
+`.venv\Scripts\python`, the same commands are these; the last line is the same:
+
+```
+mkdir build\clock-breaks\sources
+python -m odrig.generators.hello_world build/clock-breaks/sources/hello.json --mapping mapping/legs-20.json
+python -m odrig.generators.dvd_bounce build/clock-breaks/sources/dvd.json --mapping mapping/legs-20.json
+node converter/odrig.js pack --show shows/clock-breaks/show.json --mapping mapping/legs-20.json --sources build/clock-breaks/sources --out build/clock-breaks/show
+python -m emulator build/clock-breaks/show --drive-folder collection/card
+```
+
+The clocks play between the animations once `Clocks between animations` is checked in
+the Settings of the Controller view, or `clocks on` is sent; the core plays the breaks,
+and the emulator has no code of its own for them.
 
 ## The serial port
 
@@ -722,6 +762,10 @@ The answer to a seek is refused with
 `length-unknown` while the length is unknown, `beyond-length` for a point out of reach,
 and `bad-argument` for a body that is not `{"ms": <whole number>}`.
 
+After a clock break, the turn that the break cut goes on from its point, and the core
+opens its file anew at the resume. The seek bar then counts the resumed turn's loop from
+the moment of the resume, not from the loop's true start, until the next loop begins.
+
 ## The event stream
 
 The page learns everything it shows from one stream of server-sent events, `GET /events`,
@@ -750,7 +794,7 @@ data: 123460 <base64 of the refresh>
 
 | Event | What it carries |
 |---|---|
-| `hello` | First on every connection. `drive` is the folder of `--drive`, or `null` without it. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
+| `hello` | First on every connection. `drive` is the folder of `--drive` or of `--drive-folder`, or `null` without either. `serial` is the link of the serial port and `tcp` the address of the line port, each `null` when the emulator has none. `legs` lists `[leg, pin, number of LEDs]` in the core's order; `t0` is the power-on moment, the timestamp of the first request for a refresh; `error` is the reason the show is invalid as the core gives it when the page connects, or `null`. |
 | `log` | One command that arrived: `ms` is the timestamp given to the core, `time` the local time of day, `transport` is `serial`, `tcp`, `http` or, for a restart the emulator made for a seek, `seek`, `line` the first 200 characters of the line as the core read it, `length` the number of characters of that line, and `reply` the reply without its newline. A line of more than 2,048 characters, which the core cuts to its first 2,048, has `"length":2048` and `"cut":true`. A byte outside printable ASCII is written as `\xNN`. |
 | `status` | The core's reply to `status`, unchanged. The emulator asks for it after every command that arrived and once a second. These requests of its own are not commands that arrived and are not in the log. |
 | `frame` | One refresh: its timestamp, a space, and the refresh in base64: every leg's LED bytes in chain order, the legs in the order of `hello`. There are no coordinates in it: placing the LEDs is the page's work. |

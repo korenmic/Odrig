@@ -167,3 +167,72 @@ class AnEmulatorWithADrive(unittest.TestCase):
         stream = support.entered(self, support.EventStream(emulator.port))
         hello = json.loads(stream.read_until(has("hello"))[0].data)
         self.assertEqual(hello["drive"], str(self.top))
+
+
+class TheFolderOption(unittest.TestCase):
+    def setUp(self):
+        self.work = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
+
+    def test_it_names_a_folder_and_goes_neither_with_drive_nor_with_record_mode(self):
+        arguments = app.parse([str(self.work), "--drive-folder", "collection/card"])
+        self.assertEqual((arguments.drive_folder, arguments.drive), ("collection/card", None))
+        self.assertIsNone(app.parse([str(self.work)]).drive_folder)
+        for argv in ([self.work, "--drive-folder"], [self.work, "--drive", self.work, "--drive-folder", self.work],
+                     [self.work, "--drive-folder", self.work, "--drive", self.work],
+                     [self.work, "--record", self.work / "out.odrr", "--seconds", 1, "--drive-folder", self.work]):
+            result = support.run(*argv)
+            self.assertEqual(result.status, 2, argv)
+            self.assertIn("usage:", result.err)
+        self.assertIn("not allowed with argument", support.run(self.work, "--drive", self.work, "--drive-folder", self.work).err)
+        self.assertEqual(list(self.work.iterdir()), [])
+
+    def test_the_folder_itself_is_the_drives_folder_odrig_and_is_listed_by_the_same_code(self):
+        folder = support.installed(self.work / "card", {"b.odrg": b"b", "A.ODRG": b"a", "notes.txt": b""})
+        support.installed(folder / "night", {"comet.odrg": b"c"})
+        now = [0.0]
+        drive = host.Drive(folder, clock=lambda: now[0], writable=False, itself=True)
+        self.assertEqual((drive.folder, drive.look()), (str(folder), 1))
+        self.assertEqual((drive.list(1), drive.names), (3, host.drive_list(folder)))
+        self.assertEqual(drive.names, ["A.ODRG", "b.odrg", "night/comet.odrg"])
+        self.assertEqual(pathlib.Path(drive.path("drive/2")), folder / "night" / "comet.odrg")
+        self.assertIsNone(drive.path("drive/new.odrg", changing=True))
+        self.assertFalse(drive.can_write(1))
+        folder.rename(self.work / "away")
+        now[0] = 2.0
+        self.assertEqual(drive.look(), 0)
+
+
+class AnEmulatorWithADriveFolder(unittest.TestCase):
+    """A folder given as the card's folder `odrig` itself, as `collection/card` is."""
+
+    listed_when = AnEmulatorWithADrive.listed_when
+    drives = AnEmulatorWithADrive.drives
+
+    def setUp(self):
+        self.folder = support.entered(self, support.example_show())
+        self.top = pathlib.Path(support.entered(self, tempfile.TemporaryDirectory()))
+        self.animation = (self.folder / "hello.odrg").read_bytes()
+
+    def start(self, *options):
+        return support.entered(self, support.Emulator(self.folder, "--drive-folder", self.top / "card", *options))
+
+    def test_its_animations_are_served_as_those_of_odrig_and_play(self):
+        support.installed(self.top / "card", {"Sunrise.odrg": self.animation, "notes.txt": b"notes"})
+        support.installed(self.top / "card" / "night", {"comet.odrg": self.animation})
+        emulator = self.start()
+        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 2)
+        shows = [item for item in items if item[0] < 60001]
+        self.assertEqual(items, shows + [(60003, None), (60001, "Sunrise.odrg")])
+        self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 1, "list in 60003"), [(60002, "night/comet.odrg")])
+        self.assertEqual(json.loads(emulator.command("play 60002")), {"ok": True})
+        self.assertEqual(emulator.status()["animation"], 60002)
+        stream = support.entered(self, support.EventStream(emulator.port))
+        self.assertEqual(json.loads(stream.read_until(has("hello"))[0].data)["drive"], str(self.top / "card"))
+
+    def test_it_is_read_only(self):
+        support.installed(self.top / "card", {"Sunrise.odrg": self.animation})
+        emulator = self.start()
+        self.listed_when(emulator, lambda items: len(self.drives(items)) == 1)
+        self.assertEqual(json.loads(emulator.command("catalog rebuild external")), {"ok": False, "error": "read-only"})
+        self.assertEqual(json.loads(emulator.command("upload begin external x.odrg 10")), {"ok": False, "error": "read-only"})
+        self.assertEqual(sorted(path.name for path in (self.top / "card").iterdir()), ["Sunrise.odrg"])

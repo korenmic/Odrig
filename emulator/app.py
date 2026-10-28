@@ -66,7 +66,9 @@ def parser():
     made.add_argument("--storage", metavar="BYTES", type=_storage, default=host.STORAGE_BYTES,
                       help=f"the size of the storage that is reported as the total space (default: {host.STORAGE_BYTES}, the board's)")
     made.add_argument("--lan", action="store_true", help="let other devices of the local network open the page and send commands over HTTP")
-    made.add_argument("--drive", metavar="DIR", help="a folder that stands for the top of a drive, the card: its folder odrig appearing and going is the drive plugged in and pulled out")
+    drives = made.add_mutually_exclusive_group()
+    drives.add_argument("--drive", metavar="DIR", help="a folder that stands for the top of a drive, the card: its folder odrig appearing and going is the drive plugged in and pulled out")
+    drives.add_argument("--drive-folder", metavar="DIR", help="a folder that stands for the card's folder odrig itself, as collection/card; always read-only")
     made.add_argument("--drive-read-only", action="store_true", help="the drive cannot be written, as a USB stick")
     made.add_argument("--record", metavar="OUT", help="record mode: the record file to write")
     made.add_argument("--seconds", metavar="S", type=_milliseconds, help="record mode: the length of the recording")
@@ -85,8 +87,8 @@ def parse(argv):
             made.error("record mode needs its length: --seconds S")
         if arguments.port is not None or arguments.serial_link is not None or arguments.tcp_port is not None or arguments.verbose or arguments.lan:
             made.error("record mode opens no page and no port: --port, --serial-link, --tcp-port, --verbose and --lan do not go with --record")
-        if arguments.drive is not None:
-            made.error("record mode has no drive: --drive does not go with --record")
+        if arguments.drive is not None or arguments.drive_folder is not None:
+            made.error("record mode has no drive: --drive and --drive-folder do not go with --record")
     return arguments
 
 
@@ -104,7 +106,10 @@ def serve(arguments, out):
     """Real time: starts the core, opens the ports and the page address, and runs until a
     signal. A step that fails undoes the ones before it."""
     link, tcp_port = ports(arguments)
-    drive = None if arguments.drive is None else host.Drive(arguments.drive, writable=not arguments.drive_read_only)
+    if arguments.drive_folder is not None:
+        drive = host.Drive(arguments.drive_folder, writable=False, itself=True)
+    else:
+        drive = None if arguments.drive is None else host.Drive(arguments.drive, writable=not arguments.drive_read_only)
     files = host.FolderHost(arguments.show_dir, verbose=arguments.verbose, storage=arguments.storage, drive=drive)
     port = None
     line_port = None
