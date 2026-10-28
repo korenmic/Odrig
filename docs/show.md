@@ -187,8 +187,7 @@ On the board the drive is a USB stick or a microSD card, as
   files.
 - The player reads each of them whole, after the installed animations, while the show
   plays. A file that is sound and made for the canvas joins the playlist as soon as it
-  has been read, at its place in the saved order: without one, after the show's
-  animations and the drive's before it. One that is not is left out, named in the log
+  has been read, at its place in the drive's walk, after the show's animations. One that is not is left out, named in the log
   with its reason, and listed with it; it does not make the show invalid, and the drive's
   other files play.
 - Each has an id from the moment the drive is taken up: the lowest from 60001 up that the
@@ -326,30 +325,32 @@ startup item is skipped forward to the next included animation, wrapping if nece
 
 ## The saved playlist order
 
-The order of the playlist is kept in `order.txt` beside `show.json`. The player writes it
-when a command moves an animation, see [commands.md](commands.md#the-saved-playlist-order),
-and nothing else changes it; it may be missing.
+The order of the show's animations is kept in `order.txt` beside `show.json`. The player
+writes it when a command moves an animation of the show, see
+[commands.md](commands.md#the-saved-playlist-order), and nothing else changes it; it may be
+missing.
 
 ```
 odrig-order 1
 i 12
-x sunrise.odrg
 i 3
 ```
 
 The first line is `odrig-order 1`; a file with another first line names nothing. Every
 further line ends in a line feed and is an entry: `i` and the id of an animation item of
-the show, in decimal from 1 to 65,535 without a leading zero, or `x` and the file name of an
-animation of the external storage as the drive gives it, 1 to 127 bytes. A line in another
-form is no entry and takes no place. The player takes the first 512 entries, and of two
-entries for one animation the first.
+the show, in decimal from 1 to 65,535 without a leading zero. A line `x` and a file name,
+which named a file of the drive in a file written before, is passed over, and the next
+write leaves it out. A line in another form is no entry and takes no place. The player
+takes the first 512 entries, and of two entries for one animation the first.
 
-- The playlist plays the animations the file names in the order of their entries, and
-  after them the ones it does not name: the show's in the order of `show.json`, then the
-  drive's in the order of their names. A new item is therefore last until it is moved.
-- An entry whose external file is not there keeps its place and is passed over; a medium
-  with that file name gives the file that place again. An entry of an id that no item has
-  is passed over too, and an upload that gives an item that id gives it that place.
+- The playlist plays the show's animations the file names in the order of their entries,
+  and after them the ones it does not name, in the order of `show.json`; a new item is
+  therefore last until it is moved. Then it plays the drive's files in the drive's walk:
+  the root's files, then each folder's, depth first, each folder's files in the order of
+  the rows of the card's index, which `order move` changes on a card with a catalog, and of
+  their names on a card without one.
+- An entry of an id that no item has is passed over, and an upload that gives an item that
+  id gives it that place.
 - `start` still names where the playlist begins at power-on, and `play all` begins it with
   the first animation of the order. Cycles do not follow the order.
 - A turn in progress, the brightness and whether the LEDs are on do not change when the

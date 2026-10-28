@@ -118,6 +118,12 @@ bool catalog_drive_writable(const Core &core);
 // the map does not hold. Gives the id. False on a failed storage call.
 bool catalog_install_external(Core &core, uint32_t *id);
 
+// Moves the drive's file at a position of its walk among its folder's files: before the
+// file at the position `before`, of the same folder, or last for kNothing. One commit writes
+// the folder's file, the table and the map, and no page; a move that changes nothing writes
+// nothing. False on a failed storage call.
+bool catalog_move_external(Core &core, uint32_t position, uint32_t before);
+
 // Removes the drive's file at a position of its walk: one commit takes its entry and its line
 // out of the catalog and its index, with the folders left without a file, and removes the
 // file. False on a failed storage call.

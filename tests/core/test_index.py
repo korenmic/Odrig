@@ -3,7 +3,9 @@ folders, in the drive's walk; and an upload, a removal and a rebuild of its cata
 leave the same files as the PC tool."""
 
 import functools
+import pathlib
 import unittest
+import zlib
 
 from odrig import catalog
 
@@ -175,6 +177,78 @@ class ChangesOfTheIndex(unittest.TestCase):
         catalog.remove(storage, index_of(files).folders[0].rows[9][1].name)
         catalog.add(storage, "new.odrg", new, canvas=CANVAS)
         self.assertEqual(left, storage.files)
+
+
+NIGHT = {"sun.odrg": loop_of(2, 5), "moon.odrg": loop_of(2, 6), "night/a.odrg": loop_of(2, 7), "night/b.odrg": loop_of(2, 8), "night/c.odrg": loop_of(2, 9)}
+
+
+def revision(*ids):
+    """The revision of a level whose animations have these ids, in this order."""
+    return zlib.crc32(b"".join(number.to_bytes(4, "little") for number in ids))
+
+
+class MovesOfADrivesFiles(unittest.TestCase):
+    # The walk: `moon.odrg` 60001 and `sun.odrg` 60002 at the root, `night/a.odrg` 60003,
+    # `b` 60004 and `c` 60005 in `night`, whose id is 60006.
+
+    def test_moves_in_a_folder_and_at_the_root_leave_the_files_the_pc_tool_leaves(self):
+        start = card(NIGHT)
+        script = polls(0, 50) + asked(1100, f"order move {revision(60003, 60004, 60005)} 60005 60003", f"order move {revision(60005, 60003, 60004)} 60003 end",
+                                      f"order move {revision(1, 60001, 60002)} 60002 1", "order get in 60006", "order get")
+        run, left = run_on_card(start, script)
+        answers = replies(run)
+        self.assertEqual(answers[:3], [{"ok": True}] * 3)
+        self.assertEqual((answers[3]["ids"], answers[3]["revision"]), ([60005, 60004, 60003], revision(60005, 60004, 60003)))
+        self.assertEqual(answers[4]["ids"], [1, 60002, 60001])
+        storage = catalog.MemoryStorage(start, drive=True)
+        catalog.move(storage, "night/c.odrg", before="night/a.odrg")
+        catalog.move(storage, "night/a.odrg")
+        catalog.move(storage, "sun.odrg", before="moon.odrg")
+        self.assertEqual(left, storage.files)
+
+    def test_its_refusals(self):
+        night = revision(60003, 60004, 60005)
+        lines = (f"order move {night + 1} 60005 60003", f"order move {night} 60005 60001", f"order move {night} 60005 1", f"order move {night} 60005 60006",
+                 f"order move {night} 60003 60004")
+        run, left = run_on_card(card(NIGHT), polls(0, 50) + asked(1100, *lines))
+        self.assertEqual([reply.get("error") for reply in replies(run)], ["order-conflict", "in-use", "in-use", "in-use", None])
+        self.assertEqual(left, card(NIGHT))
+        run, left = run_on_card(card(NIGHT), polls(0, 50) + asked(1100, f"order move {night} 60005 60003"), ["--drive-read-only"])
+        self.assertEqual(replies(run), [{"ok": False, "error": "read-only"}])
+        self.assertEqual(left, card(NIGHT))
+
+    def test_the_walk_follows_the_new_order_and_what_plays_keeps_playing(self):
+        script = polls(0, 50) + asked(1100, "play 60004") + asked(1200, f"order move {revision(60003, 60004, 60005)} 60005 60003", "status")
+        script += asked(1300, "play 60006") + [line for second in range(1, 13) for line in asked(1300 + 1000 * second, "status")]
+        run, _ = run_on_card(card(NIGHT), script)
+        answers = replies(run)
+        self.assertEqual((answers[1], answers[2]["animation"]), ({"ok": True}, 60004))
+        seen = []
+        for reply in answers[4:]:
+            if not seen or seen[-1] != reply["animation"]:
+                seen.append(reply["animation"])
+        self.assertEqual(seen[:3], [60005, 60003, 60004])
+
+    def test_a_cut_at_every_storage_call_leaves_the_old_order_or_the_new_one(self):
+        start = card(NIGHT)
+        script = polls(0, 50) + asked(1100, f"order move {revision(60003, 60004, 60005)} 60005 60003")
+        outcomes = set()
+        number = 1
+        while True:
+            with a_drive(start) as top, support.installed(SHOW) as show:
+                result = support.host("session", show, "--drive", top, "--cut-at", number, stdin="".join(f"{line}\n" for line in script).encode("ascii"))
+                if result.status != 75:
+                    self.assertEqual(result.status, 0, result.out[-300:])
+                    break
+                support.session(show, polls(0, 50), ["--drive", top])
+                after = support.folder_files(pathlib.Path(top, "odrig"))
+            found = catalog.read(catalog.MemoryStorage(after, drive=True))
+            self.assertEqual(found.state, "ok", number)
+            night = [entry.name for _, entry in found.index.folders[found.index.ordinal_of("night")].rows]
+            self.assertIn(night, (["night/a.odrg", "night/b.odrg", "night/c.odrg"], ["night/c.odrg", "night/a.odrg", "night/b.odrg"]), number)
+            outcomes.add("before" if night[0] == "night/a.odrg" else "after")
+            number += 1
+        self.assertEqual(outcomes, {"before", "after"})
 
 
 def until_rebuilt(seconds):

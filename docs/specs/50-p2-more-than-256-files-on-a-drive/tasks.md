@@ -150,7 +150,7 @@ Rules for every task:
   - Requirements: 1.1, 2.1 to 2.3, 3.1 to 3.4, 4.1 to 4.6, 5.1 to 5.3, 6.5 to 6.7,
     7.1 to 7.3, 8.1, 8.2, 10.1
 
-- [ ] 5. A drive's file moves among its folder's rows
+- [x] 5. A drive's file moves among its folder's rows
   - `core/src/order.cpp`, `core/src/catalog.cpp`, `core/src/index.cpp`: `order move` of a
     drive's file on an indexed drive the core may write commits the drive's catalog with
     its folder's file, the table and the map; `<before>` of another level `in-use`; a

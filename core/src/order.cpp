@@ -632,13 +632,20 @@ uint32_t order_move(Core &core, uint32_t revision, uint32_t id, uint32_t before,
     if (moved == kNothing || (before != 0 && target == kNothing) || (target != kNothing && level_of(core, target) != level)) {
         return refuse(reply, "in-use");
     }
-    if (is_drive(moved)) {
-        // A drive's file stands in its folder's rows, which this core does not move.
+    if (is_drive(moved) && !catalog_drive_writable(core)) {
+        // A drive's file stands in its folder's rows, which only a drive read from its index
+        // that the core may write keeps.
         return refuse(reply, "read-only");
     }
     uint32_t total = 0;
     if (revision != revision_of(core, level, &total)) {
         return refuse(reply, "order-conflict");
+    }
+    if (is_drive(moved)) {
+        // Before another file of its folder, or last; a root's file before a show's animation
+        // goes first among the root's files.
+        const uint32_t before_position = target == kNothing ? kNothing : is_drive(target) ? target - kDriveBase : 0;
+        return catalog_move_external(core, moved - kDriveBase, before_position) ? succeed(reply) : refuse(reply, "storage-error");
     }
     if (target != kNothing && is_drive(target)) {
         // A show's animation before a file of the root goes last among the show's.

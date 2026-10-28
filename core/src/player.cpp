@@ -698,6 +698,41 @@ uint32_t shifted(uint32_t held, uint32_t at, int32_t delta) {
 
 }  // namespace
 
+namespace {
+
+// A position the player holds, after a file of the drive moved from one position of the
+// walk to another.
+uint32_t moved(uint32_t held, uint32_t from, uint32_t to) {
+    if (held == kNothing || !is_drive(held)) {
+        return held;
+    }
+    const uint32_t at = held - kDriveBase;
+    if (at == from) {
+        return kDriveBase + to;
+    }
+    if (from < to && at > from && at <= to) {
+        return held - 1;
+    }
+    if (to < from && at >= to && at < from) {
+        return held + 1;
+    }
+    return held;
+}
+
+}  // namespace
+
+void player_drive_moved(Core &core, uint32_t from, uint32_t to) {
+    if (core.playing == kPlaylist) {
+        core.turn_item = moved(core.turn_item, from, to);
+    }
+    core.resume_item = moved(core.resume_item, from, to);
+    core.shown = moved(core.shown, from, to);
+    core.mapping_saved_shown = moved(core.mapping_saved_shown, from, to);
+    if (core.stream_open && is_drive(core.stream_item)) {
+        core.stream_item = moved(core.stream_item, from, to);
+    }
+}
+
 void player_drive_shifted(Core &core, uint32_t position, int32_t delta) {
     const bool turn_went = core.playing == kPlaylist && delta < 0 && core.turn_item == kDriveBase + position;
     if (core.playing == kPlaylist) {

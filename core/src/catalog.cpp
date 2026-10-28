@@ -780,8 +780,9 @@ uint32_t writer_crc(const Writer &writer) {
 // A change of the file of a folder of a drive's index, rewritten from its old file a line
 // at a time: its id and ordinal, its old file rows and all its old lines; the row left
 // out, or the row given the added entry with its own id, kNothing for none; the id of an
-// added row, put after the file rows, or 0; and the id of a sub-folder whose row is given
-// `child_files` own files, or left out for kNothing, or 0 for none.
+// added row, put after the file rows, or 0; the id of a sub-folder whose row is given
+// `child_files` own files, or left out for kNothing, or 0 for none; and the row moved from
+// `move_from` to stand at `move_to`, the rows between following, kNothing for none.
 struct FolderEdit {
     uint32_t id;
     uint32_t ordinal;
@@ -792,6 +793,8 @@ struct FolderEdit {
     uint32_t add_id;
     uint32_t child;
     uint32_t child_files;
+    uint32_t move_from;
+    uint32_t move_to;
 };
 
 // A change of the table: the lines from `gone_from` that go, `gone_count` of them, with
@@ -813,7 +816,8 @@ struct TableEdit {
 // none for kNothing; the line of the id `drop_id` left out, or none for 0; the lines of the
 // folders whose ordinals are from `gone_from`, `gone_count` of them, left out and the
 // ordinals after them less as many; the rows after `row` of the folder `ordinal` one less,
-// or none for kNothing.
+// or none for kNothing; the rows of the folder `move_ordinal` as a move of the row
+// `move_from` to `move_to` leaves them, or none for kNothing.
 struct MapEdit {
     uint32_t insert_at;
     uint32_t add_id;
@@ -823,6 +827,9 @@ struct MapEdit {
     uint32_t gone_count;
     uint32_t ordinal;
     uint32_t row;
+    uint32_t move_ordinal;
+    uint32_t move_from;
+    uint32_t move_to;
 };
 
 // The change of a drive's index that goes with a change of its catalog: the files of the
@@ -846,15 +853,44 @@ struct IndexChange {
 void clear_change(IndexChange &change) {
     change.folder_count = 0;
     change.table = {0, 0, kNothing, 0, kNothing, 0, kNothing};
-    change.map = {kNothing, 0, 0, 0, 0, 0, kNothing, 0};
+    change.map = {kNothing, 0, 0, 0, 0, 0, kNothing, 0, kNothing, 0, 0};
     change.map_changes = false;
     change.gone_count = 0;
 }
 
 // A folder's file left as it is but for what the edit says.
 FolderEdit edit_of(const IndexFolder &folder) {
-    FolderEdit edit = {folder.id, folder.ordinal, folder.files, folder.files + folder.folders, kNothing, kNothing, 0, 0, 0};
+    FolderEdit edit = {folder.id, folder.ordinal, folder.files, folder.files + folder.folders, kNothing, kNothing, 0, 0, 0, kNothing, 0};
     return edit;
+}
+
+// The row a file stands at after a move of the row `from` to `to`, for its row before it:
+// the rows between follow.
+uint32_t row_after_move(uint32_t row, uint32_t from, uint32_t to) {
+    if (row == from) {
+        return to;
+    }
+    if (from < to && row > from && row <= to) {
+        return row - 1;
+    }
+    if (to < from && row >= to && row < from) {
+        return row + 1;
+    }
+    return row;
+}
+
+// The row before the move of the file that stands at a row after it.
+uint32_t row_before_move(uint32_t row, uint32_t from, uint32_t to) {
+    if (row == to) {
+        return from;
+    }
+    if (from < to && row >= from && row < to) {
+        return row + 1;
+    }
+    if (to < from && row > to && row <= from) {
+        return row - 1;
+    }
+    return row;
 }
 
 // Puts a file row of the added entry of a change, with its id, into the chunk buffer.
@@ -887,8 +923,9 @@ ODRIG_NOINLINE bool write_folder(Core &core, const FolderEdit &edit, const Catal
         if (line_at == edit.drop_row) {
             continue;
         }
+        const uint32_t source = edit.move_from != kNothing && line_at < edit.files ? row_before_move(line_at, edit.move_from, edit.move_to) : line_at;
         uint32_t length = 0;
-        const char *text = index_line(core, old_name, kIndexRow, line_at, &length);
+        const char *text = index_line(core, old_name, kIndexRow, source, &length);
         uint32_t at = 0;
         uint32_t id = 0;
         if (text == nullptr || !decimal32(text, &at, &id)) {
@@ -1028,6 +1065,9 @@ ODRIG_NOINLINE bool write_map(Core &core, const IndexChange &change, uint32_t *l
         }
         if (kind == 'f' && ordinal == edit.ordinal && row > edit.row) {
             --row;
+        }
+        if (kind == 'f' && ordinal == edit.move_ordinal) {
+            row = row_after_move(row, edit.move_from, edit.move_to);
         }
         const uint32_t start = writer.length;
         put_id_line(core, &writer.length, id, kind, ordinal >= past ? ordinal - edit.gone_count : ordinal, row);
@@ -1775,6 +1815,42 @@ ODRIG_NOINLINE bool plan_removal(const Core &core, uint32_t position, uint32_t o
 }
 
 }  // namespace
+
+bool catalog_move_external(Core &core, uint32_t position, uint32_t before) {
+    const uint32_t ordinal = core.indexed ? drive_folder_of(core, position) : kNoFolder;
+    IndexFolder folder;
+    if (ordinal == kNoFolder || !drive_folder(core, ordinal, folder) || folder.files == 0) {
+        return false;
+    }
+    const uint32_t from = position - folder.first;
+    uint32_t to = folder.files - 1;
+    if (before != kNothing) {
+        const uint32_t target = before - folder.first;
+        to = target > from ? target - 1 : target;
+    }
+    if (to == from) {
+        // The file stands there already: nothing is written.
+        return true;
+    }
+    IndexChange index;
+    clear_change(index);
+    index.folder_count = 1;
+    index.folders[0] = edit_of(folder);
+    index.folders[0].move_from = from;
+    index.folders[0].move_to = to;
+    index.map_changes = true;
+    index.map.move_ordinal = ordinal;
+    index.map.move_from = from;
+    index.map.move_to = to;
+    const CatalogChange change;
+    if (!commit_change(core, kExternal, change, &index)) {
+        return false;
+    }
+    current_again(core);
+    player_drive_moved(core, position, folder.first + to);
+    repeats_reload(core);
+    return true;
+}
 
 bool catalog_remove_external(Core &core, uint32_t position) {
     if (!core.indexed) {

@@ -79,6 +79,10 @@ void player_drive_joined(Core &core, uint32_t position);
 // it follow. A held position of a file that went is let go.
 void player_drive_shifted(Core &core, uint32_t position, int32_t delta);
 
+// A file of the drive moved in the walk, from one position to another, the files between
+// following: the positions the player holds follow it, and what plays goes on.
+void player_drive_moved(Core &core, uint32_t from, uint32_t to);
+
 // The drive's animations changed: a drive was plugged in or pulled out, or a file of it
 // left the playlist. When the animation whose turn it is has gone, the playlist goes on
 // with the next one that is left, from its first frame, or nothing plays.

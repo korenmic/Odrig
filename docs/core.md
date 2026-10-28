@@ -1070,46 +1070,39 @@ cleanup. The next start retries it too.
 
 ## The saved order
 
-The playlist goes in the order of [show.md](show.md#the-saved-playlist-order), which the
-core reads from `order.txt`. Each animation that can play has a key, and the playlist goes
-from the smallest key up, and from the largest to the smallest again:
+The show's animations go in the order of [show.md](show.md#the-saved-playlist-order),
+which the core reads from `order.txt`, and the drive's files after them in the drive's
+walk. Each animation of the show that can play has a key, and the show's animations go
+from the smallest key up:
 
 | The animation | Its key |
 |---|---|
 | named by entry k of the file, k from 0 | k |
 | an item of the show the file does not name | 65,536 and its position in the item table |
-| a file of the drive the file does not name | 131,072 and its place in the drive's list |
 
 The core keeps, for a host whose storage can be changed, the number of the entry that
-names each item of the item table, and of each place of a drive with the low byte of the
-FNV-1a hash of its name, in one block taken at startup; it keeps no name. It reads the
-file at three moments, always with `read_at` through the second source:
+names each item of the item table, in one block taken at startup; it keeps no name. A line
+`x <name>` is passed over. It reads the file with `read_at` through the second source at
+startup, once the show is read, and at once, as a whole, after an upload adds an item, so
+that an entry with the new item's id gives it its place as a restart would. A removed
+item's key leaves with it.
 
-- at startup, once the show is read, for the items of the show;
-- when a drive is plugged in: the check of the drive reads the file before the drive's
-  files, a step taking the bytes of one read of at most 512, an unfinished line kept in
-  the core object; a file of the drive joins the playlist only after that. When the
-  second source is taken meanwhile, the reading begins again;
-- at once, as a whole, after an upload adds an item, so that an entry with the new item's
-  id gives it its place as a restart would.
+`order get` of the root writes the ids of the show's listed animations by key, then those
+of the root's files of the drive in their rows' order; `order get in <id>` those of a
+folder's files. A level's revision is the CRC-32 of its ids in that order, each as four
+bytes, low byte first.
 
-An entry `x <name>` is matched with a place whose hash is the same, and the host's
-`drive_name` confirms the whole name. A drive pulled out keeps the keys of its places
-until the next drive is counted, so that the playlist goes on, in the saved order, after
-the animation that left. A removed item's key leaves with it.
-
-`order get` writes the ids of the listed animations by key, finding the next key with one
-walk over the items and the places for each id. Its revision is the CRC-32 of each listed
-animation's id as two bytes and key as four, low byte first, in the order of `list`.
-
-`order move` writes the next order into `order.part` while it reads `order.txt` through the
-second source, after the drive's check has yielded it: the header, every entry of the
-file but those of the moved animation and those of ids that no item has, the moved
-animation's entry before the entry of the animation it goes before, and after them every
-listed animation the file did not name, the internal ones first, by key, again with the
-moved one before its place; the moved one last for `end`. At most 512 entries are written.
-The text goes through the first 1,000 bytes of the chunk buffer; the two entries looked
-for and a drive's name stand after them.
+`order move` of a show's animation writes the next order into `order.part` while it reads
+`order.txt` through the second source, after the drive's check has yielded it: the
+header, every entry `i` of the file but the moved animation's and those of ids that no item
+has, the moved animation's entry before the entry of the animation it goes before, and
+after them every listed animation of the show the file did not name, by key, again with
+the moved one before its place; the moved one last for `end`, or before a file of the
+root. At most 512 entries are written. The text goes through the first 1,000 bytes of the
+chunk buffer; the two entries looked for stand after them. `order move` of a drive's file
+commits the drive's catalog with its folder's file, the table and the map written anew,
+the file's row moved and the rows between following, and no page; the positions the
+player holds follow the move.
 
 ```
 1  write order.part

@@ -341,7 +341,7 @@ succeeds.
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
-| `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
+| `read-only` | `upload begin external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
@@ -556,13 +556,13 @@ plug-in is `damaged`, `interrupted`, until it is plugged in again.
 
 ## The saved playlist order
 
-The playlist plays its included animations in the saved order, which the board keeps in
-its own storage, internal and external animations in one order. An animation the saved
-order does not name comes after every one it names: the internal ones in the order of
-`show.json`, then the external ones in the order of their file names. An external
-animation is named by its file name, so it keeps its place while its medium is absent
-and takes it again when the medium is back. [show.md](show.md#the-saved-playlist-order)
-has the file.
+The playlist plays its included animations in the saved order: the board's own in the
+order the board keeps in its own storage, then the external storage's in the walk of its
+folders, the root's files and then each folder's, each folder's files in the order the
+card's index keeps for them. An animation of the board that the saved order does not name
+comes after every one it names, in the order of `show.json`; a file uploaded to the card
+goes last among the root's files. [show.md](show.md#the-saved-playlist-order) has the
+file.
 
 ```
 order get
@@ -595,6 +595,13 @@ the order before the move or the one after it. A move that changes nothing, of a
 animation that already stands right before `<before>`, or last for `end`, or before
 itself, writes nothing.
 
+A file of the card moves among its folder's files, and is saved in the card's index in one
+commit of the card's catalog, as `catalog.md` says: `<before>` is a file of the same folder,
+or, for a file of the root, an animation of the show, which puts it first among the root's
+files. An animation of the show put before a file of the root goes last among the show's.
+A card without a catalog that is `ok`, or one the core may not write, keeps the order of
+its files: `read-only`.
+
 - `bad-argument`: the words are not in their form.
 - `show-invalid`: the show is invalid.
 - `busy`: until the player has read every installed animation after a start, and while
@@ -602,7 +609,8 @@ itself, writes nothing.
 - `unknown-id`: `<id>` or `<before>` is the id of no listed animation, of no cycle and of
   no folder of the card.
 - `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the card, which
-  have no place in the order.
+  have no place in the order, or `<before>` is an animation of another level than `<id>`.
+- `read-only`: `<id>` is a file of the card, and the core may not write its index.
 - `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
   `order get` again.
 - `storage-error`: the order could not be saved. It is as it was.
