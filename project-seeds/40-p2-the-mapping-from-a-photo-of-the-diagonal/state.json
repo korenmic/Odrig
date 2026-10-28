@@ -1,7 +1,8 @@
 {
   "number": 40,
   "slug": "40-p2-the-mapping-from-a-photo-of-the-diagonal",
-  "state": "in_progress",
+  "state": "completed",
+  "completedAt": "2026-10-28T20:06:14+02:00",
   "title": "The mapping from a photo of the diagonal",
   "priority": "P2",
   "addedAt": "2026-10-25T19:05:00+02:00",
