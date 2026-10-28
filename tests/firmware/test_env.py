@@ -9,13 +9,13 @@ SWITCHES = {"PLATFORMIO_SETTING_ENABLE_TELEMETRY": "No", "npm_config_update_noti
 
 
 class ChildEnvironment(unittest.TestCase):
-    def test_each_folder_variable_is_an_absolute_path_inside_the_work_folder(self):
+    def test_each_folder_variable_is_an_absolute_path_inside_the_shared_toolchains(self):
         made = env.child()
         for name in FOLDER_VARIABLES:
             self.assertTrue(name in made, f"{name} is not set")
             folder = pathlib.Path(made[name])
             self.assertTrue(folder.is_absolute(), f"{name} is {folder}")
-            self.assertTrue(paths.inside(folder, paths.WORK) and folder != paths.WORK, f"{name} is {folder}")
+            self.assertTrue(paths.inside(folder, paths.SHARED) and folder != paths.SHARED, f"{name} is {folder}")
 
     def test_the_folders_are_all_different(self):
         made = env.child()

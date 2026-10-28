@@ -28,9 +28,19 @@ class WorkFolder(unittest.TestCase):
         self.assertEqual(paths.WORK, ROOT / "build" / "firmware")
         self.assertTrue(paths.inside(paths.WORK, paths.ROOT))
 
-    def test_every_folder_of_the_tool_is_inside_the_work_folder(self):
-        for folder in (paths.VENV, paths.PYTHON, paths.PIO_CORE, paths.PIO_CACHE, paths.NPM_CACHE, paths.PIP_CACHE, paths.WLED, paths.OUT, paths.STORAGE):
+    def test_every_folder_of_the_tool_is_inside_the_work_folder_or_the_shared_toolchains(self):
+        for folder in (paths.WLED, paths.STANDALONE, paths.OUT, paths.STORAGE):
             self.assertTrue(paths.inside(folder.parent, paths.WORK) and folder.is_absolute(), folder)
+        for folder in (paths.VENV, paths.PYTHON, paths.PIO_CORE, paths.PIO_CACHE, paths.NPM_CACHE, paths.PIP_CACHE, paths.WLED_SOURCE, paths.NEWER):
+            self.assertTrue(paths.inside(folder.parent, paths.SHARED) and folder.is_absolute(), folder)
+
+    def test_the_shared_toolchains_are_odrig_tools_or_else_the_checkout_s_build(self):
+        self.assertEqual(paths.tools_folder({}, ROOT), ROOT / "build")
+        self.assertEqual(paths.tools_folder({"ODRIG_TOOLS": "/srv/odrig-tools"}, ROOT), pathlib.Path("/srv/odrig-tools").resolve())
+        self.assertEqual(paths.SHARED, paths.TOOLS / "firmware")
+        self.assertEqual(paths.SETUP_LOCK, paths.TOOLS / "setup.lock")
+        if "ODRIG_TOOLS" not in os.environ:
+            self.assertEqual((paths.SHARED, paths.WLED_SOURCE), (paths.WORK, paths.WLED))
 
     def test_git_ignores_the_work_folder(self):
         done = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", "build/firmware/out/odrig-firmware.bin"])

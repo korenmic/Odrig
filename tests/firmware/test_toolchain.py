@@ -17,8 +17,8 @@ class Requirements(unittest.TestCase):
             self.assertRegex(line, r"^[a-z-]+==\d+(\.\d+)+$")
 
     def test_wleds_own_pinned_platformio_is_installed_before_them(self):
-        self.assertEqual(toolchain.requirement_files(), [paths.WLED / "requirements.txt", paths.REQUIREMENTS])
-        pinned = (paths.WLED / "requirements.txt").read_text()
+        self.assertEqual(toolchain.requirement_files(), [paths.WLED_SOURCE / "requirements.txt", paths.REQUIREMENTS])
+        pinned = (paths.WLED_SOURCE / "requirements.txt").read_text()
         self.assertRegex(pinned, r"(?m)^platformio==6\.1\.17$")
         for line in pinned.splitlines():
             if line.strip() and not line.lstrip().startswith("#"):

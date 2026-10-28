@@ -1,12 +1,13 @@
-"""The tools in the work folder: the Python environment with PlatformIO, esptool,
-littlefs-python and Node.js, and the one of the newer USB software. Every step is skipped
-when its result is there."""
+"""The tools: the Python environment with PlatformIO, esptool, littlefs-python and Node.js,
+and the one of the newer USB software, in the folder of the shared toolchains; WLED's
+source there, and the checkout's copy of it. Every step is skipped when its result is
+there, and a setup waits for another one that runs from another checkout."""
 
 import hashlib
 import subprocess
 import sys
 
-from . import Failure, env, paths, wled
+from . import Failure, env, paths, setuplock, wled
 
 MINIMUM_PYTHON = (3, 10)
 STAMP = paths.VENV / "odrig-requirements.sha256"
@@ -22,7 +23,11 @@ def _run(what, command, newer=False):
 
 def requirement_files():
     """WLED's own pinned PlatformIO and its packages first, then the tool's."""
-    return [paths.WLED / "requirements.txt", paths.REQUIREMENTS]
+    return [paths.WLED_SOURCE / "requirements.txt", paths.REQUIREMENTS]
+
+
+def _waiting():
+    print(f"waiting for another setup, which holds {paths.SETUP_LOCK}", file=sys.stderr)
 
 
 def _wanted():
@@ -33,16 +38,25 @@ def _wanted():
 
 
 def python_environment():
-    """Makes sure the work folder has WLED's source and the Python environment with every
-    package of the two requirement files. Returns the steps it had to do."""
+    """Makes sure WLED's source and the Python environment with every package of the two
+    requirement files are there, and the checkout's copy of WLED. Returns the steps it had
+    to do."""
     if sys.version_info < MINIMUM_PYTHON:
         raise Failure("setup-failed", f"Python {'.'.join(map(str, MINIMUM_PYTHON))} or later is needed, this is {sys.version.split()[0]}")
+    with setuplock.held(paths.SETUP_LOCK, waiting=_waiting):
+        return _python_environment()
+
+
+def _python_environment():
     done = []
     if wled.fetch():
         done.append("fetched WLED")
+    wled.check(paths.WLED_SOURCE)
+    if wled.copy():
+        done.append("copied WLED into the work folder")
     wled.check()
     if not paths.PYTHON.exists():
-        paths.WORK.mkdir(parents=True, exist_ok=True)
+        paths.SHARED.mkdir(parents=True, exist_ok=True)
         _run("creating the Python environment", [sys.executable, "-m", "venv", paths.VENV])
         done.append("created the Python environment")
     wanted = _wanted()
@@ -55,8 +69,13 @@ def python_environment():
 
 
 def newer_environment():
-    """Makes sure the work folder has the newer USB software's Python environment with
-    every package of its requirement file. Returns the steps it had to do."""
+    """Makes sure the newer USB software's Python environment is there with every package
+    of its requirement file. Returns the steps it had to do."""
+    with setuplock.held(paths.SETUP_LOCK, waiting=_waiting):
+        return _newer_environment()
+
+
+def _newer_environment():
     done = []
     if not paths.NEWER_PYTHON.exists():
         paths.output(paths.NEWER).mkdir(parents=True, exist_ok=True)

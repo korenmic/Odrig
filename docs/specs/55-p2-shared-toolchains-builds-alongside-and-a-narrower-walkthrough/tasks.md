@@ -7,7 +7,7 @@ Each task is seed 53's task of the same subject, moved here unchanged.
       command; its five suites in the copy through the copy's runner; `npm ci` from the
       computer's cache; its emulators given `--parent` and ended; port 8600 checked before
       the page's emulator. Suites: runner, onboarding, then `tests/run.py --walkthrough`.
-- [ ] 2. Shared toolchains (seed 53's task 6). `ODRIG_TOOLS` in `app/apptool/paths.py` and
+- [x] 2. Shared toolchains (seed 53's task 6). `ODRIG_TOOLS` in `app/apptool/paths.py` and
       `firmware/fwtool/paths.py`, the shared and the checkout's parts, the setup lock, the
       cloned WLED copy, Gradle without its daemon, `tests.firmware.test_paths` accepting
       the shared Python. Tests in `tests/app` and `tests/firmware` with stand-in folders;

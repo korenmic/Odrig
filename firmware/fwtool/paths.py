@@ -1,19 +1,38 @@
-"""Where things are: the repository, the work folder, and the folder no tool may write."""
+"""Where things are: the repository, the work folder, the shared toolchains, and the folder
+no tool may write."""
 
+import os
 import pathlib
 
 from . import Failure
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FIRMWARE = ROOT / "firmware"
+# The checkout's own work folder: its WLED copy, its builds and what it writes.
 WORK = ROOT / "build" / "firmware"
 
-VENV = WORK / "venv"
+
+def tools_folder(environ=None, root=ROOT):
+    """The folder of the toolchains that checkouts share: `ODRIG_TOOLS` when it is set, else
+    the checkout's own `build/`."""
+    named = (os.environ if environ is None else environ).get("ODRIG_TOOLS")
+    return pathlib.Path(named).expanduser().resolve() if named else root / "build"
+
+
+TOOLS = tools_folder()
+# The firmware tool's part of it: the Python environments, PlatformIO's folders, the caches
+# and WLED's source as fetched. Without `ODRIG_TOOLS` it is the work folder itself.
+SHARED = TOOLS / "firmware"
+SETUP_LOCK = TOOLS / "setup.lock"
+
+VENV = SHARED / "venv"
 PYTHON = VENV / "bin" / "python"
-PIO_CORE = WORK / "pio"
-PIO_CACHE = WORK / "pio-cache"
-NPM_CACHE = WORK / "npm-cache"
-PIP_CACHE = WORK / "pip-cache"
+PIO_CORE = SHARED / "pio"
+PIO_CACHE = SHARED / "pio-cache"
+NPM_CACHE = SHARED / "npm-cache"
+PIP_CACHE = SHARED / "pip-cache"
+# WLED's source as fetched, and the checkout's copy of it, which is patched and built.
+WLED_SOURCE = SHARED / "WLED"
 WLED = WORK / "WLED"
 STANDALONE = WORK / "standalone"
 OUT = WORK / "out"
@@ -21,7 +40,7 @@ STORAGE = WORK / "storage"
 
 # The newer USB software, beside the build known good: its Python environment, PlatformIO's
 # folder with the platform, the framework and the compilers, and the build cache.
-NEWER = WORK / "newer"
+NEWER = SHARED / "newer"
 NEWER_VENV = NEWER / "venv"
 NEWER_PYTHON = NEWER_VENV / "bin" / "python"
 NEWER_PIO_CORE = NEWER / "pio"
