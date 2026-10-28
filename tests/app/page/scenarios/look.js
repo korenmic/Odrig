@@ -1,7 +1,7 @@
 // The measures of everything on the screens, of a row's menu, of a message and of a
 // question.
 
-import {menuOf, shown, spaceKnown, storage} from "../reading.js";
+import {menuOf, shown, spaceKnown, startSelection, storage} from "../reading.js";
 
 function displayed(element) {
   return element.getClientRects().length > 0;
@@ -103,7 +103,7 @@ export default async function (app) {
   await app.until(() => spaceKnown(app) && storage(app).rows.length === app.settings.rows, "the list with its rows and the space");
   const animations = measure(app);
   // Selection mode, with the note of the ignored row under its name inside Play.
-  app.pressIn("#list-head", "Select");
+  startSelection(app);
   await app.until(() => app.doc.querySelectorAll("#animations-list .pick").length > 0, "selection mode");
   const selecting = measure(app);
   app.press("Done");

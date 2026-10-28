@@ -114,8 +114,8 @@ class OnTheScreen(unittest.TestCase):
 
     def test_a_target_that_does_not_know_a_command_and_one_that_refuses_with_another_code(self):
         old = entered(self, support.StandIn({**support.SOUND, "play": refusal("bad-argument"), "off": refusal("weird"), "on": OK}))
-        presses = [{"press": "Play this folder", "pressIn": "#level-head"}, {"press": "Off", "not": NOT_UNDERSTOOD.format("bad-argument")}, {"press": "On", "wait": 800}, {"dismiss": True}]
-        found = support.run("refusals", address=old.address, settings={"rows": 2, "presses": presses[:2] + presses[3:]})
+        presses = [{"press": "Play this folder", "pressIn": "#level-head"}, {"tap": "power-toggle", "not": NOT_UNDERSTOOD.format("bad-argument")}, {"dismiss": True}]
+        found = support.run("refusals", address=old.address, settings={"rows": 2, "presses": presses})
         self.assertEqual(found.seen[0]["message"], NOT_UNDERSTOOD.format("bad-argument"))
         # A second message takes the place of the first, and goes when it is dismissed.
         self.assertEqual(found.seen[1]["message"], REFUSED.format("weird"))

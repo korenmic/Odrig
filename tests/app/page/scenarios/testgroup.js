@@ -1,7 +1,7 @@
 // The operator turns the test animations on in Settings, starts tests from the Tests group
 // of Animations, and stops them.
 
-import {playRow, rows, shown} from "../reading.js";
+import {playing, playRow, rows, shown} from "../reading.js";
 
 const entries = (app) => [...app.doc.querySelectorAll("#tests-grid button")].filter((button) => button.getClientRects().length > 0).map((button) => button.textContent);
 
@@ -47,7 +47,7 @@ export default async function (app) {
   seen.pressed = [...app.doc.querySelectorAll('#tests-grid button[aria-pressed="true"]')].map((button) => button.textContent);
   await app.step();
   app.press("Stop test");
-  await app.until(() => app.text("test-now-text") === null && app.text("playing") === "Playlist", "playback resumed", 8000);
+  await app.until(() => app.text("test-now-text") === null && playing(app) === "Playlist", "playback resumed", 8000);
   await app.step();
   app.press("Diagonal");
   await app.until(() => app.text("test-now-text") === "Test: Diagonal is showing. Normal playback is paused.", "the diagonal named", 8000);
@@ -59,7 +59,7 @@ export default async function (app) {
   await app.until(() => app.shown() === "animations" && app.byId("tests").hidden, "the group hidden", 8000);
   seen.namedHidden = app.text("test-now-text");
   playRow(app, settings.play);
-  await app.until(() => app.text("test-now-text") === null && app.text("playing") === "Playlist", "the play ended the test", 8000);
+  await app.until(() => app.text("test-now-text") === null && playing(app) === "Playlist", "the play ended the test", 8000);
   await app.step();
   seen.rowsAfter = rows(app).map((row) => row.id);
   seen.inList = app.doc.querySelectorAll("#animations-list .test, #animations-list [data-snake]").length;

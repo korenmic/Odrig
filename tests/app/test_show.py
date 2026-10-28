@@ -69,7 +69,7 @@ class TheState(Show):
         folder = entered(self, emulator_support.example_show())
         emulator_support.with_show_fault(folder)
         emulator, address = self.emulator(folder)
-        found = support.run("state", address=address, settings={"rows": 0, "until": "The installed show is invalid"})
+        found = support.run("state", address=address, settings={"rows": 0, "line": "^The installed show is invalid"})
         self.assertEqual(found.seen["playing"], "The installed show is invalid: undefined-id 99.")
         self.assertEqual((found.seen["now"], found.seen["rows"], found.seen["none"]), (None, [], None))
         self.assertEqual(found.seen["power"], "ON")

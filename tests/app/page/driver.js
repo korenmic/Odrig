@@ -61,6 +61,15 @@ function tools(frame) {
       }
       found[0].click();
     },
+    // Presses the button of this id, which must be on the screen: a button of an icon,
+    // which has no words.
+    tap(id) {
+      const found = app.byId(id);
+      if (!displayed(found)) {
+        throw new Error(`the button ${id} is not on the screen`);
+      }
+      found.click();
+    },
     // Presses the button that has these words inside the element a selector finds.
     pressIn(selector, words) {
       const place = app.doc.querySelector(selector);

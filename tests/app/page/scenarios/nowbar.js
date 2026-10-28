@@ -3,7 +3,7 @@
 // filter, take the app off the screen, and ask the test for its steps; the screen is looked
 // at where the test asks.
 
-import {rowOf, shown} from "../reading.js";
+import {playing, rowOf, shown} from "../reading.js";
 
 function displayed(element) {
   return element.getClientRects().length > 0;
@@ -46,7 +46,7 @@ function look(app) {
   return {
     bar: barOf(app),
     now: app.text("now"),
-    playing: app.text("playing"),
+    playing: playing(app),
     message: app.text("message-text"),
     question: app.text("confirm-text"),
     level: app.raw("level-title"),

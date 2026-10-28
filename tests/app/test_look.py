@@ -213,12 +213,13 @@ class Back(unittest.TestCase):
         for look in found["toggled"]:
             self.assertEqual((look["shown"], look["state"], look["entries"]), ("animations", {"screen": "animations", "depth": 0}, entries + 1))
         # Upload and Settings lie on top of Animations as the target screen does, and one
-        # takes the other's place there: back goes to Animations. So does `Add animation`.
+        # takes the other's place there: back goes to Animations, also after a back from the
+        # target screen.
         self.assertEqual((found["upload"]["shown"], found["upload"]["state"], found["upload"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
         self.assertEqual((found["settings"]["shown"], found["settings"]["state"], found["settings"]["entries"]), ("settings", {"screen": "settings", "depth": 1}, entries + 1))
         self.assertEqual((found["across"]["shown"], found["across"]["state"], found["across"]["entries"]), ("target", {"screen": "target", "depth": 1}, entries + 1))
         self.assertEqual((found["home"]["shown"], found["home"]["state"]), ("animations", {"screen": "animations", "depth": 0}))
-        self.assertEqual((found["added"]["shown"], found["added"]["state"], found["added"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
+        self.assertEqual((found["uploadAgain"]["shown"], found["uploadAgain"]["state"], found["uploadAgain"]["entries"]), ("upload", {"screen": "upload", "depth": 1}, entries + 1))
 
     def test_while_the_target_has_not_answered_the_target_screen_is_the_apps_first_entry(self):
         found = support.run("back", address=f"127.0.0.1:{support.free_port()}", settings={"answers": False}).seen

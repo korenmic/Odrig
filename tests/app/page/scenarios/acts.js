@@ -6,6 +6,8 @@ export default async function (app) {
     await app.sleep(act.after);
     if (act.press !== undefined) {
       app.press(act.press);
+    } else if (act.tap !== undefined) {
+      app.tap(act.tap);
     } else if (act.slide !== undefined) {
       app.slide("level", act.slide);
     } else {

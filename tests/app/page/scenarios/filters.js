@@ -1,6 +1,6 @@
 // The operator narrows the list of Animations with the filters by storage and by type.
 
-import {menuOf, rowOf, rows, shown} from "../reading.js";
+import {menuOf, rowOf, rows, shown, startSelection} from "../reading.js";
 
 const ids = (app) => rows(app).map((row) => row.id);
 
@@ -75,7 +75,7 @@ export default async function (app) {
   if (settings.selecting) {
     choose(app, "type", "Normal");
     choose(app, "storage", "Internal");
-    app.pressIn("#list-head", "Select");
+    startSelection(app);
     app.press("Select all");
     const checked = () => [...app.doc.querySelectorAll("#animations-list .pick input")].filter((input) => input.checked).map((input) => Number(input.closest(".row").dataset.id));
     seen.selectedInternal = checked();

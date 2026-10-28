@@ -30,12 +30,12 @@ class Controls(unittest.TestCase):
 
 
 class Buttons(Controls):
-    def test_off_and_on_switch_the_leds_and_the_one_in_effect_is_marked(self):
+    def test_the_power_icon_switches_the_leds_off_and_on_and_is_pressed_while_they_are_on(self):
         emulator, address = self.emulator()
-        presses = [{"press": "Off", "until": "OFF Brightness"}, {"press": "On", "until": "ON Brightness"}]
+        presses = [{"tap": "power-toggle", "until": "OFF Brightness"}, {"tap": "power-toggle", "until": "ON Brightness"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "on", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["off", "on"])
-        self.assertEqual([(step["power"], step["on"], step["off"]) for step in seen], [("OFF", False, True), ("ON", True, False)])
+        self.assertEqual([(step["power"], step["lit"]) for step in seen], [("OFF", False), ("ON", True)])
         self.assertIs(emulator.status()["on"], True)
         self.assertEqual({step["message"] for step in seen}, {None})
 
@@ -52,12 +52,12 @@ class Buttons(Controls):
     def test_from_a_cycle_the_playlist_button_goes_to_the_playlist_and_no_button_plays_a_cycle(self):
         emulator, address = self.emulator(emulator_support.example_show)
         self.assertEqual(emulator.status()["playing"], 3)
-        presses = [{"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg .*Playlist"}]
+        presses = [{"press": "Play this folder", "pressIn": "#level-head", "until": "Now 1 hello\\.odrg", "line": "^Playlist$"}]
         seen, lines = self.sent(emulator, "presses", lambda line: line == "play all", rows=2, presses=presses)
         self.assertEqual([line for line, _ in lines], ["play all"])
         self.assertEqual(emulator.status()["playing"], "all")
-        self.assertEqual(seen[0]["buttons"], ["Ignore 1 hello.odrg in playlist", "Select 1 hello.odrg", "Delete 1 hello.odrg", "Repeat 1 hello.odrg this turn",
-                                              "Save the repeat of 1 hello.odrg for every turn", "Restore the default repeat of 1 hello.odrg", "On", "Off", "Add animation", "Select", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
+        self.assertEqual(seen[0]["buttons"], ["LEDs on or off", "Collapse the panel", "Ignore 1 hello.odrg in playlist", "Select 1 hello.odrg", "Delete 1 hello.odrg", "Repeat 1 hello.odrg this turn",
+                                              "Save the repeat of 1 hello.odrg for every turn", "Restore the default repeat of 1 hello.odrg", "All, 2", "Internal, 2", "External, 0", "All, 2", "Normal, 2", "Text, 0",
                                               "Widget, 0", "Play this folder", "Play 1 hello.odrg", "Actions for 1 hello.odrg", "Play 2 dvd.odrg", "Actions for 2 dvd.odrg"])
 
 
@@ -206,7 +206,7 @@ class TheOrder(Controls):
 
     def test_what_the_operator_asked_for_is_sent_before_a_status_that_waits_and_a_status_follows_it_at_once(self):
         slow = entered(self, support.StandIn(OBEYS, delay=1.2))
-        support.run("acts", address=slow.address, settings={"acts": [{"after": 300, "press": "Off"}], "then": 4200})
+        support.run("acts", address=slow.address, settings={"acts": [{"after": 300, "tap": "power-toggle"}], "then": 4200})
         lines = self.lines(slow)
         self.assertEqual(lines[:2], ["status", "status"])
         self.assertEqual(lines[2:4], ["off", "status"], lines)
@@ -223,7 +223,7 @@ class TheOrder(Controls):
 
     def test_a_command_that_got_no_answer_is_not_sent_again(self):
         deaf = entered(self, support.StandIn({**OBEYS, "off": None}))
-        found = support.run("acts", address=deaf.address, settings={"acts": [{"after": 300, "press": "Off"}], "then": 7500})
+        found = support.run("acts", address=deaf.address, settings={"acts": [{"after": 300, "tap": "power-toggle"}], "then": 7500})
         lines = self.lines(deaf)
         self.assertEqual(lines.count("off"), 1)
         # After the five seconds of the time limit the app asks for the status again.

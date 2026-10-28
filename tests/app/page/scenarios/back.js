@@ -38,8 +38,8 @@ export default async function (app) {
   view.history.back();
   await app.until(() => app.shown() === "animations", "Animations after back from the target screen");
   const home = look();
-  app.press("Add animation");
-  await app.until(() => app.shown() === "upload", "Upload after Add animation");
-  const added = look();
-  return {began, first, second, back, toggled, upload, settings, across, home, added};
+  app.press("Upload");
+  await app.until(() => app.shown() === "upload", "Upload after back from the target screen");
+  const uploadAgain = look();
+  return {began, first, second, back, toggled, upload, settings, across, home, uploadAgain};
 }

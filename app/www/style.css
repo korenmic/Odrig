@@ -432,13 +432,8 @@ input[type="range"] {
   opacity: 0.45;
 }
 
-/* The panel of what plays stays at the top of the screen, under the band of the phone's bar,
-   while the list scrolls under it: opaque, the panel's colour over the midnight, and under
-   the band, the tabs, the menus, a lifted row and the messages. */
-#now-panel {
-  position: relative;
-}
-
+/* The top row of the panel: the power icon at the left and the collapse button at the right,
+   each 48 pixels round. Collapsed, the panel keeps that row alone. */
 .now-top {
   display: flex;
   align-items: center;
@@ -447,12 +442,12 @@ input[type="range"] {
 }
 
 #now-collapse {
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
   min-height: 0;
   margin: 0;
-  padding: 10px;
+  padding: 12px;
   border-radius: 999px;
 }
 
@@ -512,6 +507,9 @@ input[type="range"] {
   flex: 0 0 auto;
 }
 
+/* The panel of what plays stays at the top of the screen, under the band of the phone's bar,
+   while the list scrolls under it: opaque, the panel's colour over the midnight, and under
+   the band, the tabs, the menus, a lifted row and the messages. */
 #now-panel.frozen {
   position: sticky;
   top: var(--bar-top);

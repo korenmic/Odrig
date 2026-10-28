@@ -1,7 +1,7 @@
 // The operator moves animations in the saved order: by holding a row and dragging it,
 // with a finger or a mouse, or with Move up and Move down in a row's menu.
 
-import {choose, menuOf, rowOf, shown} from "../reading.js";
+import {choose, menuOf, rowOf, shown, startSelection} from "../reading.js";
 
 const ids = (app) => [...app.doc.querySelectorAll("#animations-list > .row")].map((row) => Number(row.dataset.id));
 
@@ -114,7 +114,7 @@ export default async function (app) {
     seen.after = ids(app);
   }
   if (settings.blocked) {
-    app.pressIn("#list-head", "Select");
+    startSelection(app);
     seen.selecting = {note: app.text("order-note"), menu: menuOf(app, seen.first[1])};
     app.doc.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
     const play = rowOf(app, seen.first[1]).querySelector(".play");
