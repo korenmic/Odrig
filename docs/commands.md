@@ -25,7 +25,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `status` | Reports the current state. |
 | `fault` | Reports the latest fault of a file since the start. |
 | `space` | Reports the free and the total storage and the number of animations. |
-| `list`, `list <from>` | Lists the items of the show, the playlists of the card's folders, and the animations of a USB drive or a card. |
+| `list`, `list <from>` | Lists the items of the show and the root's level of a USB drive or a card: the playlists of its folders and its own animations. |
+| `list in <folder-id>`, `list in <folder-id> <from>` | Lists one level of the card: the playlists of a folder's sub-folders and its own animations. |
 | `read <id> <offset>` | Reads up to 600 bytes of the file of an animation back. |
 | `catalog` | Reports the catalog of the board's own storage and of the drive. |
 | `catalog page <storage> <page> <offset>` | Reads up to 512 bytes of a page of the catalog of the board's own storage, `internal`, or of the drive, `external`. |
@@ -41,7 +42,8 @@ Every command gets exactly one reply: a JSON object on one line of at most 1,024
 | `mapping test on` | Shows the built-in diagonal until stopped. |
 | `mapping test off` | Stops the diagonal and resumes the show. |
 | `mapping test snake <n>` | Shows the test of snake n, 1 to 20, until stopped. |
-| `order get`, `order get <from>` | Reports the ids of the listed animations in the saved playlist order. |
+| `order get`, `order get <from>` | Reports the ids of the root level's animations in the saved playlist order. |
+| `order get in <folder-id>`, `order get in <folder-id> <from>` | Reports the ids of a folder's animations in the saved playlist order. |
 | `order move <revision> <id> <before>` | Moves one animation before another, or to the `end`, in the saved order. |
 | `repeat <id> <n>` | Makes the playlist's turn in progress of that animation `n` loops long, for that turn alone. |
 | `repeat <id> <n> save` | Keeps `n` loops as the animation's saved repeat, for every later turn, and gives them to its turn in progress. |
@@ -68,7 +70,7 @@ A number in a command is written in decimal digits.
 ## Status reply
 
 ```json
-{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"left":86399}
+{"ok":true,"on":true,"brightness":128,"playing":3,"animation":1,"fps":50,"error":null,"width":60,"height":6,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":null,"seed":null,"repeat":null,"loop":null,"saved":null,"file":"hello.odrg","playlist":null,"left":86399}
 ```
 
 | Member | Meaning |
@@ -90,6 +92,8 @@ A number in a command is written in decimal digits.
 | `repeat` | The loops of the playlist's turn in progress, while it is reported: the `n` of `repeat <id> <n>`, else the count the show gives the animation, a loop cut by its `max_seconds` counting as one; at most 65,535,000. `null` while no turn is reported, and while the length of its loop is not known yet and no `repeat` gave it a count. A turn is reported while the show is valid, no test of the mapping shows, the playlist plays, `animation` names the animation whose turn it is, and the turn's first refresh was made. |
 | `loop` | The loop in progress of that turn, from 1, at most `repeat`; 1 while the length of its loop is not known yet; `null` while no turn is reported. A loop is a file's frames once, a text's pass, or a clock's `seconds`. |
 | `saved` | The saved repeat of the animation whose turn is reported, 1 to 65,535, or `null` when it has none or no turn is reported. A reply without `repeat`, `loop` and `saved` comes from a player before them. |
+| `file` | The name of the file of the animation `animation` names: an item's file, or a drive's file by its path from the card's folder `odrig`, `night/comet.odrg`; `null` while `animation` is. So a client names what plays without the list that holds it. A reply without `file` comes from a player before it. |
+| `playlist` | The path of the card's folder whose playlist is current while `playing` is its id, `night/deep`; `null` otherwise. |
 | `left` | The whole seconds left in the window of the current playlist, 86,400 down to 0: the 24 hours of running time it plays for before the next playlist of the card's folders is current, see [show.md](show.md#the-playlist). 0 from the window's end until the turn in progress ends. Reported whatever the card holds, a fresh 86,400 each time a playlist becomes current. A reply without `left` comes from a player before it. |
 
 `checked`, `to_check` and `unavailable` are 0, and `checking` is `null`, while the show
@@ -129,7 +133,7 @@ list
 ```
 
 The items come in the order of `show.json`, beginning at the position `<from>`, counted
-from 0, which is 0 when it is left out. `<from>` is 0 to 65,535. An animation item has its
+from 0, which is 0 when it is left out. `<from>` is 0 to 4,294,967,295. An animation item has its
 `id`, its `file` and the size of that file in `bytes`, and `external`: `false` for an
 animation of the board's own storage, `true` for one of the external storage; then its
 `type`, what the file holds as its header says ([format.md](format.md)): `"frames"` for an
@@ -148,23 +152,32 @@ gives no items and `null`, and so does a show without items:
 `show-invalid`. A cycle too long to fit into a reply by itself is listed with
 `"cycle":[]`.
 
-The files of a USB drive or of the card come after the items of the show, in the order of
-the drive's listing, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
-A file in a sub-folder of the card's folder `odrig` has its path from `odrig` as its
-`file`: `{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}`.
-The sub-folders themselves come between the items of the show and the files, in the
-order of the listing, depth first, each as a playlist item with its path:
-`{"id":60007,"playlist":"night","external":true}`, then
-`{"id":60008,"playlist":"night/deep","external":true}`. Their ids come after the files',
-from the same pool, in the order of the items. [show.md](show.md#animations-from-a-usb-drive)
-says what a folder of the card is to the player.
+The drive is listed one level at a time. `list` gives the root's level after the items of
+the show: the playlists of the folders right in the card's folder `odrig`, then the files of
+`odrig` itself, each as an animation item: `{"id":60001,"file":"sunrise.odrg","bytes":52340,"external":true,"type":"frames"}`.
+`list in <folder-id>` and `list in <folder-id> <from>` give the level of the card's folder
+with that id: the playlists of its sub-folders, then its own files, from the position
+`<from>` of that level, with `next` as `list` has it. A file in a sub-folder has its path
+from `odrig` as its `file`, and a folder's playlist item its path and `files`, the number
+of its own files that `list in` of it gives:
+
+```
+list in 60007
+{"ok":true,"items":[{"id":60008,"playlist":"night/deep","external":true,"files":1},{"id":60004,"file":"night/comet.odrg","bytes":52340,"external":true,"type":"frames"}],"next":null}
+```
+
+A folder's id comes after the files', from the same pool, in the tree's order, depth
+first. `list in` is refused with `bad-argument` for another form, `show-invalid` while the
+show is invalid, and `unknown-id` for an id that is no folder of the card, the card out
+too. [show.md](show.md#animations-from-a-usb-drive) says what a folder of the card is to
+the player.
 A file left out for a fault is listed in its place as
 `{"id":60002,"file":"broken.odrg","bytes":null,"external":true,"type":"frames","fault":"truncated"}`, and `play` of it is
 refused with `unavailable`. Their ids are from 60001 up, the lowest that the show does not
 use, given when the drive is taken up and before the files are read, and `file` is the
 name on the drive, cut to 127 bytes, with `"` and `\` after a backslash and every
 character outside printable ASCII as `\u` and four hexadecimal digits, and so is
-`playlist`. The positions of `<from>` and `next` count the three kinds. An animation of the drive is listed once the player
+`playlist`. The positions of `<from>` and `next` count the kinds of the level. An animation of the drive is listed once the player
 has read it whole; while the drive is read, `list` answers without the ones still to be
 read, and is not refused with `busy` for them. [show.md](show.md#animations-from-a-usb-drive)
 says what the board does with a drive.
@@ -328,11 +341,11 @@ succeeds.
 | `unknown-id` | `play` or `remove` names an id that is neither in `show.json` nor of an animation or a folder of a USB drive or the card; `repeat <id> <n> save` or `repeat <id> default` names one of nothing `list` lists; `read` names one that is no animation of either; `play all` was sent while the playlist has no animation. A folder's id is unknown while the card is out. |
 | `unavailable` | `play` names an animation that is unavailable in this boot, as its file had a fault, a file of a drive left out for a fault, or a cycle that lists only such; `read` names such an animation. |
 | `in-use` | `repeat <id> <n> save` or `repeat <id> default` names a cycle or a folder of the card; `remove` names an animation that a cycle lists, or one of a drive the core may not write; `upload begin` names the id of a cycle or of an animation of a USB drive, or a file name another item has; `remove`, `remove many`, `ignore`, `read`, `order move` or `upload begin` names the id of a folder of the card, which is a playlist and no file. |
-| `read-only` | `upload begin external` or `catalog rebuild` while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
+| `read-only` | `upload begin external`, `catalog rebuild`, or `order move` of a file of the drive, while the core may not write the storage: no drive, a drive its host cannot write, one without a catalog that is `ok`, or a host whose own storage cannot be changed. |
 | `mapping-conflict` | The mapping changed since the client read its revision; reload before saving. |
 | `stale` | `upload expect`: the item of the upload is gone, or its file is not the one the client read. The upload is discarded. `repeat <id> <n>`: no turn of that animation is reported. |
 | `order-conflict` | `order move`: the saved order or the listed animations changed since the client read the order's revision; read it again before moving. |
-| `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive, or the drive has 256 animations. |
+| `no-space` | `repeat <id> <n> save`: no room is left for another saved repeat; `upload begin`: the file would not fit, or the show has no room for another item; `upload begin external`: the file would not fit on the drive. |
 | `bad-offset` | `upload data`: the offset is not the number of bytes received so far, or the bytes would pass the size of the file. |
 | `bad-file` | `upload end`: the file is not a valid ODRG file for the canvas. |
 | `storage-error` | The storage could not be read or written. The show is as it was. An upload that met it is discarded. A file an earlier change could not remove is removed before a change; while that fails, the change is refused with this code, and the next start removes it. |
@@ -512,12 +525,13 @@ read as before; [show.md](show.md#animations-from-a-usb-drive) has both.
 can be written and the drive's catalog is `ok`. `<file>` follows the naming rule of the
 show's files. The rest of the upload is as for the board's own storage: `upload data`, the
 check, `upload end`. On success one commit of the drive's catalog moves the file onto its
-name with its entry, and the reply gives the animation's id: `{"ok":true,"id":60003}`. A file
-of that name on the drive is replaced and keeps its id, and where it plays it plays anew
-from its start, as an item's file replaced under its name does; a new one gets the lowest free id
-from 60,001, and its place in the saved order by its name. `busy` while an upload is open or
-the drive's catalog is read, `read-only` when the core may not write the drive, `no-space`
-when `drive_space` says the file does not fit or 256 animations are on the drive.
+name with its entry and its row in the root's file of the index, and the reply gives the
+animation's id: `{"ok":true,"id":60003}`. A file of that name in the drive's folder is
+replaced and keeps its id and its row, and where it plays it plays anew from its start, as
+an item's file replaced under its name does; a new one goes last among the root's files,
+with the lowest id from 60,001 that the index's map does not hold. `busy` while an upload is
+open or the drive's catalog is read, `read-only` when the core may not write the drive,
+`no-space` when `drive_space` says the file does not fit.
 
 `remove <id>` of an animation of a drive the core may write removes its file and its entry
 in one commit; its id is free again. Of any other drive it is `in-use`, as before. `space`
@@ -542,13 +556,13 @@ plug-in is `damaged`, `interrupted`, until it is plugged in again.
 
 ## The saved playlist order
 
-The playlist plays its included animations in the saved order, which the board keeps in
-its own storage, internal and external animations in one order. An animation the saved
-order does not name comes after every one it names: the internal ones in the order of
-`show.json`, then the external ones in the order of their file names. An external
-animation is named by its file name, so it keeps its place while its medium is absent
-and takes it again when the medium is back. [show.md](show.md#the-saved-playlist-order)
-has the file.
+The playlist plays its included animations in the saved order: the board's own in the
+order the board keeps in its own storage, then the external storage's in the walk of its
+folders, the root's files and then each folder's, each folder's files in the order the
+card's index keeps for them. An animation of the board that the saved order does not name
+comes after every one it names, in the order of `show.json`; a file uploaded to the card
+goes last among the root's files. [show.md](show.md#the-saved-playlist-order) has the
+file.
 
 ```
 order get
@@ -556,8 +570,10 @@ order get
 ```
 
 `ids` are the ids of the animations `list` lists, the ignored ones, the unavailable ones
-and the external storage's among them, in the saved order, beginning at the position `<from>`, counted
-from 0, which is 0 when it is left out; `<from>` is 0 to 65,535. The reply holds as many
+and the external storage's among them, of one level, in the saved order, beginning at the position `<from>`, counted
+from 0, which is 0 when it is left out; `<from>` is 0 to 4,294,967,295. `order get` gives the
+root level, the show's animations and the root's files of the card, and `order get in
+<folder-id>` the files of that folder of the card, refused as `list in` is. The reply holds as many
 as fit into it, and `next` is the position of the first one left out, or `null`, as for
 `list`. `revision` is a number that changes whenever the order or the listed animations
 change, and is the same after a restart for the same files. `order get` is refused as
@@ -573,11 +589,18 @@ order move 2805384113 1 3
 `order move <revision> <id> <before>` moves the listed animation with the id `<id>`, of the
 board's own storage or of the external storage, to stand right before the listed animation
 with the id `<before>`, or last when `<before>` is the word `end`. `<revision>` is the
-`revision` of `order get` the client read, 0 to 4,294,967,295; `<id>` and `<before>` are 1
-to 65,535. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
+`revision` of `order get` of the level of `<id>` the client read, 0 to 4,294,967,295;
+`<id>` and `<before>` are 1 to 4,294,967,295. The reply `{"ok":true}` comes once the whole order is saved; a power cut leaves
 the order before the move or the one after it. A move that changes nothing, of an
 animation that already stands right before `<before>`, or last for `end`, or before
 itself, writes nothing.
+
+A file of the card moves among its folder's files, and is saved in the card's index in one
+commit of the card's catalog, as `catalog.md` says: `<before>` is a file of the same folder,
+or, for a file of the root, an animation of the show, which puts it first among the root's
+files. An animation of the show put before a file of the root goes last among the show's.
+A card without a catalog that is `ok`, or one the core may not write, keeps the order of
+its files: `read-only`.
 
 - `bad-argument`: the words are not in their form.
 - `show-invalid`: the show is invalid.
@@ -586,7 +609,8 @@ itself, writes nothing.
 - `unknown-id`: `<id>` or `<before>` is the id of no listed animation, of no cycle and of
   no folder of the card.
 - `in-use`: `<id>` or `<before>` is the id of a cycle or of a folder of the card, which
-  have no place in the order.
+  have no place in the order, or `<before>` is an animation of another level than `<id>`.
+- `read-only`: `<id>` is a file of the card, and the core may not write its index.
 - `order-conflict`: `<revision>` is not the order's revision now. Nothing changes; read
   `order get` again.
 - `storage-error`: the order could not be saved. It is as it was.

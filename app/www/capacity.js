@@ -5,10 +5,14 @@ function animations(count) {
   return count === 1 ? "1 animation" : `${count} animations`;
 }
 
-// The numbers of animations, each a number or null when it is not known: `internal` of the
-// show, from `space`, which reports 0 while the show is invalid; `external` of the drive,
-// undefined while no drive is present. The drive's are the items that say they are on it
-// when every item says where it is, and otherwise the listed animations less the show's.
+// The numbers of animations, each a number or null when it is not known yet: `internal` of
+// the show, from `space`, which reports 0 while the show is invalid; `external` of the
+// drive, the entries of its catalog while that is `ok`, as the list holds one level of the
+// drive only; null while its catalog is not known or read, and undefined while no drive
+// is present or its catalog cannot count it, so that no number is shown. A target that
+// keeps no catalogs, from before them, lists every animation of its drive at the root:
+// its drive's are the items that say they are on it when every item says where it is,
+// and otherwise the listed animations less the show's.
 export function counts(state) {
   const space = state.space;
   const invalid = state.status !== null && state.status.error !== null;
@@ -16,15 +20,22 @@ export function counts(state) {
   if (space === null || space.external?.present !== true) {
     return {internal, external: undefined};
   }
-  const listed = state.animations;
-  if (state.listBusy || listed === null) {
+  if (state.catalogNone) {
+    const listed = state.animations;
+    if (state.listBusy || listed === null) {
+      return {internal, external: null};
+    }
+    if (listed.length > 0 && listed.every((item) => typeof item.external === "boolean")) {
+      return {internal, external: listed.filter((item) => item.external).length};
+    }
+    const external = internal === null ? -1 : listed.length - internal;
+    return {internal, external: external < 0 ? null : external};
+  }
+  const catalog = state.catalog === null ? null : state.catalog.external;
+  if (catalog === null || catalog === undefined || catalog.state === "loading") {
     return {internal, external: null};
   }
-  if (listed.length > 0 && listed.every((item) => typeof item.external === "boolean")) {
-    return {internal, external: listed.filter((item) => item.external).length};
-  }
-  const external = internal === null ? -1 : listed.length - internal;
-  return {internal, external: external < 0 ? null : external};
+  return {internal, external: catalog.state === "ok" && typeof catalog.entries === "number" ? catalog.entries : undefined};
 }
 
 export function internal(space, count) {

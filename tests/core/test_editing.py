@@ -46,7 +46,7 @@ class Reading(Uploads):
 
     def test_its_refusals(self):
         files = self.files()
-        lines = ["read", "read 1", "read 1 0 0", "read 0 0", "read 65536 0", "read x 0", "read 1 -1", "read 1 4294967296",
+        lines = ["read", "read 1", "read 1 0 0", "read 0 0", "read 4294967296 0", "read x 0", "read 1 -1", "read 1 4294967296",
                  "read 9 0", "read 3 0", f"read 1 {len(files['one.odrg']) + 1}"]
         given = self.play(files, Script().polls(1).line(*lines))
         self.assertEqual(given, [refused("bad-argument")] * 8 + [refused("unknown-id")] * 2 + [refused("bad-argument")])

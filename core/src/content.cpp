@@ -4,6 +4,7 @@
 
 #include <string.h>
 
+#include "drive.h"
 #include "order.h"
 #include "player.h"
 #include "storage.h"
@@ -73,24 +74,31 @@ uint32_t list_tail_size(uint32_t next, uint32_t total) {
     return text_length(kListNext) + (next < total ? digits(next) : 4) + 2;
 }
 
-// Whether a file of the drive is listed: an animation of the playlist, or a file left out
-// for a fault, which has an id.
+// Whether a file of a drive without a catalog is listed: an animation of the playlist, or a
+// file left out for a fault, which has an id.
 bool drive_is_listed(const DriveEntry &entry) {
     return entry.state == kDriveInPlaylist || (entry.state == kDriveLeftOut && entry.id != 0);
 }
 
-// The number of the drive's listed files: they are listed after the items.
-uint32_t drive_listed(const Core &core) {
+// The number of a folder's own files that `list` lists: of a drive with a catalog every one,
+// of one without those in the playlist or left out with a fault.
+uint32_t level_listed(const Core &core, const IndexFolder &folder) {
+    if (core.indexed) {
+        return folder.files;
+    }
     uint32_t count = 0;
-    for (uint32_t place = 0; core.drive != nullptr && place < core.drive_count; ++place) {
+    for (uint32_t place = folder.first; place < folder.first + folder.files && place < core.drive_count; ++place) {
         count += drive_is_listed(core.drive[place]) ? 1 : 0;
     }
     return count;
 }
 
-// The place of the drive's file that is listed at this place among them.
-uint32_t drive_listed_place(const Core &core, uint32_t listed) {
-    for (uint32_t place = 0; place < core.drive_count; ++place) {
+// The position in the walk of the file listed at a place among a folder's listed files.
+uint32_t level_listed_position(const Core &core, const IndexFolder &folder, uint32_t listed) {
+    if (core.indexed) {
+        return folder.first + listed;
+    }
+    for (uint32_t place = folder.first; place < folder.first + folder.files && place < core.drive_count; ++place) {
         if (drive_is_listed(core.drive[place])) {
             if (listed == 0) {
                 return place;
@@ -98,8 +106,11 @@ uint32_t drive_listed_place(const Core &core, uint32_t listed) {
             --listed;
         }
     }
-    return core.drive_count;
+    return kNothing;
 }
+
+// The member of a folder's item of `list` that gives its own files, before their number.
+const char kListFiles[] = ",\"files\":";
 
 // The text of a file the core writes, gathered in the chunk buffer and given to the host
 // whenever the buffer is full.
@@ -180,7 +191,7 @@ uint32_t content_space(const Core &core, Reply &reply) {
 }
 
 uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
-    char drive_name[kDriveNameSize];
+    char drive_name[kDriveOpenRoom];
     const char *name = nullptr;
     uint32_t size = 0;
     for (uint32_t position = 0; name == nullptr && position < core.item_count; ++position) {
@@ -198,18 +209,23 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
             size = file.bytes;
         }
     }
-    if (name == nullptr && core.drive != nullptr && drive_has_id(core, id)) {
-        const uint32_t place = drive_place_of(core, id);
-        drive_file_name(place, drive_name);
+    uint32_t value = 0;
+    const uint8_t kind = name == nullptr ? drive_find(core, id, &value) : 0;
+    if (kind == 'f') {
+        const DriveRow *row = drive_row(core, value);
+        if (row == nullptr || !row->listed || row->fault != kNone) {
+            // A file of the drive that was left out for a fault, or one still to be read.
+            return refuse(reply, row != nullptr && row->listed ? "unavailable" : "busy");
+        }
+        size = row->bytes;
+        if (!drive_open_name(core, value, drive_name)) {
+            return refuse(reply, "storage-error");
+        }
         name = drive_name;
-        size = core.drive[place].bytes;
-    } else if (name == nullptr && core.drive != nullptr && drive_place_holding(core, id) != kDriveMost) {
-        // A file of the drive that was left out for a fault, or one still to be read.
-        return refuse(reply, core.drive[drive_place_holding(core, id)].state == kDriveLeftOut ? "unavailable" : "busy");
     }
     if (name == nullptr) {
         // A folder of the drive's tree is a playlist, with no file to read.
-        return refuse(reply, tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
+        return refuse(reply, kind == 'd' ? "in-use" : "unknown-id");
     }
     if (offset > size) {
         return refuse(reply, "bad-argument");
@@ -241,25 +257,27 @@ uint32_t content_read(Core &core, uint32_t id, uint32_t offset, Reply &reply) {
     return reply.length;
 }
 
-uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
+uint32_t content_list(const Core &core, uint32_t level, uint32_t from, Reply &reply) {
     reply.text(kListHead);
-    // The items of the show, then the folders of the drive's tree, then the drive's
-    // animations in the playlist.
-    const uint32_t folders = core.folders != nullptr && core.tree_known ? core.folder_count : 0;
-    const uint32_t total = core.item_count + folders + drive_listed(core);
+    // A level's items: the show's at the root, then its sub-folders, then its files of the
+    // drive in the playlist or left out.
+    const uint32_t items = level == 0 ? core.item_count : 0;
+    IndexFolder folder;
+    const bool known = drive_folder(core, level, folder);
+    const uint32_t folders = known ? folder.folders : 0;
+    const uint32_t total = items + folders + (known ? level_listed(core, folder) : 0);
     uint32_t position = from;
     bool first = true;
     for (; position < total; ++position) {
         const uint32_t tail = list_tail_size(position + 1, total);
-        if (position >= core.item_count && position < core.item_count + folders) {
-            const uint32_t folder = 1 + position - core.item_count;
-            char path[kDriveListedName];
-            if (tree_folder_path(core, folder, path, sizeof path) == 0) {
-                // The drive went while the list was written: it is no more.
+        if (position >= items && position < items + folders) {
+            const DriveRow *row = drive_subfolder(core, folder, position - items);
+            if (row == nullptr) {
+                // The drive went while the list was written, or cannot be read: it is no more.
                 continue;
             }
-            const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(core.folders[folder].id) + text_length(kListPlaylist) +
-                                  json_escaped(path, nullptr) + 1 + text_length(kListExternal) + 1;
+            const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(row->id) + text_length(kListPlaylist) +
+                                  json_escaped(row->name, nullptr) + 1 + text_length(kListExternal) + text_length(kListFiles) + digits(row->files) + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -268,27 +286,28 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             }
             first = false;
             reply.text(kListId);
-            reply.number(core.folders[folder].id);
+            reply.number(row->id);
             reply.text(kListPlaylist);
-            reply.escaped(path);
+            reply.escaped(row->name);
             reply.text("\"");
             reply.text(kListExternal);
+            reply.text(kListFiles);
+            reply.number(row->files);
             reply.text("}");
             continue;
         }
-        if (position >= core.item_count) {
-            const uint32_t place = drive_listed_place(core, position - core.item_count - folders);
-            const DriveEntry &entry = core.drive[place];
-            char name[kDriveListedName];
-            if (core.host.drive_name(core.host.ctx, core.drive_number, place, name, sizeof name) != 1) {
-                // The drive went while the list was written: it is no more.
+        if (position >= items) {
+            const uint32_t at = level_listed_position(core, folder, position - items - folders);
+            const DriveRow *row = at == kNothing ? nullptr : drive_row(core, at);
+            if (row == nullptr) {
+                // The drive went while the list was written, or cannot be read: it is no more.
                 continue;
             }
-            const bool left_out = entry.state == kDriveLeftOut;
-            const char *fault = reason_name(static_cast<Reason>(entry.fault));
-            const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(entry.id) + text_length(kListFile) + json_escaped(name, nullptr) +
-                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(entry.bytes)) +
-                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(entry.type)) + 1 + 1;
+            const bool left_out = row->fault != kNone;
+            const char *fault = reason_name(static_cast<Reason>(row->fault));
+            const uint32_t size = (first ? 0 : 1) + text_length(kListId) + digits(row->id) + text_length(kListFile) + json_escaped(row->name, nullptr) +
+                                  text_length(kListBytes) + (left_out ? 4 + text_length(kListFault) + text_length(fault) + 1 : digits(row->bytes)) +
+                                  text_length(kListExternal) + text_length(kListType) + text_length(type_name(row->type)) + 1 + 1;
             if (!reply.fits(size + tail)) {
                 break;
             }
@@ -297,18 +316,18 @@ uint32_t content_list(const Core &core, uint32_t from, Reply &reply) {
             }
             first = false;
             reply.text(kListId);
-            reply.number(entry.id);
+            reply.number(row->id);
             reply.text(kListFile);
-            reply.escaped(name);
+            reply.escaped(row->name);
             reply.text(kListBytes);
             if (left_out) {
                 reply.text("null");
             } else {
-                reply.number(entry.bytes);
+                reply.number(row->bytes);
             }
             reply.text(kListExternal);
             reply.text(kListType);
-            reply.text(type_name(entry.type));
+            reply.text(type_name(row->type));
             reply.text("\"");
             if (left_out) {
                 reply.text(kListFault);
@@ -390,11 +409,12 @@ uint32_t content_remove(Core &core, uint32_t id, Reply &reply) {
     if (position == core.item_count) {
         // An animation of a drive the core may change is removed with its entry; another
         // drive's is the drive's.
-        const uint32_t place = drive_place_holding(core, id);
-        if (place != kDriveMost && catalog_drive_writable(core)) {
-            return catalog_remove_external(core, place) ? succeed(reply) : refuse(reply, "storage-error");
+        uint32_t value = 0;
+        const uint8_t kind = drive_find(core, id, &value);
+        if (kind == 'f' && core.indexed && catalog_drive_writable(core)) {
+            return catalog_remove_external(core, value) ? succeed(reply) : refuse(reply, "storage-error");
         }
-        return refuse(reply, place != kDriveMost || tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
+        return refuse(reply, kind != 0 ? "in-use" : "unknown-id");
     }
     // An animation that a cycle lists stays until the cycle is gone.
     for (uint32_t entry = 0; entry < core.entry_count; ++entry) {
@@ -421,7 +441,7 @@ uint32_t content_ignore(Core &core, uint32_t id, bool ignored, Reply &reply) {
     uint32_t position = 0;
     while (position < core.item_count && core.items[position].id != id) ++position;
     if (position == core.item_count) {
-        return refuse(reply, drive_place_holding(core, id) != kDriveMost || tree_folder_with_id(core, id) != kFolderMost ? "in-use" : "unknown-id");
+        return refuse(reply, drive_id_taken(core, id) ? "in-use" : "unknown-id");
     }
     ItemInfo &item = core.items[position];
     if (item.is_cycle) return refuse(reply, "in-use");
@@ -446,7 +466,7 @@ uint32_t content_remove_many(Core &core, const uint16_t *ids, uint32_t count, Re
         uint32_t position = 0;
         while (position < core.item_count && core.items[position].id != ids[at]) ++position;
         if (position == core.item_count) {
-            return refuse(reply, drive_place_holding(core, ids[at]) != kDriveMost || tree_folder_with_id(core, ids[at]) != kFolderMost ? "in-use" : "unknown-id");
+            return refuse(reply, drive_id_taken(core, ids[at]) ? "in-use" : "unknown-id");
         }
     }
     for (uint32_t at = 0; at < count; ++at) {

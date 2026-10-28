@@ -1,0 +1,2 @@
+0abcdef0 777 60 60 2000 text night/deep/deeper/y.odrgx
+00001234 1024 60 60 4000 frames a b/c.odrg

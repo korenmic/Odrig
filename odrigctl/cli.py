@@ -66,7 +66,7 @@ def parser():
         description="Sends one command to a target, over its serial port, over TCP or over HTTP, and prints the reply. "
                     "list prints a reply for each part of a long show, and upload sends a file and prints the reply that ended it. "
                     "With --log and no command it prints the lines of the target's log as they arrive, until it is stopped.",
-        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; order get without FROM prints a reply for each part.",
+        epilog="Commands: play ID, play all, on, off, brightness N, status, fault, space, list, list in ID [FROM], read ID OFFSET, catalog, catalog rebuild internal|external, catalog cancel, remove ID, remove many IDS, ignore ID 0|1, mapping get, mapping set REV PINS, mapping cross on|off, mapping test on|off, mapping test snake N, order get [FROM], order get in ID [FROM], order move REV ID BEFORE, repeat ID N, repeat ID N save, repeat ID default, upload ID FILE, upload --external FILE. ID and N are sent as they are typed; list and order get without FROM print a reply for each part.",
     )
     target = made.add_mutually_exclusive_group(required=True)
     target.add_argument("--port", metavar="NAME", help="the serial port of the target")
@@ -120,6 +120,13 @@ def checked(made, arguments):
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
+    if arguments.command == "list":
+        words = arguments.arguments
+        if not (words == [] or (len(words) in (2, 3) and words[0] == "in")):
+            made.error("list takes no argument, or in ID [FROM]")
+        if any("\n" in word or "\r" in word for word in words):
+            made.error("a command is one line")
+        return [arguments.command, *words]
     if arguments.command == "repeat":
         words = arguments.arguments
         if not (len(words) == 2 or (len(words) == 3 and words[2] == "save")):
@@ -129,8 +136,9 @@ def checked(made, arguments):
         return [arguments.command, *words]
     if arguments.command == "order":
         words = arguments.arguments
-        if not (words == ["get"] or (len(words) == 2 and words[0] == "get") or (len(words) == 4 and words[0] == "move")):
-            made.error("order takes get [FROM], or move REV ID BEFORE")
+        level = len(words) >= 3 and words[:2] == ["get", "in"] and len(words) <= 4
+        if not (words == ["get"] or (len(words) == 2 and words[0] == "get") or level or (len(words) == 4 and words[0] == "move")):
+            made.error("order takes get [FROM], get in ID [FROM], or move REV ID BEFORE")
         if any("\n" in word or "\r" in word for word in words):
             made.error("a command is one line")
         return [arguments.command, *words]
@@ -228,10 +236,9 @@ def main(argv=None):
             return 2
     try:
         with client.Session(port=arguments.port, tcp=arguments.tcp, http=arguments.http, timeout=arguments.timeout) as session:
-            if arguments.command == "list":
-                return 0 if content.list_all(session, _print) else 1
-            if words == ["order", "get"]:
-                return 0 if content.list_all(session, _print, b"order get") else 1
+            if words in (["list"], ["order", "get"]) or (len(words) == 3 and words[:2] == ["list", "in"]) or (len(words) == 4 and words[:3] == ["order", "get", "in"]):
+                # A level is printed in every part of it.
+                return 0 if content.list_all(session, _print, " ".join(words).encode("utf-8")) else 1
             if arguments.command == "upload":
                 progress = Progress(sys.stderr)
                 try:

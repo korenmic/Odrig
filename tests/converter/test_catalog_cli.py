@@ -52,8 +52,9 @@ class CommandLine(unittest.TestCase):
 
     def test_import_checks_every_animation_writes_the_catalog_and_names_what_it_refused(self):
         self.assertEqual(self.imported(), "refused: bad.odrg: truncated\nimported: 2 animations, generation 1\n")
-        made = catalog.read(catalog.Storage(self.folder))
+        made = catalog.read(catalog.Storage(self.folder, drive=True))
         self.assertEqual((made.state, sorted(entry.name for entry in made.entries)), ("ok", ["moon.odrg", "sun.odrg"]))
+        self.assertEqual([entry.name for _, entry in made.index.folders[0].rows], ["moon.odrg", "sun.odrg"])
         self.assertEqual(run(self.mount, "status"), (0, "catalog: ok, generation 1, 2 entries; 3 animation files, 1 without an entry\n", ""))
         (self.folder / "bad.odrg").unlink()
         self.assertEqual(run(self.mount, "import"), (0, "imported: 2 animations, generation 2\n", ""))
@@ -78,7 +79,7 @@ class CommandLine(unittest.TestCase):
         self.assertEqual((self.folder / "my star.odrg").read_bytes(), animation(3))
         self.assertEqual((self.folder / "sun.odrg").read_bytes(), animation(4))
         self.assertFalse((self.folder / "small.odrg").exists())
-        self.assertEqual(catalog.check(catalog.Storage(self.folder)), [])
+        self.assertEqual(catalog.check(catalog.Storage(self.folder, drive=True)), [])
         self.assertEqual(run(self.mount, "add", star), (0, f"replaced: my star.odrg, {len(animation(3))} bytes\n", ""))
 
     def test_a_card_with_sub_folders_is_imported_checked_and_counted_by_the_paths_of_its_files(self):
@@ -89,20 +90,22 @@ class CommandLine(unittest.TestCase):
         (self.folder / "empty").mkdir()
         self.assertEqual(run(self.mount, "status"), (0, "catalog: none; 6 animation files; import writes the catalog\n", ""))
         self.assertEqual(self.imported(), "refused: bad.odrg: truncated\nimported: 5 animations, generation 1\n")
-        made = catalog.read(catalog.Storage(self.folder))
+        made = catalog.read(catalog.Storage(self.folder, drive=True))
         self.assertEqual(sorted(entry.name for entry in made.entries), ["a b/c.odrg", "moon.odrg", "night/comet.odrg", "night/deep/x.odrg", "sun.odrg"])
+        self.assertEqual([folder.path for folder in made.index.folders], ["", "a b", "night", "night/deep"])
         self.assertEqual(run(self.mount, "check"), (0, "checked: 5 entries, 0 differ\n", ""))
         (self.folder / "night" / "deep" / "x.odrg").unlink()
         self.assertEqual(run(self.mount, "check"), (1, "differs: night/deep/x.odrg: missing\nchecked: 5 entries, 1 differ\n", ""))
         self.assertEqual(run(self.mount, "remove", "night/comet.odrg"), (0, "removed: night/comet.odrg\n", ""))
         self.assertFalse((self.folder / "night" / "comet.odrg").exists())
         self.assertEqual(run(self.mount, "status"), (0, "catalog: ok, generation 2, 4 entries; 4 animation files, 1 without an entry\n", ""))
+        self.assertEqual([folder.path for folder in catalog.read(catalog.Storage(self.folder, drive=True)).index.folders], ["", "a b", "night", "night/deep"])
 
     def test_remove_takes_out_each_file_and_its_entry(self):
         self.imported()
         self.assertEqual(run(self.mount, "remove", "moon.odrg", "none.odrg"), (1, "removed: moon.odrg\nrefused: none.odrg: file-missing\n", ""))
         self.assertFalse((self.folder / "moon.odrg").exists())
-        self.assertEqual([entry.name for entry in catalog.read(catalog.Storage(self.folder)).entries], ["sun.odrg"])
+        self.assertEqual([entry.name for entry in catalog.read(catalog.Storage(self.folder, drive=True)).entries], ["sun.odrg"])
 
     def test_check_names_each_file_that_differs_from_its_entry(self):
         self.imported()
@@ -115,15 +118,12 @@ class CommandLine(unittest.TestCase):
 
     def test_recover_finishes_an_interrupted_change_and_removes_what_one_left(self):
         self.imported()
-        storage = catalog.Storage(self.folder)
-        made = catalog.read(storage)
-        entry = catalog.entry_of("star.odrg", animation(3))
-        storage.write(catalog.PART, animation(3))
+        storage = catalog.Storage(self.folder, drive=True)
         # The change is committed and cut before it was finished.
         finished = catalog.finish
         try:
             catalog.finish = lambda storage: False
-            catalog.commit(storage, made, added=entry, actions=[("move", catalog.PART, "star.odrg")])
+            catalog.add(storage, "star.odrg", animation(3))
         finally:
             catalog.finish = finished
         self.assertEqual(run(self.mount, "status"), (1, "catalog: damaged, interrupted; recover finishes the change\n", ""))
@@ -132,7 +132,9 @@ class CommandLine(unittest.TestCase):
         self.assertEqual((self.folder / "star.odrg").read_bytes(), animation(3))
         storage.write(catalog.NEW_MARKER, b"half")
         storage.write(catalog.PART, b"half")
-        self.assertEqual(run(self.mount, "recover"), (0, "recovered: removed catalog.new, upload.part\ncatalog: ok, generation 2, 3 entries; 4 animation files, 1 without an entry\n", ""))
+        storage.write("index-0.new", b"half")
+        storage.write(catalog.SCAN, b"half")
+        self.assertEqual(run(self.mount, "recover"), (0, "recovered: removed catalog.new, upload.part, index-0.new, rebuild.tmp\ncatalog: ok, generation 2, 3 entries; 4 animation files, 1 without an entry\n", ""))
         self.assertEqual(run(self.mount, "recover"), (0, "recovered: nothing to do\ncatalog: ok, generation 2, 3 entries; 4 animation files, 1 without an entry\n", ""))
 
     def test_a_card_without_a_catalog_or_with_a_damaged_one_is_not_changed(self):
@@ -143,9 +145,9 @@ class CommandLine(unittest.TestCase):
                 self.assertEqual(run(self.mount, *command), (1, "", "error: the catalog is none; import writes it\n"))
         self.assertEqual({path.name: path.read_bytes() for path in self.folder.iterdir()}, before)
         self.imported()
-        (self.folder / "catalog.txt").write_bytes(b"odrig-catalog 2 check 1 generation 00000001\n")
-        self.assertEqual(run(self.mount, "status"), (1, "catalog: incompatible, format 2, check 1\n", ""))
-        self.assertEqual(run(self.mount, "remove", "sun.odrg"), (1, "", "error: the catalog is incompatible, format 2, check 1; import writes it anew\n"))
+        (self.folder / "catalog.txt").write_bytes(catalog.Marker(1, (0,) * catalog.PAGES, (0,) * catalog.PAGES).text())
+        self.assertEqual(run(self.mount, "status"), (1, "catalog: incompatible, format 1, check 1\n", ""))
+        self.assertEqual(run(self.mount, "remove", "sun.odrg"), (1, "", "error: the catalog is incompatible, format 1, check 1; import writes it anew\n"))
         self.assertTrue((self.folder / "sun.odrg").exists())
 
     def test_the_folder_itself_is_taken_with_the_option_folder(self):

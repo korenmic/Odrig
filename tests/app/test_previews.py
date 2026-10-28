@@ -60,7 +60,7 @@ class Previews(unittest.TestCase):
         emulator_support.installed(top / "odrig", {"rainbow-lines-03.odrg": self.known["rainbow-lines-03.odrg"]})
         (top / "odrig" / "night").mkdir()
         (top / "odrig" / "night" / "rainbow-lines-04.odrg").write_bytes(self.known["rainbow-lines-04.odrg"])
-        made, refused = catalog.rebuild(catalog.Storage(top / "odrig"), canvas=(60, 60))
+        made, refused = catalog.rebuild(catalog.Storage(top / "odrig", drive=True), canvas=(60, 60))
         self.assertEqual(refused, [])
         return top
 

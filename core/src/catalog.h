@@ -21,11 +21,19 @@ const uint32_t kCatalogLineRoom = 162;
 const uint32_t kCatalogNameMost = 100;
 const uint32_t kCatalogDeepest = 3;
 
-// What the start or a drive's plug-in found of a catalog.
+// The marker of a drive's catalog, of version 2, with its index's lines, and its size.
+const uint32_t kDriveMarkerSize = 461;
+
+// What the start or a drive's plug-in found of a catalog: of a drive's also the lines and the
+// CRC-32 of the table of its index's folders and of its map of the ids.
 struct Marker {
     uint32_t generation;
     uint16_t counts[kCatalogPages];
     uint32_t crcs[kCatalogPages];
+    uint32_t folders;
+    uint32_t folders_crc;
+    uint32_t ids;
+    uint32_t ids_crc;
 };
 
 // Whether a catalog may hold a file of this name.
@@ -78,53 +86,48 @@ struct CatalogChange {
 // the storage, or at the next start or plug-in.
 bool catalog_commit(Core &core, uint32_t storage, const CatalogChange &change);
 
-// The phases of reading a drive's catalog: none; its commit record; its marker; its pages;
-// the saved order and the publication.
+// The phases of reading a drive's catalog: none; its commit record; its marker.
 const uint8_t kLoadIdle = 0;
 const uint8_t kLoadRecord = 1;
 const uint8_t kLoadMarker = 2;
-const uint8_t kLoadPages = 3;
-const uint8_t kLoadOrder = 4;
 // How long a drive's catalog stays read before its marker is looked at again, in ms.
 const uint64_t kLookEveryMs = 10000;
 
-// A drive was plugged in or pulled out: for a host that can be given the names of its
-// files, its catalog is to be read; otherwise, and without a drive, nothing is.
+// A drive was plugged in or pulled out: for a host that can open its files by their names,
+// its catalog is to be read; otherwise, and without a drive, nothing is.
 void catalog_drive_plugged(Core &core);
 
 // Whether a drive's catalog is being read.
 bool catalog_drive_loading(const Core &core);
 
-// One step of reading a drive's catalog, at most one read of a page: its commit record,
-// its marker, its pages, the saved order, and the publication of every entry at once.
+// One step of reading a drive's catalog: its commit record, then its marker, after which a
+// marker of version 2 makes the drive read from its index at once.
 void catalog_drive_step(Core &core);
 
-// The second source was taken: the page being read is read again from its start.
-void catalog_drive_yields(Core &core);
-
 // At a refresh: the marker of a drive whose catalog is read is read again once in
-// kLookEveryMs; another marker drops the drive's animations and reads the catalog again.
+// kLookEveryMs; another marker, or a line of the index that could not be read, drops the
+// drive's animations and reads the catalog again.
 void catalog_drive_look(Core &core);
-
-// The player left out a file of a drive whose catalog is read: it is remembered by its
-// name and its entry's CRC-32, so that a catalog read again leaves it out again.
-void catalog_drive_left_out(Core &core, uint32_t place, Reason reason);
 
 // Whether the core may change the drive: a host that can write it, and its catalog read.
 bool catalog_drive_writable(const Core &core);
 
-// The place an upload of this name to the drive takes: the place of the drive's file of that
-// name, else the first place a removal freed, else the next one; kDriveMost when none is left.
-uint32_t catalog_drive_place_for(const Core &core, const char *name);
-
 // Puts the upload whose check has passed onto the drive: one commit of the drive's catalog
-// moves `upload.part` onto its name with its entry; its place keeps its id when the file
-// replaces one, and gets the lowest free id otherwise. False on a failed storage call.
-bool catalog_install_external(Core &core, uint16_t *id);
+// moves `upload.part` onto its name with its entry and its line in the index: a replacement
+// keeps its line and its id, a new file goes last among the root's files with the lowest id
+// the map does not hold. Gives the id. False on a failed storage call.
+bool catalog_install_external(Core &core, uint32_t *id);
 
-// Removes the drive's animation at a place: one commit takes its entry out and removes its
-// file, and the place is free. False on a failed storage call.
-bool catalog_remove_external(Core &core, uint32_t place);
+// Moves the drive's file at a position of its walk among its folder's files: before the
+// file at the position `before`, of the same folder, or last for kNothing. One commit writes
+// the folder's file, the table and the map, and no page; a move that changes nothing writes
+// nothing. False on a failed storage call.
+bool catalog_move_external(Core &core, uint32_t position, uint32_t before);
+
+// Removes the drive's file at a position of its walk: one commit takes its entry and its line
+// out of the catalog and its index, with the folders left without a file, and removes the
+// file. False on a failed storage call.
+bool catalog_remove_external(Core &core, uint32_t position);
 
 // `catalog rebuild internal` and `catalog rebuild external`: reads every animation of the
 // storage with the check's steps and commits its catalog anew at the end. `busy` while an

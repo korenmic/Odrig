@@ -278,6 +278,9 @@ class Usage(unittest.TestCase):
             ["--port", "a", "play", "1\n2"],
             ["--port", "a", "space", "1"],
             ["--port", "a", "list", "0"],
+            ["--port", "a", "list", "in"],
+            ["--port", "a", "list", "at", "60007"],
+            ["--port", "a", "list", "in", "60007", "1", "2"],
             ["--port", "a", "remove"],
             ["--port", "a", "remove", "1", "2"],
             ["--port", "a", "remove", "1\n"],
@@ -303,10 +306,10 @@ class Usage(unittest.TestCase):
         text = (support.ROOT / "docs" / "commands.md").read_text(encoding="utf-8")
         table = text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save",
                                       "repeat <id> default", "upload begin <id> <file> <bytes>", "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         # `play all` is `play` with the word in the place of the id.
-        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ")) and command not in ("play all", "remove many <ids>")]
+        one_line = [command for command in documented if not command.startswith(("upload ", "mapping ", "order ", "catalog", "repeat ")) and command not in ("play all", "remove many <ids>", "list in <folder-id>")]
         self.assertEqual([" ".join([name, *("<x>" for _ in takes)]) for name, takes in cli.COMMANDS.items() if name not in ("upload", "mapping", "order", "catalog", "repeat")],
                          [command.replace("<id>", "<x>").replace("<n>", "<x>").replace("<value>", "<x>").replace("<offset>", "<x>") for command in one_line])
         self.assertEqual(list(cli.COMMANDS)[-1], "upload")
@@ -344,6 +347,10 @@ class Usage(unittest.TestCase):
             (["play", "1" * 70], b"play " + b"1" * 70 + b"\n"),
             (["space"], b"space\n"),
             (["list"], b"list\n"),
+            (["list", "in", "60007"], b"list in 60007\n"),
+            (["list", "in", "60007", "4"], b"list in 60007 4\n"),
+            (["order", "get", "in", "60007"], b"order get in 60007\n"),
+            (["order", "get", "in", "60007", "2"], b"order get in 60007 2\n"),
             (["remove", "12"], b"remove 12\n"),
             (["remove", "x y"], b"remove x y\n"),
             (["catalog"], b"catalog\n"),
@@ -1068,6 +1075,9 @@ class UploadSteps(unittest.TestCase):
         self.assertIs(content.list_all(session, shown.append), False)
         self.assertEqual(shown[-1], refused("show-invalid"))
         self.assertEqual(len(session.replies), 1)
+        session = Told([b'{"ok":true,"items":[{"id":1}],"next":1}', b'{"ok":true,"items":[],"next":null}'])
+        self.assertIs(content.list_all(session, [].append, b"list in 60007"), True)
+        self.assertEqual(session.sent, [b"list in 60007\n", b"list in 60007 1\n"])
 
 
 class Screen(io.StringIO):
