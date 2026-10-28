@@ -48,7 +48,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
     drive in `tests/core/test_drive.py` and `docs/core.md`'s figures.
   - Suites: the core's, the emulator's, onboarding.
 
-- [ ] 4. The command tool, the firmware tool and the emulator's page
+- [x] 4. The command tool, the firmware tool and the emulator's page
   - `odrigctl/cli.py`, `firmware/fwtool/storage.py`; tests in `tests/emulator/test_tool.py`
     and `tests/firmware/test_storage.py`.
   - `docs/emulator.md`, `docs/firmware.md`; `docs/decisions.md`: the commands' bullet and
