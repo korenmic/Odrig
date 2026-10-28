@@ -11985,6 +11985,57 @@ there finds only the emulators of temporary and preview folders, as without a ru
 `tests/emulator/test_events.py`, `tests/converter/test_catalog_types.py`,
 `converter/tests/thumbnailtool.test.js`; `agent/working-rules.md`.
 
+## The generators that docs/emulator.md shows
+
+**Question.** The converter's test of the documents counted three generator lines in
+`docs/emulator.md`, those of the demo show and of the dense show; the demo show of the clock
+breaks shows the demo's generators again, on macOS and Linux and in PowerShell. Is the count
+or the page wrong?
+
+**Answer.** The count. What the test means is that the page generates with the Python
+programs, and each of them is still the one the commands start: the generators the page
+names are exactly `hello_world`, `dvd_bounce` and `dense`, however many lines run them.
+
+**Resolution.** `converter/tests/docs.test.js`.
+
+## The internal catalog's rebuild through the emulator, answered busy
+
+**Question.** On Windows the emulator's test of `catalog rebuild internal` was answered
+`busy` most times, alone too. Is the core's refusal wrong there?
+
+**Answer.** No. The test starts the emulator with a card and sends the rebuild at once;
+the core reads the drive's catalog for the first frames after the start, and
+`docs/commands.md` has `catalog rebuild` answer `busy` while it does. Where the suite passed,
+the tool's line came after that reading; on Windows it often came during it, with the drive's state
+`loading`. The test now waits until `status` names nothing it checks, the drive's catalog
+included, as an operator's tool would, and the core is as it was.
+
+**Resolution.** `tests/emulator/test_catalog.py`.
+
+## The tests that fail only when every suite runs at once on Windows
+
+**Question.** With `tests/run.py` on Windows, the emulator's LAN test and the lost-reply
+tests of the command tool failed now and then with WinError 10055 at a connect, and
+scenarios of the app and the mapping, a different few in each run, with the app still on
+`Checking` when their wait ran out; each passes alone. What gives way?
+
+**Answer.** Two things, both of Windows. The emulator's tests sent every command on a
+connection of its own, and each closed connection holds a port of the computer's 16,384 for
+two minutes; a run of the emulator's, the app's and the mapping's suites held 8,790 at its
+peak, and the full run and other work on the computer more, until a connect had no port
+left. The tests' helper now keeps its connection to the emulator from one command to the
+next, as a browser does, and the same run held 3,422; the command tool still opens one for
+each exchange, as `docs/emulator.md` says. And a server of Python's library lets five
+connections wait to be taken; when the queue is full, macOS and Linux leave the next one
+to try again, and Windows refuses it. A loaded computer is slow to take them, Chrome asks
+for the app's modules all at once, and one refused module leaves the app as its page
+stands, on `Checking`, even after 30 seconds. The emulator's server, the app tool's server
+and the app tests' stand-in target now let 64 wait. The waits of the scenarios were not
+lengthened: with the app stopped no length would do.
+
+**Resolution.** `tests/emulator/support.py`, `emulator/httpd.py`,
+`app/apptool/webserver.py`, `tests/app/support.py`, `tests/emulator/test_http.py`,
+`tests/app/test_tool.py`.
 ## Seed 55: the lock of a setup, held by the system
 
 **Question.** Seed 53's design takes `setup.lock` by an exclusive create, and a lock older

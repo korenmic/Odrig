@@ -18,6 +18,8 @@ import unittest
 import unittest.mock
 import zipfile
 
+from tests.emulator import support as emulator_support
+
 from . import support
 
 from apptool import Failure, build, cli, device, env, paths, stage, toolchain, webserver  # noqa: E402
@@ -126,6 +128,13 @@ class Serve(unittest.TestCase):
         self.assertEqual(self.server.server_address[0], "127.0.0.1")
         self.assertEqual(self.server.url, f"http://127.0.0.1:{self.server.port}/")
         self.assertEqual(webserver.PORT, 8610)
+
+
+class ManyAtOnce(unittest.TestCase):
+    def test_connections_that_come_together_wait_to_be_taken_and_none_is_refused(self):
+        server = webserver.Server(0)
+        self.addCleanup(server.server_close)
+        self.assertEqual(emulator_support.connected_at_once(server.port), emulator_support.AT_ONCE)
 
 
 class TheCommand(unittest.TestCase):

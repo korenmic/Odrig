@@ -227,6 +227,8 @@ class Emulator:
 
     def __init__(self, folder, *options, port=0, serial_link=None, tcp_port=None, checked=True):
         self._temporary = None
+        self._kept = []
+        self._keeping = threading.Lock()
         command = [sys.executable, "-m", "emulator", str(folder), "--port", str(port), "--parent", str(os.getpid())]
         if HAS_SERIAL:
             if serial_link is None:
@@ -295,11 +297,51 @@ class Emulator:
             connection.close()
 
     def command(self, line):
-        """The reply to a command line sent over HTTP."""
-        answer = self.request(body=line if isinstance(line, bytes) else line.encode("utf-8"))
-        if answer.status != 200:
-            raise AssertionError(f"POST /odrig gave status {answer.status}")
-        return answer.body
+        """The reply to a command line sent over HTTP. The connection is kept for the next
+        command, as a browser keeps it: a connection for each of the many commands of a suite
+        would leave a port waiting for each, more than Windows has when the suites run at once
+        (WinError 10055). A kept connection the emulator has closed is replaced, and the line
+        sent on a new one."""
+        body = line if isinstance(line, bytes) else line.encode("utf-8")
+        with self._keeping:
+            kept = self._kept.pop() if self._kept else None
+        if kept is not None:
+            try:
+                status, reply, closing = self._exchange(kept, body)
+            except (http.client.RemoteDisconnected, ConnectionError):
+                kept.close()
+                kept = None
+            except BaseException:
+                kept.close()
+                raise
+        if kept is None:
+            kept = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+            try:
+                status, reply, closing = self._exchange(kept, body)
+            except BaseException:
+                kept.close()
+                raise
+        if closing or status != 200:
+            kept.close()
+        else:
+            with self._keeping:
+                self._kept.append(kept)
+        if status != 200:
+            raise AssertionError(f"POST /odrig gave status {status}")
+        return reply
+
+    @staticmethod
+    def _exchange(connection, body):
+        """Status, body and whether the emulator closes the connection, of one command."""
+        connection.request("POST", "/odrig", body=body)
+        answer = connection.getresponse()
+        return answer.status, answer.read(), answer.will_close
+
+    def _let_go(self):
+        with self._keeping:
+            kept, self._kept = self._kept, []
+        for connection in kept:
+            connection.close()
 
     def wait_for_the_check(self):
         """Asks for the list until it gives the size of every animation file the core can
@@ -323,6 +365,7 @@ class Emulator:
 
     def stop(self, number=STOP):
         """Ends the emulator with a signal and gives its exit status and what it printed."""
+        self._let_go()
         if self._result is None:
             if self.process.poll() is None:
                 try:
@@ -356,6 +399,36 @@ class Emulator:
 
     def __exit__(self, *_):
         self.stop()
+
+
+# More connections than a browser opens to one server at once, with room to spare.
+AT_ONCE = 32
+
+
+def connected_at_once(port, count=AT_ONCE, seconds=2):
+    """How many of `count` connections made at the same moment to a port of 127.0.0.1 are
+    taken within `seconds`, while its server accepts none of them."""
+    taken = []
+    made = []
+
+    def connect():
+        connection = socket.socket()
+        made.append(connection)
+        connection.settimeout(seconds)
+        try:
+            connection.connect(("127.0.0.1", port))
+        except OSError:
+            return
+        taken.append(connection)
+
+    threads = [threading.Thread(target=connect) for _ in range(count)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    for connection in made:
+        connection.close()
+    return len(taken)
 
 
 def raw_request(port, data, seconds=5):

@@ -79,6 +79,9 @@ class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
     # On Windows the option would let a second program take a port another one holds.
     allow_reuse_address = sys.platform != "win32"
+    # Connections not taken yet wait in a queue; Windows refuses one outright when the queue
+    # is full, and a browser that loads the app's modules opens several at once.
+    request_queue_size = 64
 
     def __init__(self, port=PORT, folder=paths.WWW, handler=Handler):
         self.folder = folder

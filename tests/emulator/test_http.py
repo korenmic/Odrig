@@ -210,6 +210,14 @@ class Engine:
         return b'{"ok":true}\n'
 
 
+class ManyAtOnce(unittest.TestCase):
+    def test_connections_that_come_together_wait_to_be_taken_and_none_is_refused(self):
+        folder = support.entered(self, tempfile.TemporaryDirectory())
+        server = httpd.Server(0, Engine(), folder, lambda: {})
+        self.addCleanup(server.server_close)
+        self.assertEqual(support.connected_at_once(server.port), support.AT_ONCE)
+
+
 class WhatTheServerPassesOn(unittest.TestCase):
     def setUp(self):
         self.engine = Engine()
