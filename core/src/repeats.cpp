@@ -379,7 +379,7 @@ struct Plan {
 
 // Reads the old file: the lines of the other animations, and of them those of files the
 // show no longer names.
-__attribute__((noinline)) Ending count_others(Core &core, const Plan &plan, uint32_t *others, uint32_t *gone) {
+ODRIG_NOINLINE Ending count_others(Core &core, const Plan &plan, uint32_t *others, uint32_t *gone) {
     return read_through(core, [&](const Line &line, uint32_t) {
         if (!is_own(line, plan.kind, plan.name, plan.length)) {
             ++*others;
@@ -391,7 +391,7 @@ __attribute__((noinline)) Ending count_others(Core &core, const Plan &plan, uint
 // Writes `repeats.part` and renames it onto the file: the header, every line of a sound
 // old file but the animation's own and the dropped ones, and its new line in the place of
 // its first one or at the end. False when a call of the host failed.
-__attribute__((noinline)) bool write_file(Core &core, const Plan &plan) {
+ODRIG_NOINLINE bool write_file(Core &core, const Plan &plan) {
     const odrig_host &host = core.host;
     if (host.write_open(host.ctx, kRepeatsPart) != 1) {
         return false;
