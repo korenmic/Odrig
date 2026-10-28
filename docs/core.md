@@ -554,6 +554,18 @@ of [reasons.md](reasons.md), "Widgets in ODRGX", and held in the window while it
   number that is fixed for the refresh.
 - **The turn.** The loop of a clock is its `seconds`, and its turn is as an animation's:
   [show.md](show.md), "The turn of an animation".
+- **Picture clocks.** A picture dial or a picture display, [format.md](format.md),
+  "Picture clocks", is read and checked as a clock is, in one step, and its picture is
+  decoded on the way with a decoder of the reader's: the player's at the start's check,
+  the checker's after the start and at an upload. When its turn opens its file, the
+  picture is decoded once into the pixel buffer, as palette indices, and the decoder keeps
+  its palette; the window keeps the head and the parts from its first byte, and from byte
+  128 the layer, a byte for each pixel. At each refresh the layer is written, the hands and
+  the caps or the fields at the virtual time with its direction, and the LED data takes for
+  each LED the layer's palette index where it has one and the pixel buffer's otherwise. The
+  pixel buffer is not written again in the turn. A hand or a cap touches only the pixels
+  near it; the time walks the slowest points of the turn so far, one for at least every 6
+  seconds of it.
 
 ## A drive
 
@@ -919,7 +931,10 @@ a table of 33 records of 8 bytes and 104 bytes of room for the current playlist'
 368, and the saved repeats of 32 of the drive's files, 8 bytes each, 256. With it
 the target file takes 130,761 bytes, 99 percent. The size and the number of frames
 of an `.odrg` file change nothing: the core never holds a file or a frame record, only
-the 512 bytes it last read.
+the 512 bytes it last read. Picture clocks add no block either: a picture is decoded into
+the pixel buffer, its head, its parts and its layer live in the window of the DEFLATE
+decoder, and what reading them needs is on the stack; the suite finds the same memory for
+a show of picture clocks as for one of clocks.
 
 When the host cannot supply the first block, `odrig_core_begin` returns `NULL`. When it
 cannot supply a later one, the show is invalid with `out-of-memory`.
@@ -952,7 +967,7 @@ repeated exactly.
 | `odrig_host session DIR [options]` | Starts the core on the files of the folder `DIR`, prints the startup lines, then obeys the lines of standard input. |
 | `odrig_host session --batch [options]` | Runs one session after the other from standard input, which holds a file set and a script for each, and prints `end` after each. |
 | `odrig_host decode FILE` | Reads one `.odrg` file or ODRGX container with the core's decoder. Prints `container <type> <loop> <payload>` for a container; then, for frames, `header <W> <H> <C> <F> <compressed>` and one `frame <ms> <hex>` for each frame record with the picture as three bytes for each pixel; then `end`; or `rejected <reason>` where the file is refused. A text has no frame records: its payload is read and checked whole. |
-| `odrig_host render [--seed N] FILE MS...` | Reads a text or a clock and draws it as the player does at each of these milliseconds into its turn, a clock with the seed N, 1 when none is given. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
+| `odrig_host render [--seed N] FILE MS...` | Reads a text or a clock and draws it as the player does at each of these milliseconds into its turn, a clock with the seed N, 1 when none is given; a picture clock as its LEDs show it, its picture through its palette with its layer over it. Prints `picture <W> <H> <hex>` for each, three bytes for each pixel in the pixel order of [format.md](format.md); or `rejected <reason>`. |
 | `odrig_host decode --batch` | The same for any number of files on standard input. |
 | `odrig_host decode --slice BYTES FILE`, `decode --slice BYTES --batch` | The same, with the decoder settling a defect in slices of `BYTES` bytes, not of 32,768: it is called again while it gives `pending`, and `pending <calls>`, how many calls gave it, comes before the last line. |
 | `odrig_host inflate` | Decodes standard input as one raw DEFLATE stream with the core's decoder. Prints `data <hex>` and `left <n>`, the number of bytes of input after the stream; or `rejected <reason>`. |

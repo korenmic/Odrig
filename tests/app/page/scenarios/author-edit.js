@@ -1,6 +1,7 @@
 // The operator edits an installed text or clock from its row's menu: the form opens on
 // Upload with what the installation holds, takes a change, and Save puts it in place; or
-// another controller changed the animation meanwhile. And the menus of some rows.
+// another controller changed the animation meanwhile; or the clock is made from a picture,
+// and a message says so in place of the form. And the menus of some rows.
 
 import {choose, menuOf, rows, shown, spaceKnown, storage} from "../reading.js";
 
@@ -29,6 +30,13 @@ export default async function (app) {
   }
   menuOf(app, settings.edit);
   choose(app, "Edit");
+  if (settings.refused === true) {
+    await app.until(() => app.text("message-text") !== null, "a message in place of the form", 10000);
+    seen.message = app.text("message-text");
+    seen.formShown = !app.byId("author").hidden;
+    app.press("OK");
+    return seen;
+  }
   await app.until(() => app.shown() === "upload" && app.byId("author-upload").textContent === "Save" && !app.byId("author-upload").disabled, "the form of the animation", 10000);
   seen.opened = form(app);
   for (const [id, value] of settings.fields || []) {

@@ -30,21 +30,32 @@ test("the tables are what the fonts give", async (t) => {
   });
 });
 
-test("every font has every character of the repertoire", () => {
+test("every font has every character of its repertoire", () => {
   assert.equal(generator.REPERTOIRE.length, 95 + 27);
+  assert.deepEqual(generator.DIGITS, [0x20, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a]);
   for (const table of Object.values(fonttables.FONT_TABLES)) {
-    assert.deepEqual(table.codes, generator.REPERTOIRE, table.name);
+    assert.deepEqual(table.codes, table.name === "tiny" ? generator.DIGITS : generator.REPERTOIRE, table.name);
     assert.equal(table.widths.length, table.codes.length);
     assert.equal(table.rows.length, table.codes.length * (table.ascent + table.descent));
     for (const width of table.widths) {
       assert.ok(width >= 1 && width <= 8, `${table.name}: a glyph ${width} wide`);
     }
   }
-  assert.deepEqual(Object.keys(fonttables.FONT_TABLES), ["1", "2"]);
+  assert.deepEqual(Object.keys(fonttables.FONT_TABLES), ["1", "2", "4"]);
   const small = fonttables.FONT_TABLES[1];
   const medium = fonttables.FONT_TABLES[2];
+  const tiny = fonttables.FONT_TABLES[4];
   assert.deepEqual([small.name, small.ascent, small.descent], ["small", 7, 2]);
   assert.deepEqual([medium.name, medium.ascent, medium.descent], ["medium", 10, 3]);
+  assert.deepEqual([tiny.name, tiny.ascent, tiny.descent], ["tiny", 5, 0]);
+  assert.deepEqual(tiny.widths, [1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1]);
+});
+
+test("a font may name the repertoire of digits, and no other", () => {
+  const tiny = fs.readFileSync(path.join(ROOT, "fonts", "tiny.txt"), "utf8");
+  assert.equal(generator.readFont(tiny, "tiny.txt").glyphs.length, 12);
+  assert.throws(() => generator.readFont(tiny.replace("repertoire digits", "repertoire hours"), "tiny.txt"), /no repertoire hours/);
+  assert.throws(() => generator.readFont(tiny.replace("repertoire digits\n", ""), "tiny.txt"), /not the repertoire in order/);
 });
 
 test("no pixel of a glyph lies outside its width, and only the space is dark", () => {
@@ -61,7 +72,7 @@ test("no pixel of a glyph lies outside its width, and only the space is dark", (
 
 test("the final forms and the qof reach below the baseline, and no other Hebrew letter does", () => {
   const below = [0x5da, 0x5df, 0x5e3, 0x5e5, 0x5e7];
-  for (const table of Object.values(fonttables.FONT_TABLES)) {
+  for (const table of [fonttables.FONT_TABLES[1], fonttables.FONT_TABLES[2]]) {
     const height = table.ascent + table.descent;
     for (let code = 0x5d0; code <= 0x5ea; code += 1) {
       const index = table.codes.indexOf(code);

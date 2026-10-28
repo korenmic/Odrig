@@ -67,6 +67,7 @@ enum Reason {
 
     // A widget of an ODRGX container.
     kUnknownWidget,
+    kBadPicture,
 
     kReasonCount,
 

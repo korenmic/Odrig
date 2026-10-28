@@ -17,7 +17,7 @@ ENDING = ".odrgx"
 # payload of each may have.
 TYPE_NAMES = {1: "frames", 2: "text", 3: "widget"}
 TYPE_VERSIONS = {1: 1, 2: 1, 3: 1}
-LARGEST_PAYLOAD = {1: 0xFFFFFFFF, 2: 3612, 3: 20}
+LARGEST_PAYLOAD = {1: 0xFFFFFFFF, 2: 3612, 3: 32768}
 
 
 @dataclasses.dataclass(frozen=True)

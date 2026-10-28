@@ -100,7 +100,7 @@ of the Python library of [python-library.md](python-library.md).
 ## Starting
 
 ```
-python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]]
+python -m emulator SHOW_DIR [--port N] [--serial-link PATH] [--tcp-port N] [--core PATH] [--verbose] [--storage BYTES] [--lan] [--drive DIR [--drive-read-only]] [--parent PID]
 ```
 
 Started from the repository root with the folder of an installed show, the emulator starts
@@ -129,6 +129,7 @@ Ctrl-C or Ctrl-Break, and then removes the link to its port and exits with statu
 | `--lan` | The page and the commands over HTTP are reachable on every IPv4 address of this computer, so that a phone on the same network reaches the emulator. See [From a phone](#from-a-phone). | 127.0.0.1 only |
 | `--drive DIR` | The folder `DIR` stands for the top of a USB drive of animations. See [A drive](#a-drive). | No drive |
 | `--drive-read-only` | With `--drive`: the core may not change the drive's files, as on a USB stick. | The core may change them, as on the card |
+| `--parent PID` | The emulator ends, as on an interrupt, within a second or two after the process with this id ends, even when that process was killed without ending it. The preview and the tests give their own id, so that no emulator outlives them. | It runs until it is stopped |
 
 There is no option for the size of the canvas and none that names an address: the canvas
 is the one of `mapping.json` in the folder, and the emulator listens on 127.0.0.1, or

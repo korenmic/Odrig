@@ -155,7 +155,21 @@ export function drawText(decoded, font, t, picture) {
 // milliseconds since its turn began give. Positions are in half pixels from the canvas's
 // centre, with y growing downwards; angles in 1/2^26 of a turn, from 12 o'clock clockwise;
 // sines in units of 1/16,384.
-export const WIDGETS = ["analog", "digital", "melting"];
+export const WIDGETS = ["analog", "digital", "melting", "picture-dial", "picture-display"];
+// The widgets that carry a picture of their own, and what such a widget's settings name.
+export const PICTURE_WIDGETS = ["picture-dial", "picture-display"];
+export const WAYS = ["forward", "backward", "random"];
+export const UNITS = ["hour", "minute", "second"];
+export const DISPLAY_FONTS = {small: 1, medium: 2, large: 3, tiny: 4};
+export const PATTERN_CHARACTERS = "HIhMmSs: ";
+export const MOST_HANDS = 8;
+export const MOST_CAPS = 4;
+export const MOST_FIELDS = 4;
+export const LONGEST_PATTERN = 8;
+export const MOST_COLOURS = 8;
+export const MOST_TURNS = 100;
+export const LARGEST_OFFSET = 12;
+export const WIDEST_HAND = 15;
 export const LONGEST_CLOCK = 3600;
 export const FASTEST_CLOCK = 3600;
 
@@ -217,7 +231,9 @@ function xorshift(value) {
 // start of the virtual time, its base speed, the swing of the speed about it, the swing's
 // period and its phase; then the melting watch's tilt in degrees, where it folds, as a
 // percentage of its radius below its centre, how far the hanging face stretches and how
-// fast it narrows, in percent, its shear and the wave of the fold in half pixels.
+// fast it narrows, in percent, its shear and the wave of the fold in half pixels; then
+// whether a picture widget's turn of a random way starts backward, and its chance of
+// turning at each slowest point of the swing, in percent.
 export function clockOf(settings, seed) {
   let state = seed === 0 ? 1 : seed;
   const next = () => {
@@ -237,7 +253,9 @@ export function clockOf(settings, seed) {
   const narrow = 20 + (next() % 31);
   const shear = 10 + (next() % 21);
   const wave = 2 + (next() % 3);
-  return {start, base, swing, period, phase, tilt, fold, stretch, narrow, shear, wave};
+  const back = next() % 2;
+  const chance = next() % ((settings.turns ?? 0) + 1);
+  return {start, base, swing, period, phase, tilt, fold, stretch, narrow, shear, wave, back, chance};
 }
 
 // The sine of an angle from the table, read between its entries in steps of 1/65,536.
@@ -410,9 +428,143 @@ function drawMelting(settings, clock, time, t, canvas, picture) {
   }
 }
 
+// The time a picture widget shows `t` milliseconds into its turn, in milliseconds and not
+// yet taken modulo 12 hours: the way forward of the existing clocks, gone forward or back
+// as its direction says, and with a random way turned at the swing's slowest points as the
+// seed says.
+export function pictureTime(settings, clock, seed, t) {
+  const forward = (time) => virtualTime(clock, time) - clock.start;
+  const random = settings.direction === "random";
+  let way = settings.direction === "backward" || (random && clock.back === 1) ? -1 : 1;
+  const period = clock.period;
+  const first = fdiv(period * fmod(3 * 16777216 - clock.phase * STEP, TURN), TURN);
+  if (t < first) return clock.start + way * forward(t);
+  const passed = fdiv(t - first, period) + 1;
+  const round = clock.base * period;
+  const chosen = seed === 0 ? 1 : seed;
+  let gone = way * forward(first);
+  for (let point = 1; point <= passed; point += 1) {
+    if (random && mix((chosen ^ point) >>> 0) % 100 < clock.chance) way = -way;
+    if (point < passed) gone += way * round;
+  }
+  return clock.start + gone + way * (forward(t) - forward(first) - (passed - 1) * round);
+}
+
+// A part's time of day, its offset of whole hours added, from 0 to 12 hours.
+function partTime(time, offset) {
+  return fmod(time + offset * HOUR, HALF_DAY);
+}
+
+// The characters a field's pattern shows at a time of day.
+export function patternText(pattern, time) {
+  const hour = Math.floor(time / HOUR) % 12 || 12;
+  const minute = Math.floor(time / MINUTE) % 60;
+  const second = Math.floor(time / 1000) % 60;
+  let shown = "";
+  for (const character of pattern) {
+    if (character === "H") shown += String(Math.floor(hour / 10));
+    else if (character === "I") shown += hour >= 10 ? "1" : "";
+    else if (character === "h") shown += String(hour % 10);
+    else if (character === "M") shown += String(Math.floor(minute / 10));
+    else if (character === "m") shown += String(minute % 10);
+    else if (character === "S") shown += String(Math.floor(second / 10));
+    else if (character === "s") shown += String(second % 10);
+    else shown += character;
+  }
+  return shown;
+}
+
+// The table and the scale of a display's font: `large` is `small` at twice the size.
+export function displayFont(name) {
+  const id = DISPLAY_FONTS[name];
+  return {table: FONT_TABLES[id === 3 ? 1 : id], scale: id === 3 ? 2 : 1};
+}
+
+// The layer a picture widget draws over its picture `t` milliseconds into its turn: one
+// byte for each pixel in the pixel order of docs/format.md, 0 where nothing is drawn and
+// the palette index plus 1 where a hand, a cap or a digit is.
+export function overlayOf(settings, seed, t, canvas) {
+  const {width, height} = canvas;
+  const layer = new Uint8Array(width * height);
+  const time = pictureTime(settings, clockOf(settings, seed), seed, t);
+  const mark = (x, y, colour) => {
+    layer[(height - 1 - y) * width + x] = colour + 1;
+  };
+  if (settings.widget === "picture-dial") {
+    for (const hand of settings.hands) {
+      const unit = [HALF_DAY, HOUR, MINUTE][UNITS.indexOf(hand.unit)];
+      const angle = fdiv(TURN * fmod(partTime(time, hand.offset), unit), unit);
+      const across = sine(angle);
+      const down = -cosine(angle);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const u = 2 * x + 1 - hand.x;
+          const w = 2 * y + 1 - hand.y;
+          const along = u * across + w * down;
+          if (along < -hand.tail * ONE || along > hand.length * ONE) continue;
+          if (Math.abs(u * down - w * across) <= hand.half * ONE) mark(x, y, hand.color);
+        }
+      }
+    }
+    for (const cap of settings.caps) {
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const u = 2 * x + 1 - cap.x;
+          const w = 2 * y + 1 - cap.y;
+          if (u * u + w * w <= cap.radius * cap.radius) mark(x, y, cap.color);
+        }
+      }
+    }
+    return layer;
+  }
+  const colon = t % 1000 < 500;
+  for (const field of settings.fields) {
+    const {table, scale} = displayFont(field.font);
+    const shown = patternText(field.pattern, partTime(time, field.offset));
+    const glyphs = [...shown].map((character) => glyphIndex(table, character.charCodeAt(0)));
+    const line = glyphs.reduce((sum, glyph) => sum + (table.widths[glyph] + 1) * scale, 0) - scale;
+    let left = field.left + fdiv(field.width - line, 2);
+    const top = field.top + fdiv(field.height - table.ascent * scale, 2);
+    const rows = table.ascent + table.descent;
+    for (const [place, glyph] of glyphs.entries()) {
+      const isColon = shown[place] === ":";
+      const colour = isColon ? field.colons : field.digits;
+      for (let row = 0; (!isColon || !field.blink || colon) && row < rows; row += 1) {
+        const bits = table.rows[glyph * rows + row];
+        for (let column = 0; column < table.widths[glyph]; column += 1) {
+          if ((bits & (0x80 >> column)) === 0) continue;
+          for (let down = 0; down < scale; down += 1) {
+            for (let across = 0; across < scale; across += 1) {
+              const x = left + column * scale + across;
+              const y = top + row * scale + down;
+              if (x >= field.left && x < field.left + field.width && y >= field.top && y < field.top + field.height) mark(x, y, colour);
+            }
+          }
+        }
+      }
+      left += (table.widths[glyph] + 1) * scale;
+    }
+  }
+  return layer;
+}
+
+// A picture widget: its picture through its palette, and the layer over it.
+function drawPictureWidget(settings, seed, t, canvas, picture) {
+  const layer = overlayOf(settings, seed, t, canvas);
+  const colours = settings.palette.map(colourOf);
+  for (let pixel = 0; pixel < canvas.width * canvas.height; pixel += 1) {
+    const index = layer[pixel] !== 0 ? layer[pixel] - 1 : settings.picture[pixel];
+    picture.set(colours[index], 3 * pixel);
+  }
+}
+
 // Draws a clock of these settings with this seed `t` milliseconds into its turn into
 // `picture`, three bytes for each pixel in the pixel order of docs/format.md.
 export function drawClock(settings, seed, t, canvas, picture) {
+  if (PICTURE_WIDGETS.includes(settings.widget)) {
+    drawPictureWidget(settings, seed, t, canvas, picture);
+    return picture;
+  }
   const clock = clockOf(settings, seed);
   const time = fmod(virtualTime(clock, t), HALF_DAY);
   if (settings.widget === "analog") drawAnalog(settings, time, canvas, picture);

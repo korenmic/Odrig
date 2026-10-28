@@ -10759,6 +10759,131 @@ in the commit that records it; a file whose key the folder holds only adds its n
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
 
+## Seed 52: the bytes of a picture clock
+
+**Question.** Seed 52 asks for two widgets that carry their base picture, "compressed as the
+format compresses a picture", with their geometry, and leaves the bytes to the spec. How
+are they laid out, how large may a widget's payload be, and how is a widget of 20 bytes
+told from one with a picture?
+
+**Answer.** The widget's first byte tells it: 1 to 3 keep their 20 bytes, 4
+`picture-dial` and 5 `picture-display` have a head of 12 bytes, their parts (hands of 10
+bytes and caps of 6, or fields of 22) and then the picture, an ODRG file of one frame and
+a palette of 1 to 8 colours, to the end of the payload. The ODRG file is how the format
+compresses a picture, and the core already decodes it. A widget's payload may have 32,768
+bytes, more than the largest picture needs. So the widget's byte is read before the
+payload's length is compared: a file of widget 1 with a length of 21 is still refused with
+`payload-size`, and the vector `unknown-widget.four` is now `unknown-widget.six`. A
+picture whose frames or palette are not those of a picture clock is refused with a new
+reason, `bad-picture`. A hand has a tail behind its pivot and an offset of whole hours, and
+a cap is a disc of a colour over the hands, so that a tile's pivot cap or a second clock
+of another time zone can be drawn; a field shows a pattern of the hour, the minutes and
+the seconds, and a display has up to 4 fields, for tiles whose time is in several boxes.
+`check` prints a picture clock's `direction` and the size of its `palette`.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `docs/reasons.md`;
+`converter/lib/odrgx.js`; `docs/converter.md`.
+
+## Seed 52: the direction and the slowest points
+
+**Question.** A picture clock runs forward, backward, or in a way chosen by the seed of its
+turn, which "may also turn at the swing's slowest point, at a chance the seed fixes". What
+does the seed draw, where are the slowest points, and how is the time found so that a time
+of the turn has one picture however the refreshes come?
+
+**Answer.** The seed draws the eleven values of the other clocks, in their order, and then
+`back`, r % 2, and `chance`, r % (turns + 1). The swing's speed is least where the angle of
+its cosine is three quarters of a turn, once in each period P, the first at
+`t0 = floor(P * ((3 * 2^24 - Φ) mod 2^26) / 2^26)`. Whether the way turns at the k-th
+slowest point is `mix(seed ^ k) % 100 < chance`, a fact of the seed and k alone, and the
+time is the sum of the ways over the whole periods before it, each b * P long, so it needs
+no state. At a slowest point itself the time is the turn's point: the step that ends there
+still goes the earlier way.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `converter/lib/draw.js`,
+`pictureTime`.
+
+## Seed 52: the font of small displays
+
+**Question.** Many tiles show their time in a display a few pixels high once the tile is
+60 x 60: the small font, 7 rows, does not fit them. Which font do they use?
+
+**Answer.** A fourth font, `tiny`: the ten digits, the colon and the space, 3 by 5, in
+`fonts/tiny.txt`, generated with the others into the tables of the core and the
+converter. A font file may now name its repertoire, `digits`; the fonts of texts keep the
+whole one. A text cannot name it: the texts' fonts stay 1 to 3, and a text of font 4 is
+refused with `unknown-font` as before.
+
+**Resolution.** `fonts/tiny.txt`, `fonts/generate.mjs`, `core/src/font_tables.cpp`,
+`converter/lib/fonttables.js`; `docs/format.md`.
+
+## Seed 52: the vectors of picture clocks, and which task holds them
+
+**Question.** The tasks of seed 52 put the vectors of picture clocks with the core, task 2.
+But the converter's suite checks that the invalid vectors of widgets have every reason of
+"Widgets in ODRGX", the Python library's that every listed reason is one of its own, and
+the core's that it has every reason of a widget: once task 1 lists `bad-picture`, those
+suites need its vector and its name. Where do the vectors go, and how is each commit whole?
+
+**Answer.** The vectors of picture clocks are a folder of their own,
+`tests/vectors/pictures/`, with its builder, valid clocks with their sources and an
+invalid vector for each refusal; they come with task 1, which the converter's suite reads.
+The name `bad-picture` comes with task 1 in the converter, the Python library and the
+core's list of reasons; the core produces it, and its suite reads the folder, with task 2.
+The folder of the clocks of 20 bytes keeps its vectors.
+
+**Resolution.** `tests/vectors/pictures/build.mjs`; `converter/tests/picture.test.js`,
+`converter/tests/clock.test.js`; `odrig/errors.py`; `core/src/reasons.h`,
+`core/src/reasons.cpp`.
+
+## Seed 52: where the core keeps a picture clock
+
+**Question.** Seed 52 asks that a picture clock cost the core no memory: its picture
+decoded once a turn into the pixel buffer, its hands or digits drawn over it as the LED
+data is made, the pixel buffer never written meanwhile. Where are the head, the parts and
+the hands of a refresh kept, and what decodes the picture at each check?
+
+**Answer.** The picture is decoded into the pixel buffer as palette indices by the
+player's decoder, which keeps its palette; the window of the DEFLATE decoder, which a
+drawn type leaves free, keeps the head and the parts from its first byte and, from byte
+128, a layer of a byte for each pixel, written at each refresh with the hands and caps or
+the digits; `fill_leds` takes the layer's colour where it has one. The window serves the
+picture's inflate first: the head is read onto the stack and copied there afterwards.
+Each check decodes the picture with the decoder, the window and the pixel buffer it has
+for frames, so it needs nothing more. The Python library's header reader allows a widget
+32,768 bytes, as the converter and the core do.
+
+**Resolution.** `core/src/clock.h`, `core/src/clock.cpp`, `core/src/container.h`,
+`core/src/player.cpp`; `docs/core.md`, "Clocks" and "Memory"; `odrig/odrgx.py`.
+
+## Seed 52: the reference pictures are written the same on every computer
+
+**Question.** The builder of `tests/vectors/procedural/` wrote its PNG files with the zlib
+of Node.js, and Node.js on Windows gives other bytes than on the Mac that made them: 18 of
+the 35 pictures came out different with the same pixels, and the converter's suite failed
+on Windows on one of them. Seed 52 adds pictures of picture clocks; made on Windows, they
+would fail on the Mac. How are they written?
+
+**Answer.** The builder compresses with the library's own DEFLATE, which writes the same
+bytes everywhere, in a zlib stream of its own making. All the pictures were written again:
+every one keeps its pixels, which the core's and the emulator's suites read, and the
+converter's suite finds them what their builder makes on Windows too.
+
+**Resolution.** `tests/vectors/procedural/build.mjs` and its pictures.
+
+## Seed 52: what the app does with a picture clock
+
+**Question.** The app lists a picture clock as a `widget`, as `list` says, and so offers
+its `Edit`; the form of a clock has no fields for a picture, hands or fields. What does
+`Edit` do with it?
+
+**Answer.** `list` says only the type, so the menu keeps `Edit`; the app reads the file as
+for any clock, and when it holds a picture, says "This clock is made from a picture: it
+cannot be edited here." in place of the form, and sends nothing. The app does not make
+one either: the converter's `clocks` does, from an inventory.
+
+**Resolution.** `app/www/screens/author.js`, `app/www/messages.js`;
+`docs/android-app.md`; `tests/app/test_authoring.py`.
 ## Seed 50: which catalogs are of version 2
 
 **Question.** The seed takes the marker's format to version 2 and says a reader of version
@@ -11366,6 +11491,255 @@ the same day?
 `tests/app/page/driver.js`, `tests/app/test_panel_top.py`,
 `tests/app/page/scenarios/paneltop.js`; docs/android-app.md.
 
+## Seed 53: isolation under load, and the slowest tests
+
+**Question.** Task 2 of seed 53 mends every failure that comes from two workers or two
+suites sharing a file, a port or a build. What did the first loaded run show, and where
+does the work go that brings the slowest tests within requirement 8.1?
+
+**Answer.** The first run of `tests/run.py` with its default eight workers, on db81baa with
+the runner of task 1, failed in nothing shared: every failure of the emulator's, the
+app's, the core's and the converter's suites was absent, and the one failure, of
+`tests.firmware.test_paths`, came from the firmware tool's Python environment linked into
+the checkout from another one, which task 6's `ODRIG_TOOLS` settles. The suites already
+take their ports from the system, their folders from temporary directories and their
+Chrome profiles from temporary folders, and the firmware suite compiles its host program
+into a temporary folder; the emulator's package no longer builds the core under the
+runner (task 1). Its wall time was 631 s, against 1,954 s for the same suites one after
+another; the core's suite, 598 s, was bound by one test of 492 s,
+`test_the_memory_does_not_depend_on_the_length_of_a_clip`, whose time is the test host's
+`read_at` reading the whole of a 10.8 MB file again for every call of at most 512 bytes.
+That and the other tests that keep a suite above a third of its time alone are task 3's,
+with the timing: requirement 8.1 is met there.
+
+**Resolution.** No code changes for task 2; task 3 takes the slowest tests with the timing.
+
+## Seed 53: the slowest tests, a module split by its classes, and timing under load
+
+**Question.** Task 3 makes the tests that fail under load robust and brings the core's,
+the emulator's and the app's suites within a third of their time alone (requirement 8.1).
+What did that take?
+
+**Answer.** Three things. The core's test host read a whole file from storage again for
+every `read_at` of at most 512 bytes; a 10.8 MB clip took 193 s to play. It now keeps the
+content it read while the next call goes on where the last ended, with no storage call
+and no change of the drive in between, and reads anew otherwise; the clip plays in 0.6 s
+and the core's suite alone takes 368 s instead of 564. The runner gives a module that took
+more than a worker's share in the previous report by its test classes, and the report
+keeps the times of the suites a run did not run. And under load the app asked an
+installation that keeps no catalogs twice: the client asks once the target answers, and
+Settings' question, queued behind that answer, was sent after it; a queued question is now
+not sent once the installation is known to keep none (`client.catalog`), with a test whose
+stand-in answers in three seconds. Three passes in a row with eight workers then took 435,
+377 and 399 s, against 1,954 s one after another, with no failure but the linked Python
+environment of task 2's entry. Alone through the runner: core 95 s (564), emulator 58 s
+(387), app 271 s (854, its four workers kept).
+
+**Resolution.** `tests/core/host/host.cpp`'s `read_at`; `tests/run.py`'s `split` and report;
+`app/www/client.js`'s `catalog`; `tests/runner/test_runner.py`; `tests/app/test_catalog.py`.
+
+## Seed 53: no process left behind, without a helper of its own
+
+**Question.** Task 4 names `tests/children.py`, a marker set to `manual` outside the runner,
+and process groups for every starter. What was needed?
+
+**Answer.** The emulators found running for days were left by starters killed without a
+chance to clean up, which no cleanup can mend; the emulator now takes `--parent PID` and
+ends within two seconds after that process ends, and the preview and the emulator suite's
+starter give their own id. The starters already put their children in a group of their
+own. The runner sets `ODRIG_RUN` for its children, which every child inherits, ends at a
+run's end what still carries its id, and `--sweep` ends every process that carries any id
+and every emulator of a temporary or a preview's folder; outside the runner no id is set,
+and the sweep's second rule finds those emulators. So no helper module and no `manual` id.
+A preview also removes, at its start, the work folders of previews no longer running, and
+the preview's tests look at their own folder only. Under load, a test of the app's kept
+keys found the board's pages read again after the card was back rather than before; it now
+looks for them from the moment the board's catalog is whole.
+
+**Resolution.** `emulator/parent.py`, `emulator/app.py`'s `--parent`, `preview/__init__.py`,
+`tests/run.py`'s `strays`, `end` and `--sweep`, `tests/emulator/test_parent.py`,
+`tests/app/test_keys.py`.
+## Seed 52: the inventory, its motions and the subcommand `clocks`
+
+**Question.** The seed asks for one inventory that the converter reads, and for the motions
+of the tiles that show no time, of the kinds it names, and leaves their form, the reading
+and the place of the code to the spec. What are they?
+
+**Answer.** A subcommand of the converter, `clocks INVENTORY.json --out DIR`, so that the
+files can be made again from a clone, with `converter/lib/inventory.js` and
+`converter/lib/motion.js` beside the other modules. The inventory holds each tile's
+palette and picture as a picture clock's source does, rows of palette digits, so it needs
+no reader of images; a tile's base picture is that picture. A motion is up to 8 parts,
+each working on what the ones before it made: a level that falls and rises again in a
+triangle over the loop, so that it loops without a jump; a flicker of 2 or 3 recolourings;
+a pulse through up to 8 recolourings and back; a turn and a swing of the pixels of some
+colours about a point. Turns and swings are made in whole numbers with the sine table of
+the clocks, so the same inventory gives the same bytes on every computer, and they keep
+the palette's colours, as a recolouring does: no motion makes a colour. Every file is made
+before one is written. The design's `from` and `to` of a level are named `start` and
+`half`, its share at the start of the loop and at its half: the library's test of its own
+imports reads a quoted `from` as one.
+
+**Resolution.** `converter/lib/motion.js`, `converter/lib/inventory.js`,
+`converter/cli/clocks.js`; `docs/converter.md`, "clocks".
+
+## Seed 52: the tiles reduced to 8 colours
+
+**Question.** Each tile is to be "scaled to 60 x 60 and reduced to" at most 8 colours,
+"black among them when the clock has black". The cut tiles are not square: those of the
+lower rows of the owner's picture are 103 to 114 pixels high and about 122 wide, because
+the picture's rows are. How is a tile scaled, how are its colours chosen, and where is the
+tool?
+
+**Answer.** Each cut tile is scaled to 60 x 60 as it is, with Pillow's box filter: the
+lower rows' tiles are stretched up to 17 percent in height, which pixel art bears, rather
+than given bands that are not in the picture. Its colours are a median cut of the scaled
+tile, refined by k-means, 8 or fewer; when the tile has a pixel darker than 24 in each
+channel, the colour nearest black becomes black. Each pixel takes the nearest colour,
+without dithering, and the colours are ordered from dark to light. The tool, `prep.py`,
+and every other tool of the inventory are kept with the collection in
+`clocks/source/tools/`, as the inventory is, and were run from `scratch/clocks52/` of the
+first checkout on the Windows computer; the kinds came from a look at the picture: 38
+dials, 28 displays and 34 motions, the list of
+`docs/specs/52-p2-a-hundred-picture-clocks/design.md`.
+
+**Resolution.** The collection's `clocks/source/tools/prep.py` and
+`clocks/source/inventory.json`.
+
+## Seed 52: the dials of the inventory
+
+**Question.** For each of the 38 dials: which hands it has, where its pivot is, how its
+painted hands are erased, and how fast it runs. The seed calls a sundial's shadow "a dial
+with one hand" and lists sundials among the tiles that show no time.
+
+**Answer.** The sundials and the obelisk, tiles 1 to 3, are dials of one hour hand in the
+shadow's colour about the foot of the gnomon: the hand the seed names; it hides behind the
+gnomon for part of its turn, as a shadow would. A dial's numerals and marks stay: they are
+its face; only its hands are erased, painted with the colours of the face around them, a
+column's own grain on the wooden tile 38. Hands are drawn in the colours the tile's hands
+had, an hour hand of half width 2 and a minute hand of 1 where the dial is big enough; a
+second hand only where the tile had one (33, 39, 45, 58 and 76), and those dials run 2 to
+30 times real time so that the second hand can be followed, the others 60 to 600. Several
+pivots where the tile has several dials: the world map, tile 59, with three clocks 5 hours
+behind, at and 3 hours ahead; the chess clock, tile 70, two hours apart; the chronograph's
+four small dials, tile 33. Where the palette lost a hand's colour (the red hands of 39 and
+58) the nearest colour of the palette draws it, and on the busy faces of 34 and 50 a light
+hand is drawn over a wider dark one so that it reads. The kitchen timer, tile 68, has one
+hand, a minute hand of its pointer's two colours; the stopwatch, 76, a second hand only.
+Every dial runs 30 seconds a loop in a random direction, turns 30.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the scripts of each tile
+in `clocks/source/tools/helpers-dials/`.
+
+## Seed 52: the displays of the inventory
+
+**Question.** For each of the 28 displays: the box of its time, the font that fits it,
+what it shows, and its colours; and the tiles whose time is not one line.
+
+**Answer.** The time is erased by painting its box with the display's background, labels
+that are not the time kept (GPS, NTP, the date of tile 64, the cities of tile 60, the
+battery's charge bar of 89). The font is the largest whose widest time fits the box whole,
+checked over every time of a day: `medium` for most clocks of 10 rows, `small` for
+watches, the holograms and the lines of seconds, `large` only for the LED matrix 26,
+`tiny` for the parking meter 86. The flip clock 24 and the band 29 have a field for the
+hours and one for the minutes; the nixie tubes 25 a field for each tube; the three cities
+of 60 three fields at offsets 0, -7 and -2 hours. The time sources 51 to 53 show
+`hh:mm:ss`, the timers 66, 67, 75 and 83 minutes and seconds (`m:ss` on 83, as its picture
+shows `5:00`), the traffic light 84 its seconds; those run 2 to 30 times real time, the
+others 60 to 600. The colons of the digital clocks blink; those of the flaps, tubes and
+lights do not.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of the
+displays in `clocks/source/tools/helpers-displays/`.
+
+## Seed 52: the motions of the inventory
+
+**Question.** For each of the 34 tiles that show no time: its motion, of the kinds the seed
+names, and how far its picture may be changed to make the motion read.
+
+**Answer.** Hourglasses (4, 5, 6, 74, 79, 87, 88) and water clocks (7, 8, 9) are levels:
+the upper sand or water falls while the lower rises, and in the second half of the loop
+the sand goes back up, which is the installation's "this is not the time" and loops
+without a jump; a falling stream is a flicker of three variants that moves down a pixel a
+step. Flames, smoke, the lava lamp, the bulb, the waves of the mast, the satellite and the
+tuning fork, the calendars, the moon displays, the drum machine, the music box, the atom's
+electrons and the zen garden's rings are flickers or slow pulses of palette colours. The
+metronome 71 swings and the egg timer 69 rocks; the gears 92, the water wheel 93 and the
+spinner 80 turn. Where the reduced picture of a moving part was too ragged to turn
+cleanly, the part was drawn again in its own colours about one centre (the metronome's
+arm, the spinner's dots, the gears, the water wheel, the zen garden's rings, the window's
+hourglass 88); every other tile keeps its picture but for a few stray pixels. Every motion
+runs 12 to 16 seconds, its frames 50 ms apart, the spinner's 150 ms, one dot a frame.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of each tile in
+`clocks/source/tools/helpers-motions/`.
+
+## Seed 52: the hundred made and kept
+
+**Question.** Where do the 100 files go, with what, and how are they known to work?
+
+**Answer.** `clocks` made them from the inventory in one run: 38 picture dials and 28
+picture displays of 393 to 1,218 bytes each, and 34 frames files of up to 45,633, 153,655
+bytes in all.
+`check` accepts each, and each has at most 8 colours, counted over the pictures of a
+frames file and over a clock's pictures every 250 ms of its loop with three seeds: 97 of
+them 8, the others 5 to 7. Their previews, made by `thumbnail --catalog thumbnails`, are
+100 GIFs in `thumbnails/`, 1,775,742 bytes, committed; the collection's folder `clocks/` on the share holds
+each file with its preview `X.gif`, the copy of its GIF in `thumbnails/`, and its readme
+`X.md` in the shape of seed 46, which names the owner's picture, the tile and its place;
+and `source/` with the owner's picture, the 100 cut tiles, the inventory, each base picture
+as a PNG and the tools. Nothing of it is committed. The emulator, given a drive whose
+folder `odrig` held the 100, listed all of them and played each with `play <id>`, `status`
+naming it with a seed. A recording of 16 seconds played the wall clock, tile 15, and the
+red alarm clock, tile 21, twice each, each turn begun by `play`: the wall clock went
+backward at about 7.5 minutes a second, then forward at 2.5; the alarm clock backward at
+1.4, then backward at 3; 7 to 59 LEDs changed in each second.
+
+**Resolution.** `thumbnails/`; the collection's `clocks/`.
+
+## Seed 52: the original six of the twelve
+
+**Question.** The original six are to be rendered from `references/original/animation.js`
+"by calling the script's drawing at each frame's time", 8 colours each: "black, then the
+colours its script draws with, most used first". The script draws only on its own timer
+and keeps its drawings inside its closure; and on its 60 x 60 canvas almost no pixel has a
+named colour exactly, every dot and line being soft at its edges. How are the frames taken,
+which colours count as used, and how near are the files to the reference GIFs?
+
+**Answer.** The page that renders adds one name after the script's own list of its six
+drawing functions, which are pure functions of the time, and calls them at 0, 50, 100 ms
+and so on, on the script's own canvas after its own background: so each frame is the
+script's picture at that time exactly. The colours the script names are `#d6e3e8`,
+`#51e6df`, `#ef80bd`, `#ffc577` and `#354953` and its background `#040609`, which is black;
+each pixel counts for the named colour whose blend with the background comes nearest it,
+and the colours that a scene uses come after black, the most used first: 4 to 6 colours.
+Every other pixel takes the nearest of them. At 50 ms a frame every file is far below
+2 MB, so none is taken at 100 ms: the largest, every row 720 s, has 471,095 bytes, the
+others 1,443 to 23,875. Compared with the reference GIFs at their 100 ms frames, mapped to
+the same colours, two times and every row differ in no pixel, the clock that melts in at
+most 4 of 3,600, sand in at most 93 and we were here in 58, both at single frames; never
+zero differs at each whole second, up to 792 pixels, a digit: the GIFs were rendered by
+adding steps of 0.1 s, which lands just before the second, where the file shows the
+script's time exactly. Every row is compared over the GIF's 144 seconds of its 720.
+
+**Resolution.** The collection's `clocks/time-original-*.odrg` with their readmes;
+`clocks/source/tools/render12.mjs`, `make12.mjs` and `compare12.mjs`.
+
+## Seed 52: the standalone six of the twelve
+
+**Question.** The same for the standalone six, whose script names many colours.
+
+**Answer.** `TimeAnimations.draw(ctx, scene, seconds)` of
+`references/standalone/standalone-script.js` draws a scene at a time on a canvas of the
+page's own; its frames are taken at 0, 50, 100 ms and so on for 18 seconds. Of the colours
+the script names, the seven a scene uses most, by the same count, follow black: 8 colours
+each. Every file is below 26 KB at 50 ms. Compared with the GIFs the page held, at their
+times, mapped to the same colours, they differ in 24 to 73 pixels of 3,600 on average, at
+most 45 to 109: the page made its GIFs another way, and the colours of a soft edge fall to
+one side or the other of a nearest colour.
+
+**Resolution.** The collection's `clocks/time-standalone-*.odrg` with their readmes; the
+same tools.
 ## Seed 50 and seed 48: the saved repeats of a drive's files
 
 **Question.** Seed 48 keeps the saved repeats of 32 of the drive's files by their places,
@@ -11480,3 +11854,30 @@ does. The stand-in of the app's tests answers `list` and `list in` one level at 
 
 **Resolution.** `app/www/screens/show.js` (`barAnimation`, `selectFromBar`);
 `tests/app/test_now_bar.py`.
+## Seed 52: the clocks placed as the collection says
+
+**Question.** The tasks of seed 52 kept the 112 files outside git, in the share's
+collection `clocks/`, with their sources there too. Then the collection's standard was
+merged with seed 46, `collection/README.md`: an animation the installation is given is
+tracked in `collection/`, at its path on the card, with its GIF and readme beside it. The
+owner asked on 2026-10-28 that seed 52 follow it. Where do the files and their sources go?
+
+**Answer.** The 112 files are in `collection/card/clocks/`, their path on the card
+`clocks/`, none of them heavy: the largest has 471,095 bytes. Each has `X.gif`, written
+by `thumbnail --catalog thumbnails --card collection/card --beside`, so the line of its
+key in `thumbnails/catalog.js` holds `clocks/X` too; and `X.md` of the 16 lines, its
+Platform `unknown`, as none of the platforms the standard lists made it. Their sources,
+the owner's picture, the 100 cut tiles, the inventory, the base pictures and the tools,
+are tracked beside the seed in `project-seeds/52-p2-a-hundred-picture-clocks/source/`,
+with `twelve.json` and `comparison.json`, what the twelve's colours were and how near
+they came to their GIFs: they make the files, and the collection holds animations only.
+On the share, the same files are in the collection's `card/clocks/`, and its earlier
+`clocks/` was moved, not deleted, to artifacts/odrig/archived/collection/clocks/; every
+file was read back. The earlier entries of this seed name `clocks/source/` of the
+collection: that is now the seed's `source/`. With the clocks the card's folder `odrig`
+of the collection holds more than 256 files, the most a card takes today; seed 50 is the
+work that lifts that limit.
+
+**Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
+`thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
+`design.md`.

@@ -120,8 +120,11 @@ Reason open_stream(Core &core, uint32_t animation, uint64_t turn, uint64_t loop)
         return kSizeMismatch;
     }
     if (is_drawn(header.type)) {
-        // The payload is held whole in the window, which no frames file uses meanwhile.
-        reason = drawn_read(&core.file, header, core.window);
+        // The payload is held whole in the window, which no frames file uses meanwhile; a
+        // picture clock's picture is decoded into the pixel buffer once, its palette kept
+        // by the decoder, and the window holds its head and parts and then its layer.
+        const Picture picture = {&core.decoder, &core.inflate, core.window, core.pixels};
+        reason = drawn_read(&core.file, header, core.window, picture);
         core.file.close();
         if (reason != kNone) {
             return reason;
@@ -186,7 +189,8 @@ Reason first_loop_to(Core &core, uint32_t animation, uint64_t turn, uint64_t tim
 // its turn, which began at `start`. While the length of the animation is not known, the
 // time lies in its first loop. Once it is known, the loop and the place in it are found by
 // division. A text is drawn at its time in its pass; a clock at its time in the turn, with
-// the seed the turn got when it began.
+// the seed the turn got when it began; a picture clock's layer is written, and the picture
+// in the pixel buffer is left as it is.
 Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, uint64_t start) {
     const uint8_t type = type_of(core, animation);
     if (is_drawn(type)) {
@@ -203,6 +207,10 @@ Reason show_at(Core &core, uint32_t animation, uint64_t turn, uint64_t in_turn, 
             if (type == kTypeWidget) {
                 core.seed = clock_seed(core.noise, id_of(core, animation), start);
             }
+        }
+        if (type == kTypeWidget && clock_is_picture(core.window)) {
+            clock_overlay(core.window, core.seed, core.width, core.height, in_turn, core.window + kLayerAt);
+            return kNone;
         }
         core.decoder.colours = 0;
         if (type == kTypeText) {
@@ -588,12 +596,25 @@ Shown advance(Core &core, uint64_t now) {
 }
 
 // Writes the colour of every LED: its pixel, through the palette in a palette file, at the
-// current brightness.
+// current brightness; for a picture clock its layer's colour where the layer has one.
 void fill_leds(Core &core) {
     const uint8_t *scale = core.scale;
     const uint16_t *pixel = core.led_pixel;
     uint8_t *out = core.led_data;
-    if (core.decoder.colours != 0) {
+    const bool layered = core.stream_open && core.stream_drawn && type_of(core, core.stream_item) == kTypeWidget &&
+                         clock_is_picture(core.window);
+    if (layered) {
+        const uint8_t *palette = core.decoder.palette;
+        const uint8_t *layer = core.window + kLayerAt;
+        for (uint32_t led = 0; led < core.led_total; ++led) {
+            const uint32_t at = pixel[led];
+            const uint8_t index = layer[at] != 0 ? static_cast<uint8_t>(layer[at] - 1) : core.pixels[at];
+            const uint8_t *colour = palette + 3u * index;
+            *out++ = scale[colour[0]];
+            *out++ = scale[colour[1]];
+            *out++ = scale[colour[2]];
+        }
+    } else if (core.decoder.colours != 0) {
         const uint8_t *palette = core.decoder.palette;
         for (uint32_t led = 0; led < core.led_total; ++led) {
             const uint8_t *colour = palette + 3u * core.pixels[pixel[led]];

@@ -214,7 +214,8 @@ function showForm(which) {
 }
 
 // Edits an installed text or clock: reads its file from the target, fills the form with
-// it, and saves it in its place.
+// it, and saves it in its place. A clock made from a picture has no form: a message says
+// so, and nothing is changed.
 async function edit(animation, message, go) {
   if (sending !== null || reading) {
     return;
@@ -252,6 +253,11 @@ async function edit(animation, message, go) {
   }
   reading = false;
   if (version !== client.targetVersion()) {
+    return;
+  }
+  if (read.type === "widget" && "picture" in read.settings) {
+    byId("author").hidden = true;
+    message(messages.PICTURE_CLOCK);
     return;
   }
   fill(read);

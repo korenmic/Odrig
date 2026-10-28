@@ -759,10 +759,21 @@ private:
         if (capacity == 0 || capacity > 512 || (offset != 0 && !goes_on && !host.in_command_ && !anywhere)) {
             stop("file misuse", kFileMisuse);
         }
-        std::string content;
-        if (of_the_drive(name) ? !host.drive_content(name, &content) : !host.whole_file(name, &content)) {
-            return -1;
+        // A read that goes on where the last of the same file ended, with no storage call and
+        // no change of the drive since, reads the content the last one read; any other reads
+        // the file anew.
+        const bool kept = goes_on && host.read_at_kept_name_ == name && host.read_at_kept_calls_ == host.store_calls_ &&
+                          host.read_at_kept_drive_ == host.drive_number_;
+        if (!kept) {
+            host.read_at_kept_name_.clear();
+            if (of_the_drive(name) ? !host.drive_content(name, &host.read_at_kept_) : !host.whole_file(name, &host.read_at_kept_)) {
+                return -1;
+            }
+            host.read_at_kept_name_ = name;
+            host.read_at_kept_calls_ = host.store_calls_;
+            host.read_at_kept_drive_ = host.drive_number_;
         }
+        const std::string &content = host.read_at_kept_;
         size_t count = kReadSizes[host.reads_at_++ % (sizeof kReadSizes / sizeof kReadSizes[0])];
         count = std::min(count, capacity);
         count = offset < content.size() ? std::min(count, content.size() - offset) : 0;
@@ -790,11 +801,12 @@ private:
             }
             count = static_cast<size_t>(fails) - offset;
         }
-        const long differs = uploaded ? options.read_back_differs : -1;
-        if (differs >= 0 && static_cast<size_t>(differs) < content.size()) {
-            content[static_cast<size_t>(differs)] = static_cast<char>(content[static_cast<size_t>(differs)] ^ 0x01);
-        }
         std::memcpy(buffer, content.data() + (count != 0 ? offset : 0), count);
+        const long differs = uploaded ? options.read_back_differs : -1;
+        if (differs >= 0 && static_cast<size_t>(differs) < content.size() && static_cast<size_t>(differs) >= offset &&
+            static_cast<size_t>(differs) < offset + count) {
+            buffer[static_cast<size_t>(differs) - offset] = static_cast<uint8_t>(buffer[static_cast<size_t>(differs) - offset] ^ 0x01);
+        }
         host.read_at_ends_[name] = offset + static_cast<uint32_t>(count);
         host.call_bytes_ += count;
         if (options.trace_read_at) {
@@ -1047,6 +1059,10 @@ public:
     std::FILE *written_ = nullptr;
     long store_calls_ = 0;
     std::map<std::string, uint32_t> read_at_ends_;   // where the last `read_at` of each file ended
+    std::string read_at_kept_;          // the content the last `read_at` read, of the file named
+    std::string read_at_kept_name_;     // by this name, empty when none is kept
+    long read_at_kept_calls_ = 0;       // the storage calls made when it was read
+    uint32_t read_at_kept_drive_ = 0;   // and the drive then
     size_t reads_at_ = 0;
     bool in_command_ = false;       // a command line is being carried out
 
@@ -1148,7 +1164,9 @@ void decode_one(Host &host, const char *name, uint32_t slice) {
     if (reason == odrig::kNone && odrig::is_drawn(content.type)) {
         // A text or a widget is read and checked whole, as the core reads it.
         std::vector<uint8_t> payload(odrig::kLargestTextPayload);
-        reason = odrig::drawn_read(&file, content, payload.data());
+        std::vector<uint8_t> pixels(3u * content.width * content.height);
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), pixels.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     } else if (reason == odrig::kNone) {
         std::printf("header %u %u %u %u %u\n", decoder.width, decoder.height, decoder.colours,
                     decoder.frames, decoder.compressed);
@@ -1231,8 +1249,11 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         reason = odrig::kUnknownType;
     }
     std::vector<uint8_t> payload(odrig::kLargestTextPayload);
+    // A picture clock's picture: its palette indices, as the player's pixel buffer holds them.
+    std::vector<uint8_t> indices(3u * content.width * content.height);
     if (reason == odrig::kNone) {
-        reason = odrig::drawn_read(&file, content, payload.data());
+        const odrig::Picture picture = {&decoder, &inflate, window.data(), indices.data()};
+        reason = odrig::drawn_read(&file, content, payload.data(), picture);
     }
     file.close();
     if (reason != odrig::kNone) {
@@ -1240,9 +1261,17 @@ int render(const std::string &path, const std::vector<std::string> &times, uint3
         return 0;
     }
     std::vector<uint8_t> pixels(3u * content.width * content.height);
+    std::vector<uint8_t> layer(static_cast<size_t>(content.width) * content.height);
     for (const std::string &time : times) {
         const uint64_t ms = std::strtoull(time.c_str(), nullptr, 10);
-        if (content.type == odrig::kTypeText) {
+        if (content.type == odrig::kTypeWidget && odrig::clock_is_picture(payload.data())) {
+            // The picture through its palette, and the layer over it, as the LEDs show it.
+            odrig::clock_overlay(payload.data(), seed, content.width, content.height, ms, layer.data());
+            for (size_t at = 0; at < layer.size(); ++at) {
+                const uint8_t index = layer[at] != 0 ? static_cast<uint8_t>(layer[at] - 1) : indices[at];
+                std::memcpy(&pixels[3 * at], decoder.palette + 3u * index, 3);
+            }
+        } else if (content.type == odrig::kTypeText) {
             odrig::text_draw(payload.data(), content.width, content.height, ms % content.loop_ms, pixels.data());
         } else {
             odrig::clock_draw(payload.data(), seed, content.width, content.height, ms, pixels.data());
