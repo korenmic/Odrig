@@ -3,6 +3,7 @@ started with `--parent PID` watches, so that it ends when the program that start
 gone, even when that program was killed without a chance to end it."""
 
 import os
+import subprocess
 import sys
 import threading
 
@@ -11,16 +12,9 @@ WINDOWS = sys.platform == "win32"
 
 def alive(pid):
     if WINDOWS:
-        import ctypes
-
-        kernel = ctypes.windll.kernel32
-        handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
-        if not handle:
-            return False
-        try:
-            return kernel.WaitForSingleObject(handle, 0) == 0x102  # WAIT_TIMEOUT: still running
-        finally:
-            kernel.CloseHandle(handle)
+        # Windows' own list of processes, filtered by the id: a line naming it while it runs.
+        listed = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"], capture_output=True, text=True)
+        return f'"{pid}"' in listed.stdout
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
