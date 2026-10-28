@@ -109,7 +109,7 @@ Rules for every task:
   - `docs/drifts.md`: the scaling, the colours, the kinds.
   - Requirements: 7.1, 7.3, 8.3
 
-- [ ] 6. The inventory: the dials
+- [x] 6. The inventory: the dials
   - For each dial: its hands, caps, colours and settings; the hands erased from its base
     picture; a sheet of each at two times, with its hands drawn by the converter, looked
     at.

@@ -11304,3 +11304,28 @@ dials, 28 displays and 34 motions, the list of
 
 **Resolution.** The collection's `clocks/source/tools/prep.py` and
 `clocks/source/inventory.json`.
+
+## Seed 52: the dials of the inventory
+
+**Question.** For each of the 38 dials: which hands it has, where its pivot is, how its
+painted hands are erased, and how fast it runs. The seed calls a sundial's shadow "a dial
+with one hand" and lists sundials among the tiles that show no time.
+
+**Answer.** The sundials and the obelisk, tiles 1 to 3, are dials of one hour hand in the
+shadow's colour about the foot of the gnomon: the hand the seed names; it hides behind the
+gnomon for part of its turn, as a shadow would. A dial's numerals and marks stay: they are
+its face; only its hands are erased, painted with the colours of the face around them, a
+column's own grain on the wooden tile 38. Hands are drawn in the colours the tile's hands
+had, an hour hand of half width 2 and a minute hand of 1 where the dial is big enough; a
+second hand only where the tile had one (33, 39, 45, 58 and 76), and those dials run 2 to
+30 times real time so that the second hand can be followed, the others 60 to 600. Several
+pivots where the tile has several dials: the world map, tile 59, with three clocks 5 hours
+behind, at and 3 hours ahead; the chess clock, tile 70, two hours apart; the chronograph's
+four small dials, tile 33. Where the palette lost a hand's colour (the red hands of 39 and
+58) the nearest colour of the palette draws it, and on the busy faces of 34 and 50 a light
+hand is drawn over a wider dark one so that it reads. The kitchen timer, tile 68, has one
+hand, a minute hand of its pointer's two colours; the stopwatch, 76, a second hand only.
+Every dial runs 30 seconds a loop in a random direction, turns 30.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the scripts of each tile
+in `clocks/source/tools/helpers-dials/`.
