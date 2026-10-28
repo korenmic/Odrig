@@ -33,8 +33,8 @@ def show_files(with_files=True):
     return files
 
 
-def cataloged(files, names=("hello.odrgx", "clock.odrgx")):
-    storage = catalog.MemoryStorage({name: data.encode() if isinstance(data, str) else data for name, data in files.items()})
+def cataloged(files, names=("hello.odrgx", "clock.odrgx"), drive=False):
+    storage = catalog.MemoryStorage({name: data.encode() if isinstance(data, str) else data for name, data in files.items()}, drive=drive)
     made, refused = catalog.rebuild(storage, names=names, canvas=CANVAS)
     assert refused == [], refused
     return storage.files
@@ -57,7 +57,7 @@ class AtTheStart(unittest.TestCase):
 
 class OnADrive(unittest.TestCase):
     def test_the_entries_give_the_types(self):
-        card = cataloged({"hello.odrgx": text(), "clock.odrgx": CLOCK}, names=None)
+        card = cataloged({"hello.odrgx": text(), "clock.odrgx": CLOCK}, names=None, drive=True)
         files = {"mapping.json": support.one_leg_mapping(*CANVAS), "show.json": json.dumps({"version": 1, "brightness": 255, "items": []})}
         with a_card(card) as top:
             run = support.start(files, asked(0, "list"), ["--drive", top])
@@ -72,15 +72,15 @@ class Uploads(unittest.TestCase):
         self.assertEqual((entry.type, entry.total_ms), ("text", odrgx.read_header(text()).loop_ms))
 
     def test_an_upload_of_a_clock_to_the_card_records_it_as_the_pc_library_does(self):
-        card = cataloged({"hello.odrgx": text()}, names=None)
+        card = cataloged({"hello.odrgx": text()}, names=None, drive=True)
         files = {"mapping.json": support.one_leg_mapping(*CANVAS), "show.json": json.dumps({"version": 1, "brightness": 255, "items": []})}
         with a_card(card) as top:
             support.start(files, upload_external("clock.odrgx", CLOCK, T0), ["--drive", top])
             left = folder_of(top)
-        storage = catalog.MemoryStorage(card)
+        storage = catalog.MemoryStorage(card, drive=True)
         catalog.add(storage, "clock.odrgx", CLOCK, canvas=CANVAS)
         self.assertEqual(left, storage.files)
-        self.assertEqual(catalog.read(catalog.MemoryStorage(left)).entry("clock.odrgx").type, "widget")
+        self.assertEqual(catalog.read(catalog.MemoryStorage(left, drive=True)).entry("clock.odrgx").type, "widget")
 
 
 if __name__ == "__main__":

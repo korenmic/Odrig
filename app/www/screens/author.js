@@ -214,7 +214,8 @@ function showForm(which) {
 }
 
 // Edits an installed text or clock: reads its file from the target, fills the form with
-// it, and saves it in its place.
+// it, and saves it in its place. A clock made from a picture has no form: a message says
+// so, and nothing is changed.
 async function edit(animation, message, go) {
   if (sending !== null || reading) {
     return;
@@ -252,6 +253,11 @@ async function edit(animation, message, go) {
   }
   reading = false;
   if (version !== client.targetVersion()) {
+    return;
+  }
+  if (read.type === "widget" && "picture" in read.settings) {
+    byId("author").hidden = true;
+    message(messages.PICTURE_CLOCK);
     return;
   }
   fill(read);
@@ -295,11 +301,11 @@ function upload(message) {
     message(messages.ofNoSpace(bytes.length, state.space.free));
     return;
   }
-  const listed = state.animations === null ? [] : state.animations;
+  const named = state.rootNames ?? {ids: [], files: []};
   const saving = editing;
-  const id = saving !== null ? saving.id : freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
+  const id = saving !== null ? saving.id : freeId(new Set(named.ids));
   const base = kind === "text" ? textName(made.source.text) : `clock-${made.source.widget}`;
-  const file = saving !== null ? saving.file : fileName(base, new Set(listed.map((animation) => animation.file)), ENDING);
+  const file = saving !== null ? saving.file : fileName(base, new Set(named.files), ENDING);
   const shown = byId("author-uploading");
   shown.hidden = false;
   shown.textContent = "Sending: 0%";

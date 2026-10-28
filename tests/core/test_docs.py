@@ -142,7 +142,7 @@ class CommandsDocument(unittest.TestCase):
     def test_its_commands_are_the_ones_the_front_end_reads(self):
         table = self.text.split("\n## Commands\n")[1].split("\n## ")[0]
         documented = [row.split("`")[1] for row in table.splitlines() if row.startswith("| `")]
-        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "upload begin <id> <file> <bytes>",
+        self.assertEqual(documented, ["play <id>", "play all", "on", "off", "brightness <n>", "status", "fault", "space", "list", "list in <folder-id>", "read <id> <offset>", "catalog", "catalog page <storage> <page> <offset>", "catalog rebuild <storage>", "catalog cancel", "remove <id>", "remove many <ids>", "ignore <id> <value>", "mapping get", "mapping set <revision> <pins>", "mapping cross on", "mapping cross off", "mapping test on", "mapping test off", "mapping test snake <n>", "order get", "order get in <folder-id>", "order move <revision> <id> <before>", "repeat <id> <n>", "repeat <id> <n> save", "repeat <id> default", "upload begin <id> <file> <bytes>",
                                       "upload begin external <file> <bytes>", "upload data <offset> <base64>", "upload expect <crc32>", "upload end <crc32>", "upload cancel"])
         self.assertEqual(set(re.findall(r'words\.is\(0, "([a-z]+)"\)', self.sources)), {command.split(" ")[0] for command in documented})
         self.assertEqual(set(re.findall(r'words\.is\(1, "([a-z]+)"\)', self.sources)), {"all", "begin", "data", "end", "cancel", "get", "set", "cross", "test", "many", "move", "expect", "rebuild", "page"})
@@ -151,7 +151,7 @@ class CommandsDocument(unittest.TestCase):
         limits = dict(re.findall(r"#define (ODRIG_[A-Z_]+)\s+([0-9]+)", self.header))
         self.assertEqual(limits, {"ODRIG_LINE_MAX": "2048", "ODRIG_REPLY_MAX": "1024"})
         for phrase in ("A line is at most 2,048 characters.", "a JSON object on one line of at most 1,024 bytes.", "| `line-too-long` | The line is longer than 2,048 characters. |",
-                       '{"ok":true,"chunk":1500}', "`<id>` is 1 to 65,535.", "`<bytes>` is the size of the file, 1 to 4,294,967,295.", "`<from>` is 0 to 65,535.",
+                       '{"ok":true,"chunk":1500}', "`<id>` is 1 to 65,535.", "`<bytes>` is the size of the file, 1 to 4,294,967,295.", "`<from>` is 0 to 4,294,967,295.",
                        "An upload on which nothing has moved for 60\nseconds is discarded too"):
             self.assertIn(phrase, self.text)
         self.assertIn("const uint32_t kChunkSize = 1500;", self.sources)

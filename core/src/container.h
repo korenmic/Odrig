@@ -44,10 +44,22 @@ Reason content_open(FileSource *file, Inflate *inflate, uint8_t *window, OdrgDec
 // was read to its end and checked whole by its own reader: nothing is left to do.
 Reason content_finish(FileSource *file, OdrgDecoder *decoder, const ContentHeader &header, uint64_t total_ms);
 
+// What decodes the picture of a picture widget as its payload is read: a decoder, its
+// inflate state and window, and a pixel buffer of W * H bytes at least, which holds the
+// picture's palette indices afterwards. The window serves the inflate only while the
+// picture is read.
+struct Picture {
+    OdrgDecoder *decoder;
+    Inflate *inflate;
+    uint8_t *window;
+    uint8_t *pixels;
+};
+
 // Reads and checks the payload of a drawn type whole, from where the header left the
 // source to the end of the file, and keeps it in `into` when that is given: a text's or a
-// widget's, by its own reader.
-Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into);
+// widget's, by its own reader. A picture widget's picture is decoded with `picture`, and
+// `into` keeps its head and its parts.
+Reason drawn_read(FileSource *file, const ContentHeader &header, uint8_t *into, const Picture &picture);
 
 // The name `list` writes for a type.
 const char *type_name(uint8_t type);

@@ -1,0 +1,93 @@
+; The tiny font: the ten digits, the colon and the space, 5 rows from the baseline up, for
+; the time of a picture display. A glyph is its code point and its rows, '#' lit and '.'
+; dark, every row as wide as the glyph. Texts do not use it.
+name tiny
+id 4
+version 1
+ascent 5
+descent 0
+repertoire digits
+
+glyph U+0020
+.
+.
+.
+.
+.
+
+glyph U+0030
+###
+#.#
+#.#
+#.#
+###
+
+glyph U+0031
+.#.
+##.
+.#.
+.#.
+###
+
+glyph U+0032
+###
+..#
+###
+#..
+###
+
+glyph U+0033
+###
+..#
+.##
+..#
+###
+
+glyph U+0034
+#.#
+#.#
+###
+..#
+..#
+
+glyph U+0035
+###
+#..
+###
+..#
+###
+
+glyph U+0036
+###
+#..
+###
+#.#
+###
+
+glyph U+0037
+###
+..#
+.#.
+.#.
+.#.
+
+glyph U+0038
+###
+#.#
+###
+#.#
+###
+
+glyph U+0039
+###
+#.#
+###
+..#
+###
+
+glyph U+003A
+.
+#
+.
+#
+.

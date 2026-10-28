@@ -59,6 +59,48 @@ class WithACard(unittest.TestCase):
         return {support.LINES: support.line_target(emulator), "http": ("--http", f"127.0.0.1:{emulator.port}")}
 
 
+class ABigCard(WithACard):
+    def test_a_card_of_300_files_in_40_folders_that_the_pc_tool_imported_is_read_from_its_index(self):
+        clip = animation(1)
+        folders = [path for top in range(13) for path in (f"t{top:02d}", f"t{top:02d}/a", f"t{top:02d}/b")] + ["t00/a/deep"]
+        shutil.rmtree(self.top / "odrig")
+        root = support.installed(self.top / "odrig", {f"r{number:02d}.odrg": clip for number in range(20)})
+        for folder in folders:
+            support.installed(root.joinpath(*folder.split("/")), {f"c{number}.odrg": clip for number in range(7)})
+        imported = pc_tool(self.top, "import")
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        emulator = self.start()
+        self.assertEqual(self.catalog_when(emulator, lambda reply: reply["external"]["state"] == "ok")["external"]["entries"], 300)
+        items = []
+        reply = {"next": 0}
+        while reply["next"] is not None:
+            reply = json.loads(emulator.command(f"list {reply['next']}"))
+            items += [(item["id"], item.get("file")) for item in reply["items"] if item["id"] > 60000]
+        # The root's level: its 13 folders, `t00` the table's first and each other after the
+        # three lines of the one before, then its 20 files.
+        self.assertEqual(items, [(60301, None)] + [(60302 + 3 * top, None) for top in range(1, 13)] + [(60001 + number, f"r{number:02d}.odrg") for number in range(20)])
+        last = [(item["id"], item["file"]) for item in json.loads(emulator.command("list in 60340"))["items"]]
+        self.assertEqual(last, [(60294 + number, f"t12/b/c{number}.odrg") for number in range(7)])
+        self.assertEqual(json.loads(emulator.command("play 60300")), {"ok": True})
+        status = emulator.status()
+        self.assertEqual((status["animation"], status["file"]), (60300, "t12/b/c6.odrg"))
+        # A removal through the emulator keeps the catalog and the index as the PC tool reads
+        # them.
+        self.assertEqual(json.loads(emulator.command("remove 60010")), {"ok": True})
+        checked = pc_tool(self.top, "check")
+        self.assertEqual((checked.returncode, checked.stdout.strip().splitlines()[-1]), (0, "checked: 299 entries, 0 differ"))
+        self.assertNotIn("r09.odrg", [path.name for path in root.iterdir()])
+
+    def test_a_card_that_is_read_only_lists_it_and_takes_no_removal(self):
+        support.installed(self.top / "odrig" / "night", {f"c{number}.odrg": animation(1) for number in range(3)})
+        self.assertEqual(pc_tool(self.top, "import").returncode, 0)
+        emulator = self.start("--drive-read-only")
+        self.catalog_when(emulator, lambda reply: reply["external"]["state"] == "ok")
+        night = [(item["id"], item["file"]) for item in json.loads(emulator.command("list in 60005"))["items"]]
+        self.assertEqual(night, [(60002, "night/c0.odrg"), (60003, "night/c1.odrg"), (60004, "night/c2.odrg")])
+        self.assertEqual(json.loads(emulator.command("remove 60002")), {"ok": False, "error": "in-use"})
+
+
 class Commands(WithACard):
     def test_catalog_prints_the_reply_by_each_transport(self):
         self.assertEqual(pc_tool(self.top, "import").returncode, 0)
@@ -118,7 +160,7 @@ class Commands(WithACard):
         checked = pc_tool(self.top, "check")
         self.assertEqual((checked.returncode, checked.stdout.strip().splitlines()[-1]), (0, "checked: 3 entries, 0 differ"))
         # The same uploads through the PC library on the card as it was leave the same files.
-        storage = catalog.MemoryStorage({"sun.odrg": animation(2)})
+        storage = catalog.MemoryStorage({"sun.odrg": animation(2)}, drive=True)
         catalog.rebuild(storage)
         for name, data in sent.items():
             catalog.add(storage, name, data)
@@ -154,7 +196,7 @@ class Commands(WithACard):
         self.catalog_when(emulator, lambda reply: reply["external"]["state"] == "ok" and reply["rebuild"] is None)
         copy = self.work / "copy"
         shutil.copytree(self.top, copy)
-        for name in [name for name in self.card_files() if name.startswith("catalog")]:
+        for name in [name for name in self.card_files() if name.startswith(("catalog", "index-"))]:
             (copy / "odrig" / name).unlink()
         self.assertEqual(pc_tool(copy, "import").returncode, 0)
         self.assertEqual(self.card_files(), {path.name: path.read_bytes() for path in (copy / "odrig").iterdir()})

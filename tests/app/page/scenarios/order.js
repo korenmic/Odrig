@@ -45,6 +45,10 @@ export default async function (app) {
     seen.menu = menuOf(app, seen.first[0]);
     return seen;
   }
+  if (settings.look) {
+    seen.menu = menuOf(app, settings.look);
+    return seen;
+  }
   if (settings.drag) {
     const target = () => rowOf(app, settings.drag.before).getBoundingClientRect().top + 4;
     await drag(app, settings.drag.id, target, settings.drag.kind, seen);

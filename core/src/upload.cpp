@@ -115,7 +115,8 @@ void upload_step(Core &core, uint64_t now) {
         }
     } else if (upload.records_left != 0) {
         if (is_drawn(core.check_content.type)) {
-            reason = drawn_read(&checker.file, core.check_content, nullptr);
+            const Picture picture = {&checker.decoder, &checker.inflate, core.check_window, core.check_pixels};
+            reason = drawn_read(&checker.file, core.check_content, nullptr, picture);
             upload.total_ms = core.check_content.loop_ms;
         } else {
             uint16_t duration = 0;
@@ -214,9 +215,6 @@ uint32_t upload_begin_external(Core &core, uint64_t now, const char *name, uint3
     }
     if (!catalog_drive_writable(core)) {
         return refuse(reply, "read-only");
-    }
-    if (catalog_drive_place_for(core, name) == kDriveMost) {
-        return refuse(reply, "no-space");
     }
     const odrig_host &host = core.host;
     uint64_t free_bytes = 0;
@@ -371,7 +369,7 @@ uint32_t upload_end(Core &core, uint32_t crc, Reply &reply) {
         return reply.length;
     }
     if (upload.id == 0) {
-        uint16_t id = 0;
+        uint32_t id = 0;
         if (upload.outcome != kCheckPassed || !catalog_install_external(core, &id)) {
             upload_discard(core);
             return refuse(reply, "storage-error");

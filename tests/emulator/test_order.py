@@ -71,7 +71,7 @@ class OrderAndSnakeTestsOnEveryRoute(unittest.TestCase):
                     self.assertEqual((got["test"], got["snake"]), (False, None))
 
     def test_the_tool_refuses_malformed_forms_without_sending_them(self):
-        for argv, said in ((["order"], "order takes get [FROM], or move REV ID BEFORE"), (["order", "move", "1", "2"], "order takes get"),
+        for argv, said in ((["order"], "order takes get [FROM], get in ID [FROM], or move REV ID BEFORE"), (["order", "move", "1", "2"], "order takes get"),
                            (["order", "put"], "order takes get"), (["mapping", "test", "snake"], "mapping takes get"),
                            (["order", "get", "1\n"], "a command is one line")):
             result = support.run_tool("--port", "a", *argv)

@@ -139,7 +139,7 @@ class ClocksInAShow(Playback):
     def test_a_clock_of_another_canvas_or_with_a_fault_is_quarantined_at_the_start(self):
         cases = {
             "size-mismatch": clock_of(canvas=(21, 10)),
-            "unknown-widget": clock_of(widget=4),
+            "unknown-widget": clock_of(widget=6),
             "bad-settings": clock_of(least=601),
             "loop-mismatch": bytes(clock_of()[:12]) + struct.pack("<I", 1999) + bytes(clock_of()[16:]),
         }

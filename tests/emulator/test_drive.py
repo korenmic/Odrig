@@ -38,7 +38,7 @@ class TheOption(unittest.TestCase):
         (folder / "inner.odrg").mkdir()
         self.assertEqual(host.drive_list(folder), ["A.ODRG", "C.ODRGX", "b.odrg", "d.odrgx"])
         support.installed(folder, {f"{index:03d}.odrg": b"" for index in range(300)})
-        self.assertEqual(len(host.drive_list(folder)), 256)
+        self.assertEqual(len(host.drive_list(folder)), 304)
 
     def test_the_list_walks_the_sub_folders_depth_first_to_three_levels(self):
         folder = support.installed(self.work / "odrig", {"b.odrg": b"", "A.ODRG": b""})
@@ -49,17 +49,17 @@ class TheOption(unittest.TestCase):
         self.assertEqual(host.drive_list(folder), ["A.ODRG", "b.odrg", "a b/q.odrg", "a-b/r.odrg", "night/comet.odrg", "night/deep/x.odrg",
                                                    "night/deep/deeper/y.odrg", "only/sub/k.odrg"])
 
-    def test_the_list_takes_at_most_32_sub_folders_counted_when_their_first_file_is_kept(self):
+    def test_the_list_takes_every_sub_folder(self):
         folder = support.installed(self.work / "odrig", {f"r{index:03d}.odrg": b"" for index in range(5)})
         for index in range(40):
             support.installed(folder / f"f{index:02d}", {"x.odrg": b""})
         names = host.drive_list(folder)
-        self.assertEqual((len(names), names[-1]), (37, "f31/x.odrg"))
+        self.assertEqual((len(names), names[-1]), (45, "f39/x.odrg"))
         nested = support.installed(self.work / "nested" / "odrig", {})
         for index in range(40):
             support.installed(nested / "a" / f"b{index:02d}", {"x.odrg": b""})
         names = host.drive_list(nested)
-        self.assertEqual((len(names), names[-1]), (31, "a/b30/x.odrg"))
+        self.assertEqual((len(names), names[-1]), (40, "a/b39/x.odrg"))
 
     def test_the_folder_is_looked_for_once_a_second_and_listed_when_the_core_asks(self):
         now = [0.0]
@@ -92,11 +92,12 @@ class AnEmulatorWithADrive(unittest.TestCase):
     def start(self, *options):
         return support.entered(self, support.Emulator(self.folder, "--drive", self.top, *options))
 
-    def listed_when(self, emulator, condition):
-        """The items of `list` once they meet a condition, which the test waits for."""
+    def listed_when(self, emulator, condition, command="list"):
+        """The items of `list`, or of another level's command, once they meet a condition,
+        which the test waits for."""
         deadline = time.monotonic() + WAIT_SECONDS
         while True:
-            items = [(item["id"], item.get("file")) for item in json.loads(emulator.command("list"))["items"]]
+            items = [(item["id"], item.get("file")) for item in json.loads(emulator.command(command))["items"]]
             if condition(items) or time.monotonic() > deadline:
                 return items
             time.sleep(0.1)
@@ -118,14 +119,18 @@ class AnEmulatorWithADrive(unittest.TestCase):
         support.installed(folder / "night", {"comet.odrg": self.animation})
         support.installed(folder / "night" / "deep", {"x.odrg": self.animation})
         emulator = support.entered(self, support.Emulator(self.folder, "--drive", self.top, tcp_port=0))
-        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 5)
+        items = self.listed_when(emulator, lambda items: len(self.drives(items)) == 2)
         shows = [item for item in items if item[0] < 60001]
-        self.assertEqual(items, shows + [(60004, None), (60005, None), (60001, "b.odrg"), (60002, "night/comet.odrg"), (60003, "night/deep/x.odrg")])
+        self.assertEqual(items, shows + [(60004, None), (60001, "b.odrg")])
+        self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 2, "list in 60004"), [(60005, None), (60002, "night/comet.odrg")])
+        self.assertEqual(self.listed_when(emulator, lambda items: len(items) == 1, "list in 60005"), [(60003, "night/deep/x.odrg")])
         reply = json.loads(emulator.command("list"))
-        self.assertEqual([item for item in reply["items"] if "playlist" in item],
-                         [{"id": 60004, "playlist": "night", "external": True}, {"id": 60005, "playlist": "night/deep", "external": True}])
+        self.assertEqual([item for item in reply["items"] if "playlist" in item], [{"id": 60004, "playlist": "night", "external": True, "files": 1}])
+        night = json.loads(emulator.command("list in 60004"))
+        self.assertEqual(night["items"][0], {"id": 60005, "playlist": "night/deep", "external": True, "files": 1})
         with support.Lines(emulator.tcp) as port:
             self.assertEqual(json.loads(port.ask("list")), reply)
+            self.assertEqual(json.loads(port.ask("list in 60004")), night)
         # The folder's playlist chosen: `playing` names it, and its first animation plays.
         self.assertEqual(json.loads(emulator.command("play 60004")), {"ok": True})
         status = emulator.status()

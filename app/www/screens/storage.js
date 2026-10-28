@@ -151,9 +151,9 @@ function upload(message) {
     message(messages.ofNoSpace(bytes.length, state.space.free));
     return;
   }
-  const listed = state.animations === null ? [] : state.animations;
-  const id = external ? null : freeId(new Set([...listed.map((animation) => animation.id), ...state.cycles]));
-  const file = fileName(made.file.name, new Set(listed.map((animation) => animation.file)));
+  const named = state.rootNames ?? {ids: [], files: []};
+  const id = external ? null : freeId(new Set(named.ids));
+  const file = fileName(made.file.name, new Set(named.files));
   const shown = byId("uploading");
   shown.hidden = false;
   shown.textContent = "Sending: 0%";
