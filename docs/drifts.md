@@ -10946,3 +10946,101 @@ band and the panel, so that a field scrolled into view stops under it. `Select` 
 scrolls the row to 8 px under the panel, or under the band while the panel does not stick.
 
 **Resolution.** `app/www/screens/show.js`, `app/www/style.css`, `app/www/screens/reorder.js`.
+
+## Seed 49: the lines of each reply, not each page
+
+**Question.** The seed says that the keys of a page are used as soon as that page is read.
+A page of the card's catalog takes several replies of 512 bytes. Is a key used when its
+page has ended, or sooner?
+
+**Answer.** Sooner: the whole lines of each reply give their rows their keys as soon as
+the reply has come, which is what the owner asked for, each preview as soon as it can be.
+A line is whole when it is taken, so no half key is used. A page of another generation
+starts the read again and drops what it had taken, and a read that ends without keys
+leaves `reads`, so that no line of either gives a key. The keys of the storage,
+`state.keys`, are still set only when the read has ended whole, and only those are kept on
+the phone.
+
+**Resolution.** `app/www/client.js`; docs/android-app.md; tests/app/test_keys.py,
+tests/app/page/scenarios/keys.js.
+
+## Seed 49: the keys kept on the phone
+
+**Question.** How are the keys kept between two starts of the app, and what if they come
+later than the first reply of `catalog`?
+
+**Answer.** In the database of the phone's own previews, `odrig-previews`, at version 2,
+whose upgrade creates each of its stores, `previews` and `keys`, that it lacks, so that a
+phone of version 1 keeps its previews. A record of `keys` is named `<address> <storage>`,
+the address as the app keeps it, and holds `{generation, entries, names}`, `names` the
+pairs of name and key; a record of another shape is skipped. One connection serves both
+stores. An open that an older connection blocks is given up for this run, and is closed if
+it succeeds later; the connection closes on `versionchange`. Keys kept in this run before
+the database is open are not replaced by older ones, and are written when it opens. No
+page of a catalog is asked before the kept keys have been taken or found missing, so that
+a reply of `catalog` that comes first does not start a read the kept keys would have
+spared; a read it started ends when they come. Should IndexedDB never answer, the pages
+are asked three seconds after the start, as before this seed.
+
+**Resolution.** `app/www/previews.js`, `app/www/client.js`, `app/www/main.js`;
+docs/android-app.md; tests/app/test_keys.py, tests/app/page/scenarios/keys.js,
+tests/app/page/scenarios/ownpreviews.js.
+
+## Seed 49: a preview by name and size, and the test's own catalog
+
+**Question.** Which key does a file's name find, and how is a name of two keys tested when
+the default catalog has none?
+
+**Answer.** The keys the default catalog gives the file's name, of the row's size; when
+the catalog does not name the file at all and the file holds a `/`, those of its own name,
+the part after the last `/`, since a run of `thumbnail` without `--card` names a card file
+by its own name only. Exactly one key is used; none or more than one give no preview until
+the board's key is read. The suite's server serves a folder of the test's own in place of
+`thumbnails/` when `support.run` is given `thumbnails=`, with a `catalog.js` and GIFs the
+test writes; the stand-in `Paged` can refuse every page with `busy` and list the card's
+folders. The plan of `keys.js` waits for a number of rows, `untilRows`, rather than the
+spec's `{"until": "rows"}`, and opens a folder with `enter`.
+
+**Resolution.** `app/www/previews.js`, `app/www/screens/show.js`; tests/app/support.py,
+tests/app/test_previews.py, tests/app/test_keys.py, tests/app/page/scenarios/keys.js.
+
+## Seed 49: the APK waits
+
+**Question.** The seed's Definition Of Done builds the APK from the branch. Is it built?
+
+**Answer.** No, not by this seed's tasks. On 2026-10-28 the owner asked: "do not rebuild
+apk, another agent is working on apk changes so only after they finish we can rebuild apk,
+but you may test this on an emulator". The APK of the branch is built when that work has
+ended, for the owner's check on a phone.
+
+**Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 6.
+
+## Seed 49: the measurement
+
+**Question.** How many requests does the app send before its first preview, before the
+seed and after it, and what does that mean on the board?
+
+**Answer.** Measured on 2026-10-28 with two emulators side by side, one of `master` at
+`3709ce0` and one of this branch, each with the show `scratch/seed-44-show`, 116
+animations, and the card copy `scratch/all-card-local`, 235 animations of catalog
+generation 2, `--drive-read-only`; the app at `/app/` in a browser, and each emulator's
+log of commands read from `/events`.
+
+- `master`, at the first start and at the second alike: 86 requests before the first
+  preview, among them the 44 parts of `list`, `catalog` and 44 `catalog page`; 98 `catalog
+  page` in the first 15 seconds of each start; every preview of a storage asked for within
+  a few milliseconds of the first.
+- The branch, first start: 45 requests before the first preview, `status` and the 44 parts
+  of `list`, and no `catalog page` before it. The previews are asked for as soon as the
+  rows are drawn, and the pages are read after them, 98 in 15 seconds.
+- The branch, second start: 45 requests before the first preview, and no `catalog page` in
+  the first 15 seconds; `catalog` was asked twice, and the kept keys answered both times.
+
+The list itself, 44 parts for 351 animations, is what the rows wait for now; this seed
+does not change it. The round trip to the board was not measured: the board answers on its
+own Wi-Fi network, at 4.3.2.1, which this computer is not on, and joining it would change
+the computer's network. Each request costs one round trip on the board, so the first start
+waits 41 round trips less for its first preview, and a second start sends 44 or more
+requests fewer; the seconds wait for the owner's session.
+
+**Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 5.

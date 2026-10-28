@@ -23,11 +23,11 @@ async function ready(app) {
   await app.until(() => app.shown() === "animations" && app.text("power") !== "-", "the show screen with a status");
 }
 
-// The keys the phone's own catalog holds in IndexedDB.
+// The keys the phone's own catalog holds in IndexedDB, at the version the database has.
 async function storedKeys(app) {
   const view = app.frame.contentWindow;
   return new Promise((resolve, reject) => {
-    const request = view.indexedDB.open("odrig-previews", 1);
+    const request = view.indexedDB.open("odrig-previews");
     request.onupgradeneeded = () => request.result.createObjectStore("previews");
     request.onsuccess = () => {
       const keys = request.result.transaction("previews").objectStore("previews").getAllKeys();
@@ -44,7 +44,7 @@ async function storedKeys(app) {
 async function storeKeys(app, keys) {
   const view = app.frame.contentWindow;
   await new Promise((resolve, reject) => {
-    const request = view.indexedDB.open("odrig-previews", 1);
+    const request = view.indexedDB.open("odrig-previews");
     request.onupgradeneeded = () => request.result.createObjectStore("previews");
     request.onsuccess = () => {
       const writing = request.result.transaction("previews", "readwrite");
