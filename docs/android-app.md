@@ -72,7 +72,7 @@ a top bar with the app's name and whether the installation answers.
   travel.
 
 The app is one more client of the commands of [commands.md](commands.md). It sends
-thirty-five command lines and no other, each as `POST /odrig` to the address that is set:
+thirty-eight command lines and no other, each as `POST /odrig` to the address that is set:
 
 | The operator | The line |
 |---|---|
@@ -98,6 +98,9 @@ thirty-five command lines and no other, each as `POST /odrig` to the address tha
 | Presses a snake's test in the Tests group | `mapping test snake <n>` |
 | Nothing: after every complete list, and its further parts for a long one | `order get`, and `order get <next>` |
 | Lets go of a row it dragged, or presses Move up or Move down | `order move <revision> <id> <before>` |
+| Presses `Repeat this` on the bar of the animation playing now, or Done or Enter in its field | `repeat <id> <n>` |
+| Presses `Save` on that bar | `repeat <id> <n> save` |
+| Presses `Restore default` on that bar | `repeat <id> default` |
 | Opens the target screen while the installation answers | `fault` |
 | Opens Settings, or waits two seconds while Settings is visible, and after it sent a rebuild or a cancel; nothing: when the target first answers, when it answers again after a silence, and after every complete list | `catalog` |
 | Nothing: after `catalog` showed a storage's catalog of another generation or number of entries than the one the app read, every page of it from offset 0 to its end, one request after the other | `catalog page <storage> <page> <offset>` |
@@ -689,14 +692,17 @@ it is dismissed with `OK` or another takes its place.
 | `read-only` | A rebuild of the catalog of a storage the installation cannot write. | That storage cannot be written now, so its catalog cannot be rebuilt. |
 | `storage-error` | The installation could not read or write its storage. | The installation could not use its storage. |
 | `in-use` | An upload whose id or file name another item took meanwhile. | That name or id is in use on the installation. The list is asked for again; upload again. |
+| `in-use` | `Save` or `Restore default` of the bar for a cycle or a folder of the card. | That is a cycle or a folder, which keeps no repeat. |
 | `no-space` | An upload that does not fit, before it is sent or as the installation judges it. | The animation needs `<size>` KB, and the installation has `<free>` KB free. |
 | `no-space` | An upload to the card that does not fit on it. | The animation needs `<size>` KB, and the card has `<free>` KB free. |
+| `no-space` | `Save` of the bar when the installation keeps no more saved repeats. | The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all. |
 | `no-upload` | The installation dropped the upload: nothing came for a minute. | The installation dropped the upload, after the app was away for a minute or more. Upload again. |
 | `bad-checksum`, `incomplete`, `bad-offset` | Bytes of the upload were lost on the way. | The upload did not arrive whole. Upload again. |
 | `bad-file` | The installation refused the file it checked. | The installation refused the file: `<reason>`. |
 | `mapping-conflict` | A save used an assignment another controller changed. | Mapping changed on the target. Reload before saving. |
 | `order-conflict` | A move used an order that another controller, an upload or the card changed. | The order changed on the installation since the app read it. The list is read again; move the animation again. |
 | `stale` | A text or a clock that was edited was changed or removed by another controller since it was read. | Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one. |
+| `stale` | `Repeat this` of the bar after the animation's turn ended. | That animation's turn had already ended. |
 | any other | The installation refused a command for a reason the app has no sentence for. | The installation refused the command. |
 
 Two more lines are not failures of a command. While the installation does not answer, the
@@ -723,6 +729,17 @@ A removal and an upload that succeeded are said in the same place, without a cod
 `Removed animation <id> <file>.`, `Uploaded as animation <id> <file>. It plays in the
 playlist.`, `Uploaded to the card as animation <id> <file>. It plays in the playlist.` and
 `Saved animation <id> <file>.`
+
+The bar of the animation playing now says the same way what its lines did, from the first
+`status` after the reply: `Animation 1 hello.odrg plays 8 loops this turn; loop 3 is
+playing.`, or `Animation 1 hello.odrg's turn has ended.` once its turn has ended; `Saved:
+animation 1 hello.odrg plays 5 loops every turn.` and `Default restored: animation 1
+hello.odrg plays its own count again.`, each followed by `It plays 8 loops this turn; loop 3
+is playing.` while the turn goes on; a count of one is `1 loop`. A number that is not 1 to
+65,535 is not sent: `A repeat is 1 to 65,535.` Without a reply: `No confirmed reply. The
+turn's count is read again before another change.` for `Repeat this`, and `No confirmed
+reply. The saved repeat is read again before another change.` for `Save` and `Restore
+default`.
 
 ## The phone and the installation's network
 
@@ -975,7 +992,7 @@ By programs, on a Mac:
   `This board` chosen instead, each refusal in words, and no choice for a card it cannot
   write; `Delete` of a card's animation, one with a fault among them, and none on a card
   that cannot be written; the storage lines and the badges of both kinds of card.
-- That the web code sends the thirty-four lines above and no other, and names no address
+- That the web code sends the thirty-eight lines above and no other, and names no address
   but `4.3.2.1`.
 - That a setup and a build write nothing outside the repository's folder, that every
   download has its tracked size and SHA-256, and that the SDK holds the one accepted

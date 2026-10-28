@@ -304,6 +304,14 @@ button[aria-pressed="true"] {
   color: var(--lesser);
 }
 
+#repeat-count {
+  flex: 0 0 auto;
+  width: 5em;
+  margin: 0;
+  padding: 8px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
 .now-words .bar-note {
   margin: 0;
   font-size: 15px;

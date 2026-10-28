@@ -109,6 +109,7 @@ const REFUSALS = {
     line.startsWith("remove many ") ? "Some selected animations cannot be removed: a cycle plays them, or they are on external storage." :
     line.startsWith("ignore ") ? "Only installed animations support playlist inclusion." :
     line.startsWith("order ") ? "A cycle has no place in the order of the playlist." :
+    line.startsWith("repeat ") ? "That is a cycle or a folder, which keeps no repeat." :
     line.startsWith("upload ")
       ? "That name or id is in use on the installation. The list is asked for again; upload again."
       : `Animation ${line.split(" ")[1]} cannot be removed: a cycle plays it, or it is on a USB stick.`,
@@ -118,9 +119,11 @@ const REFUSALS = {
     `Animation ${line.split(" ")[1]} cannot be removed: the card cannot be written now.`,
   "mapping-conflict": () => "Mapping changed on the target. Reload before saving.",
   "order-conflict": () => "The order changed on the installation since the app read it. The list is read again; move the animation again.",
-  stale: () => "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
+  stale: (line) => line.startsWith("repeat ") ? "That animation's turn had already ended." :
+    "Another controller changed this animation since it was opened. Your changes are still here; open it again to see the new one.",
   "storage-error": () => "The installation could not use its storage.",
-  "no-space": (line) => ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
+  "no-space": (line) => line.startsWith("repeat ") ?
+    "The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all." : ofNoSpace(Number(line.split(" ")[4]), null, line.split(" ")[2] === "external" ? "the card" : "the installation").replace(/ \(no-space\)$/, ""),
   "bad-file": (line, reason, refusal) => `The installation refused the file: ${refusal.reason === null ? "it is not a valid animation" : refusal.reason}.`,
   "bad-checksum": NOT_WHOLE,
   incomplete: NOT_WHOLE,
@@ -134,6 +137,30 @@ const REFUSALS = {
 export function ofNoSpace(bytes, free, where = "the installation") {
   const room = free === null ? `more than ${where} has free` : `and ${where} has ${kilobytes(free)} KB free`;
   return `The animation needs ${kilobytes(bytes)} KB, ${room}. (no-space)`;
+}
+
+// What the app says of a repeat that is not 1 to 65,535, and when a line of the bar got no
+// reply: of the turn's count, or of the saved repeat.
+export const REPEAT_RANGE = "A repeat is 1 to 65,535.";
+export const REPEAT_NO_REPLY = "No confirmed reply. The turn's count is read again before another change.";
+export const SAVED_NO_REPLY = "No confirmed reply. The saved repeat is read again before another change.";
+
+function loopsWords(count) {
+  return count === 1 ? "1 loop" : `${count} loops`;
+}
+
+// What the app says after the reply to a line of the bar, from the first status after it:
+// `repeat`, `save` or `default` of an animation, with the loops sent. The turn is said
+// while the status still names the animation and reports its loops. No failure, no code.
+export function ofRepeat(kind, animation, loops, status) {
+  const named = `animation ${animation.id} ${animation.file}`;
+  const turn = status !== null && status.animation === animation.id && status.repeat !== null && status.loop !== null ?
+    `plays ${loopsWords(status.repeat)} this turn; loop ${status.loop} is playing.` : null;
+  if (kind === "repeat") {
+    return turn === null ? `Animation ${animation.id} ${animation.file}'s turn has ended.` : `Animation ${animation.id} ${animation.file} ${turn}`;
+  }
+  const first = kind === "save" ? `Saved: ${named} plays ${loopsWords(loops)} every turn.` : `Default restored: ${named} plays its own count again.`;
+  return turn === null ? first : `${first} It ${turn}`;
 }
 
 // What the app says when an edited animation was saved. It is no failure and has no code.

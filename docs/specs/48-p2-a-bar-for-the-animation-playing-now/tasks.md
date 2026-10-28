@@ -69,7 +69,7 @@ Requirements: [requirements.md](requirements.md). Design: [design.md](design.md)
   - `docs/drifts.md`: the decisions of the spec beyond the seed for the app.
   - Suites: the app's.
 
-- [ ] 6. Repeat this, Save and Restore default
+- [x] 6. Repeat this, Save and Restore default
   - `app/www/screens/show.js` (the second and third lines, the focus rules, the sends and
     the sentences), `app/www/main.js` (`focusout`), `app/www/messages.js`,
     `app/www/style.css`.

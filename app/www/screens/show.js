@@ -32,10 +32,20 @@ let waiting = null;
 let inForce = null;
 // The inclusion changes under way, by id, each with the target it was sent to.
 const pending = new Map();
-// The bar of the animation playing now: the animation it shows, or null while it is hidden;
-// and the key of what it shows, which it is built anew for.
+// The bar of the animation playing now: the animation it shows and what the installation
+// reported of its turn when it was drawn, or null while it is hidden; the key of what it
+// shows, which it is built anew for; its line that is out, "repeat", "save" or "default",
+// or null; when its field last lost the focus; and the sentence that waits for the first
+// status after a reply, as `{count, say}`.
 let bar = null;
 let barKey = "";
+let barOut = null;
+let fieldLeftAt = -Infinity;
+let awaiting = null;
+// How long after its field lost the focus the bar keeps what it showed.
+const FIELD_RESTS_MS = 1000;
+// The loops a repeat may have.
+const MOST_REPEAT = 65535;
 // The row whose menu is open, and the button that opened it.
 let menuFor = null;
 let menuButton = null;
@@ -267,12 +277,15 @@ function barButton(label, named, act) {
 }
 
 // Builds the bar for an animation: on its first line the row menu's actions but `Edit`, or
-// the line that says why it has none; on its second `Edit` when the menu has it.
+// the line that says why it has none; on its second `Edit` when the menu has it, and
+// `Repeat this` with its field while the installation reports `repeat`; on a third, while
+// it reports `saved`, `Save` and `Restore default`.
 function buildBar(place, animation) {
   const first = document.createElement("div");
   first.className = "bar-line";
   const second = document.createElement("div");
   second.className = "bar-line";
+  const lines = [first, second];
   for (const item of barActions(animation)) {
     if (item.note !== undefined) {
       const note = document.createElement("p");
@@ -288,14 +301,111 @@ function buildBar(place, animation) {
     if (item.danger) button.classList.add("danger");
     (item.label === "Edit" ? second : first).append(button);
   }
-  place.replaceChildren(first, second);
+  const named = `${animation.id} ${animation.file}`;
+  if (bar.hasRepeat) {
+    const repeat = barButton("Repeat this", `Repeat ${named} this turn`, () => sendRepeat("repeat"));
+    repeat.id = "repeat-this";
+    const field = document.createElement("input");
+    field.id = "repeat-count";
+    field.type = "text";
+    field.inputMode = "numeric";
+    field.setAttribute("enterkeyhint", "done");
+    field.autocomplete = "off";
+    field.placeholder = "-";
+    field.setAttribute("aria-label", `Loops of ${named} this turn`);
+    field.addEventListener("input", () => {
+      const digits = field.value.replace(/[^0-9]/g, "");
+      if (digits !== field.value) field.value = digits;
+    });
+    field.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") sendRepeat("repeat");
+    });
+    second.append(repeat, field);
+  }
+  if (bar.hasSaved) {
+    const third = document.createElement("div");
+    third.className = "bar-line";
+    const save = barButton("Save", `Save the repeat of ${named} for every turn`, () => sendRepeat("save"));
+    save.id = "repeat-save";
+    const restore = barButton("Restore default", `Restore the default repeat of ${named}`, () => sendRepeat("default"));
+    restore.id = "repeat-default";
+    third.append(save, restore);
+    lines.push(third);
+  }
+  place.replaceChildren(...lines);
+}
+
+// Whether the bar keeps what it shows: while its field has the focus, within a second after
+// it lost it, and while a line of the bar is out.
+function barHeld() {
+  const field = document.getElementById("repeat-count");
+  return bar !== null && (barOut !== null || (field !== null && document.activeElement === field) || performance.now() - fieldLeftAt < FIELD_RESTS_MS);
+}
+
+// The text the field shows for the turn's loops: none while they are not known.
+function loopsText(repeat) {
+  return repeat === null ? "" : String(repeat);
+}
+
+// An element lost the focus: the time is noted when it is the bar's field.
+export function left(element) {
+  if (element instanceof Element && element.id === "repeat-count") {
+    fieldLeftAt = performance.now();
+  }
+}
+
+// Sends a line of the bar for the animation it shows: `repeat <id> <n>` with the field's
+// text, the same with `save`, or `repeat <id> default`. Then the app says what the next
+// status reports, or the refusal, or that no reply came.
+async function sendRepeat(kind) {
+  if (bar === null || barOut !== null || !answers() || selection.locked()) return;
+  const {animation} = bar;
+  const field = byId("repeat-count");
+  let loops = null;
+  if (kind === "default") {
+    field.value = loopsText(bar.repeat);
+  } else {
+    const digits = field.value.replace(/[^0-9]/g, "");
+    loops = Number(digits);
+    if (digits === "" || loops < 1 || loops > MOST_REPEAT) {
+      field.value = loopsText(bar.repeat);
+      message(messages.REPEAT_RANGE);
+      return;
+    }
+  }
+  const version = client.targetVersion();
+  barOut = kind;
+  draw(client.state);
+  try {
+    if (kind === "repeat") await client.repeat(animation.id, loops);
+    else if (kind === "save") await client.repeatSave(animation.id, loops);
+    else await client.repeatDefault(animation.id);
+    if (version !== client.targetVersion()) return;
+    awaiting = {count: client.state.statusCount, say: (status) => messages.ofRepeat(kind, animation, loops, status)};
+  } catch (error) {
+    if (version !== client.targetVersion()) return;
+    if (error instanceof Refusal) message(messages.ofRefusal(error));
+    else message(kind === "repeat" ? messages.REPEAT_NO_REPLY : messages.SAVED_NO_REPLY);
+  } finally {
+    if (version === client.targetVersion()) {
+      barOut = null;
+      // What was typed is sent: the field follows the status once it has not the focus.
+      fieldLeftAt = -Infinity;
+      draw(client.state);
+    }
+  }
 }
 
 // Draws the bar: built anew when what it shows changes, its buttons' states at every draw.
+// While it is held it stays on what it showed, and its field is not rewritten.
 function drawBar(state) {
   const place = byId("now-bar");
-  const animation = barAnimation(state);
-  bar = animation === null ? null : {animation};
+  const held = barHeld();
+  if (!held) {
+    const animation = barAnimation(state);
+    const status = state.status;
+    bar = animation === null ? null : {animation, hasRepeat: status.hasRepeat, hasSaved: status.hasSaved, repeat: status.repeat, saved: status.saved};
+  }
   place.hidden = bar === null;
   if (bar === null) {
     if (barKey !== "") place.replaceChildren();
@@ -303,7 +413,7 @@ function drawBar(state) {
     return;
   }
   const items = barActions(bar.animation);
-  const key = JSON.stringify([bar.animation.id, bar.animation.file, items.map((item) => [item.label, item.note])]);
+  const key = JSON.stringify([bar.animation.id, bar.animation.file, items.map((item) => [item.label, item.note]), bar.hasRepeat, bar.hasSaved]);
   if (key !== barKey) {
     buildBar(place, bar.animation);
     barKey = key;
@@ -311,6 +421,21 @@ function drawBar(state) {
   for (const button of place.querySelectorAll("button[data-label]")) {
     const item = items.find((one) => one.label === button.dataset.label);
     button.disabled = item === undefined || item.disabled === true;
+  }
+  const free = answers() && !selection.locked() && barOut === null;
+  const field = document.getElementById("repeat-count");
+  if (field !== null) {
+    byId("repeat-this").disabled = !free;
+    if (!held && field.value !== loopsText(bar.repeat)) field.value = loopsText(bar.repeat);
+  }
+  if (document.getElementById("repeat-save") !== null) {
+    byId("repeat-save").disabled = !free;
+    byId("repeat-default").disabled = !free || bar.saved === null;
+  }
+  if (awaiting !== null && state.statusCount > awaiting.count) {
+    const said = awaiting.say(state.status);
+    awaiting = null;
+    message(said);
   }
 }
 

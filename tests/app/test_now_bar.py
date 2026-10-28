@@ -1,5 +1,10 @@
 import json
+import pathlib
+import re
+import tempfile
 import unittest
+
+from tests.core import support as core_support
 
 from tests.emulator import support as emulator_support
 
@@ -149,6 +154,129 @@ class ItsActions(unittest.TestCase):
         seen = run(target, acts)
         self.assertEqual(seen["deleting"]["bar"]["lines"], [["Ignore (disabled)", "Select (disabled)", "Delete (disabled)"], []])
         self.assertEqual(seen["after"]["bar"]["lines"], INTERNAL)
+
+
+
+def long_loops(folder):
+    """A show on the two-leg mapping whose two animations loop in 5 seconds: 6 loops of the
+    show's 30 seconds each."""
+    items = [{"id": 1, "file": "hello.odrg"}, {"id": 2, "file": "dvd.odrg"}]
+    files = {"mapping.json": core_support.mapping_texts()["legs-2"], "show.json": json.dumps({"version": 1, "brightness": 128, "items": items}),
+             "hello.odrg": core_support.clip(1, 60, 6, (1000,) * 5), "dvd.odrg": core_support.clip(2, 60, 6, (1000,) * 5)}
+    return emulator_support.installed(pathlib.Path(folder, "show"), files)
+
+
+TURN = re.compile(r"\AAnimation 1 hello\.odrg plays (\d+) loops? this turn; loop (\d+) is playing\.\Z")
+
+
+class RepeatThis(unittest.TestCase):
+    def emulator(self):
+        work = entered(self, tempfile.TemporaryDirectory())
+        folder = long_loops(work)
+        emulator = entered(self, emulator_support.Emulator(folder))
+        return emulator, folder
+
+    def run_on(self, emulator, acts):
+        with emulator_support.EventStream(emulator.port) as stream:
+            seen = support.run("nowbar", address=f"127.0.0.1:{emulator.port}", settings={"rows": 2, "acts": acts}).seen
+            logged = emulator_support.of_kind(stream.read_for(0.5), "log")
+        return seen, [entry["line"] for entry in logged if entry["line"].startswith("repeat")]
+
+    def test_its_button_sends_the_typed_count_and_the_app_says_the_turn(self):
+        emulator, _ = self.emulator()
+        acts = [{"untilBar": "Repeat 1 hello.odrg this turn", "look": "before"}, {"type": "9"}, {"bar": "Repeat 1 hello.odrg this turn"},
+                {"until": "plays 9 loops this turn", "look": "after"}]
+        seen, lines = self.run_on(emulator, acts)
+        self.assertEqual(seen["before"]["bar"]["lines"], [["Ignore", "Select", "Delete"], ["Repeat this", "[6]"], ["Save", "Restore default (disabled)"]])
+        self.assertEqual(seen["before"]["bar"]["named"][3:], ["Repeat 1 hello.odrg this turn", "Loops of 1 hello.odrg this turn", "Save the repeat of 1 hello.odrg for every turn",
+                                                              "Restore the default repeat of 1 hello.odrg"])
+        self.assertEqual(lines, ["repeat 1 9"])
+        self.assertRegex(seen["after"]["message"], TURN)
+        self.assertEqual(seen["after"]["question"], None)
+        self.assertEqual(emulator.status()["repeat"], 9)
+
+    def test_done_sends_it_and_never_saves(self):
+        emulator, folder = self.emulator()
+        seen, lines = self.run_on(emulator, [{"untilBar": "Repeat 1 hello.odrg this turn"}, {"type": "7"}, {"enter": True}, {"until": "plays 7 loops this turn", "look": "after"}])
+        self.assertEqual(lines, ["repeat 1 7"])
+        self.assertTrue(seen["after"]["focused"])
+        self.assertFalse((folder / "repeats.txt").exists())
+
+    def test_save_keeps_the_typed_count_or_the_one_in_force_and_restore_default_brings_the_own_count_back(self):
+        emulator, folder = self.emulator()
+        acts = [{"untilBar": "Save the repeat of 1 hello.odrg for every turn"}, {"bar": "Save the repeat of 1 hello.odrg for every turn"},
+                {"until": "Saved: animation 1 hello.odrg plays 6 loops every turn", "look": "untouched"}, {"type": "4"}, {"leave": True},
+                {"bar": "Save the repeat of 1 hello.odrg for every turn"}, {"until": "Saved: animation 1 hello.odrg plays 4 loops every turn", "wait": 1300, "look": "typed"},
+                {"bar": "Restore the default repeat of 1 hello.odrg"}, {"until": "Default restored", "wait": 1300, "look": "restored"}]
+        seen, lines = self.run_on(emulator, acts)
+        self.assertEqual(lines, ["repeat 1 6 save", "repeat 1 4 save", "repeat 1 default"])
+        self.assertRegex(seen["untouched"]["message"], r"\ASaved: animation 1 hello\.odrg plays 6 loops every turn\. It plays 6 loops this turn; loop \d is playing\.\Z")
+        self.assertEqual((seen["typed"]["bar"]["lines"][2], seen["typed"]["field"]), (["Save", "Restore default"], "4"))
+        self.assertRegex(seen["restored"]["message"], r"\ADefault restored: animation 1 hello\.odrg plays its own count again\. It plays 6 loops this turn; loop \d is playing\.\Z")
+        self.assertEqual((seen["restored"]["bar"]["lines"][2], seen["restored"]["field"]), (["Save", "Restore default (disabled)"], "6"))
+        self.assertEqual((folder / "repeats.txt").read_bytes(), b"odrig-repeats 1\n")
+        self.assertIsNone(seen["restored"]["question"])
+
+    def test_0_65536_and_an_empty_field_send_nothing_and_say_the_range(self):
+        target = Target(self)
+        target.status = status_of(1, repeat=8, loop=3, saved=None)
+        acts = [{"untilBar": "Repeat 1 one.odrg this turn"}]
+        for text in ("0", "65536", ""):
+            acts += [{"type": text}, {"bar": "Repeat 1 one.odrg this turn", "look": f"repeat {text}"}, {"press": "OK"}, {"type": text},
+                     {"bar": "Save the repeat of 1 one.odrg for every turn", "look": f"save {text}"}, {"press": "OK"}, {"type": text}, {"enter": True, "look": f"enter {text}"},
+                     {"press": "OK"}]
+        seen = run(target, acts)
+        self.assertEqual(target.sent(), [])
+        for name, look in seen.items():
+            self.assertEqual((look["message"], look["field"]), ("A repeat is 1 to 65,535.", "8"), name)
+
+    def test_the_field_is_kept_while_it_has_the_focus_and_its_text_is_dropped_a_second_after_it_is_left(self):
+        target = Target(self)
+        target.status = status_of(1, repeat=8, loop=3, saved=None)
+        steps = [lambda: setattr(target, "status", status_of(2, repeat=5, loop=1, saved=None))]
+        acts = [{"untilBar": "Repeat 1 one.odrg this turn"}, {"type": "12"}, {"step": True, "wait": 2500, "look": "focused"}, {"leave": True, "wait": 300, "look": "left"},
+                {"wait": 2200, "look": "later"}]
+        seen = run(target, acts, steps=steps)
+        self.assertEqual((seen["focused"]["field"], seen["focused"]["now"], seen["focused"]["bar"]["named"][0]), ("12", "Now 2 two.odrg", "Ignore 1 one.odrg in playlist"))
+        self.assertEqual((seen["left"]["field"], seen["left"]["bar"]["named"][0]), ("12", "Ignore 1 one.odrg in playlist"))
+        self.assertEqual((seen["later"]["field"], seen["later"]["bar"]["named"][0]), ("5", "Restore 2 two.odrg to playlist"))
+        self.assertEqual(target.sent(), [])
+
+    def test_the_refusals_and_a_missing_reply_are_said(self):
+        cases = ((("repeat", (200, '{"ok":false,"error":"stale"}\n')), "Repeat 1 one.odrg this turn", "That animation's turn had already ended. (stale)"),
+                 (("repeat", (200, '{"ok":false,"error":"no-space"}\n')), "Save the repeat of 1 one.odrg for every turn",
+                  "The installation has no room for another saved repeat: it keeps them for at most 32 files of a card or drive and 512 files in all. (no-space)"),
+                 (("repeat", (200, '{"ok":false,"error":"in-use"}\n')), "Save the repeat of 1 one.odrg for every turn", "That is a cycle or a folder, which keeps no repeat. (in-use)"),
+                 (("repeat", (200, '{"ok":false,"error":"busy"}\n')), "Save the repeat of 1 one.odrg for every turn", "The installation is busy. Try again in a moment. (busy)"),
+                 (("repeat", None), "Save the repeat of 1 one.odrg for every turn", "No confirmed reply. The saved repeat is read again before another change."),
+                 (("repeat", None), "Repeat 1 one.odrg this turn", "No confirmed reply. The turn's count is read again before another change."))
+        for (word, reply), button, said in cases:
+            with self.subTest(button=button, said=said):
+                target = Target(self, **{word: reply})
+                target.status = status_of(1, repeat=8, loop=3, saved=None)
+                seen = run(target, [{"untilBar": button}, {"bar": button}, {"until": re.escape(said[:30]), "ms": 12000, "look": "said"}])
+                self.assertEqual(seen["said"]["message"], said)
+
+    def test_its_buttons_are_disabled_while_a_line_is_out_and_restore_default_while_nothing_is_saved(self):
+        target = Target(self, **{"repeat": lambda line: (support.time.sleep(2), OK)[1]})
+        target.status = status_of(1, repeat=8, loop=3, saved=2)
+        acts = [{"untilBar": "Restore the default repeat of 1 one.odrg", "look": "saved"}, {"bar": "Restore the default repeat of 1 one.odrg", "wait": 300, "look": "out"},
+                {"wait": 3000, "look": "after"}]
+        seen = run(target, acts)
+        self.assertEqual(seen["saved"]["bar"]["lines"][1:], [["Repeat this", "[8]"], ["Save", "Restore default"]])
+        self.assertEqual(seen["out"]["bar"]["lines"][1:], [["Repeat this (disabled)", "[8]"], ["Save (disabled)", "Restore default (disabled)"]])
+        self.assertEqual(seen["after"]["bar"]["lines"][1:], [["Repeat this", "[8]"], ["Save", "Restore default"]])
+        self.assertEqual(target.sent(), ["repeat 1 default"])
+
+    def test_an_installation_without_the_members_gets_neither_line_and_is_sent_none(self):
+        target = Target(self)
+        target.status = status_of(1, repeat=8, loop=3)
+        seen = run(target, [{"untilBar": "Repeat 1 one.odrg this turn", "look": "repeat"}])
+        self.assertEqual(seen["repeat"]["bar"]["lines"], [["Ignore", "Select", "Delete"], ["Repeat this", "[8]"]])
+        target.status = status_of(1)
+        seen = run(target, [{"untilBar": "Select 1 one.odrg", "look": "none"}])
+        self.assertEqual(seen["none"]["bar"]["lines"], INTERNAL)
+        self.assertIsNone(seen["none"]["field"])
 
 
 if __name__ == "__main__":

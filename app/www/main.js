@@ -85,7 +85,11 @@ function typing() {
 
 window.addEventListener("resize", typing);
 document.addEventListener("focusin", typing);
-document.addEventListener("focusout", () => setTimeout(typing, 0));
+document.addEventListener("focusout", (event) => {
+  // The bar of Animations notes when its field lost the focus.
+  animationsScreen.left(event.target);
+  setTimeout(typing, 0);
+});
 typing();
 // The page's history holds one entry of the app, its first screen, or two, with another
 // screen on top. So the back gesture goes from any other screen to the first, and from

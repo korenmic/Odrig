@@ -72,22 +72,24 @@ class TheAppsPage(unittest.TestCase):
             self.assertIn(folder, setup)
         self.assertIn("accepts that one licence and no other", flat(setup))
 
-    def test_the_lines_the_app_sends_are_the_thirty_five_of_its_table(self):
+    def test_the_lines_the_app_sends_are_the_thirty_eight_of_its_table(self):
         table = section(self.text, "What it is")
         lines = [span for row in table.splitlines() if row.startswith("| ") for span in re.findall(r"`([^`]+)`", row.split("|")[2])]
         self.assertEqual(lines, ["status", "list 0", "list <next>", "play <id>", "play all", "on", "off", "brightness <n>", "space", "remove <id>", "ignore <id> <0-or-1>", "remove many <ids>",
                                  "upload begin <id> <file> <bytes>", "upload data <offset> <base64>", "upload end <crc32>", "upload begin external <file> <bytes>", "upload cancel",
                                  "read <id> <offset>", "upload begin <id> <file> <bytes>", "upload expect <crc32>", "mapping get", "mapping set <revision> <pins>",
                                  "mapping cross on", "mapping cross off", "mapping test on",
-                                 "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "fault", "catalog",
+                                 "mapping test off", "mapping test snake <n>", "order get", "order get <next>", "order move <revision> <id> <before>", "repeat <id> <n>",
+                                 "repeat <id> <n> save", "repeat <id> default", "fault", "catalog",
                                  "catalog page <storage> <page> <offset>", "catalog rebuild internal", "catalog rebuild external", "catalog cancel"])
-        self.assertIn("It sends thirty-five command lines and no other", self.said)
+        self.assertIn("It sends thirty-eight command lines and no other", self.said)
 
     def test_every_message_of_the_app_is_on_the_page(self):
         refusals = [["line-too-long", "on", None], ["show-invalid", "play all", "`<reason>`"], ["unknown-id", "play `<id>`", None], ["unknown-id", "play all", None], ["weird", "on", None],
                     ["busy", "remove `<id>`", None], ["in-use", "remove `<id>`", None], ["storage-error", "space", None],
                     ["in-use", "upload begin 1 a.odrg 1", None], ["no-upload", "upload data 0 AA", None], ["bad-offset", "upload data 0 AA", None],
-                    ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None]]
+                    ["read-only", "remove `<id>`", None], ["read-only", "upload begin external a.odrg 1", None], ["read-only", "catalog rebuild external", None],
+                    ["in-use", "repeat 9 5 save", None], ["no-space", "repeat 1 5 save", None], ["stale", "repeat 1 5", None]]
         failures = [["bad-address", ""], ["no-wifi", ""], ["no-answer", "`<address>`"], ["bad-reply", "`<address>`"]]
         found = support.run("texts", settings={"refusals": refusals, "failures": failures}).seen
         messages = section(self.text, "Messages")
@@ -99,8 +101,8 @@ class TheAppsPage(unittest.TestCase):
         self.assertIn("The installed show is invalid: <reason>.", said)
         rows = [row.split("`")[1] for row in messages.splitlines() if row.startswith("| `")]
         self.assertEqual(rows, ["bad-address", "no-wifi", "no-answer", "bad-reply", "line-too-long", "show-invalid", "unknown-id", "unknown-id", "unavailable", "busy", "in-use",
-                                "read-only", "read-only", "read-only", "storage-error", "in-use", "no-space", "no-space", "no-upload", "bad-checksum", "bad-file",
-                                "mapping-conflict", "order-conflict", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
+                                "read-only", "read-only", "read-only", "storage-error", "in-use", "in-use", "no-space", "no-space", "no-space", "no-upload", "bad-checksum",
+                                "bad-file", "mapping-conflict", "order-conflict", "stale", "stale", "unsupported-character", "does-not-fit", "no-canvas", "no-gif-decoder", "unreadable-media", "bad-part", "bad-range"])
         self.assertIn("`Removed animation <id> <file>.`", said)
         self.assertIn("`Uploaded as animation <id> <file>. It plays in the playlist.`", said)
         self.assertIn("`Uploaded to the card as animation <id> <file>. It plays in the playlist.`", said)
