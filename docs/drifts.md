@@ -11350,3 +11350,25 @@ lights do not.
 
 **Resolution.** The collection's `clocks/source/inventory.json`; the script of the
 displays in `clocks/source/tools/helpers-displays/`.
+
+## Seed 52: the motions of the inventory
+
+**Question.** For each of the 34 tiles that show no time: its motion, of the kinds the seed
+names, and how far its picture may be changed to make the motion read.
+
+**Answer.** Hourglasses (4, 5, 6, 74, 79, 87, 88) and water clocks (7, 8, 9) are levels:
+the upper sand or water falls while the lower rises, and in the second half of the loop
+the sand goes back up, which is the installation's "this is not the time" and loops
+without a jump; a falling stream is a flicker of three variants that moves down a pixel a
+step. Flames, smoke, the lava lamp, the bulb, the waves of the mast, the satellite and the
+tuning fork, the calendars, the moon displays, the drum machine, the music box, the atom's
+electrons and the zen garden's rings are flickers or slow pulses of palette colours. The
+metronome 71 swings and the egg timer 69 rocks; the gears 92, the water wheel 93 and the
+spinner 80 turn. Where the reduced picture of a moving part was too ragged to turn
+cleanly, the part was drawn again in its own colours about one centre (the metronome's
+arm, the spinner's dots, the gears, the water wheel, the zen garden's rings, the window's
+hourglass 88); every other tile keeps its picture but for a few stray pixels. Every motion
+runs 12 to 16 seconds, its frames 50 ms apart, the spinner's 150 ms, one dot a frame.
+
+**Resolution.** The collection's `clocks/source/inventory.json`; the script of each tile in
+`clocks/source/tools/helpers-motions/`.

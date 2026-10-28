@@ -122,7 +122,7 @@ Rules for every task:
   - `docs/drifts.md`: the tiles with several fields, the fonts chosen.
   - Requirements: 7.1, 8.2, 8.3
 
-- [ ] 8. The inventory: the motions
+- [x] 8. The inventory: the motions
   - For each tile that shows no time: its motion, its parts and their boxes; a sheet of
     each at four times, looked at.
   - `docs/drifts.md`: the motion of each tile.
