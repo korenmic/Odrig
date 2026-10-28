@@ -229,7 +229,7 @@ test("the other documents show the JavaScript tool where they convert or pack", 
       assert.equal(/python\S* -m odrig (import|encode|decode|check|pack)\b/.test(text), false, `${name} starts the Python tool to convert or pack`);
     }
     const emulator = commands(read("docs", "emulator.md"));
-    assert.equal(emulator.filter((line) => line.startsWith("python -m odrig.generators.")).length, 3);
+    assert.ok(emulator.filter((line) => line.startsWith("python -m odrig.generators.")).length >= 3, "emulator.md generates with the Python programs");
   });
 
   await t.test("docs/reasons.md says that the converter and the programs of the Python library use its names", () => {

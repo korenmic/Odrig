@@ -1,7 +1,10 @@
-"""WLED's source in the work folder: fetched at the pinned tag, checked, and patched."""
+"""WLED's source: fetched at the pinned tag into the shared toolchains, copied into the
+checkout's work folder, checked, and patched there."""
 
 import pathlib
+import shutil
 import subprocess
+import sys
 
 from . import Failure, env, paths
 
@@ -18,7 +21,7 @@ def _git(folder, *arguments):
     return subprocess.run(["git", "-C", str(folder), *arguments], capture_output=True, text=True, env=env.child())
 
 
-def fetch(folder=paths.WLED, url=URL, tag=TAG):
+def fetch(folder=paths.WLED_SOURCE, url=URL, tag=TAG):
     """Clones WLED at the tag into the folder, unless the folder is there already."""
     folder = paths.output(folder)
     if folder.exists():
@@ -27,6 +30,36 @@ def fetch(folder=paths.WLED, url=URL, tag=TAG):
     done = subprocess.run(["git", "clone", "--depth", "1", "--branch", tag, url, str(folder)], capture_output=True, text=True, env=env.child())
     if done.returncode != 0:
         raise Failure("setup-failed", f"git clone of {url} at {tag} failed: {done.stderr.strip()[-300:]}")
+    return True
+
+
+def copy_command(source, folder, platform=sys.platform):
+    """The command that copies a folder whole, sharing the blocks of its files where the file
+    system can: a clone on macOS, a reflink on Linux. None where there is no such command."""
+    if platform == "darwin":
+        return ["cp", "-c", "-R", str(source), str(folder)]
+    if platform.startswith("linux"):
+        return ["cp", "--reflink=auto", "-R", str(source), str(folder)]
+    return None
+
+
+def copy(source=paths.WLED_SOURCE, folder=paths.WLED):
+    """Gives the checkout its own copy of WLED's source, with its git folder and whatever the
+    source holds besides, unless the copy is there already or is the source itself."""
+    folder = paths.output(folder)
+    if folder.exists() or pathlib.Path(source).resolve() == folder.resolve():
+        return False
+    folder.parent.mkdir(parents=True, exist_ok=True)
+    partial = folder.with_name(folder.name + ".partial")
+    shutil.rmtree(partial, ignore_errors=True)
+    command = copy_command(source, partial)
+    if command is None:
+        shutil.copytree(source, partial, symlinks=True)
+    else:
+        done = subprocess.run(command, capture_output=True, text=True)
+        if done.returncode != 0:
+            raise Failure("setup-failed", f"copying {source} into {partial} failed: {done.stderr.strip()[-300:]}")
+    partial.rename(folder)
     return True
 
 

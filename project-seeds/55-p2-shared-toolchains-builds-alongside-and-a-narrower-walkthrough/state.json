@@ -1,7 +1,8 @@
 {
   "number": 55,
   "slug": "55-p2-shared-toolchains-builds-alongside-and-a-narrower-walkthrough",
-  "state": "remaining",
+  "state": "completed",
+  "completedAt": "2026-10-28T23:17:28+02:00",
   "title": "Shared toolchains, builds alongside, and a narrower walkthrough",
   "priority": "P2",
   "addedAt": "2026-10-28T18:00:00+02:00",

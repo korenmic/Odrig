@@ -100,6 +100,7 @@ def _setup(arguments):
     for step in done:
         print(step)
     print(f"work folder: {paths.WORK}")
+    print(f"toolchains: {paths.SHARED}")
     for name, version in versions.items():
         print(f"{name}: {version}")
     return 0

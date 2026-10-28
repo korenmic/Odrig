@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import pathlib
@@ -236,6 +237,85 @@ class Sweeping(unittest.TestCase):
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         run.end([child.pid])
         self.assertIsNotNone(child.wait(timeout=5))
+
+
+MAKES = """
+import pathlib, sys, time
+time.sleep(0.3)
+if sys.argv[1] == "fail":
+    print("the stand-in toolchain is missing")
+    sys.exit(4)
+pathlib.Path("out").mkdir(exist_ok=True)
+pathlib.Path("out", sys.argv[1]).write_bytes(b"built")
+"""
+
+CHECKS = """
+import pathlib
+import unittest
+
+
+class Built(unittest.TestCase):
+    def test_the_build_is_there(self):
+        self.assertEqual(pathlib.Path("out/thing.bin").read_bytes(), b"built")
+"""
+
+WITH_BUILDS = (
+    run.Suite("beta", "tests/beta"),
+    run.Suite("checks", "tests/checks", only="builds"),
+)
+
+
+def stand_in_builds(made):
+    return (
+        run.Build("thing", ["makes.py", made], f"out/{made}", then="checks"),
+        run.Build("other", ["makes.py", "other.bin"], "out/other.bin"),
+    )
+
+
+class Builds(unittest.TestCase):
+    def root(self):
+        root = standin_root(self, {"tests/beta/test_whole.py": ONE, "tests/checks/test_built.py": CHECKS})
+        (root / "makes.py").write_text(MAKES)
+        return root
+
+    def test_with_builds_both_are_built_beside_the_suites_and_the_waiting_suite_runs_after(self):
+        root = self.root()
+        out = io.StringIO()
+        status = run.main(["--builds", "--workers", "4"], root=root, suites=WITH_BUILDS, out=out, builds=stand_in_builds("thing.bin"))
+        printed = out.getvalue()
+        self.assertEqual(status, 0, printed)
+        self.assertRegex(printed, r"(?m)^thing: 5 bytes, \d+ s, SHA-256 [0-9a-f]{8}\.\.\.$")
+        self.assertRegex(printed, r"(?m)^other: 5 bytes, \d+ s, SHA-256 [0-9a-f]{8}\.\.\.$")
+        self.assertLess(printed.index("thing: 5 bytes"), printed.index("checks: 1 tests"))
+        self.assertIn("beta: 1 tests", printed)
+        report = json.loads((root / "build" / "tests" / "report.json").read_text())
+        self.assertEqual(report["builds"]["thing"]["bytes"], 5)
+        self.assertEqual(report["builds"]["thing"]["sha256"], hashlib.sha256(b"built").hexdigest())
+
+    def test_a_build_that_fails_says_why_fails_the_run_and_its_suite_is_not_run(self):
+        root = self.root()
+        out = io.StringIO()
+        status = run.main(["--builds"], root=root, suites=WITH_BUILDS, out=out, builds=stand_in_builds("fail"))
+        printed = out.getvalue()
+        self.assertEqual(status, 1, printed)
+        self.assertIn("thing: FAILED with status 4", printed)
+        self.assertIn("the stand-in toolchain is missing", printed)
+        self.assertIn("checks: not run: thing was not built", printed)
+        self.assertRegex(printed, r"(?m)^other: 5 bytes")
+
+    def test_without_builds_nothing_is_built(self):
+        root = self.root()
+        out = io.StringIO()
+        status = run.main([], root=root, suites=WITH_BUILDS, out=out, builds=stand_in_builds("thing.bin"))
+        self.assertEqual(status, 0, out.getvalue())
+        self.assertFalse((root / "out").exists())
+        self.assertNotIn("checks:", out.getvalue())
+
+    def test_the_real_builds_are_the_tools_own_commands(self):
+        self.assertEqual([(build.name, build.command, build.output, build.then) for build in run.BUILDS], [
+            ("apk", ["app/app.py", "build"], "build/app/odrig-debug.apk", "apk"),
+            ("firmware", ["firmware/fw.py", "build"], "build/firmware/out/odrig-firmware.bin", None),
+        ])
 
 
 class Splitting(unittest.TestCase):

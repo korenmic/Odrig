@@ -2,9 +2,11 @@ import collections
 import pathlib
 import re
 import tempfile
+import time
 import unittest
 
 from emulator import recfile
+from tests import run as runner
 from tests.onboarding import support as pages
 
 from . import support
@@ -38,15 +40,22 @@ GUIDE = Followed(
 )
 PLAN = (START, GUIDE)
 
-# The suites the getting-started page runs after the setup. The suite of the converter is
-# run by npm and ends with counts; each of the others ends with the line OK.
+# The suites the getting-started page runs after the setup. The copy's runner runs them, all
+# at once, rather than their commands one after another; each has its line, which ends with
+# OK when it passed, naming the tests that were left out, as the emulator's suite does for
+# those of the other system.
+TESTS = "Run the tests"
 SUITES = 5
-CONVERTER_SUITE = "npm test --prefix converter"
-NONE_FAILED = re.compile(r"(?m)^\S+ fail 0$")
-SOME_PASSED = re.compile(r"(?m)^\S+ pass [1-9][0-9]*$")
-# The last line of a suite of Python that passed. It names the tests that were left out,
-# which the emulator's suite does for those of the other system.
-PASSED = re.compile(r"\AOK( \(skipped=[0-9]+\))?\Z")
+
+
+def is_the_runner(command):
+    """Whether a command of the page is the runner's, which the walk-through runs itself for
+    the page's suites."""
+    return command.split()[1:2] == ["tests/run.py"]
+
+
+def passed(suite):
+    return re.compile(rf"(?m)^{re.escape(suite)}: [1-9][0-9]* tests, [0-9]+ s, OK( \(skipped=[0-9]+\))?$")
 
 # What the setup of the page leaves in the copy: the Python of the environment, the two
 # packages of the converter with the decoder program, and the core's library.
@@ -89,6 +98,26 @@ class Plan(unittest.TestCase):
         self.assertEqual(len(imports), 1)
         self.assertIn(f" import {CLIP} ", imports[0])
 
+    def test_every_suite_the_page_runs_is_one_of_the_runner(self):
+        commands = [command for heading, command in pages.page_commands(pages.read(START.page)) if heading == TESTS and not is_the_runner(command)]
+        self.assertEqual(len(commands), SUITES)
+        names = [support.runner_suite(command, runner.SUITES) for command in commands]
+        self.assertNotIn(None, names, commands)
+        self.assertEqual(len(set(names)), SUITES)
+
+
+class Commands(unittest.TestCase):
+    def test_a_command_s_children_end_with_it_and_npm_prefers_the_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            done = support.run("sleep 60 >/dev/null 2>&1 & echo $!; echo $npm_config_prefer_offline", folder)
+        self.assertEqual(done.status, 0, done.output)
+        child, offline = done.output.split()
+        deadline = time.monotonic() + 5
+        while runner.alive(int(child)) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertFalse(runner.alive(int(child)))
+        self.assertEqual(offline, "true")
+
 
 class FreshCopy(unittest.TestCase):
     def setUp(self):
@@ -104,14 +133,28 @@ class FreshCopy(unittest.TestCase):
 
     def follow(self, plan):
         """Runs the commands under the followed headings of a page, in the page's order, from
-        the root of the copy. Returns what each command printed, by heading."""
+        the root of the copy. Returns what each command printed, by heading. The commands of
+        the suites are run together, by the copy's runner, once the heading's commands are
+        read; each of them gets the runner's output."""
         path = self.copy / plan.page
         self.assertTrue(path.is_file(), f"{plan.page} is not in the fresh copy: a new file has to be staged before the walk-through sees it")
         printed = collections.defaultdict(list)
-        for heading, command in pages.page_commands(path.read_text(encoding="utf-8")):
-            if heading in plan.followed:
+        commands = [(heading, command) for heading, command in pages.page_commands(path.read_text(encoding="utf-8")) if heading in plan.followed]
+        for index, (heading, command) in enumerate(commands):
+            if heading != TESTS:
                 printed[heading].append((command, self.run_in_the_copy(command, f"{plan.page}, under \"{heading}\"")))
+            elif index + 1 == len(commands) or commands[index + 1][0] != TESTS:
+                printed[heading] = self.run_the_suites([each for under, each in commands if under == TESTS], plan.page)
         return printed
+
+    def run_the_suites(self, commands, page):
+        self.assertEqual(sum(map(is_the_runner, commands)), 1, f"{page} gives the runner's command once under \"{TESTS}\"")
+        commands = [command for command in commands if not is_the_runner(command)]
+        names = [support.runner_suite(command, runner.SUITES) for command in commands]
+        for command, name in zip(commands, names):
+            self.assertIsNotNone(name, f"{page}: the command\n    {command}\nis not one of a suite the runner knows")
+        output = self.run_in_the_copy(f".venv/bin/python tests/run.py --suites {','.join(names)}", f"{page}, under \"{TESTS}\", by the runner")
+        return [(command, output) for command in commands]
 
     def shown(self, plan, heading):
         """The blocks of a page, under a heading, that show what a command prints."""
@@ -132,15 +175,10 @@ class FreshCopy(unittest.TestCase):
         for installed in INSTALLED:
             self.assertTrue((self.copy / installed).exists(), installed)
 
-        suites = started["Run the tests"]
+        suites = started[TESTS]
         self.assertEqual(len(suites), SUITES)
-        self.assertEqual([command for command, _ in suites].count(CONVERTER_SUITE), 1)
         for command, output in suites:
-            if command == CONVERTER_SUITE:
-                self.assertRegex(output, NONE_FAILED, command)
-                self.assertRegex(output, SOME_PASSED, command)
-            else:
-                self.assertRegex(output.strip().splitlines()[-1], PASSED, command)
+            self.assertRegex(output, passed(support.runner_suite(command, runner.SUITES)), command)
 
         show = self.copy / DEMO_SHOW
         self.assertEqual(sorted(path.name for path in show.iterdir()), sorted(DEMO_FILES))

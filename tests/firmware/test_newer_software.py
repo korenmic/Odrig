@@ -25,7 +25,7 @@ def environments():
 
 class TheFolder(unittest.TestCase):
     def test_the_newer_software_has_a_folder_of_its_own_inside_the_work_folder(self):
-        self.assertEqual(paths.NEWER, paths.WORK / "newer")
+        self.assertEqual(paths.NEWER, paths.SHARED / "newer")
         for folder in (paths.NEWER_VENV, paths.NEWER_PYTHON, paths.NEWER_PIO_CORE, paths.NEWER_PIO_CACHE):
             self.assertTrue(folder.is_absolute(), folder)
             self.assertIn(paths.NEWER, folder.parents, folder)

@@ -135,9 +135,8 @@ contributor works in a clone of their own, and the work meets on `master` of the
    see that `git branch --show-current` names your branch.
 3. **Before you merge, bring your branch up to date**: `git fetch origin`, then
    `git merge origin/master` on your branch.
-4. **Run every suite that works on your computer** on the up-to-date branch. A branch is
-   merged only when all of them pass. Without a board that is every suite that needs no
-   board; on Windows it is the suites that run there.
+4. **Run every suite that works on your computer** on the up-to-date branch, at once by `.venv/bin/python tests/run.py`, with `--walkthrough` when `agent/getting-started.md` or `agent/animation-guide.md` changed.
+   A branch is merged only when all of them pass. Without a board that is every suite that needs no board; on Windows it is the suites that run there.
 5. **Then merge into `master` and push**: `git switch master`,
    `git merge --ff-only origin/master`, `git merge <your-branch>` and
    `git push origin master`. If the push is refused because `master` has moved on, go
@@ -184,6 +183,7 @@ one-line command for the emulator that it gives the owner; it never types it fro
 - **C++.** Write what GCC, Clang and MSVC take with warnings as errors, an attribute through a macro for each; never `__attribute__` alone, a signed and unsigned comparison, or a variable read on a path that did not set it.
 - **Ports and load.** Bind to port 0 and bound the sockets and processes run at once; never SO_REUSEADDR on Windows, where a second server takes a port in use, nor as many sockets as macOS takes (WinError 10055).
 - **Processes.** Start a program without a window and end it by what each system offers, a job object on Windows; never `chrome --version` as it is, which opens a window there, nor `os.kill(pid, 0)`, which ends the process.
+- **What you start, you end.** A test or a tool ends every process it starts, when it is done and when it is stopped: by its process group, a job object on Windows, and `--parent` for an emulator; its children keep the runner's `ODRIG_RUN` in their environment, by which the runner ends what is left.
 - **Time.** Measure from the moment the program reports, such as the hello's `t0`; never take a first refresh or tick to come at 0 ms.
 
 ## The owner's workflow skills

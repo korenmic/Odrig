@@ -33,6 +33,7 @@ git clone https://github.com/korenmic/Odrig.git
 cd Odrig
 python -m venv .venv
 npm ci --prefix converter
+.venv\Scripts\python tests/run.py
 npm test --prefix converter
 .venv\Scripts\python core/build.py shared
 .venv\Scripts\python -m unittest discover -s tests/converter -t .
@@ -72,6 +73,7 @@ the others write it as `python`. With the collection of animations at hand, copy
 ## Run the tests
 
 ```sh
+.venv/bin/python tests/run.py
 npm test --prefix converter
 .venv/bin/python -m unittest discover -s tests/converter -t .
 make -C core test
@@ -79,18 +81,16 @@ make -C core test
 .venv/bin/python -m unittest discover -s tests/onboarding -t .
 ```
 
-The first ends with a list of counts, in which `fail 0` says that every test passed. Each
-of the others ends with the line `OK`. The emulator's suite leaves out the tests that are
-for the other system and says how many, as in `OK (skipped=9)`. None needs the board or
-the network.
+The first, the runner, runs at once every suite that works on this computer, these and those of the next heading, and prints a line for each, as `core: 951 tests, 82 s, OK`, then the slowest tests; `--suites core,app` picks some. Each of the others runs one suite alone. The second ends with a list of counts, in which `fail 0` says that every test passed. Each of the others ends with the line `OK`. The emulator's suite leaves out the tests that are for the other system and says how many, as in `OK (skipped=9)`. None needs the board or the network.
 
-| Suite | What it checks | Takes about |
-|---|---|---|
-| `converter/tests` | The converter: its results against the stored answers of the Python package, which converted before it, and its library in Chrome. Without Chrome that one test is skipped. | 25 seconds |
-| `tests/converter` | The Python library and the generators, and every tracked document against the tools. | 20 seconds |
-| `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 40 seconds |
-| `tests/emulator` | The emulator and the command tool. | 2 minutes |
-| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real; and the collection in git. | 3 seconds |
+| Suite | What it checks | Alone | In the runner |
+|---|---|---|---|
+| `converter/tests` | The converter: its results against the stored answers of the Python package, which converted before it, and its library in Chrome. Without Chrome that one test is skipped. | 10 seconds | 10 seconds |
+| `tests/converter` | The Python library and the generators, and every tracked document against the tools. | 30 seconds | 11 seconds |
+| `tests/core` | The core. `make -C core test` builds it first, with the compiler's checks for memory faults switched on, and uses `python3`. | 6 minutes | 1.5 minutes |
+| `tests/emulator` | The emulator and the command tool. | 7 minutes | 1 minute |
+| `tests/onboarding` | This page and the other pages for newcomers: that every path, link and command in them is real; and the collection in git. | 2 seconds | 3 seconds |
+| Every suite | The runner, `tests/run.py`, with those of the next heading; `--builds` adds the APK and the firmware. | 29 minutes | 7 minutes |
 
 ## Suites that need more
 
@@ -107,8 +107,8 @@ run fetches WLED's source and build tools, about 260 MB, into `build/firmware/`.
 `tests/app`, runs the web code of the operators' app, `app/www/`, in Chrome without a window
 against the emulator; the third, `tests/apk`, checks the app's package once it was built. The
 last, `tests/walkthrough`, follows this page and the animation guide in a fresh copy, over the
-network, and runs the five suites above: seven minutes. Run it when either page changed.
-`tests/mapping` checks pin assignments and the diagonal, with the core test host built. `.venv/bin/python tests/run.py` runs every suite at once, in about seven minutes, and prints the slowest tests; `tests/runner`, run by `.venv/bin/python -m unittest discover -s tests/runner -t .`, checks it.
+network, and runs the five suites above through its runner: six minutes. Run it, or `tests/run.py --walkthrough`, when either page changed.
+`tests/mapping` checks pin assignments and the diagonal, with the core test host built; `tests/runner`, run by `.venv/bin/python -m unittest discover -s tests/runner -t .`, checks the runner. `tests/app` takes 15 minutes alone and 4 in the runner. To share the toolchains of the APK and the firmware among checkouts, set the environment variable `ODRIG_TOOLS` to the full path of a folder of its own, outside the checkout; [firmware.md](../docs/firmware.md#the-work-folder) says what goes there.
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
 `tests/air`. Before either, read "If you have a board" in
@@ -181,7 +181,7 @@ printf '1000 status\n' > build/demo-20/ask.txt
 ```
 
 ```text
-reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null,"repeat":6,"loop":1,"saved":null,"left":86399}
+reply 1000 {"ok":true,"on":true,"brightness":128,"playing":"all","animation":1,"fps":50,"error":null,"width":60,"height":60,"readiness":"ready","checked":2,"to_check":0,"unavailable":0,"checking":null,"host":"odrig emulator on Darwin arm64","seed":null,"repeat":6,"loop":1,"saved":null,"file":"hello.odrg","playlist":null,"clocks":false,"clock_message":false,"left":86399}
 ```
 
 `"error":null` says the show is valid, `"playing":"all"` that the playlist is playing,

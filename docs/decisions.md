@@ -849,3 +849,11 @@ are in [format.md](format.md), "Measured sizes".
   twelve time animations of the owner's ideas are 112 files of 60 x 60 and at most 8
   colours in `collection/card/clocks/`, their sources beside the seed. The core's memory,
   the command list and every reply are unchanged. The owner's look at the LEDs is open.
+- 2026-10-28: Seeds 53 and 55, the owner's orders of 2026-10-28: every suite runs at once
+  by `tests/run.py`, split across worker processes by the previous run's times, and a merge
+  is preceded by it, with `--walkthrough` when a page for newcomers changed; every test and
+  tool ends what it starts, and the runner ends what is left of its run. The toolchains of
+  the APK and the firmware may be shared among checkouts in the folder `ODRIG_TOOLS`, with
+  a lock for their setup; each checkout keeps its own WLED copy and outputs. `--builds`
+  builds the APK and the firmware beside the suites. Nothing is flashed, uploaded or
+  installed by a test run.

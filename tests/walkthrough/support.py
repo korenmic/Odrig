@@ -4,6 +4,7 @@ import collections
 import contextlib
 import os
 import pathlib
+import re
 import shutil
 import signal
 import subprocess
@@ -62,14 +63,30 @@ def fresh_copy(target):
 
 
 def environment():
-    """The caller's environment without what would lead a command to another Python."""
-    return {name: value for name, value in os.environ.items() if name not in NOT_PASSED_ON}
+    """The caller's environment without what would lead a command to another Python, with
+    npm told to install from the computer's cache before it goes to the network."""
+    kept = {name: value for name, value in os.environ.items() if name not in NOT_PASSED_ON}
+    kept["npm_config_prefer_offline"] = "true"
+    return kept
+
+
+def runner_suite(command, suites):
+    """The name of the runner's suite that a page's command of a suite runs, or None."""
+    if command == "npm test --prefix converter":
+        folder = "converter/tests"
+    elif command == "make -C core test":
+        folder = "tests/core"
+    else:
+        found = re.search(r"-m unittest discover -s (\S+) -t \.$", command)
+        folder = found and found.group(1)
+    return next((suite.name for suite in suites if suite.folder == folder), None)
 
 
 def run(command, folder):
     """Runs one command of a page from a folder, as a shell runs it, and returns its status
-    and everything it printed. The command gets a process group of its own; when it takes
-    longer than the limit, or the caller is interrupted, that group is ended."""
+    and everything it printed. The command gets a process group of its own, which is ended
+    once the command is: nothing it started outlives it, also when it takes longer than the
+    limit or the caller is interrupted."""
     process = subprocess.Popen(
         ["/bin/sh", "-c", command], cwd=folder, env=environment(), text=True,
         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
@@ -77,10 +94,16 @@ def run(command, folder):
     try:
         output, _ = process.communicate(timeout=TIME_LIMIT)
     except BaseException as stopped:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGTERM)
+        end_group(process.pid)
         output, _ = process.communicate()
         if not isinstance(stopped, subprocess.TimeoutExpired):
             raise
         return Done(None, f"{output}\n(ended by the test after {TIME_LIMIT} seconds)")
+    end_group(process.pid)
     return Done(process.returncode, output)
+
+
+def end_group(group):
+    """Ends what is left of a process group."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(group, signal.SIGTERM)
