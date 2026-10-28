@@ -782,3 +782,6 @@ are in [format.md](format.md), "Measured sizes".
   through the seed by ordering it built as written. A turn plays the count `repeat` gave it,
   else the saved repeat, else the show's own count; neither of the first two is cut by
   `max_seconds`. The firmware tool keeps the board's `repeats.txt` as it keeps `order.txt`.
+- 2026-10-28: The owner's ruling: GIFs may be tracked beside a seed, in its folder, as its
+  references, besides the previews of `thumbnails/`; MP4 and MOV files are tracked nowhere.
+  Seed 52's two text files of references end their lines with a line feed alone.

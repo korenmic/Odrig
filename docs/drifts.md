@@ -11044,3 +11044,20 @@ waits 41 round trips less for its first preview, and a second start sends 44 or 
 requests fewer; the seconds wait for the owner's session.
 
 **Resolution.** docs/specs/49-p1-previews-at-once/tasks.md, task 5.
+
+## The owner's ruling of 2026-10-28: GIFs beside a seed, and line ends
+
+**Question.** Seed 52 tracks twelve GIFs of reference in its folder, and two text files of
+its references end their lines with a carriage return and a line feed. The converter's
+test let no GIF be tracked but the previews of `thumbnails/`, and the emulator's test lets
+no tracked text file hold a carriage return, so both failed on `master`.
+
+**Answer.** The owner's words of 2026-10-28: "gifs are acceptable alongside seeds", and the
+conversion of the text files from Windows line ends to Unix ones is accepted. A GIF may be
+tracked anywhere inside a seed's folder, `project-seeds/NN-.../`, besides the previews of
+`thumbnails/`; MP4 and MOV files are still tracked nowhere. The two text files,
+`references/conversation.txt` and `references/standalone/standalone-script.js`, end their
+lines with a line feed alone now, and hold no other change.
+
+**Resolution.** converter/tests/library.test.js; the two files of
+project-seeds/52-p2-a-hundred-picture-clocks/references/; docs/decisions.md.
