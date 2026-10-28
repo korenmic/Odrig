@@ -454,11 +454,19 @@ def test(toolchain):
     return subprocess.run(command, cwd=ROOT).returncode
 
 
+def host(toolchain):
+    """Builds the static library and the test host, and runs nothing: what `tests/run.py`
+    builds once before the suite's workers start."""
+    build_static(toolchain)
+    build_host(toolchain)
+    return 0
+
+
 def clean():
     shutil.rmtree(BUILD, ignore_errors=True)
 
 
-TARGETS = {"shared": build_shared, "test": test}
+TARGETS = {"shared": build_shared, "test": test, "host": host}
 
 
 def parser():
@@ -466,7 +474,7 @@ def parser():
         prog="python core/build.py",
         description="Builds the core without GNU Make: the static library, or what the word names.",
     )
-    made.add_argument("target", metavar="TARGET", nargs="?", choices=sorted([*TARGETS, "clean"]), help="shared: the shared library the emulator loads; test: the test host, and the suite of tests/core; clean: removes core/build/")
+    made.add_argument("target", metavar="TARGET", nargs="?", choices=sorted([*TARGETS, "clean"]), help="shared: the shared library the emulator loads; test: the test host, and the suite of tests/core; host: the test host alone; clean: removes core/build/")
     made.add_argument("--cxx", metavar="PROGRAM", help="the C++ compiler: g++, clang++ or cl, by name or by path")
     return made
 

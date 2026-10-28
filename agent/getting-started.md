@@ -108,7 +108,7 @@ run fetches WLED's source and build tools, about 260 MB, into `build/firmware/`.
 against the emulator; the third, `tests/apk`, checks the app's package once it was built. The
 last, `tests/walkthrough`, follows this page and the animation guide in a fresh copy, over the
 network, and runs the five suites above: seven minutes. Run it when either page changed.
-`tests/mapping` checks pin assignments and the diagonal, with the core test host built.
+`tests/mapping` checks pin assignments and the diagonal, with the core test host built. `tests/runner`, run by `.venv/bin/python -m unittest discover -s tests/runner -t .`, checks `tests/run.py`.
 Two more suites need the board on USB and write to it: `python3 firmware/fw.py test-board`
 runs `tests/board`, and `python3 firmware/fw.py test-air --http <address>` runs
 `tests/air`. Before either, read "If you have a board" in

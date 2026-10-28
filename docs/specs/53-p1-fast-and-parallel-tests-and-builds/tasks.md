@@ -2,7 +2,7 @@
 
 Requirements: [requirements.md](requirements.md). Design: [design.md](design.md).
 
-- [ ] 1. The runner and its suite. `tests/run.py` and `tests/runner_worker.py`: the
+- [x] 1. The runner and its suite. `tests/run.py` and `tests/runner_worker.py`: the
       suites' table, discovery of modules, workers, the greedy fill from the report,
       `--suites`, `--serial`, `--workers`, `--slowest`, the lines, the failures, the
       report `build/tests/report.json`, the exit status; the core built once first with
