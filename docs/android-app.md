@@ -23,7 +23,7 @@ a top bar with the app's name and whether the installation answers.
   slider for it under them: the field and the slider follow each other both ways. The
   panel shows no line of what plays, such as `Playlist` or `Cycle 3`, and no words `On`
   and `Off`. Under the name of the animation on the LEDs stands its bar while a
-  playlist turn plays it, the root's or a folder's, and the list holds it: its row menu's
+  playlist turn plays it, the root's or a folder's, and the level shown holds it: its row menu's
   actions but the moves, in short words, `Ignore` or `Restore`, `Select`, `Delete` and,
   for a text or a clock, `Edit`, or a line that says why it has none; `Repeat this` with a
   field that holds the loops of the turn in progress; and `Save` and `Restore default`,
@@ -314,9 +314,9 @@ Store. It asks for no permission that the phone shows a question for.
    stands. A number above 255 is not sent, and the line under the slider says `The
    brightness is 0 to 255.`; an emptied field sends nothing and shows the brightness again.
 4. The bar under the name of the animation on the LEDs acts on that animation as its row's
-   menu does, whichever folder the list shows: `Ignore` ends its turn at once, `Delete`
-   asks first, `Select` shows the selection with its row ticked, at the root and with the
-   filters showing it. Its field shows how many loops the turn in progress plays; type
+   menu does, on the level that holds it: `Ignore` ends its turn at once, `Delete`
+   asks first, `Select` shows the selection with its row ticked, with the filters showing
+   it. Its field shows how many loops the turn in progress plays; type
    another number and press `Repeat this`, or Done, and the turn plays that many loops from
    its first frame, or ends with the loop in progress when that is already the last, for
    this turn alone; the app then says how many loops it plays and which is playing. `Save`

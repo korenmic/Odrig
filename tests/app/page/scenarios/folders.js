@@ -21,8 +21,10 @@ async function drag(app, id, toY, back = false) {
   const y = box.top + box.height / 2;
   pointer(app, "pointerdown", play, x, y);
   await app.sleep(600);
-  const to = toY();
+  // The height is read again at each step: the list may scroll while the row is dragged.
+  let to = toY();
   for (let step = 1; step <= 8; step += 1) {
+    to = toY();
     pointer(app, "pointermove", app.doc, x, y + (to - y) * step / 8);
     await app.sleep(30);
   }
