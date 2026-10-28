@@ -646,6 +646,28 @@ def mix(value):
     return value ^ (value >> 16)
 
 
+def clock_shuffle(key, count, index):
+    """The place of `index` in the permutation of 0 to count - 1 that a key draws, as the
+    core orders the clocks of a break: a balanced Feistel network of four rounds over the
+    fewest even bits that hold `count`, walked again on its own output while that is
+    `count` or more."""
+    if count <= 1:
+        return 0
+    bits = 2
+    while bits < 32 and (1 << bits) < count:
+        bits += 2
+    half = bits // 2
+    mask = (1 << half) - 1
+    value = index
+    while True:
+        left, right = value >> half, value & mask
+        for round_ in range(4):
+            left, right = right, left ^ (mix(key ^ ((round_ * 0x9E3779B9) & 0xFFFFFFFF) ^ right) & mask)
+        value = (left << half) | right
+        if value < count:
+            return value
+
+
 def seed_of(noise, number, start):
     """The seed of the turn of a clock: the noise, the item's id and the turn's start."""
     return mix(noise ^ mix((number ^ start) & 0xFFFFFFFF)) or 1
