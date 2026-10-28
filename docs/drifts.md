@@ -11504,3 +11504,31 @@ The walk-through, which clones the repository, took 1,418 seconds.
 **Resolution.**
 docs/specs/46-p2-every-animation-file-tracked-with-its-preview-and-source/tasks.md, task
 6.
+
+## Seed 52: the clocks placed as the collection says
+
+**Question.** The tasks of seed 52 kept the 112 files outside git, in the share's
+collection `clocks/`, with their sources there too. Then the collection's standard was
+merged with seed 46, `collection/README.md`: an animation the installation is given is
+tracked in `collection/`, at its path on the card, with its GIF and readme beside it. The
+owner asked on 2026-10-28 that seed 52 follow it. Where do the files and their sources go?
+
+**Answer.** The 112 files are in `collection/card/clocks/`, their path on the card
+`clocks/`, none of them heavy: the largest has 471,095 bytes. Each has `X.gif`, written
+by `thumbnail --catalog thumbnails --card collection/card --beside`, so the line of its
+key in `thumbnails/catalog.js` holds `clocks/X` too; and `X.md` of the 16 lines, its
+Platform `unknown`, as none of the platforms the standard lists made it. Their sources,
+the owner's picture, the 100 cut tiles, the inventory, the base pictures and the tools,
+are tracked beside the seed in `project-seeds/52-p2-a-hundred-picture-clocks/source/`,
+with `twelve.json` and `comparison.json`, what the twelve's colours were and how near
+they came to their GIFs: they make the files, and the collection holds animations only.
+On the share, the same files are in the collection's `card/clocks/`, and its earlier
+`clocks/` was moved, not deleted, to artifacts/odrig/archived/collection/clocks/; every
+file was read back. The earlier entries of this seed name `clocks/source/` of the
+collection: that is now the seed's `source/`. With the clocks the card's folder `odrig`
+of the collection holds more than 256 files, the most a card takes today; seed 50 is the
+work that lifts that limit.
+
+**Resolution.** `collection/card/clocks/`; `project-seeds/52-p2-a-hundred-picture-clocks/source/`;
+`thumbnails/catalog.js`; `docs/specs/52-p2-a-hundred-picture-clocks/requirements.md` and
+`design.md`.

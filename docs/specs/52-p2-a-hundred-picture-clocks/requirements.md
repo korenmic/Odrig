@@ -10,8 +10,9 @@ widget payload of [format.md](../../format.md), which carry the tile's picture w
 hands or digits erased, and over which the player draws the hands or the digits of a
 virtual time that runs at a random speed and in a random direction. A tile that shows no
 time becomes frames that move as the tile suggests. The twelve become frames rendered from
-their own scripts. The files, their previews and their sources are kept in the collection
-of seed 46, outside git; only the previews are tracked, in `thumbnails/`.
+their own scripts. The files, their previews and readmes are tracked in the collection,
+`collection/card/clocks/`, as `collection/README.md` says, and their sources beside the
+seed.
 
 The seed has no open questions. The owner approved the two widgets on 2026-10-28 by asking
 for the seed. The choices the seed leaves to the spec are made in
@@ -125,7 +126,7 @@ folder of seed 46, on this computer the share `E:\artifacts\odrig\collection`.
 2. A subcommand of the converter, `clocks`, SHALL read the inventory strictly and write
    one file for each tile: `clock-NNN.odrgx` for a dial or a display and `clock-NNN.odrg`
    for a motion. Nothing else SHALL convert the tiles.
-3. The inventory and the base pictures SHALL be kept with the collection, not in git.
+3. The inventory and the base pictures SHALL be kept beside the seed, in its `source/`.
 
 ## Requirement 8: the hundred
 
@@ -159,14 +160,15 @@ folder of seed 46, on this computer the share `E:\artifacts\odrig\collection`.
 
 ## Requirement 10: where the files go
 
-1. The 112 files SHALL be in the collection's folder `clocks/`, each with its preview
-   `X.gif` and its readme `X.md` in the shape of seed 46, which names its source: the
-   owner's picture and its tile, or its script and its reference GIF.
-2. The previews SHALL be added to `thumbnails/` by `thumbnail --catalog thumbnails`, as
-   seed 44 keeps them, and committed.
+1. The 112 files SHALL be in the collection's `collection/card/clocks/`, their path on the
+   card `clocks/`, each with its preview `X.gif` and its readme `X.md` in the shape of
+   `collection/README.md`, which names its source: the owner's picture and its tile, or
+   its script and its reference GIF; and on the share at the same paths.
+2. The previews SHALL be added to `thumbnails/` by `thumbnail --catalog thumbnails --card
+   collection/card --beside`, as the collection keeps them, and committed with the files.
 3. The owner's picture, the 100 cut tiles, the inventory, the base pictures and the
-   scripts that made the files SHALL be kept in the collection beside the files, as their
-   source. Nothing of the collection SHALL be committed.
+   scripts that made the files SHALL be kept beside the seed, in
+   `project-seeds/52-p2-a-hundred-picture-clocks/source/`, tracked.
 
 ## Requirement 11: the app and the emulator
 

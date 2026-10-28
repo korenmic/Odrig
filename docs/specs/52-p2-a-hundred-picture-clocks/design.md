@@ -16,8 +16,8 @@ Three kinds of work make the 112 files:
 - **The making**: an inventory of the 100 tiles, read by a new subcommand `clocks`; and
   the twelve, rendered from their scripts in a headless Chrome and reduced to 8 colours.
 
-The files, their previews, readmes and sources go into the collection's folder `clocks/`;
-the previews into `thumbnails/`.
+The files, their previews and readmes go into `collection/card/clocks/`, tracked, and
+their sources beside the seed; the previews into `thumbnails/`.
 
 ## What this design relies on
 
@@ -317,9 +317,8 @@ them.
 
 ## The hundred
 
-The tools that prepare the tiles are scripts of their own, kept with the collection in
-`clocks/source/tools/` and run from `scratch/`; they are not part of the repository, as
-the inventory is not.
+The tools that prepare the tiles are scripts of their own, run from `scratch/` and kept
+beside the seed in `source/tools/`, with the inventory.
 
 1. **Prepare.** Each cut tile `scratch/clocks/clock-NNN.png` is scaled to 60 x 60 with
    Pillow's box filter and reduced to at most 8 colours: Pillow's median cut on the
@@ -375,12 +374,14 @@ entry and the readmes.
 
 ## Where the files go
 
-- `E:\artifacts\odrig\collection\clocks\`: the 112 files, `X.gif` the copy of its preview
-  in `thumbnails/`, and `X.md` the readme of seed 46's shape: the title, then the 16 lines,
-  `Source` naming the owner's picture and its tile, or the script and its reference GIF.
-- `clocks/source/`: the owner's picture, `tiles/` with the 100 cut tiles, `inventory.json`,
-  `base/` with each base picture as a PNG, `tools/` with the scripts.
-- `thumbnails/`: `thumbnail --catalog thumbnails` of the 112 files, committed.
+- `collection/card/clocks/`: the 112 files, their path on the card `clocks/`; beside each
+  `X.gif`, written by `thumbnail --catalog thumbnails --card collection/card --beside`,
+  and `X.md` in the shape of `collection/README.md`. Tracked, and the same on the share,
+  in its collection's `card/clocks/`.
+- `project-seeds/52-p2-a-hundred-picture-clocks/source/`: the owner's picture, `tiles/`
+  with the 100 cut tiles, `inventory.json`, `base/` with each base picture as a PNG, and
+  `tools/` with the scripts; tracked.
+- `thumbnails/`: the previews and their lines of `catalog.js`, with their card paths.
 - `build/clocks/contact-sheet.png`: the first picture of each of the 112, for the report.
 
 ## The app and the emulator

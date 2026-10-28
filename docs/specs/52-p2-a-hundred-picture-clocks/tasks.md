@@ -168,7 +168,7 @@ Rules for every task:
     read. Not done by an agent.
   - Requirements: 13.4
 
-- [ ] 14. The clocks placed as the collection says
+- [x] 14. The clocks placed as the collection says
   - The branch brought up to date with `origin/master`, which holds the collection's
     standard, `collection/README.md`.
   - The 112 files in `collection/card/clocks/`, their path on the card being `clocks/`,
