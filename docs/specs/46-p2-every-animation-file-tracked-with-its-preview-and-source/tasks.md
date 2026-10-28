@@ -27,7 +27,7 @@ Rules for every task:
 - The decisions a task takes beyond the seed go into `docs/drifts.md` under "Seed 46" in
   task 5's commit.
 
-- [ ] 1. The local collection archived and the exclude line removed
+- [x] 1. The local collection archived and the exclude line removed
   - Set the seed's `state.json` to `in_progress`.
   - Move `/Users/koren/src/odrig/collection` whole to
     `/Users/koren/src/odrig/scratch/collection-built-2026-10-27/`; count its 1,078 files.
