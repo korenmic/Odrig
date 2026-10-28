@@ -10758,3 +10758,80 @@ in the commit that records it; a file whose key the folder holds only adds its n
 
 **Resolution.** `thumbnails/`; agent/animation-guide.md, agent/vocabulary.md,
 docs/decisions.md; converter/tests/thumbnails.test.js.
+
+## Seed 52: the bytes of a picture clock
+
+**Question.** Seed 52 asks for two widgets that carry their base picture, "compressed as the
+format compresses a picture", with their geometry, and leaves the bytes to the spec. How
+are they laid out, how large may a widget's payload be, and how is a widget of 20 bytes
+told from one with a picture?
+
+**Answer.** The widget's first byte tells it: 1 to 3 keep their 20 bytes, 4
+`picture-dial` and 5 `picture-display` have a head of 12 bytes, their parts (hands of 10
+bytes and caps of 6, or fields of 22) and then the picture, an ODRG file of one frame and
+a palette of 1 to 8 colours, to the end of the payload. The ODRG file is how the format
+compresses a picture, and the core already decodes it. A widget's payload may have 32,768
+bytes, more than the largest picture needs. So the widget's byte is read before the
+payload's length is compared: a file of widget 1 with a length of 21 is still refused with
+`payload-size`, and the vector `unknown-widget.four` is now `unknown-widget.six`. A
+picture whose frames or palette are not those of a picture clock is refused with a new
+reason, `bad-picture`. A hand has a tail behind its pivot and an offset of whole hours, and
+a cap is a disc of a colour over the hands, so that a tile's pivot cap or a second clock
+of another time zone can be drawn; a field shows a pattern of the hour, the minutes and
+the seconds, and a display has up to 4 fields, for tiles whose time is in several boxes.
+`check` prints a picture clock's `direction` and the size of its `palette`.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `docs/reasons.md`;
+`converter/lib/odrgx.js`; `docs/converter.md`.
+
+## Seed 52: the direction and the slowest points
+
+**Question.** A picture clock runs forward, backward, or in a way chosen by the seed of its
+turn, which "may also turn at the swing's slowest point, at a chance the seed fixes". What
+does the seed draw, where are the slowest points, and how is the time found so that a time
+of the turn has one picture however the refreshes come?
+
+**Answer.** The seed draws the eleven values of the other clocks, in their order, and then
+`back`, r % 2, and `chance`, r % (turns + 1). The swing's speed is least where the angle of
+its cosine is three quarters of a turn, once in each period P, the first at
+`t0 = floor(P * ((3 * 2^24 - Φ) mod 2^26) / 2^26)`. Whether the way turns at the k-th
+slowest point is `mix(seed ^ k) % 100 < chance`, a fact of the seed and k alone, and the
+time is the sum of the ways over the whole periods before it, each b * P long, so it needs
+no state. At a slowest point itself the time is the turn's point: the step that ends there
+still goes the earlier way.
+
+**Resolution.** `docs/format.md`, "Picture clocks"; `converter/lib/draw.js`,
+`pictureTime`.
+
+## Seed 52: the font of small displays
+
+**Question.** Many tiles show their time in a display a few pixels high once the tile is
+60 x 60: the small font, 7 rows, does not fit them. Which font do they use?
+
+**Answer.** A fourth font, `tiny`: the ten digits, the colon and the space, 3 by 5, in
+`fonts/tiny.txt`, generated with the others into the tables of the core and the
+converter. A font file may now name its repertoire, `digits`; the fonts of texts keep the
+whole one. A text cannot name it: the texts' fonts stay 1 to 3, and a text of font 4 is
+refused with `unknown-font` as before.
+
+**Resolution.** `fonts/tiny.txt`, `fonts/generate.mjs`, `core/src/font_tables.cpp`,
+`converter/lib/fonttables.js`; `docs/format.md`.
+
+## Seed 52: the vectors of picture clocks, and which task holds them
+
+**Question.** The tasks of seed 52 put the vectors of picture clocks with the core, task 2.
+But the converter's suite checks that the invalid vectors of widgets have every reason of
+"Widgets in ODRGX", the Python library's that every listed reason is one of its own, and
+the core's that it has every reason of a widget: once task 1 lists `bad-picture`, those
+suites need its vector and its name. Where do the vectors go, and how is each commit whole?
+
+**Answer.** The vectors of picture clocks are a folder of their own,
+`tests/vectors/pictures/`, with its builder, valid clocks with their sources and an
+invalid vector for each refusal; they come with task 1, which the converter's suite reads.
+The name `bad-picture` comes with task 1 in the converter, the Python library and the
+core's list of reasons; the core produces it, and its suite reads the folder, with task 2.
+The folder of the clocks of 20 bytes keeps its vectors.
+
+**Resolution.** `tests/vectors/pictures/build.mjs`; `converter/tests/picture.test.js`,
+`converter/tests/clock.test.js`; `odrig/errors.py`; `core/src/reasons.h`,
+`core/src/reasons.cpp`.

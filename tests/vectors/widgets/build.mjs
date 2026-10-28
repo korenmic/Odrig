@@ -54,7 +54,7 @@ export function vectors() {
   made.set("invalid/payload-size.short.odrgx", changed(good, 16, ...u32(19)));
   made.set("invalid/truncated.odrgx", good.subarray(0, p + 12));
   made.set("invalid/unknown-widget.zero.odrgx", changed(good, p, 0));
-  made.set("invalid/unknown-widget.four.odrgx", changed(good, p, 4));
+  made.set("invalid/unknown-widget.six.odrgx", changed(good, p, 6));
   made.set("invalid/bad-settings.reserved.odrgx", changed(good, p + 1, 1));
   made.set("invalid/bad-settings.seconds.odrgx", changed(good, p + 2, ...u16(0)));
   made.set("invalid/bad-settings.long.odrgx", changed(good, p + 2, ...u16(3601)));

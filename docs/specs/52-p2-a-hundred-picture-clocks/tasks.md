@@ -33,7 +33,7 @@ Rules for every task:
 - Every task that changes a page runs the onboarding suite; the decisions a task takes go
   into `docs/drifts.md` under "Seed 52" in its commit.
 
-- [ ] 1. The picture widgets in the converter
+- [x] 1. The picture widgets in the converter
   - Set the seed's `state.json` to `in_progress`.
   - `fonts/tiny.txt`, `fonts/generate.mjs` with a repertoire for each font,
     `core/src/font_tables.cpp`, `converter/lib/fonttables.js`.

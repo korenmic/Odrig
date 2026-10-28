@@ -234,7 +234,9 @@ characters are checked, it is laid out and its pass is measured as
 with `unsupported-character`, naming it and its code point, and a block that cannot be seen
 whole with `does-not-fit`, naming the effects that show it. The JSON source of a clock is
 written as an ODRGX container of a widget in the same way: [format.md](format.md), "The
-widget payload".
+widget payload". So is the source of a picture clock, a picture dial or a picture display:
+its picture becomes an ODRG file of one frame with the palette in the source's order,
+compressed, at the end of the payload ([format.md](format.md), "Picture clocks").
 
 ## decode
 
@@ -254,7 +256,7 @@ node converter/odrig.js decode build/hello.odrg build/hello-again.json
 An ODRGX container of frames is read as well: the file's first four bytes tell which it
 is, whatever its name. A container of a text or a clock is written back as its JSON
 source, in the layout `dumpsText` and `dumpsWidget` write: two spaces of indent and one
-member on a line. A file that breaks its format is rejected with one of the reasons
+member on a line; a picture clock's picture is one row of the picture on a line. A file that breaks its format is rejected with one of the reasons
 under "ODRG files" or "ODRGX files" in [reasons.md](reasons.md), and no output is written.
 
 A source in which no two frames that follow each other have the same pixels comes back from
@@ -304,7 +306,8 @@ compressed: yes
 For a container of a text the lines are `format`, `type`, `canvas`, then `loop_ms`, its
 pass in milliseconds, `font`, `effect` with its motion, `block`, the size of its layout,
 `glyphs`, `text_bytes` and `file_bytes`. For a clock they are `format`, `type`, `canvas`,
-`loop_ms`, `widget`, `speed`, the least and the greatest, and `file_bytes`.
+`loop_ms`, `widget`, `speed`, the least and the greatest, and `file_bytes`; for a picture
+clock `direction` and `palette`, the number of its colours, come before `file_bytes`.
 
 An invalid file is rejected with its reason and nothing is printed to standard output.
 
@@ -421,10 +424,10 @@ a web page load the same files.
 | `inflate.js` | The DEFLATE decoder. |
 | `deflate.js` | The DEFLATE compressor. |
 | `odrg.js` | ODRG files: `header`, `reader`, which reads the frame records one at a time and sums their durations, `decode` and `encode`. |
-| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; and `pictureAt`, the picture of a text or a clock at a time. |
+| `odrgx.js` | ODRGX containers: `isContainer`, `readHeader`, `decode`, `framesReader`, `decodeFrames`, `encodeFrames` and `wrap`; texts: `loadsSource`, `encodeText`, `decodeText`, `textOf` and `dumpsText`; clocks: `encodeWidget`, `decodeWidget`, `widgetOf` and `dumpsWidget`; picture clocks: `loadsPicture`, `loadsPictureSettings`, `pictureRows` and `pictureFile`; and `pictureAt`, the picture of a text or a clock at a time. |
 | `bidi.js` | The Unicode Bidirectional Algorithm for the characters of a text: `paragraphLevel`, `levels` and `visualOrder`. |
 | `textlayout.js` | The layout of a text: `checkCharacters`, `visualLines` and `layout`, with the fonts by name. |
-| `draw.js` | What the player draws: the pass of a text and the place of its block at a time, `passMs` and `placeAt`, and its picture, `drawText`; a clock's seed, `mix`, `stir` and `seedOf`, what the seed chooses, `clockOf`, its virtual time, `virtualTime`, and its picture, `drawClock`. |
+| `draw.js` | What the player draws: the pass of a text and the place of its block at a time, `passMs` and `placeAt`, and its picture, `drawText`; a clock's seed, `mix`, `stir` and `seedOf`, what the seed chooses, `clockOf`, its virtual time, `virtualTime`, and its picture, `drawClock`; a picture clock's time with its direction, `pictureTime`, the text of a field's pattern, `patternText`, and the layer of its hands or its digits, `overlayOf`. |
 | `mapping.js` | Mapping files: `loads`. |
 | `show.js` | Show files: `loads`. |
 | `pack.js` | The installed file set of a show from the bytes of its files: `pack`. |

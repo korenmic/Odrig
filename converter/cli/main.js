@@ -183,8 +183,11 @@ function widgetSummary(decoded, data) {
     `loop_ms: ${decoded.header.loopMs}`,
     `widget: ${decoded.settings.widget}`,
     `speed: ${decoded.settings.speedMin} to ${decoded.settings.speedMax}`,
-    `file_bytes: ${data.length}`,
   ];
+  if ("palette" in decoded.settings) {
+    lines.push(`direction: ${decoded.settings.direction}`, `palette: ${decoded.settings.palette.length}`);
+  }
+  lines.push(`file_bytes: ${data.length}`);
   return `${lines.join("\n")}\n`;
 }
 
