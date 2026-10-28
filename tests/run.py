@@ -539,7 +539,10 @@ class Runner:
         self.say(f"{'FAILED' if self.failed else 'OK'}: wall time {wall:.0f} s ({wall / 60:.1f} min)")
 
 
-def main(argv=None, root=ROOT, suites=SUITES, out=sys.stdout):
+def main(argv=None, root=ROOT, suites=SUITES, out=None):
+    if out is None:
+        out = sys.stdout
+        out.reconfigure(encoding="utf-8")
     arguments = parser().parse_args(argv)
     if arguments.workers < 1:
         raise SystemExit("error: --workers takes 1 or more")
