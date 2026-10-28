@@ -10,3 +10,5 @@ __pycache__/
 /converter/node_modules/
 /app/node_modules/
 /env
+/collection/long/**/*.odrg
+/collection/long/**/*.odrgx

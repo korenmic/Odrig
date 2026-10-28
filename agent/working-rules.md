@@ -124,7 +124,7 @@ the board. The figures are in [firmware.md](../docs/firmware.md#verified-on-the-
 
 ## Several contributors at once
 
-The repository has a remote, `https://github.com/korenmic/Odrig`, which is private. Each
+The repository has a remote, `https://github.com/korenmic/Odrig`, which is public. Each
 contributor works in a clone of their own, and the work meets on `master` of the remote.
 
 1. **Clone, and make a branch of your own**:
@@ -166,6 +166,14 @@ names that commit and the branch to run the emulator from; and a coding agent wo
 worktree of its own, `git worktree add`, never by `git switch` in the owner's checkout:
 on 2026-10-24 a run that switched it left it on a worker branch, and the emulator started
 there showed an app many seeds behind the phone's.
+
+**Where the animations are kept.** Every animation the installation is given is in the
+collection: the small ones tracked in `collection/`, the heavy ones on the share, whose
+collection holds every file. Its full path on a computer is `ODRIG_ANIMATIONS` in `env` at
+the root of the checkout, a copy of `env.template` that git ignores; from a worktree two
+folders down it is `../../env` of the first computer's checkout, else `env.template`. A
+coding agent takes the path from there to copy to the share, to read it back, and in a
+one-line command for the emulator that it gives the owner; it never types it from memory.
 
 ## The owner's workflow skills
 

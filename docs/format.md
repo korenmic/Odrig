@@ -4,7 +4,7 @@ An animation exists in these formats:
 
 | Format | File | Role |
 |---|---|---|
-| JSON frames | `name.json` | The tracked source of the animation. Lossless and readable. Never played by the board. |
+| JSON frames | `name.json` | The tracked source of an animation of the bench or of a test. Lossless and readable. Never played by the board. |
 | ODRG | `name.odrg` | The runtime format, produced from the JSON source by the converter. This is what the player reads, on the board and in the emulator. |
 | ODRGX | `name.odrgx` | The container of the runtime: a header that names what its payload is, and the payload. A payload of frames is an ODRG file as it is. |
 
@@ -339,8 +339,8 @@ A UTF-8 JSON object, read as strictly as JSON frames, with exactly the members `
 frames), `align` (`"left"`, `"center"` or `"right"`), `valign` (`"top"`, `"middle"` or
 `"bottom"`), `direction` (`"auto"`, `"ltr"` or `"rtl"`), `wrap` (`true` or `false`),
 `effect`, `motion`, `speed` (1 to 240) and `pause_ms` (0 to 65,535, at least 20 for
-`static`). It is the tracked source of a text, as JSON frames are of frames; the converter
-writes it with two spaces of indent.
+`static`). It is the tracked source of a text of the bench or of a test, as JSON frames
+are of frames; the converter writes it with two spaces of indent.
 
 ```json
 {

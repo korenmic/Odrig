@@ -1,7 +1,8 @@
 {
   "number": 46,
   "slug": "46-p2-every-animation-file-tracked-with-its-preview-and-source",
-  "state": "remaining",
+  "state": "completed",
+  "completedAt": "2026-10-28T15:08:55+02:00",
   "title": "Every animation tracked with its preview and its source, the heavy ones on the share",
   "priority": "P2",
   "addedAt": "2026-10-27T18:00:00+02:00",
