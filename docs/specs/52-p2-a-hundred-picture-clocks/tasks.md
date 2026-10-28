@@ -150,7 +150,7 @@ Rules for every task:
   - Suites: the converter's, the onboarding suite.
   - Requirements: 9.1 to 9.6, 10.1, 10.2
 
-- [ ] 11. The twelve: the standalone six
+- [x] 11. The twelve: the standalone six
   - As task 10, from `references/standalone/standalone-script.js`.
   - Suites: the converter's, the onboarding suite.
   - Requirements: 9.1 to 9.6, 10.1, 10.2

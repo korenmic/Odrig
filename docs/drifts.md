@@ -11423,3 +11423,19 @@ script's time exactly. Every row is compared over the GIF's 144 seconds of its 7
 
 **Resolution.** The collection's `clocks/time-original-*.odrg` with their readmes;
 `clocks/source/tools/render12.mjs`, `make12.mjs` and `compare12.mjs`.
+
+## Seed 52: the standalone six of the twelve
+
+**Question.** The same for the standalone six, whose script names many colours.
+
+**Answer.** `TimeAnimations.draw(ctx, scene, seconds)` of
+`references/standalone/standalone-script.js` draws a scene at a time on a canvas of the
+page's own; its frames are taken at 0, 50, 100 ms and so on for 18 seconds. Of the colours
+the script names, the seven a scene uses most, by the same count, follow black: 8 colours
+each. Every file is below 26 KB at 50 ms. Compared with the GIFs the page held, at their
+times, mapped to the same colours, they differ in 24 to 73 pixels of 3,600 on average, at
+most 45 to 109: the page made its GIFs another way, and the colours of a soft edge fall to
+one side or the other of a nearest colour.
+
+**Resolution.** The collection's `clocks/time-standalone-*.odrg` with their readmes; the
+same tools.
