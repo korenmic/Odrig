@@ -193,7 +193,7 @@ test("the tool is the library and a command line part that is built on it", asyn
     }
   });
 
-  await t.test("what is tracked of the tool is its sources, and the only media files are the default catalog's previews and GIFs beside a seed", (inner) => {
+  await t.test("what is tracked of the tool is its sources, and the only media files are the default catalog's previews, GIFs beside a seed and the collection's previews", (inner) => {
     const listed = spawnSync("git", ["ls-files", "-z"], {cwd: ROOT, encoding: "utf8"});
     if (listed.status !== 0) {
       inner.skip("git does not list the files of this folder");
@@ -205,7 +205,8 @@ test("the tool is the library and a command line part that is built on it", asyn
     const known = /^converter\/(package\.json|package-lock\.json|ffmpeg\.sha256|odrig\.js|(cli|lib|tests)\/[a-z]+\.js|tests\/[a-z]+\.test\.js|tests\/page\/(index\.html|page\.js)|tests\/expected\/[a-z_]+\.json(\.gz)?|tests\/expected\/files\/[0-9a-f]{64}\.gz)$/;
     assert.deepEqual(ours.filter((name) => !known.test(name)), []);
     const media = tracked.filter((name) => /\.(mp4|mov|gif)$/i.test(name));
-    assert.deepEqual(media.filter((name) => !/^thumbnails\/[0-9a-f]{8}-[1-9][0-9]*\.gif$/.test(name) && !/^project-seeds\/[0-9]{2}-[a-z0-9-]+\/.+\.gif$/i.test(name)), []);
+    const allowed = [/^thumbnails\/[0-9a-f]{8}-[1-9][0-9]*\.gif$/, /^project-seeds\/[0-9]{2}-[a-z0-9-]+\/.+\.gif$/i, /^collection\/(card|earlier|others|long)\/.+\.gif$/];
+    assert.deepEqual(media.filter((name) => !allowed.some((pattern) => pattern.test(name))), []);
   });
 });
 

@@ -146,7 +146,7 @@ class TheChecks(unittest.TestCase):
             self.assertTrue(support.is_path(word) and not support.exists(word), word)
         for word in ("status", ".odrg", "(x, y)", "127.0.0.1:8600", "--mapping", "/odrig", "<id>"):
             self.assertFalse(support.is_path(word), word)
-        for word in ("build/demo-20/show", ".venv/bin/python", "converter/node_modules/", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json", "origin/master"):
+        for word in ("build/demo-20/show", ".venv/bin/python", "converter/node_modules/", "esp32-backup/", "firmware/wled-16.0.1/", "mapping.json", "origin/master", "env", "../../env"):
             self.assertFalse(support.looked_for(word), word)
 
     def test_a_seed_that_is_named_ahead_of_this_branch_is_on_master(self):

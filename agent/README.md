@@ -11,8 +11,8 @@ ESP32-S3, drives a canvas of 60 x 60 LEDs and plays animations that are stored o
 repository holds everything between a video or an idea and what the LEDs show:
 
 - the **converter**, `converter/`: JavaScript, run with Node.js. It turns a video or a GIF
-  into a source that git tracks, a source into the file that is played, and a list of
-  animations into a show;
+  into a source that git tracks for the bench or a test, a source into the file that is
+  played, and a list of animations into a show;
 - the **Python library**, `odrig/`: Python. It reads and writes the project's files for the
   tests and the tools, and holds the generators, the programs that write animations. It was
   the converter before, and converts nothing any more;

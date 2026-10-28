@@ -351,7 +351,7 @@ folder around it are left as they were.
 ## thumbnail
 
 ```
-node converter/odrig.js thumbnail FILE... (--catalog DIR [--card ODRIG] | --out OUT.gif)
+node converter/odrig.js thumbnail FILE... (--catalog DIR [--card ODRIG] [--beside] | --out OUT.gif)
 ```
 
 Makes the preview of an ODRG file or an ODRGX container: a GIF of the animation's own
@@ -404,6 +404,21 @@ subcommand only:
 
 ```
 node converter/odrig.js thumbnail test-animations/*.odrg --catalog thumbnails
+```
+
+With `--beside`, which goes with `--catalog` only, each file that was not passed over also
+gets its preview beside it, once the mapping is written, in the order the files are given:
+`X.gif` in the file's folder, a copy of the catalog's `<key>.gif`, in place of a file of
+that name. `X` is the file's name without its ending when that ending is `.odrg` or
+`.odrgx`, in any case; a file with neither ending gets its whole name and `.gif`. A file
+passed over gets no GIF, and a GIF already beside it stays; of two files of one folder
+that differ only in their ending, the last one given writes the GIF. A GIF that cannot be
+written ends the run with `cannot-write` and status 1, the mapping and the GIFs before it
+written. `--beside` with `--out` is a mistake of the command line, status 2. An animation
+the installation is given gets its two previews so:
+
+```
+node converter/odrig.js thumbnail collection/card/gifs/NAME.odrg --catalog thumbnails --card collection/card --beside
 ```
 
 ## clocks

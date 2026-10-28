@@ -36,6 +36,9 @@ FIRST_COMPUTER_ONLY = ("esp32-backup/", "firmware/wled-16.0.1/")
 INSTALLED_NAMES = ("mapping.json",)
 # What a page gives as something for the reader to make.
 TO_BE_MADE = ("odrig/generators/dot.py",)
+# Files a page names that no clone holds: the untracked file of the computer that names where
+# the animations are kept, as a checkout and a worktree two folders down read it.
+UNTRACKED_FILES = ("env", "../../env")
 # A seed that the pages name and that a branch holds once it is up to date with `master`.
 SEEDS_ON_MASTER = ("project-seeds/11-p0-emulator-and-tools-on-windows/",)
 # How a page names a branch of the remote.
@@ -146,7 +149,7 @@ def is_path(word):
 def looked_for(word):
     """Whether a path must exist in a clone: not one that is made on the computer."""
     apart = MADE_ON_THE_COMPUTER + FETCHED_OR_TRIED + FIRST_COMPUTER_ONLY + (REMOTE_BRANCHES,)
-    return not word.startswith(apart) and word not in INSTALLED_NAMES + TO_BE_MADE + SEEDS_ON_MASTER
+    return not word.startswith(apart) and word not in INSTALLED_NAMES + TO_BE_MADE + SEEDS_ON_MASTER + UNTRACKED_FILES
 
 
 def on_master(word):

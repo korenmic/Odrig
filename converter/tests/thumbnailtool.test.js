@@ -137,7 +137,8 @@ test("a catalog.js of another shape is a fault of the folder: status 70", (t) =>
 
 test("the command line wants one of the two forms", () => {
   for (const argv of [["thumbnail", LINES], ["thumbnail", LINES, "--out", "a.gif", "--catalog", "x"], ["thumbnail", LINES, RAINBOW, "--out", "a.gif"],
-    ["thumbnail", LINES, "--out", "a.gif", "--card", "x"], ["thumbnail", "--catalog", "x"], ["thumbnail", LINES, "--catalog"], ["thumbnail", LINES, "--bogus", "--catalog", "x"]]) {
+    ["thumbnail", LINES, "--out", "a.gif", "--card", "x"], ["thumbnail", "--catalog", "x"], ["thumbnail", LINES, "--catalog"], ["thumbnail", LINES, "--bogus", "--catalog", "x"],
+    ["thumbnail", LINES, "--out", "a.gif", "--beside"], ["thumbnail", LINES, "--beside"]]) {
     const done = runJs(argv);
     assert.equal(done.status, 2, argv.join(" "));
     assert.equal(done.out, "");
@@ -152,4 +153,59 @@ test("an option given twice takes its last value", (t) => {
   assert.equal(runJs(["thumbnail", LINES, "--catalog", first, "--catalog", second]).status, 0);
   assert.equal(fs.existsSync(first), false);
   assert.ok(fs.existsSync(path.join(second, "catalog.js")));
+});
+
+test("--beside writes each file's preview beside it, from the catalog, once the mapping is written", (t) => {
+  const work = temporary(t);
+  const folder = path.join(work, "thumbnails");
+  assert.equal(runJs(["thumbnail", LINES, "--catalog", folder]).status, 0);
+  const held = copy(LINES, path.join(work, "card", "held.odrg"));
+  const fresh = copy(RAINBOW, path.join(work, "card", "night", "fresh.odrg"));
+  const upper = copy(RAINBOW, path.join(work, "loud.ODRG"));
+  const plain = copy(LINES, path.join(work, "plain"));
+  fs.writeFileSync(path.join(work, "card", "held.gif"), "older");
+  const done = runJs(["thumbnail", held, fresh, upper, plain, "--catalog", folder, "--beside"]);
+  assert.deepEqual(done, {status: 0, out: "", err: ""});
+  const lines = bytes(path.join(folder, `${keyOf(LINES)}.gif`));
+  const rainbow = bytes(path.join(folder, `${keyOf(RAINBOW)}.gif`));
+  assert.deepEqual(bytes(path.join(work, "card", "held.gif")), lines, "an older GIF is replaced");
+  assert.deepEqual(bytes(path.join(work, "card", "night", "fresh.gif")), rainbow, "a new key");
+  assert.deepEqual(bytes(path.join(work, "loud.gif")), rainbow, "an ending in capitals");
+  assert.deepEqual(bytes(path.join(work, "plain.gif")), lines, "a name with neither ending");
+  assert.deepEqual(rainbow, thumbnail.make(bytes(RAINBOW)));
+});
+
+test("--beside writes no GIF for a file passed over and leaves an older one, and the last of two names writes a shared GIF", (t) => {
+  const work = temporary(t);
+  const folder = path.join(work, "thumbnails");
+  const broken = copy(BROKEN, path.join(work, "broken.odrg"));
+  fs.writeFileSync(path.join(work, "broken.gif"), "older");
+  const first = copy(LINES, path.join(work, "pair.odrg"));
+  const second = copy(RAINBOW, path.join(work, "pair.odrgx"));
+  const done = runJs(["thumbnail", broken, first, second, "--catalog", folder, "--beside"]);
+  assert.equal(done.status, 0);
+  assert.equal(done.out, "");
+  assert.match(done.err, /^passed over: .*broken\.odrg: bad-magic: /);
+  assert.equal(fs.readFileSync(path.join(work, "broken.gif"), "utf8"), "older");
+  assert.deepEqual(bytes(path.join(work, "pair.gif")), bytes(path.join(folder, `${keyOf(RAINBOW)}.gif`)));
+});
+
+test("--beside that cannot write a GIF ends with cannot-write and 1, the mapping and the GIFs before it written", (t) => {
+  const work = temporary(t);
+  const folder = path.join(work, "thumbnails");
+  const first = copy(LINES, path.join(work, "first.odrg"));
+  const blocked = copy(RAINBOW, path.join(work, "blocked.odrg"));
+  fs.mkdirSync(path.join(work, "blocked.gif"));
+  const done = runJs(["thumbnail", first, blocked, "--catalog", folder, "--beside"]);
+  assert.equal(done.status, 1);
+  assert.equal(done.out, "");
+  assert.match(done.err, /^error: cannot-write: .*blocked\.gif/);
+  assert.ok(fs.readFileSync(path.join(folder, "catalog.js"), "utf8").includes(`"${keyOf(RAINBOW)}"`));
+  assert.deepEqual(bytes(path.join(work, "first.gif")), bytes(path.join(folder, `${keyOf(LINES)}.gif`)));
+});
+
+test("--beside goes with --catalog only", () => {
+  const done = runJs(["thumbnail", LINES, "--out", "a.gif", "--beside"]);
+  assert.equal(done.status, 2);
+  assert.match(done.err, /--beside goes with --catalog/);
 });
